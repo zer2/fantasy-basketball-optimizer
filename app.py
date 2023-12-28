@@ -1,4 +1,6 @@
 import streamlit as st
+st.set_page_config(layout="wide")
+
 import pandas as pd
 from process_player_data import process_player_data
 from run_algorithm import run_algorithm
