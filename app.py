@@ -16,7 +16,7 @@ def color(pos):
     return f'background-color: {color}'
 
 df = pd.read_csv('./predictions.csv').set_index('player')
-df = df.style.applymap(color, subset=['pos'])
+df = df.style.applymap(color, subset=pd.IndexSlice[:, ['pos']])
 
 edited_df = st.data_editor(df) # 👈 An editable dataframe
 
