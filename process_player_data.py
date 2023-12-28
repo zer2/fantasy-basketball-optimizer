@@ -37,7 +37,7 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
-def process_player_data(player_stats, coefficients, psi, n_drafters, n_picks):
+def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks):
 
   n_players = n_drafters * n_picks
 
@@ -48,7 +48,7 @@ def process_player_data(player_stats, coefficients, psi, n_drafters, n_picks):
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
   x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 0,1)
 
-  positions = player_stats[['Positions']]
+  positions = player_stats[['Position']]
 
   score_table = x_scores.groupby([np.floor(x/12) for x in range(len(x_scores))]).agg(['mean','var'])
   diff_var = 26 + x_scores[0:n_players].var() * 13
@@ -66,7 +66,7 @@ def process_player_data(player_stats, coefficients, psi, n_drafters, n_picks):
   joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'pos', suffixes = ['_x',''])
 
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
-  x_scores_as_diff = (x_scores - 10/13 * x_category_scores)[x_scores.columns]
+  x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
   
   #get weights of X to G 
