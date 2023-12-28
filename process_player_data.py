@@ -1,4 +1,4 @@
 #1: based on player stats: calculate coefficients and score tables and such
 
-def code():
-  return 'Code ran'
+def process_player_data():
+  return 'Process player data'
