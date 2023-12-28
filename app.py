@@ -26,7 +26,18 @@ with tab1:
   edited_df = st.data_editor(df) # 👈 An editable dataframe
 
 with tab2: 
-             
+
+  st.header('General options')
+  
+  format = st.selectbox(
+    'Which format are you playing?',
+    ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories'))
+
+  if format == 'Rotisserie':
+    st.write('Note that only Z-scores are available for Rotisserie. No advanced algorithms for Rotisserie have been implemented')
+
+  st.header('Algorithm parameters')
+
   omega = st.number_input(r'$\omega$', value = 1.5)
   omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
                   it quantifies how much better the optimal player choice will be compared to the player that would be 
@@ -49,12 +60,7 @@ with tab2:
 
   st.write(psi_str)
 
-  format = st.selectbox(
-    'Which format are you playing?',
-    ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories'))
 
-  if format == 'Rotisserie':
-    st.write('Note that only Z-scores are available for Rotisserie. No advanced algorithms for Rotisserie have been implemented')
 
 with tab3:
   st.markdown(process_player_data())
