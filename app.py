@@ -5,8 +5,6 @@ from run_algorithm import run_algorithm
 
 tab1, tab2, tab3 = st.tabs(["Player Stats", "Parameters", "Draft"])
 
-st.markdown(f"Weekly player projections below: feel free to edit")
-
 color_map = {'C' : 'yellow'
              ,'PF' : 'green'
              ,'SF' : 'green'
@@ -23,6 +21,8 @@ df[r'No Play %'] = df[r'No Play %'] * 100
 df = df.round(1)
 
 with tab1:
+  st.markdown(f"Weekly player projections below: feel free to edit")
+
   edited_df = st.data_editor(df) # 👈 An editable dataframe
 
 with tab2: 
