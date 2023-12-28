@@ -76,4 +76,4 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
   
   L = np.array(x_scores_as_diff.cov()) 
   
-  return g_scores, z_scores, x_scores, positions, v, L
+  return player_stats, z_scores, x_scores, positions, v, L
