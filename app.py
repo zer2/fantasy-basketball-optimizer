@@ -40,7 +40,7 @@ with tab2:
 
   st.subheader('Algorithm parameters')
 
-  psi = st.number_input(r'$\psi$'
+  psi = st.number_input(r'Select a $\psi$ value'
                         , min_value = 0.0
                         , value = 0.85
                        , max_value = 1.0)
@@ -50,13 +50,13 @@ with tab2:
 
   st.caption(psi_str)
 
-  omega = st.number_input(r'$\omega$', value = 1.5)
+  omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
   omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
                   it quantifies how much better the optimal player choice will be compared to the player that would be 
                   chosen with baseline weights'''
   st.caption(omega_str)
 
-  gamma = st.number_input(r'$\gamma$ value', value = 0.1)
+  gamma = st.number_input(r'Select a $\gamma$ value', value = 0.1)
   gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
           tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
            players that  work best for its strategy'''
