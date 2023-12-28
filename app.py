@@ -109,7 +109,11 @@ with tab3:
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
   selections_editable = st.data_editor(selections)
 
-  g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(selections_editable)])
+  def listify(x):
+    x = x.values.tolist()
+    return [item for row in x for item in row]
+
+  g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
 
 #below: use this for the color of results
 #def color(pos):
