@@ -37,6 +37,7 @@ def process_player_data(edited_df):
 
   adjusted_df = edited_df.copy()
   adjusted_df[counting_statistics + volume_statistics] = adjusted_df[counting_statistics + volume_statistics] * ( 1- adjusted_df['No Play %'] * psi) 
+  adjusted_df[percentage_statistics] = adjusted_df[percentage_statistics]/100 #adjust from the display
 
   (adjusted_df[['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']] - means_of_means[counting_statistics]
 
