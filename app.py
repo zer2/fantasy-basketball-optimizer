@@ -27,7 +27,7 @@ coefficient_df = pd.read_csv('./coefficients.csv')
 with tab1:
   st.markdown(f"Weekly player projections below: feel free to edit")
 
-  edited_df = st.data_editor(df) # 👈 An editable dataframe
+  player_stats = st.data_editor(df) # 👈 An editable dataframe
 
 with tab2: 
   c1, c2, c3 = st.columns(3)
