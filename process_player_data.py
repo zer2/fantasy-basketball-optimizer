@@ -70,7 +70,7 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
   x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
   
   #get weights of X to G 
-  v = np.sqrt(coefficients.loc[counting_statistics + percentage_statistics , 'Means of Variance']/(coefficients.loc[counting_statistics + percentage_statistics , 'Means of Variance'] + \
+  v = np.sqrt(coefficients.loc[counting_statistics + percentage_statistics , 'Mean of Variances']/(coefficients.loc[counting_statistics + percentage_statistics , 'Mean of Variances'] + \
                                                                                                    coefficients.loc[counting_statistics + percentage_statistics , 'Variance of Means']))
   v = np.array(v/v.sum()).reshape(9,1)
   
