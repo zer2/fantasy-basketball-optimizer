@@ -1,5 +1,7 @@
 #1: based on player stats: calculate coefficients and score tables and such
 
+import pandas as pd
+
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
