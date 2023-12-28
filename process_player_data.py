@@ -63,7 +63,7 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
 
   players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
 
-  joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'pos', suffixes = ['_x',''])
+  joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
 
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
