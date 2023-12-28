@@ -11,7 +11,11 @@ color_map = {'C' : 'yellow'
              ,'SG' : 'red'
              ,'PG' : 'red'}
 
-df = pd.read_csv('./predictions.csv').set_index('Player').round(2)
+df = pd.read_csv('./predictions.csv').set_index('Player')
+
+df['Free Throw %'] = df['Free Throw %'] * 100
+df['Field Goal %'] = df['Field Goal %'] * 100
+df = df.round(1)
 
 edited_df = st.data_editor(df) # 👈 An editable dataframe
 
