@@ -56,6 +56,8 @@ with tab2:
       st.caption(psi_str)
     
       coefficients = st.data_editor(coefficient_df)
+
+      st.caption('Coefficients for scoring purposes. Probably best not to mess with these')
   
   with c3:
     st.subheader('Algorithm parameters')
