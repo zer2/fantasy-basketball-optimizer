@@ -22,7 +22,7 @@ df[r'No Play %'] = df[r'No Play %'] * 100
 
 df = df.round(1)
 
-coefficient_df = pd.read_csv('./coefficients.csv')
+coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 with tab1:
   st.markdown(f"Weekly player projections below: feel free to edit")
