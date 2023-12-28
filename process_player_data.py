@@ -10,9 +10,9 @@ def calculate_scores_from_coefficients(player_stats
                                        ,beta_weight = 1):
     """Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau"""
         
-    main_cat_mean_of_means = coefficients.loc['Mean of Means',counting_statistics]
-    main_cat_var_of_means = coefficients.loc['Variance of Means',counting_statistics]
-    main_cat_mean_of_vars = coefficients.loc['Mean of Variances',counting_statistics]
+    main_cat_mean_of_means = coefficients.loc[counting_statistics,'Mean of Means']
+    main_cat_var_of_means = coefficients.loc[counting_statistics,'Variance of Means']
+    main_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
 
     main_cat_denominator = (main_cat_var_of_means.values*alpha_weight + main_cat_mean_of_vars.values*beta_weight ) ** 0.5
     numerator = player_stats.loc[:,main_categories] - main_cat_mean_of_means
@@ -21,12 +21,12 @@ def calculate_scores_from_coefficients(player_stats
 
     #free throws 
     ftp_denominator = (coefficients.loc['Variance of Means','Free Throw %']*alpha_weight + coefficients.loc['Mean of Variances','Free Throw %']*beta_weight)**0.5
-    ftp_numerator = player_stats.loc[:, 'Free Throw Attempts']/coefficients.loc['Mean of Means','Free Throw Attempts'] * (player_stats['Free Throw %'] - coefficients.loc['Mean of Means','Free Throw %'])
+    ftp_numerator = player_stats.loc[:, 'Free Throw Attempts']/coefficients.loc['Free Throw Attempts','Mean of Means'] * (player_stats['Free Throw %'] - coefficients.loc['Free Throw %','Mean of Means'])
     ftp_score = ftp_numerator.divide(ftp_denominator)
 
     #field goals
-    fgp_denominator = (var_of_means['Field Goal %']*alpha_weight + mean_of_vars['Field Goal %']*beta_weight)**0.5
-    fgp_numerator = player_stats.loc[:, 'Field Goal Attempts']/coefficients.loc['Mean of Means','Field Goal Attempts'] * (player_stats['Field Goal %']  - coefficients.loc['Mean of Means','Field Goal %'])
+    fgp_denominator = (coefficients.loc['Variance of Means','Field Goal %']*alpha_weight + coefficients.loc['Mean of Variances','Field Goal %']*beta_weight)**0.5
+    fgp_numerator = player_stats.loc[:, 'Field Goal Attempts']/coefficients.loc['Field Goal Attempts','Mean of Means'] * (player_stats['Field Goal %']  - coefficients.loc['Field Goal %','Mean of Means'])
     fgp_score = fgp_numerator.divide(fgp_denominator)
     
     res = pd.concat([main_scores, ftp_score, fgp_score],axis = 1)  
