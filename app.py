@@ -113,6 +113,8 @@ with tab3:
     x = x.values.tolist()
     return [item for row in x for item in row]
 
+  g_score.loc[:,'Total'] = g_score,sum(axis = 1)
+  g_score.sort_values('Total', ascending = False, inplace = True)
   g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
 
 #below: use this for the color of results
