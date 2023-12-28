@@ -11,7 +11,7 @@ color_map = {'C' : 'yellow'
              ,'SG' : 'red'
              ,'PG' : 'red'}
 
-df = pd.read_csv('./predictions.csv').set_index('player').round(2)
+df = pd.read_csv('./predictions.csv').set_index('Player').round(2)
 
 edited_df = st.data_editor(df) # 👈 An editable dataframe
 
