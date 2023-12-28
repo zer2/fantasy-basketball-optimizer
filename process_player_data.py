@@ -15,7 +15,7 @@ def calculate_scores_from_coefficients(player_stats
     main_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
 
     main_cat_denominator = (main_cat_var_of_means.values*alpha_weight + main_cat_mean_of_vars.values*beta_weight ) ** 0.5
-    numerator = player_stats.loc[:,main_categories] - main_cat_mean_of_means
+    numerator = player_stats.loc[:,counting_statistics] - main_cat_mean_of_means
     main_scores = numerator.divide(main_cat_denominator)
     main_scores['Turnovers'] = - main_scores['Turnovers']
 
