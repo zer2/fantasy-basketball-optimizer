@@ -106,6 +106,9 @@ with tab3:
   g_scores, z_scores, x_scores, positions, v, L = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
   st.markdown(run_algorithm())
 
+  selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
+  selections_editable = st.data_editor(selections)
+
 #below: use this for the color of results
 #def color(pos):
 #    col = color_map[pos]
