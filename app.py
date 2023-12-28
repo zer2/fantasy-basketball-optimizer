@@ -54,6 +54,8 @@ with tab2:
                 entirely, their counting statistics will be multplied by (1-Y*X). So for example is if \psi is 50\% and a 
                 player is expected to miss 20\% of weeks, their counting statistics will be multplied by $(1-0.5*0.2) =  90\%'''
 
+  st.write(psi_str)
+
 with tab3:
   st.markdown(process_player_data())
   st.markdown(run_algorithm())
