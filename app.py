@@ -71,7 +71,7 @@ with tab2:
 
   
   with c3:
-    st.subheader('Algorithm parameters')
+    st.subheader('Algorithm')
 
     omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
     omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
