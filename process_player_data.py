@@ -33,7 +33,7 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
-def process_player_data(edited_df):
+def process_player_data():
 
   adjusted_df = edited_df.copy()
   adjusted_df[counting_statistics + volume_statistics] = adjusted_df[counting_statistics + volume_statistics] * ( 1- adjusted_df['No Play %'] * psi) 
