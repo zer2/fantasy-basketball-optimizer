@@ -33,7 +33,7 @@ with tab2:
   c1, c2, c3 = st.columns(3)
 
   with c1: 
-    st.subheader('General')
+    st.header('General')
     
     format = st.selectbox(
       'Which format are you playing?',
@@ -54,7 +54,7 @@ with tab2:
 
   
   with c2: 
-      st.subheader('Player Statistics')
+      st.header('Player Statistics')
 
       psi = st.number_input(r'Select a $\psi$ value'
                         , min_value = 0.0
@@ -66,12 +66,12 @@ with tab2:
     
       st.caption(psi_str)
 
-      st.write(f"Coefficients for scoring purposes. Edit if desired")
+      st.subheader(f"Coefficients")
       coefficients = st.data_editor(coefficient_df)
 
   
   with c3:
-    st.subheader('Algorithm')
+    st.header('Algorithm')
 
     omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
     omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
