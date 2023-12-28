@@ -85,16 +85,16 @@ with tab2:
              players that  work best for its strategy'''
     st.caption(gamma_str)
 
-    nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0, max_value = 1)
+    nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0.0, max_value = 1.0)
     nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
                 if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
     st.caption(nu_str)
 
-    alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01)
+    alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01, min_value = 0.0)
     alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
     st.caption(alpha_str)
 
-    beta = st.number_input(r'Select a $\beta$ value', value = 0.25)
+    beta = st.number_input(r'Select a $\beta$ value', value = 0.25, min_value = 0.0)
     beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
     st.caption(beta_str)
 
