@@ -113,9 +113,22 @@ with tab3:
     x = x.values.tolist()
     return [item for row in x for item in row]
 
-  g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
-  g_scores.sort_values('Total', ascending = False, inplace = True)
-  g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
+  subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
+
+  with subtab1:
+    z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+    z_scores.sort_values('Total', ascending = False, inplace = True)
+    z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
+    
+  with subtab2:
+    g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+    g_scores.sort_values('Total', ascending = False, inplace = True)
+    g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
+
+  with subtab3:
+    st.header('H scoring')
+
+ 
 
 #below: use this for the color of results
 #def color(pos):
