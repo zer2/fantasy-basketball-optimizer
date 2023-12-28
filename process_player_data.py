@@ -10,7 +10,7 @@ def calculate_scores_from_coefficients(player_stats
                                        ,beta_weight = 1):
     """Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau"""
         
-    main_cat_mean_of_means = coefficients.loc['Mean of Means',counting_statistics]
+    main_cat_mean_of_means = coefficients['Mean of Means',counting_statistics]
     main_cat_var_of_means = coefficients.loc['Variance of Means',counting_statistics]
     main_cat_mean_of_vars = coefficients.loc['Mean of Variances',counting_statistics]
 
