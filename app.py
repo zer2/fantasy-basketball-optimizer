@@ -27,7 +27,7 @@ with tab1:
 
 with tab2: 
 
-  st.header('General options')
+  st.subheader('General options')
   
   format = st.selectbox(
     'Which format are you playing?',
@@ -36,7 +36,7 @@ with tab2:
   if format == 'Rotisserie':
     st.write('Note that only Z-scores are available for Rotisserie. No advanced algorithms for Rotisserie have been implemented')
 
-  st.header('Algorithm parameters')
+  st.subheader('Algorithm parameters')
 
   omega = st.number_input(r'$\omega$', value = 1.5)
   omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
