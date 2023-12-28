@@ -85,6 +85,11 @@ with tab2:
              players that  work best for its strategy'''
     st.caption(gamma_str)
 
+    nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0, max_value = 1)
+    nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
+                if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
+    st.caption(nu_str)
+
     alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01)
     alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
     st.caption(alpha_str)
@@ -98,7 +103,7 @@ with tab2:
     st.caption(n_iterations_str)
 
 with tab3:
-  g_scores, z_scores, x_scores, positions, v, L = process_player_data(player_stats, coefficients, psi, n_drafters, n_picks)
+  g_scores, z_scores, x_scores, positions, v, L = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
   st.markdown(run_algorithm())
 
 #below: use this for the color of results
