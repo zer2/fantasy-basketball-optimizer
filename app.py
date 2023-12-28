@@ -69,6 +69,7 @@ with tab2:
 with tab3:
   st.markdown(process_player_data())
   st.markdown(run_algorithm())
+  st.write('Gamma is ' + str(gamma))
 
 
 #below: use this for the color of results
