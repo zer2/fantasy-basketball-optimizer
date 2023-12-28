@@ -33,14 +33,13 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
-def process_player_data():
+def process_player_data(player_stats):
 
-  adjusted_df = edited_df.copy()
-  adjusted_df[counting_statistics + volume_statistics] = adjusted_df[counting_statistics + volume_statistics] * ( 1- adjusted_df['No Play %'] * psi) 
-  adjusted_df[percentage_statistics] = adjusted_df[percentage_statistics]/100 #adjust from the display
+  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * ( 1- player_stats['No Play %'] * psi) 
+  player_stats[percentage_statistics] = player_stats[percentage_statistics]/100 #adjust from the display
 
-  g_scores = calculate_scores_from_coefficients(adjusted_df, mean_of_means, var_of_means, mean_of_vars, 1,1)
-  z_scores =  calculate_scores_from_coefficients(adjusted_df, mean_of_means, var_of_means, mean_of_vars, 1,0)
-  x_scores =  calculate_scores_from_coefficients(adjusted_df, mean_of_means, var_of_means, mean_of_vars, 0,1)
+  g_scores = calculate_scores_from_coefficients(player_stats, mean_of_means, var_of_means, mean_of_vars, 1,1)
+  z_scores =  calculate_scores_from_coefficients(player_stats, mean_of_means, var_of_means, mean_of_vars, 1,0)
+  x_scores =  calculate_scores_from_coefficients(player_stats, mean_of_means, var_of_means, mean_of_vars, 0,1)
   
   return 'Process player data'
