@@ -1,13 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-df = pd.DataFrame(
-    [
-        {"command": "st.selectbox", "rating": 4, "is_widget": True},
-        {"command": "st.balloons", "rating": 5, "is_widget": False},
-        {"command": "st.time_input", "rating": 3, "is_widget": True},
-    ]
-)
+df = pd.read_csv('./2022-23_complete.csv')
 
 edited_df = st.data_editor(df) # 👈 An editable dataframe
 
