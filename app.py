@@ -66,7 +66,7 @@ with tab2:
     
       st.caption(psi_str)
 
-      st.markdown(f"Coefficients for scoring purposes. Edit if desired")
+      st.write(f"Coefficients for scoring purposes. Edit if desired")
       coefficients = st.data_editor(coefficient_df)
 
   
