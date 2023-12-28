@@ -1,6 +1,7 @@
 #1: based on player stats: calculate coefficients and score tables and such
 
 import pandas as pd
+from scipy.signal import savgol_filter
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
@@ -35,7 +36,9 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
-def process_player_data(player_stats, coefficients, psi):
+def process_player_data(player_stats, coefficients, psi, n_drafters, n_picks):
+
+  n_players = n_drafters * n_picks
 
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
   player_stats[percentage_statistics] = player_stats[percentage_statistics]/100 #adjust from the display
@@ -43,5 +46,32 @@ def process_player_data(player_stats, coefficients, psi):
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
   x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 0,1)
+
+  positions = player_stats[['Positions']]
+
+  score_table = x_scores.groupby([np.floor(x/12) for x in range(len(x_scores))]).agg(['mean','var'])
+  diff_var = 26 + x_scores[0:n_players].var() * 13
+  score_table_smoothed = x_scores.transform(lambda x: savgol_filter(x,10,1))
+  players_and_positions = pd.merge(x_scores
+                           , positions
+                           , left_index = True
+                           , right_index = True)
   
-  return 'Process player data'
+  position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
+  position_means = position_means - position_means.mean(axis = 0)
+
+  players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
+
+  joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'pos', suffixes = ['_x',''])
+
+  x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
+  x_scores_as_diff = (x_scores - 10/13 * x_category_scores)[x_scores.columns]
+  x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
+  
+  #get weights of X to G 
+  v = np.sqrt(coefficients.loc[ , 'Means of Variance']/(coefficients.loc[ , 'Means of Variance'] + coefficients.loc[ , 'Variance of Means']))
+  v = np.array(v/v.sum()).reshape(9,1)
+  
+  L = np.array(x_scores_as_diff.cov()) 
+  
+  return g_scores, z_scores, x_scores, positions, v, L
