@@ -1,8 +1,8 @@
 #1: based on player stats: calculate coefficients and score tables and such
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
-percentage_statistics = ['Free Throw %',''Field Goal %']
-volume_statistics = ['Free Throw Attempts',''Field Goal Attempts']
+percentage_statistics = ['Free Throw %','Field Goal %']
+volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
 def calculate_scores_from_coefficients(player_stats
                                        ,coefficients
@@ -38,8 +38,6 @@ def process_player_data(edited_df):
   adjusted_df = edited_df.copy()
   adjusted_df[counting_statistics + volume_statistics] = adjusted_df[counting_statistics + volume_statistics] * ( 1- adjusted_df['No Play %'] * psi) 
   adjusted_df[percentage_statistics] = adjusted_df[percentage_statistics]/100 #adjust from the display
-
-  (adjusted_df[['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']] - means_of_means[counting_statistics]
 
   g_scores = calculate_scores_from_coefficients(adjusted_df, mean_of_means, var_of_means, mean_of_vars, 1,1)
   z_scores =  calculate_scores_from_coefficients(adjusted_df, mean_of_means, var_of_means, mean_of_vars, 1,0)
