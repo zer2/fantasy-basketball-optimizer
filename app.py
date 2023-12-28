@@ -11,12 +11,9 @@ color_map = {'C' : 'yellow'
              ,'SG' : 'red'
              ,'PG' : 'red'}
              
-def color(pos):
-    col = color_map[pos]
-    return f'background-color: {color}'
+
 
 df = pd.read_csv('./predictions.csv').set_index('player')
-df = df.style.applymap(color, subset=pd.IndexSlice[:, ['pos']])
 
 edited_df = st.data_editor(df) # 👈 An editable dataframe
 
@@ -24,3 +21,9 @@ st.markdown(process_player_data())
 st.markdown(run_algorithm())
 
 
+#below: use this for the color of results
+#def color(pos):
+#    col = color_map[pos]
+#    return f'background-color: {color}'
+#
+#df = df.style.applymap(color, subset=pd.IndexSlice[:, ['pos']])
