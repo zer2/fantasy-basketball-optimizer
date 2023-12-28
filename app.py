@@ -44,6 +44,15 @@ with tab2:
     else:
       st.caption('Head to head formats are supported with G-scores and H-scores. Z-scores are also available but not advisable to use')
 
+    n_drafters = st.number_input(r'How many drafters are in your league?'
+                    , min_value = 2
+                    , value = 12)
+
+    n_picks = st.number_input(r'How many players will each drafter choose?'
+                , min_value = 1
+                , value = 13)
+
+  
   with c2: 
       st.subheader('Player Statistics')
 
@@ -88,13 +97,9 @@ with tab2:
     n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
     st.caption(n_iterations_str)
 
-
-
 with tab3:
-  st.markdown(process_player_data(player_stats, coefficients, psi))
+  g_scores, z_scores, x_scores, positions, v, L = process_player_data(player_stats, coefficients, psi, n_drafters, n_picks)
   st.markdown(run_algorithm())
-  st.write('Gamma is ' + str(gamma))
-
 
 #below: use this for the color of results
 #def color(pos):
