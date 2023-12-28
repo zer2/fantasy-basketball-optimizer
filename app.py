@@ -47,9 +47,9 @@ with tab2:
 
 
   psi = st.number_input(r'\psi'
-                        , min_value = 0
+                        , min_value = 0.0
                         , value = 0.85
-                       , max_value = 1)
+                       , max_value = 1.0)
   psi_str = r'''\psi controls how injury rates are dealt with. If \psi is X\%, and a player is expected to miss Y\% of weeks
                 entirely, their counting statistics will be multplied by (1-Y*X). So for example is if \psi is 50\% and a 
                 player is expected to miss 20\% of weeks, their counting statistics will be multplied by $(1-0.5*0.2) =  90\%'''
