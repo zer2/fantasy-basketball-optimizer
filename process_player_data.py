@@ -20,12 +20,12 @@ def calculate_scores_from_coefficients(player_stats
     main_scores['Turnovers'] = - main_scores['Turnovers']
 
     #free throws 
-    ftp_denominator = (coefficients.loc['Variance of Means','Free Throw %']*alpha_weight + coefficients.loc['Mean of Variances','Free Throw %']*beta_weight)**0.5
+    ftp_denominator = (coefficients.loc['Free Throw %','Variance of Means']*alpha_weight + coefficients.loc['Free Throw %','Mean of Variances']*beta_weight)**0.5
     ftp_numerator = player_stats.loc[:, 'Free Throw Attempts']/coefficients.loc['Free Throw Attempts','Mean of Means'] * (player_stats['Free Throw %'] - coefficients.loc['Free Throw %','Mean of Means'])
     ftp_score = ftp_numerator.divide(ftp_denominator)
 
     #field goals
-    fgp_denominator = (coefficients.loc['Variance of Means','Field Goal %']*alpha_weight + coefficients.loc['Mean of Variances','Field Goal %']*beta_weight)**0.5
+    fgp_denominator = (coefficients.loc['Field Goal %','Variance of Means']*alpha_weight + coefficients.loc['Field Goal %','Mean of Variances']*beta_weight)**0.5
     fgp_numerator = player_stats.loc[:, 'Field Goal Attempts']/coefficients.loc['Field Goal Attempts','Mean of Means'] * (player_stats['Field Goal %']  - coefficients.loc['Field Goal %','Mean of Means'])
     fgp_score = fgp_numerator.divide(fgp_denominator)
     
