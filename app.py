@@ -91,7 +91,7 @@ with tab2:
 
 
 with tab3:
-  st.markdown(process_player_data(player_stats))
+  st.markdown(process_player_data(player_stats, coefficients, psi))
   st.markdown(run_algorithm())
   st.write('Gamma is ' + str(gamma))
 
