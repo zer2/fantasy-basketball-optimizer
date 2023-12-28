@@ -34,23 +34,23 @@ with tab2:
     st.write('Note that only Z-scores are available for Rotisserie. No advanced algorithms for Rotisserie have been implemented')
 
   else: 
-    omega = st.number_input(r'\omega', value = 1.5)
-    omega_str = r'''The higher \omega is, the more aggressively the algorithm will try to punt. Slightly more technically, 
+    omega = st.number_input(r'$\omega$', value = 1.5)
+    omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
                     it quantifies how much better the optimal player choice will be compared to the player that would be 
                     chosen with baseline weights'''
     st.write()
   
-    gamma = st.number_input(r'\gamma value', value = 0.1)
-    st.write(r'''\gamma also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+    gamma = st.number_input(r'$\gamma$ value', value = 0.1)
+    st.write(r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
             tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
              players that  work best for its strategy''')
 
 
-  psi = st.number_input(r'\psi'
+  psi = st.number_input(r'$\psi$'
                         , min_value = 0.0
                         , value = 0.85
                        , max_value = 1.0)
-  psi_str = r'''\psi controls how injury rates are dealt with. If \psi is X\%, and a player is expected to miss Y\% of weeks
+  psi_str = r'''$\psi$ controls how injury rates are dealt with. If \psi is X\%, and a player is expected to miss Y\% of weeks
                 entirely, their counting statistics will be multplied by (1-Y*X). So for example is if \psi is 50\% and a 
                 player is expected to miss 20\% of weeks, their counting statistics will be multplied by $(1-0.5*0.2) =  90\%'''
 
