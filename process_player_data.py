@@ -20,6 +20,7 @@ def calculate_scores_from_coefficients(player_stats
 
     main_cat_denominator = (main_cat_var_of_means.values*alpha_weight + main_cat_mean_of_vars.values*beta_weight ) ** 0.5
     numerator = player_stats.loc[:,counting_statistics] - main_cat_mean_of_means
+    print(numerator)                                     
     main_scores = numerator.divide(main_cat_denominator)
     main_scores['Turnovers'] = - main_scores['Turnovers']
 
@@ -76,4 +77,4 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
   
   L = np.array(x_scores_as_diff.cov()) 
   
-  return player_stats, z_scores, x_scores, positions, v, L
+  return g_scores, z_scores, x_scores, positions, v, L
