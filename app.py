@@ -104,8 +104,8 @@ with tab2:
 
 with tab3:
   g_scores, z_scores, x_scores, positions, v, L = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
-  st.markdown(run_algorithm())
 
+  #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
   selections_editable = st.data_editor(selections)
 
