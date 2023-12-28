@@ -52,14 +52,14 @@ with tab2:
                         , value = 0.85
                        , max_value = 1.0)
       psi_str = r'''$\psi$ controls how injury rates are dealt with. If $\psi$ is $X\%$, and a player is expected to miss $Y\%$ of weeks
-                    entirely, their counting statistics will be multplied by $(1-Y*X)$. So for example is if $\psi$ is $50\%$ and a 
-                    player is expected to miss $20\%$ of weeks, their counting statistics will be multplied by $(1-0.5*0.2) =  90\%$'''
+                    entirely, their counting statistics will be multiplied by $(1-Y*X)$. So for example is if $\psi$ is $50\%$ and a 
+                    player is expected to miss $20\%$ of weeks, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
     
       st.caption(psi_str)
-    
+
+      st.markdown(f"Coefficients for scoring purposes. Edit if desired")
       coefficients = st.data_editor(coefficient_df)
 
-      st.caption('Coefficients for scoring purposes. Probably best not to mess with these')
   
   with c3:
     st.subheader('Algorithm parameters')
