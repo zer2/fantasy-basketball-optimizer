@@ -1,6 +1,7 @@
 #1: based on player stats: calculate coefficients and score tables and such
 
 import pandas as pd
+import numpy as np
 from scipy.signal import savgol_filter
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
