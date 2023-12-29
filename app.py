@@ -121,7 +121,7 @@ with tab3:
     st.header('Team statistics')
     
     metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
-    st.caption('For ' + format, ' it is recommended to aggregate by ' + metric)
+    st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
   
     team_selections = selections_editable['Drafter_' + str(seat)].dropna()
 
