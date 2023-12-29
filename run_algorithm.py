@@ -5,7 +5,7 @@ def run_algorithm():
 
 #below here experimental
 
-class UAgent(SimpleAgent):
+class UAgent():
 
     def __init__(self
                  , season_df
