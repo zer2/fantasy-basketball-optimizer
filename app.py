@@ -108,6 +108,9 @@ with tab2:
     st.caption(n_iterations_str)
 
 with tab3:
+
+  st.subheader('Draft board')
+  
   info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
@@ -121,7 +124,7 @@ with tab3:
   c1, c2 = st.columns(2)
 
   with c1:
-    st.header('Team statistics')
+    st.subheader('Team statistics')
     
     metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
     st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
@@ -141,6 +144,7 @@ with tab3:
       g_display = st.dataframe(team_stats)
 
   with c2:
+    st.subheader('Candidate player evaluation')
     subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
   
     with subtab1:
