@@ -80,9 +80,9 @@ class HAgent():
         if round_n < 12:
             for i in range(self.n_iterations):
 
-                del_full = self.get_del_full(c,L)
+                del_full = self.get_del_full(c)
 
-                expected_x = self.get_x_mu(c,L)
+                expected_x = self.get_x_mu(c)
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
 
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
@@ -134,27 +134,27 @@ class HAgent():
         return win_sums
     
     
-    def get_x_mu(self,c,L):
+    def get_x_mu(self,c):
 
         factor = (self.v.dot(self.v.T).dot(L).dot(c.T)/self.v.T.dot(L).dot(self.v)).T
 
         c_mod = c - factor
-        sigma = np.sqrt((c_mod.dot(L) * c_mod).sum(axis = 1))
+        sigma = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1))
         U = np.array([[self.v.reshape(9),c_0.reshape(9)] for c_0 in c])
         b = np.array([[-self.gamma * s,self.omega * s] for s in sigma]).reshape(-1,2,1)
 
         U_T = np.swapaxes(U, 1, 2)
 
-        q = np.einsum('aij, ajk -> aik', U.dot(L), U_T)
+        q = np.einsum('aij, ajk -> aik', U.dot(self.L), U_T)
 
         inverse_part = np.linalg.inv(q)
 
-        r = np.einsum('ij, ajk -> aik', L, U_T)
+        r = np.einsum('ij, ajk -> aik', self.L, U_T)
 
         x = np.einsum('aij, ajk -> aik', r, inverse_part)
 
-        #inverse_part = np.linalg.inv(U.dot(L).dot(U.T))
-        #X_mu = L.dot(U.T).dot(inverse_part).dot(b)
+        #inverse_part = np.linalg.inv(U.dot(self.L).dot(U.T))
+        #X_mu = self.L.dot(U.T).dot(inverse_part).dot(b)
 
         X_mu = np.einsum('aij, ajk -> aik', x, b)
 
@@ -183,67 +183,67 @@ class HAgent():
 
         return (c * self.gamma).reshape(-1,9,1) + (self.v * self.omega).reshape(1,9,1)
 
-    def get_term_five(self,c,L):
-        return self.get_term_five_a(c,L)/self.get_term_five_b(c,L)
+    def get_term_five(self,c):
+        return self.get_term_five_a(c)/self.get_term_five_b(c)
 
-    def get_term_five_a(self,c,L):
-        factor =  (self.v.dot(self.v.T).dot(L).dot(c.T)/self.v.T.dot(L).dot(self.v)).T
+    def get_term_five_a(self,c):
+        factor =  (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
         c_mod = c - factor
-        return np.sqrt((c_mod.dot(L) * c_mod).sum(axis = 1).reshape(-1,1,1))
+        return np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1).reshape(-1,1,1))
 
-    def get_term_five_b(self,c,L):
-        return ((c.dot(L) * c).sum(axis = 1) * self.v.T.dot(L).dot(self.v) - self.v.T.dot(L.dot(c.T))**2).reshape(-1,1,1)
+    def get_term_five_b(self,c):
+        return ((c.dot(self.L) * c).sum(axis = 1) * self.v.T.dot(self.L).dot(self.v) - self.v.T.dot(self.L.dot(c.T))**2).reshape(-1,1,1)
 
-    def get_terms_four_five(self,c,L):
+    def get_terms_four_five(self,c):
         #is this the right shape
-        return self.get_term_four(c) * self.get_term_five(c,L)
+        return self.get_term_four(c) * self.get_term_five(c)
 
     def get_del_term_four(self,c):
         return (np.identity(9) * self.gamma).reshape(1,9,9)
 
-    def get_del_term_five_a(self,c,L):
-        factor = (self.v.dot(self.v.T).dot(L).dot(c.T)/self.v.T.dot(L).dot(self.v)).T
+    def get_del_term_five_a(self,c):
+        factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
 
         c_mod = c - factor
-        top = c_mod.dot(L).reshape(-1,1,9)
-        bottom = np.sqrt((c_mod.dot(L) * c_mod).sum(axis = 1).reshape(-1,1,1))
-        side = np.identity(9) - self.v.dot(self.v.T).dot(L)/self.v.T.dot(L).dot(self.v)
+        top = c_mod.dot(self.L).reshape(-1,1,9)
+        bottom = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1).reshape(-1,1,1))
+        side = np.identity(9) - self.v.dot(self.v.T).dot(self.L)/self.v.T.dot(self.L).dot(self.v)
         res = (top/bottom).dot(side)
         return res.reshape(-1,1,9)
 
-    def get_del_term_five_b(self,c,L):
-        term_one = (2 * c.dot(L) * self.v.T.dot(L).dot(self.v)).reshape(-1,1,9)
-        term_two = (2 * self.v.T.dot(L.dot(c.T)).T).reshape(-1,1,1)
-        term_three = (self.v.T.dot(L)).reshape(1,1,9)
+    def get_del_term_five_b(self,c):
+        term_one = (2 * c.dot(self.L) * self.v.T.dot(self.L).dot(self.v)).reshape(-1,1,9)
+        term_two = (2 * self.v.T.dot(self.L.dot(c.T)).T).reshape(-1,1,1)
+        term_three = (self.v.T.dot(self.L)).reshape(1,1,9)
         return term_one.reshape(-1,1,9) - (term_two * term_three).reshape(-1,1,9)
 
-    def get_del_term_five(self,c,L):
-        a = self.get_term_five_a(c,L)
-        del_a = self.get_del_term_five_a(c,L)
-        b = self.get_term_five_b(c,L)
-        del_b = self.get_del_term_five_b(c,L)
+    def get_del_term_five(self,c):
+        a = self.get_term_five_a(c)
+        del_a = self.get_del_term_five_a(c)
+        b = self.get_term_five_b(c)
+        del_b = self.get_del_term_five_b(c)
 
         return (del_a * b - a * del_b) / b**2
 
-    def get_del_terms_four_five(self,c,L):
-        return self.get_term_four(c) * self.get_del_term_five(c,L) + \
-                    self.get_del_term_four(c) * self.get_term_five(c,L)
+    def get_del_terms_four_five(self,c):
+        return self.get_term_four(c) * self.get_del_term_five(c) + \
+                    self.get_del_term_four(c) * self.get_term_five(c)
 
-    def get_last_three_terms(self,c,L):
-        return np.einsum('ij, ajk -> aik',L,self.get_terms_four_five(c,L))
+    def get_last_three_terms(self,c):
+        return np.einsum('ij, ajk -> aik',self.L,self.get_terms_four_five(c))
 
-    def get_del_last_three_terms(self,c,L):
-        return np.einsum('ij, ajk -> aik',L,self.get_del_terms_four_five(c,L))
+    def get_del_last_three_terms(self,c):
+        return np.einsum('ij, ajk -> aik',self.L,self.get_del_terms_four_five(c))
 
-    def get_last_four_terms(self,c,L):
+    def get_last_four_terms(self,c):
         return np.einsum('ij, ajk -> aik', self.get_term_two(c), self.get_last_three_terms(c,L))
 
-    def get_del_last_four_terms(self,c,L):
+    def get_del_last_four_terms(self,c):
         comp_i = self.get_del_term_two(c)
-        comp_ii = self.get_last_three_terms(c,L)
+        comp_ii = self.get_last_three_terms(c)
         term_a = np.einsum('aijk, aj -> aik', comp_i, comp_ii.reshape(-1,9))
         term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c,L))
         return term_a + term_b
 
-    def get_del_full(self,c,L):
-        return np.einsum('ij, ajk -> aik',L,self.get_del_last_four_terms(c,L))
+    def get_del_full(self,c):
+        return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
