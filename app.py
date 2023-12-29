@@ -53,6 +53,10 @@ with tab2:
                 , min_value = 1
                 , value = 13)
 
+    seat =  st.number_input(r'What seat are you drafting at?'
+                        , min_value = 1
+                        , value = 1
+                       , max_value = n_drafters)
   
   with c2: 
       st.header('Player Statistics')
@@ -108,8 +112,29 @@ with tab3:
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
-  selections_editable = st.data_editor(selections)
 
+  c1, c2 = st.columns(2)
+
+  with c1: 
+    selections_editable = st.data_editor(selections)
+  with c2: 
+    st.header('Team statistics')
+    
+    metric = 'Z-score' if format == 'Rotisserie else 'G-score'
+    st.caption('For ' + format, ' it is recommended to aggregate by ' + metric)
+  
+    team_selections = selections_editable['Drafter_' + str(seat)].dropna()
+
+    tab1, tab2 = st.tabs(["Z-score", "G-score"])
+    with tab1:
+      team_stats = z_scores[z_scores.index.isin(listify(selections_editable))
+      team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+      z_display = st.dataframe(team_stats)
+    with tab2:
+      team_stats = g_scores[g_scores.index.isin(listify(selections_editable))
+      team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+      g_display = st.dataframe(team_stats)
+    
   subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
 
   with subtab1:
