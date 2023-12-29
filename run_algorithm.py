@@ -1,6 +1,8 @@
 #2: based on drafting situation: run gradient descent, get results
 
 import numpy as np
+from scipy.stats import norm
+from helper_functions import combinatorial_calculation, calculate_tipping_points
 
 class HAgent():
 
