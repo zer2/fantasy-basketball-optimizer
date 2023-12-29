@@ -127,8 +127,19 @@ with tab3:
     g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
 
   with subtab3:
-    H = HAgent(info, omega, gamma, alpha, beta, n_iterations)
-    st.header('H scoring')
+    winner_take_all = format == 'Head to Head: Most Categories'
+    n_players = n_drafters * n_picks
+    
+    H = HAgent(info = info
+               , omega = omega
+               , gamma = gamma
+               , alpha = alpha
+               , beta = beta
+               , n_iterations = n_iterations
+               , n_players = n_players
+               , winner_take_all = winner_take_all)
+
+    st.header('H-scoring')
 
  
 
