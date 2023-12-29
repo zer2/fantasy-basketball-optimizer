@@ -118,7 +118,7 @@ with tab3:
   st.subheader('Draft board')
   selections_editable = st.data_editor(selections)
 
-  n, dummy_col = st.beta_columns(2)
+  n, dummy_col = st.columns(2)
 
   with n:
     seat =  st.number_input(r'Analyze for which drafter?'
