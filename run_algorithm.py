@@ -40,7 +40,7 @@ class HAgent():
         self.winner_take_all = winner_take_all 
         self.x_scores = info['X-scores']
         self.score_table = info['Score-table']
-        self.smoothed_score_table = info['Smoothed-score-table']
+        self.score_table_smoothed = info['Score-table-smoothed']
         self.diff_var = info['Diff-var']
         self.v = info['v']
         self.L = info['L']
