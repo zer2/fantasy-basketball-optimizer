@@ -123,7 +123,7 @@ with tab3:
     metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
     st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
   
-    team_selections = selections_editable['Drafter_' + str(seat)].dropna()
+    team_selections = selections_editable['Drafter ' + str(seat)].dropna()
 
     tab1, tab2 = st.tabs(["Z-score", "G-score"])
     with tab1:
