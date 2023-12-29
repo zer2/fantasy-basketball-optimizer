@@ -167,8 +167,8 @@ with tab3:
                , n_players = n_players
                , winner_take_all = winner_take_all)
 
-    players_available = z_scores.index[~z_scores.index.isin(listify(selections_editable))]
-    my_players = z_scores.index[z_scores.index.isin(listify(selections_editable['Drafter ' + str(seat)].dropna()))]
+    players_chosen = listify(selections_editable))
+    my_players = listify(selections_editable['Drafter ' + str(seat)].dropna())
 
     res = H.get_h_scores(player_stats, players_available, my_players)
     st.dataframe(res)
