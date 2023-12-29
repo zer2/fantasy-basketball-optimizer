@@ -115,7 +115,7 @@ with tab3:
   with subtab1:
     z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
     z_scores.sort_values('Total', ascending = False, inplace = True)
-    z_scores = z_scores.round(1)
+    z_scores = z_scores.round(3)
     z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
     
   with subtab2:
