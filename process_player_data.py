@@ -37,7 +37,13 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
-def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks):
+def process_player_data(player_stats
+                        , coefficients
+                        , psi
+                        , nu
+                        , n_drafters
+                        , n_picks):
+  """Based on player stats and parameters, do all calculations to set up for running algorithms """
 
   n_players = n_drafters * n_picks
 
