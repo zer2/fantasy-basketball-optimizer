@@ -3,7 +3,7 @@ st.set_page_config(layout="wide")
 
 import pandas as pd
 from process_player_data import process_player_data
-from run_algorithm import run_algorithm
+from run_algorithm import HAgent
 from helper_functions import listify
 
 tab1, tab2, tab3 = st.tabs(["Player Stats", "Parameters", "Draft"])
@@ -127,6 +127,7 @@ with tab3:
     g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
 
   with subtab3:
+    H = HAgent(info, omega, gamma, alpha, beta, n_iterations)
     st.header('H scoring')
 
  
