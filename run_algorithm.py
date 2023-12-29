@@ -136,7 +136,7 @@ class HAgent():
     
     def get_x_mu(self,c):
 
-        factor = (self.v.dot(self.v.T).dot(L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
+        factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
 
         c_mod = c - factor
         sigma = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1))
