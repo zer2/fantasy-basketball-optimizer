@@ -167,7 +167,10 @@ with tab3:
                , n_players = n_players
                , winner_take_all = winner_take_all)
 
-    st.header('H-scoring')
+    players_available = z_scores.index[~z_scores.index.isin(listify(selections_editable))]
+    my_players = z_scores.index[z_scores.index.isin(listify(selections_editable['Drafter ' + str(seat)].dropna()))]
+
+    H.get_pick()
 
  
 
