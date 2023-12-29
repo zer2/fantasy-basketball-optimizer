@@ -113,7 +113,7 @@ with tab3:
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
 
-  c1, c2 = st.columns(2)
+  c1, c2 = st.columns([0.6,0.4])
 
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
@@ -171,6 +171,7 @@ with tab3:
     my_players = [p for p in selections_editable['Drafter ' + str(seat)] if len(p) > 0]
 
     res = H.get_h_scores(player_stats, my_players, players_chosen)
+    res = res.sort_values(ascending = False)
     st.dataframe(res)
 
  
