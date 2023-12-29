@@ -115,17 +115,17 @@ with tab3:
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
 
-  top_left, top_right = st.columns([0.8,0.2])
+  top_left, top_right = st.columns([0.2,0.8])
 
-  with top_left:
-    st.subheader('Draft board')
-    selections_editable = st.data_editor(selections)
-
-  with top_right: 
-    seat =  st.number_input(r'What seat are you drafting at?'
+  with top_left: 
+    seat =  st.number_input(r'analyse '
                       , min_value = 1
                       , value = 1
                      , max_value = n_drafters)
+
+  with top_right:
+    st.subheader('Draft board')
+    selections_editable = st.data_editor(selections)
 
   bottom_left, bottom_right = st.columns(2)
 
