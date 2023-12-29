@@ -50,9 +50,9 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
 
   positions = player_stats[['Position']]
 
-  score_table = x_scores.groupby([np.floor(x/12) for x in range(len(x_scores))]).agg(['mean','var'])
-  diff_var = 26 + x_scores[0:n_players].var() * 13
+  score_table = x_scores.groupby([np.floor(x/n_drafters) for x in range(len(x_scores))]).agg(['mean','var'])
   score_table_smoothed = x_scores.transform(lambda x: savgol_filter(x,10,1))
+  diff_var = n_picks * 2 + x_scores[0:n_players].var() * n_picks
   players_and_positions = pd.merge(x_scores
                            , positions
                            , left_index = True
@@ -74,5 +74,15 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
   v = np.array(v/v.sum()).reshape(9,1)
   
   L = np.array(x_scores_as_diff.cov()) 
+
+  info = {'G-scores' : g_scores
+          ,'Z-scores' : z_scores
+          ,'X-scores' : x_scores
+          , 'Score-table' : score_table
+          , 'Score-table-smoothed' : score_table_smoother
+          , 'Diff-var' : diff_var
+          , 'Positions' : positions
+          , 'v' : v
+          , 'L' : L}
   
-  return g_scores, z_scores, x_scores, positions, v, L
+  return info
