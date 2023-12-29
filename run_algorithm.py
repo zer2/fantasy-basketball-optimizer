@@ -48,7 +48,7 @@ class HAgent():
     def get_h_scores(self
                   , df
                   , my_players
-                  , all_players_chosen ):
+                  , players_available ):
 
         """Picks a player based on the D-score algorithm
 
@@ -59,9 +59,9 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
-        round_n = len(self.players) 
+        round_n = len(my_players) 
 
-        x_self_sum = self.x_scores.loc[self.players].sum(axis = 0)
+        x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
         
         current_score_table = self.score_table[0:round_n].sum()
         diff_means =  x_self_sum - current_score_table.loc[(self.x_scores.columns,'mean')].droplevel(1)
@@ -73,10 +73,7 @@ class HAgent():
         other_team_variance = self.score_table.loc[0:12,(self.x_scores.columns,'var')].sum().droplevel(1)
         rest_of_team_variance = self.score_table.loc[(round_n + 1):12,(self.x_scores.columns,'var')].sum().droplevel(1)
 
-        top_players = self.x_scores[self.x_scores.index.isin(self.representative_player_set)]
-        diff_var = 26 + top_players.var() * 13
-
-        x_scores_available = self.x_scores[~self.x_scores.index.isin(player_assignments.keys())]
+        x_scores_available = self.x_scores[self.x_scores.index.isin(players_available)]
         
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
         
@@ -92,7 +89,7 @@ class HAgent():
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
 
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
-                                          , scale = np.sqrt(diff_var))
+                                          , scale = np.sqrt(self.diff_var))
 
                 if self.winner_take_all:
 
@@ -111,24 +108,18 @@ class HAgent():
                 #first_moment_unbiased = first_moment/(1 - self.beta_1**2)
                 #second_moment_unbiased = second_moment/(1 - self.beta_2**2)
 
-                step_size = self.alpha * (i + 1)**(-self.beta) #* first_moment_unbiased/(np.sqrt(second_moment_unbiased) + 1E-8)
+                step_size = self.alpha * (i + 1)**(-self.beta) 
                 change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
 
                 c = c + change_c
                 c[c < 0] = 0
                 c = c/c.sum(axis = 1).reshape(-1,1)
 
-                cdf_estimates = norm.cdf(diff_means + x_scores_available + expected_future_diff
-                          , scale = np.sqrt(diff_var))
-                
-                scores = scores + [pd.DataFrame(cdf_estimates.mean(axis = 1), index = x_scores_available.index) ]
-                weights = weights + [pd.DataFrame(c, index = x_scores_available.index) ]
-
         else:
             expected_future_diff = 0
             
         win_probabilities = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
-                                                  , scale = np.sqrt(diff_var))
+                                                  , scale = np.sqrt(self.diff_var))
                                          ,index = x_scores_available.index)
 
         win_probabilities.columns = x_scores_available.columns
@@ -139,38 +130,11 @@ class HAgent():
                                                           , categories = win_probabilities.columns
                              )
         else:
-            win_sums = win_probabilities.sum(axis = 1) #+ optimal_punt_reward
+            win_sums = win_probabilities.sum(axis = 1) 
 
         win_sums.name = 'value'
-        players_and_positions = pd.merge(win_sums
-                                         , self.positions
-                                         , left_index = True
-                                         , right_index = True)
-        #players_and_positions['pos'] = [list(eval(x)) for x in players_and_positions['pos']]
-        players_and_positions = players_and_positions.explode('pos')
-
-        replacement_level_players = players_and_positions[~players_and_positions.index.isin(top_players.index)]
-
-        replacement_level_values = pd.Series({pos : 
-                                    replacement_level_players[[pos in x for x in replacement_level_players['pos']]].max().values[0] \
-                                     for pos in ['C','PF','PG','SF','SG']}
-                                            )
-
-        n_per_position = self.positions.loc[self.players].explode().value_counts()
-        adjusted_replacement_level_values = adjust_replacement_level_values(n_per_position,replacement_level_values)
-        adjusted_replacement_level_values.name = 'replacement_value'
-
-        joined = pd.merge(players_and_positions
-                                     , adjusted_replacement_level_values, right_index = True, left_on = 'pos')
-        mined = joined.groupby('player').min()
-        adjusted_win_sums = mined['value'] #- mined['replacement_value']
-
-        players_sorted = adjusted_win_sums.sort_values(ascending = False)
-                
-        player = self.pick_from_order(players_sorted)
-        
-        self.info[round_n] = {'scores' : scores,'weights' : weights}
-        return player
+                    
+        return win_sums
     
     
     def get_x_mu(self,c,L):
