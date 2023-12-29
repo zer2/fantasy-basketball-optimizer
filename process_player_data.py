@@ -14,13 +14,13 @@ def calculate_scores_from_coefficients(player_stats
                                        ,beta_weight = 1):
     """Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau"""
         
-    main_cat_mean_of_means = coefficients.loc[counting_statistics,'Mean of Means']
-    main_cat_var_of_means = coefficients.loc[counting_statistics,'Variance of Means']
-    main_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
+    counting_cat_mean_of_means = coefficients.loc[counting_statistics,'Mean of Means']
+    counting_cat_var_of_means = coefficients.loc[counting_statistics,'Variance of Means']
+    counting_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
 
-    main_cat_denominator = (main_cat_var_of_means.values*alpha_weight + main_cat_mean_of_vars.values*beta_weight ) ** 0.5
-    numerator = player_stats.loc[:,counting_statistics] - main_cat_mean_of_means
-    main_scores = numerator.divide(main_cat_denominator)
+    counting_cat_denominator = (counting_cat_var_of_means.values*alpha_weight + counting_cat_mean_of_vars.values*beta_weight ) ** 0.5
+    numerator = player_stats.loc[:,counting_statistics] - counting_cat_mean_of_means
+    main_scores = numerator.divide(counting_cat_denominator)
     main_scores['Turnovers'] = - main_scores['Turnovers']
 
     #free throws 
@@ -57,12 +57,11 @@ def process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks
                            , positions
                            , left_index = True
                            , right_index = True)
-  
+
+  #get position averages, to make sure the covariance matrix measures differences relative to position
   position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
   position_means = position_means - position_means.mean(axis = 0)
-
   players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
-
   joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
 
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
