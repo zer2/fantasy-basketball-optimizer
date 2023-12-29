@@ -8,14 +8,14 @@ def run_algorithm():
 class UAgent():
 
     def __init__(self
+                  info
                  , omega
                  , gamma
                  , alpha
                  , beta
                  , n_iterations 
-                 , n_players = n_players
+                 , n_players
                  , winner_take_all
-                 , info
 ):
         """Calculates the rank order based on U-score
 
@@ -35,8 +35,6 @@ class UAgent():
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
-        self.v = v
-        self.L = L
         self.n_iterations = n_iterations
         self.n_players = n_players
         self.winner_take_all = winner_take_all 
@@ -44,6 +42,8 @@ class UAgent():
         self.score_table = info['Score-table']
         self.smoothed_score_table = info['Smoothed-score-table']
         self.diff_var = info['Diff-var']
+        self.v = info['v']
+        self.L = info['L']
       
     def make_pick(self
                   , df
@@ -79,9 +79,6 @@ class UAgent():
         x_scores_available = self.x_scores[~self.x_scores.index.isin(player_assignments.keys())]
         
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
-        
-        #first_moment = np.zeros(shape = c.shape)
-        #second_moment = np.zeros(shape = c.shape)
         
         scores = []
         weights = []
