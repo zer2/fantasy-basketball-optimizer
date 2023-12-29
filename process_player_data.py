@@ -85,7 +85,7 @@ def process_player_data(player_stats
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
           , 'Score-table' : score_table
-          , 'Score-table-smoothed' : score_table_smoother
+          , 'Score-table-smoothed' : score_table_smoothed
           , 'Diff-var' : diff_var
           , 'Positions' : positions
           , 'v' : v
