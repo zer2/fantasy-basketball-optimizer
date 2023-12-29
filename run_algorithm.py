@@ -8,7 +8,7 @@ def run_algorithm():
 class HAgent():
 
     def __init__(self
-                  info
+                 , info
                  , omega
                  , gamma
                  , alpha
