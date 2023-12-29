@@ -117,7 +117,7 @@ with tab3:
 
   top_left, top_right = st.columns([0.8,0.2])
 
-  with top_Left:
+  with top_left:
     st.subheader('Draft board')
     selections_editable = st.data_editor(selections)
 
