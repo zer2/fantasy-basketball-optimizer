@@ -4,6 +4,7 @@ st.set_page_config(layout="wide")
 import pandas as pd
 from process_player_data import process_player_data
 from run_algorithm import run_algorithm
+from helper_functions import listify
 
 tab1, tab2, tab3 = st.tabs(["Player Stats", "Parameters", "Draft"])
 
