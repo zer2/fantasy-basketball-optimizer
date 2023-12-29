@@ -104,7 +104,7 @@ with tab2:
     st.caption(n_iterations_str)
 
 with tab3:
-  g_scores, z_scores, x_scores, positions, v, L = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
+  info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
@@ -113,12 +113,14 @@ with tab3:
   subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
 
   with subtab1:
+    z_scores = info['Z-scores']
     z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
     z_scores.sort_values('Total', ascending = False, inplace = True)
     z_scores = z_scores.round(2)
     z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
     
   with subtab2:
+    g_scores = info['G-scores']
     g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
     g_scores.sort_values('Total', ascending = False, inplace = True)
     g_scores = g_scores.round(2)
