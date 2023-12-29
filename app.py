@@ -118,10 +118,13 @@ with tab3:
   st.subheader('Draft board')
   selections_editable = st.data_editor(selections)
 
-  seat =  st.number_input(r'analyse '
-                  , min_value = 1
-                  , value = 1
-                 , max_value = n_drafters)
+  n, dummy_col = st.beta_columns(2)
+
+  with n:
+    seat =  st.number_input(r'Analyze for which drafter?'
+                    , min_value = 1
+                    , value = 1
+                   , max_value = n_drafters)
 
   bottom_left, bottom_right = st.columns(2)
 
