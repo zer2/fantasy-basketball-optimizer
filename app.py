@@ -115,11 +115,13 @@ with tab3:
   with subtab1:
     z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
     z_scores.sort_values('Total', ascending = False, inplace = True)
+    z_scores = z_scores.round(1)
     z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
     
   with subtab2:
     g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
     g_scores.sort_values('Total', ascending = False, inplace = True)
+    g_scores = g_scores.round(1)
     g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
 
   with subtab3:
