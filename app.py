@@ -109,10 +109,6 @@ with tab3:
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
   selections_editable = st.data_editor(selections)
 
-  def listify(x):
-    x = x.values.tolist()
-    return [item for row in x for item in row]
-
   subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
 
   with subtab1:
