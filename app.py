@@ -113,14 +113,14 @@ with tab3:
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [''] * n_picks for n in range(n_drafters)})
 
-  c1, c2 = st.columns([0.6,0.4])
-
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
 
-  with c1: 
-    selections_editable = st.data_editor(selections)
-  with c2: 
+  selections_editable = st.data_editor(selections)
+
+  c1, c2 = st.columns(2)
+
+  with c1:
     st.header('Team statistics')
     
     metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
@@ -139,40 +139,41 @@ with tab3:
       team_stats.loc['Total', :] = team_stats.sum(axis = 0)
       team_stats = team_stats.round(2)
       g_display = st.dataframe(team_stats)
-    
-  subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
 
-  with subtab1:
-    z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
-    z_scores.sort_values('Total', ascending = False, inplace = True)
-    z_scores = z_scores.round(2)
-    z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
-    
-  with subtab2:
-    g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
-    g_scores.sort_values('Total', ascending = False, inplace = True)
-    g_scores = g_scores.round(2)
-    g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
-
-  with subtab3:
-    winner_take_all = format == 'Head to Head: Most Categories'
-    n_players = n_drafters * n_picks
-    
-    H = HAgent(info = info
-               , omega = omega
-               , gamma = gamma
-               , alpha = alpha
-               , beta = beta
-               , n_iterations = n_iterations
-               , n_players = n_players
-               , winner_take_all = winner_take_all)
-
-    players_chosen = listify(selections_editable)
-    my_players = [p for p in selections_editable['Drafter ' + str(seat)] if len(p) > 0]
-
-    res = H.get_h_scores(player_stats, my_players, players_chosen)
-    res = res.sort_values(ascending = False)
-    st.dataframe(res)
+  with c2:
+    subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
+  
+    with subtab1:
+      z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+      z_scores.sort_values('Total', ascending = False, inplace = True)
+      z_scores = z_scores.round(2)
+      z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
+      
+    with subtab2:
+      g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+      g_scores.sort_values('Total', ascending = False, inplace = True)
+      g_scores = g_scores.round(2)
+      g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
+  
+    with subtab3:
+      winner_take_all = format == 'Head to Head: Most Categories'
+      n_players = n_drafters * n_picks
+      
+      H = HAgent(info = info
+                 , omega = omega
+                 , gamma = gamma
+                 , alpha = alpha
+                 , beta = beta
+                 , n_iterations = n_iterations
+                 , n_players = n_players
+                 , winner_take_all = winner_take_all)
+  
+      players_chosen = listify(selections_editable)
+      my_players = [p for p in selections_editable['Drafter ' + str(seat)] if len(p) > 0]
+  
+      res = H.get_h_scores(player_stats, my_players, players_chosen)
+      res = res.sort_values(ascending = False)
+      st.dataframe(res)
 
  
 
