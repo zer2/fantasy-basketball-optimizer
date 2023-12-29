@@ -170,7 +170,8 @@ with tab3:
     players_available = z_scores.index[~z_scores.index.isin(listify(selections_editable))]
     my_players = z_scores.index[z_scores.index.isin(listify(selections_editable['Drafter ' + str(seat)].dropna()))]
 
-    H.get_h_scores(player_stats, players_available, my_players)
+    res = H.get_h_scores(player_stats, players_available, my_players)
+    st.markdown(res)
 
  
 
