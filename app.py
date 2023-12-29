@@ -132,10 +132,12 @@ with tab3:
     with tab1:
       team_stats = z_scores[z_scores.index.isin(team_selections)]
       team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+      team_stats = team_stats.round(2)
       z_display = st.dataframe(team_stats)
     with tab2:
       team_stats = g_scores[g_scores.index.isin(team_selections)]
       team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+      team_stats = team_stats.round(2)
       g_display = st.dataframe(team_stats)
     
   subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
