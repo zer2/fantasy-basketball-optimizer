@@ -115,6 +115,9 @@ with tab3:
 
   c1, c2 = st.columns(2)
 
+  z_scores = info['Z-scores']
+  g_scores = info['G-scores']
+
   with c1: 
     selections_editable = st.data_editor(selections)
   with c2: 
@@ -138,14 +141,12 @@ with tab3:
   subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
 
   with subtab1:
-    z_scores = info['Z-scores']
     z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
     z_scores.sort_values('Total', ascending = False, inplace = True)
     z_scores = z_scores.round(2)
     z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
     
   with subtab2:
-    g_scores = info['G-scores']
     g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
     g_scores.sort_values('Total', ascending = False, inplace = True)
     g_scores = g_scores.round(2)
