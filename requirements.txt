@@ -1,3 +1,5 @@
+libxslt
+libxml2 
 streamlit
 streamlit-extras
 scipy
