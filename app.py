@@ -33,9 +33,9 @@ with tab1:
   player_stats = st.data_editor(df) # 👈 An editable dataframe
 
 with tab2: 
-  c1, c2, c3 = st.columns(3)
+  left, middle, right = st.columns([0.3,0.35,0.35])
 
-  with c1: 
+  with left: 
     st.header('General')
     
     format = st.selectbox(
@@ -54,13 +54,8 @@ with tab2:
     n_picks = st.number_input(r'How many players will each drafter choose?'
                 , min_value = 1
                 , value = 13)
-
-    seat =  st.number_input(r'What seat are you drafting at?'
-                        , min_value = 1
-                        , value = 1
-                       , max_value = n_drafters)
   
-  with c2: 
+  with middle: 
       st.header('Player Statistics')
 
       psi = st.number_input(r'Select a $\psi$ value'
@@ -77,7 +72,7 @@ with tab2:
       coefficients = st.data_editor(coefficient_df)
 
   
-  with c3:
+  with right:
     st.header('Algorithm')
 
     omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
@@ -111,7 +106,6 @@ with tab2:
 
 with tab3:
 
-  st.subheader('Draft board')
   
   info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
 
@@ -121,11 +115,21 @@ with tab3:
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
 
-  selections_editable = st.data_editor(selections)
+  top_left, top_right = st.columns([0.8,0.2])
 
-  c1, c2 = st.columns(2)
+  with top_Left:
+    st.subheader('Draft board')
+    selections_editable = st.data_editor(selections)
 
-  with c1:
+  with top_right: 
+    seat =  st.number_input(r'What seat are you drafting at?'
+                      , min_value = 1
+                      , value = 1
+                     , max_value = n_drafters)
+
+  bottom_left, bottom_right = st.columns(2)
+
+  with bottom_left:
     st.subheader('Team statistics')
     
     metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
@@ -145,7 +149,7 @@ with tab3:
       team_stats = team_stats.round(2)
       g_display = st.dataframe(team_stats)
 
-  with c2:
+  with bottom_right:
     st.subheader('Candidate player evaluation')
     subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
   
