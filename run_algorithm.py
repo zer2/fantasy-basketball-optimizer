@@ -45,7 +45,7 @@ class HAgent():
         self.v = info['v']
         self.L = info['L']
       
-    def make_pick(self
+    def get_h_scores(self
                   , df
                   , my_players
                   , all_players_chosen ):
