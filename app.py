@@ -127,11 +127,11 @@ with tab3:
 
     tab1, tab2 = st.tabs(["Z-score", "G-score"])
     with tab1:
-      team_stats = z_scores[z_scores.index.isin(listify(selections_editable))
+      team_stats = z_scores[z_scores.index.isin(team_selections)]
       team_stats.loc['Total', :] = team_stats.sum(axis = 0)
       z_display = st.dataframe(team_stats)
     with tab2:
-      team_stats = g_scores[g_scores.index.isin(listify(selections_editable))
+      team_stats = g_scores[g_scores.index.isin(team_selections)]
       team_stats.loc['Total', :] = team_stats.sum(axis = 0)
       g_display = st.dataframe(team_stats)
     
