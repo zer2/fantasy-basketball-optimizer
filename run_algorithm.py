@@ -5,7 +5,7 @@ def run_algorithm():
 
 #below here experimental
 
-class UAgent():
+class HAgent():
 
     def __init__(self
                   info
