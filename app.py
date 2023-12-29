@@ -168,7 +168,7 @@ with tab3:
                , winner_take_all = winner_take_all)
 
     players_chosen = listify(selections_editable)
-    my_players = selections_editable['Drafter ' + str(seat)].dropna()
+    my_players = [p for p in selections_editable['Drafter ' + str(seat)] if len(p) > 0]
 
     res = H.get_h_scores(player_stats, my_players, players_chosen)
     st.dataframe(res)
