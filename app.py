@@ -170,7 +170,7 @@ with tab3:
     players_chosen = listify(selections_editable)
     my_players = listify(selections_editable['Drafter ' + str(seat)].dropna())
 
-    res = H.get_h_scores(player_stats, players_available, my_players)
+    res = H.get_h_scores(player_stats, my_players, players_chosen)
     st.dataframe(res)
 
  
