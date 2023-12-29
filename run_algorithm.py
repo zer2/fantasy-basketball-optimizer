@@ -236,13 +236,13 @@ class HAgent():
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_terms_four_five(c))
 
     def get_last_four_terms(self,c):
-        return np.einsum('ij, ajk -> aik', self.get_term_two(c), self.get_last_three_terms(c,L))
+        return np.einsum('ij, ajk -> aik', self.get_term_two(c), self.get_last_three_terms(c))
 
     def get_del_last_four_terms(self,c):
         comp_i = self.get_del_term_two(c)
         comp_ii = self.get_last_three_terms(c)
         term_a = np.einsum('aijk, aj -> aik', comp_i, comp_ii.reshape(-1,9))
-        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c,L))
+        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c))
         return term_a + term_b
 
     def get_del_full(self,c):
