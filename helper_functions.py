@@ -77,10 +77,10 @@ def calculate_tipping_points(x):
     return final_probabilities
 
 def make_progress_chart(res):
-    data = pd.concat([pd.DataFrame({'Imputed win percent' : [r.loc[player]* 100 for r in res]
+    data = pd.concat([pd.DataFrame({'Expected # of categories won' : [r.loc[player] for r in res]
                                 , 'Player' : player
                                , 'Iteration' : list(range(len(res)))})
-        for player in res[-1].sort_values(ascending = False).index[0:6]])
+        for player in res[-1].sort_values(ascending = False).index[0:10]])
     
     fig = px.line(data
                   , x = "Iteration"
