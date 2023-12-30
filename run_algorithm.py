@@ -92,6 +92,10 @@ class HAgent():
         
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
                                           , scale = np.sqrt(self.diff_var))
+                
+                cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
+                                          , scale = np.sqrt(self.diff_var))
+                                 ,index = x_scores_available.index)
         
                 if self.winner_take_all:
         
@@ -112,10 +116,6 @@ class HAgent():
 
             else:
                 expected_future_diff = 0
-    
-            cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
-                                                      , scale = np.sqrt(self.diff_var))
-                                             ,index = x_scores_available.index)
     
             cdf_estimates.columns = cdf_estimates.columns
     
