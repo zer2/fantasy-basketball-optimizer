@@ -2,3 +2,4 @@ lxml==4.9.1
 streamlit
 streamlit-extras
 scipy
+plotly
