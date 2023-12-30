@@ -80,7 +80,7 @@ def make_progress_chart(res):
     data = pd.concat([pd.DataFrame({'Imputed win percent' : [r.loc[player].values[0]* 100 for r in res]
                                 , 'Player' : player
                                , 'Iteration' : list(range(len(scores)))})
-        for player in res[-1].sort_values(ascending = False, by = 0).index[0:6]])
+        for player in res[-1].sort_values(ascending = False).index[0:6]])
     
     fig = px.line(data
                   , x = "Iteration"
