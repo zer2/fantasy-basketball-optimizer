@@ -42,7 +42,8 @@ def process_player_data(player_stats
                         , psi
                         , nu
                         , n_drafters
-                        , n_picks):
+                        , n_picks
+                        , rotisserie):
   """Based on player stats and parameters, do all calculations to set up for running algorithms """
 
   n_players = n_drafters * n_picks
@@ -58,7 +59,9 @@ def process_player_data(player_stats
 
   score_table = x_scores.groupby([np.floor(x/n_drafters) for x in range(len(x_scores))]).agg(['mean','var'])
   score_table_smoothed = x_scores.transform(lambda x: savgol_filter(x,10,1))
-  diff_var = n_picks * 2 + x_scores[0:n_players].var() * n_picks
+  weekly_var = 0 if rotisserie else n_picks * 2
+  diff_var =  weekly_var + x_scores[0:n_players].var() * n_picks
+                          
   players_and_positions = pd.merge(x_scores
                            , positions
                            , left_index = True
