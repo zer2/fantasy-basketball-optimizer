@@ -126,7 +126,7 @@ with tab3:
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
 
-  left, right = st.columns(3)
+  left, right = st.columns(2)
 
   with left:
 
