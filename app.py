@@ -75,7 +75,7 @@ with tab2:
                                                       ,'Mean of Variances' : '𝜏²'}
                                                       )
 
-      st.caption('If you believe e.g. steals will be relatively unpredictable next year, you can increase 𝜏 for it. But the default values should be reasonable')
+      st.caption('μ, σ² and 𝜏² are defined in the paper. If you believe e.g. steals will be relatively unpredictable next year, you can increase 𝜏² for it. But the default values should be reasonable')
 
 
   
