@@ -6,8 +6,7 @@ from process_player_data import process_player_data
 from run_algorithm import HAgent
 from helper_functions import listify, make_progress_chart
 
-st.title('Optimization for fantasy basketball') 
-st.markdown('Implements the procedures and algorithms described by [this paper](https://arxiv.org/abs/2307.02188)')
+st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
 tab1, tab2, tab3 = st.tabs(["Player Stats", "Parameters", "Draft"])
 
 color_map = {'C' : 'yellow'
