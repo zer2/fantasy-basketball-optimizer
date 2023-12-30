@@ -216,9 +216,9 @@ with tab3:
         placeholder = st.empty()
         all_res = []
         
-        for i in range(n_iterations // 3):
+        for i in range(n_iterations // 1):
   
-          for _ in range(3):
+          for _ in range(1):
             c, res = next(generator)
             all_res = all_res + [res]
           
