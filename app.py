@@ -138,8 +138,8 @@ with tab3:
     default_seat = None
     while (i < n_drafters * n_picks) and (default_seat is None):
       round = i // n_drafters 
-      pick = i - round * n_drafters + 1
-      drafter = pick if round % 2 == 0 else n_drafters - pick
+      pick = i - round * n_drafters
+      drafter = pick + 1 if round % 2 == 0 else n_drafters - pick
 
       if selections_editable.loc[round, 'Drafter ' + str(drafter)] is None:
         default_seat = drafter
