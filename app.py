@@ -217,7 +217,7 @@ with tab3:
           
           with placeholder.container():
 
-            c1, c2 = st.columns([0.3,0.7])
+            c1, c2 = st.columns([0.25,0.75])
 
             with c1:
               res = res.sort_values(ascending = False)
