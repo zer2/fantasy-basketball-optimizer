@@ -184,16 +184,18 @@ with tab3:
                  , gamma = gamma
                  , alpha = alpha
                  , beta = beta
-                 , n_iterations = n_iterations
                  , n_players = n_players
                  , winner_take_all = winner_take_all)
   
       players_chosen = listify(selections_editable)
       my_players = [p for p in selections_editable['Drafter ' + str(seat)] if len(p) > 0]
   
-      res = H.get_h_scores(player_stats, my_players, players_chosen)
-      res = res.sort_values(ascending = False)
-      st.dataframe(res)
+      generator = H.get_h_scores(player_stats, my_players, players_chosen)
+
+      for i in range(n_iterations)
+        c, res = next(generator) 
+        res = res.sort_values(ascending = False)
+        st.dataframe(res)
 
  
 
