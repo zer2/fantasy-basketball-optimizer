@@ -130,6 +130,8 @@ class HAgent():
         c = c + change_c
         c[c < 0] = 0
         c = c/c.sum(axis = 1).reshape(-1,1)
+
+        return c
     
     
     def get_x_mu(self,c):
