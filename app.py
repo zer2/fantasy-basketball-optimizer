@@ -4,7 +4,7 @@ st.set_page_config(layout="wide")
 import pandas as pd
 from process_player_data import process_player_data
 from run_algorithm import HAgent
-from helper_functions import listify
+from helper_functions import listify, make_progress_chart
 
 st.title('Optimization for fantasy basketball') 
 st.markdown('Implements the procedures and algorithms described by [this paper](https://arxiv.org/abs/2307.02188)')
@@ -193,14 +193,22 @@ with tab3:
       generator = H.get_h_scores(player_stats, my_players, players_chosen)
 
       placeholder = st.empty()
+      all_res = []
       
       for i in range(n_iterations):
 
         c, res = next(generator) 
+        all_res = all_res + [res]
         
         with placeholder.container():
-          res = res.sort_values(ascending = False)
-          st.dataframe(res)
+
+          c1, c2 = st.columns([0.2,0.8])
+          with c1:
+            res = res.sort_values(ascending = False)
+            st.dataframe(res)
+          with c2:
+            st.plotly_chart(make_progress_chart(all_res))
+          
 
  
 
