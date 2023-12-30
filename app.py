@@ -143,6 +143,8 @@ with tab3:
 
       if selections_editable.loc[round, 'Drafter ' + str(drafter)] is None:
         default_seat = drafter
+
+      i += 1 
         
     seat =  st.number_input(r'Analyze for which drafter?'
                     , min_value = 1
