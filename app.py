@@ -33,7 +33,7 @@ with tab1:
   player_stats = st.data_editor(df) # 👈 An editable dataframe
 
 with tab2: 
-  left, middle, right = st.columns([0.25,0.35,0.4])
+  left, middle, right = st.columns([0.25,0.3,0.45])
 
   with left: 
     st.header('General')
@@ -75,34 +75,38 @@ with tab2:
   with right:
     st.header('Algorithm')
 
-    omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
-    omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
-                    it quantifies how much better the optimal player choice will be compared to the player that would be 
-                    chosen with baseline weights'''
-    st.caption(omega_str)
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+      omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
+      omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
+                      it quantifies how much better the optimal player choice will be compared to the player that would be 
+                      chosen with baseline weights'''
+      st.caption(omega_str)
+    
+      gamma = st.number_input(r'Select a $\gamma$ value', value = 0.1)
+      gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+              tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
+               players that  work best for its strategy'''
+      st.caption(gamma_str)
   
-    gamma = st.number_input(r'Select a $\gamma$ value', value = 0.1)
-    gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
-            tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-             players that  work best for its strategy'''
-    st.caption(gamma_str)
+      nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0.0, max_value = 1.0)
+      nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
+                  if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
+      st.caption(nu_str)
 
-    nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0.0, max_value = 1.0)
-    nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
-                if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
-    st.caption(nu_str)
-
-    alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01, min_value = 0.0)
-    alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
-    st.caption(alpha_str)
-
-    beta = st.number_input(r'Select a $\beta$ value', value = 0.25, min_value = 0.0)
-    beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
-    st.caption(beta_str)
-
-    n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 0, max_value = 1000)
-    n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
-    st.caption(n_iterations_str)
+    with right_col:
+      alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01, min_value = 0.0)
+      alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
+      st.caption(alpha_str)
+  
+      beta = st.number_input(r'Select a $\beta$ value', value = 0.25, min_value = 0.0)
+      beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
+      st.caption(beta_str)
+  
+      n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 0, max_value = 1000)
+      n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
+      st.caption(n_iterations_str)
 
 with tab3:
 
