@@ -148,7 +148,7 @@ with tab3:
         
     seat =  st.number_input(r'Analyze for which drafter?'
                     , min_value = 1
-                    , value = 1
+                    , value = default_seat
                    , max_value = n_drafters)
 
   bottom_left, bottom_right = st.columns([0.4,0.6])
