@@ -126,12 +126,14 @@ with tab3:
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
 
-  st.subheader('Draft board')
-  selections_editable = st.data_editor(selections)
+  left, middle, right = st.columns(3)
 
-  n, dummy_col = st.columns(2)
+  with left:
 
-  with n:
+    st.subheader('Draft board')
+    selections_editable = st.data_editor(selections)
+
+  with middle:
 
     #figure out which drafter is next
     i = 0
@@ -151,9 +153,7 @@ with tab3:
                     , value = default_seat
                    , max_value = n_drafters)
 
-  bottom_left, bottom_right = st.columns([0.4,0.6])
 
-  with bottom_left:
     st.subheader('Team statistics')
     
     metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
@@ -173,7 +173,7 @@ with tab3:
       team_stats = team_stats.round(2)
       g_display = st.dataframe(team_stats)
 
-  with bottom_right:
+  with right:
     st.subheader('Candidate player evaluation')
     subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
   
