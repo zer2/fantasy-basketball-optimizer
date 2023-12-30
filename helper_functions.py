@@ -94,4 +94,4 @@ def make_progress_chart(res):
         xanchor="right",
         x=0.99
                 ))
-    fig.show()
+    return fig
