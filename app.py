@@ -26,7 +26,6 @@ df[r'No Play %'] = df[r'No Play %'] * 100
 df = df.round(1)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
-coefficient_df.columns = ['μ','σ','𝜏']
 
 with tab1:
   st.markdown(f"Weekly player projections below: feel free to edit")
@@ -70,7 +69,12 @@ with tab2:
       st.caption(psi_str)
 
       st.subheader(f"Coefficients")
-      coefficients = st.data_editor(coefficient_df)
+      coefficients = st.data_editor(coefficient_df
+                                   , column_config = {'Mean of Means' :  'μ'
+                                                      ,'Variance of Means' : 'σ²'
+                                                      ,'Mean of Variances' : '𝜏²'}
+                                                      )
+
       st.caption('If you believe e.g. steals will be relatively unpredictable next year, you can increase 𝜏 for it. But the default values should be reasonable')
 
 
