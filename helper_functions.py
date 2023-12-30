@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import plotly.express as px
 
 #get all values from a dataframe into a list
 def listify(x):
@@ -73,3 +75,23 @@ def calculate_tipping_points(x):
     final_probabilities = positive_case_probabilities + negative_case_probabilities
     
     return final_probabilities
+
+def make_progress_chart(res):
+    data = pd.concat([pd.DataFrame({'Imputed win percent' : [r.loc[player].values[0]* 100 for r in res]
+                                , 'Player' : player
+                               , 'Iteration' : list(range(len(scores)))})
+        for player in res[-1].sort_values(ascending = False, by = 0).index[0:6]])
+    
+    fig = px.line(data
+                  , x = "Iteration"
+                  , y = "Imputed win percent"
+                  , color = "Player"
+                 , title = title_str)
+    
+    fig.update_layout(legend=dict(
+        yanchor="bottom",
+        y=0.01,
+        xanchor="right",
+        x=0.99
+                ))
+    fig.show()
