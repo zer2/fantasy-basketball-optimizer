@@ -153,28 +153,28 @@ with tab3:
                     , value = default_seat
                    , max_value = n_drafters)
 
-    tab1, tab2 = st.tabs(["Team", "Candidates"])
+    team_tab, cand_tab = st.tabs(["Team", "Candidates"])
 
-    with tab1:
+    with team_tab:
       
       metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
       st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
     
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
   
-      tab1, tab2 = st.tabs(["Z-score", "G-score"])
-      with tab1:
+      z_tab, g_tab = st.tabs(["Z-score", "G-score"])
+      with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats = team_stats.round(2)
         z_display = st.dataframe(team_stats)
-      with tab2:
+      with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats = team_stats.round(2)
         g_display = st.dataframe(team_stats)
 
-    with tab2:
+    with cand_tab:
       subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
     
       with subtab1:
