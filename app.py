@@ -26,6 +26,7 @@ df[r'No Play %'] = df[r'No Play %'] * 100
 df = df.round(1)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
+coefficient_df.columns = [r'$\mu$',r'$\sigma^2$',r'$\tau^2$']
 
 with tab1:
   st.markdown(f"Weekly player projections below: feel free to edit")
