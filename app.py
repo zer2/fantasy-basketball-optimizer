@@ -192,8 +192,9 @@ with tab3:
   
       generator = H.get_h_scores(player_stats, my_players, players_chosen)
 
+      print('Hello')
       for i in range(n_iterations):
-        print(i)
+        print(str(i))
         c, res = next(generator) 
         res = res.sort_values(ascending = False)
         st.dataframe(res)
