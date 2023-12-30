@@ -213,8 +213,7 @@ with tab3:
 
         for _ in range(3):
           c, res = next(generator)
-        
-        all_res = all_res + [res]
+          all_res = all_res + [res]
         
         with placeholder.container():
 
