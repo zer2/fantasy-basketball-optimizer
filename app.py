@@ -141,7 +141,7 @@ with tab3:
       pick = i - round * n_drafters + 1
       drafter = pick if round % 2 == 0 else n_drafters - pick
 
-      if selections_editable.loc[round, 'Drafter ' + str(drafter)] is not None:
+      if selections_editable.loc[round, 'Drafter ' + str(drafter)] is None:
         default_seat = drafter
         
     seat =  st.number_input(r'Analyze for which drafter?'
