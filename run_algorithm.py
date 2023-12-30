@@ -80,6 +80,8 @@ class HAgent():
 
     def perform_iterations(self,c,round_n, diff_means, x_scores_available):
 
+        i = 0
+        
         while True:
 
             if round_n < 12:
@@ -124,8 +126,12 @@ class HAgent():
                                  )
             else:
                 win_sums = cdf_estimates.sum(axis = 1) 
+
+            i = i + 1
     
             yield c, win_sums
+
+    
     
     
     def get_x_mu(self,c):
