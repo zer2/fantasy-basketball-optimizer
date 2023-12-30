@@ -84,9 +84,7 @@ def make_progress_chart(res):
     
     fig = px.line(data
                   , x = "Iteration"
-                  , y = "Expected # of categories won"
-                  , color = "Player"
-                 , title = 'Score Progression')
+                  , color = "Player")
     
     fig.update_layout(legend=dict(
         yanchor="bottom",
