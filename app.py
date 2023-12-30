@@ -158,7 +158,7 @@ with tab3:
     with team_tab:
       
       metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
-      st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
+      st.caption('For ' + format + ', it is recommended to evaluate your team by ' + metric)
     
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
   
@@ -177,9 +177,9 @@ with tab3:
     with cand_tab:
 
       if format == 'Rotisserie': 
-        st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
+        st.caption('For ' + format + ', it is recommended to select players based on ' + metric)
       else: 
-        st.caption('For ' + format + ', it is recommended to aggregate by H-score' )
+        st.caption('For ' + format + ', it is recommended to select players based on H-score' )
       
       subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
     
