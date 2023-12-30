@@ -84,6 +84,7 @@ def make_progress_chart(res):
     
     fig = px.line(data
                   , x = "Iteration"
+                  , y = 'Expected # of categories won'
                   , color = "Player")
     
     fig.update_layout(legend=dict(
@@ -92,4 +93,7 @@ def make_progress_chart(res):
         xanchor="right",
         x=0.99
                 ))
+
+    fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
+
     return fig
