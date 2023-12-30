@@ -111,7 +111,7 @@ with tab2:
       beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
       st.caption(beta_str)
   
-      n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 0, max_value = 1000)
+      n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 100, max_value = 10000)
       n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
       st.caption(n_iterations_str)
 
@@ -137,7 +137,7 @@ with tab3:
                     , value = 1
                    , max_value = n_drafters)
 
-  bottom_left, bottom_right = st.columns(2)
+  bottom_left, bottom_right = st.columns([0.4,0.6])
 
   with bottom_left:
     st.subheader('Team statistics')
@@ -202,7 +202,7 @@ with tab3:
         
         with placeholder.container():
 
-          c1, c2 = st.columns([0.2,0.8])
+          c1, c2 = st.columns([0.3,0.7])
           with c1:
             res = res.sort_values(ascending = False)
             st.dataframe(res)
