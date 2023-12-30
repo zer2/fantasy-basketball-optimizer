@@ -63,8 +63,6 @@ class HAgent():
 
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
         
-        current_score_table = self.score_table[0:round_n].sum()
-        diff_means =  x_self_sum - current_score_table.loc[(self.x_scores.columns,'mean')].droplevel(1)
         
         previous_rounds_expected = self.score_table.iloc[0:round_n].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
         this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
@@ -83,37 +81,7 @@ class HAgent():
         if round_n < 12:
             for i in range(self.n_iterations):
 
-                del_full = self.get_del_full(c)
-
-                expected_x = self.get_x_mu(c)
-                expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
-
-                pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
-                                          , scale = np.sqrt(self.diff_var))
-
-                if self.winner_take_all:
-
-
-                    tipping_points = calculate_tipping_points(cdf_estimates)   
-
-                    pdf_weights = (tipping_points*pdf_estimates)
-                else:
-                    pdf_weights = pdf_estimates
-
-                gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
-
-                #first_moment = self.beta_1 * first_moment + (1- self.beta_1) * gradient 
-                #second_moment = self.beta_2 * second_moment + (1- self.beta_2) * gradient**2 
-
-                #first_moment_unbiased = first_moment/(1 - self.beta_1**2)
-                #second_moment_unbiased = second_moment/(1 - self.beta_2**2)
-
-                step_size = self.alpha * (i + 1)**(-self.beta) 
-                change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
-
-                c = c + change_c
-                c[c < 0] = 0
-                c = c/c.sum(axis = 1).reshape(-1,1)
+                c = self.perform_iteration(c,i,round_n, diff_means, x_scores_available)
 
         else:
             expected_future_diff = 0
@@ -135,6 +103,33 @@ class HAgent():
         win_sums.name = 'value'
                     
         return win_sums
+
+    def perform_iteration(c,i,round_n, diff_means, x_scores_available):
+        
+        del_full = self.get_del_full(c)
+
+        expected_x = self.get_x_mu(c)
+        expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
+
+        pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
+                                  , scale = np.sqrt(self.diff_var))
+
+        if self.winner_take_all:
+
+            tipping_points = calculate_tipping_points(cdf_estimates)   
+
+            pdf_weights = (tipping_points*pdf_estimates)
+        else:
+            pdf_weights = pdf_estimates
+
+        gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
+
+        step_size = self.alpha * (i + 1)**(-self.beta) 
+        change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
+
+        c = c + change_c
+        c[c < 0] = 0
+        c = c/c.sum(axis = 1).reshape(-1,1)
     
     
     def get_x_mu(self,c):
