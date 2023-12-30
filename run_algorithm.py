@@ -87,7 +87,7 @@ class HAgent():
 
         #no need for iterating through different weight vectors if there is only one player left 
         else:
-             cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
+            cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                                                   , scale = np.sqrt(self.diff_var))
                                          ,index = x_scores_available.index)
     
