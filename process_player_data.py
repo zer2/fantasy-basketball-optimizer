@@ -55,6 +55,13 @@ def process_player_data(player_stats
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
   x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 0,1)
 
+  #Design the score table based on what we expect other drafters to use. 
+  #Z-score for rotisserie, otherwise G-score
+  if rotisserie:
+    x_scores = x_scores.loc[z_scores.sum(axis = 1).sort_values(ascending = False).index]
+  else:
+    x_scores = x_scores.loc[g_scores.sum(axis = 1).sort_values(ascending = False).index]
+
   positions = player_stats[['Position']]
 
   score_table = x_scores.groupby([np.floor(x/n_drafters) for x in range(len(x_scores))]).agg(['mean','var'])
