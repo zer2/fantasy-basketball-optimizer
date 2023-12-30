@@ -85,7 +85,10 @@ class HAgent():
 
         else:
             expected_future_diff = 0
-            
+
+        expected_x = self.get_x_mu(c)
+        expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
+                      
         win_probabilities = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
                                                   , scale = np.sqrt(self.diff_var))
                                          ,index = x_scores_available.index)
