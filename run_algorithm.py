@@ -104,7 +104,7 @@ class HAgent():
                     
         return win_sums
 
-    def perform_iteration(c,i,round_n, diff_means, x_scores_available):
+    def perform_iteration(self,c,i,round_n, diff_means, x_scores_available):
         
         del_full = self.get_del_full(c)
 
