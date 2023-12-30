@@ -133,8 +133,6 @@ with tab3:
     st.subheader('Draft board')
     selections_editable = st.data_editor(selections)
 
-  with right:
-
     #figure out which drafter is next
     i = 0
     default_seat = None
@@ -152,6 +150,8 @@ with tab3:
                     , min_value = 1
                     , value = default_seat
                    , max_value = n_drafters)
+
+  with right:
 
     team_tab, cand_tab = st.tabs(["Team", "Candidates"])
 
@@ -216,12 +216,16 @@ with tab3:
             all_res = all_res + [res]
           
           with placeholder.container():
-  
-            res = res.sort_values(ascending = False)
-            res.name = 'Value for last iteration'
-            st.dataframe(pd.DataFrame(res).T)
-          
-            st.plotly_chart(make_progress_chart(all_res))
+
+            c1, c2 = st.columns([0.3,0.7])
+
+            with c1:
+              res = res.sort_values(ascending = False)
+              res.name = 'H-score'
+              st.dataframe(pd.DataFrame(res).T)
+
+            with c2:
+              st.plotly_chart(make_progress_chart(all_res))
             
 
  
