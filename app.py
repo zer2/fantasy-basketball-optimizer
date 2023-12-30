@@ -194,6 +194,7 @@ with tab3:
 
       for i in range(n_iterations):
         st.write(str(i))
+        st.write(n_iterations)
         c, res = next(generator) 
         res = res.sort_values(ascending = False)
         st.dataframe(res)
