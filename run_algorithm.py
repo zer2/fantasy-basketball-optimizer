@@ -76,11 +76,11 @@ class HAgent():
         scores = []
         weights = []
 
-        return perform_iteration(self,c,round_n, diff_means, x_scores_available,n_iterations)
+        return perform_iterations(self,c,round_n, diff_means, x_scores_available,n_iterations)
 
-    def perform_iteration(self,c,round_n, diff_means, x_scores_available,n_iterations):
+    def perform_iterations(self,c,round_n, diff_means, x_scores_available,n_iterations):
 
-        while :
+        while True:
 
             if round_n < 12:
                 del_full = self.get_del_full(c)
