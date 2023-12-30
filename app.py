@@ -211,7 +211,7 @@ with tab3:
       
       for i in range(n_iterations):
 
-        c, res = next(generator) 
+        c, res = next(next(next(generator))) 
         all_res = all_res + [res]
         
         with placeholder.container():
