@@ -117,8 +117,9 @@ with tab2:
 
 with tab3:
 
+  rotisserie = format == 'Rotisserie'
   
-  info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks)
+  info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks, rotisserie)
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
@@ -177,7 +178,7 @@ with tab3:
     with cand_tab:
 
       if format == 'Rotisserie': 
-        st.caption('For ' + format + ', it is recommended to select players based on ' + metric)
+        st.caption('For Rotisserie, it is recommended to select players based on ' + metric + ' or H-score. However, keep in mind that H-score for Rotisserie is experimental')
       else: 
         st.caption('For ' + format + ', it is recommended to select players based on H-score' )
       
