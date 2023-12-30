@@ -33,7 +33,7 @@ with tab1:
   player_stats = st.data_editor(df) # 👈 An editable dataframe
 
 with tab2: 
-  left, middle, right = st.columns([0.25,0.3,0.45])
+  left, middle, right = st.columns([0.25,0.25,0.5])
 
   with left: 
     st.header('General')
