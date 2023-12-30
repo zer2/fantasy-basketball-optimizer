@@ -222,7 +222,7 @@ with tab3:
             with c1:
               res = res.sort_values(ascending = False)
               res.name = 'H-score'
-              st.dataframe(pd.DataFrame(res).T)
+              st.dataframe(pd.DataFrame(res))
 
             with c2:
               st.plotly_chart(make_progress_chart(all_res))
