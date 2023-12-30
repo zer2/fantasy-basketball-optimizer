@@ -111,7 +111,7 @@ with tab2:
       beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
       st.caption(beta_str)
   
-      n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 100, min_value = 10, max_value = 10000)
+      n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 10, max_value = 10000)
       n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
       st.caption(n_iterations_str)
 
