@@ -175,6 +175,12 @@ with tab3:
         g_display = st.dataframe(team_stats)
 
     with cand_tab:
+
+      if format == 'Rotisserie': 
+        st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
+      else: 
+        st.caption('For ' + format + ', it is recommended to aggregate by H-score' )
+      
       subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
     
       with subtab1:
