@@ -217,12 +217,11 @@ with tab3:
         
         with placeholder.container():
 
-          c1, c2 = st.columns([0.3,0.7])
-          with c1:
-            res = res.sort_values(ascending = False)
-            st.dataframe(res)
-          with c2:
-            st.plotly_chart(make_progress_chart(all_res))
+          res = res.sort_values(ascending = False).T
+          res.name = ['Value for last iteration']
+          st.dataframe(res)
+        
+          st.plotly_chart(make_progress_chart(all_res))
           
 
  
