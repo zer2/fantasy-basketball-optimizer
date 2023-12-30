@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import itertools
 
 #get all values from a dataframe into a list
 def listify(x):
