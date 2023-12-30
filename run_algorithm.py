@@ -76,9 +76,9 @@ class HAgent():
         scores = []
         weights = []
 
-        return perform_iterations(self,c,round_n, diff_means, x_scores_available,n_iterations)
+        return self.perform_iterations(self,c,round_n, diff_means, x_scores_available)
 
-    def perform_iterations(self,c,round_n, diff_means, x_scores_available,n_iterations):
+    def perform_iterations(self,c,round_n, diff_means, x_scores_available):
 
         while True:
 
