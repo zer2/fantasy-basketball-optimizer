@@ -218,7 +218,7 @@ with tab3:
         with placeholder.container():
 
           res = res.sort_values(ascending = False).T
-          res.name = ['Value for last iteration']
+          res.name = 'Value for last iteration'
           st.dataframe(res)
         
           st.plotly_chart(make_progress_chart(all_res))
