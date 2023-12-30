@@ -81,31 +81,28 @@ class HAgent():
         if round_n < 12:
             for i in range(self.n_iterations):
 
-                c = self.perform_iteration(c,i,round_n, diff_means, x_scores_available)
+                c, win_sums = self.perform_iteration(c,i,round_n, diff_means, x_scores_available)
 
+            return win_sums
+
+        #no need for iterating through different weight vectors if there is only one player left 
         else:
-            expected_future_diff = 0
-
-        expected_x = self.get_x_mu(c)
-        expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
-                      
-        win_probabilities = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
+             cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                                                   , scale = np.sqrt(self.diff_var))
                                          ,index = x_scores_available.index)
+    
+            cdf_estimates.columns = cdf_estimates.columns
+    
+            if self.winner_take_all:
+                win_sums = combinatorial_calculation(cdf_estimates
+                                                              , 1 - cdf_estimates
+                                                              , categories = cdf_estimates.columns
+                                 )
+            else:
+                win_sums = cdf_estimates.sum(axis = 1) 
+    
+            return win_sums
 
-        win_probabilities.columns = x_scores_available.columns
-
-        if self.winner_take_all:
-            win_sums = combinatorial_calculation(win_probabilities
-                                                          , 1 - win_probabilities
-                                                          , categories = win_probabilities.columns
-                             )
-        else:
-            win_sums = win_probabilities.sum(axis = 1) 
-
-        win_sums.name = 'value'
-                    
-        return win_sums
 
     def perform_iteration(self,c,i,round_n, diff_means, x_scores_available):
         
@@ -134,7 +131,21 @@ class HAgent():
         c[c < 0] = 0
         c = c/c.sum(axis = 1).reshape(-1,1)
 
-        return c
+        cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
+                                                  , scale = np.sqrt(self.diff_var))
+                                         ,index = x_scores_available.index)
+
+        cdf_estimates.columns = cdf_estimates.columns
+
+        if self.winner_take_all:
+            win_sums = combinatorial_calculation(cdf_estimates
+                                                          , 1 - cdf_estimates
+                                                          , categories = cdf_estimates.columns
+                             )
+        else:
+            win_sums = cdf_estimates.sum(axis = 1) 
+
+        return c, win_sums
     
     
     def get_x_mu(self,c):
