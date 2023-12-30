@@ -86,7 +86,7 @@ def make_progress_chart(res):
                   , x = "Iteration"
                   , y = "Imputed win percent"
                   , color = "Player"
-                 , title = title_str)
+                 , title = 'Score Progression')
     
     fig.update_layout(legend=dict(
         yanchor="bottom",
