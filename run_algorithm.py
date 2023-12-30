@@ -13,7 +13,6 @@ class HAgent():
                  , gamma
                  , alpha
                  , beta
-                 , n_iterations 
                  , n_players
                  , winner_take_all
 ):
@@ -35,7 +34,6 @@ class HAgent():
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
-        self.n_iterations = n_iterations
         self.n_players = n_players
         self.winner_take_all = winner_take_all 
         self.x_scores = info['X-scores']
@@ -78,18 +76,44 @@ class HAgent():
         scores = []
         weights = []
 
-        if round_n < 12:
-            for i in range(self.n_iterations):
+        return perform_iteration(self,c,round_n, diff_means, x_scores_available,n_iterations)
 
-                c, win_sums = self.perform_iteration(c,i,round_n, diff_means, x_scores_available)
+    def perform_iteration(self,c,round_n, diff_means, x_scores_available,n_iterations):
 
-            return win_sums
+        while :
 
-        #no need for iterating through different weight vectors if there is only one player left 
-        else:
-            cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
-                                                  , scale = np.sqrt(self.diff_var))
-                                         ,index = x_scores_available.index)
+            if round_n < 12:
+                del_full = self.get_del_full(c)
+        
+                expected_x = self.get_x_mu(c)
+                expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
+        
+                pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
+                                          , scale = np.sqrt(self.diff_var))
+        
+                if self.winner_take_all:
+        
+                    tipping_points = calculate_tipping_points(cdf_estimates)   
+        
+                    pdf_weights = (tipping_points*pdf_estimates)
+                else:
+                    pdf_weights = pdf_estimates
+        
+                gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
+        
+                step_size = self.alpha * (i + 1)**(-self.beta) 
+                change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
+        
+                c = c + change_c
+                c[c < 0] = 0
+                c = c/c.sum(axis = 1).reshape(-1,1)
+
+            else:
+                expected_future_diff = 0
+    
+            cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
+                                                      , scale = np.sqrt(self.diff_var))
+                                             ,index = x_scores_available.index)
     
             cdf_estimates.columns = cdf_estimates.columns
     
@@ -101,51 +125,7 @@ class HAgent():
             else:
                 win_sums = cdf_estimates.sum(axis = 1) 
     
-            return win_sums
-
-
-    def perform_iteration(self,c,i,round_n, diff_means, x_scores_available):
-        
-        del_full = self.get_del_full(c)
-
-        expected_x = self.get_x_mu(c)
-        expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
-
-        pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
-                                  , scale = np.sqrt(self.diff_var))
-
-        if self.winner_take_all:
-
-            tipping_points = calculate_tipping_points(cdf_estimates)   
-
-            pdf_weights = (tipping_points*pdf_estimates)
-        else:
-            pdf_weights = pdf_estimates
-
-        gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
-
-        step_size = self.alpha * (i + 1)**(-self.beta) 
-        change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
-
-        c = c + change_c
-        c[c < 0] = 0
-        c = c/c.sum(axis = 1).reshape(-1,1)
-
-        cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
-                                                  , scale = np.sqrt(self.diff_var))
-                                         ,index = x_scores_available.index)
-
-        cdf_estimates.columns = cdf_estimates.columns
-
-        if self.winner_take_all:
-            win_sums = combinatorial_calculation(cdf_estimates
-                                                          , 1 - cdf_estimates
-                                                          , categories = cdf_estimates.columns
-                             )
-        else:
-            win_sums = cdf_estimates.sum(axis = 1) 
-
-        return c, win_sums
+            yield c, win_sums
     
     
     def get_x_mu(self,c):
