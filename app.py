@@ -126,14 +126,14 @@ with tab3:
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
 
-  left, middle, right = st.columns(3)
+  left, right = st.columns(3)
 
   with left:
 
     st.subheader('Draft board')
     selections_editable = st.data_editor(selections)
 
-  with middle:
+  with right:
 
     #figure out which drafter is next
     i = 0
@@ -153,76 +153,76 @@ with tab3:
                     , value = default_seat
                    , max_value = n_drafters)
 
+    tab1, tab2 = st.tabs(["Team", "Candidates"])
 
-    st.subheader('Team statistics')
-    
-    metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
-    st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
-  
-    team_selections = selections_editable['Drafter ' + str(seat)].dropna()
-
-    tab1, tab2 = st.tabs(["Z-score", "G-score"])
     with tab1:
-      team_stats = z_scores[z_scores.index.isin(team_selections)]
-      team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-      team_stats = team_stats.round(2)
-      z_display = st.dataframe(team_stats)
+      
+      metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
+      st.caption('For ' + format + ', it is recommended to aggregate by ' + metric)
+    
+      team_selections = selections_editable['Drafter ' + str(seat)].dropna()
+  
+      tab1, tab2 = st.tabs(["Z-score", "G-score"])
+      with tab1:
+        team_stats = z_scores[z_scores.index.isin(team_selections)]
+        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+        team_stats = team_stats.round(2)
+        z_display = st.dataframe(team_stats)
+      with tab2:
+        team_stats = g_scores[g_scores.index.isin(team_selections)]
+        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+        team_stats = team_stats.round(2)
+        g_display = st.dataframe(team_stats)
+
     with tab2:
-      team_stats = g_scores[g_scores.index.isin(team_selections)]
-      team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-      team_stats = team_stats.round(2)
-      g_display = st.dataframe(team_stats)
-
-  with right:
-    st.subheader('Candidate player evaluation')
-    subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
-  
-    with subtab1:
-      z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
-      z_scores.sort_values('Total', ascending = False, inplace = True)
-      z_scores = z_scores.round(2)
-      z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
-      
-    with subtab2:
-      g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
-      g_scores.sort_values('Total', ascending = False, inplace = True)
-      g_scores = g_scores.round(2)
-      g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
-  
-    with subtab3:
-      winner_take_all = format == 'Head to Head: Most Categories'
-      n_players = n_drafters * n_picks
-      
-      H = HAgent(info = info
-                 , omega = omega
-                 , gamma = gamma
-                 , alpha = alpha
-                 , beta = beta
-                 , n_players = n_players
-                 , winner_take_all = winner_take_all)
-  
-      players_chosen = listify(selections_editable)
-      my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
-  
-      generator = H.get_h_scores(player_stats, my_players, players_chosen)
-
-      placeholder = st.empty()
-      all_res = []
-      
-      for i in range(n_iterations // 3):
-
-        for _ in range(3):
-          c, res = next(generator)
-          all_res = all_res + [res]
+      subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
+    
+      with subtab1:
+        z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+        z_scores.sort_values('Total', ascending = False, inplace = True)
+        z_scores = z_scores.round(2)
+        z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
         
-        with placeholder.container():
-
-          res = res.sort_values(ascending = False)
-          res.name = 'Value for last iteration'
-          st.dataframe(pd.DataFrame(res).T)
+      with subtab2:
+        g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+        g_scores.sort_values('Total', ascending = False, inplace = True)
+        g_scores = g_scores.round(2)
+        g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
+    
+      with subtab3:
+        winner_take_all = format == 'Head to Head: Most Categories'
+        n_players = n_drafters * n_picks
         
-          st.plotly_chart(make_progress_chart(all_res))
+        H = HAgent(info = info
+                   , omega = omega
+                   , gamma = gamma
+                   , alpha = alpha
+                   , beta = beta
+                   , n_players = n_players
+                   , winner_take_all = winner_take_all)
+    
+        players_chosen = listify(selections_editable)
+        my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
+    
+        generator = H.get_h_scores(player_stats, my_players, players_chosen)
+  
+        placeholder = st.empty()
+        all_res = []
+        
+        for i in range(n_iterations // 3):
+  
+          for _ in range(3):
+            c, res = next(generator)
+            all_res = all_res + [res]
           
+          with placeholder.container():
+  
+            res = res.sort_values(ascending = False)
+            res.name = 'Value for last iteration'
+            st.dataframe(pd.DataFrame(res).T)
+          
+            st.plotly_chart(make_progress_chart(all_res))
+            
 
  
 
