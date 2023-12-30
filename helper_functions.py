@@ -84,7 +84,7 @@ def make_progress_chart(res):
     
     fig = px.line(data
                   , x = "Iteration"
-                  , y = "Imputed win percent"
+                  , y = "Expected # of categories won"
                   , color = "Player"
                  , title = 'Score Progression')
     
