@@ -132,6 +132,18 @@ with tab3:
   n, dummy_col = st.columns(2)
 
   with n:
+
+    #figure out which drafter is next
+    i = 0
+    default_seat = None
+    while (i < n_drafters * n_picks) and (default_seat is None):
+      round = i // n_drafters 
+      pick = i - round * n_drafters 
+      drafter = pick if round % 2 == 0 else n_drafters - pick
+
+      if selections_editable.loc[round, 'Drafter ' + str(drafter)] is not None:
+        default_seat = drafter
+        
     seat =  st.number_input(r'Analyze for which drafter?'
                     , min_value = 1
                     , value = 1
