@@ -99,7 +99,7 @@ class HAgent():
         
                 if self.winner_take_all:
         
-                    tipping_points = calculate_tipping_points(cdf_estimates)   
+                    tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
         
                     pdf_weights = (tipping_points*pdf_estimates)
                 else:
