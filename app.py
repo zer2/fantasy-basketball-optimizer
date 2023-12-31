@@ -2,6 +2,7 @@ import streamlit as st
 st.set_page_config(layout="wide")
 
 import pandas as pd
+from pandas.api.types import CategoricalDtype
 from process_player_data import process_player_data
 from run_algorithm import HAgent
 from helper_functions import listify, make_progress_chart
@@ -15,7 +16,7 @@ color_map = {'C' : 'yellow'
              ,'SG' : 'red'
              ,'PG' : 'red'}
 
-df = pd.read_csv('./predictions.csv').set_index('Player')
+df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
 df[r'Free Throw %'] = df[r'Free Throw %'] * 100
@@ -122,6 +123,10 @@ with tab3:
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+
+  #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+  player_category_type = CategoricalDtype(categories=list(player_stats.index), ordered=True)
+  selections = selections.astype(player_category_type)
 
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
