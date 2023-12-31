@@ -84,9 +84,13 @@ def process_player_data(player_stats
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
   
-  #get weights of X to G 
-  v = np.sqrt(coefficients.loc[counting_statistics + percentage_statistics , 'Mean of Variances']/(coefficients.loc[counting_statistics + percentage_statistics , 'Mean of Variances'] + \
-                                                                                                   coefficients.loc[counting_statistics + percentage_statistics , 'Variance of Means']))
+  mov = coefficients.loc[counting_statistics + percentage_statistics , 'Mean of Variances']
+  vom = coefficients.loc[counting_statistics + percentage_statistics , 'Variance of Means']
+  if rotisserie:  #get weights of X to Z 
+    v = np.sqrt(mov/vom)  
+  else:   #get weights of X to G 
+    v = np.sqrt(mov/(mov + vom))
+
   v = np.array(v/v.sum()).reshape(9,1)
   
   L = np.array(x_scores_as_diff.cov()) 
