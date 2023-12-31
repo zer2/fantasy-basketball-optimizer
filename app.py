@@ -80,7 +80,7 @@ with tab2:
 
   
   with right:
-    st.header('Algorithm')
+    st.header('H-Scoring Algorithm')
 
     left_col, right_col = st.columns(2)
 
