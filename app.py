@@ -136,7 +136,7 @@ with tab3:
   with left:
 
     st.subheader('Draft board')
-    selections_editable = st.data_editor(selections)
+    selections_editable = st.data_editor(selections, hide_index = True)
 
     #figure out which drafter is next
     i = 0
