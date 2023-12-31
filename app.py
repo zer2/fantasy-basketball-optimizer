@@ -146,7 +146,9 @@ with tab3:
       pick = i - round * n_drafters
       drafter = pick + 1 if round % 2 == 0 else n_drafters - pick
 
-      if selections_editable.loc[round, 'Drafter ' + str(drafter)] is None:
+      #the condition should only trigger when the seat to check is blank 
+      check_seat = selections_editable.loc[round, 'Drafter ' + str(drafter)]
+      if check_seat != check_seat:
         default_seat = drafter
 
       i += 1 
