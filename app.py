@@ -201,15 +201,9 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.applymap(coloring
-                                                           , subset=(['Total','Expected'], slice(None)
-                                                                    )
-                                                          )
+        team_stats - team_stats.style.format("{:.2%}").applymap(styler)
 
-        team_stats - team_stats.style.format("{:.2%}")
-
-        z_display = st.dataframe(team_stats)
-        
+        z_display = st.dataframe(team_stats.style)        
         
       with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
@@ -219,13 +213,13 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.applymap(coloring
+        team_stats = team_stats.style.map(coloring
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-        team_stats - team_stats.style.format("{:.2%}")
+        team_stats - team_stats.style.format("{:.2%}").applymap(styler)
 
-        g_display = st.dataframe(team_stats)
+        g_display = st.dataframe(team_stats.style)
         
     with cand_tab:
 
