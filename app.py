@@ -19,6 +19,9 @@ color_map = {'C' : 'yellow'
 df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
+counting_stats = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers','Free Throw Attempts','Free Throw Attempts','Field Goal Attempts']
+df[counting_stats] = df[counting_stats]/3
+ #adjust for the display
 df[r'Free Throw %'] = df[r'Free Throw %'] * 100
 df[r'Field Goal %'] = df[r'Field Goal %'] * 100
 df[r'No Play %'] = df[r'No Play %'] * 100
@@ -28,9 +31,17 @@ df = df.round(1)
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 with tab1:
-  st.markdown(f"Weekly player projections below: feel free to edit")
+  st.markdown(f"Per-game player projections below: feel free to edit. Converted to weekly by multiplying by three")
 
-  player_stats = st.data_editor(df) # 👈 An editable dataframe
+  player_stats_editable = st.data_editor(df) # 👈 An editable dataframe
+  player_stats = player_stats_editable.copy()
+
+  #re-adjust from user inputs
+  player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
+  player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
+  player_stats[r'No Play %'] = player_stats[r'No Play %']/100
+  player_stats[counting_stats] = player_stats[counting_stats] * 3
+
 
 with tab2: 
   left, middle, right = st.columns([0.25,0.25,0.5])

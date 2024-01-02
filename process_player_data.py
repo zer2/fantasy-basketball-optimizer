@@ -48,8 +48,7 @@ def process_player_data(player_stats
 
   n_players = n_drafters * n_picks
 
-  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics].mul(( 1- player_stats['No Play %']/100 * psi), axis = 0)
-  player_stats[percentage_statistics] = player_stats[percentage_statistics]/100 #adjust from the display
+  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
 
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
