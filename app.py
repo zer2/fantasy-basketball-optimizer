@@ -28,6 +28,10 @@ def stat_styler(value):
   else:
     return f"background-color: darkred;color:white;" 
 
+def other_styler(value):
+    return f"background-color: grey; color:white;" 
+
+
 df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
@@ -270,12 +274,12 @@ with tab3:
         
           with subtab1:
             z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-            z_scores_unselected = z_scores_unselected.style.format("{:.2}").applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+            z_scores_unselected = z_scores_unselected.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
             z_scores_display = st.dataframe(z_scores_unselected)
             
           with subtab2:
             g_scores_unselected = g_scores[~z_scores.index.isin(listify(selections_editable))]
-            g_scores_unselected = g_scores_unselected.style.format("{:.2}").applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+            g_scores_unselected = g_scores_unselected.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
             g_scores_display = st.dataframe(g_scores_unselected)
         
           with subtab3:
