@@ -298,7 +298,7 @@ with tab3:
   
           with subtab4:
             c_df = c.loc[res.index]
-            c_df = c_df.style.format("{:.0}").background_gradient(axis = None)
+            c_df = c_df.style.format("{:,}").background_gradient(axis = None)
             st.dataframe(c_df)
               
 
