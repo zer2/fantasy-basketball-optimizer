@@ -129,7 +129,13 @@ with tab3:
   selections = selections.astype(player_category_type)
 
   z_scores = info['Z-scores']
+  z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+  z_scores.sort_values('Total', ascending = False, inplace = True)
+
   g_scores = info['G-scores']
+  g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+  g_scores.sort_values('Total', ascending = False, inplace = True)
+  
   categories = z_scores.columns
 
   left, right = st.columns(2)
@@ -219,8 +225,6 @@ with tab3:
           subtab1, subtab2, subtab3, subtab4 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
         
           with subtab1:
-            z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
-            z_scores.sort_values('Total', ascending = False, inplace = True)
             z_scores = z_scores.round(2)
             z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
             
