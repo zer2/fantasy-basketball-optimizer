@@ -194,7 +194,7 @@ with tab3:
         team_stats = team_stats.round(2)
         z_display = st.dataframe(team_stats)
 
-        agg_stats = pd.DataFrame()
+        agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
         expected = z_scores[0:n_players_on_team*n_drafters].mean()
         agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
@@ -208,7 +208,7 @@ with tab3:
         team_stats = team_stats.round(2)
         g_display = st.dataframe(team_stats)
 
-        agg_stats = pd.DataFrame()
+        agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
         expected = g_scores[0:n_players_on_team*n_drafters].mean()
         agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
