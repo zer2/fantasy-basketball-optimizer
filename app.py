@@ -205,7 +205,7 @@ with tab3:
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-                                ).style.format("{:.2%}")
+                                ).format("{:.2%}")
         
         
       with g_tab:
@@ -220,7 +220,7 @@ with tab3:
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-                                ).style.format("{:.2%}")
+                                ).format("{:.2%}")
         
     with cand_tab:
 
