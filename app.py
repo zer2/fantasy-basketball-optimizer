@@ -216,7 +216,7 @@ with tab3:
           
         with placeholder.container():
           
-          subtab1, subtab2, subtab3, subtab5 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
+          subtab1, subtab2, subtab3, subtab4 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
         
           with subtab1:
             z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
