@@ -203,7 +203,7 @@ with tab3:
 
         team_stats = team_stats.style.format("{:.2%}").applymap(styler)
 
-        z_display = st.dataframe(team_stats.style)        
+        z_display = st.dataframe(team_stats)        
         
       with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
@@ -215,7 +215,7 @@ with tab3:
 
         team_stats - team_stats.style.format("{:.2%}").applymap(styler)
 
-        g_display = st.dataframe(team_stats.style)
+        g_display = st.dataframe(team_stats)
         
     with cand_tab:
 
