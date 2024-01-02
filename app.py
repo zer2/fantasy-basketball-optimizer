@@ -19,8 +19,11 @@ color_map = {'C' : 'yellow'
 df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
-counting_stats = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers','Free Throw Attempts','Field Goal Attempts']
-df[counting_stats] = df[counting_stats]/3
+counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
+percentage_statistics = ['Free Throw %','Field Goal %']
+volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
+
+df[counting_statistics + volume_statistics ] = df[counting_statistics + volume_statistics]/3
  #adjust for the display
 df[r'Free Throw %'] = df[r'Free Throw %'] * 100
 df[r'Field Goal %'] = df[r'Field Goal %'] * 100
@@ -40,7 +43,7 @@ with tab1:
   player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
   player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
-  player_stats[counting_stats] = player_stats[counting_stats] * 3
+  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
 
 
 with tab2: 
@@ -211,7 +214,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, counting_stats + [r'Free Throw %',r'Field Goal %']])
+        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
 
         z_display = st.dataframe(team_stats)        
         
@@ -223,7 +226,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, counting_stats + [r'Free Throw %',r'Field Goal %']])
+        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
 
         g_display = st.dataframe(team_stats)
         
