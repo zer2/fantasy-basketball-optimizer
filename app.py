@@ -197,8 +197,8 @@ with tab3:
         agg_stats = pd.DataFrame()
         n_players_on_team = team_stats.shape[0]
         expected = z_scores[0:n_players_on_team*n_drafters].mean()
-        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-        team_stats.loc['Expected', :] = expected
+        agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
+        agg_stats.loc['Expected', :] = expected
 
         z_aggregate_display = st.dataframe(agg_stats)
         
@@ -211,8 +211,8 @@ with tab3:
         agg_stats = pd.DataFrame()
         n_players_on_team = team_stats.shape[0]
         expected = g_scores[0:n_players_on_team*n_drafters].mean()
-        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-        team_stats.loc['Expected', :] = expected
+        agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
+        agg_stats.loc['Expected', :] = expected
 
         g_aggregate_display = st.dataframe(agg_stats)
 
