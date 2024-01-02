@@ -191,12 +191,10 @@ with tab3:
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
       with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
-        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats = team_stats.round(2)
         z_display = st.dataframe(team_stats)
       with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
-        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats = team_stats.round(2)
         g_display = st.dataframe(team_stats)
 
