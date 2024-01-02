@@ -220,7 +220,7 @@ with tab3:
         c, res = next(generator)
         all_res = all_res + [res]
         #normalize weights by what we expect from other drafters
-        c = pd.DataFrame(c, index = res.index, columns = categories)/info['v']
+        c = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
           
         with placeholder.container():
           
