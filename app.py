@@ -246,7 +246,7 @@ with tab3:
                 st.plotly_chart(make_progress_chart(all_res))
 
             with weight_tab:
-              st.dataframe(c[res.index])
+              st.dataframe(c.loc[res.index])
             
 
  
