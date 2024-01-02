@@ -190,7 +190,7 @@ with tab3:
   
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
 
-      def color_vowel(value):
+      def coloring(value):
         return f"background-color: pink;" 
         
       with z_tab:
