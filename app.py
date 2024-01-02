@@ -297,8 +297,8 @@ with tab3:
                 st.plotly_chart(make_progress_chart(all_res))
   
           with subtab4:
-            c_df = c.loc[res.index]
-            c_df = c_df.style.format("{:,}").background_gradient(axis = None)
+            c_df = c.loc[res.index].round().astype(int)
+            c_df = c_df.background_gradient(axis = None)
             st.dataframe(c_df)
               
 
