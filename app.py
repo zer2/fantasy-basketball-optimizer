@@ -16,6 +16,18 @@ color_map = {'C' : 'yellow'
              ,'SG' : 'red'
              ,'PG' : 'red'}
 
+def stat_styler(value):
+  if value > 1.5:
+    return f"background-color: darkgreen;color:white;" 
+  elif value > 0.5:
+    return f"background-color: green;color:white;" 
+  elif value > -0.5: 
+    return f"background-color: yellow;color:black;" 
+  elif value > -1.5:
+    return f"background-color: red;color:white;" 
+  else:
+    return f"background-color: darkred;color:white;" 
+
 df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
@@ -192,18 +204,6 @@ with tab3:
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
   
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
-
-      def styler(value):
-        if value > 1.5:
-          return f"background-color: darkgreen;color:white;" 
-        elif value > 0.5:
-          return f"background-color: green;color:white;" 
-        elif value > -0.5: 
-          return f"background-color: yellow;color:black;" 
-        elif value > -1.5:
-          return f"background-color: red;color:white;" 
-        else:
-          return f"background-color: darkred;color:white;" 
         
       with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
@@ -214,7 +214,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
+        team_stats = team_stats.style.format("{:.2}").applymap(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
 
         z_display = st.dataframe(team_stats)        
         
@@ -226,7 +226,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
+        team_stats = team_stats.style.format("{:.2}").applymap(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
 
         g_display = st.dataframe(team_stats)
         
@@ -269,12 +269,14 @@ with tab3:
           subtab1, subtab2, subtab3, subtab4 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
         
           with subtab1:
-            z_scores = z_scores.round(2)
-            z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
+            z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
+            z_scores_unselected = z_scores_unselected.style.format("{:.2}").applymap(stat_styler, subset = [:,counting_statistics + percentage_statistics])
+            z_scores_display = st.dataframe(z_scores_unselected)
             
           with subtab2:
-            g_scores = g_scores.round(2)
-            g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
+            g_scores_unselected = g_scores[~z_scores.index.isin(listify(selections_editable))]
+            g_scores_unselected = g_scores_unselected.style.format("{:.2}").applymap(stat_styler, subset = [:,counting_statistics + percentage_statistics])
+            g_scores_display = st.dataframe(g_scores_unselected)
         
           with subtab3:
   
