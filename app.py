@@ -19,7 +19,7 @@ color_map = {'C' : 'yellow'
 df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
-counting_stats = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers','Free Throw Attempts','Free Throw Attempts','Field Goal Attempts']
+counting_stats = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers','Free Throw Attempts','Field Goal Attempts']
 df[counting_stats] = df[counting_stats]/3
  #adjust for the display
 df[r'Free Throw %'] = df[r'Free Throw %'] * 100
