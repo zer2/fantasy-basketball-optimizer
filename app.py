@@ -189,7 +189,7 @@ with tab3:
       else: 
         st.caption('For ' + format + ', it is recommended to select players based on H-score' )
       
-      subtab1, subtab2, subtab3,subtab4 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
+      subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score"])
     
       with subtab1:
         z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
@@ -231,18 +231,21 @@ with tab3:
           
           with placeholder.container():
 
-            c1, c2 = st.columns([0.25,0.75])
+            res_tab, weight_tab = st.tabs(2)
 
-            with c1:
-              res = res.sort_values(ascending = False)
-              res.name = 'H-score'
+            with res_tab:
+              c1, c2 = st.columns([0.25,0.75])
+  
+              with c1:
+                res = res.sort_values(ascending = False)
+                res.name = 'H-score'
+  
+                st.dataframe(pd.DataFrame(res))
+  
+              with c2:
+                st.plotly_chart(make_progress_chart(all_res))
 
-              st.dataframe(pd.DataFrame(res))
-
-            with c2:
-              st.plotly_chart(make_progress_chart(all_res))
-
-            with subtab4:
+            with weight_tab:
               st.dataframe(c)
             
 
