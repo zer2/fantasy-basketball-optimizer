@@ -201,11 +201,15 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        z_display = st.dataframe(team_stats.style.applymap(coloring
+        team_stats = team_stats.style.applymap(coloring
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-                                ).format("{:.2%}")
+                                )
+
+        team_stats - team_stats.style.format("{:.2%}")
+
+        z_display = st.dataframe(team_stats)
         
         
       with g_tab:
@@ -216,11 +220,15 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        g_display = st.dataframe(team_stats.style.applymap(coloring
+        team_stats = team_stats.style.applymap(coloring
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-                                ).format("{:.2%}")
+                                )
+
+        team_stats - team_stats.style.format("{:.2%}")
+
+        g_display = st.dataframe(team_stats)
         
     with cand_tab:
 
