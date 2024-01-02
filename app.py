@@ -205,7 +205,6 @@ with tab3:
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-                                )
 
         team_stats - team_stats.style.format("{:.2%}")
 
@@ -224,8 +223,6 @@ with tab3:
                                                            , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
-                                )
-
         team_stats - team_stats.style.format("{:.2%}")
 
         g_display = st.dataframe(team_stats)
