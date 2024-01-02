@@ -203,7 +203,7 @@ with tab3:
 
         team_stats = team_stats.round(2)
         z_display = st.dataframe(team_stats.style.applymap(coloring
-                                                           , subset=([-1,-2], slice(None)
+                                                           , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
                                 )
@@ -219,7 +219,7 @@ with tab3:
 
         team_stats = team_stats.round(2)
         g_display = st.dataframe(team_stats.style.applymap(coloring
-                                                           , subset=([-1,-2], slice(None)
+                                                           , subset=(['Total','Expected'], slice(None)
                                                                     )
                                                           )
                                 )
