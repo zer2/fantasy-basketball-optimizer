@@ -289,6 +289,7 @@ with tab3:
               with c1:
                 res = res.sort_values(ascending = False)
                 res.name = 'H-score'
+                res = res.style.format("{:.0}").background_gradient(axis = None)
   
                 st.dataframe(pd.DataFrame(res))
   
