@@ -118,6 +118,8 @@ class HAgent():
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
+
+                c = None
         
             if self.winner_take_all:
                 win_sums = combinatorial_calculation(cdf_estimates
