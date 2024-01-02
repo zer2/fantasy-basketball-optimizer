@@ -192,15 +192,15 @@ with tab3:
 
       def styler(value):
         if value > 1.5:
-          return f"background-color: darkgreen;" 
+          return f"background-color: darkgreen;color:white;" 
         elif value > 0.5:
-          return f"background-color: green;" 
+          return f"background-color: green;color:white;" 
         elif value > -0.5: 
-          return f"background-color: yellow;" 
+          return f"background-color: yellow;color:black;" 
         elif value > -1.5:
-          return f"background-color: red;" 
+          return f"background-color: red;color:white;" 
         else:
-          return f"background-color: darkred;" 
+          return f"background-color: darkred;color:white;" 
         
       with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
