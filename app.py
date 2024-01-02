@@ -231,7 +231,7 @@ with tab3:
           
           with placeholder.container():
 
-            res_tab, weight_tab = st.tabs(2)
+            res_tab, weight_tab = st.tabs(['Results','Weight'])
 
             with res_tab:
               c1, c2 = st.columns([0.25,0.75])
