@@ -289,7 +289,7 @@ with tab3:
               with c1:
                 res = res.sort_values(ascending = False)
                 res.name = 'H-score'
-                res = res.style.format("{:.0}").background_gradient(axis = None)
+
   
                 st.dataframe(pd.DataFrame(res))
   
@@ -297,7 +297,9 @@ with tab3:
                 st.plotly_chart(make_progress_chart(all_res))
   
           with subtab4:
-            st.dataframe(c.loc[res.index])
+            c_df = c.loc[res.index]
+            c_df = c_df.style.format("{:.0}").background_gradient(axis = None)
+            st.dataframe(c_df)
               
 
  
