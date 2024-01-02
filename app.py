@@ -188,65 +188,63 @@ with tab3:
         st.caption('For Rotisserie, it is recommended to select players based on ' + metric + ' or H-score. However, keep in mind that H-score for Rotisserie is experimental')
       else: 
         st.caption('For ' + format + ', it is recommended to select players based on H-score' )
-      
-      subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score"])
-    
-      with subtab1:
-        z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
-        z_scores.sort_values('Total', ascending = False, inplace = True)
-        z_scores = z_scores.round(2)
-        z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
-        
-      with subtab2:
-        g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
-        g_scores.sort_values('Total', ascending = False, inplace = True)
-        g_scores = g_scores.round(2)
-        g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
-    
-      with subtab3:
-        winner_take_all = format == 'Head to Head: Most Categories'
-        n_players = n_drafters * n_picks
-        
-        H = HAgent(info = info
-                   , omega = omega
-                   , gamma = gamma
-                   , alpha = alpha
-                   , beta = beta
-                   , n_players = n_players
-                   , winner_take_all = winner_take_all)
-    
-        players_chosen = listify(selections_editable)
-        my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
-    
-        generator = H.get_h_scores(player_stats, my_players, players_chosen)
+
+      for i in range(n_iterations):
   
-        placeholder = st.empty()
-        all_res = []
-        
-        for i in range(n_iterations):
-  
-          c, res = next(generator)
-          all_res = all_res + [res]
-          c = pd.DataFrame(c, index = res.index, columns = categories)
+        c, res = next(generator)
+        all_res = all_res + [res]
+        c = pd.DataFrame(c, index = res.index, columns = categories)
           
-          with placeholder.container():
+      with placeholder.container():
+        
+        subtab1, subtab2, subtab3, subtab5 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
+      
+        with subtab1:
+          z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+          z_scores.sort_values('Total', ascending = False, inplace = True)
+          z_scores = z_scores.round(2)
+          z_scores_unselected = st.dataframe(z_scores[~z_scores.index.isin(listify(selections_editable))])
+          
+        with subtab2:
+          g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+          g_scores.sort_values('Total', ascending = False, inplace = True)
+          g_scores = g_scores.round(2)
+          g_scores_unselected = st.dataframe(g_scores[~g_scores.index.isin(listify(selections_editable))])
+      
+        with subtab3:
+          winner_take_all = format == 'Head to Head: Most Categories'
+          n_players = n_drafters * n_picks
+          
+          H = HAgent(info = info
+                     , omega = omega
+                     , gamma = gamma
+                     , alpha = alpha
+                     , beta = beta
+                     , n_players = n_players
+                     , winner_take_all = winner_take_all)
+      
+          players_chosen = listify(selections_editable)
+          my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
+      
+          generator = H.get_h_scores(player_stats, my_players, players_chosen)
+    
+          placeholder = st.empty()
+          all_res = []
+          
+          with subtab3:
+            c1, c2 = st.columns([0.25,0.75])
 
-            res_tab, weight_tab = st.tabs(['Results','Weight'])
+            with c1:
+              res = res.sort_values(ascending = False)
+              res.name = 'H-score'
 
-            with res_tab:
-              c1, c2 = st.columns([0.25,0.75])
-  
-              with c1:
-                res = res.sort_values(ascending = False)
-                res.name = 'H-score'
-  
-                st.dataframe(pd.DataFrame(res))
-  
-              with c2:
-                st.plotly_chart(make_progress_chart(all_res))
+              st.dataframe(pd.DataFrame(res))
 
-            with weight_tab:
-              st.dataframe(c.loc[res.index])
+            with c2:
+              st.plotly_chart(make_progress_chart(all_res))
+
+          with subtab4:
+            st.dataframe(c.loc[res.index])
             
 
  
