@@ -213,10 +213,6 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.map(coloring
-                                                           , subset=(['Total','Expected'], slice(None)
-                                                                    )
-                                                          )
         team_stats - team_stats.style.format("{:.2%}").applymap(styler)
 
         g_display = st.dataframe(team_stats.style)
