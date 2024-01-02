@@ -207,7 +207,6 @@ with tab3:
       with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
         team_stats = team_stats.round(2)
-        g_display = st.dataframe(team_stats)
 
         agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
