@@ -190,7 +190,7 @@ with tab3:
   
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
 
-      def coloring(value):
+      def styler(value):
         return f"background-color: pink;" 
         
       with z_tab:
