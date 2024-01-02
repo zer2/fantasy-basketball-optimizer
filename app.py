@@ -226,7 +226,7 @@ with tab3:
   
           c, res = next(generator)
           all_res = all_res + [res]
-          c = pd.DataFrame(c, index = res.index, columns = res.columns)
+          c = pd.DataFrame(c, index = res.index, columns = z_scores.columns)
           
           with placeholder.container():
 
