@@ -226,6 +226,8 @@ with tab3:
   
           c, res = next(generator)
           all_res = all_res + [res]
+          c.index = res.index
+          c.columns = z_scores.columns
           
           with placeholder.container():
 
@@ -234,6 +236,7 @@ with tab3:
             with c1:
               res = res.sort_values(ascending = False)
               res.name = 'H-score'
+
               st.dataframe(pd.DataFrame(res))
 
             with c2:
