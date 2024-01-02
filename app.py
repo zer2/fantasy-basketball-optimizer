@@ -202,7 +202,11 @@ with tab3:
         team_stats.loc['Expected', :] = expected
 
         team_stats = team_stats.round(2)
-        z_display = st.dataframe(team_stats.style.applymap(coloring, subset=([-1:-2], slice(None))))
+        z_display = st.dataframe(team_stats.style.applymap(coloring
+                                                           , subset=([-1:-2], slice(None)
+                                                                    )
+                                                          )
+                                )
         
         
       with g_tab:
@@ -214,7 +218,11 @@ with tab3:
         team_stats.loc['Expected', :] = expected
 
         team_stats = team_stats.round(2)
-        g_display = st.dataframe(team_stats.style.applymap(coloring, subset=([-1:-2], slice(None))))
+        g_display = st.dataframe(team_stats.style.applymap(coloring
+                                                           , subset=([-1:-2], slice(None)
+                                                                    )
+                                                          )
+                                )
         
     with cand_tab:
 
