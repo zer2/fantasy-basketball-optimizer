@@ -130,6 +130,7 @@ with tab3:
 
   z_scores = info['Z-scores']
   g_scores = info['G-scores']
+  categories = z_scores.columns
 
   left, right = st.columns(2)
 
@@ -226,7 +227,7 @@ with tab3:
   
           c, res = next(generator)
           all_res = all_res + [res]
-          c = pd.DataFrame(c, index = res.index, columns = z_scores.columns)
+          c = pd.DataFrame(c, index = res.index, columns = categories)
           
           with placeholder.container():
 
