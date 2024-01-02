@@ -189,35 +189,32 @@ with tab3:
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
   
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
+
+      def color_vowel(value):
+        return f"background-color: pink;" 
+        
       with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
 
-        agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
         expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-        agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
-        agg_stats.loc['Expected', :] = expected
+        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+        team_stats.loc['Expected', :] = expected
 
         team_stats = team_stats.round(2)
-        z_display = st.dataframe(team_stats)
-        agg_stats = agg_stats.round(2)
-        z_aggregate_display = st.dataframe(agg_stats)
+        z_display = st.dataframe(team_stats.style.applymap(coloring, subset=([-1:-2], slice(None))))
         
         
       with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
-        team_stats = team_stats.round(2)
 
-        agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
-        expected = g_scores[0:n_players_on_team*n_drafters].mean()  * n_players_on_team
-        agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
-        agg_stats.loc['Expected', :] = expected
+        expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+        team_stats.loc['Expected', :] = expected
 
         team_stats = team_stats.round(2)
-        g_display = st.dataframe(team_stats)
-        agg_stats = agg_stats.round(2)
-        g_aggregate_display = st.dataframe(agg_stats)
+        g_display = st.dataframe(team_stats.style.applymap(coloring, subset=([-1:-2], slice(None))))
         
     with cand_tab:
 
