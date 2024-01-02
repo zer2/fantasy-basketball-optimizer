@@ -240,7 +240,7 @@ with tab3:
               st.plotly_chart(make_progress_chart(all_res))
 
             with subtab4:
-              st.dataframe(c[res.index])
+              st.dataframe(c)
             
 
  
