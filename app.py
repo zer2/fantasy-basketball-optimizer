@@ -191,15 +191,16 @@ with tab3:
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
       with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
-        team_stats = team_stats.round(2)
-        z_display = st.dataframe(team_stats)
 
         agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
-        expected = z_scores[0:n_players_on_team*n_drafters].mean()
+        expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
         agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
         agg_stats.loc['Expected', :] = expected
 
+        team_stats = team_stats.round(2)
+        z_display = st.dataframe(team_stats)
+        agg_stats = agg_stats.round(2)
         z_aggregate_display = st.dataframe(agg_stats)
         
         
@@ -210,12 +211,15 @@ with tab3:
 
         agg_stats = pd.DataFrame(index = ['Total','Expected'], columns = team_stats.columns)
         n_players_on_team = team_stats.shape[0]
-        expected = g_scores[0:n_players_on_team*n_drafters].mean()
+        expected = g_scores[0:n_players_on_team*n_drafters].mean()  * n_players_on_team
         agg_stats.loc['Total', :] = team_stats.sum(axis = 0)
         agg_stats.loc['Expected', :] = expected
 
+        team_stats = team_stats.round(2)
+        g_display = st.dataframe(team_stats)
+        agg_stats = agg_stats.round(2)
         g_aggregate_display = st.dataframe(agg_stats)
-
+        
     with cand_tab:
 
       if format == 'Rotisserie': 
