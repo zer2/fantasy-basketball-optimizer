@@ -191,17 +191,27 @@ with tab3:
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
 
       def styler(value):
-        return f"background-color: pink;" 
+        if value > 1.5:
+          return f"background-color: darkgreen;" 
+        elif value > 0.5:
+          return f"background-color: green;" 
+        elif value > -0.5: 
+          return f"background-color: yellow;" 
+        elif value > -1.5:
+          return f"background-color: red;" 
+        else:
+          return f"background-color: darkred;" 
         
       with z_tab:
         team_stats = z_scores[z_scores.index.isin(team_selections)]
+        team_players = list(team_stats.index)
 
         n_players_on_team = team_stats.shape[0]
         expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[['Total','Expected'], :])
+        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[list(team_stats.index), :])
 
         z_display = st.dataframe(team_stats)        
         
@@ -213,7 +223,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[['Total','Expected'], :])
+        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[list(team_stats.index), :])
 
         g_display = st.dataframe(team_stats)
         
