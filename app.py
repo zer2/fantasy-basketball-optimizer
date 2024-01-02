@@ -200,7 +200,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        z_aggregate_display = st.DataFrame(agg_stats)
+        z_aggregate_display = st.dataframe(agg_stats)
         
         
       with g_tab:
@@ -214,7 +214,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        g_aggregate_display = st.DataFrame(agg_stats)
+        g_aggregate_display = st.dataframe(agg_stats)
 
     with cand_tab:
 
