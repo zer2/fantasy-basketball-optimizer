@@ -188,7 +188,7 @@ with tab3:
       else: 
         st.caption('For ' + format + ', it is recommended to select players based on H-score' )
       
-      subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score Algorithm"])
+      subtab1, subtab2, subtab3,subtab4 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
     
       with subtab1:
         z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
@@ -222,11 +222,10 @@ with tab3:
         placeholder = st.empty()
         all_res = []
         
-        for i in range(n_iterations // 1):
+        for i in range(n_iterations):
   
-          for _ in range(1):
-            c, res = next(generator)
-            all_res = all_res + [res]
+          c, res = next(generator)
+          all_res = all_res + [res]
           
           with placeholder.container():
 
@@ -239,6 +238,9 @@ with tab3:
 
             with c2:
               st.plotly_chart(make_progress_chart(all_res))
+
+            with subtab4:
+              st.dataframe(c[res.index])
             
 
  
