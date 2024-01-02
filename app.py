@@ -211,7 +211,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[list(team_stats.index), :])
+        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, :])
 
         z_display = st.dataframe(team_stats)        
         
@@ -223,7 +223,7 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[list(team_stats.index), :])
+        team_stats = team_stats.style.format("{:.2}").applymap(styler, subset = pd.IndexSlice[team_players, :])
 
         g_display = st.dataframe(team_stats)
         
