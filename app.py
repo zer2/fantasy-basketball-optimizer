@@ -233,11 +233,6 @@ with tab3:
         
     with cand_tab:
 
-      if format == 'Rotisserie': 
-        st.caption('For Rotisserie, it is recommended to select players based on ' + metric + ' or H-score. However, keep in mind that H-score for Rotisserie is experimental')
-      else: 
-        st.caption('For ' + format + ', it is recommended to select players based on H-score' )
-
       subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score"])
     
       with subtab1:
