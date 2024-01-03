@@ -88,7 +88,7 @@ class HAgent():
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
-                os.write(1,bytes(str(expected_x[0:5])))
+                os.write(1,bytes(str(expected_x[0:5])),'utf-8')
 
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
