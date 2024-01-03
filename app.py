@@ -8,7 +8,6 @@ from run_algorithm import HAgent
 from helper_functions import listify, make_progress_chart
 
 st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
-tab1, tab2, tab3 = st.tabs(["Player Stats", "Parameters", "Draft"])
 
 color_map = {'C' : 'yellow'
              ,'PF' : 'green'
@@ -31,7 +30,6 @@ def stat_styler(value):
 def other_styler(value):
     return f"background-color: grey; color:white;" 
 
-
 df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
 df = df.drop(columns = ['ft','fg'])
 
@@ -49,20 +47,9 @@ df = df.round(1)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-with tab1:
-  st.markdown(f"Per-game player projections below: feel free to edit. Converted to weekly by multiplying by three")
+tab1, tab2, tab3 = st.tabs(["Parameters", "Player Stats", "Draft"])
 
-  player_stats_editable = st.data_editor(df) # 👈 An editable dataframe
-  player_stats = player_stats_editable.copy()
-
-  #re-adjust from user inputs
-  player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
-  player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-  player_stats[r'No Play %'] = player_stats[r'No Play %']/100
-  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
-
-
-with tab2: 
+with tab1: 
   left, middle, right = st.columns([0.25,0.25,0.5])
 
   with left: 
@@ -145,6 +132,18 @@ with tab2:
       n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
       st.caption(n_iterations_str)
 
+with tab2:
+  st.markdown(f"Per-game player projections below: feel free to edit. Converted to weekly by multiplying by three")
+
+  player_stats_editable = st.data_editor(df) # 👈 An editable dataframe
+  player_stats = player_stats_editable.copy()
+
+  #re-adjust from user inputs
+  player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
+  player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
+  player_stats[r'No Play %'] = player_stats[r'No Play %']/100
+  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
+  
 with tab3:
 
   rotisserie = format == 'Rotisserie'
