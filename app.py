@@ -37,7 +37,7 @@ counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes',
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
-full_df[counting_statistics + volume_statistics ] = df[counting_statistics + volume_statistics]/3
+full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
  #adjust for the display
 full_df[r'Free Throw %'] = full_df[r'Free Throw %'] * 100
 full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
