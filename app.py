@@ -57,7 +57,8 @@ with tab1:
     
     format = st.selectbox(
       'Which format are you playing?',
-      ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories'))
+      ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
+      , index = 2)
   
     if format == 'Rotisserie':
       st.caption('Note that only H-scores for Rotisserie are experimental and have not been tested')
@@ -67,7 +68,7 @@ with tab1:
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?',
       pd.unique(full_df.index.get_level_values('Season'))
-      ,value = 2023
+      ,index = -1
     )
 
     full_df = full_df.loc[dataset_name]
