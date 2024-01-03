@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
+import os
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
@@ -93,6 +94,9 @@ def process_player_data(player_stats
   v = np.array(v/v.sum()).reshape(9,1)
   
   L = np.array(x_scores_as_diff.cov()) 
+
+  os.write(1,bytes(str(x_scores_as_diff),'utf-8'))
+  os.write(1,bytes(str(L),'utf-8'))
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
