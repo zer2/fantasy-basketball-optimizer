@@ -88,6 +88,8 @@ class HAgent():
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
+
+                st.dataframe(expected_x)
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
