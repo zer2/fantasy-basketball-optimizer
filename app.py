@@ -73,7 +73,7 @@ with tab2:
       ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories'))
   
     if format == 'Rotisserie':
-      st.caption('Note that only Z-scores are available for Rotisserie. No advanced algorithms for Rotisserie have been implemented')
+      st.caption('Note that only H-scores for Rotisserie are experimental and have not been tested')
     else:
       st.caption('Head to head formats are supported with G-scores and H-scores. Z-scores are also available but not advisable to use')
 
@@ -201,9 +201,6 @@ with tab3:
     team_tab, cand_tab = st.tabs(["Team", "Candidates"])
 
     with team_tab:
-      
-      metric = 'Z-score' if format == 'Rotisserie' else 'G-score'
-      st.caption('For ' + format + ', it is recommended to evaluate your team by ' + metric)
     
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
   
