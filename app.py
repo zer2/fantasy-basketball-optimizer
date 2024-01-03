@@ -19,11 +19,11 @@ def stat_styler(value):
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  int(value*100),255 , 255 -  int(value*100))
+    bgc = '#%02x%02x%02x' % (255 -  int(value*50),255 , 255 -  int(value*50))
   else:
-    bgc = '#%02x%02x%02x' % (255, 255 + int(value*100), 255 + int(value*100))
+    bgc = '#%02x%02x%02x' % (255, 255 + int(value*50), 255 + int(value*50))
 
-  tc = 'white' if abs(value) > 1 else 'black'
+  tc = 'black' if abs(value) > 1 else 'black'
   
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
   
