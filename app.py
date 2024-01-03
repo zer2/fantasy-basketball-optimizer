@@ -68,8 +68,8 @@ with tab1:
     unique_datasets = pd.unique(full_df.index.get_level_values('Season'))
                                 
     dataset_name = st.selectbox(
-      'Which dataset do you want to default to?',
-      unique_datasets)
+      'Which dataset do you want to default to?'
+      ,unique_datasets
       ,index = len(unique_datasets)-1
     )
 
