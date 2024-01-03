@@ -241,66 +241,69 @@ with tab3:
       else: 
         st.caption('For ' + format + ', it is recommended to select players based on H-score' )
 
-      winner_take_all = format == 'Head to Head: Most Categories'
-      n_players = n_drafters * n_picks
-      
-      H = HAgent(info = info
-                 , omega = omega
-                 , gamma = gamma
-                 , alpha = alpha
-                 , beta = beta
-                 , n_players = n_players
-                 , winner_take_all = winner_take_all)
-  
-      players_chosen = listify(selections_editable)
-      my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
-  
-      generator = H.get_h_scores(player_stats, my_players, players_chosen)
+      subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score"])
+    
+      with subtab1:
+        z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
+        z_scores_unselected = z_scores_unselected.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+        z_scores_display = st.dataframe(z_scores_unselected)
+        
+      with subtab2:
+        g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
+        g_scores_unselected = g_scores_unselected.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+        g_scores_display = st.dataframe(g_scores_unselected)
+    
+      with subtab3:
 
-      placeholder = st.empty()
-      all_res = []
+        winner_take_all = format == 'Head to Head: Most Categories'
+        n_players = n_drafters * n_picks
       
-      for i in range(n_iterations):
+        H = HAgent(info = info
+                   , omega = omega
+                   , gamma = gamma
+                   , alpha = alpha
+                   , beta = beta
+                   , n_players = n_players
+                   , winner_take_all = winner_take_all)
+    
+        players_chosen = listify(selections_editable)
+        my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
+    
+        generator = H.get_h_scores(player_stats, my_players, players_chosen)
   
-        c, res = next(generator)
-        all_res = all_res + [res]
-        #normalize weights by what we expect from other drafters
-        c = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
-        c = (c * 100).round()
-          
-        with placeholder.container():
-          
-          subtab1, subtab2, subtab3, subtab4 = st.tabs(["Z-scores", "G-scores", "H-score","H-weight"])
+        placeholder = st.empty()
+        all_res = []
         
-          with subtab1:
-            z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-            z_scores_unselected = z_scores_unselected.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
-            z_scores_display = st.dataframe(z_scores_unselected)
+        for i in range(n_iterations):
+    
+          c, res = next(generator)
+          all_res = all_res + [res]
+          #normalize weights by what we expect from other drafters
+          c = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
+          c = (c * 100).round()
             
-          with subtab2:
-            g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
-            g_scores_unselected = g_scores_unselected.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
-            g_scores_display = st.dataframe(g_scores_unselected)
-        
-          with subtab3:
-  
+          with placeholder.container():
+
+            score_tab, weight_tab = tabs(['Scores','Weights'])
+
+            with score_tab:
               c1, c2 = st.columns([0.25,0.75])
-  
+    
               with c1:
                 res = res.sort_values(ascending = False)
                 res.name = 'H-score'
-
-  
+    
+    
                 st.dataframe(pd.DataFrame(res))
-  
+    
               with c2:
                 st.plotly_chart(make_progress_chart(all_res))
   
-          with subtab4:
-            c_df = c.loc[res.index].round().astype(int)
-            c_df = c_df.style.background_gradient(axis = None)
-            st.dataframe(c_df)
-              
+            with weight_tab:
+              c_df = c.loc[res.index].round().astype(int)
+              c_df = c_df.style.background_gradient(axis = None)
+              st.dataframe(c_df)
+          
 
  
 
