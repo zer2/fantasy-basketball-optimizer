@@ -17,11 +17,11 @@ color_map = {'C' : 'yellow'
 
 def stat_styler(value):
   if value > 0:
-    bgc = (0, value * 100, 0)
+    bgc = (0, value , 0)
   else:
-    bgc = (-value * 100, 0, 0)
+    bgc = (-value, 0, 0)
 
-  tc = 'white' if abs(value) < 1 else 'black'
+  tc = 'white' if abs(value) > 1 else 'black'
   
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
   
