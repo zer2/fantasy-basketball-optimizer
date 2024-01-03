@@ -278,7 +278,7 @@ with tab3:
                    , n_players = n_players
                    , winner_take_all = winner_take_all)
     
-        players_chosen = listify(selections_editable)
+        players_chosen = [x for x in listify(selections_editable) if x ==x]
         my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
     
         generator = H.get_h_scores(player_stats, my_players, players_chosen)
