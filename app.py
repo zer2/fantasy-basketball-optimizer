@@ -73,7 +73,7 @@ with tab1:
       ,index = len(unique_datasets)-1
     )
 
-    full_df = full_df.loc[dataset_name]
+    df = full_df.loc[dataset_name]
 
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
