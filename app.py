@@ -65,10 +65,12 @@ with tab1:
     else:
       st.caption('Head to head formats are supported with G-scores and H-scores. Z-scores are also available but not advisable to use')
 
+    unique_datasets = pd.unique(full_df.index.get_level_values('Season')
+                                
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?',
-      pd.unique(full_df.index.get_level_values('Season'))
-      ,index = -1
+      unique_datasets)
+      ,index = len(unique_datasets)-1
     )
 
     full_df = full_df.loc[dataset_name]
