@@ -73,9 +73,8 @@ class HAgent():
         
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
 
-        os.write(1,bytes(str(c.shape),'utf-8'))
-        os.write(1,bytes(str(c),'utf-8'))
-
+        os.write(1,bytes(str(v),'utf-8'))
+        os.write(1,bytes(str(np.array((diff_means + x_scores_available))),'utf-8'))
         
         scores = []
         weights = []
