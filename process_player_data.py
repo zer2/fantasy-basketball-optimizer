@@ -77,7 +77,7 @@ def process_player_data(player_stats
   #get position averages, to make sure the covariance matrix measures differences relative to position
   position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
   position_means = position_means - position_means.mean(axis = 0)
-  players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
+  #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
   joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
 
   os.write(1,bytes(str(position_means),'utf-8'))
