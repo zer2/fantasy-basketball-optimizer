@@ -80,6 +80,9 @@ def process_player_data(player_stats
   players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
   joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
 
+  os.write(1,bytes(str(position_means),'utf-8'))
+  os.write(1,bytes(str(players_and_positions),'utf-8'))
+
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
@@ -94,9 +97,6 @@ def process_player_data(player_stats
   v = np.array(v/v.sum()).reshape(9,1)
   
   L = np.array(x_scores_as_diff.cov()) 
-
-  os.write(1,bytes(str(x_scores_as_diff),'utf-8'))
-  os.write(1,bytes(str(L),'utf-8'))
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
