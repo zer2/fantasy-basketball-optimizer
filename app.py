@@ -43,8 +43,6 @@ full_df[r'Free Throw %'] = full_df[r'Free Throw %'] * 100
 full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
 full_df[r'No Play %'] = full_df[r'No Play %'] * 100
 
-full_df = full_df.round(1)
-
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 tab1, tab2, tab3 = st.tabs(["Parameters", "Player Stats", "Draft"])
@@ -302,7 +300,7 @@ with tab3:
                 st.plotly_chart(make_progress_chart(all_res))
   
             with weight_tab:
-              c_df = c.loc[res.index].round().astype(int)
+              c_df = c.loc[res.index].dropna().round().astype(int)
               c_df = c_df.style.background_gradient(axis = None)
               st.dataframe(c_df)
           
