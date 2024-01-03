@@ -70,9 +70,9 @@ with tab1:
       , index = 2)
   
     if format == 'Rotisserie':
-      st.caption('Note that only H-scores for Rotisserie are experimental and have not been tested')
+      st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
     else:
-      st.caption('Head to head formats are supported with G-scores and H-scores. Z-scores are also available but not advisable to use')
+      st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
     unique_datasets = pd.unique(full_df.index.get_level_values('Season'))
                                 
