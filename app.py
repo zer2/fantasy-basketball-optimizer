@@ -30,20 +30,20 @@ def stat_styler(value):
 def other_styler(value):
     return f"background-color: grey; color:white;" 
 
-df = pd.read_csv('./predictions.csv').set_index('Player').sort_index()
-df = df.drop(columns = ['ft','fg'])
+full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index()
+full_df = full_df.drop(columns = ['ft','fg'])
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
-df[counting_statistics + volume_statistics ] = df[counting_statistics + volume_statistics]/3
+full_df[counting_statistics + volume_statistics ] = df[counting_statistics + volume_statistics]/3
  #adjust for the display
-df[r'Free Throw %'] = df[r'Free Throw %'] * 100
-df[r'Field Goal %'] = df[r'Field Goal %'] * 100
-df[r'No Play %'] = df[r'No Play %'] * 100
+full_df[r'Free Throw %'] = full_df[r'Free Throw %'] * 100
+full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
+full_df[r'No Play %'] = full_df[r'No Play %'] * 100
 
-df = df.round(1)
+full_df = full_df.round(1)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
@@ -63,6 +63,14 @@ with tab1:
       st.caption('Note that only H-scores for Rotisserie are experimental and have not been tested')
     else:
       st.caption('Head to head formats are supported with G-scores and H-scores. Z-scores are also available but not advisable to use')
+
+    dataset_name = st.selectbox(
+      'Which dataset do you want to default to?',
+      pd.unique(df.index.get_level_values('Season'))
+      ,value = 2023
+    )
+
+    full_df = full_df.loc[dataset_name]
 
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
