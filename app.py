@@ -17,9 +17,9 @@ color_map = {'C' : 'yellow'
 
 def stat_styler(value):
   if value > 0:
-    bgc = '#%02x%02x%02x' % (0, value , 0)
+    bgc = '#%02x%02x%02x' % (0, int(value*100) , 0)
   else:
-    bgc = '#%02x%02x%02x' % (-value, 0, 0)
+    bgc = '#%02x%02x%02x' % (-int(value*100), 0, 0)
 
   tc = 'white' if abs(value) > 1 else 'black'
   
