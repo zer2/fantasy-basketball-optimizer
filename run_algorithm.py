@@ -61,13 +61,14 @@ class HAgent():
         round_n = len(my_players) 
 
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
-        
+
+        os.write(1,bytes(str(len(players_chosen)),'utf-8'))
+        os.write(1,bytes(str(self.score_table_smoothed),'utf-8'))
+
         previous_rounds_expected = self.score_table.iloc[0:round_n].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
         this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
         diff_means = x_self_sum - previous_rounds_expected - this_round_expected
 
-        os.write(1,bytes(str(x_self_sum),'utf-8'))
-        os.write(1,bytes(str(previous_rounds_expected),'utf-8'))
         os.write(1,bytes(str(this_round_expected),'utf-8'))
         
         other_team_variance = self.score_table.loc[0:12,(self.x_scores.columns,'var')].sum().droplevel(1)
