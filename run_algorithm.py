@@ -76,8 +76,6 @@ class HAgent():
         scores = []
         weights = []
 
-        os.write(1,bytes(str(diff_means),'utf-8'))
-
         return self.perform_iterations(c,round_n, diff_means, x_scores_available)
 
     def perform_iterations(self,c,round_n, diff_means, x_scores_available):
@@ -90,6 +88,9 @@ class HAgent():
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
+
+                os.write(1,bytes(str(c),'utf-8'))
+                os.write(1,bytes(str(expected_x),'utf-8'))
 
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
