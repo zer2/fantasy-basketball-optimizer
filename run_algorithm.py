@@ -65,6 +65,9 @@ class HAgent():
         previous_rounds_expected = self.score_table.iloc[0:round_n].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
         this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
         diff_means = x_self_sum - previous_rounds_expected - this_round_expected
+
+        os.write(1,bytes(str(np.array(diff_means)[0:1]),'utf-8'))
+
         
         other_team_variance = self.score_table.loc[0:12,(self.x_scores.columns,'var')].sum().droplevel(1)
         rest_of_team_variance = self.score_table.loc[(round_n + 1):12,(self.x_scores.columns,'var')].sum().droplevel(1)
@@ -72,7 +75,6 @@ class HAgent():
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
         
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
-        os.write(1,bytes(str(c[0:1]),'utf-8'))
         
         scores = []
         weights = []
