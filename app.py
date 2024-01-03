@@ -235,7 +235,8 @@ with tab3:
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
-        team_stats = team_stats.style.format("{:.2}").applymap(other_styler).background_gradient(cmap = 'RdYlGn', subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
+        team_stats = team_stats.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
+
 
         g_display = st.dataframe(team_stats)
         
