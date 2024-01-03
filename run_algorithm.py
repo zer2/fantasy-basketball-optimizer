@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 from helper_functions import combinatorial_calculation, calculate_tipping_points
-import streamlit as st
+import os
 
 class HAgent():
 
@@ -90,7 +90,8 @@ class HAgent():
         
                 expected_x = self.get_x_mu(c)
 
-                st.dataframe(expected_x)
+                os.write(1,b'Something was executed.\n')
+
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
