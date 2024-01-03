@@ -62,7 +62,6 @@ class HAgent():
 
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
         
-        
         previous_rounds_expected = self.score_table.iloc[0:round_n].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
         this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
         diff_means = x_self_sum - previous_rounds_expected - this_round_expected
@@ -89,7 +88,7 @@ class HAgent():
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
-                os.write(1,str(expected_x[0:5]))
+                os.write(1,bytes(str(expected_x[0:5])))
 
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
