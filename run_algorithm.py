@@ -72,6 +72,7 @@ class HAgent():
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
         
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
+        os.write(1,bytes(str(c[0:1]),'utf-8'))
         
         scores = []
         weights = []
@@ -88,7 +89,6 @@ class HAgent():
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
-                os.write(1,bytes(str(expected_x[0:5]),'utf-8'))
 
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
