@@ -284,7 +284,7 @@ with tab3:
             
           with placeholder.container():
 
-            score_tab, weight_tab = tabs(['Scores','Weights'])
+            score_tab, weight_tab = st.tabs(['Scores','Weights'])
 
             with score_tab:
               c1, c2 = st.columns([0.25,0.75])
