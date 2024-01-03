@@ -66,7 +66,7 @@ with tab1:
 
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?',
-      pd.unique(df.index.get_level_values('Season'))
+      pd.unique(full_df.index.get_level_values('Season'))
       ,value = 2023
     )
 
