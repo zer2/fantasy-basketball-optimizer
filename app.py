@@ -253,7 +253,7 @@ with tab3:
         
     with cand_tab:
 
-      subtab1, subtab2, subtab3 = st.tabs(["Z-scores", "G-scores", "H-score"])
+      subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
     
       with subtab1:
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
