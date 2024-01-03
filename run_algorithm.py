@@ -89,9 +89,6 @@ class HAgent():
         
                 expected_x = self.get_x_mu(c)
 
-                os.write(1,bytes(str(c),'utf-8'))
-                os.write(1,bytes(str(expected_x),'utf-8'))
-
                 expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
         
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
