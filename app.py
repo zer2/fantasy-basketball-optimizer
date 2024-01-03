@@ -31,7 +31,7 @@ def other_styler(value):
     return f"background-color: grey; color:white;" 
 
 full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index()
-full_df = full_df.drop(columns = ['ft','fg'])
+#full_df = full_df.drop(columns = ['ft','fg'])
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
