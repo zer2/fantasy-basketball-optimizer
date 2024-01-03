@@ -170,6 +170,8 @@ with tab3:
   
   info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks, rotisserie)
 
+  st.dataframe(info['v'])
+
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
