@@ -23,7 +23,7 @@ def stat_styler(value):
 
   tc = 'white' if abs(value) < 1 else 'black'
   
-  return f"background-color: ' + str(bgc) + ';color:' + tc + ";" 
+  return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
   
   if value > 1.5:
     return f"background-color: darkgreen;color:white;" 
