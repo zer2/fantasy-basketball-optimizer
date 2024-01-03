@@ -16,7 +16,7 @@ color_map = {'C' : 'yellow'
              ,'PG' : 'red'}
 
 def stat_styler(value):
-  if value is None:
+  if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
     bgc = '#%02x%02x%02x' % (0, int(value*100) , 0)
