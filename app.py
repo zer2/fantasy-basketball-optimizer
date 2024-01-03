@@ -19,9 +19,9 @@ def stat_styler(value):
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
-    bgc = '#%02x%02x%02x' % (0, int(value*100) , 0)
+    bgc = '#%02x%02x%02x' % (255 -  int(value*100),255 , 255 -  int(value*100))
   else:
-    bgc = '#%02x%02x%02x' % (-int(value*100), 0, 0)
+    bgc = '#%02x%02x%02x' % (255, 255 + int(value*100), 255 + int(value*100))
 
   tc = 'white' if abs(value) > 1 else 'black'
   
