@@ -90,7 +90,7 @@ with tab1:
       ,index = len(unique_datasets)-1
     )
 
-    df = get_partial_data(dataset_name)
+    df = get_partial_data(full_df,dataset_name)
 
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
