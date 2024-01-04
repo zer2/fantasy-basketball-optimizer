@@ -317,13 +317,3 @@ with tab3:
               c_df = c.loc[res.index].dropna().round().astype(int)
               c_df = c_df.style.background_gradient(axis = None)
               st.dataframe(c_df)
-          
-
- 
-
-#below: use this for the color of results
-#def color(pos):
-#    col = color_map[pos]
-#    return f'background-color: {color}'
-#
-#df = df.style.applymap(color, subset=pd.IndexSlice[:, ['pos']])
