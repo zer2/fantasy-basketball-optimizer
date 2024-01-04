@@ -9,12 +9,6 @@ from helper_functions import listify, make_progress_chart
 
 st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
 
-color_map = {'C' : 'yellow'
-             ,'PF' : 'green'
-             ,'SF' : 'green'
-             ,'SG' : 'red'
-             ,'PG' : 'red'}
-
 def stat_styler(value):
   if value != value:
     return f"background-color:white;color:white;" 
