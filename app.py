@@ -57,7 +57,7 @@ def get_full_data():
   full_df[r'No Play %'] = full_df[r'No Play %'] * 100
   return full_df
 
-df = get_full_data()
+full_df = get_full_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
