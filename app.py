@@ -166,6 +166,7 @@ with tab2:
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
   player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
+  player_stats.index.name = 'Player'
   
 with tab3:
 
