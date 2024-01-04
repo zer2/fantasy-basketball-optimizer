@@ -58,7 +58,7 @@ def get_full_data():
 
 @st.cache_data
 def get_partial_data(full_df, dataset_name):
-  return full_df, full_df.loc[dataset_name]
+  return full_df.loc[dataset_name]
 
 full_df = get_full_data()
 
