@@ -240,7 +240,7 @@ with tab3:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
 
         n_players_on_team = team_stats.shape[0]
-        expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+        expected = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
 
