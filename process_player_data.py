@@ -39,7 +39,7 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
-@st.data_cache
+@st.cache_data
 def process_player_data(player_stats
                         , coefficients
                         , psi
