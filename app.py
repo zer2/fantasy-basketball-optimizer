@@ -297,7 +297,7 @@ with tab3:
             score_tab, weight_tab = st.tabs(['Scores','Weights'])
 
             with score_tab:
-              c1, c2 = st.columns([0.27,0.73])
+              c1, c2 = st.columns([0.3,0.7])
     
               with c1:
                 res = res.sort_values(ascending = False).round(3)
