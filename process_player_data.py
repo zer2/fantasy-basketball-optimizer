@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
 import os
+import streamlist as st
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
@@ -38,6 +39,7 @@ def calculate_scores_from_coefficients(player_stats
     res.columns = counting_statistics + percentage_statistics 
     return res
 
+@st.data_cache
 def process_player_data(player_stats
                         , coefficients
                         , psi
