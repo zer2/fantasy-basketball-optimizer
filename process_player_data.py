@@ -132,7 +132,7 @@ def process_player_data(player_stats
   g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
   g_scores.sort_values('Total', ascending = False, inplace = True)
 
-  os.print('HIII')
+  os.write('HIII')
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
