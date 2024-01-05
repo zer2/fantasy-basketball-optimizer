@@ -307,7 +307,7 @@ with tab3:
                 st.dataframe(pd.DataFrame(res))
     
               with c2:
-                st.plotly_chart(make_progress_chart(all_res))
+                st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
   
             with weight_tab:
               c_df = c.loc[res.index].dropna().round().astype(int)
