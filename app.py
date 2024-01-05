@@ -300,7 +300,7 @@ with tab3:
               c1, c2 = st.columns([0.27,0.73])
     
               with c1:
-                res = res.sort_values(ascending = False)
+                res = res.sort_values(ascending = False).round(3)
                 res.name = 'H-score'
     
     
