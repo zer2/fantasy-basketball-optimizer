@@ -96,7 +96,7 @@ def make_progress_chart(res):
         x=0.99
                 ))
 
-    #fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
+    fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
 
     fig.update_layout(margin=go.layout.Margin(
                                     l=0, #left margin
