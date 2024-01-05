@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
 import os
-import streamlist as st
+import streamlit as st
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
