@@ -128,11 +128,11 @@ def process_player_data(player_stats
 
   z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
   z_scores.sort_values('Total', ascending = False, inplace = True)
-  z_scores = z_scores.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
 
   g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
   g_scores.sort_values('Total', ascending = False, inplace = True)
-  g_scores = g_scores.style.format("{:.2}").applymap(other_styler).applymap(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+
+  os.print('HIII')
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
