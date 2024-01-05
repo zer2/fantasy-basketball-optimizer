@@ -108,8 +108,7 @@ def process_player_data(player_stats
   #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
   joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
 
-  os.write(1,bytes(str(position_means),'utf-8'))
-  os.write(1,bytes(str(players_and_positions),'utf-8'))
+  #os.write(1,bytes(str(players_and_positions),'utf-8'))
 
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
@@ -132,7 +131,7 @@ def process_player_data(player_stats
   g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
   g_scores.sort_values('Total', ascending = False, inplace = True)
 
-  os.write(1,b'HIII')
+  #os.write(1,b'HIII')
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
