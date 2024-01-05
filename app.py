@@ -234,7 +234,7 @@ with tab3:
 
         team_stats = team_stats.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
 
-        z_display = st.dataframe(team_stats)        
+        z_display = st.dataframe(team_stats, use_container_width = True)        
         
       with g_tab:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
@@ -247,7 +247,7 @@ with tab3:
         team_stats = team_stats.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
 
 
-        g_display = st.dataframe(team_stats)
+        g_display = st.dataframe(team_stats, use_container_width = True)
         
     with cand_tab:
 
