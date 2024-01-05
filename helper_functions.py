@@ -98,10 +98,11 @@ def make_progress_chart(res):
     fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
 
     fig,update_layout(margin=go.layout.Margin(
-        l=0, #left margin
-        r=0, #right margin
-        b=0, #bottom margin
-        t=0, #top margin
-    )
+                                    l=0, #left margin
+                                    r=0, #right margin
+                                    b=0, #bottom margin
+                                    t=0, #top margin
+                                            )
+                     )
 
     return fig
