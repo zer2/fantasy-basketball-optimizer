@@ -79,14 +79,14 @@ def calculate_tipping_points(x):
     return final_probabilities
 
 def make_progress_chart(res):
-    data = pd.concat([pd.DataFrame({'Expected # of categories won' : [r.loc[player] for r in res]
+    data = pd.concat([pd.DataFrame({'H-score' : [r.loc[player] for r in res]
                                 , 'Player' : player
                                , 'Iteration' : list(range(len(res)))})
         for player in res[-1].sort_values(ascending = False).index[0:10]])
     
     fig = px.line(data
                   , x = "Iteration"
-                  , y = 'Expected # of categories won'
+                  , y = 'H-score'
                   , color = "Player")
     
     fig.update_layout(legend=dict(
@@ -96,7 +96,7 @@ def make_progress_chart(res):
         x=0.99
                 ))
 
-    fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
+    #fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
 
     fig.update_layout(margin=go.layout.Margin(
                                     l=0, #left margin
