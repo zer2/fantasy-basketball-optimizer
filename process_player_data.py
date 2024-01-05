@@ -100,6 +100,12 @@ def process_player_data(player_stats
   
   L = np.array(x_scores_as_diff.cov()) 
 
+  z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+  z_scores.sort_values('Total', ascending = False, inplace = True)
+
+  g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+  g_scores.sort_values('Total', ascending = False, inplace = True)
+
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
