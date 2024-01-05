@@ -182,16 +182,10 @@ with tab3:
   selections = selections.astype(player_category_type)
 
   z_scores = info['Z-scores']
-  categories = z_scores.columns
-
-  z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
-  z_scores.sort_values('Total', ascending = False, inplace = True)
+  categories = [x for x in z_scores.columns if x != 'Total']
 
   g_scores = info['G-scores']
-  g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
-  g_scores.sort_values('Total', ascending = False, inplace = True)
   
-
   left, right = st.columns(2)
 
   with left:
