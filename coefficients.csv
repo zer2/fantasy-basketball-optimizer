@@ -1,12 +1,10 @@
-,Mean of Means,Variance of Means,Mean of Variances
-Points,44.63,285.9,569.6
-Rebounds,15.88,50.23,69.38
-Assists,10.01,33.56,37.49
-Steals,2.592,0.871,4.24
-Blocks,1.774,2.023,2.863
-Threes,4.422,7.76,10.42
-Turnovers,5.028,4.38,10.36
-Free Throw Attempts,9.548,,
-Free Throw %,0.8002,0.009324,0.02112
-Field Goal Attempts,33.21,,
-Field Goal %,0.4902,0.003215,0.007836
+,Conversion Factor
+Points,1.99
+Rebounds,1.38
+Assists,1.12
+Steals,4.87
+Blocks,1.42
+Threes,1.34
+Turnovers,2.37
+Free Throw %,2.26
+Field Goal %,2.44
