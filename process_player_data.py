@@ -12,7 +12,7 @@ volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
 def calculate_coefficients(player_stats
                      , representative_player_set
-                     , translation_factors = 1):
+                     , translation_factors ):
     """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores """
 
     #counting stats
@@ -42,7 +42,11 @@ def calculate_coefficients(player_stats
     var_of_means.loc['Field Goal %'] = fgp_var_of_means
 
     #get mean of vars
-    mean_of_vars = mean_of_means * pd.Series(translation_factors)
+    translation_factors = pd.Series(translation_factors)
+    translation_facotrs['Free Throw Attempts'] = 0
+    translation_facotrs['Field Goal Attempts'] = 0
+
+    mean_of_vars = mean_of_means * translation_facotrs
     os.write(1,bytes(str(mean_of_means),'utf-8'))
     os.write(1,bytes(str(translation_factors),'utf-8'))
     os.write(1,bytes(str(mean_of_vars),'utf-8'))
