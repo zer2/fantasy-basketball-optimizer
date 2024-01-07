@@ -24,6 +24,7 @@ def calculate_coefficients(player_stats
     mean_of_means.loc['Free Throw Attempts'] = fta_mean_of_means
                        
     ftp_agg_average = (player_stats.loc[representative_player_set, 'Free Throw %'] * player_stats.loc[representative_player_set, 'Free Throw Attempts']).mean()/fta_mean_of_means
+    os.write(1,bytes(str(ftp_agg_average)))
     mean_of_means.loc['Free Throw %'] = ftp_agg_average
                        
     ftp_numerator = player_stats.loc[representative_player_set, 'Free Throw Attempts']/fta_mean_of_means * (player_stats.loc[representative_player_set, 'Free Throw %'] - ftp_agg_average)
