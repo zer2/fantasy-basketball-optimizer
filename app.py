@@ -9,28 +9,17 @@ from helper_functions import listify, make_progress_chart
 
 st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
 
-def stat_styler(value):
+def stat_styler(value, multiplier = 1):
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  int(value*50),255 , 255 -  int(value*50))
+    bgc = '#%02x%02x%02x' % (255 -  int(value*50)* multiplier,255 , 255 -  int(value*50)*multiplier)
   else:
-    bgc = '#%02x%02x%02x' % (255, 255 + int(value*50), 255 + int(value*50))
+    bgc = '#%02x%02x%02x' % (255, 255 + int(value*50)*multiplier, 255 + int(value*50)*multiplier)
 
-  tc = 'black' if abs(value) > 1 else 'black'
+  tc = 'black' if abs(value * multiplier) > 1 else 'black'
   
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
-  
-  if value > 1.5:
-    return f"background-color: darkgreen;color:white;" 
-  elif value > 0.5:
-    return f"background-color: green;color:white;" 
-  elif value > -0.5: 
-    return f"background-color: yellow;color:black;" 
-  elif value > -1.5:
-    return f"background-color: red;color:white;" 
-  else:
-    return f"background-color: darkred;color:white;" 
 
 def other_styler(value):
     return f"background-color: grey; color:white;" 
@@ -236,7 +225,10 @@ with tab3:
         team_stats.loc['Expected', :] = expected
         team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
 
-        team_stats = team_stats.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[team_players + ['Difference'], counting_statistics + percentage_statistics])
+        team_stats = team_stats.style.format("{:.2}").map(other_styler) \
+                                                    .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
+                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 0.25)
+
 
         z_display = st.dataframe(team_stats, use_container_width = True)        
         
@@ -249,8 +241,9 @@ with tab3:
         team_stats.loc['Expected', :] = expected
         team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
 
-        team_stats = team_stats.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[team_players + ['Difference'], counting_statistics + percentage_statistics])
-
+        team_stats = team_stats.style.format("{:.2}").map(other_styler) \
+                                                    .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics])
+                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 0.25)
 
         g_display = st.dataframe(team_stats, use_container_width = True)
         
