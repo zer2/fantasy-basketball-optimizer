@@ -42,13 +42,14 @@ def calculate_coefficients(player_stats
     var_of_means.loc['Field Goal %'] = fgp_var_of_means
 
     #get mean of vars
+    os.write(1,bytes(str(translation_factors),'utf-8'))
+
     translation_factors = pd.Series(translation_factors)
-    translation_facotrs['Free Throw Attempts'] = 0
-    translation_facotrs['Field Goal Attempts'] = 0
+    translation_factors['Free Throw Attempts'] = 0
+    translation_factors['Field Goal Attempts'] = 0
 
     mean_of_vars = mean_of_means * translation_facotrs
     os.write(1,bytes(str(mean_of_means),'utf-8'))
-    os.write(1,bytes(str(translation_factors),'utf-8'))
     os.write(1,bytes(str(mean_of_vars),'utf-8'))
 
 
