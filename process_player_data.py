@@ -85,7 +85,7 @@ def calculate_scores_from_coefficients(player_stats
 
 @st.cache_data
 def process_player_data(player_stats
-                        , coefficients
+                        , conversion_factors
                         , psi
                         , nu
                         , n_drafters
@@ -103,7 +103,7 @@ def process_player_data(player_stats
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
   os.write(1,bytes(str(coefficients),'utf-8'))
-  coefficients = calculate_coefficients(player_stats, representative_player_set)
+  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors)
   os.write(1,bytes(str(coefficients),'utf-8'))
                          
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
