@@ -41,7 +41,7 @@ volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
 @st.cache_data
 def get_full_data():
-  full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index()  
+  full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
   full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
   
    #adjust for the display
