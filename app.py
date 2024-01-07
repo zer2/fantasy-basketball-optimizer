@@ -265,51 +265,56 @@ with tab3:
     
       with subtab3:
 
-        winner_take_all = format == 'Head to Head: Most Categories'
-        n_players = n_drafters * n_picks
-      
-        H = HAgent(info = info
-                   , omega = omega
-                   , gamma = gamma
-                   , alpha = alpha
-                   , beta = beta
-                   , n_players = n_players
-                   , winner_take_all = winner_take_all)
-    
-        players_chosen = [x for x in listify(selections_editable) if x ==x]
-        my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
-    
-        generator = H.get_h_scores(player_stats, my_players, players_chosen)
-  
-        placeholder = st.empty()
-        all_res = []
+        with st.form(key='my_form_to_submit'):
+          submit_button = st.form_submit_button(label='Run H-score algorithm')
+          
+        if submit_button:
+
+          winner_take_all = format == 'Head to Head: Most Categories'
+          n_players = n_drafters * n_picks
         
-        for i in range(n_iterations):
+          H = HAgent(info = info
+                     , omega = omega
+                     , gamma = gamma
+                     , alpha = alpha
+                     , beta = beta
+                     , n_players = n_players
+                     , winner_take_all = winner_take_all)
+      
+          players_chosen = [x for x in listify(selections_editable) if x ==x]
+          my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
+      
+          generator = H.get_h_scores(player_stats, my_players, players_chosen)
     
-          c, res = next(generator)
-          all_res = all_res + [res]
-          #normalize weights by what we expect from other drafters
-          c = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
-          c = (c * 100).round()
-            
-          with placeholder.container():
-
-            score_tab, weight_tab = st.tabs(['Scores','Weights'])
-
-            with score_tab:
-              c1, c2 = st.columns([0.3,0.7])
-    
-              with c1:
-                res = res.sort_values(ascending = False).round(3)
-                res.name = 'H-score'
-    
-    
-                st.dataframe(pd.DataFrame(res))
-    
-              with c2:
-                st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
+          placeholder = st.empty()
+          all_res = []
+          
+          for i in range(n_iterations):
+      
+            c, res = next(generator)
+            all_res = all_res + [res]
+            #normalize weights by what we expect from other drafters
+            c = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
+            c = (c * 100).round()
+              
+            with placeholder.container():
   
-            with weight_tab:
-              c_df = c.loc[res.index].dropna().round().astype(int)
-              c_df = c_df.style.background_gradient(axis = None)
-              st.dataframe(c_df)
+              score_tab, weight_tab = st.tabs(['Scores','Weights'])
+  
+              with score_tab:
+                c1, c2 = st.columns([0.3,0.7])
+      
+                with c1:
+                  res = res.sort_values(ascending = False).round(3)
+                  res.name = 'H-score'
+      
+      
+                  st.dataframe(pd.DataFrame(res))
+      
+                with c2:
+                  st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
+    
+              with weight_tab:
+                c_df = c.loc[res.index].dropna().round().astype(int)
+                c_df = c_df.style.background_gradient(axis = None)
+                st.dataframe(c_df)
