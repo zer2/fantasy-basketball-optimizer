@@ -221,7 +221,6 @@ with tab3:
         n_players_on_team = team_stats.shape[0]
         expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
 
-        os.write(1,bytes(str(z_scores[0:n_players_on_team*n_drafters]),'utf-8'))
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
         team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
