@@ -104,7 +104,7 @@ def process_player_data(player_stats
 
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
 
-  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors)
+  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'])
   z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, 1,0)
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
