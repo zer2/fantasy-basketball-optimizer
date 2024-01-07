@@ -23,7 +23,7 @@ def calculate_coefficients(player_stats
     fta_mean_of_means = player_stats.loc[representative_player_set, 'Free Throw Attempts'].mean()
     mean_of_means.loc['Free Throw Attempts'] = fta_mean_of_means
                        
-    ftp_agg_average = (player_stats.loc[representative_player_set, 'Free Throw %'] * player_stats.loc[representative_player_set, 'Free Throw %']).mean()/fta_mean_of_means
+    ftp_agg_average = (player_stats.loc[representative_player_set, 'Free Throw %'] * player_stats.loc[representative_player_set, 'Free Throw Attempts']).mean()/fta_mean_of_means
     mean_of_means.loc['Free Throw %'] = ftp_agg_average
                        
     ftp_numerator = player_stats.loc[representative_player_set, 'Free Throw Attempts']/fta_mean_of_means * (player_stats.loc[representative_player_set, 'Free Throw %'] - ftp_agg_average)
@@ -34,7 +34,7 @@ def calculate_coefficients(player_stats
     fga_mean_of_means = player_stats.loc[representative_player_set, 'Field Goal Attempts'].mean()
     mean_of_means.loc['Field Goal Attempts'] = fga_mean_of_means
                        
-    fgp_agg_average = (player_stats.loc[representative_player_set, 'Field Goal %'] * player_stats.loc[representative_player_set, 'Field Goal %']).mean()/fga_mean_of_means
+    fgp_agg_average = (player_stats.loc[representative_player_set, 'Field Goal %'] * player_stats.loc[representative_player_set, 'Field Goal Attempts']).mean()/fga_mean_of_means
     mean_of_means.loc['Field Goal %'] = fgp_agg_average
                        
     fgp_numerator = player_stats.loc[representative_player_set, 'Field Goal Attempts']/fga_mean_of_means * (player_stats.loc[representative_player_set, 'Field Goal %'] - fgp_agg_average)
