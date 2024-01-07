@@ -9,13 +9,13 @@ from helper_functions import listify, make_progress_chart
 
 st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
 
-def stat_styler(value, multiplier = 1):
+def stat_styler(value, multiplier = 50):
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  int(value*50)* multiplier,255 , 255 -  int(value*50)*multiplier)
+    bgc = '#%02x%02x%02x' % (255 -  int(value*multiplier),255 , 255 -  int(value*multiplier))
   else:
-    bgc = '#%02x%02x%02x' % (255, 255 + int(value*50)*multiplier, 255 + int(value*50)*multiplier)
+    bgc = '#%02x%02x%02x' % (255, 255 + int(value*multiplier), 255 + int(value*multiplier))
 
   tc = 'black' if abs(value * multiplier) > 1 else 'black'
   
@@ -227,7 +227,7 @@ with tab3:
 
         team_stats = team_stats.style.format("{:.2}").map(other_styler) \
                                                     .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
-                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 0.25)
+                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
 
         z_display = st.dataframe(team_stats, use_container_width = True)        
@@ -243,7 +243,7 @@ with tab3:
 
         team_stats = team_stats.style.format("{:.2}").map(other_styler) \
                                                     .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
-                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 0.25)
+                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
         g_display = st.dataframe(team_stats, use_container_width = True)
         
