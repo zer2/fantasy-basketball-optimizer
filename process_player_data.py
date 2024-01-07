@@ -104,7 +104,7 @@ def process_player_data(player_stats
 
   os.write(1,bytes(str(coefficients)))
   coefficients = calculate_coefficients(player_stats, representative_player_set)
-   os.write(1,bytes(str(coefficients)))
+  os.write(1,bytes(str(coefficients)))
                          
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
