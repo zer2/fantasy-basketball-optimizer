@@ -234,7 +234,7 @@ with tab3:
         expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
-        team_stats.loc['Difference', :] = team_stats['Total'] - team_stats['Expected']
+        team_stats.loc['Difference', :] = team_stats['Total',:] - team_stats['Expected',:]
 
         team_stats = team_stats.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[team_players + ['Difference'], counting_statistics + percentage_statistics])
 
