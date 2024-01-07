@@ -43,6 +43,10 @@ def calculate_coefficients(player_stats
 
     #get mean of vars
     mean_of_vars = mean_of_means * translation_factors
+    os.write(1,bytes(str(mean_of_means),'utf-8'))
+    os.write(1,bytes(str(translation_factors),'utf-8'))
+    os.write(1,bytes(str(mean_of_vars),'utf-8'))
+
 
     coefficients = pd.DataFrame({'Mean of Means' : mean_of_means
                                 ,'Variance of Means' : var_of_means
@@ -102,7 +106,6 @@ def process_player_data(player_stats
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
   coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors)
-  os.write(1,bytes(str(coefficients),'utf-8'))
                          
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
