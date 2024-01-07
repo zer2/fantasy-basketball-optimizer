@@ -10,31 +10,48 @@ counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes',
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
-def stat_styler(value):
-  if value != value:
-    return f"background-color:white;color:white;" 
-  elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  int(value*50),255 , 255 -  int(value*50))
-  else:
-    bgc = '#%02x%02x%02x' % (255, 255 + int(value*50), 255 + int(value*50))
+def calculate_coefficients(season_df
+                     , representative_player_set
+                     , translation_factors = 1):
+    """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores """
 
-  tc = 'black' if abs(value) > 1 else 'black'
-  
-  return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
-  
-  if value > 1.5:
-    return f"background-color: darkgreen;color:white;" 
-  elif value > 0.5:
-    return f"background-color: green;color:white;" 
-  elif value > -0.5: 
-    return f"background-color: yellow;color:black;" 
-  elif value > -1.5:
-    return f"background-color: red;color:white;" 
-  else:
-    return f"background-color: darkred;color:white;" 
+    #counting stats
+    var_of_means = player_stats.loc[representative_player_set,counting_statistics].var(axis = 0)
+    mean_of_means = player_stats.loc[representative_player_set,counting_statistics].mean(axis = 0)
 
-def other_styler(value):
-    return f"background-color: grey; color:white;" 
+    #free throw percent
+    fta_mean_of_means = player_stats.loc[representative_player_set, 'Free Throw Attempts'].mean()
+    mean_of_means.loc['Free Throw Attempts'] = fta_mean_of_means
+                       
+    ftp_agg_average = (player_stats.loc[representative_player_set, 'Free Throw %'] * player_stats.loc[representative_player_set, 'Free Throw %']).mean()/fta_mean_of_means
+    mean_of_means.loc['Free Throw %'] = ftp_agg_average
+                       
+    ftp_numerator = player_stats.loc[representative_player_set, 'Free Throw Attempts']/fta_mean_of_means * (player_stats.loc[representative_player_set, 'Free Throw %'] - ftp_agg_average)
+    ftp_var_of_means = ftp_numerator.var()
+    var_of_means.loc['Free Throw %'] = ftp_var_of_means
+    
+    #field goal %
+    fga_mean_of_means = player_stats.loc[representative_player_set, 'Field Goal Attempts'].mean()
+    mean_of_means.loc['Field Goal Attempts'] = fga_mean_of_means
+                       
+    fgp_agg_average = (player_stats.loc[representative_player_set, 'Field Goal %'] * player_stats.loc[representative_player_set, 'Field Goal %']).mean()/fga_mean_of_means
+    mean_of_means.loc['Field Goal %'] = fgp_agg_average
+                       
+    fgp_numerator = player_stats.loc[representative_player_set, 'Field Goal Attempts']/fga_mean_of_means * (player_stats.loc[representative_player_set, 'Field Goal %'] - fgp_agg_average)
+    fgp_var_of_means = fgp_numerator.var()
+    var_of_means.loc['Field Goal %'] = fgp_var_of_means
+
+    #get mean of vars
+    mean_of_vars = mean_of_means * translation_factors
+
+    coefficients = pd.DataFrame({'Mean of Means' : mean_of_means
+                                ,'Variance of Means' : var_of_means
+                                ,'Mean of Variances' : mean_of_vars
+                                }
+                               )
+    return coefficients
+  
+
 
 def calculate_scores_from_coefficients(player_stats
                                        ,coefficients
