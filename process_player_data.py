@@ -10,7 +10,7 @@ counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes',
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
-def calculate_coefficients(season_df
+def calculate_coefficients(player_stats
                      , representative_player_set
                      , translation_factors = 1):
     """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores """
@@ -96,6 +96,13 @@ def process_player_data(player_stats
 
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
 
+  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index)
+  z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, 1,0)
+  first_order_score = z_scores_first_order.sum(axis = 1)
+  representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
+
+  coefficients = calculate_coefficients(player_stats, representative_player_set)
+                          
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
   x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 0,1)
