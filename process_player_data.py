@@ -102,8 +102,10 @@ def process_player_data(player_stats
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
+  os.write(1,bytes(str(coefficients)))
   coefficients = calculate_coefficients(player_stats, representative_player_set)
-                          
+   os.write(1,bytes(str(coefficients)))
+                         
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
   x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 0,1)
