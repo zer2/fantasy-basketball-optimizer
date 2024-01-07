@@ -213,6 +213,9 @@ with tab3:
                     , value = default_seat
                    , max_value = n_drafters)
 
+    with st.form(key='my_form_to_submit'):
+      h_score_button = st.form_submit_button(label='Run H-score algorithm')
+
   with right:
 
     team_tab, cand_tab = st.tabs(["Team", "Candidates"])
@@ -264,10 +267,8 @@ with tab3:
         g_scores_display = st.dataframe(g_scores_unselected)
     
       with subtab3:
-
-        submit_button = st.form_submit_button(label='Run H-score algorithm')
-          
-        if submit_button:
+    
+        if h_score_button:
 
           winner_take_all = format == 'Head to Head: Most Categories'
           n_players = n_drafters * n_picks
