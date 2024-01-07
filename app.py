@@ -6,6 +6,7 @@ from pandas.api.types import CategoricalDtype
 from process_player_data import process_player_data
 from run_algorithm import HAgent
 from helper_functions import listify, make_progress_chart
+import os 
 
 st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
 
@@ -219,6 +220,8 @@ with tab3:
 
         n_players_on_team = team_stats.shape[0]
         expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+
+        os.write(1,bytes(str(z_scores[0:n_players_on_team*n_drafters]),'utf-8'))
         team_stats.loc['Total', :] = team_stats.sum(axis = 0)
         team_stats.loc['Expected', :] = expected
         team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
