@@ -24,7 +24,6 @@ def calculate_coefficients(player_stats
     mean_of_means.loc['Free Throw Attempts'] = fta_mean_of_means
                        
     ftp_agg_average = (player_stats.loc[representative_player_set, 'Free Throw %'] * player_stats.loc[representative_player_set, 'Free Throw Attempts']).mean()/fta_mean_of_means
-    os.write(1,bytes(str(ftp_agg_average),'utf-8'))
     mean_of_means.loc['Free Throw %'] = ftp_agg_average
                        
     ftp_numerator = player_stats.loc[representative_player_set, 'Free Throw Attempts']/fta_mean_of_means * (player_stats.loc[representative_player_set, 'Free Throw %'] - ftp_agg_average)
@@ -102,7 +101,6 @@ def process_player_data(player_stats
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  os.write(1,bytes(str(coefficients),'utf-8'))
   coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors)
   os.write(1,bytes(str(coefficients),'utf-8'))
                          
