@@ -98,10 +98,10 @@ with tab1:
 
       st.subheader(f"Coefficients")
       conversion_factors = st.data_editor(coefficient_df
-                                   , column_config = {'Conversion Factor' :  '𝜏² to σ²'}
+                                   , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
                                                       )
 
-      st.caption('μ, σ² and 𝜏² are defined in the paper. If you believe e.g. steals will be relatively unpredictable next year, you can increase 𝜏² for it. But the default values should be reasonable')
+      st.caption('σ² and 𝜏² are defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
 
   
