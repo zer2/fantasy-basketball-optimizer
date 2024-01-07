@@ -97,10 +97,8 @@ with tab1:
       st.caption(psi_str)
 
       st.subheader(f"Coefficients")
-      coefficients = st.data_editor(coefficient_df
-                                   , column_config = {'Mean of Means' :  'μ'
-                                                      ,'Variance of Means' : 'σ²'
-                                                      ,'Mean of Variances' : '𝜏²'}
+      conversion_factors = st.data_editor(coefficient_df
+                                   , column_config = {'Conversion Factor' :  '𝜏² to σ²'}
                                                       )
 
       st.caption('μ, σ² and 𝜏² are defined in the paper. If you believe e.g. steals will be relatively unpredictable next year, you can increase 𝜏² for it. But the default values should be reasonable')
@@ -161,7 +159,7 @@ with tab3:
 
   rotisserie = format == 'Rotisserie'
   
-  info = process_player_data(player_stats, coefficients, psi, nu, n_drafters, n_picks, rotisserie)
+  info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie)
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
