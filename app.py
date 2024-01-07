@@ -265,8 +265,7 @@ with tab3:
     
       with subtab3:
 
-        with st.form(key='my_form_to_submit'):
-          submit_button = st.form_submit_button(label='Run H-score algorithm')
+        submit_button = st.form_submit_button(label='Run H-score algorithm')
           
         if submit_button:
 
