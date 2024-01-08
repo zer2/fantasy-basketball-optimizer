@@ -3,7 +3,8 @@ Rankings and algorithms are based on the methods described in [this paper](https
 The most important weaknesses to keep in mind for H-scoring are 
 * There is no implicit handling of value above replacement differences across positions. If the algorithm is
 leaning towards centers to align with its punting strategy, you might want to pick players of other positions even
-if they have slightly lower H-scores
+if they have slightly lower H-scores. The degree to which you should do this depends on how strict your league is
+on position players vs. utilities 
 * The algorithm does not adjust for the choices of other players. If you notice another player pursuing a 
 particular punting strategy, you might want to avoid that strategy for yourself
 * The extension of H-scoring to Rotisserie implemented in this tool is not described in the paper.
