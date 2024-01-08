@@ -81,7 +81,7 @@ class HAgent():
         
         while True:
 
-            if round_n < 12:
+            if (round_n < 12) & (n_iterations > 0):
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
