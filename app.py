@@ -26,8 +26,11 @@ def stat_styler(value, multiplier = 50):
   
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
 
-def other_styler(value):
+def styler_a(value):
     return f"background-color: grey; color:white;" 
+
+def styler_b(value):
+    return f"background-color: lightgrey; color:black;" 
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
@@ -231,7 +234,8 @@ with tab3:
             team_stats.loc['Expected', :] = expected
             team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
     
-            team_stats = team_stats.style.format("{:.2}").map(other_styler) \
+            team_stats = team_stats.style.format("{:.2}")).map(styler_a) \
+                                                        .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
@@ -250,7 +254,8 @@ with tab3:
             team_stats.loc['Expected', :] = expected
             team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
     
-            team_stats = team_stats.style.format("{:.2}").map(other_styler) \
+            team_stats = team_stats.style.format("{:.2}").map(styler_a) \
+                                                        .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
