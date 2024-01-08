@@ -272,12 +272,12 @@ with tab3:
     
       with subtab1:
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-        z_scores_unselected = z_scores_unselected.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+        z_scores_unselected = z_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
         z_scores_display = st.dataframe(z_scores_unselected)
         
       with subtab2:
         g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
-        g_scores_unselected = g_scores_unselected.style.format("{:.2}").map(other_styler).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+        g_scores_unselected = g_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
         g_scores_display = st.dataframe(g_scores_unselected)
     
       with subtab3:
