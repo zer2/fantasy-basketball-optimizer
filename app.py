@@ -52,7 +52,7 @@ full_df = get_full_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-tab1, tab2, tab3, tab4 = st.tabs(["Parameters", "Player Stats", "Draft","Notes"])
+tab1, tab2, tab3, tab4 = st.tabs(["Parameters", "Player Stats", "Draft","About"])
 
 with tab1: 
   left, middle, right = st.columns([0.25,0.25,0.5])
