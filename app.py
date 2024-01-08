@@ -289,8 +289,9 @@ with tab3:
     
           placeholder = st.empty()
           all_res = []
-          
-          for i in range(n_iterations):
+
+          #if n_iterations is 0 we run just once with punting set to False
+          for i in range(max(1,n_iterations)):
       
             c, res = next(generator)
             all_res = all_res + [res]
