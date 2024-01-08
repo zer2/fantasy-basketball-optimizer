@@ -9,7 +9,7 @@ from helper_functions import listify, make_progress_chart
 from pathlib import Path
 import os 
 
-st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
+st.title('Optimization for fantasy basketball') 
 
 def read_markdown_file(markdown_file):
     return Path(markdown_file).read_text()
