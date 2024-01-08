@@ -16,6 +16,7 @@ class HAgent():
                  , beta
                  , n_players
                  , winner_take_all
+                 , punting
 ):
         """Calculates the rank order based on U-score
 
@@ -43,13 +44,15 @@ class HAgent():
         self.diff_var = info['Diff-var']
         self.v = info['v']
         self.L = info['L']
+        self.punting = punting
       
     def get_h_scores(self
                   , df
                   , my_players
-                  , players_chosen ):
+                  , players_chosen
+                  ,):
 
-        """Picks a player based on the D-score algorithm
+        """Picks a player based on the H-score algorithm
 
         Args:
             player_assignments: dict of format
@@ -73,15 +76,15 @@ class HAgent():
         scores = []
         weights = []
 
-        return self.perform_iterations(c,round_n, diff_means, x_scores_available)
+        return self.perform_iterations(c,round_n, diff_means, x_scores_available, punting)
 
-    def perform_iterations(self,c,round_n, diff_means, x_scores_available):
+    def perform_iterations(self,c,round_n, diff_means, x_scores_available, punting):
 
         i = 0
         
         while True:
 
-            if (round_n < 12) & (n_iterations > 0):
+            if (round_n < 12) & (self.punting):
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
