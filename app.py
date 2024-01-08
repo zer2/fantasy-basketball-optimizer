@@ -223,15 +223,17 @@ with tab3:
         team_players = list(team_stats.index)
 
         n_players_on_team = team_stats.shape[0]
-        expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
 
-        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-        team_stats.loc['Expected', :] = expected
-        team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
-
-        team_stats = team_stats.style.format("{:.2}").map(other_styler) \
-                                                    .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
-                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
+        if n_players_on_team > 0:
+            expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+    
+            team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+            team_stats.loc['Expected', :] = expected
+            team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
+    
+            team_stats = team_stats.style.format("{:.2}").map(other_styler) \
+                                                        .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
+                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
 
         z_display = st.dataframe(team_stats, use_container_width = True)        
@@ -240,16 +242,19 @@ with tab3:
         team_stats = g_scores[g_scores.index.isin(team_selections)]
 
         n_players_on_team = team_stats.shape[0]
-        expected = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-        team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-        team_stats.loc['Expected', :] = expected
-        team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
 
-        team_stats = team_stats.style.format("{:.2}").map(other_styler) \
-                                                    .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
-                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
+        if n_players_on_team > 0:
 
-        g_display = st.dataframe(team_stats, use_container_width = True)
+            expected = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+            team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+            team_stats.loc['Expected', :] = expected
+            team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
+    
+            team_stats = team_stats.style.format("{:.2}").map(other_styler) \
+                                                        .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
+                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
+    
+            g_display = st.dataframe(team_stats, use_container_width = True)
         
     with cand_tab:
 
