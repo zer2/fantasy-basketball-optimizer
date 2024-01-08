@@ -319,4 +319,5 @@ with tab3:
                 st.dataframe(c_df)
 
 with tab4:
-  read_markdown_file('notes.md')
+  mk = read_markdown_file('notes.md')
+  st.markdown(mk, unsafe_allow_html=True)
