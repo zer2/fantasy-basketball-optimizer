@@ -254,7 +254,7 @@ with tab3:
                                                         .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
-            g_display = st.dataframe(team_stats, use_container_width = True)
+        g_display = st.dataframe(team_stats, use_container_width = True)
         
     with cand_tab:
 
