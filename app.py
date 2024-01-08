@@ -239,7 +239,7 @@ with tab3:
     
             team_stats = team_stats.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
-                                                        .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total]]) \
+                                                        .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
@@ -260,7 +260,7 @@ with tab3:
     
             team_stats = team_stats.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
-                                                        .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total]]) \
+                                                        .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
