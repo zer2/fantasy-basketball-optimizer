@@ -2,7 +2,7 @@ Rankings and algorithms are based on the methods described in [this paper](https
 
 The most important weaknesses to keep in mind for H-scoring are 
 * There is no implicit handling of value above replacement differences across positions. The algorithm understands that
-it cannot pick all players of the same position when evaluating punting strategies, but it does not adjust H-scores by
+it cannot pick all players of the same position when through the &nu parameter, but it does not adjust H-scores by
 position. If the algorithm is leaning towards centers to align with its punting strategy, you might want to pick players
 of other positions even if they have slightly lower H-scores. The degree to which you should do this depends on how strict
 your league is on position players vs. utilities 
