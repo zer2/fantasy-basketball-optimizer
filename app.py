@@ -63,7 +63,7 @@ with tab1:
     format = st.selectbox(
       'Which format are you playing?',
       ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
-      , index = 2)
+      , index = 1)
   
     if format == 'Rotisserie':
       st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
