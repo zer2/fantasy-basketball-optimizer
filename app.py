@@ -271,14 +271,16 @@ with tab3:
 
           winner_take_all = format == 'Head to Head: Most Categories'
           n_players = n_drafters * n_picks
-        
+          punting = n_iterations > 0
+            
           H = HAgent(info = info
                      , omega = omega
                      , gamma = gamma
                      , alpha = alpha
                      , beta = beta
                      , n_players = n_players
-                     , winner_take_all = winner_take_all)
+                     , winner_take_all = winner_take_all
+                     , punting = punting)
       
           players_chosen = [x for x in listify(selections_editable) if x ==x]
           my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
