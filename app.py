@@ -33,7 +33,7 @@ def styler_b(value):
     return f"background-color: lightgrey; color:black;" 
 
 def styler_c(value):
-    return f"background-color: darkgrey; color:white;" 
+    return f"background-color: darkgrey; color:black;" 
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
