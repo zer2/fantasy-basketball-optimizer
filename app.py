@@ -6,10 +6,14 @@ from pandas.api.types import CategoricalDtype
 from process_player_data import process_player_data
 from run_algorithm import HAgent
 from helper_functions import listify, make_progress_chart
+from pathlib import Path
 import os 
 
 st.title('Optimization for fantasy basketball: based on [this paper](https://arxiv.org/abs/2307.02188)') 
 
+def read_markdown_file(markdown_file):
+    return Path(markdown_file).read_text()
+  
 def stat_styler(value, multiplier = 50):
   if value != value:
     return f"background-color:white;color:white;" 
@@ -48,7 +52,7 @@ full_df = get_full_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-tab1, tab2, tab3 = st.tabs(["Parameters", "Player Stats", "Draft"])
+tab1, tab2, tab3, tab4 = st.tabs(["Parameters", "Player Stats", "Draft","Notes"])
 
 with tab1: 
   left, middle, right = st.columns([0.25,0.25,0.5])
@@ -313,3 +317,6 @@ with tab3:
                 c_df = c.loc[res.index].dropna().round().astype(int)
                 c_df = c_df.style.background_gradient(axis = None)
                 st.dataframe(c_df)
+
+with tab4:
+  read_markdown_file('notes.md')
