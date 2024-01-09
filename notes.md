@@ -1,4 +1,4 @@
-Rankings and algorithms are based on the methods described in [this paper](https://arxiv.org/abs/2307.02188). A simplified version of the analysis can be found [here](https://github.com/zer2/Fantasy-Basketball--in-progress-/blob/main/readme.md). As detailed in the paper, the algorithms all utilize many simplifying assumptions and are not guaranteed to achieve success. 
+Rankings and algorithms are based on the methods described in [this paper](https://arxiv.org/abs/2307.02188). A simplified version of the analysis can be found [here](https://github.com/zer2/Fantasy-Basketball--in-progress-/blob/main/readme.md). As detailed in the paper, the algorithms all utilize many simplifying assumptions and are not guaranteed to achieve success
 
 The most important weaknesses to keep in mind for H-scoring are 
 * The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a 
