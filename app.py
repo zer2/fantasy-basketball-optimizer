@@ -191,23 +191,21 @@ with tab3:
     st.subheader('Draft board')
     selections_editable = st.data_editor(selections, hide_index = True)
 
-    '''
     #figure out which drafter is next
-    i = 0
-    default_seat = None
-    while (i < n_drafters * n_picks) and (default_seat is None):
-      round = i // n_drafters 
-      pick = i - round * n_drafters
-      drafter = pick + 1 if round % 2 == 0 else n_drafters - pick
+    #i = 0
+    #default_seat = None
+    #while (i < n_drafters * n_picks) and (default_seat is None):
+    #  round = i // n_drafters 
+    #  pick = i - round * n_drafters
+    #  drafter = pick + 1 if round % 2 == 0 else n_drafters - pick
+    #
+    #  #the condition should only trigger when the seat to check is blank 
+    #  check_seat = selections_editable.loc[round, 'Drafter ' + str(drafter)]
+    #  if check_seat != check_seat:
+    #    default_seat = drafter
+    #
+    #  i += 1 
 
-      #the condition should only trigger when the seat to check is blank 
-      check_seat = selections_editable.loc[round, 'Drafter ' + str(drafter)]
-      if check_seat != check_seat:
-        default_seat = drafter
-
-      i += 1 
-
-    '''
     seat =  st.number_input(r'Analyze for which drafter?'
                     , min_value = 1
                     #, value = default_seat
