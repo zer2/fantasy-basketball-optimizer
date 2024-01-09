@@ -191,6 +191,7 @@ with tab3:
     st.subheader('Draft board')
     selections_editable = st.data_editor(selections, hide_index = True)
 
+    '''
     #figure out which drafter is next
     i = 0
     default_seat = None
@@ -205,10 +206,11 @@ with tab3:
         default_seat = drafter
 
       i += 1 
-        
+
+    '''
     seat =  st.number_input(r'Analyze for which drafter?'
                     , min_value = 1
-                    , value = default_seat
+                    #, value = default_seat
                    , max_value = n_drafters)
 
     with st.form(key='my_form_to_submit'):
