@@ -2,10 +2,12 @@ Rankings and algorithms are based on the methods described in [this paper](https
 
 The most important weaknesses to keep in mind for H-scoring are 
 * There is no implicit handling of value above replacement differences across positions. The algorithm understands that
-it cannot pick all players of the same position when through the $\nu$ parameter, but it does not adjust H-scores by
-position. If the algorithm is leaning towards centers to align with its punting strategy, you might want to pick players
-of other positions even if they have slightly lower H-scores. The degree to which you should do this depends on how strict
-your league is on position players vs. utilities 
+it cannot pick all players of the same position through the $\nu$ parameter, but it does not adjust H-scores by
+position. It works this way because in my simulations, the greedy heuristic of simply taking the highest-scoring available player
+that can fit on the team at every stage of the draft does fine, and I have not found a value-above-replacement system which improves
+algorithm performance. However, you may not want to draft this way, to reduce the likelihood of accidentally selecting an unbalanced
+team.  So e.g. If the algorithm is leaning towards centers to align with its punting strategy, you might want to pick players
+of other positions even if they have slightly lower H-scores
 * The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a 
 particular punting strategy, you might want to avoid that strategy for yourself so that you do not compete
 for the same players 
