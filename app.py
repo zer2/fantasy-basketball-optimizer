@@ -58,9 +58,13 @@ full_df = get_full_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-tab1, tab2, tab3, tab4 = st.tabs(["Parameters", "Player Stats", "Draft","About"])
+tab1, tab2, tab3, tab4 = st.tabs(["About","Parameters", "Player Stats", "Draft"])
 
-with tab1: 
+with tab1:
+  mk = read_markdown_file('notes.md')
+  st.markdown(mk, unsafe_allow_html=True)
+
+with tab2: 
   left, middle, right = st.columns([0.25,0.25,0.5])
 
   with left: 
@@ -152,7 +156,7 @@ with tab1:
       n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
       st.caption(n_iterations_str)
 
-with tab2:
+with tab3:
   st.markdown(f"Per-game player projections below: feel free to edit. Converted to weekly by multiplying by three")
 
   player_stats_editable = st.data_editor(df) # 👈 An editable dataframe
@@ -166,7 +170,7 @@ with tab2:
   player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
   player_stats.index.name = 'Player'
   
-with tab3:
+with tab4:
 
   rotisserie = format == 'Rotisserie'
   
@@ -336,6 +340,4 @@ with tab3:
                 c_df = c_df.style.background_gradient(axis = None)
                 st.dataframe(c_df)
 
-with tab4:
-  mk = read_markdown_file('notes.md')
-  st.markdown(mk, unsafe_allow_html=True)
+
