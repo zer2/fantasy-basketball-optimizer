@@ -220,7 +220,8 @@ with tab4:
 
   with right:
 
-    team_tab, cand_tab = st.tabs(["Team", "Candidates"])
+    team_tab, cand_tab, waiver_tab, trade_tab = st.tabs(["Team", "Candidates","Waiver Moves","Trades"])
+    #add two more tabs: "Waiver moves" and "Trades", only unlocked when n = n_picks
 
     with team_tab:
     
@@ -340,4 +341,9 @@ with tab4:
                 c_df = c_df.style.background_gradient(axis = None)
                 st.dataframe(c_df)
 
+    with waiver_tab:
+        st.markdown('Coming soon!')
+        
+    with trade_tab:
+        st.markdown('Coming soon!')
 
