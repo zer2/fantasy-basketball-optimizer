@@ -298,7 +298,7 @@ with tab4:
                      , gamma = gamma
                      , alpha = alpha
                      , beta = beta
-                     , n_players = n_players
+                     , n_picks = n_picks
                      , winner_take_all = winner_take_all
                      , punting = punting)
       
