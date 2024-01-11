@@ -14,7 +14,7 @@ class HAgent():
                  , gamma
                  , alpha
                  , beta
-                 , n_players
+                 , n_picks
                  , winner_take_all
                  , punting
 ):
@@ -36,7 +36,7 @@ class HAgent():
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
-        self.n_players = n_players #actually we need n_picks and n_drafters 
+        self.n_picks = n_picks 
         self.winner_take_all = winner_take_all 
         self.x_scores = info['X-scores']
         self.score_table = info['Score-table']
@@ -85,7 +85,7 @@ class HAgent():
         while True:
 
             #12 should not be hard-coded. 
-            if (round_n < 12) & (self.punting):
+            if (round_n < self.n_picks - 1) & (self.punting):
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
