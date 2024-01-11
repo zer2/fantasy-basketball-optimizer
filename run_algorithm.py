@@ -36,7 +36,7 @@ class HAgent():
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
-        self.n_players = n_players
+        self.n_players = n_players #actually we need n_picks and n_drafters 
         self.winner_take_all = winner_take_all 
         self.x_scores = info['X-scores']
         self.score_table = info['Score-table']
@@ -84,6 +84,7 @@ class HAgent():
         
         while True:
 
+            #12 should not be hard-coded. 
             if (round_n < 12) & (self.punting):
                 del_full = self.get_del_full(c)
         
@@ -115,13 +116,14 @@ class HAgent():
                 c[c < 0] = 0
                 c = c/c.sum(axis = 1).reshape(-1,1)
 
-            else:
+            else: #should be if round_n =- n_picks - 1
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
 
                 c = None
-        
+
+            #this if structure should be distributed among the two branches above 
             if self.winner_take_all:
                 win_sums = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
@@ -129,6 +131,9 @@ class HAgent():
                                  )
             else:
                 win_sums = cdf_estimates.sum(axis = 1) 
+
+            #one more else: number of players greater than number of picks
+            #should iterate through all possible combos and take the best 
 
             i = i + 1
     
