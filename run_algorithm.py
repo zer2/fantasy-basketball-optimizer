@@ -176,7 +176,7 @@ class HAgent():
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1)
+                    win_sums = cdf_estimates.sum()
 
                 c = None
 
