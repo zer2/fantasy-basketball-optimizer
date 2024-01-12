@@ -427,11 +427,17 @@ with tab4:
                       ,second_team_selections
                     )
 
+
                 if (len(my_trade) == 0) | (len(second_trade) == 0):
                     st.markdown('Need to trade at least one player')
                 else:
                     my_others = [x for x in team_selections if x not in my_trade]
                     second_others = [x for x in second_team_selections if x not in second_trade]
+
+                    os.write(1, bytes(str(my_others),'utf-8'))
+                    os.write(1, bytes(str(second_others),'utf-8'))
+                    os.write(1, bytes(str(my_trade),'utf-8'))
+                    os.write(1, bytes(str(second_trade),'utf-8'))
         
                     trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
                     st.markdown('My team before trade: ' + str(trade_results[0]))
