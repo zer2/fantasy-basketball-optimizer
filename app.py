@@ -420,7 +420,7 @@ with tab4:
 
             second_trade = st.multiselect(
                   'Which players are you receiving?'
-                  ,other_team_selections
+                  ,second_team_selections
                 )
 
             my_others = [x for x in team_selections if x not in my_trade]
