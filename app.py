@@ -363,11 +363,8 @@ with tab4:
 
             _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
-            top_player = res.index[0]
-            score = res[0]
-
-            st.markdown('You could pick up ' + top_player )
-            st.markdown(score)
+            st.markdown('Possible pickups')
+            st.dataframe(res)
 
             #make a dropdown of each player on the team 
             #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
