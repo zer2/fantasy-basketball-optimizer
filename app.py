@@ -416,7 +416,7 @@ with tab4:
             if len(second_team_selections) < n_picks:
                 st.markdown('This team is not full yet! Come back here when it is')
             else:
-      
+
                 my_trade = st.multiselect(
                   'Which players are you trading?'
                   ,team_selections
@@ -426,12 +426,15 @@ with tab4:
                       'Which players are you receiving?'
                       ,second_team_selections
                     )
-    
-                my_others = [x for x in team_selections if x not in my_trade]
-                second_others = [x for x in second_team_selections if x not in second_trade]
-    
-                trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
-                st.markdown('My team before trade: ' + str(trade_results[0]))
-                st.markdown('My team after trade: ' + str(trade_results[1]))
-                st.markdown('Their team before trade: ' + str(trade_results[3]))
-                st.markdown('Their team after trade: ' + str(trade_results[3]))
+
+                if (len(my_trade) == 0) | (len(second_trade) == 0):
+                    st.markdown('Need to trade at least one player')
+                else:
+                    my_others = [x for x in team_selections if x not in my_trade]
+                    second_others = [x for x in second_team_selections if x not in second_trade]
+        
+                    trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
+                    st.markdown('My team before trade: ' + str(trade_results[0]))
+                    st.markdown('My team after trade: ' + str(trade_results[1]))
+                    st.markdown('Their team before trade: ' + str(trade_results[3]))
+                    st.markdown('Their team after trade: ' + str(trade_results[3]))
