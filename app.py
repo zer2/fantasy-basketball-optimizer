@@ -362,15 +362,21 @@ with tab4:
             z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
 
             with z_tab:
+                st.markdown('Projected team stats with chosen player:')
+                no_drop = team_stats_z.loc[['Total'],:]
+                no_drop.index = [drop_player]
+                
                 drop_player_stats_z = z_scores.loc[drop_player]
-                diff_z = z_scores_unselected - drop_player_stats_z
-                diff_z_styled = diff_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+                new_z =  team_stats_z.loc['Total',:] + g_scores_unselected - drop_player_stats_g
 
-                st.dataframe(diff_z_styled) 
+                new_z = pd.concat([no_drop,new_z])
+                new_z_styled = new_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = 15)
+
+                st.dataframe(new_z_styled) 
 
             with g_tab:
-                st.markdown('Current team:')
-                no_drop = team_stats_z.loc[['Total'],:]
+                st.markdown('Projected team stats with chosen player:')
+                no_drop = team_stats_g.loc[['Total'],:]
                 no_drop.index = [drop_player]
                 
                 drop_player_stats_g = g_scores.loc[drop_player]
