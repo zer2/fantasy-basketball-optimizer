@@ -164,7 +164,7 @@ class HAgent():
                 players_to_remove_possibilities = combinations(my_players,extra_players)
                 best_score = 0
                 
-                diff_means_mod = diff_means - pd.concat((self.x_scores.loc[players_to_remove].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
+                diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
                                                        ,axis = 0)
                 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
