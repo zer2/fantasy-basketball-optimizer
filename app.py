@@ -250,14 +250,14 @@ with tab4:
             team_stats_z.loc['Expected', :] = expected_z
             team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
     
-            team_stats_z = team_stats_z.style.format("{:.2}").map(styler_a) \
+            team_stats_z_styled = team_stats_z.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
 
-        z_display = st.dataframe(team_stats_z, use_container_width = True)        
+        z_display = st.dataframe(team_stats_z_styled, use_container_width = True)        
         
       with g_tab:
         team_stats_g = g_scores[g_scores.index.isin(team_selections)]
@@ -271,13 +271,13 @@ with tab4:
             team_stats_g.loc['Expected', :] = expected_g
             team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
     
-            team_stats_g = team_stats_g.style.format("{:.2}").map(styler_a) \
+            team_stats_g_styled = team_stats_g.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
-        g_display = st.dataframe(team_stats_g, use_container_width = True)
+        g_display = st.dataframe(team_stats_g_styled, use_container_width = True)
         
     with cand_tab:
         
@@ -369,11 +369,17 @@ with tab4:
                 st.dataframe(diff_z_styled) 
 
             with g_tab:
+                st.markdown('Current team:')
+                no_drop = team_stats_z.loc['Total',:]
+                no_drop.index = drop_player
+                
                 drop_player_stats_g = g_scores.loc[drop_player]
-                diff_g = g_scores_unselected - drop_player_stats_g
-                diff_g_styled = diff_g.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+                new_g =  team_stats_g.loc['Total',:] + g_scores_unselected - drop_player_stats_g
 
-                st.dataframe(diff_g_styled) 
+                new_g = pd.concat([no_drop,new_g])
+                new_g_styled = new_g.new_g.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+
+                st.dataframe(new_g_styled) 
 
             with h_tab:
                 _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
