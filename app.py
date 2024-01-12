@@ -250,11 +250,11 @@ with tab4:
             team_stats_z.loc['Expected', :] = expected_z
             team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
     
-            team_stats_z_styled = team_stats_z.style.format("{:.2}").map(styler_a) \
-                                                        .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
-                                                        .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
-                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
+        team_stats_z_styled = team_stats_z.style.format("{:.2}").map(styler_a) \
+                                                    .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
+                                                    .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
+                                                    .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
+                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
 
         z_display = st.dataframe(team_stats_z_styled, use_container_width = True)        
@@ -271,11 +271,11 @@ with tab4:
             team_stats_g.loc['Expected', :] = expected_g
             team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
     
-            team_stats_g_styled = team_stats_g.style.format("{:.2}").map(styler_a) \
-                                                        .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
-                                                        .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
-                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
+        team_stats_g_styled = team_stats_g.style.format("{:.2}").map(styler_a) \
+                                                    .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
+                                                    .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
+                                                    .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
+                                                    .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
         g_display = st.dataframe(team_stats_g_styled, use_container_width = True)
         
@@ -400,5 +400,18 @@ with tab4:
             #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
         
     with trade_tab:
-        st.markdown('Coming soon!')
+            my_team_trade = st.multiselect(
+              'Which players are you trading?'
+              ,my_players
+            )
+
+            seat =  st.number_input(r'which drafter are you trading with?'
+                    , min_value = 1
+                    #, value = default_seat
+                   , max_value = n_drafters)
+
+            other_team = st.multiselect(
+              'Which players are you trading?'
+              ,my_players
+            )
 
