@@ -163,10 +163,12 @@ class HAgent():
                 extra_players = n_players_selected - self.n_picks 
                 players_to_remove_possibilities = combinations(my_players,extra_players)
                 best_score = 0
-                
+
                 diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
-                                                       ,axis = 0)
-                
+                                                       ,axis = 1).T
+
+                os.write(1,bytes(str(diff_means_mod), 'utf-8'))
+
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
                                               , scale = np.sqrt(self.diff_var))
                                      ,index = diff_means.index)
@@ -327,7 +329,6 @@ def analyze_trade(team_1_other
     elif n_player_diff == 0:
         _, H_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
 
-        os.write(1,b'HIII')
         os.write(1, bytes(str(team_2_other + team_1_trade),'utf-8'))
         _, H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
     else:
