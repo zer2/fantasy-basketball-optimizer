@@ -7,6 +7,7 @@ from process_player_data import process_player_data
 from run_algorithm import HAgent, analyze_trade
 from helper_functions import listify, make_progress_chart
 from pathlib import Path
+import numpy as np
 import os 
 
 st.title('Optimization for fantasy basketball') 
