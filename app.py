@@ -274,7 +274,7 @@ with tab4:
             team_stats_g = team_stats_g.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                        .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
+                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
         g_display = st.dataframe(team_stats_g, use_container_width = True)
