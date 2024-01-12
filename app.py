@@ -367,7 +367,7 @@ with tab4:
                 no_drop.index = [drop_player]
                 
                 drop_player_stats_z = z_scores.loc[drop_player]
-                new_z =  team_stats_z.loc['Total',:] + g_scores_unselected - drop_player_stats_g
+                new_z =  team_stats_z.loc['Total',:] + z_scores_unselected - drop_player_stats_z
 
                 new_z = pd.concat([no_drop,new_z])
                 new_z_styled = new_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = 15)
