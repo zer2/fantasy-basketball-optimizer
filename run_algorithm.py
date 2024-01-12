@@ -314,6 +314,7 @@ def analyze_trade(team_1_other
     _, H_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
 
     n_player_diff = len(team_1_trade) - len(team_2_trade)
+    os.write(1, bytes(str(n_player_diff),'utf-8'))
 
     if n_player_diff > 0:
         generator = H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen)
