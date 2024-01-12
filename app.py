@@ -357,7 +357,7 @@ with tab4:
                      , winner_take_all = winner_take_all
                      , punting = punting)
       
-            base_score, _ = next(H.get_h_scores(player_stats, my_players, players_chosen))
+            _, base_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
             
             st.markdown(base_score)
         
