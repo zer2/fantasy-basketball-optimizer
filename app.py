@@ -280,6 +280,15 @@ with tab4:
         g_display = st.dataframe(team_stats, use_container_width = True)
         
     with cand_tab:
+        
+      H = HAgent(info = info
+         , omega = omega
+         , gamma = gamma
+         , alpha = alpha
+         , beta = beta
+         , n_picks = n_picks
+         , winner_take_all = winner_take_all
+         , punting = punting)
 
       subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
     
@@ -298,15 +307,6 @@ with tab4:
         if h_score_button:
 
           n_players = n_drafters * n_picks
-            
-          H = HAgent(info = info
-                     , omega = omega
-                     , gamma = gamma
-                     , alpha = alpha
-                     , beta = beta
-                     , n_picks = n_picks
-                     , winner_take_all = winner_take_all
-                     , punting = punting)
       
           generator = H.get_h_scores(player_stats, my_players, players_chosen)
     
@@ -348,18 +348,13 @@ with tab4:
         if len(my_players) < n_picks:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
-            H = HAgent(info = info
-                     , omega = omega
-                     , gamma = gamma
-                     , alpha = alpha
-                     , beta = beta
-                     , n_picks = n_picks
-                     , winner_take_all = winner_take_all
-                     , punting = punting)
       
             _, base_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
             
             st.markdown(base_score)
+
+            #make a dropdown of each player on the team 
+            #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
         
     with trade_tab:
         st.markdown('Coming soon!')
