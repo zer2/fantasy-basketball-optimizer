@@ -125,7 +125,7 @@ class HAgent():
                     win_sums = cdf_estimates.sum(axis = 1) 
 
             #case where one more player needs to be chosen
-            elif (round_n == (self.n_picks - 1)) | (self.punting & round_n < (self.n_picks - 1) ): 
+            elif (round_n == (self.n_picks - 1)) | (self.punting & (round_n < (self.n_picks - 1)) ): 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
