@@ -403,20 +403,31 @@ with tab4:
             #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
         
     with trade_tab:
+        if len(my_players) < n_picks:
+            st.markdown('Your team is not full yet! Come back here when you have a full team')
+        else:
 
-            other_seat =  st.number_input(r'which drafter are you trading with?'
+            second_seat =  st.number_input(r'which drafter are you trading with?'
                 , min_value = 1
                , max_value = n_drafters)
 
-            other_team_selections = selections_editable['Drafter ' + str(other_seat)].dropna()
+            second_team_selections = selections_editable['Drafter ' + str(second_seat)].dropna()
       
             my_trade = st.multiselect(
               'Which players are you trading?'
               ,team_selections
             )
 
-            other_trade = st.multiselect(
+            second_trade = st.multiselect(
                   'Which players are you receiving?'
                   ,other_team_selections
                 )
 
+            my_others = [x for x in team_selections if x not in my_trade]
+            second_others = [x for x in second_team_selections if x not in second_trade]
+
+            trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
+            st.markdown('My team before trade: ' + str(trade_results[0]))
+            st.markdown('My team after trade: ' + str(trade_results[1]))
+            st.markdown('Their team before trade: ' + str(trade_results[3]))
+            st.markdown('Their team after trade: ' + str(trade_results[3]))
