@@ -171,7 +171,7 @@ class HAgent():
 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
                                               , scale = np.sqrt(self.diff_var))
-                                     ,index = players_to_remove_possibilities)
+                                     ,index = diff_means_mod.index)
                                         
                 if self.winner_take_all:
                     win_sums = combinatorial_calculation(cdf_estimates
