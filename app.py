@@ -246,7 +246,7 @@ with tab4:
         if n_players_on_team > 0:
             expected_z = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
     
-            team_stats_z.loc['Total', :] = team_stats.sum(axis = 0)
+            team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
             team_stats_z.loc['Expected', :] = expected_z
             team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
     
