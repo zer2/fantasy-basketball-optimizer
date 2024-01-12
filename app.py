@@ -416,6 +416,8 @@ with tab4:
 
             if len(second_team_selections) < n_picks:
                 st.markdown('This team is not full yet! Come back here when it is')
+            elif second_seat == seat:
+                st.markdown('You cannot trade with yourself!')
             else:
 
                 my_trade = st.multiselect(
