@@ -404,7 +404,7 @@ with tab4:
         
     with trade_tab:
 
-             other_seat =  st.number_input(r'which drafter are you trading with?'
+            other_seat =  st.number_input(r'which drafter are you trading with?'
                 , min_value = 1
                , max_value = n_drafters)
 
