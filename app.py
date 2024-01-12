@@ -436,7 +436,7 @@ with tab4:
                     second_others = [x for x in second_team_selections if x not in second_trade]
         
                     trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
-                    st.markdown('My team before trade: ' + str(np.round(trade_results[0],2)))
-                    st.markdown('My team after trade: ' + str(np.round(trade_results[1],2)))
-                    st.markdown('Their team before trade: ' + str(np.round(trade_results[3])))
-                    st.markdown('Their team after trade: ' + str(np.round(trade_results[2])))
+                    st.markdown('Your team before trade: ' + str(np.round(trade_results[0],2)))
+                    st.markdown('Your team after trade: ' + str(np.round(trade_results[1],2)))
+                    st.markdown('Their team before trade: ' + str(np.round(trade_results[3],2)))
+                    st.markdown('Their team after trade: ' + str(np.round(trade_results[2],2)))
