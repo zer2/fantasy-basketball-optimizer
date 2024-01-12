@@ -174,9 +174,9 @@ class HAgent():
                     win_sums = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
-                                 ).max()
+                                 )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1).max() 
+                    win_sums = cdf_estimates.sum(axis = 1)
 
                 c = None
 
