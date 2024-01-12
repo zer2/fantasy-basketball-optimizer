@@ -154,7 +154,7 @@ class HAgent():
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1) 
+                    win_sums = cdf_estimates.sum() 
 
             #case where there are too many players and some need to be removed 
             else: #n > n_picks 
@@ -176,7 +176,7 @@ class HAgent():
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum()
+                    win_sums = cdf_estimates.sum(axis = 1)
 
                 c = None
 
