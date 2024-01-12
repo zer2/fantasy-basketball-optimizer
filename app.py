@@ -294,13 +294,13 @@ with tab4:
     
       with subtab1:
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-        z_scores_unselected = z_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
-        z_scores_display = st.dataframe(z_scores_unselected)
+        z_scores_unselected_styled = z_scores_unselected_styled.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+        z_scores_display = st.dataframe(z_scores_unselected_styled)
         
       with subtab2:
         g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
-        g_scores_unselected = g_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
-        g_scores_display = st.dataframe(g_scores_unselected)
+        g_scores_unselected_styled = g_scores_unselected_styled.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+        g_scores_display = st.dataframe(g_scores_unselected_styled)
     
       with subtab3:
     
@@ -364,12 +364,16 @@ with tab4:
             with z_tab:
                 drop_player_stats_z = z_scores.loc[drop_player]
                 diff_z = z_scores_unselected - drop_player_stats_z
-                st.dataframe(diff_z) 
+                diff_z_styled = diff_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+
+                st.dataframe(diff_z_styled) 
 
             with g_tab:
                 drop_player_stats_g = g_scores.loc[drop_player]
                 diff_g = g_scores_unselected - drop_player_stats_g
-                st.dataframe(diff_g) 
+                diff_g_styled = diff_g.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics])
+
+                st.dataframe(diff_g_styled) 
 
             with h_tab:
                 _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
