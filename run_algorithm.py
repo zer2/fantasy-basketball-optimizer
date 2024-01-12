@@ -5,6 +5,7 @@ import pandas as pd
 from scipy.stats import norm
 from helper_functions import combinatorial_calculation, calculate_tipping_points
 import os
+from itertools import combinations
 
 class HAgent():
 
