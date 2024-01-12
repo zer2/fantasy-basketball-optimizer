@@ -326,6 +326,7 @@ def analyze_trade(team_1_other
     elif n_player_diff == 0:
         _, H_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
 
+        os.write(1,b'HIII')
         os.write(1, bytes(str(team_2_other + team_1_trade),'utf-8'))
         _, H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
     else:
