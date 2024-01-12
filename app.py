@@ -80,6 +80,8 @@ with tab2:
     else:
       st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
+    winner_take_all = format == 'Head to Head: Most Categories'
+
     unique_datasets = pd.unique(full_df.index.get_level_values('Season'))
                                 
     dataset_name = st.selectbox(
@@ -292,7 +294,6 @@ with tab4:
     
         if h_score_button:
 
-          winner_take_all = format == 'Head to Head: Most Categories'
           n_players = n_drafters * n_picks
           punting = n_iterations > 0
             
