@@ -215,6 +215,9 @@ with tab4:
                     #, value = default_seat
                    , max_value = n_drafters)
 
+    players_chosen = [x for x in listify(selections_editable) if x ==x]
+    my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
+
     with st.form(key='my_form_to_submit'):
       h_score_button = st.form_submit_button(label='Run H-score algorithm')
 
@@ -302,9 +305,6 @@ with tab4:
                      , winner_take_all = winner_take_all
                      , punting = punting)
       
-          players_chosen = [x for x in listify(selections_editable) if x ==x]
-          my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
-      
           generator = H.get_h_scores(player_stats, my_players, players_chosen)
     
           placeholder = st.empty()
@@ -342,7 +342,21 @@ with tab4:
                 st.dataframe(c_df)
 
     with waiver_tab:
-        st.markdown('Coming soon!')
+        if len(my_players) < n_picks:
+            st.markdown('Your team is not full yet! Come back here when you have a full team')
+        else:
+            H = HAgent(info = info
+                     , omega = omega
+                     , gamma = gamma
+                     , alpha = alpha
+                     , beta = beta
+                     , n_picks = n_picks
+                     , winner_take_all = winner_take_all
+                     , punting = punting)
+      
+            base_score, _ = next(H.get_h_scores(player_stats, my_players, players_chosen))
+            
+            st.markdown(base_score)
         
     with trade_tab:
         st.markdown('Coming soon!')
