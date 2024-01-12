@@ -84,7 +84,7 @@ class HAgent():
         
         while True:
 
-            #12 should not be hard-coded. 
+            #case where many players need to be chosen
             if (round_n < self.n_picks - 1) & (self.punting):
                 del_full = self.get_del_full(c)
         
@@ -116,24 +116,69 @@ class HAgent():
                 c[c < 0] = 0
                 c = c/c.sum(axis = 1).reshape(-1,1)
 
-            else: #should be if round_n =- n_picks - 1
+                if self.winner_take_all:
+                    win_sums = combinatorial_calculation(cdf_estimates
+                                                              , 1 - cdf_estimates
+                                                              , categories = cdf_estimates.columns
+                                 )
+                else:
+                    win_sums = cdf_estimates.sum(axis = 1) 
+
+            #case where one more player needs to be chosen
+            elif round_n == (self.n_picks - 1)| (self.punting & round_n < (self.n_picks - 1) ): 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
 
                 c = None
-
-            #this if structure should be distributed among the two branches above 
-            if self.winner_take_all:
-                win_sums = combinatorial_calculation(cdf_estimates
+                
+                if self.winner_take_all:
+                    win_sums = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
-            else:
-                win_sums = cdf_estimates.sum(axis = 1) 
+                else:
+                    win_sums = cdf_estimates.sum(axis = 1) 
 
-            #one more else: number of players greater than number of picks
-            #should iterate through all possible combos and take the best 
+            #case where no new players need to be chosen
+            elif round_n == self.n_picks: 
+                cdf_estimates = pd.DataFrame(norm.cdf(diff_means
+                              , scale = np.sqrt(self.diff_var))
+                     ,index = diff_means.index)
+
+                c = None
+                
+                if self.winner_take_all:
+                    win_sums = combinatorial_calculation(cdf_estimates
+                                                              , 1 - cdf_estimates
+                                                              , categories = cdf_estimates.columns
+                                 )
+                else:
+                    win_sums = cdf_estimates.sum(axis = 1) 
+
+            #case where there are too many players and some need to be removed 
+            else: #n > n_picks 
+
+                extra_players = round_n - self.n_picks 
+                players_to_remove_possibilities = combinations(self.players,extra_players)
+                best_score = 0
+                
+                diff_means_mod = diff_means - pd.concat((self.x_scores.loc[players_to_remove].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
+                                                       ,axis = 0)
+                
+                cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
+                                              , scale = np.sqrt(self.diff_var))
+                                     ,index = diff_means.index)
+                                        
+                if self.winner_take_all:
+                    win_sums = combinatorial_calculation(cdf_estimates
+                                                              , 1 - cdf_estimates
+                                                              , categories = cdf_estimates.columns
+                                 ).max()
+                else:
+                    win_sums = cdf_estimates.sum(axis = 1).max() 
+
+                c = None
 
             i = i + 1
     
