@@ -359,7 +359,7 @@ with tab4:
 
             mod_my_players = [x for x in my_players if x != drop_player]
 
-            z_tab, g_tab, h_tab = tabs(['Z-score','G-score','H-score'])
+            z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
 
             with z_tab:
                 drop_player_stats_z = z_scores.loc[drop_player]
