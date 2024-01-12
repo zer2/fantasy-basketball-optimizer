@@ -158,6 +158,9 @@ with tab2:
       n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
       st.caption(n_iterations_str)
 
+      punting = n_iterations > 0
+
+
 with tab3:
   st.markdown(f"Per-game player projections below: feel free to edit. Converted to weekly by multiplying by three")
 
@@ -295,7 +298,6 @@ with tab4:
         if h_score_button:
 
           n_players = n_drafters * n_picks
-          punting = n_iterations > 0
             
           H = HAgent(info = info
                      , omega = omega
