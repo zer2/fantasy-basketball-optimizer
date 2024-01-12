@@ -408,7 +408,7 @@ with tab4:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
 
-            second_seat =  st.number_input(r'which drafter are you trading with?'
+            second_seat =  st.number_input(r'Which drafter are you trading with?'
                 , min_value = 1
                , max_value = n_drafters)
 
