@@ -370,7 +370,7 @@ with tab4:
 
             with g_tab:
                 st.markdown('Current team:')
-                no_drop = team_stats_z.loc['Total',:]
+                no_drop = team_stats_z.loc[['Total'],:]
                 no_drop.index = drop_player
                 
                 drop_player_stats_g = g_scores.loc[drop_player]
