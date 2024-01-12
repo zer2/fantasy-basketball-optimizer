@@ -363,6 +363,10 @@ with tab4:
 
             _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
+            res = res - base_score
+            res = res.sort_values(ascending = False).round(3)
+            res.name = 'H-score differential'
+
             st.markdown('Possible pickups')
             st.dataframe(res)
 
