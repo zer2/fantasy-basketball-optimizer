@@ -238,46 +238,46 @@ with tab4:
       z_tab, g_tab = st.tabs(["Z-score", "G-score"])
         
       with z_tab:
-        team_stats = z_scores[z_scores.index.isin(team_selections)]
-        team_players = list(team_stats.index)
+        team_stats_z = z_scores[z_scores.index.isin(team_selections)]
+        #team_players = list(team_stats.index)
 
         n_players_on_team = team_stats.shape[0]
 
         if n_players_on_team > 0:
-            expected = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+            expected_z = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
     
-            team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-            team_stats.loc['Expected', :] = expected
-            team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
+            team_stats_z.loc['Total', :] = team_stats.sum(axis = 0)
+            team_stats_z.loc['Expected', :] = expected_z
+            team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
     
-            team_stats = team_stats.style.format("{:.2}").map(styler_a) \
+            team_stats_z = team_stats_z.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                        .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
+                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
 
 
-        z_display = st.dataframe(team_stats, use_container_width = True)        
+        z_display = st.dataframe(team_stats_z, use_container_width = True)        
         
       with g_tab:
-        team_stats = g_scores[g_scores.index.isin(team_selections)]
+        team_stats_g = g_scores[g_scores.index.isin(team_selections)]
 
-        n_players_on_team = team_stats.shape[0]
+        n_players_on_team = team_stats_g.shape[0]
 
         if n_players_on_team > 0:
 
-            expected = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-            team_stats.loc['Total', :] = team_stats.sum(axis = 0)
-            team_stats.loc['Expected', :] = expected
-            team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
+            expected_g = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+            team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
+            team_stats_g.loc['Expected', :] = expected_g
+            team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
     
-            team_stats = team_stats.style.format("{:.2}").map(styler_a) \
+            team_stats_g = team_stats_g.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_players, counting_statistics + percentage_statistics]) \
                                                         .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 15)
     
-        g_display = st.dataframe(team_stats, use_container_width = True)
+        g_display = st.dataframe(team_stats_g, use_container_width = True)
         
     with cand_tab:
         
@@ -351,8 +351,6 @@ with tab4:
       
             _, base_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
             
-            st.markdown(base_score)
-
             drop_player = st.selectbox(
               'Which player are you considering dropping?'
               ,my_players
@@ -361,14 +359,26 @@ with tab4:
 
             mod_my_players = [x for x in my_players if x != drop_player]
 
-            _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
+            z_tab, g_tab, h_tab = tabs(['Z-score','G-score','H-score'])
 
-            res = res - base_score.values[0]
-            res = res.sort_values(ascending = False).round(3)
-            res.name = 'H-score differential'
+            with z_tab:
+                drop_player_stats_z = z_scores.loc[drop_player]
+                diff_z = z_scores_unselected - drop_player_stats_z
+                st.dataframe(diff_z) 
 
-            st.markdown('Possible pickups')
-            st.dataframe(res)
+            with g_tab:
+                drop_player_stats_g = g_scores.loc[drop_player]
+                diff_g = g_scores_unselected - drop_player_stats_g
+                st.dataframe(diff_g) 
+
+            with h_tab:
+                _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
+    
+                res = res - base_score.values[0]
+                res = res.sort_values(ascending = False).round(3)
+                res.name = 'H-score differential'
+    
+                st.dataframe(res)
 
             #make a dropdown of each player on the team 
             #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
