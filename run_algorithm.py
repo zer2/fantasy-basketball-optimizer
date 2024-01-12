@@ -300,3 +300,37 @@ class HAgent():
 
     def get_del_full(self,c):
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
+
+def analyze_trade(team_1_other
+                  , team_1_trade
+                  , team_2_other
+                  , team_2_trade
+                  , Hmodel
+                  , player_stats
+                  , players_chosen
+                  ,n_iterations):    
+                      
+    _, H_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
+    _, H_2_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+
+    n_player_diff = len(team_1_trade) - len(team_2_trade)
+
+    if n_player_diff > 0:
+        generator = H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen)
+        for i in range(n_iterations):
+            _, H_1_2 = next(generator)
+                
+        H_2_1 = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
+    elif n_player_diff == 0:
+        _, H_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        _, H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+    else:
+        H_1_2 = H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen)
+
+        generator = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
+        for i in range(n_iterations):
+            _, H_2_1 = next(generator)
+
+
+    return H_1_1, H_1_2, H_2_1, H_2_2
+                
