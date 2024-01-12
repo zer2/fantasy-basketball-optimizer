@@ -62,11 +62,11 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
-        round_n = len(my_players) 
+        n_players_selected = len(my_players) 
 
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
 
-        previous_rounds_expected = self.score_table.iloc[0:round_n].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
+        previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
         this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
         diff_means = x_self_sum - previous_rounds_expected - this_round_expected
 
@@ -77,21 +77,21 @@ class HAgent():
         scores = []
         weights = []
 
-        return self.perform_iterations(c,round_n, diff_means, x_scores_available)
+        return self.perform_iterations(c,n_players_selected, diff_means, x_scores_available, my_players)
 
-    def perform_iterations(self,c,round_n, diff_means, x_scores_available):
+    def perform_iterations(self,c,n_players_selected, diff_means, x_scores_available, my_players):
 
         i = 0
         
         while True:
 
             #case where many players need to be chosen
-            if (round_n < self.n_picks - 1) & (self.punting):
+            if (n_players_selected < self.n_picks - 1) & (self.punting):
                 del_full = self.get_del_full(c)
         
                 expected_x = self.get_x_mu(c)
 
-                expected_future_diff = ((12-round_n) * expected_x).reshape(-1,9)
+                expected_future_diff = ((12-n_players_selected) * expected_x).reshape(-1,9)
         
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
                                           , scale = np.sqrt(self.diff_var))
@@ -126,7 +126,7 @@ class HAgent():
                     win_sums = cdf_estimates.sum(axis = 1) 
 
             #case where one more player needs to be chosen
-            elif (round_n == (self.n_picks - 1)) | (self.punting & (round_n < (self.n_picks - 1)) ): 
+            elif (n_players_selected == (self.n_picks - 1)) | (self.punting & (n_players_selected < (self.n_picks - 1)) ): 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
@@ -142,7 +142,7 @@ class HAgent():
                     win_sums = cdf_estimates.sum(axis = 1) 
 
             #case where no new players need to be chosen
-            elif round_n == self.n_picks: 
+            elif n_players_selected == self.n_picks: 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
                               , scale = np.sqrt(self.diff_var))
                      ,index = diff_means.index)
@@ -160,8 +160,8 @@ class HAgent():
             #case where there are too many players and some need to be removed 
             else: #n > n_picks 
 
-                extra_players = round_n - self.n_picks 
-                players_to_remove_possibilities = combinations(self.players,extra_players)
+                extra_players = n_players_selected - self.n_picks 
+                players_to_remove_possibilities = combinations(my_players,extra_players)
                 best_score = 0
                 
                 diff_means_mod = diff_means - pd.concat((self.x_scores.loc[players_to_remove].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
