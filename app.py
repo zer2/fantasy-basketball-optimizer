@@ -215,7 +215,7 @@ with tab4:
     #
     #  i += 1 
 
-    seat =  st.number_input(r'Analyze for which drafter?'
+    seat =  st.number_input(r'Which drafter are you?'
                     , min_value = 1
                     #, value = default_seat
                    , max_value = n_drafters)
