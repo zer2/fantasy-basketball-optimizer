@@ -241,7 +241,7 @@ with tab4:
         team_stats_z = z_scores[z_scores.index.isin(team_selections)]
         #team_players = list(team_stats.index)
 
-        n_players_on_team = team_stats.shape[0]
+        n_players_on_team = team_stats_z.shape[0]
 
         if n_players_on_team > 0:
             expected_z = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
