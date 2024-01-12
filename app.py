@@ -4,7 +4,7 @@ st.set_page_config(layout="wide")
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 from process_player_data import process_player_data
-from run_algorithm import HAgent
+from run_algorithm import HAgent, analyze_trade
 from helper_functions import listify, make_progress_chart
 from pathlib import Path
 import os 
@@ -412,22 +412,26 @@ with tab4:
                , max_value = n_drafters)
 
             second_team_selections = selections_editable['Drafter ' + str(second_seat)].dropna()
+
+            if len(second_team_selections) < n_picks:
+                st.markdown('This team is not full yet! Come back here when it is')
+            else:
       
-            my_trade = st.multiselect(
-              'Which players are you trading?'
-              ,team_selections
-            )
-
-            second_trade = st.multiselect(
-                  'Which players are you receiving?'
-                  ,second_team_selections
+                my_trade = st.multiselect(
+                  'Which players are you trading?'
+                  ,team_selections
                 )
-
-            my_others = [x for x in team_selections if x not in my_trade]
-            second_others = [x for x in second_team_selections if x not in second_trade]
-
-            trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
-            st.markdown('My team before trade: ' + str(trade_results[0]))
-            st.markdown('My team after trade: ' + str(trade_results[1]))
-            st.markdown('Their team before trade: ' + str(trade_results[3]))
-            st.markdown('Their team after trade: ' + str(trade_results[3]))
+    
+                second_trade = st.multiselect(
+                      'Which players are you receiving?'
+                      ,second_team_selections
+                    )
+    
+                my_others = [x for x in team_selections if x not in my_trade]
+                second_others = [x for x in second_team_selections if x not in second_trade]
+    
+                trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
+                st.markdown('My team before trade: ' + str(trade_results[0]))
+                st.markdown('My team after trade: ' + str(trade_results[1]))
+                st.markdown('Their team before trade: ' + str(trade_results[3]))
+                st.markdown('Their team after trade: ' + str(trade_results[3]))
