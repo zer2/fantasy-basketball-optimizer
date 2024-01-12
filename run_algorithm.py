@@ -305,7 +305,7 @@ def analyze_trade(team_1_other
                   , team_1_trade
                   , team_2_other
                   , team_2_trade
-                  , Hmodel
+                  , H
                   , player_stats
                   , players_chosen
                   ,n_iterations):    
