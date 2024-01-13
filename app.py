@@ -438,7 +438,17 @@ with tab4:
                     second_others = [x for x in second_team_selections if x not in second_trade]
         
                     trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
-                    st.markdown('Your team before trade: ' + str(np.round(trade_results[0],2)))
-                    st.markdown('Your team after trade: ' + str(np.round(trade_results[1],2)))
-                    st.markdown('Their team before trade: ' + str(np.round(trade_results[3],2)))
-                    st.markdown('Their team after trade: ' + str(np.round(trade_results[2],2)))
+                    your_team_pre_trade = trade_results[0].max()
+                    your_team_post_trade = trade_results[1].max()
+                    their_team_pre_trade = trade_results[3].max()
+                    their_team_post_trade = trade_results[2].max()
+
+                    if your_team_pre_trade > your_team_post_trade:
+                        st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade,2)) + ' to ' + str(np.round(your_team_post_trade,2)))
+                    else:
+                        st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade,2)) + ' to ' + str(np.round(your_team_post_trade,2)))
+
+                    if their_team_pre_trade > their_team_post_trade:
+                        st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
+                    else:
+                        st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
