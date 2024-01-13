@@ -78,7 +78,7 @@ class HAgent():
             #os.write(1,bytes(str(diff_means),'utf-8'))
             #os.write(1,bytes(str(x_scores_available),'utf-8'))
         else:
-            previous_rounds_expected = self.score_table.iloc[0:n_players_selected + 1].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
+            previous_rounds_expected = self.score_table.iloc[0:self.n_picks].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             diff_means = x_self_sum - previous_rounds_expected 
 
 
