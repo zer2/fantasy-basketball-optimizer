@@ -336,5 +336,5 @@ def analyze_trade(team_1_other
         for i in range(n_iterations):
             _, H_2_1 = next(generator)
 
-    return H_1_1.max(), H_1_2.max(), H_2_1.max(), H_2_2.max()
+    return H_1_1, H_1_2, H_2_1, H_2_2
                 
