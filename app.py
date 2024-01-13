@@ -443,12 +443,12 @@ with tab4:
                     their_team_pre_trade = trade_results[3].max()
                     their_team_post_trade = trade_results[2].max()
 
-                    if your_team_pre_trade > your_team_post_trade:
+                    if your_team_pre_trade < your_team_post_trade:
                         st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade,2)) + ' to ' + str(np.round(your_team_post_trade,2)))
                     else:
                         st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade,2)) + ' to ' + str(np.round(your_team_post_trade,2)))
 
-                    if their_team_pre_trade > their_team_post_trade:
+                    if their_team_pre_trade < their_team_post_trade:
                         st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
                     else:
                         st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
