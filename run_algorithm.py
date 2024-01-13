@@ -73,6 +73,10 @@ class HAgent():
             previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
             diff_means = x_self_sum - previous_rounds_expected - this_round_expected
+            #os.write(1,bytes(str(previous_rounds_expected),'utf-8'))
+            #os.write(1,bytes(str(this_round_expected),'utf-8'))
+            #os.write(1,bytes(str(diff_means),'utf-8'))
+            #os.write(1,bytes(str(x_scores_available),'utf-8'))
         else:
             previous_rounds_expected = self.score_table.iloc[0:n_players_selected + 1].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             diff_means = x_self_sum - previous_rounds_expected 
@@ -80,11 +84,7 @@ class HAgent():
 
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
                       
-        os.write(1,bytes(str(previous_rounds_expected),'utf-8'))
-        os.write(1,bytes(str(this_round_expected),'utf-8'))
-        os.write(1,bytes(str(diff_means),'utf-8'))
-        os.write(1,bytes(str(x_scores_available),'utf-8'))
-                      
+
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
         
         scores = []
