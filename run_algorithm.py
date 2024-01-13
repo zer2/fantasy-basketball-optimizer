@@ -72,8 +72,8 @@ class HAgent():
 
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
 
-        os.write(1,bytes(diff_means,'utf-8'))
-        os.write(1,bytes(x_scores_available,'utf-8'))
+        os.write(1,bytes(str(diff_means),'utf-8'))
+        os.write(1,bytes(str(x_scores_available),'utf-8'))
                       
         c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
         
