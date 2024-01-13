@@ -71,7 +71,9 @@ class HAgent():
         diff_means = x_self_sum - previous_rounds_expected - this_round_expected
 
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
-
+                      
+        os.write(1,bytes(str(previous_rounds_expected),'utf-8'))
+        os.write(1,bytes(str(this_round_expected),'utf-8'))
         os.write(1,bytes(str(diff_means),'utf-8'))
         os.write(1,bytes(str(x_scores_available),'utf-8'))
                       
