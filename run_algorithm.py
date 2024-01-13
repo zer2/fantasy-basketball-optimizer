@@ -69,7 +69,7 @@ class HAgent():
 
         #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
         #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
-        if n_players_selected < (n_picks - 1):
+        if n_players_selected < (self.n_picks - 1):
             previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
             diff_means = x_self_sum - previous_rounds_expected - this_round_expected
