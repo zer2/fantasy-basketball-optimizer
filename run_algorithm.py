@@ -336,7 +336,7 @@ def analyze_trade(team_1_other
         for i in range(n_iterations):
             _, H_1_2 = next(generator)
         
-        H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+        _, H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
     elif n_player_diff == 0:
         _, H_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
 
