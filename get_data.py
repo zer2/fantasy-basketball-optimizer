@@ -49,7 +49,7 @@ def get_current_season_data(season = 2024):
 
   data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
                ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
-               ,str(season) + '-Full Season' :  process_game_level_data(two_week_subset, player_metadata)
+               ,str(season) + '-Full Season' :  process_game_level_data(full_subset, player_metadata)
               }
   return data_dict 
 
