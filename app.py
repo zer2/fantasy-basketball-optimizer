@@ -47,7 +47,7 @@ def get_partial_data(historical_df, current_data, dataset_name):
   if dataset_name in list(current_data.keys()):
       return current_data[dataset_name]
   else:
-      return historical_df.loc[dataset_name]
+      return historical_df.loc[int(dataset_name)]
 
 historical_df = get_historical_data()
 current_data = get_current_season_data()
@@ -78,7 +78,7 @@ with tab2:
 
     winner_take_all = format == 'Head to Head: Most Categories'
 
-    unique_datasets_historical = pd.unique(historical_df.index.get_level_values('Season'))
+    unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
     unique_datasets_current = list(current_data.keys())
 
     os.write(1, bytes(str(unique_datasets_historical),'utf-8'))  
