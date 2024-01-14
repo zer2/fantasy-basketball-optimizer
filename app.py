@@ -42,10 +42,14 @@ percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
 @st.cache_data
-def get_partial_data(full_df, dataset_name):
-  return full_df.loc[dataset_name]
+def get_partial_data(historical_df, current_data, dataset_name):
 
-full_df = get_historical_data()
+  if dataset_name in list(current_data.keys()):
+      return current_data[dataset_name]
+  else:
+      return historical_df.loc[dataset_name]
+
+historical_df = get_historical_data()
 current_data = get_current_season_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
@@ -74,15 +78,16 @@ with tab2:
 
     winner_take_all = format == 'Head to Head: Most Categories'
 
-    unique_datasets = pd.unique(full_df.index.get_level_values('Season'))
+    unique_datasets_historical = pd.unique(full_df.index.get_level_values('Season'))
+    unique_datasets_current = list(current_data.keys()]
                                 
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?'
-      ,unique_datasets
+      ,unique_datasets + unique_datasets_current
       ,index = len(unique_datasets)-1
     )
 
-    df = get_partial_data(full_df,dataset_name)
+    df = get_partial_data(historical_df,current_data, dataset_name)
 
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
