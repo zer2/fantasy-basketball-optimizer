@@ -75,8 +75,11 @@ def get_player_metadata():
    players_df = pd.DataFrame(
     data, columns=headers
            )
-   return pd.DataFrame({'Player' : players_df['PLAYER_FIRST_NAME'] + players_df['PLAYER_LAST_NAME'] 
-                        ,'Position' : players_df['POSITION'].str[0]})
+
+   simplified = pd.DataFrame({'Position' : players_df['POSITION'].str[0]}
+                      , index = players_df['PLAYER_FIRST_NAME'] + players_df['PLAYER_LAST_NAME'] )
+   simplified.index.name = 'Player'
+   return simplified
 
   
 def process_game_level_data(df, metadata):
@@ -87,5 +90,5 @@ def process_game_level_data(df, metadata):
   agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
 
-  agg_df = agg_df.merge(metadata, left_index = True, right_on = 'Player')
+  agg_df = agg_df.merge(metadata)
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
