@@ -42,7 +42,7 @@ def get_current_season_data(season = 2024):
   two_weeks_ago = datetime.now() - pd.Timedelta(days = 14)
 
   four_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= four_weeks_ago].drop(columns = ['Game Date'])
-  two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= four_weeks_ago].drop(columns = ['Game Date'])
+  two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= two_weeks_ago].drop(columns = ['Game Date'])
   full_subset = pgl_df.drop(columns = ['Game Date'])
 
   player_metadata = get_player_metadata()
