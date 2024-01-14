@@ -20,7 +20,9 @@ renamer = {'PLAYER_NAME' : 'Player'
 
 #cache this globally so it doesn't have to be rerun constantly 
 @cache_resource(ttl = '1d') 
-def get_data(season = 2024):
+def get_current_season_data(season = 2024):
+  #get all box scores from the current season and calculate various running averages 
+           
   season_str = str(season -1) + '-' + str(season -2000)
   pgl_df = pd.concat(
       [
@@ -46,7 +48,10 @@ def get_data(season = 2024):
   return data_dict 
   
 def process_game_level_data(df):
+  #convert a game level dataframe to a week-level dataframe
+           
   agg_df = df.groupy('Player').mean()
   agg_df.loc[:,'Free Throw %'] = df['Free Throws Made']/df['Free Throw Attempts']
   agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
+  agg_df.loc[','No Play %'] = 0 #currently not implemented 
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
