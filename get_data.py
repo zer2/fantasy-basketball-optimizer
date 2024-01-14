@@ -90,5 +90,5 @@ def process_game_level_data(df, metadata):
   agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
 
-  agg_df = agg_df.merge(metadata)
+  agg_df = agg_df.merge(metadata, left_index = True, right_index = True)
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
