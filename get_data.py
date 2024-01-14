@@ -77,6 +77,9 @@ def get_player_metadata():
 
    simplified = pd.DataFrame({'Position' : players_df['POSITION'].str[0]}
                       , index = players_df['PLAYER_FIRST_NAME'] + ' ' + players_df['PLAYER_LAST_NAME'] )
+
+   os.write(1, bytes('players_df: ' + str(simplified),'utf-8'))  
+
    simplified.index.name = 'Player'
 
    return simplified
