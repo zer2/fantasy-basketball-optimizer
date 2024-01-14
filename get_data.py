@@ -99,4 +99,4 @@ def process_game_level_data(df, metadata):
   
   os.write(1, bytes('AGG2: ' + str(agg_df),'utf-8'))  
 
-  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made']).reset_index()
+  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
