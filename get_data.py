@@ -3,6 +3,10 @@ from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
 import streamlit as st
 from datetime import datetime
 
+counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
+percentage_statistics = ['Free Throw %','Field Goal %']
+volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
+
 renamer = {'PLAYER_NAME' : 'Player'
            ,'PTS' : 'Points'
            ,'REB' : 'Rebounds'
