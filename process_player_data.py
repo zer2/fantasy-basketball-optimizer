@@ -47,9 +47,9 @@ def calculate_coefficients(player_stats
     translation_factors['Field Goal Attempts'] = 0
 
     mean_of_vars = var_of_means * translation_factors
-    os.write(1,bytes(str(translation_factors),'utf-8'))
-    os.write(1,bytes(str(mean_of_means),'utf-8'))
-    os.write(1,bytes(str(mean_of_vars),'utf-8'))
+    #os.write(1,bytes(str(translation_factors),'utf-8'))
+    #os.write(1,bytes(str(mean_of_means),'utf-8'))
+    #os.write(1,bytes(str(mean_of_vars),'utf-8'))
 
 
     coefficients = pd.DataFrame({'Mean of Means' : mean_of_means
