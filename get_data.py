@@ -60,11 +60,6 @@ def get_historical_data():
 
   full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
   full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
-  
-   #adjust for the display
-  full_df[r'Free Throw %'] = full_df[r'Free Throw %'] * 100
-  full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
-  full_df[r'No Play %'] = full_df[r'No Play %'] * 100
   return full_df
 
 
