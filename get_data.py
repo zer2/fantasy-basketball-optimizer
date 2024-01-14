@@ -36,6 +36,7 @@ def get_current_season_data(season = 2024):
   )
 
   pgl_df = pgl_df.rename(columns = renamer)[list(renamer.values())]
+  os.write(1, bytes('pgl_df: ' + str(pgl_df),'utf-8'))  
 
   four_weeks_ago = datetime.now() - pd.Timedelta(days = 28)
   two_weeks_ago = datetime.now() - pd.Timedelta(days = 14)
@@ -85,8 +86,6 @@ def process_game_level_data(df, metadata):
   agg_df.loc[:,'Free Throw %'] = df['Free Throws Made']/df['Free Throw Attempts']
   agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
-
-  os.write(1, bytes('AGG1: ' + str(agg_df),'utf-8'))  
 
   agg_df = agg_df.merge(metadata, left_index = True, right_index = True)
   
