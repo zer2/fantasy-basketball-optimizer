@@ -22,7 +22,7 @@ renamer = {'PLAYER_NAME' : 'Player'
 
 
 #cache this globally so it doesn't have to be rerun constantly 
-@st.cache_resource(ttl = '1d') 
+#@st.cache_resource(ttl = '1d') 
 def get_current_season_data(season = 2024):
   #get all box scores from the current season and calculate various running averages 
            
@@ -53,7 +53,7 @@ def get_current_season_data(season = 2024):
               }
   return data_dict 
 
-@st.cache_data
+#@st.cache_data
 def get_historical_data():
   counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
   percentage_statistics = ['Free Throw %','Field Goal %']
@@ -73,7 +73,7 @@ def get_player_metadata():
     data, columns=headers
            )
 
-   os.write(1, bytes('players_df: ' + str(players_df),'utf-8'))  
+   os.write(1, bytes('players_df: ' + str(players_df['POSITION']),'utf-8'))  
 
    simplified = pd.DataFrame({'Position' : players_df['POSITION'].str[0]}
                       , index = players_df['PLAYER_FIRST_NAME'] + ' ' + players_df['PLAYER_LAST_NAME'] )
