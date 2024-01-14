@@ -96,3 +96,17 @@ def process_game_level_data(df, metadata):
   agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
   
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
+
+@st.cache_data
+def get_partial_data(historical_df, current_data, dataset_name):
+
+  if dataset_name in list(current_data.keys()):
+      df = current_data[dataset_name]
+  else:
+      df = historical_df.loc[int(dataset_name)]
+
+  #adjust for the display
+  df[r'Free Throw %'] = df[r'Free Throw %'] * 100
+  df[r'Field Goal %'] = df[r'Field Goal %'] * 100
+  df[r'No Play %'] = df[r'No Play %'] * 100
+  return df 
