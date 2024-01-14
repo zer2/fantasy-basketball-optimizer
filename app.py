@@ -172,6 +172,7 @@ with tab4:
 
     st.subheader('Draft board')
     selections_editable = st.data_editor(selections, hide_index = True)
+    st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
 
     #figure out which drafter is next
     #i = 0
