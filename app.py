@@ -172,11 +172,11 @@ with tab3:
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
 
-  os.write(1, bytes(str(player_stats['Position']),'utf-8'))  
-  os.write(1, bytes(str(player_stats.index),'utf-8'))  
-
   player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
   player_stats.index.name = 'Player'
+
+  os.write(1, bytes(str(player_stats),'utf-8'))  
+
   
 with tab4:
 
