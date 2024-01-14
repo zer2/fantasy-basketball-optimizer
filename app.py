@@ -12,6 +12,7 @@ import os
 
 st.title('Optimization for fantasy basketball') 
 
+#below should be in a parameter yaml file
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
