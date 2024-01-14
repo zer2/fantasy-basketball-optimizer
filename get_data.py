@@ -1,6 +1,6 @@
 import pandas as pd
 from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
-import streamlist as st
+import streamlit as st
 from datetime import datetime
 
 renamer = {'PLAYER_NAME' : 'Player'
