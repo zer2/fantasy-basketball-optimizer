@@ -3,3 +3,4 @@ streamlit
 streamlit-extras
 scipy
 plotly
+nba_api
