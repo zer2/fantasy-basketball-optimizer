@@ -80,11 +80,16 @@ with tab2:
 
     unique_datasets_historical = pd.unique(historical_df.index.get_level_values('Season'))
     unique_datasets_current = list(current_data.keys())
-                                
+
+    os.write(1, bytes(str(unique_datasets_historical)),'utf-8')  
+    os.write(1, bytes(str(unique_datasets_current)),'utf-8')  
+
+    all_datasets = unique_datasets_historical + unique_datasets_current
+      
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?'
-      ,unique_datasets_historical + unique_datasets_current
-      ,index = len(unique_datasets)-1
+      ,all_datasets
+      ,index = len(all_datasets)-1
     )
 
     df = get_partial_data(historical_df,current_data, dataset_name)
