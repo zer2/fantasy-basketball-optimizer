@@ -83,7 +83,7 @@ with tab2:
                                 
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?'
-      ,unique_datasets + unique_datasets_current
+      ,unique_datasets_historical + unique_datasets_current
       ,index = len(unique_datasets)-1
     )
 
