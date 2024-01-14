@@ -21,20 +21,6 @@ z_score_agg_multiplier = 20
 g_score_player_multiplier = 60
 g_score_agg_multiplier = 24
 
-@st.cache_data
-def get_partial_data(historical_df, current_data, dataset_name):
-
-  if dataset_name in list(current_data.keys()):
-      df = current_data[dataset_name]
-  else:
-      df = historical_df.loc[int(dataset_name)]
-
-  #adjust for the display
-  df[r'Free Throw %'] = df[r'Free Throw %'] * 100
-  df[r'Field Goal %'] = df[r'Field Goal %'] * 100
-  df[r'No Play %'] = df[r'No Play %'] * 100
-  return df 
-
 historical_df = get_historical_data()
 current_data = get_current_season_data()
 
