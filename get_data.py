@@ -64,5 +64,5 @@ def process_game_level_data(df):
   agg_df = df.groupy('Player').mean()
   agg_df.loc[:,'Free Throw %'] = df['Free Throws Made']/df['Free Throw Attempts']
   agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
-  agg_df.loc[','No Play %'] = 0 #currently not implemented 
+  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
