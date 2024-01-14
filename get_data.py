@@ -72,7 +72,7 @@ def get_player_metadata():
     data, columns=headers
            )
 
-   simplified = pd.DataFrame({'Position' : players_df['POSITION']}
+   simplified = pd.DataFrame({'Position' : players_df['POSITION'].str[0]}
                       , index = players_df['PLAYER_FIRST_NAME'] + ' ' + players_df['PLAYER_LAST_NAME'] )
    simplified.index.name = 'Player'
 
@@ -84,10 +84,12 @@ def get_player_metadata():
 def process_game_level_data(df, metadata):
   #convert a game level dataframe to a week-level dataframe
            
-  agg_df = df.groupby('Player').mean()
+  agg_df = df.groupby('Player').mean().astype(float)
   agg_df.loc[:,'Free Throw %'] = agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
   agg_df.loc[:,'Field Goal %'] = agg_df['Field Goals Made']/agg_df['Free Throw Attempts']
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
+
+  os.write(1, bytes('agg_df: ' + str(agg_df),'utf-8'))  
 
   agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
   
