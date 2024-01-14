@@ -17,12 +17,14 @@ def read_markdown_file(markdown_file):
     return Path(markdown_file).read_text()
   
 def stat_styler(value, multiplier = 50):
+
+  intensity = min(int(abs(value)*multiplier), 255)
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  int(value*multiplier),255 , 255 -  int(value*multiplier))
+    bgc = '#%02x%02x%02x' % (255 -  intensity,255 , 255 -  intensity)
   else:
-    bgc = '#%02x%02x%02x' % (255, 255 + int(value*multiplier), 255 + int(value*multiplier))
+    bgc = '#%02x%02x%02x' % (255, 255 - intensity, 255 - intensity)
 
   tc = 'black' if abs(value * multiplier) > 1 else 'black'
   
@@ -40,6 +42,11 @@ def styler_c(value):
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
+
+z_score_player_multiplier = 50
+z_score_agg_multiplier = 20
+g_score_player_multiplier = 60
+g_score_agg_multiplier = 24
 
 @st.cache_data
 def get_partial_data(historical_df, current_data, dataset_name):
@@ -258,8 +265,8 @@ with tab4:
             team_stats_z_styled = team_stats_z.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics], multiplier = 35) \
-                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 14)
+                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier) \
+                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
         else:
             team_stats_z_styled = pd.DataFrame()
 
@@ -281,8 +288,8 @@ with tab4:
             team_stats_g_styled = team_stats_g.style.format("{:.2}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics], multiplier = 50) \
-                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = 20)
+                                                        .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier) \
+                                                        .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
         else:
             team_stats_g_styled = pd.DataFrame()
     
@@ -303,12 +310,12 @@ with tab4:
     
       with subtab1:
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-        z_scores_unselected_styled = z_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = 35)
+        z_scores_unselected_styled = z_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
         z_scores_display = st.dataframe(z_scores_unselected_styled)
         
       with subtab2:
         g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
-        g_scores_unselected_styled = g_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = 50)
+        g_scores_unselected_styled = g_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
         g_scores_display = st.dataframe(g_scores_unselected_styled)
     
       with subtab3:
@@ -379,7 +386,7 @@ with tab4:
                 new_z =  team_stats_z.loc['Total',:] + z_scores_unselected - drop_player_stats_z
 
                 new_z = pd.concat([no_drop,new_z])
-                new_z_styled = new_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = 14)
+                new_z_styled = new_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
 
                 st.dataframe(new_z_styled) 
 
@@ -392,7 +399,7 @@ with tab4:
                 new_g =  team_stats_g.loc['Total',:] + g_scores_unselected - drop_player_stats_g
 
                 new_g = pd.concat([no_drop,new_g])
-                new_g_styled = new_g.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = 20)
+                new_g_styled = new_g.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
 
                 st.dataframe(new_g_styled) 
 
