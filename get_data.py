@@ -38,8 +38,8 @@ def get_current_season_data(season = 2024):
   four_weeks_ago = datetime.now() - pd.Timedelta(days = 28)
   two_weeks_ago = datetime.now() - pd.Timedelta(days = 14)
 
-  four_week_subset = pgl_df[pgl_df['Game Date'] >= four_weeks_ago].drop(columns = ['Game Date'])
-  two_week_subset = pgl_df[pgl_df['Game Date'] >= four_weeks_ago].drop(columns = ['Game Date'])
+  four_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= four_weeks_ago].drop(columns = ['Game Date'])
+  two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= four_weeks_ago].drop(columns = ['Game Date'])
   full_subset = pgl_df.drop(columns = ['Game Date'])
 
   data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset)
