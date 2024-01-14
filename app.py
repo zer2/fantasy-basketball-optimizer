@@ -18,9 +18,9 @@ percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
 z_score_player_multiplier = 50
-z_score_agg_multiplier = 20
+z_score_team_multiplier = 20
 g_score_player_multiplier = 60
-g_score_agg_multiplier = 24
+g_score_team_multiplier = 24
 
 historical_df = get_historical_data()
 current_data = get_current_season_data()
