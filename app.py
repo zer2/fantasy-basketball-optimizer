@@ -174,9 +174,6 @@ with tab3:
 
   player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
   player_stats.index.name = 'Player'
-
-  os.write(1, bytes(str(player_stats),'utf-8'))  
-
   
 with tab4:
 
