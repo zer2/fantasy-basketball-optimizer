@@ -87,11 +87,7 @@ def process_game_level_data(df, metadata):
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
 
   os.write(1, bytes('AGG1: ' + str(agg_df),'utf-8'))  
-  os.write(1, bytes('META: ' + str(metadata),'utf-8'))  
-
 
   agg_df = agg_df.merge(metadata, left_index = True, right_index = True)
   
-  os.write(1, bytes('AGG2: ' + str(agg_df),'utf-8'))  
-
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
