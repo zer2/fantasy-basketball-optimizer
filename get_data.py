@@ -72,7 +72,7 @@ def get_player_metadata():
     data, columns=headers
            )
 
-   simplified = pd.DataFrame({'Position' : players_df['POSITION'].str[0]}
+   simplified = pd.DataFrame({'Position' : players_df['POSITION']}
                       , index = players_df['PLAYER_FIRST_NAME'] + ' ' + players_df['PLAYER_LAST_NAME'] )
    simplified.index.name = 'Player'
 
