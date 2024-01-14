@@ -1,6 +1,6 @@
 import pandas as pd
 from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
-from streamlit import cache_resource
+from streamlit import cache_resource, cache_data
 from datetime import datetime
 
 renamer = {'PLAYER_NAME' : 'Player'
@@ -46,6 +46,17 @@ def get_current_season_data(season = 2024):
                ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset)
                ,str(season) + '-Full Season' :  process_game_level_data(two_week_subset)}
   return data_dict 
+
+@st.cache_data
+def get_historical_data():
+  full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
+  full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
+  
+   #adjust for the display
+  full_df[r'Free Throw %'] = full_df[r'Free Throw %'] * 100
+  full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
+  full_df[r'No Play %'] = full_df[r'No Play %'] * 100
+  return full_df
   
 def process_game_level_data(df):
   #convert a game level dataframe to a week-level dataframe
