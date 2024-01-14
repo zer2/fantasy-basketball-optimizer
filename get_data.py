@@ -2,6 +2,7 @@ import pandas as pd
 from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
 import streamlit as st
 from datetime import datetime
+from nba_api.stats import endpoints as nba_endpoints
 
 renamer = {'PLAYER_NAME' : 'Player'
            ,'PTS' : 'Points'
@@ -42,9 +43,11 @@ def get_current_season_data(season = 2024):
   two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= four_weeks_ago].drop(columns = ['Game Date'])
   full_subset = pgl_df.drop(columns = ['Game Date'])
 
-  data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset)
-               ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset)
-               ,str(season) + '-Full Season' :  process_game_level_data(two_week_subset)}
+  player_metadata = get_player_metadata()
+
+  data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
+               ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
+               ,str(season) + '-Full Season' :  process_game_level_data(two_week_subset), player_metadata}
   return data_dict 
 
 @st.cache_data
@@ -61,12 +64,27 @@ def get_historical_data():
   full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
   full_df[r'No Play %'] = full_df[r'No Play %'] * 100
   return full_df
+
+
+def get_player_metadata():
+   playerindex = nba_endpoints.playerindex.PlayerIndex()
+   data = playerindex.data_sets[0].get_dict()['data']
+   headers = playerindex.data_sets[0].get_dict()['headers']
+
+   players_df = pd.DataFrame(
+    data, columns=headers
+           )
+   return pd.DataFrame({'Player' : players_df['PLAYER_FIRST_NAME'] + players_df['PLAYER_LAST_NAME'] 
+                        ,'Position' : players_df['POSITION'].str[0]})
+
   
-def process_game_level_data(df):
+def process_game_level_data(df, metadata):
   #convert a game level dataframe to a week-level dataframe
            
   agg_df = df.groupby('Player').mean()
   agg_df.loc[:,'Free Throw %'] = df['Free Throws Made']/df['Free Throw Attempts']
   agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
+
+  agg_df = pd.merge([agg_df,metadata], left_index = True)
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
