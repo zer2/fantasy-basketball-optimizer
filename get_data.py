@@ -73,14 +73,10 @@ def get_player_metadata():
     data, columns=headers
            )
 
-   os.write(1, bytes('players_df: ' + str(players_df['POSITION']),'utf-8'))  
-
    simplified = players_df['POSITION'].str[0]
    simplified.index = players_df['PLAYER_FIRST_NAME'] + ' ' + players_df['PLAYER_LAST_NAME']
    simplified.index.name = 'Player'
    simplified.name = 'Position'
-
-   os.write(1, bytes('players_df: ' + str(simplified),'utf-8'))  
 
    return simplified
 
@@ -96,8 +92,6 @@ def process_game_level_data(df, metadata):
                                           , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
                                           ,0) 
   agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
-
-  os.write(1, bytes('agg_df: ' + str(agg_df),'utf-8'))  
 
   agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
   
