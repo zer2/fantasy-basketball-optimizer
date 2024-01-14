@@ -46,6 +46,7 @@ def get_partial_data(full_df, dataset_name):
   return full_df.loc[dataset_name]
 
 full_df = get_historical_data()
+current_data = get_current_season_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
