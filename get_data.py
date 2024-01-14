@@ -97,7 +97,7 @@ def process_game_level_data(df, metadata):
   
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
 
-@st.cache_data
+@st.cache_data(show_spinner = False)
 def get_partial_data(historical_df, current_data, dataset_name):
 
   if dataset_name in list(current_data.keys()):
