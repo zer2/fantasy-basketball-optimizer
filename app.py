@@ -78,7 +78,7 @@ with tab2:
 
     winner_take_all = format == 'Head to Head: Most Categories'
 
-    unique_datasets_historical = pd.unique(full_df.index.get_level_values('Season'))
+    unique_datasets_historical = pd.unique(historical_df.index.get_level_values('Season'))
     unique_datasets_current = list(current_data.keys())
                                 
     dataset_name = st.selectbox(
