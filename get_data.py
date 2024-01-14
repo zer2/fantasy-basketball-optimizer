@@ -3,6 +3,7 @@ from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
 import streamlit as st
 from datetime import datetime
 from nba_api.stats import endpoints as nba_endpoints
+import os
 
 renamer = {'PLAYER_NAME' : 'Player'
            ,'PTS' : 'Points'
