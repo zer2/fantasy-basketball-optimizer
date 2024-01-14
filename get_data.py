@@ -33,7 +33,7 @@ def get_current_season_data(season = 2024):
       ]
   )
 
-  pgl_df = pgl_df.rename(columns = renamer)[list(renamer.keys())]
+  pgl_df = pgl_df.rename(columns = renamer)[list(renamer.values())]
 
   four_weeks_ago = datetime.now() - pd.timedelta(days = 28)
   two_weeks_ago = datetime.now() - pd.timedelta(days = 14)
