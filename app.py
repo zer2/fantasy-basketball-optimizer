@@ -5,39 +5,13 @@ import pandas as pd
 from pandas.api.types import CategoricalDtype
 from process_player_data import process_player_data
 from run_algorithm import HAgent, analyze_trade
-from helper_functions import listify, make_progress_chart
+from helper_functions import listify, make_progress_chart, read_markdown_file, stat_styler, styler_a,styler_b, styler_c
 from get_data import get_historical_data, get_current_season_data
 from pathlib import Path
 import numpy as np
 import os 
 
 st.title('Optimization for fantasy basketball') 
-
-def read_markdown_file(markdown_file):
-    return Path(markdown_file).read_text()
-  
-def stat_styler(value, multiplier = 50):
-
-  intensity = min(int(abs(value)*multiplier), 255)
-  if value != value:
-    return f"background-color:white;color:white;" 
-  elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  intensity,255 , 255 -  intensity)
-  else:
-    bgc = '#%02x%02x%02x' % (255, 255 - intensity, 255 - intensity)
-
-  tc = 'black' if abs(value * multiplier) > 1 else 'black'
-  
-  return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
-
-def styler_a(value):
-    return f"background-color: grey; color:white;" 
-
-def styler_b(value):
-    return f"background-color: lightgrey; color:black;" 
-
-def styler_c(value):
-    return f"background-color: darkgrey; color:black;" 
 
 counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
 percentage_statistics = ['Free Throw %','Field Goal %']
