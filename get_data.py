@@ -22,7 +22,7 @@ renamer = {'PLAYER_NAME' : 'Player'
 
 
 #cache this globally so it doesn't have to be rerun constantly 
-#@st.cache_resource(ttl = '1d') 
+@st.cache_resource(ttl = '1d') 
 def get_current_season_data(season = 2024):
   #get all box scores from the current season and calculate various running averages 
            
@@ -53,7 +53,7 @@ def get_current_season_data(season = 2024):
               }
   return data_dict 
 
-#@st.cache_data
+@st.cache_resource
 def get_historical_data():
   counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
   percentage_statistics = ['Free Throw %','Field Goal %']
