@@ -41,21 +41,10 @@ percentage_statistics = ['Free Throw %','Field Goal %']
 volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
 @st.cache_data
-def get_full_data():
-  full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
-  full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
-  
-   #adjust for the display
-  full_df[r'Free Throw %'] = full_df[r'Free Throw %'] * 100
-  full_df[r'Field Goal %'] = full_df[r'Field Goal %'] * 100
-  full_df[r'No Play %'] = full_df[r'No Play %'] * 100
-  return full_df
-
-@st.cache_data
 def get_partial_data(full_df, dataset_name):
   return full_df.loc[dataset_name]
 
-full_df = get_full_data()
+full_df = get_historical_data()
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
