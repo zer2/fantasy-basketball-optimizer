@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import itertools
+from pathlib import Path
 
 def read_markdown_file(markdown_file):
     return Path(markdown_file).read_text()
