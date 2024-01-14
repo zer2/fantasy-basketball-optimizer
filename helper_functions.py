@@ -4,6 +4,32 @@ import plotly.express as px
 import plotly.graph_objs as go
 import itertools
 
+def read_markdown_file(markdown_file):
+    return Path(markdown_file).read_text()
+  
+def stat_styler(value, multiplier = 50):
+
+  intensity = min(int(abs(value)*multiplier), 255)
+  if value != value:
+    return f"background-color:white;color:white;" 
+  elif value > 0:
+    bgc = '#%02x%02x%02x' % (255 -  intensity,255 , 255 -  intensity)
+  else:
+    bgc = '#%02x%02x%02x' % (255, 255 - intensity, 255 - intensity)
+
+  tc = 'black' if abs(value * multiplier) > 1 else 'black'
+  
+  return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
+
+def styler_a(value):
+    return f"background-color: grey; color:white;" 
+
+def styler_b(value):
+    return f"background-color: lightgrey; color:black;" 
+
+def styler_c(value):
+    return f"background-color: darkgrey; color:black;" 
+    
 #get all values from a dataframe into a list
 def listify(x):
     x = x.values.tolist()
