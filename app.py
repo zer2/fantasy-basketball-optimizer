@@ -81,9 +81,6 @@ with tab2:
     unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
     unique_datasets_current = list(current_data.keys())
 
-    os.write(1, bytes(str(unique_datasets_historical),'utf-8'))  
-    os.write(1, bytes(str(unique_datasets_current),'utf-8'))  
-
     all_datasets = unique_datasets_historical + unique_datasets_current
       
     dataset_name = st.selectbox(
@@ -174,6 +171,10 @@ with tab3:
   player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
+
+  os.write(1, bytes(str(player_stats['Position']),'utf-8'))  
+  os.write(1, bytes(str(player_stats.index),'utf-8'))  
+
   player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
   player_stats.index.name = 'Player'
   
