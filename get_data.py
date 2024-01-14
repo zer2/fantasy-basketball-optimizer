@@ -35,8 +35,8 @@ def get_current_season_data(season = 2024):
 
   pgl_df = pgl_df.rename(columns = renamer)[list(renamer.values())]
 
-  four_weeks_ago = datetime.now() - pd.timedelta(days = 28)
-  two_weeks_ago = datetime.now() - pd.timedelta(days = 14)
+  four_weeks_ago = datetime.now() - pd.Timedelta(days = 28)
+  two_weeks_ago = datetime.now() - pd.Timedelta(days = 14)
 
   four_week_subset = pgl_df[pgl_df['Game Date'] >= four_weeks_ago].drop(columns = ['Game Date'])
   two_week_subset = pgl_df[pgl_df['Game Date'] >= four_weeks_ago].drop(columns = ['Game Date'])
