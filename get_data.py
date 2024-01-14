@@ -90,7 +90,8 @@ def process_game_level_data(df, metadata):
                                           ,0)
   agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
                                           , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
-                                          ,0)  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
+                                          ,0) 
+  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
 
   os.write(1, bytes('agg_df: ' + str(agg_df),'utf-8'))  
 
