@@ -1,9 +1,26 @@
 import pandas as pd
 from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
 from streamlit import cache_resource
+from datetime import datetime
 
+renamer = {'PLAYER_NAME' : 'Player'
+           ,'PTS' : 'Points'
+           ,'REB' : 'Rebounds'
+           ,'AST' : 'Assists'
+           ,'STL': 'Steals'
+           ,'BLK' : 'Blocks'
+           ,'FG3M' : 'Threes'
+           ,'TOV' : 'Turnovers'
+           ,'FTA' : 'Free Throw Attempts'
+           ,'FTM' : 'Free Throws Made'
+           ,'FGA' : 'Field Goal Attempts'
+           ,'FGM' : 'Field Goals Made'
+           ,'GAME_DATE' : 'Game Date'}
+
+
+#cache this globally so it doesn't have to be rerun constantly 
 @cache_resource(ttl = '1d') 
-def get_data(season):
+def get_data(season = 2024):
   season_str = str(season -1) + '-' + str(season -2000)
   pgl_df = pd.concat(
       [
@@ -13,11 +30,23 @@ def get_data(season):
           for season_type in ["Regular Season"]
       ]
   )
-  
-  relevant_columns = ['PLAYER_NAME','PTS','REB','AST','STL','BLK','FG3M','TOV','FTA','FTM','FGA','FGM','GAME_DATE']
-  pgl_df = pgl_df[relevant_columns]
 
+  pgl_df = pgl_df.rename(columns = renamer)[list(renamer.keys())]
+
+  four_weeks_ago = datetime.now() - pd.timedelta(days = 28)
+  two_weeks_ago = datetime.now() - pd.timedelta(days = 14)
+
+  four_week_subset = pgl_df[pgl_df['Game Date'] >= four_weeks_ago].drop(columns = ['Game Date'])
+  two_week_subset = pgl_df[pgl_df['Game Date'] >= four_weeks_ago].drop(columns = ['Game Date'])
+  full_subset = pgl_df.drop(columns = ['Game Date'])
+
+  data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset)
+               ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset)
+               ,str(season) + '-Full Season' :  process_game_level_data(two_week_subset)}
+  return data_dict 
+  
 def process_game_level_data(df):
-  agg_df = df.groupy('PLAYER_NAME').mean()
-  agg_df.loc[:,'Free Throw %'] = df['FTM']/df['FTA']
-  agg_df.loc[:,'Field Goal %'] = df['FGA']/df['FGM']
+  agg_df = df.groupy('Player').mean()
+  agg_df.loc[:,'Free Throw %'] = df['Free Throws Made']/df['Free Throw Attempts']
+  agg_df.loc[:,'Field Goal %'] = df['Field Goals Made']/df['Free Throw Attempts']
+  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
