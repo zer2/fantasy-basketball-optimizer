@@ -1,6 +1,6 @@
 import pandas as pd
 from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
-from streamlit import cache_resource, cache_data
+import streamlist as st
 from datetime import datetime
 
 renamer = {'PLAYER_NAME' : 'Player'
@@ -19,7 +19,7 @@ renamer = {'PLAYER_NAME' : 'Player'
 
 
 #cache this globally so it doesn't have to be rerun constantly 
-@cache_resource(ttl = '1d') 
+@st.cache_resource(ttl = '1d') 
 def get_current_season_data(season = 2024):
   #get all box scores from the current season and calculate various running averages 
            
