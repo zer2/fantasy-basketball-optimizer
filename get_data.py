@@ -85,9 +85,12 @@ def process_game_level_data(df, metadata):
   #convert a game level dataframe to a week-level dataframe
            
   agg_df = df.groupby('Player').mean().astype(float)
-  agg_df.loc[:,'Free Throw %'] = agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
-  agg_df.loc[:,'Field Goal %'] = agg_df['Field Goals Made']/agg_df['Free Throw Attempts']
-  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
+  agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
+                                          , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
+                                          ,0)
+  agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
+                                          , agg_df['Field Goal Made']/agg_df['Field Goal Attempts']
+                                          ,0)  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
 
   os.write(1, bytes('agg_df: ' + str(agg_df),'utf-8'))  
 
