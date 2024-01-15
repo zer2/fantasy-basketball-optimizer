@@ -101,10 +101,12 @@ def process_game_level_data(df, metadata):
 @st.cache_data(show_spinner = False)
 def get_partial_data(historical_df, current_data, dataset_name):
 
+  #not sure but I think copying the dataset instead of slicing it prevents issues with 
+  #overwriting the version in the cache
   if dataset_name in list(current_data.keys()):
-      df = current_data[dataset_name]
+      df = current_data[dataset_name].copy()
   else:
-      df = historical_df.loc[int(dataset_name)]
+      df = historical_df.loc[int(dataset_name)].copy()
 
   #adjust for the display
   df[r'Free Throw %'] = df[r'Free Throw %'] * 100
