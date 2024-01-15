@@ -109,7 +109,7 @@ def get_partial_data(historical_df, current_data, dataset_name):
       df = historical_df.loc[int(dataset_name)].copy()
 
   #adjust for the display
-  df[r'Free Throw %'] = df[r'Free Throw %'] * 100
-  df[r'Field Goal %'] = df[r'Field Goal %'] * 100
-  df[r'No Play %'] = df[r'No Play %'] * 100
+  df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
+  df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
+  df[r'No Play %'] = (df[r'No Play %'] * 100).round(1)
   return df.round(2) 
