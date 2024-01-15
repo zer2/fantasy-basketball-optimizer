@@ -61,7 +61,7 @@ def get_historical_data():
 
   full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
   full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
-  return full_df.round(3)
+  return full_df
 
 
 def get_player_metadata():
@@ -95,7 +95,7 @@ def process_game_level_data(df, metadata):
 
   agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
   
-  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made']).round(3)
+  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
 
 #setting show spinner to false prevents flickering
 @st.cache_data(show_spinner = False)
@@ -110,4 +110,4 @@ def get_partial_data(historical_df, current_data, dataset_name):
   df[r'Free Throw %'] = df[r'Free Throw %'] * 100
   df[r'Field Goal %'] = df[r'Field Goal %'] * 100
   df[r'No Play %'] = df[r'No Play %'] * 100
-  return df 
+  return df.round(2) 
