@@ -26,7 +26,7 @@ z_score_team_multiplier = params['z-score-team-multiplier']
 g_score_player_multiplier = params['g-score-player-multiplier']
 g_score_team_multiplier = params['g-score-team-multiplier']
 
-historical_df = get_historical_data()
+historical_df = get_historical_data(params)
 current_data = get_current_season_data()
 
 ### Make app
