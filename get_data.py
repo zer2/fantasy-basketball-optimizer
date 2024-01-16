@@ -35,7 +35,8 @@ def get_current_season_data(params, season = 2024):
           for season_type in ["Regular Season"]
       ]
   )
-
+           
+  renamer = params['api-renamer']
   pgl_df = pgl_df.rename(columns = renamer)[list(renamer.values())].fillna(0)  
 
   four_weeks_ago = datetime.now() - pd.Timedelta(days = 28)
