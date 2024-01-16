@@ -40,7 +40,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["About","Parameters", "Player Stats", "Draft"]
 
 with tab1:
 
-  intro_tab, static_explanation_tab, dynamic_explanation_tab = tabs(['Intro','Static Ranking lists','Dynamic algorithms'])
+  intro_tab, static_explanation_tab, dynamic_explanation_tab = st.tabs(['Intro','Static Ranking lists','Dynamic algorithms'])
 
   with intro_tab:
       intro_md = read_markdown_file('about_intro.md')
