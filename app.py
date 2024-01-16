@@ -39,7 +39,7 @@ coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 tab1, tab2, tab3, tab4 = st.tabs(["About","Parameters", "Player Stats", "Draft"])
 
 with tab1:
-  mk = read_markdown_file('notes.md')
+  mk = read_markdown_file('about.md')
   st.markdown(mk, unsafe_allow_html=True)
 
 with tab2: 
