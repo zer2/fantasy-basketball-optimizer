@@ -10,7 +10,7 @@ def calculate_coefficients(player_stats
                      , representative_player_set
                      , translation_factors
                     , params):
-    """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores """
+    #calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
 
     #counting stats
     var_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
@@ -63,7 +63,7 @@ def calculate_scores_from_coefficients(player_stats
                                        , params
                                        ,alpha_weight = 1
                                        ,beta_weight = 1):
-    """Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau"""
+    #Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau
         
     counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
     counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
@@ -97,7 +97,7 @@ def process_player_data(player_stats
                         , n_picks
                         , rotisserie
                         , params):
-  """Based on player stats and parameters, do all calculations to set up for running algorithms """
+  #Based on player stats and parameters, do all calculations to set up for running algorithms
 
   n_players = n_drafters * n_picks
 
