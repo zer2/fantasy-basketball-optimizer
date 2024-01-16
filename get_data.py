@@ -6,21 +6,6 @@ from nba_api.stats import endpoints as nba_endpoints
 import numpy as np
 import os
 
-renamer = {'PLAYER_NAME' : 'Player'
-           ,'PTS' : 'Points'
-           ,'REB' : 'Rebounds'
-           ,'AST' : 'Assists'
-           ,'STL': 'Steals'
-           ,'BLK' : 'Blocks'
-           ,'FG3M' : 'Threes'
-           ,'TOV' : 'Turnovers'
-           ,'FTA' : 'Free Throw Attempts'
-           ,'FTM' : 'Free Throws Made'
-           ,'FGA' : 'Field Goal Attempts'
-           ,'FGM' : 'Field Goals Made'
-           ,'GAME_DATE' : 'Game Date'}
-
-
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
 def get_current_season_data(params, season = 2024):
