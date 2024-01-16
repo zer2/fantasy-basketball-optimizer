@@ -126,20 +126,20 @@ Our logic relies on many assumptions, so we can't be sure that G-scores work in 
 
 The code in this repository simulates a simplistic version of head-to-head fantasy basketball, via a $12$ team snake draft. It doesn't include advanced strategies like using the waiver wire or punting categories, but for the most part it should be similar to real fantasy. For more detail, check out the code or the paper. 
 
-The expected win rate if all strategies are equally good is $\frac{1}{12} = 8.33\\%$. Empirical win rates are shown below for *Head-to-Head: Each Category* 9-Cat, which includes all categories, and 8-Cat, a variant which excludes turnovers 
+The expected win rate if all strategies are equally good is $\frac{1}{12} = 8.33\%$. Empirical win rates are shown below for *Head-to-Head: Each Category* 9-Cat, which includes all categories, and 8-Cat, a variant which excludes turnovers 
 
 |     | G-score vs 11 Z-score | Z-score vs. 11 G-score|
 | -------- | ------- |------- |
 | __9-Cat__    |  | |
-| 2021  | $15.9\\%$   | $1.5\\%$  |
-| 2022 | $14.3\\%$   | $1.3\\%$  |
-| 2023    | $21.7\\%$    | $0.4\\%$  |
-| Overall    | $17.3\\%$    | $1.4\\%$ |  
+| 2021  | 15.9%   | 1.5%  |
+| 2022 | 14.3%$   | 1.3%  |
+| 2023    | 21.7%    | 0.4%  |
+| Overall    | 17.3%    | 1.4% |  
 | __8-Cat__    |  | |
-| 2021  | $10.7\\%$   | $2.9\\%$  |
-| 2022 | $12.0\\%$   | $1.5\\%$  |
-| 2023    | $15.4\\%$    | $0.9\\%$  |
-| Overall    | $12.7\\%$    | $1.8\\%$ |  
+| 2021  | 10.7%   | 2.9%  |
+| 2022 | 12.0%   | 1.5%  |
+| 2023    | 15.4%    | 0.9%  |
+| Overall    | 12.7%    | 1.8% |  
 
 When interpreting these results, it is important to remember that they are for an idealized version of fantasy basketball. Still, the dominance displayed by G-scores in the simulations suggests that the G-score modification really is appropriate.
 
@@ -147,16 +147,16 @@ To confirm the intuition about why the G-score works, take a look at its win rat
 
 |     | G-score win rate | 
 | -------- | ------- |
-| Points  | $77.7\\%$   | 
-| Rebounds | $70.8\\%$   | 
-| Assists    | $81.6\\%$    | 
-| Steals    | $25.7\\%$    |  
-| Blocks  | $44.9\\%$   | 
-| Three-pointers | $77.3\\%$   | 
-| Turnovers    | $16.2\\%$    | 
-| Field goal %    | $34.9\\%$    | 
-| Free throw %    | $40.6\\%$    | 
-| Overall   | $52.2\\%$    | 
+| Points  | 77.7%   | 
+| Rebounds | 70.8%   | 
+| Assists    | 81.6%    | 
+| Steals    | 25.7%    |  
+| Blocks  | 44.9%   | 
+| Three-pointers | 77.3%   | 
+| Turnovers    | 16.2%    | 
+| Field goal %    | 34.9%    | 
+| Free throw %    | 40.6%    | 
+| Overall   | 52.2%    | 
 
 The G-score drafter performs well in stable/high-volume categories like assists and poorly in volatile categories like turnovers, netting to an average win rate of slightly above $50\\%$. As expected, the marginal investment in stable categories is worth more than the corresponding underinvestment in volatile categories, since investment in stable categories leads to reliable wins and the volatile categories can be won despite underinvestment with sheer luck. 
 
@@ -164,9 +164,4 @@ Simulations also suggest that G-scores work better than Z-scores in the *Head-to
 
 Another possible use-case is auctions. There is a well-known procedure for translating player value to auction value, outlined e.g. [in this article](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). If the auction is for a head-to-head format, it is reasonable to use G-scores to quantify value rather than Z-scores 
 
-## Addendum: Further improvement 
-
-Any situation-agnostic value quantification system is suboptimal, since a truly optimal strategy would adapt to the circumstances of the draft/auction. 
-
-In the paper, I outline a methodology called H-scoring that dynamically chooses players based on the drafting situation. It performs significantly better than going straight off G-score and Z-score. However, it is far from perfect, particularly because it does not fully understand the consequences of punting. There is a lot of room for improvement, and I hope that I, or someone else, can make a better version in the future! 
 
