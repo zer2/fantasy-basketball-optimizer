@@ -21,10 +21,10 @@ counting_statistics = params['counting-statistics'] #['Points','Rebounds','Assis
 percentage_statistics = params['percentage-statistics'] #['Free Throw %','Field Goal %']
 volume_statistics = params['percentage-statistics'] #['Free Throw Attempts','Field Goal Attempts']
 
-z_score_player_multiplier = 50
-z_score_team_multiplier = 20
-g_score_player_multiplier = 60
-g_score_team_multiplier = 24
+z_score_player_multiplier = params['z-score-player-multiplier']
+z_score_team_multiplier = params['z-score-team-multiplier']
+g_score_player_multiplier = params['g-score-player-multiplier']
+g_score_team_multiplier = params['g-score-team-multiplier']
 
 historical_df = get_historical_data()
 current_data = get_current_season_data()
