@@ -54,10 +54,10 @@ def get_current_season_data(season = 2024):
   return data_dict 
 
 @st.cache_resource
-def get_historical_data():
+def get_historical_data(params):
 
   full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
-  full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
+  full_df[params['counting-statistics'] + params['volume-statistics'] ] = full_df[params['counting-statistics'] + params['volume-statistics']]/3
   return full_df
 
 
