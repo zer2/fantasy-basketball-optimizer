@@ -160,7 +160,7 @@ with tab4:
 
   rotisserie = format == 'Rotisserie'
   
-  info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie)
+  info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
 
   #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
   selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
