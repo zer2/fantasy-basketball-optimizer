@@ -8,19 +8,26 @@ from pathlib import Path
 def read_markdown_file(markdown_file):
     return Path(markdown_file).read_text()
   
-def stat_styler(value, multiplier = 50):
-
+def stat_styler(value
+                , multiplier = 50):
+  #styler function used for coloring stat values red/green with varying intensities 
+                    
   intensity = min(int(abs(value)*multiplier), 255)
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
-    bgc = '#%02x%02x%02x' % (255 -  intensity,255 , 255 -  intensity)
+    rgb = (255 -  intensity,255 , 255 -  intensity)
   else:
-    bgc = '#%02x%02x%02x' % (255, 255 - intensity, 255 - intensity)
+    rgb = (255, 255 - intensity, 255 - intensity)
+      
+bgc = '#%02x%02x%02x' % rgb
 
-  tc = 'black' if abs(value * multiplier) > 1 else 'black'
-  
-  return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
+#formula adapted from
+#https://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
+darkness_value = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114
+tc = 'white' if darkness_value > 186 else 'black'
+
+return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
 
 def styler_a(value):
     return f"background-color: grey; color:white;" 
