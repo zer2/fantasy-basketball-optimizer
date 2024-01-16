@@ -13,6 +13,20 @@ percentage-statistics:
 volume-statistics: 
   - Free Throw Attempts
   - Field Goal Attempts
+api-renamer: 
+ PLAYER_NAME : Player
+ PTS : Points
+ REB : Rebounds
+ AST : Assists
+ STL: Steals
+ BLK : Blocks
+ FG3M : Threes
+ TOV : Turnovers
+ FTA : Free Throw Attempts
+ FTM : Free Throws Made
+ FGA : Field Goal Attempts
+ FGM : Field Goals Made
+ GAME_DATE : Game Date
 z-score-player-multiplier : 50
 z-score-team-multiplier : 20
 g-score-player-multiplier : 60
