@@ -53,7 +53,7 @@ class HAgent():
                   , players_chosen
                   ,):
 
-        """Picks a player based on the H-score algorithm
+        """Performs the H-score algorithm
 
         Args:
             player_assignments: dict of format
@@ -65,7 +65,6 @@ class HAgent():
         n_players_selected = len(my_players) 
 
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
-
 
         #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
         #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
@@ -90,10 +89,31 @@ class HAgent():
         scores = []
         weights = []
 
-        return self.perform_iterations(c,n_players_selected, diff_means, x_scores_available, my_players)
+        return self.perform_iterations(c,my_players, n_players_selected, diff_means, x_scores_available)
 
-    def perform_iterations(self,c,n_players_selected, diff_means, x_scores_available, my_players):
+    def perform_iterations(self
+                           ,c
+                           ,my_players
+                           ,n_players_selected
+                           , diff_means
+                           , x_scores_available):
+         """Performs one iteration of H-scoring. 
+         
+         Case (1): If n_players_selected < n_picks -1, the Gaussian multivariate assumption is used for future picks and weight is chosen by gradient descent
+         Case (2): If n_players_selected = n_picks -1, each candidate player is evaluated with no need for modeling future picks
+         Case (3): If n_players_selected = n_picks, a single number is returned for the team's total H-score
+         Case (4): If n_players_selected > n_picks, all subsets of possible players are evaluated for the best subset
 
+        Args:
+            c: Starting choice of weights. Relevant for case (1)
+            my_players: list of players selected
+            n_players_selected: integer, number of players already selected
+            diff_means: series, difference in mean between already selected players and expected
+            x_scores_available: dataframe, X-scores of unselected players
+        Returns:
+            None
+
+        """
         i = 0
         
         while True:
@@ -200,9 +220,9 @@ class HAgent():
     
             yield c, win_sums
 
-    
-    
-    
+
+    ### below are functions used for the optimization procedure 
+
     def get_x_mu(self,c):
 
         factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
