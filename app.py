@@ -39,9 +39,21 @@ coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 tab1, tab2, tab3, tab4 = st.tabs(["About","Parameters", "Player Stats", "Draft"])
 
 with tab1:
-  mk = read_markdown_file('about.md')
-  st.markdown(mk, unsafe_allow_html=True)
 
+  intro_tab, static_explanation_tab, dynamic_explanation_tab = tabs(['Intro','Static Ranking lists','Dynamic algorithms'])
+
+  with intro_tab:
+      intro_md = read_markdown_file('about_intro.md')
+      st.markdown(intro_md, unsafe_allow_html=True)
+
+  with static_explanation_tab:
+      static_md = read_markdown_file('static_explanation.md')
+      st.markdown(static_md, unsafe_allow_html=True)
+      
+  with dynamic_explanation_tab:
+      dynamic_md = read_markdown_file('dynamic_explanation.md')
+      st.markdown(dynamic_md, unsafe_allow_html=True)
+      
 with tab2: 
   left, middle, right = st.columns([0.25,0.25,0.5])
 
