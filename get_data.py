@@ -39,6 +39,7 @@ def get_current_season_data(params, season = 2024):
               }
   return data_dict 
 
+#cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource
 def get_historical_data(params):
 
@@ -47,6 +48,7 @@ def get_historical_data(params):
   return full_df
 
 
+#no need to cache this since it only gets re-run when current_season_data is refreshed
 def get_player_metadata():
    playerindex = nba_endpoints.playerindex.PlayerIndex()
    data = playerindex.data_sets[0].get_dict()['data']
@@ -63,7 +65,7 @@ def get_player_metadata():
 
    return simplified
 
-  
+#no need to cache this since it only gets re-run when current_season_data is refreshed
 def process_game_level_data(df, metadata):
   #convert a game level dataframe to a week-level dataframe
            
@@ -81,6 +83,7 @@ def process_game_level_data(df, metadata):
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
 
 #setting show spinner to false prevents flickering
+#data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False)
 def get_partial_data(historical_df, current_data, dataset_name):
 
