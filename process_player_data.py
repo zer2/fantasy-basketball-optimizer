@@ -6,18 +6,15 @@ from scipy.signal import savgol_filter
 import os
 import streamlit as st
 
-counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
-percentage_statistics = ['Free Throw %','Field Goal %']
-volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
-
 def calculate_coefficients(player_stats
                      , representative_player_set
-                     , translation_factors ):
+                     , translation_factors
+                    , params):
     """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores """
 
     #counting stats
-    var_of_means = player_stats.loc[representative_player_set,counting_statistics].var(axis = 0)
-    mean_of_means = player_stats.loc[representative_player_set,counting_statistics].mean(axis = 0)
+    var_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
+    mean_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].mean(axis = 0)
 
     #free throw percent
     fta_mean_of_means = player_stats.loc[representative_player_set, 'Free Throw Attempts'].mean()
@@ -63,16 +60,17 @@ def calculate_coefficients(player_stats
 
 def calculate_scores_from_coefficients(player_stats
                                        ,coefficients
+                                       , params
                                        ,alpha_weight = 1
                                        ,beta_weight = 1):
     """Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau"""
         
-    counting_cat_mean_of_means = coefficients.loc[counting_statistics,'Mean of Means']
-    counting_cat_var_of_means = coefficients.loc[counting_statistics,'Variance of Means']
-    counting_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
+    counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
+    counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
+    counting_cat_mean_of_vars = coefficients.loc[params['counting-statistics'],'Mean of Variances']
 
     counting_cat_denominator = (counting_cat_var_of_means.values*alpha_weight + counting_cat_mean_of_vars.values*beta_weight ) ** 0.5
-    numerator = player_stats.loc[:,counting_statistics] - counting_cat_mean_of_means
+    numerator = player_stats.loc[:,params['counting-statistics']] - counting_cat_mean_of_means
     main_scores = numerator.divide(counting_cat_denominator)
     main_scores['Turnovers'] = - main_scores['Turnovers']
 
@@ -87,7 +85,7 @@ def calculate_scores_from_coefficients(player_stats
     fgp_score = fgp_numerator.divide(fgp_denominator)
     
     res = pd.concat([main_scores, ftp_score, fgp_score],axis = 1)  
-    res.columns = counting_statistics + percentage_statistics 
+    res.columns = params['counting-statistics'] + params['percentage-statistics'] 
     return res
 
 @st.cache_data
@@ -97,23 +95,24 @@ def process_player_data(player_stats
                         , nu
                         , n_drafters
                         , n_picks
-                        , rotisserie):
+                        , rotisserie
+                        , params):
   """Based on player stats and parameters, do all calculations to set up for running algorithms """
 
   n_players = n_drafters * n_picks
 
-  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
+  player_stats[params['counting-statistics'] + params['volume-statistics']] = player_stats[params['counting-statistics'] + params['volume-statistics']].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
 
-  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'])
-  z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, 1,0)
+  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'], params)
+  z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, params, 1,0)
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors['Conversion Factor'])
+  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors['Conversion Factor'], params)
                          
-  g_scores = calculate_scores_from_coefficients(player_stats, coefficients, 1,1)
-  z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 1,0)
-  x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, 0,1)
+  g_scores = calculate_scores_from_coefficients(player_stats, coefficients, params, 1,1)
+  z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params,  1,0)
+  x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params, 0,1)
 
   #Design the score table based on what we expect other drafters to use. 
   #Z-score for rotisserie, otherwise G-score
@@ -148,8 +147,8 @@ def process_player_data(player_stats
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
   
-  mov = coefficients.loc[counting_statistics + percentage_statistics , 'Mean of Variances']
-  vom = coefficients.loc[counting_statistics + percentage_statistics , 'Variance of Means']
+  mov = coefficients.loc[params['counting-statistics'] + params['percentage-statistics'] , 'Mean of Variances']
+  vom = coefficients.loc[params['counting-statistics'] + params['percentage-statistics'] , 'Variance of Means']
   if rotisserie:  #get weights of X to Z 
     v = np.sqrt(mov/vom)  
   else:   #get weights of X to G 
