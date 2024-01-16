@@ -23,7 +23,7 @@ renamer = {'PLAYER_NAME' : 'Player'
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
-def get_current_season_data(season = 2024):
+def get_current_season_data(params, season = 2024):
   #get all box scores from the current season and calculate various running averages 
            
   season_str = str(season -1) + '-' + str(season -2000)
