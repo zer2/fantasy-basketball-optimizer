@@ -18,9 +18,9 @@ with open("parameters.yaml", "r") as stream:
     except yaml.YAMLError as exc:
         print(exc) 
       
-counting_statistics = params['counting-statistics'] #['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
-percentage_statistics = params['percentage-statistics'] #['Free Throw %','Field Goal %']
-volume_statistics = params['percentage-statistics'] #['Free Throw Attempts','Field Goal Attempts']
+counting_statistics = params['counting-statistics'] 
+percentage_statistics = params['percentage-statistics'] 
+volume_statistics = params['percentage-statistics'] 
 
 z_score_player_multiplier = params['z-score-player-multiplier']
 z_score_team_multiplier = params['z-score-team-multiplier']
