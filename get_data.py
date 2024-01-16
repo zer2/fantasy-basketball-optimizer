@@ -8,7 +8,8 @@ import os
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
-def get_current_season_data(params, season = 2024):
+def get_current_season_data(params
+                            , season = 2024):
   #get all box scores from the current season and calculate various running averages 
            
   season_str = str(season -1) + '-' + str(season -2000)
@@ -42,7 +43,8 @@ def get_current_season_data(params, season = 2024):
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource
 def get_historical_data(params):
-
+  #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
+  
   full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
   full_df[params['counting-statistics'] + params['volume-statistics'] ] = full_df[params['counting-statistics'] + params['volume-statistics']]/3
   return full_df
@@ -50,6 +52,8 @@ def get_historical_data(params):
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def get_player_metadata():
+   #get player positions from the NBA API
+  
    playerindex = nba_endpoints.playerindex.PlayerIndex()
    data = playerindex.data_sets[0].get_dict()['data']
    headers = playerindex.data_sets[0].get_dict()['headers']
@@ -66,7 +70,8 @@ def get_player_metadata():
    return simplified
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
-def process_game_level_data(df, metadata):
+def process_game_level_data(df
+                            , metadata):
   #convert a game level dataframe to a week-level dataframe
            
   agg_df = df.groupby('Player').mean().astype(float)
@@ -85,7 +90,10 @@ def process_game_level_data(df, metadata):
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False)
-def get_partial_data(historical_df, current_data, dataset_name):
+def get_partial_data(historical_df
+                     , current_data
+                     , dataset_name):
+  #fetch the data subset which will be used for the algorithms
 
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
