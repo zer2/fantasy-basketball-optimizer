@@ -1,6 +1,6 @@
-This website aims to implement the fantasy basketball optimization methods I described in [my paper](https://arxiv.org/abs/2307.02188). For more readable and intuitive explanations of the methods, see the following tabs on static and dynamic ranking systems. 
+This website aims to implement the fantasy basketball optimization methods I described in [my paper](https://arxiv.org/abs/2307.02188). For more readable and intuitive explanations of the methods, see the following tabs on static and dynamic ranking systems
 
-If you have any additional questions, please consult the paper or contact me on [reddit](https://www.reddit.com/user/zeros1123)
+If you have any additional questions, please consult the paper or contact me on [reddit](https://www.reddit.com/user/zeros1123). I'm always happy to discuss this work! 
 
 *Hey! If you are unfamiliar with fantasy basketball, here are some useful links*
 - [*General intro*](https://dunkorthree.com/how-fantasy-basketball-work/)
