@@ -1,7 +1,7 @@
 
-Ranking players is a popular pasttime for fantasy basketball enthusiasts. While most would concede that drafting via a static ranking list is not perfectly optimal, it does have the benefit of simplicty. 
+Ranking players is a popular pasttime for fantasy basketball enthusiasts. Rankings curated by experts are useful because they allow newer drafters, or those who simply don't have the time to craft their own sophisticated strategies, to make reasonable drafting decisions. 
 
-Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. However, as far as I know, nobody has ever laid out exactly why Z-scores should work. They just seem intuitively sensible, so people use them.
+Ranking players quantitatively requires a metric by which to judge players. The standard metric for category leagues is called 'Z-scoring', and it is used to make objective rankings of players. However, as far as I know, nobody has ever laid out exactly why Z-scores should work. They just seem intuitively sensible, so people use them.
 
 The [paper](https://arxiv.org/abs/2307.02188) lays out the math and justified Z-scores. However, the justification is only appropriate for the "Rotisserie" format. When the math is modified for head-to-head formats, a different metric that I call "G-score" pops out as the optimal way to rank players instead. 
 
