@@ -1,16 +1,3 @@
-*Hey! This repository deals with fantasy basketball. If you are unfamiliar with how it works, here are some useful links*
-- [*General intro*](https://dunkorthree.com/how-fantasy-basketball-work/)
-- [*Scoring formats*](https://support.espn.com/hc/en-us/articles/360003913972-Scoring-Formats)
-- [*Snake vs auction drafts*](https://www.dummies.com/article/home-auto-hobbies/sports-recreation/fantasy-sports/fantasy-football/understanding-fantasy-football-snake-and-auction-drafts-149492/)
-
-# Improving Z-scores for H2H fantasy
-
-Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. However, as far as I know, nobody has ever laid out exactly why Z-scores should work. They just seem intuitively sensible, so people use them.
-
-I looked into the math and did manage to derive a justification for Z-scores. However, the justification is only appropriate for the "Rotisserie" format. When the math is modified for head-to-head formats, a different metric that I call "G-score" pops out as the optimal way to rank players instead. I wrote a paper to that effect a few months ago which is available [here](https://arxiv.org/abs/2307.02188).
-
-I realize that the paper's explanation is incomprehensible to anyone without a background in math. To that end, I am providing a simplified version of the argument in this readme, which hopefully will be easier to follow
-
 ## 1.	What are Z-scores?
 
 You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
