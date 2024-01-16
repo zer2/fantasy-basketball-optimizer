@@ -1,4 +1,3 @@
-# Static rankings
 
 Ranking players is a popular pasttime for fantasy basketball enthusiasts. While most would concede that drafting via a static ranking list is not perfectly optimal, it does have the benefit of simplicty. 
 
