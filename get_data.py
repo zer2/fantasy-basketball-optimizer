@@ -55,9 +55,6 @@ def get_current_season_data(season = 2024):
 
 @st.cache_resource
 def get_historical_data():
-  counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
-  percentage_statistics = ['Free Throw %','Field Goal %']
-  volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
 
   full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
   full_df[counting_statistics + volume_statistics ] = full_df[counting_statistics + volume_statistics]/3
