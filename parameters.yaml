@@ -9,7 +9,7 @@ counting-statistics:
   - Turnovers
 percentage-statistics:
   - Free Throw %
-  - Field Goal %'
+  - Field Goal %
 volume-statistics: 
   - Free Throw Attempts
   - Field Goal Attempts
