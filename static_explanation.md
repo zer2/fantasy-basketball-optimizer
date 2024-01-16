@@ -9,7 +9,7 @@ I realize that the paper's explanation is incomprehensible to anyone without a b
 
 ## 1.	What are Z-scores?
 
-You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtra[here](https://arxiv.org/abs/2307.02188)cting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
+You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
 
 For use in fantasy basketball, a few modifications are made to basic Z-scores 
 -	The percentage categories are adjusted by volume. This is necessary because players who shoot more matter more; if a team has one player who goes $9$ for $9$ ($100\%$) and another who goes $0$ for $1$ ($0\%$) their aggregate average is $90\%$ rather than $50\%$. The fix is to multiply scores by the player's volume, relative to average volume
