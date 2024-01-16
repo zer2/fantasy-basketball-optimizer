@@ -38,8 +38,9 @@ def styler_b(value):
 def styler_c(value):
     return f"background-color: darkgrey; color:black;" 
     
-#get all values from a dataframe into a list
 def listify(x):
+    #get all values from a dataframe into a list. Useful for listing all chosen players 
+
     x = x.values.tolist()
     return [item for row in x for item in row]
 
@@ -88,8 +89,8 @@ def combinatorial_calculation(c
         return data
 
 def calculate_tipping_points(x):
-
     #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
+    
     which = np.array([list(itertools.combinations(range(9), 5))] )
     grid = np.zeros((126, 9), dtype="bool")     
     grid[np.arange(126)[None].T, which] = True
@@ -113,6 +114,9 @@ def calculate_tipping_points(x):
     return final_probabilities
 
 def make_progress_chart(res):
+    #chart the progress of gradient descent in action. 
+    #input res is the the log from H-scoring after some number of iterations
+    
     data = pd.concat([pd.DataFrame({'H-score' : [r.loc[player] for r in res]
                                 , 'Player' : player
                                , 'Iteration' : list(range(len(res)))})
