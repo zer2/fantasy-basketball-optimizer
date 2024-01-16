@@ -9,13 +9,17 @@ from helper_functions import listify, make_progress_chart, read_markdown_file, s
 from get_data import get_historical_data, get_current_season_data, get_partial_data
 import numpy as np
 import os 
+import yaml
 
-st.title('Optimization for fantasy basketball') 
-
-#below should be in a parameter yaml file
-counting_statistics = ['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
-percentage_statistics = ['Free Throw %','Field Goal %']
-volume_statistics = ['Free Throw Attempts','Field Goal Attempts']
+with open("parameters.yaml", "r") as stream:
+    try:
+       params = yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+        print(exc) 
+      
+counting_statistics = params['counting-statistics'] #['Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
+percentage_statistics = params['percentage-statistics'] #['Free Throw %','Field Goal %']
+volume_statistics = params['percentage-statistics'] #['Free Throw Attempts','Field Goal Attempts']
 
 z_score_player_multiplier = 50
 z_score_team_multiplier = 20
@@ -24,6 +28,10 @@ g_score_team_multiplier = 24
 
 historical_df = get_historical_data()
 current_data = get_current_season_data()
+
+### Make app
+
+st.title('Optimization for fantasy basketball') 
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
