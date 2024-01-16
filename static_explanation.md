@@ -1,4 +1,6 @@
-# Improving Z-scores for H2H fantasy
+# Static rankings
+
+Ranking players is a popular pasttime for fantasy basketball enthusiasts. While most would concede that drafting via a static ranking list is not perfectly optimal, it does have the benefit of simplicty. 
 
 Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. However, as far as I know, nobody has ever laid out exactly why Z-scores should work. They just seem intuitively sensible, so people use them.
 
