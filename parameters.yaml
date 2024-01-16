@@ -1,0 +1,19 @@
+---
+counting_statistics :
+  - Points
+  - Rebounds
+  - Assists
+  - Steals 
+  - Blocks
+  - Threes
+  - Turnovers
+percentage_statistics :
+  - Free Throw %
+  - Field Goal %'
+volume_statistics : 
+  - Free Throw Attempts
+  - Field Goal Attempts
+z_score_player_multiplier : 50
+z_score_team_multiplier : 20
+g_score_player_multiplier : 60
+g_score_team_multiplier : 24
