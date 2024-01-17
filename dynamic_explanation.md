@@ -73,7 +73,7 @@ Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covarian
 - $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
 - $\gamma$ controls how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
-This is easy-peasy to calculate, right :p. If not, it's ok: computers can do it for you, as implemented on this website.
+This is easy-peasy to calculate, right :stuck_out_tongue:. If not, it's ok: computers can do it for you, as implemented on this website.
 
 ## 4. Optimizing for $j$
 
