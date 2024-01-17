@@ -1,8 +1,8 @@
 ## 1. Draft decisions as an optimization problem 
 
-Instead of having no information about any other players as in the static context, a dynamic algorithm knows previously drafted players and is aware that future picks will be made with the same knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize a flexible objective function constrained by the reality of the drafting situation. 
+While no information about any other players was available in the static context, a dynamic algorithm knows previously drafted players and is aware that future picks will be made with the same knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize probability of victory as a function of the statistics of the team it chooses. 
 
-Define $V(X)$ as the objective function relative to the stat distribution of your team $X$. With $w_c$ as the probability of winning a category based on $X, the objective function for the Each Category format is simply 
+Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
 $$
 V(X) = \sum_c w_c(X)
@@ -16,10 +16,25 @@ $$
 
 Where there is a term for each scenario including five or more scenario wins
 
-## 2. Draft decisions as an optimization problem 
+## 2. A formula for $w_c(X)$
 
-The discussion of static ranking lists established that point differentials between teams can be modeled as Normal distributions. This simplification is helpful even in the dynamic context, since it allows us to write out $w_c(X)$
+The discussion of static ranking lists established that point differentials between teams can be modeled as Normal distributions. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting normal distribution can then be defined
+- The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
+- The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
+$X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. One useful way to decompose them is into
+- $X = X_s + X_p + X_{\mu_u} + X_u$ where $X_s$ is the aggregate statistics of already selected players, $X_p$ is the statistics of the candidate player, $X_{\mu_u}$ is the expected statistics of unchosen players, and $X_u$ is a difference factor to adjust for future picks being different from expected. 
+- $X_\mu = X_{\mu_s} + X_{\mu_u}$ where $X_{\mu_s}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
+
+This allows the distribution mean to be rewritten to 
+
+$$
+X_s + X_p - X_{\mu_s} + X_u
+$$
+
+The first two quantities are known. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. The tricky quantity to compute is $X_u$
+
+## 4. Approximating X_u
 
 
 ## 3. Limitations
