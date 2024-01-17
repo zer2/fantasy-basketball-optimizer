@@ -23,7 +23,7 @@ The discussion of static ranking lists established that point differentials betw
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. One useful way to decompose them is into
-- $X = X_s + X_p + X_{\mu_u} + X_u$ where $X_s$ is the aggregate statistics of already selected players, $X_p$ is the statistics of the candidate player, $X_{\mu_u}$ is the expected statistics of unchosen players, and $X_u$ is a difference factor to adjust for future picks being different from expected. 
+- $X = X_s + X_p + X_{\mu_u} + X_u$ where $X_s$ is the aggregate statistics of already selected players, $X_p$ is the statistics of the candidate player, $X_{\mu_u}$ is the expected statistics of unchosen players, and $X_u$ is a difference factor to adjust for future picks being different from expected
 - $X_\mu = X_{\mu_s} + X_{\mu_u}$ where $X_{\mu_s}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
 
 This allows the distribution mean to be rewritten to 
