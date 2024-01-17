@@ -8,7 +8,7 @@ I derive a dynamic algorithm to improve on punting logic in the the [paper](http
 
 ## 1. Objective function
 
-First it is essential to define what we are trying to achieve. There is no reason to do anything different than for static ranking lists in this regard; the objective is to maximize our expected number of either category wins or probability of winning five+ categories. In this case, it helps to write them out explicitly.
+First it is essential to define what we are trying to achieve. There is no reason to do anything different than for static ranking lists in this regard; the objective is to maximize our expected number of either category wins or probability of winning $\geq 5$ categories. In this case, it helps to write them out explicitly.
 
 Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
