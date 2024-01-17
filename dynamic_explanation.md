@@ -41,14 +41,12 @@ $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is
 - $X_\mu = X_{\mu_s} + X_{\mu_u}$ where
   - $X_{\mu_s}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
 
-This allows the distribution mean to be rewritten to 
+This allows the redefine the distribution can be redefined as follows 
+- The mean is $X_s + X_p - X_{\mu_s} + X_u$
+- The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
-$$
-X_s + X_p - X_{\mu_s} + X_u
-$$
-
-The first two quantities are known. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. The tricky quantity to compute is $X_u$
-
+$X_s$ and $X_p$ are known. $m_{\sigma}$ and $m_{\tau}$ are easily estimated. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. The tricky quantity to compute is $X_u$. 
+  
 ## 3. Approximating $X_u$
 
 Future draft picks are tricky to model because they are neither completely under the drafter's control (since they don't know which players will be available later) nor completely random (since the drafter will use the dynamic algorithm to draft them). Instead, they fall somewhere between the two extremes. 
