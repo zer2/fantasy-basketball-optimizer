@@ -6,9 +6,9 @@ There is an obvious way to implement the punting strategy, which is to calculate
 
 I derive a dynamic algorithm to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
-## 1. Draft decisions as an optimization problem 
+## 1. Objective function
 
-While no information about any other players was available in the static context, a dynamic algorithm knows which players were already drafted and is aware that future picks will be made with equivalent knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize probability of victory as a function of the statistics of the team it chooses. 
+The best place to start is defining what we are trying to achieve. There is no reason to do anything different than for static ranking lists in this regard; we want to maximize our expected number of either category wins or probability of winning five+ categories. In this case, it helps to write them out explicitly.
 
 Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
@@ -25,6 +25,8 @@ $$
 Where there is a term for each scenario including five or more scenario wins
 
 ## 2. A formula for $w_c(X)$
+
+While no information about any other players was available in the static context, a dynamic algorithm knows which players were already drafted and is aware that future picks will be made with equivalent knowledge. 
 
 The discussion of static ranking lists established that point differentials between teams can be modeled as normal distributions. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting normal distribution can then be defined in the following way
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
