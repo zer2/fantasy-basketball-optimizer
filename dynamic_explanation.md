@@ -46,7 +46,7 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
 - It is relatively easy to work with. A more complicated function, while perhaps more suited to real data, would make the math much more complicated
 
-It is simple to derive a parameterization for $X_u$ when it is not conditional on any weight. One could simply compute the mean, variance, and correlations of real player data. The key to modeling $x_u$ is understanding how it changes when two conditions are applied
+It is simple to derive a parameterization for $X_u$ when it is not conditional on any weight. One could simply compute the mean, variance, and correlations of real player data. The key to modeling expected statistics for $x_u$ is understanding how it changes when two conditions are applied
 - All players above a certain threshold of general value have been picked
 - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$
 
@@ -62,7 +62,7 @@ Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covarian
 - $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
 - $\gamma$ controls how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
-## 4. Optimizing for j
+## 4. Optimizing for $j$
 
 We have all the ingredients for calculating H-score based on the choice of $j$. However, that does not imply that that we know the choice of $j$ that optimizes H-score. In fact, this question is quite difficult to solve: there are infinite choices for $j$ and even if we were to simplify it to say $10$ choices of weight per category, there would still be $\approx 10^9$ options to look through, which is a lot!
 
