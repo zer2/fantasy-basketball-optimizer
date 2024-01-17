@@ -34,8 +34,9 @@ $$
 
 The first two quantities are known. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. The tricky quantity to compute is $X_u$
 
-## 4. Approximating X_u
+## 3. Approximating X_u
 
+## 4. Optimizing for j
 
 ## 3. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
