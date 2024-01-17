@@ -1,3 +1,5 @@
+Static ranking lists are convenient but obviously suboptimal. An algorithm that can adapt to draft circumstances is preferable
+
 ## 1. Draft decisions as an optimization problem 
 
 While no information about any other players was available in the static context, a dynamic algorithm knows previously drafted players and is aware that future picks will be made with the same knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize probability of victory as a function of the statistics of the team it chooses. 
