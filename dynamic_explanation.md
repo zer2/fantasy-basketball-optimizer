@@ -89,8 +89,8 @@ Detailed results are included in the paper. To summarize them, the H-score algor
 
 One interesting result is that the category win rates are distributed bimodally, as expected. 
 
-![Bar chart for EC](images/ECBars.png "ECBars")
-![Bar chart for MC](images/MCBars.png "MCBars")
+![Bar chart for EC](images/ECbars.png "ECBars")
+![Bar chart for MC](images/MCbars.png "MCBars")
 
 ## 6. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
