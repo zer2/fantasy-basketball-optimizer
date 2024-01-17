@@ -38,7 +38,33 @@ The first two quantities are known. $X_{\mu_s}$ can be estimated by finding the 
 
 ## 3. Approximating X_u
 
+Future draft picks are tricky to model because they are neither completely under the drafter's control (since they don't know which players will be available later) nor completely random (since the drafter will use the dynamic algorithm to draft them). Instead, they fall somewhere between the two extremes. 
+
+One way of approaching this dilemma is allowing the drafter to choose per-category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. This allows the drafter to have some measure of control over future picks, albeit a noisy one that does not anchor on specific players. 
+
+A natural choice for modeling the statistics of draft picks is the [multivariate normal distribution](https://en.wikipedia.org/wiki/Multivariate_normal_distribution). It has two useful properties
+- It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
+- It is relatively easy to work with. A more complicated function, while perhaps more suited to real data, would make the math much more complicated
+
+It is simple to derive a parameterization for $X_u$ when it is not conditional on any weight. One could simply compute the mean, variance, and correlations of real player data. The key to modeling $x_u$ is understanding how it changes when two conditions are applied
+- All players above a certain threshold of general value have been picked
+- The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$
+
+The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation is 
+
+$$
+X_u(j) = \Sigma * \left( v j^T - j v^T \right) * \Sigma * \left( - \gamma j - \omega v \right) * \frac{
+   \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
+  }{j^T \Sigma j * v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
+$$
+
+Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players 
+
 ## 4. Optimizing for j
+
+We have all the ingredients for calculating H-score based on the choice of $j$. However, that does not imply that that we know the choice of $j$ that optimizes H-score. In fact, this question is quite difficult to solve: there are infinite choices for $j$ and even if we were to simplify it to say $10$ choices of weight per category, there would still be $\approx 10^9$ options to look through, which is a lot!
+
+Instead of looking through all the options at random, we can use a method called [gradient descent](https://en.wikipedia.org/wiki/Gradient_descent). Essentially, gradient descent conceives of the solution space as a multi-dimensional mountain, and repeatedly moves in the direction of the highest slope to eventually reach a peak. 
 
 ## 5. Results
 
