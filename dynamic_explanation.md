@@ -40,7 +40,9 @@ The first two quantities are known. $X_{\mu_s}$ can be estimated by finding the 
 
 ## 4. Optimizing for j
 
-## 3. Limitations
+## 5. Results
+
+## 6. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
 * The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a 
 particular punting strategy, you might want to avoid that strategy for yourself so that you do not compete
