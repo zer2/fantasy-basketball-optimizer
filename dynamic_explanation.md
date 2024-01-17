@@ -60,8 +60,8 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 It is simple to derive a parameterization for $X_u$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
 - Player position can be accounted for by subtracting out position means. E.g. if Centers get $+0.5$ rebounds on average, a center's rebound number could be adjusted by $-0.5$. Or, since there are some flex spots making position requirements not entirely rigid, the adjustment number could be scaled by some constant which is $\leq 1$, which we call $\nu$. So if $\nu$ is $0.8$, the previous example would instead lead to $0.4$ rebounds being subtracted out from centers' numbers
 - Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_u$ are chosen
- - All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
- - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
+  - All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
+  - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
 The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
 
