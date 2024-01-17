@@ -41,7 +41,7 @@ $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is
 - $X_\mu = X_{\mu_s} + X_{\mu_u}$ where
   - $X_{\mu_s}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
 
-This allows the redefine the distribution can be redefined as follows 
+This allows the distribution to be redefined as follows 
 - The mean is $X_s + X_p - X_{\mu_s} + X_u$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
