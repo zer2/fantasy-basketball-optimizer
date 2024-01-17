@@ -8,7 +8,7 @@ $$
 V(X) = \sum_c w_c(X)
 $$
 
-For Most Categories, it is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
+For Most Categories, $V(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
 
 $$
 V(j)  = w_1(X) * w_2(X) * w_3(X) * w_4(X) * w_5(X) * (1-w_6(X)) * (1-w_7(X)) * (1-w_8(X)) * (1- w_9(X)) + \cdots
