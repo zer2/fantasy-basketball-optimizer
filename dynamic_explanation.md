@@ -4,7 +4,7 @@ One way that this can be useful is 'punting'- a strategy used often by real draf
 
 There is an obvious way to implement the punting strategy, which is to calculate all player values ignoring the lowest category completely. This makes some sense as a heuristic, but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
 
-I derive a dynamic algorithm to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
+I derive a dynamic algorithm called H-scoring to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
 ## 1. Objective function
 
@@ -57,9 +57,11 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
 - It is relatively easy to work with. A more complicated function, while perhaps more suited to real data, would make the math much more complicated
 
-It is simple to derive a parameterization for $X_u$ when it is not conditional on any weight. One could simply compute the mean, variance, and correlations of real player data. The key to modeling expected statistics for $x_u$ is understanding how it changes when two conditions are applied
-- All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
-- The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
+It is simple to derive a parameterization for $X_u$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
+-Player position can be accounted for by subtracting out position means. E.g. if Centers get $+0.5$ rebounds on average, a center's rebound number could be adjusted by $-0.5$. Or, since there are some flex spots making position requirements not entirely rigid, the adjustment number could be scaled by some constant which is $\leq 1$, which we call $\nu$. So if $\nu$ is $0.8$, the previous example would instead lead to $0.4$ rebounds being subtracted out from centers' numbers
+- Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_u$ are chosen
+ - All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
+ - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
 The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
 
@@ -98,6 +100,8 @@ The behavior of the algorithm is interesting, and I encourage you to look throug
 
 This shows a heavily bimodal distribution of category win rates, with a sharp peak at 0% and another at 75% or so. This pattern is consistent with the concept of punting. It seems that the algorithm is roughly bifurcating between categories that it is attempting to compete in and categories which it is strategically sacrificing. However, the bifurcation is not completely binary: a sizable portion of the distribution’s density is between 5% and 35%, indicating that some categories are being only partially sacrificed, with the algorithm implicitly still hoping to win those categories sometimes. This corresponds with the idea of a “soft punt”, wherein a drafter largely sacrifices a category but tries not to entirely give up on their chances for it. Other figures in the paper underscore the point that punting is not fully binary; optimal weights do seem to be non-zero in general
 ## 6. Limitations
+
+H-scoring is sophisticated but it is not a panacea and fails to account for many 
 The most important weaknesses to keep in mind for H-scoring are 
 * The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a 
 particular punting strategy, you might want to avoid that strategy for yourself so that you do not compete
