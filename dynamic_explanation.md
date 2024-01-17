@@ -87,10 +87,12 @@ Instead of looking through all the options at random, we can use a method called
 
 Detailed results are included in the paper. To summarize them, the H-score algorithm wins up to $24\%$ of the time in Each Category and up to $43\%$ of the time in Most Category simulations against G-score drafters. These simulations do not have other drafters punting, so they may not be perfectly reflective of real fantasy basketball, but they do provide evidence that the algorithm is appropriate.
 
-One interesting result is that the category win rates are distributed bimodally, as expected. 
+The behavior of the algorithm is interesting, and I encourage you to look through figures 19 through 25 in the paper which describe it. I will also highlight one particular figure, which shows that the algorithm learns the concept of punting
 
 <iframe  width = "1000" height = "500" padding = "none" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/926f3396-acaf-426a-a8bc-108b66bbb900"> </iframe>
 <iframe  width = "1000" height = "500" padding = "none" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/41bc0dad-aa23-434b-9cbb-b037de2ed11d"> </iframe>
+
+This shows a heavily bimodal distribution of category win rates, with a sharp peak at 0% and another at 75% or so. This pattern is consistent with the concept of punting. It seems that the algorithm is roughly bifurcating between categories that it is attempting to compete in and categories which it is strategically sacrificing. However, the bifurcation is not completely binary: a sizable portion of the distribution’s density is between 5% and 35%, indicating that some categories are being only partially sacrificed, with the algorithm implicitly still hoping to win those categories sometimes. This corresponds with the idea of a “soft punt”, wherein a drafter largely sacrifices a category but tries not to entirely give up on their chances for it. Other figures in the paper underscore the point that punting is not fully binary; optimal weights do seem to exist within the spectrum
 
 ## 6. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
