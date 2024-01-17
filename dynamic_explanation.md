@@ -58,10 +58,10 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 - It is relatively easy to work with. A more complicated function, while perhaps more suited to real data, would make the math much more complicated
 
 It is simple to derive a parameterization for $X_u$ when it is not conditional on any weight. One could simply compute the mean, variance, and correlations of real player data. The key to modeling expected statistics for $x_u$ is understanding how it changes when two conditions are applied
-- All players above a certain threshold of general value have been picked
-- The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$
+- All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
+- The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation is 
+The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
 
 $$
 X_u(j) = \Sigma * \left( v j^T - j v^T \right) * \Sigma * \left( - \gamma j - \omega v \right) * \frac{
