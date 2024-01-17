@@ -8,7 +8,7 @@ Making a dynamic algorithm that understands the nuances of punting is difficult.
 
 ## 1. Draft decisions as an optimization problem 
 
-While no information about any other players was available in the static context, a dynamic algorithm knows previously drafted players and is aware that future picks will be made with the same knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize probability of victory as a function of the statistics of the team it chooses. 
+While no information about any other players was available in the static context, a dynamic algorithm knows which players were already drafted and is aware that future picks will be made with equivalent knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize probability of victory as a function of the statistics of the team it chooses. 
 
 Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
