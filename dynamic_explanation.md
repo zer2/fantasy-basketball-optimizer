@@ -1,4 +1,10 @@
-Static ranking lists are convenient but obviously suboptimal. An algorithm that can adapt to draft circumstances is preferable
+Static ranking lists are convenient but suboptimal, since they lack context about team composition. An ideal algorithm would adapt its strategy based on which players have already been chosen. 
+
+One way that this can be useful is 'punting'- a strategy used often by real drafters, wherein they sacrifice some number of categories to gain a significant advantage in the rest. This can be beneficial because sacrificing a category will cost a $50\%$ chance of winning that category at most, and will often provide more than a $50\%$ value to the other categories collectively. 
+
+There is an obvious way to implement the punting strategy, which is to calculate all player values ignoring the lowest category completely. This makes some sense as a heuristic, but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which is obviously wrong. It also has no mathematical argument behind it- why treat $N$ categories with a weight of $100\%$, and $9-N$ categories with a weight of $0\%$, rather than putting weights somewhere on a spectrum? And is the lowest category value definitely the right one to punt, even if it is extremely close to other category values?
+
+Making a dynamic algorithm that understands the nuances of punting is difficult. I cannot claim that the following mathematical treatment addresses it fully. However, I believe that the logic is sound, and evidence suggests that the derived algorithm works well
 
 ## 1. Draft decisions as an optimization problem 
 
