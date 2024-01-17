@@ -64,9 +64,9 @@ It is simple to derive a parameterization for $X_u$ when it is not conditional o
 The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
 
 $$
-X_u(j) = \Sigma * \left( v j^T - j v^T \right) * \Sigma * \left( - \gamma j - \omega v \right) * \frac{
+X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
    \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
-  }{j^T \Sigma j * v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
+  }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
 $$
 
 Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players, and $\omega$ and $\gamma$ are paremeters defining how succesful punting is expected to be. Describing them briefly:
