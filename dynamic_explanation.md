@@ -89,8 +89,8 @@ Detailed results are included in the paper. To summarize them, the H-score algor
 
 One interesting result is that the category win rates are distributed bimodally, as expected. 
 
-<iframe  width = "784" height = "441" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/926f3396-acaf-426a-a8bc-108b66bbb900"> </iframe>
-<iframe  width = "784" height = "441" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/41bc0dad-aa23-434b-9cbb-b037de2ed11d"> </iframe>
+<iframe  width = "896" height = "504" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/926f3396-acaf-426a-a8bc-108b66bbb900"> </iframe>
+<iframe  width = "896" height = "504" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/41bc0dad-aa23-434b-9cbb-b037de2ed11d"> </iframe>
 
 ## 6. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
