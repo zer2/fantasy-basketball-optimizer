@@ -2,9 +2,9 @@ Static ranking lists are convenient but suboptimal, since they lack context abou
 
 One way that this can be useful is 'punting'- a strategy used often by real drafters, wherein they sacrifice some number of categories to gain a significant advantage in the rest. This can be beneficial because sacrificing a category will cost a $50\%$ chance of winning that category at most, and will often provide more than a $50\%$ value to the other categories collectively. 
 
-There is an obvious way to implement the punting strategy, which is to calculate all player values ignoring the lowest category completely. This makes some sense as a heuristic, but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which is obviously wrong. It also has no mathematical argument behind it- why treat $N$ categories with a weight of $100\%$, and $9-N$ categories with a weight of $0\%$, rather than putting weights somewhere on a spectrum? And is the lowest category value definitely the right one to punt, even if it is extremely close to other category values?
+There is an obvious way to implement the punting strategy, which is to calculate all player values ignoring the lowest category completely. This makes some sense as a heuristic, but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
 
-Making a dynamic algorithm that understands the nuances of punting is difficult. I cannot claim that the following mathematical treatment addresses it fully. However, I believe that the logic is sound, and evidence suggests that the derived algorithm works well
+I derive a dynamic punting algorithm in the paper. While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
 ## 1. Draft decisions as an optimization problem 
 
