@@ -73,6 +73,8 @@ Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covarian
 - $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
 - $\gamma$ controls how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
+This is easy-peasy to calculate, right :p. If not, it's ok: computers can do it for you, as implemented on this website.
+
 ## 4. Optimizing for $j$
 
 We have all the ingredients for calculating H-score based on the choice of $j$. However, that does not imply that that we know the choice of $j$ that optimizes H-score. In fact, this question is quite difficult to solve: there are infinite choices for $j$ and even if we were to simplify it to say $10$ choices of weight per category, there would still be $\approx 10^9$ options to look through, which is a lot!
