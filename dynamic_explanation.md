@@ -26,7 +26,7 @@ Where there is a term for each scenario including five or more scenario wins
 
 ## 2. A formula for $w_c(X)$
 
-The discussion of static ranking lists established that point differentials between teams can be modeled as Normal distributions. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting normal distribution can then be defined
+The discussion of static ranking lists established that point differentials between teams can be modeled as normal distributions. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting normal distribution can then be defined in the following way
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
