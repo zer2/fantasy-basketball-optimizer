@@ -36,7 +36,7 @@ $$
 
 The first two quantities are known. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. The tricky quantity to compute is $X_u$
 
-## 3. Approximating X_u
+## 3. Approximating $X_u$
 
 Future draft picks are tricky to model because they are neither completely under the drafter's control (since they don't know which players will be available later) nor completely random (since the drafter will use the dynamic algorithm to draft them). Instead, they fall somewhere between the two extremes. 
 
@@ -58,7 +58,9 @@ X_u(j) = \Sigma * \left( v j^T - j v^T \right) * \Sigma * \left( - \gamma j - \o
   }{j^T \Sigma j * v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
 $$
 
-Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players 
+Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players, and $\omega$ and $\gamma$ are paremeters defining how succesful punting is expected to be. Describing them briefly:
+- $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
+- $\gamma$ controls how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
 ## 4. Optimizing for j
 
