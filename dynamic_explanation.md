@@ -2,7 +2,7 @@
 
 Instead of having no information about any other players as in the static context, a dynamic algorithm knows previously drafted players and is aware that future picks will be made with the same knowledge. This allows the algorithm to treat player choice as an optimization problem; attempting to maximize a flexible objective function constrained by the reality of the drafting situation. 
 
-Define $V(X}$ as the objective function relative to the stat distribution of your team $X$. With $w_c$ as the probability of winning a category based on $X, the objective function for the Each Category format is simply 
+Define $V(X)$ as the objective function relative to the stat distribution of your team $X$. With $w_c$ as the probability of winning a category based on $X, the objective function for the Each Category format is simply 
 
 $$
 V(X) = \sum_c w_c(X)
