@@ -92,9 +92,6 @@ One interesting result is that the category win rates are distributed bimodally,
 <iframe  width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/blob/adding-image-branch/ECbars.png> </iframe>
 <iframe  width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/blob/adding-image-branch/MCbars.png> </iframe>
 
-![Bar chart for EC](")
-![Bar chart for MC]( "MCBars")
-
 ## 6. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
 * The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a 
