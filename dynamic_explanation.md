@@ -85,6 +85,8 @@ Instead of looking through all the options at random, we can use a method called
 
 ## 5. Results
 
+Detailed results are included in the paper. To summarize them, the H-score algorithm wins up to $24\%$ of the time in Each Category and up to $43\%$ of the time in Most Category simulations against G-score drafters. These simulations do not have other drafters punting, so they may not be perfectly reflective of real fantasy basketball, but they do provide evidence that the algorithm is appropriate.
+
 ## 6. Limitations
 The most important weaknesses to keep in mind for H-scoring are 
 * The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a 
