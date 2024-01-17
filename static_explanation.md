@@ -34,7 +34,7 @@ $$
 
 See below for an animation of weekly blocking numbers going through the Z-score transformation step by step. First the mean is subtracted out, centering the distribution around zero, then the standard deviation is divided through to make the distribution more narrow. Note that a set of $156$ players expected to be on fantasy rosters is pre-defined
 
-<iframe src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/5996da7a-a877-4db1-bb63-c25bed81415f"> </iframe>
+<iframe width = "1120" height = "630" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/5996da7a-a877-4db1-bb63-c25bed81415f"> </iframe>
 
 Adding up the results for all categories yields an aggregate Z-score
 
@@ -57,7 +57,7 @@ The simplified problem can be approached by calculating the probability for team
 
 The difference in category score between two teams tells us which team is winning the category and by how much. By randomly selecting the $2N -1$ random players many times, we can get a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with $N=12$
 
-<iframe src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/73c3acaa-20c9-4a61-907a-ee0de2ff7e3b"> </iframe>
+<iframe width = "1120" height = "630" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/73c3acaa-20c9-4a61-907a-ee0de2ff7e3b"> </iframe>
 
 You may notice that the result looks a lot like a Bell curve even though the raw block numbers look nothing like a Bell curve. This happens because of the surprising "Central Limit Theorem", which says that when adding a bunch of random numbers together, their sum always ends up looking a lot like a Bell curve. This applies to all the other categories as well
 
@@ -107,7 +107,7 @@ It is clear that the expected number of category victories is directly proportio
 
 For Rotisserie, we handled uncertainty about which other players would be chosen by assuming they were chosen randomly. To extend this for head-to-head, we can assume that their performances are randomly chosen as well. Effectively, the revamped assumption is that we are randomly choosing player/weekly performance combos from a set of top players and their performances for a season, rather than just choosing a player and taking their average. Below, see how metrics for blocks change when we look at every weekly performance of the top $156$ players, instead of just their averages 
 
-<iframe src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab41db2a-99f2-45b1-8c05-d755c014b30f"> </iframe>
+<iframe width = "1120" height = "630" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab41db2a-99f2-45b1-8c05-d755c014b30f"> </iframe>
 
 Although the mean remains the same, the standard deviation gets larger. This makes sense, because week-to-week "noise" adds more volatility, which is reflected in the additional $m_\tau$ term. Note that the new standard deviation is $\sqrt{m_\sigma^2 + m_\tau^2}$ rather than $m_\sigma + m_\tau$ because of how standard deviation aggregates across multiple variables, as discussed in section 2B
 
