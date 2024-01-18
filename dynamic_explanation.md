@@ -37,7 +37,7 @@ It is helpful to start by delineating draft picks into stages. For pick $6$ out 
 | Pick 3   | A_c |  |
 | Pick 4   |    | B_m |
 | Pick 5   |    | |
-| -------- | ------- | |
+_bottom line_
 | Pick 6   |  p| |
 | -------- | ------- |------- |
 | Pick 7   |    |  |
