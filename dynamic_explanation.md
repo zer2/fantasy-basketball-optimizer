@@ -37,9 +37,9 @@ It is helpful to start by delineating draft picks into stages. For pick $6$ out 
 | Pick 3   | A_c |  |
 | Pick 4   |    | B_m |
 | Pick 5   |    | |
-| -------- | -------- | |
+| -------- | ------- | |
 | Pick 6   |  p| |
- |-------- | -------- | -------- |
+| -------- | ------- |------- |
 | Pick 7   |    |  |
 | Pick 8   |   |  |
 | Pick 9   |    |   |
@@ -47,7 +47,7 @@ It is helpful to start by delineating draft picks into stages. For pick $6$ out 
 | Pick 11  |   |  |
 | Pick 12   |    | |
 | Pick 13   |  | |  
- |-------- | -------- | -------- |
+| -------- | ------- |------- |
 
 ## 2. A formula for $w_c(X)$
 
