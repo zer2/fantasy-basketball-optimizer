@@ -111,9 +111,11 @@ You may recognize that this method doesn't guarantee finding the absolute minimu
 
 Another downside of gradient descent is that it necessitates recalculating the slope every time it moves, which takes time. Computers can do this calculation fairly quickly but the temporal cost of doing it many times in a row does add up, especially when we are running the process seperately to optimize $j$ based on choice of $p$.
 
+After performing gradient descent, each player $p$ is paired with an optimal or close to optimal $j$. One of those pairs has the highest H-score. The player $p$ associated with that pair is the one most recommended by the H-score algorithm. 
+
 ## 4. Results
 
-Detailed results are included in the paper. To summarize them, the H-score algorithm wins up to $24\%$ of the time in Each Category and up to $43\%$ of the time in Most Category simulations against G-score drafters. These simulations do not have other drafters punting, so they may not be perfectly reflective of real fantasy basketball, but they do provide evidence that the algorithm is appropriate.
+Simulations were performed to test how well drafters would do using H-score for each of their picks. Detailed results are included in the paper. To summarize them, the H-score algorithm won up to $24\%$ of the time in Each Category and up to $43\%$ of the time in Most Category against G-score drafters. These simulations do not have other drafters punting, so they may not be perfectly reflective of real fantasy basketball, but they do provide evidence that the algorithm is appropriate.
 
 The behavior of the algorithm is interesting, and I encourage you to look through figures 19 through 25 in the paper which describe it. I will also highlight one particular figure, which demonstrates how the algorithm implicitly handles the concept of punting
 
