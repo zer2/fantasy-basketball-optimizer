@@ -20,6 +20,8 @@ If they were equipped with a function translating $p$ and $j$ into their probabi
 
 ## 2. Calculating H-score based on $p$ and $j$
 
+Deriving the required function involves several steps, from defining the ultimate objective to modeling the effect of $j$
+
 ### 2a. Defining the objective function
 
 In the static ranking context the expected number of category wins was a reasonable objective even for Most Categories, since strategizing how to win only five out of nine categories was impossible. In the dynamic context, more information is available, and using the appropriate objective function for the format is warranted. 
