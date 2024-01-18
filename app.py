@@ -43,16 +43,22 @@ with tab1:
   intro_tab, static_explanation_tab, dynamic_explanation_tab = st.tabs(['Intro','Static Ranking lists','Dynamic algorithms'])
 
   with intro_tab:
-      intro_md = read_markdown_file('about_intro.md')
-      st.markdown(intro_md, unsafe_allow_html=True)
+      c2,c2,c3 = st.columns([0.1,0.8,0.1])
+      with c2:
+          intro_md = read_markdown_file('about_intro.md')
+          st.markdown(intro_md, unsafe_allow_html=True)
 
   with static_explanation_tab:
-      static_md = read_markdown_file('static_explanation.md')
-      st.markdown(static_md, unsafe_allow_html=True)
+      c2,c2,c3 = st.columns([0.1,0.8,0.1])
+      with c2:
+          static_md = read_markdown_file('static_explanation.md')
+          st.markdown(static_md, unsafe_allow_html=True)
       
   with dynamic_explanation_tab:
-      dynamic_md = read_markdown_file('dynamic_explanation.md')
-      st.markdown(dynamic_md, unsafe_allow_html=True)
+      c2,c2,c3 = st.columns([0.1,0.8,0.1])
+      with c2:
+          dynamic_md = read_markdown_file('dynamic_explanation.md')
+          st.markdown(dynamic_md, unsafe_allow_html=True)
       
 with tab2: 
   left, middle, right = st.columns([0.25,0.25,0.5])
