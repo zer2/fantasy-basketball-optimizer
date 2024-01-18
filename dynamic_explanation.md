@@ -16,7 +16,7 @@ H-scores' solution to this dilemma is to choose category weights for future pick
 
 Of course, the drafter also has an explicit choice about who to take from the available player pool. So they are making two decisions simultaneously for each pick: a player $p$ and a weighting $j$. 
 
-If a drafter has a function which relates $p$ and $j$ to their objective function, they can use it to work backwards and find the $p$ and $j$ that yield a strong value of their objective function. The next section describes how to derive the function, and the section after that describes how to use it to optimize $p$ and $j$.
+If they were equipped with a function translating $p$ and $j$ into their probability of victory, a drafter could work backwards and find good choices of $p$ and $j$. The next section describes how to derive the function, and the section after that describes how to use it to optimize $p$ and $j$.
 
 ## 2. Calculating H-score based on $p$ and $j$
 
@@ -61,11 +61,14 @@ This allows the Bell curve's parameters to be redefined as follows
 - The mean is $X_s + X_p - X_{\mu_s} + X_u$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
-$X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
+$X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. 
 
-So every component of the equation can be accounted for, except for $X_u$. The next section describes one approach to calculating it
+So every component of the equation can be accounted for, except for $X_{\mu_s}$ and $X_u$. The next sections describes how to find them
 
-### 2d. Estimating $X_s$
+### 2d. Estimating $X_{\mu_s}$
+
+$X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
+
 ### 2e. Estimating $X_u$
 
 A natural choice for modeling the statistics of draft picks is the [multivariate normal distribution](https://en.wikipedia.org/wiki/Multivariate_normal_distribution). It has two useful properties
