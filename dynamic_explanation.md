@@ -30,22 +30,30 @@ Where there is a term for each scenario including five or more scenario wins
 
 It is helpful to start by delineating draft picks into stages. For pick $6$ out of $13$, they can be 
 
-|     | Drafter's team | Opponent's team|
-| -------- | ------- |------- |
-| Pick 1   |  | |
-| Pick 2   |  |  |
-| Pick 3   | A_c |  |
-| Pick 4   |    | B_m |
-| Pick 5   |    | |
-| ^Pick 6^   |  ^p^ | |
-| ^Pick 7^   | ^ ^  | ^ ^ |
-| Pick 8   |   |  |
-| Pick 9   |    |   |
-| Pick 10   | A_u  | b_u|  
-| Pick 11  |   |  |
-| Pick 12   |    | |
-| Pick 13   |  | |  
-| -------- | ------- |------- |
+$$
+\centering
+\begin{tabular}{|c|c|c|}
+\hline
+& Team A & Team B \\
+\hline
+Pick 1 & \multirow{5}{*}{A_c} & \multirow{6}{*}{B_m} \\
+Pick 2 & & \\
+Pick 3 & & \\
+Pick 4 & & \\
+Pick 5 & & \\
+\cline{1-2} 
+Pick 6 & p &\\[1pt]
+\hline
+Pick 7 & \multirow{7}{*}{A_u} & \multirow{7}{*}{B_u}\\
+Pick 8 & & \\
+Pick 9 & & \\
+Pick 10 & &\\
+Pick 11 & & \\
+Pick 12 & & \\
+Pick 13 & & \\
+\hline
+\end{tabular}
+$$
 
 ## 2. A formula for $w_c(X)$
 
