@@ -2,7 +2,7 @@ Static ranking lists are convenient but suboptimal, since they lack context abou
 
 One way that this can be useful is 'punting'- a strategy whereby a drafter gives up on winning some number of categories in order to improve their chances of winning the rest. This can be beneficial because sacrificing a category gives up an expected value of $0.5$ category wins at most, and the value of over-performing in all of the other categories is often worth more than that. For example, a drafter may give up on turnovers in such a way that they gain a slight edge in every other category. If they end up with a $0\%$ chance of winning turnovers and a $60\%$ chance of winning the other categories, their expected value of categories won is $4.8$ which is above the baseline of $4.5$. 
 
-The simplest way to implement this strategy is calculating player values as normal, just without adding in the punted categories. This makes sense as a heuristic but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
+The simplest way to implement this strategy is calculating player values as normal, just without adding in the punted categories. This makes sense as a heuristic but lacks mathematical rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
 
 I derive a dynamic algorithm called H-scoring to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
@@ -63,7 +63,7 @@ It is simple to derive a parameterization for $X_u$ when it ignores player posit
   - All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-The details of this calculation are involved. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
+This scenario provides a launching point for calculating the expected value of $X_u$. You can find the mathematical details of the ensuing calculation in the paper if you are interested, or take it for granted that the resulting equation is 
 
 $$
 X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
