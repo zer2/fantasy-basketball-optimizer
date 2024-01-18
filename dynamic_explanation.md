@@ -46,7 +46,7 @@ The discussion of static ranking lists established that point differentials betw
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
-### 2c. Breaking down $X$
+### 2c. Breaking down $X$ and $x_\mu$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
 - $X = A_s + X_p + X_{\mu_u} + X_u$ where
