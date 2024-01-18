@@ -12,16 +12,16 @@ In the static ranking context the expected number of category wins was a reasona
 
 Another consideration is that the drafter will have some control over the aggregate statistics of their team so the objective function should be expressed as a function of team composition. 
 
-Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
+Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
 $$
-V(X) = \sum_c w_c(X)
+H(X) = \sum_c w_c(X)
 $$
 
-For Most Categories, $V(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
+For Most Categories, $H(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
 
 $$
-V(j)  = w_1(X) * w_2(X) * w_3(X) * w_4(X) * w_5(X) * (1-w_6(X)) * (1-w_7(X)) * (1-w_8(X)) * (1- w_9(X)) + \cdots
+H(j)  = w_1(X) * w_2(X) * w_3(X) * w_4(X) * w_5(X) * (1-w_6(X)) * (1-w_7(X)) * (1-w_8(X)) * (1- w_9(X)) + \cdots
 $$
 
 Where there is a term for each scenario including five or more scenario wins
