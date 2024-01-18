@@ -45,19 +45,19 @@ with tab1:
   with intro_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
       with c2:
-          intro_md = read_markdown_file('about_intro.md')
+          intro_md = read_markdown_file('about/intro.md')
           st.markdown(intro_md, unsafe_allow_html=True)
 
   with static_explanation_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
       with c2:
-          static_md = read_markdown_file('static_explanation.md')
+          static_md = read_markdown_file('about/static_explanation.md')
           st.markdown(static_md, unsafe_allow_html=True)
       
   with dynamic_explanation_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
       with c2:
-          dynamic_md = read_markdown_file('dynamic_explanation.md')
+          dynamic_md = read_markdown_file('about/dynamic_explanation.md')
           st.markdown(dynamic_md, unsafe_allow_html=True)
       
 with tab2: 
