@@ -67,7 +67,7 @@ So every component of the equation can be accounted for, except for $X_{\mu_s}$ 
 
 ### 2d. Estimating $X_{\mu_s}$
 
-$X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
+$X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. This can change drastically from round to round, so it is important to calibrate correctly. 
 
 ### 2e. Estimating $X_u$
 
