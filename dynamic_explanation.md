@@ -45,15 +45,9 @@ This allows the Bell curve's parameters to be redefined as follows
 - The mean is $X_s + X_p - X_{\mu_s} + X_u$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
-$X_s$ is known.
+$X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
 
-Values of $X_p$ are known for each candidate player. 
-
-$m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context
-
-$X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
-
-The trickiest quantity to compute is $X_u$. The next section describes one approach to calculating it
+So every component of the equation can be accounted for, except for $X_u$. The next section describes one approach to calculating it
   
 ## 3. Approximating $X_u$
 
