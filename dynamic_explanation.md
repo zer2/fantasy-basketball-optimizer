@@ -47,9 +47,9 @@ $X_s$ and $X_p$ are known. $m_{\sigma}$ and $m_{\tau}$ are easily estimated. $X_
   
 ## 3. Approximating $X_u$
 
-Future draft picks are tricky to model because they are neither completely under the drafter's control (since they don't know which players will be available later) nor completely random (since the drafter will use the dynamic algorithm to draft them). Instead, they fall somewhere between the two extremes. 
+Future draft picks are tricky to model because they are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
-One way of approaching this dilemma is allowing the drafter to choose per-category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. This allows the drafter to have some measure of control over future picks, albeit an imperfect one.
+H-scores' solution to this dilemma is allowing the drafter to choose category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and one with $2\%$. It would stand to reason that this weighting would result in decent statistics for the first eight categories and significantly lower statistics for the last one. By this mechanism, the drafter has some measure of control over future picks.
 
 A natural choice for modeling the statistics of draft picks is the [multivariate normal distribution](https://en.wikipedia.org/wiki/Multivariate_normal_distribution). It has two useful properties
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
