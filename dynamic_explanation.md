@@ -49,7 +49,7 @@ $X_s$ and $X_p$ are known. $m_{\sigma}$ and $m_{\tau}$ are easily estimated. $X_
 
 Future draft picks are tricky to model because they are neither completely under the drafter's control (since they don't know which players will be available later) nor completely random (since the drafter will use the dynamic algorithm to draft them). Instead, they fall somewhere between the two extremes. 
 
-One way of approaching this dilemma is allowing the drafter to choose per-category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. This allows the drafter to have some measure of control over future picks, albeit a noisy one that does not anchor on specific players. 
+One way of approaching this dilemma is allowing the drafter to choose per-category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. This allows the drafter to have some measure of control over future picks, albeit an imperfect one.
 
 A natural choice for modeling the statistics of draft picks is the [multivariate normal distribution](https://en.wikipedia.org/wiki/Multivariate_normal_distribution). It has two useful properties
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
