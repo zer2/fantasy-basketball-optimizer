@@ -6,7 +6,17 @@ The simplest way to implement this strategy is calculating player values as norm
 
 I derive a dynamic algorithm called H-scoring to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
-## 1. Objective function
+## 1. The approach
+
+Future draft picks are tricky to model because they are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
+
+H-scores' solution to this dilemma is allowing the drafter to choose category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and one with $2\%$. It would stand to reason that this weighting would result in decent statistics for the first eight categories and significantly lower statistics for the last one. By this mechanism, the drafter has some measure of control over future picks.
+
+This framing of the problem provides two choices to the drafter: which player $p$ they take from the available player pool, and which weight vector $j$ they plan on using for draft picks after $p$. 
+
+## 2. Calculating H-score based on $p$ and $j$
+
+### 2a. Defining the objective function
 
 In the static ranking context the expected number of category wins was a reasonable objective even for Most Categories, since strategizing how to win only five out of nine categories was impossible. In the dynamic context, more information is available, and using the appropriate objective function for the format is warranted. 
 
@@ -26,11 +36,13 @@ $$
 
 Where there is a term for each scenario including five or more scenario wins
 
-## 2. A formula for $w_c(X)$
+### 2b. Calculating $W_c(X)$
 
 The discussion of static ranking lists established that point differentials between teams can be modeled as Bell curves. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting curve can then be defined in the following way
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
+- 
+### 2c. Breaking down $X$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
 - $X = X_s + X_p + X_{\mu_u} + X_u$ where
@@ -48,12 +60,9 @@ This allows the Bell curve's parameters to be redefined as follows
 $X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
 
 So every component of the equation can be accounted for, except for $X_u$. The next section describes one approach to calculating it
-  
-## 3. Approximating $X_u$
 
-Future draft picks are tricky to model because they are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
-
-H-scores' solution to this dilemma is allowing the drafter to choose category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and one with $2\%$. It would stand to reason that this weighting would result in decent statistics for the first eight categories and significantly lower statistics for the last one. By this mechanism, the drafter has some measure of control over future picks.
+### 2d. Estimating $X_s$
+### 2e. Estimating $X_u$
 
 A natural choice for modeling the statistics of draft picks is the [multivariate normal distribution](https://en.wikipedia.org/wiki/Multivariate_normal_distribution). It has two useful properties
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
@@ -81,9 +90,9 @@ Describing the parameters briefly:
 
 $X_u(j)$ is easy-peasy to calculate, right :stuck_out_tongue:. If not, it's ok. Computers can do it for you, as implemented on this website.
 
-## 4. Optimizing for $j$ and $p$
+## 3. Optimizing for $j$ and $p$
 
-This framing of the problem provides two choices to the drafter: which player $p$ they take from the available player pool, and which weight vector $j$ they plan on using for draft picks after $p$. The equations in the preceding sections provide a mechanism by which a drafter can calculate the value of their objective function based on these two choices, by first calculating expected team statistics as a function of $p$ and $j$, then calculating probabilities of winning each category, and finally combining them into the overall objective function. Unfortunately, being able to calculate $H$ based on $p$ and $j$ does not immediately reveal values of $p$ and $j$ that optimize H-score. 
+The equations in the preceding sections provide a mechanism by which a drafter can calculate the value of their objective function based on these two choices, by first calculating expected team statistics as a function of $p$ and $j$, then calculating probabilities of winning each category, and finally combining them into the overall objective function. Unfortunately, being able to calculate $H$ based on $p$ and $j$ does not immediately reveal values of $p$ and $j$ that optimize H-score. 
 
 There are a finite number of potential players $p$, so the drafter can simply try each of them. However $j$ presents a problem because trying all values of $j$ is not possible, since there are infinite choices for $j$. Even if the drafter were to simplify it to e.g. $10$ choices of weight per category, there would still be $\approx 10^8$ options to look through, which is a lot!
 
@@ -95,7 +104,7 @@ You may recognize that this method doesn't guarantee finding the absolute minimu
 
 Another downside of gradient descent is that it necessitates recalculating the slope every time it moves, which takes time. Computers can do this calculation fairly quickly but the temporal cost of doing it many times in a row does add up, especially when we are running the process seperately to optimize $j$ based on choice of $p$.
 
-## 5. Results
+## 4. Results
 
 Detailed results are included in the paper. To summarize them, the H-score algorithm wins up to $24\%$ of the time in Each Category and up to $43\%$ of the time in Most Category simulations against G-score drafters. These simulations do not have other drafters punting, so they may not be perfectly reflective of real fantasy basketball, but they do provide evidence that the algorithm is appropriate.
 
@@ -105,7 +114,8 @@ The behavior of the algorithm is interesting, and I encourage you to look throug
 <iframe  width = "1000" height = "500" padding = "none" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/41bc0dad-aa23-434b-9cbb-b037de2ed11d"> </iframe>
 
 This shows a heavily bimodal distribution of category win rates, with a sharp peak at 0% and another at 75% or so. It seems that the algorithm is roughly bifurcating between categories that it is attempting to compete in and categories which it is strategically sacrificing. However, the bifurcation is not completely binary: a sizable portion of the distribution’s density is between 5% and 35%, indicating that some categories are being only partially sacrificed, with the algorithm implicitly still hoping to win those categories sometimes. This corresponds with the idea of a “soft punt”, wherein a drafter largely sacrifices a category but tries not to entirely give up on their chances for it. Other figures in the paper underscore the point that punting is not fully binary; optimal weights do seem to be non-zero in general
-## 6. Limitations
+
+## 5. Limitations
 
 H-scoring is sophisticated but it is not a panacea and fails to account for many 
 The most important weaknesses to keep in mind for H-scoring are 
