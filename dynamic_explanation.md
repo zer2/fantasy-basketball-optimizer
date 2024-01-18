@@ -12,7 +12,7 @@ Dynamic drafting is a fundamentally more difficult proposition than static draft
 
 The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
-H-scores' solution to this dilemma is allowing the drafter to choose category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and two with $1\%$. It would stand to reason that this weighting would result in decent statistics for the first seven categories and significantly lower statistics for the last two. By this mechanism, the drafter has some measure of control over future picks. 
+H-scores' solution to this dilemma is to choose category weights for future picks, then approximate the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and two with $1\%$. It would stand to reason that this weighting would result in decent statistics for the first seven categories and significantly lower statistics for the last two. By this mechanism, the drafter has some measure of control over future picks. 
 
 Of course, the drafter also has an explicit choice about who to take from the available player pool. So they are making two decisions simultaneously for each pick: a player $p$ and a weighting $j$. 
 
