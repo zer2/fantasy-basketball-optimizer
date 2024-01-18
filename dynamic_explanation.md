@@ -8,9 +8,9 @@ I derive a dynamic algorithm called H-scoring to improve on punting logic in the
 
 ## 1. Objective function
 
-First it is essential to define what we are trying to achieve. There is no reason to do anything different than for static ranking lists in this regard; the objective is to maximize our expected number of either category wins or probability of winning $\geq 5$ categories. In this case, it helps to write them out explicitly.
+First it is essential to define what we are trying to achieve. In the static ranking context the expected number of category wins was a reasonable objective even for Most Categories, since strategizing how to win only five out of nine categories was impossible. In the dynamic context, more information is available, and using the appropriate objective function for the format is warranted. 
 
-Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
+The drafter will have some control over the aggregate statistics of their team so the objective function should be expressed as a function of team composition. Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
 $$
 V(X) = \sum_c w_c(X)
