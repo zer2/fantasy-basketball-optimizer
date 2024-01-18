@@ -45,12 +45,12 @@ Where there is a term for each scenario including five or more scenario wins
 The discussion of static ranking lists established that point differentials between teams can be modeled as Bell curves. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting curve can then be defined in the following way
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
-- 
+
 ### 2c. Breaking down $X$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
-- $X = X_s + X_p + X_{\mu_u} + X_u$ where
-  - $X_s$ is the aggregate statistics of already selected players
+- $X = A_s + X_p + X_{\mu_u} + X_u$ where
+  - $X_s$ is the aggregate statistics of team $A$'s already selected players
   - $X_p$ is the statistics of the candidate player
   - $X_{\mu_u}$ is the expected statistics of unchosen players
   - $X_u$ is a difference factor to adjust for future picks being different from expected
