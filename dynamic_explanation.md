@@ -45,7 +45,15 @@ This allows the Bell curve's parameters to be redefined as follows
 - The mean is $X_s + X_p - X_{\mu_s} + X_u$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
-$X_s$ and $X_p$ are known. $m_{\sigma}$ and $m_{\tau}$ are easily estimated. $X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. The tricky quantity to compute is $X_u$. 
+$X_s$ is known.
+
+Values of $X_p$ are known for each candidate player. 
+
+$m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context
+
+$X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score.
+
+The trickiest quantity to compute is $X_u$. The next section describes one approach to calculating it
   
 ## 3. Approximating $X_u$
 
@@ -79,28 +87,30 @@ Describing the parameters briefly:
 
 $X_u(j)$ is easy-peasy to calculate, right :stuck_out_tongue:. If not, it's ok. Computers can do it for you, as implemented on this website.
 
-## 4. Optimizing for $j$
+## 4. Optimizing for $j$ and $p$
 
-We have all the ingredients for calculating H-score based on the choice of $j$. However, that does not imply that that we know the choice of $j$ that optimizes H-score. In fact, this question is quite difficult to solve: there are infinite choices for $j$ and even if we were to simplify it to say $10$ choices of weight per category, there would still be $\approx 10^9$ options to look through, which is a lot!
+This framing of the problem provides two choices to the drafter: which player $p$ they take from the available player pool, and which weight vector $j$ they plan on using for draft picks after $p$. The equations in the preceding sections provide a mechanism by which a drafter can calculate the value of their objective function based on these two choices, by first calculating expected team statistics as a function of $p$ and $j$, then calculating probabilities of winning each category, and finally combining them into the overall objective function. Unfortunately, being able to calculate $H$ based on $p$ and $j$ does not immediately reveal values of $p$ and $j$ that optimize H-score. 
 
-Instead of looking through all the options at random, we can use a method called [gradient descent](https://en.wikipedia.org/wiki/Gradient_descent). Essentially, gradient descent conceives of the solution space as a multi-dimensional mountain, and repeatedly moves in the direction of the highest or lowest slope to eventually reach a peak or valley. See a demonstration from youtube below, of gradient descent finding a minimum from various starting points
+There are a finite number of potential players $p$, so the drafter can simply try each of them. However $j$ presents a problem because trying all values of $j$ is not possible, since there are infinite choices for $j$. Even if the drafter were to simplify it to e.g. $10$ choices of weight per category, there would still be $\approx 10^8$ options to look through, which is a lot!
+
+Instead of looking through all the options for $j$ at random for each possible choice of $p$, we can use a method called [gradient descent](https://en.wikipedia.org/wiki/Gradient_descent). Essentially, gradient descent conceives of the solution space as a multi-dimensional mountain, and repeatedly moves in the direction of the highest or lowest slope to eventually reach a peak or valley. See a demonstration from youtube below, of gradient descent finding a minimum from various starting points
 
 <iframe width = "800" height = "450" padding = "none" scrolling="no" src="https://www.youtube.com/embed/kJgx2RcJKZY"> </iframe>
 
 You may recognize that this method doesn't guarantee finding the absolute minimum or maximum, it just keeps going until it gets stuck. While this is not ideal it is also impossible to avoid, since there is no guaranteed way to find the optimal point unless the space has a special property ([convexity](https://en.wikipedia.org/wiki/Convex_function)) which $V(j)$ does not have.
 
-Another downside of gradient descent iscthat it necessitates recalculating the slope every time it moves, which takes time. Computers can do this calculation fairly quickly but the temporal cost of doing it many times in a row does add up.
+Another downside of gradient descent is that it necessitates recalculating the slope every time it moves, which takes time. Computers can do this calculation fairly quickly but the temporal cost of doing it many times in a row does add up, especially when we are running the process seperately to optimize $j$ based on choice of $p$.
 
 ## 5. Results
 
 Detailed results are included in the paper. To summarize them, the H-score algorithm wins up to $24\%$ of the time in Each Category and up to $43\%$ of the time in Most Category simulations against G-score drafters. These simulations do not have other drafters punting, so they may not be perfectly reflective of real fantasy basketball, but they do provide evidence that the algorithm is appropriate.
 
-The behavior of the algorithm is interesting, and I encourage you to look through figures 19 through 25 in the paper which describe it. I will also highlight one particular figure, which shows that the algorithm learns the concept of punting
+The behavior of the algorithm is interesting, and I encourage you to look through figures 19 through 25 in the paper which describe it. I will also highlight one particular figure, which demonstrates how the algorithm implicitly handles the concept of punting
 
 <iframe  width = "1000" height = "500" padding = "none" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/926f3396-acaf-426a-a8bc-108b66bbb900"> </iframe>
 <iframe  width = "1000" height = "500" padding = "none" scrolling="no" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/41bc0dad-aa23-434b-9cbb-b037de2ed11d"> </iframe>
 
-This shows a heavily bimodal distribution of category win rates, with a sharp peak at 0% and another at 75% or so. This pattern is consistent with the concept of punting. It seems that the algorithm is roughly bifurcating between categories that it is attempting to compete in and categories which it is strategically sacrificing. However, the bifurcation is not completely binary: a sizable portion of the distribution’s density is between 5% and 35%, indicating that some categories are being only partially sacrificed, with the algorithm implicitly still hoping to win those categories sometimes. This corresponds with the idea of a “soft punt”, wherein a drafter largely sacrifices a category but tries not to entirely give up on their chances for it. Other figures in the paper underscore the point that punting is not fully binary; optimal weights do seem to be non-zero in general
+This shows a heavily bimodal distribution of category win rates, with a sharp peak at 0% and another at 75% or so. It seems that the algorithm is roughly bifurcating between categories that it is attempting to compete in and categories which it is strategically sacrificing. However, the bifurcation is not completely binary: a sizable portion of the distribution’s density is between 5% and 35%, indicating that some categories are being only partially sacrificed, with the algorithm implicitly still hoping to win those categories sometimes. This corresponds with the idea of a “soft punt”, wherein a drafter largely sacrifices a category but tries not to entirely give up on their chances for it. Other figures in the paper underscore the point that punting is not fully binary; optimal weights do seem to be non-zero in general
 ## 6. Limitations
 
 H-scoring is sophisticated but it is not a panacea and fails to account for many 
