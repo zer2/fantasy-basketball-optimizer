@@ -26,9 +26,7 @@ Where there is a term for each scenario including five or more scenario wins
 
 ## 2. A formula for $w_c(X)$
 
-While no information about any other players was available in the static context, a dynamic algorithm knows which players were already drafted and is aware that future picks will be made with equivalent knowledge. 
-
-The discussion of static ranking lists established that point differentials between teams can be modeled as normal distributions. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting normal distribution can then be defined in the following way
+The discussion of static ranking lists established that point differentials between teams can be modeled as Bell surves. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting curve can then be defined in the following way
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
@@ -41,7 +39,7 @@ $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is
 - $X_\mu = X_{\mu_s} + X_{\mu_u}$ where
   - $X_{\mu_s}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
 
-This allows the distribution to be redefined as follows 
+This allows the Bell curve's parameters to be redefined as follows 
 - The mean is $X_s + X_p - X_{\mu_s} + X_u$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
@@ -63,7 +61,7 @@ It is simple to derive a parameterization for $X_u$ when it ignores player posit
   - All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-The details of this calculation are mathy. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
+The details of this calculation are involved. You can find them in the paper if you are interested, or take it for granted that the resulting equation for the expected value of $X_u$ is 
 
 $$
 X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
