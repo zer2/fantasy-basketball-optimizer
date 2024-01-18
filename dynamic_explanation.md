@@ -30,7 +30,7 @@ Where there is a term for each scenario including five or more scenario wins
 
 It is helpful to start by delineating draft picks into stages. For pick $6$ out of $13$, they can be 
 
-$$ \centering \begin{tabular}{|c|c|c|}
+$$ \begin{tabular}{|c|c|c|}
 \hline
 & Team A & Team B \\
 \hline
