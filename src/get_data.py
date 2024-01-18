@@ -45,7 +45,7 @@ def get_current_season_data(params
 def get_historical_data(params):
   #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
   
-  full_df = pd.read_csv('./stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
+  full_df = pd.read_csv('./data/stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
   full_df[params['counting-statistics'] + params['volume-statistics'] ] = full_df[params['counting-statistics'] + params['volume-statistics']]/3
   return full_df
 
