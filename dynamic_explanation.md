@@ -32,7 +32,7 @@ The discussion of static ranking lists established that point differentials betw
 - The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
-$X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed in the following way
+$X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components
 - $X = X_s + X_p + X_{\mu_u} + X_u$ where
   - $X_s$ is the aggregate statistics of already selected players
   - $X_p$ is the statistics of the candidate player
