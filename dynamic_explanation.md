@@ -2,13 +2,13 @@ Static ranking lists are convenient but suboptimal, since they lack context abou
 
 One way that this can be useful is 'punting'- a strategy many drafters whereby they sacrifice some number of categories to gain a significant advantage in the rest. This can be beneficial because sacrificing a category will cost a $50\%$ chance of winning that category at most, and will often provide more than a $50\%$ value to the other categories collectively. 
 
-There is an obvious way to implement the punting strategy, which is to calculate all player values ignoring the lowest category completely. This makes some sense as a heuristic, but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
+There is an obvious way to implement the punting strategy, which is to calculate all player values ignoring the category with the lowest value. This makes some sense as a heuristic, but lacks mathematic rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
 
 I derive a dynamic algorithm called H-scoring to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
 ## 1. Objective function
 
-First it is essential to define what we are trying to achieve. In the static ranking context the expected number of category wins was a reasonable objective even for Most Categories, since strategizing how to win only five out of nine categories was impossible. In the dynamic context, more information is available, and using the appropriate objective function for the format is warranted. 
+In the static ranking context the expected number of category wins was a reasonable objective even for Most Categories, since strategizing how to win only five out of nine categories was impossible. In the dynamic context, more information is available, and using the appropriate objective function for the format is warranted. 
 
 The drafter will have some control over the aggregate statistics of their team so the objective function should be expressed as a function of team composition. Define $V(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
 
