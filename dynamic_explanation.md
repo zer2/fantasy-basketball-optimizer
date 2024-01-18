@@ -2,17 +2,21 @@ Static ranking lists are convenient but suboptimal, since they lack context abou
 
 One way that this can be useful is 'punting'- a strategy whereby a drafter gives up on winning some number of categories in order to improve their chances of winning the rest. This can be beneficial because sacrificing a category gives up an expected value of $0.5$ category wins at most, and the value of over-performing in all of the other categories is often worth more than that. For example, a drafter may give up on turnovers in such a way that they gain a slight edge in every other category. If they end up with a $0\%$ chance of winning turnovers and a $60\%$ chance of winning the other categories, their expected value of categories won is $4.8$ which is above the baseline of $4.5$. 
 
-The simplest way to implement this strategy is calculating player values as normal, just without adding in the punted categories. This makes sense as a heuristic but lacks mathematical rigor and has obvious flaws. It would suggest that an infinitesimal increase in a prioritized category is preferable to an infinite increase in a deprioritized category, which seems wrong. It also provides no mechanism for deciding how many or which categories to punt.
+The simplest way to implement this strategy is calculating player values as normal, just without adding in the punted categories. This makes sense as a heuristic but lacks mathematical rigor and has obvious flaws. It would suggest that a tiny increase in a prioritized category is preferable to a huge increase in a deprioritized category, which is questionable. It also provides no mechanism for deciding how many or which categories to punt.
 
 I derive a dynamic algorithm called H-scoring to improve on punting logic in the the [paper](https://arxiv.org/abs/2307.02188). While imperfect, I believe that the logic is sound, and evidence suggests that it works at least in a simplified context. Below is a summary of how the algorithm is designed
 
-## 1. The approach
+## 1. The H-scoring approach
 
-Future draft picks are tricky to model because they are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
+Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is good, but figuring out the right way to incoporate it into decision-making is tricky. 
 
-H-scores' solution to this dilemma is allowing the drafter to choose category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and one with $2\%$. It would stand to reason that this weighting would result in decent statistics for the first eight categories and significantly lower statistics for the last one. By this mechanism, the drafter has some measure of control over future picks.
+The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
-This framing of the problem provides two choices to the drafter: which player $p$ they take from the available player pool, and which weight vector $j$ they plan on using for draft picks after $p$. 
+H-scores' solution to this dilemma is allowing the drafter to choose category weights for future picks, then approximating the aggregate statistics of future picks based on those weights. For example, a drafter may weight seven categories with $14\%$ weight and two with $1\%$. It would stand to reason that this weighting would result in decent statistics for the first seven categories and significantly lower statistics for the last two. By this mechanism, the drafter has some measure of control over future picks. 
+
+Of course, the drafter also has an explicit choice about who to take from the available player pool. So they are making two decisions simultaneously for each pick: a player $p$ and a weighting $j$. 
+
+If a drafter has a function which relates $p$ and $j$ to their objective function, they can use it to work backwards and find the $p$ and $j$ that yield a strong value of their objective function. The next section describes how to derive the function, and the section after that describes how to use it to optimize $p$ and $j$.
 
 ## 2. Calculating H-score based on $p$ and $j$
 
