@@ -26,6 +26,29 @@ $$
 
 Where there is a term for each scenario including five or more scenario wins
 
+## 2. Stages of the draft
+
+It is helpful to start by delineating draft picks into stages. For pick $6$ out of $13$, they can be 
+
+|     | Drafter's team | Opponent's team|
+| -------- | ------- |------- |
+| Pick 1   |  | |
+| Pick 2   |  |  |
+| Pick 3   | A_c |  |
+| Pick 4   |    | B_m |
+| Pick 5   |    | |
+| -------- | -------- | |
+| Pick 6   |  p| |
+ |-------- | -------- | -------- |
+| Pick 7   |    |  |
+| Pick 8   |   |  |
+| Pick 9   |    |   |
+| Pick 10   | A_u  | b_u|  
+| Pick 11  |   |  |
+| Pick 12   |    | |
+| Pick 13   |  | |  
+ |-------- | -------- | -------- |
+
 ## 2. A formula for $w_c(X)$
 
 The discussion of static ranking lists established that point differentials between teams can be modeled as Bell curves. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting curve can then be defined in the following way
