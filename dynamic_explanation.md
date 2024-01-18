@@ -71,7 +71,7 @@ X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v
   }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
 $$
 
-Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players, $v$ is a vector of weights that other drafters will be using, and $\omega$ and $\gamma$ are paremeters defining how succesful punting is expected to be. 
+Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position, $v$ is a vector of weights that other drafters will be using, and $\omega$ and $\gamma$ are paremeters defining how succesful punting is expected to be. 
 
 Describing the parameters briefly:
 - $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
