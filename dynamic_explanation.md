@@ -20,7 +20,7 @@ If they were equipped with a function translating $p$ and $j$ into their probabi
 
 ## 2. Calculating H-score based on $p$ and $j$
 
-Deriving the required function involves several steps, from defining the ultimate objective to modeling the effect of $j$
+Deriving the required function involves several steps
 
 ### 2a. Defining the objective function
 
