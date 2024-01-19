@@ -91,7 +91,7 @@ with tab2:
       ,index = len(all_datasets)-1
     )
 
-    df = get_partial_data(historical_df, darko_data, current_data, dataset_name)
+    df = get_partial_data(historical_df, current_data, darko_data, dataset_name)
 
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
