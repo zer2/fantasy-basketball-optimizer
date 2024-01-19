@@ -237,8 +237,11 @@ with tab4:
     with team_tab:
     
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
+
+      _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
+
   
-      z_tab, g_tab = st.tabs(["Z-score", "G-score"])
+      z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
         
       with z_tab:
         team_stats_z = z_scores[z_scores.index.isin(team_selections)]
@@ -284,7 +287,10 @@ with tab4:
             team_stats_g_styled = pd.DataFrame()
     
         g_display = st.dataframe(team_stats_g_styled, use_container_width = True)
-        
+    
+      with h_tab:
+          st.markdown('The H-score of team ' + str(seat) + ' is ' + str(np.round(base_h_score,3)))
+          
     with cand_tab:
         
       H = HAgent(info = info
@@ -354,9 +360,7 @@ with tab4:
         if len(my_players) < n_picks:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
-      
-            _, base_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
-            
+                  
             drop_player = st.selectbox(
               'Which player are you considering dropping?'
               ,my_players
@@ -396,7 +400,7 @@ with tab4:
             with h_tab:
                 _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
     
-                res = res - base_score.values[0]
+                res = res - base_h_score.values[0]
                 res = res.sort_values(ascending = False).round(3)
                 res.name = 'H-score differential'
     
