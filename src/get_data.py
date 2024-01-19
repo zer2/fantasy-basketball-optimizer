@@ -76,7 +76,7 @@ def get_darko_data(params):
 
   skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv').set_index('Player')
   per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv').set_index('Player')
-  all_darko = skill_projections.merge(per_game_projections_subset, left_index = True, right_index = True)
+  all_darko = skill_projections.merge(per_game_projections, left_index = True, right_index = True)
 
   #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
   fg3_pct = all_darko['FG3%']
