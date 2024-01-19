@@ -37,8 +37,7 @@ darko_data, darko_date = get_darko_data(params)
 
 ### Make app
 
-st.markdown(":basketball:")
-st.title('Optimization for fantasy basketball')
+st.title('Optimization for fantasy basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
