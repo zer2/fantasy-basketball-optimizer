@@ -92,8 +92,8 @@ def process_game_level_data(df
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(params):
 
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv').set_index('Player')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv').set_index('Player')
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-19.csv').set_index('Player')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-19.csv').set_index('Player')
   all_darko = skill_projections.merge(per_game_projections, left_index = True, right_index = True)
 
   #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
@@ -116,9 +116,7 @@ def get_darko_data(params):
   player_metadata = get_player_metadata()
   all_darko = all_darko.merge(player_metadata, left_index = True, right_index = True)
 
-  os.write(1,bytes(str(all_darko),'utf-8'))
-
-  return all_darko, '1-16'
+  return all_darko, '1-19'
   
 
 #setting show spinner to false prevents flickering
