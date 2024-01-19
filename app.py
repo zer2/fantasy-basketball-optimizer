@@ -10,6 +10,7 @@ from pandas.api.types import CategoricalDtype
 import numpy as np
 import os 
 import yaml
+from utils import icon
 
 from src.helper_functions import listify, make_progress_chart, read_markdown_file, stat_styler, styler_a,styler_b, styler_c
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
