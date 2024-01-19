@@ -107,3 +107,26 @@ def get_partial_data(historical_df
   df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
   df[r'No Play %'] = (df[r'No Play %'] * 100).round(1)
   return df.round(2) 
+
+@st.cache_resource(ttl = '1d') 
+def get_darko_data(params)
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv')
+
+  #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
+  fg3_pct = skill_projections['FG3%']
+  fg2_pct = skill_projections['FG2%']
+  fg3a_pct = skill_projections['FG3ARate%']	
+
+  skill_projections.loc[:,'FG%'] = fg3_pct * (1- fg3a_pct) + fg2_pct * fg3a_pct
+  skill_projections_subset = skill_projections.set_index('Player')[['FG%','FT%']]
+
+  per_game_projections.loc[:,'REB'] = per_game_projections['DREB'] + per_game_projections['OREB'] 
+  per_game_projections_subset = per_game_projections.set_index('Player')
+
+  all_darko = skill_projections.merge(per_game_projections_subset)
+  
+  renamer = params['darko-renamer']
+  all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
+  return all_darko
+  
