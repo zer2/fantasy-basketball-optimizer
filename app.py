@@ -8,7 +8,7 @@ import os
 import yaml
 
 from src.helper_functions import listify, make_progress_chart, read_markdown_file, stat_styler, styler_a,styler_b, styler_c
-from src.get_data import get_historical_data, get_current_season_data, get_partial_data
+from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
 
@@ -29,6 +29,7 @@ g_score_team_multiplier = params['g-score-team-multiplier']
 
 historical_df = get_historical_data(params)
 current_data = get_current_season_data(params)
+darko_data, darko_date = get_current_darko_data(params)
 
 ### Make app
 
@@ -80,8 +81,9 @@ with tab2:
 
     unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
     unique_datasets_current = list(current_data.keys())
+      
 
-    all_datasets = unique_datasets_historical + unique_datasets_current
+    all_datasets = unique_datasets_historical + unique_datasets_current + ['DARKO as of ' + darko_date]
       
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?'
@@ -89,7 +91,7 @@ with tab2:
       ,index = len(all_datasets)-1
     )
 
-    df = get_partial_data(historical_df,current_data, dataset_name)
+    df = get_partial_data(historical_df, darko_data, current_data, dataset_name)
 
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
