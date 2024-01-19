@@ -46,6 +46,8 @@ def get_historical_data(params):
   #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
   
   full_df = pd.read_csv('./data/stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
+
+  #adjust for the fact that historical data is week-based on game-based
   full_df[params['counting-statistics'] + params['volume-statistics'] ] = full_df[params['counting-statistics'] + params['volume-statistics']]/3
   return full_df
 
@@ -92,6 +94,7 @@ def process_game_level_data(df
 @st.cache_data(show_spinner = False)
 def get_partial_data(historical_df
                      , current_data
+                     , darko_data
                      , dataset_name):
   #fetch the data subset which will be used for the algorithms
 
@@ -99,6 +102,8 @@ def get_partial_data(historical_df
   #overwriting the version in the cache
   if dataset_name in list(current_data.keys()):
       df = current_data[dataset_name].copy()
+  elif 'DARKO' in dataset_name:
+    return darko_data
   else:
       df = historical_df.loc[int(dataset_name)].copy()
 
