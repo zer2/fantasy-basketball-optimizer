@@ -1,5 +1,9 @@
 import streamlit as st
-st.set_page_config(layout="wide")
+st.set_page_config(page_title='Optimization for fantasy basketball'
+                   , page_icon=':basketball:'
+                   , layout="wide"
+                   , initial_sidebar_state="auto"
+                   , menu_items=None)
 
 import pandas as pd
 from pandas.api.types import CategoricalDtype
@@ -11,12 +15,6 @@ from src.helper_functions import listify, make_progress_chart, read_markdown_fil
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
-
-st.set_page_config(page_title='Optimization for fantasy basketball'
-                   , page_icon=':basketball:'
-                   , layout="centered"
-                   , initial_sidebar_state="auto"
-                   , menu_items=None)
 
 with open("parameters.yaml", "r") as stream:
     try:
