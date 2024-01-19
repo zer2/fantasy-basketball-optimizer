@@ -110,23 +110,25 @@ def get_partial_data(historical_df
 
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(params)
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv')
+
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv').set_index('Player')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv').set_index('Player')
+  all_darko = skill_projections.merge(per_game_projections_subset, left_index = True, right_index = True)
 
   #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
-  fg3_pct = skill_projections['FG3%']
-  fg2_pct = skill_projections['FG2%']
-  fg3a_pct = skill_projections['FG3ARate%']	
+  fg3_pct = all_darko['FG3%']
+  fg2_pct = all_darko['FG2%']
+  fg3a_pct = all_darko['FG3ARate%']	
+  fg3a = all_darko['FG3A]
 
-  skill_projections.loc[:,'FG%'] = fg3_pct * (1- fg3a_pct) + fg2_pct * fg3a_pct
-  skill_projections_subset = skill_projections.set_index('Player')[['FG%','FT%']]
+  oreb = all_darko['OREB'] 
+  dreb = all_darko['DREB'] 
 
-  per_game_projections.loc[:,'REB'] = per_game_projections['DREB'] + per_game_projections['OREB'] 
-  per_game_projections_subset = per_game_projections.set_index('Player')
+  all_darko.loc[:,'FG%'] = fg3_pct * (1- fg3a_pct) + fg2_pct * fg3a_pct
+  all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
+  all_darko.loc[:,'REB'] = dreb + oreb 
 
-  all_darko = skill_projections.merge(per_game_projections_subset)
-  
   renamer = params['darko-renamer']
   all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
-  return all_darko
+  return all_darko, '1-16'
   
