@@ -65,7 +65,7 @@ with tab2:
   left, middle, right = st.columns([0.25,0.25,0.5])
 
   with left: 
-    st.header('General', divider = True)
+    st.header('General')
     
     format = st.selectbox(
       'Which format are you playing?',
@@ -102,7 +102,7 @@ with tab2:
                 , value = 13)
   
   with middle: 
-      st.header('Player Statistics', divider = True)
+      st.header('Player Statistics')
 
       psi = st.number_input(r'Select a $\psi$ value'
                         , min_value = 0.0
@@ -124,7 +124,7 @@ with tab2:
 
   
   with right:
-    st.header('H-scoring Algorithm', divider = True)
+    st.header('H-scoring Algorithm')
 
     left_col, right_col = st.columns(2)
 
