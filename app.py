@@ -12,6 +12,12 @@ from src.get_data import get_historical_data, get_current_season_data, get_darko
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
 
+st.set_page_config(page_title='Optimization for fantasy basketball'
+                   , page_icon=':basketball:'
+                   , layout="centered"
+                   , initial_sidebar_state="auto"
+                   , menu_items=None)
+
 with open("parameters.yaml", "r") as stream:
     try:
        params = yaml.safe_load(stream)
@@ -32,12 +38,6 @@ current_data = get_current_season_data(params)
 darko_data, darko_date = get_darko_data(params)
 
 ### Make app
-
-st.set_page_config(page_title='Optimization for fantasy basketball'
-                   , page_icon=':basketball:'
-                   , layout="centered"
-                   , initial_sidebar_state="auto"
-                   , menu_items=None)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
