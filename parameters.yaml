@@ -29,13 +29,16 @@ api-renamer:
  GAME_DATE : Game Date
 darko-renamer:
  PTS : Points
+ REB : Rebounds
  AST : Assists
  STL: Steals
  BLK : Blocks
+ FG3M : Threes
  TOV : Turnovers
  FTA : Free Throw Attempts
  FGA : Field Goal Attempts
  FT% : Free Throw %
+ FG% : Field Goal %
 z-score-player-multiplier : 50
 z-score-team-multiplier : 20
 g-score-player-multiplier : 60
