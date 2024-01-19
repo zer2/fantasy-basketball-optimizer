@@ -129,7 +129,7 @@ def get_partial_data(historical_df
   if dataset_name in list(current_data.keys()):
       df = current_data[dataset_name].copy()
   elif 'DARKO' in dataset_name:
-    return darko_data
+      df = darko_data
   else:
       df = historical_df.loc[int(dataset_name)].copy()
 
