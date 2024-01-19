@@ -71,6 +71,32 @@ def get_player_metadata():
 
    return simplified
 
+@st.cache_resource(ttl = '1d') 
+def get_darko_data(params):
+
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv').set_index('Player')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv').set_index('Player')
+  all_darko = skill_projections.merge(per_game_projections_subset, left_index = True, right_index = True)
+
+  #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
+  fg3_pct = all_darko['FG3%']
+  fg2_pct = all_darko['FG2%']
+  fg3a_pct = all_darko['FG3ARate%']	
+  fg3a = all_darko['FG3A]
+
+  oreb = all_darko['OREB'] 
+  dreb = all_darko['DREB'] 
+
+  all_darko.loc[:,'FG%'] = fg3_pct * (1- fg3a_pct) + fg2_pct * fg3a_pct
+  all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
+  all_darko.loc[:,'REB'] = dreb + oreb 
+
+  renamer = params['darko-renamer']
+  all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
+  return all_darko, '1-16'
+  
+
+
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def process_game_level_data(df
                             , metadata):
@@ -113,27 +139,3 @@ def get_partial_data(historical_df
   df[r'No Play %'] = (df[r'No Play %'] * 100).round(1)
   return df.round(2) 
 
-@st.cache_resource(ttl = '1d') 
-def get_darko_data(params)
-
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-16.csv').set_index('Player')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-16.csv').set_index('Player')
-  all_darko = skill_projections.merge(per_game_projections_subset, left_index = True, right_index = True)
-
-  #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
-  fg3_pct = all_darko['FG3%']
-  fg2_pct = all_darko['FG2%']
-  fg3a_pct = all_darko['FG3ARate%']	
-  fg3a = all_darko['FG3A]
-
-  oreb = all_darko['OREB'] 
-  dreb = all_darko['DREB'] 
-
-  all_darko.loc[:,'FG%'] = fg3_pct * (1- fg3a_pct) + fg2_pct * fg3a_pct
-  all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
-  all_darko.loc[:,'REB'] = dreb + oreb 
-
-  renamer = params['darko-renamer']
-  all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
-  return all_darko, '1-16'
-  
