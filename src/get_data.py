@@ -114,7 +114,7 @@ def get_darko_data(params):
   all_darko.loc[:,'No Play %'] = 0 #currently not implemented 
 
   player_metadata = get_player_metadata()
-  all_darko = all_darko.merge(metadata, left_index = True, right_index = True)
+  all_darko = all_darko.merge(player_metadata, left_index = True, right_index = True)
 
   os.write(1,bytes(str(all_darko),'utf-8'))
 
