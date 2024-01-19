@@ -29,7 +29,7 @@ g_score_team_multiplier = params['g-score-team-multiplier']
 
 historical_df = get_historical_data(params)
 current_data = get_current_season_data(params)
-darko_data, darko_date = get_current_darko_data(params)
+darko_data, darko_date = get_darko_data(params)
 
 ### Make app
 
