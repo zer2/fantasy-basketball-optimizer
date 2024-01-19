@@ -226,6 +226,17 @@ with tab4:
     players_chosen = [x for x in listify(selections_editable) if x ==x]
     my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
 
+    H = HAgent(info = info
+         , omega = omega
+         , gamma = gamma
+         , alpha = alpha
+         , beta = beta
+         , n_picks = n_picks
+         , winner_take_all = winner_take_all
+         , punting = punting)
+    _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
+
+
     with st.form(key='my_form_to_submit'):
       h_score_button = st.form_submit_button(label='Run H-score algorithm')
 
@@ -238,7 +249,6 @@ with tab4:
     
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
 
-      _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
 
   
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
@@ -292,15 +302,6 @@ with tab4:
           st.markdown('The H-score of team ' + str(seat) + ' is ' + str(np.round(base_h_score,3)))
           
     with cand_tab:
-        
-      H = HAgent(info = info
-         , omega = omega
-         , gamma = gamma
-         , alpha = alpha
-         , beta = beta
-         , n_picks = n_picks
-         , winner_take_all = winner_take_all
-         , punting = punting)
 
       subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
     
