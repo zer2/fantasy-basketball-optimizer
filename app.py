@@ -65,7 +65,7 @@ with tab2:
   left, middle, right = st.columns([0.25,0.25,0.5])
 
   with left: 
-    st.header('General')
+    st.header('General', divider = True)
     
     format = st.selectbox(
       'Which format are you playing?',
@@ -102,7 +102,7 @@ with tab2:
                 , value = 13)
   
   with middle: 
-      st.header('Player Statistics')
+      st.header('Player Statistics', divider = True)
 
       psi = st.number_input(r'Select a $\psi$ value'
                         , min_value = 0.0
@@ -114,7 +114,7 @@ with tab2:
     
       st.caption(psi_str)
 
-      st.subheader(f"Coefficients")
+      st.subheader(f"Coefficients", divider = True)
       conversion_factors = st.data_editor(coefficient_df
                                    , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
                                                       )
@@ -124,7 +124,7 @@ with tab2:
 
   
   with right:
-    st.header('H-scoring Algorithm')
+    st.header('H-scoring Algorithm', divider = True)
 
     left_col, right_col = st.columns(2)
 
@@ -199,7 +199,7 @@ with tab4:
 
   with left:
 
-    st.subheader('Draft board')
+    st.subheader('Draft board', divider = True)
     selections_editable = st.data_editor(selections, hide_index = True)
     st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
 
