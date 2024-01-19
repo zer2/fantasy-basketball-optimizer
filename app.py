@@ -41,7 +41,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["About","Parameters", "Player Stats", "Draft"]
 
 with tab1:
 
-  intro_tab, static_explanation_tab, dynamic_explanation_tab = st.tabs(['Intro','Static Ranking lists','Dynamic algorithms'])
+  intro_tab, static_explanation_tab, dynamic_explanation_tab = st.tabs(['Intro','G-scoring','H-scoring'])
 
   with intro_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
