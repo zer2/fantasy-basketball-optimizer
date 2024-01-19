@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(page_title='Optimization for fantasy basketball'
+st.set_page_config(page_title='Fantasy BBall Optimization'
                    , page_icon=':basketball:'
                    , layout="wide"
                    , initial_sidebar_state="auto"
@@ -36,6 +36,9 @@ current_data = get_current_season_data(params)
 darko_data, darko_date = get_darko_data(params)
 
 ### Make app
+
+icon.show_icon(":basketball:")
+st.title('Optimization for fantasy basketball)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
