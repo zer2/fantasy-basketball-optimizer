@@ -36,6 +36,7 @@ darko-renamer:
  TOV : Turnovers
  FTA : Free Throw Attempts
  FGA : Field Goal Attempts
+ FT% : Free Throw %
 z-score-player-multiplier : 50
 z-score-team-multiplier : 20
 g-score-player-multiplier : 60
