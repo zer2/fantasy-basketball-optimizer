@@ -93,6 +93,9 @@ def get_darko_data(params):
 
   renamer = params['darko-renamer']
   all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
+
+  os.write(1,bytes(str(all_darko),'utf-8'))
+
   return all_darko, '1-16'
   
 
