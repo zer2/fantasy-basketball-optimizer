@@ -33,7 +33,11 @@ darko_data, darko_date = get_darko_data(params)
 
 ### Make app
 
-st.title('Optimization for fantasy basketball') 
+st.set_page_config(page_title='Optimization for fantasy basketball'
+                   , page_icon=:basketball:
+                   , layout="centered"
+                   , initial_sidebar_state="auto"
+                   , menu_items=None)
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
