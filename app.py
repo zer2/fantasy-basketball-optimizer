@@ -299,7 +299,7 @@ with tab4:
         g_display = st.dataframe(team_stats_g_styled, use_container_width = True)
     
       with h_tab:
-          st.markdown('The H-score of team ' + str(seat) + ' is ' + str(np.round(base_h_score,3)))
+          st.markdown('The H-score of team ' + str(seat) + ' is ' + str(base_h_score.round(3).values[0]))
           
     with cand_tab:
 
