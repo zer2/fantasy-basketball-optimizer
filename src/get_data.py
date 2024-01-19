@@ -111,6 +111,7 @@ def get_darko_data(params):
 
   renamer = params['darko-renamer']
   all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
+  all_darko.loc[:,'No Play %'] = 0 #currently not implemented 
 
   os.write(1,bytes(str(all_darko),'utf-8'))
 
