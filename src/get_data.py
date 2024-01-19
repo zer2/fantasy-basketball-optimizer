@@ -105,7 +105,7 @@ def get_darko_data(params):
   oreb = all_darko['OREB'] 
   dreb = all_darko['DREB'] 
 
-  all_darko.loc[:,'FG%'] = fg3_pct * (1- fg3a_pct) + fg2_pct * fg3a_pct
+  all_darko.loc[:,'FG%'] = fg2_pct * (1- fg3a_pct) + fg3_pct * fg3a_pct
   all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
   all_darko.loc[:,'REB'] = dreb + oreb 
 
