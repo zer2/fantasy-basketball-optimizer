@@ -114,7 +114,7 @@ with tab2:
     
       st.caption(psi_str)
 
-      st.subheader(f"Coefficients", divider = True)
+      st.subheader(f"Coefficients")
       conversion_factors = st.data_editor(coefficient_df
                                    , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
                                                       )
@@ -199,7 +199,7 @@ with tab4:
 
   with left:
 
-    st.subheader('Draft board', divider = True)
+    st.subheader('Draft board')
     selections_editable = st.data_editor(selections, hide_index = True)
     st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
 
