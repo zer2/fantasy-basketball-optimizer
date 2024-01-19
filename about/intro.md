@@ -5,4 +5,4 @@ It assumes that you have some familiarity with how fantasy basketball works. If 
 - [*Scoring formats*](https://support.espn.com/hc/en-us/articles/360003913972-Scoring-Formats)
 - [*Snake vs auction drafts*](https://www.dummies.com/article/home-auto-hobbies/sports-recreation/fantasy-sports/fantasy-football/understanding-fantasy-football-snake-and-auction-drafts-149492/)
 
-If you have any additional questions, please consult the paper or contact me on [reddit](https://www.reddit.com/user/zeros1123). I'm always happy to discuss this work! 
+If you have any questions please check out the following tabs, consult the paper, or contact me on [reddit](https://www.reddit.com/user/zeros1123). I'm always happy to discuss this work! 
