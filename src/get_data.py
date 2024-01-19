@@ -71,6 +71,24 @@ def get_player_metadata():
 
    return simplified
 
+#no need to cache this since it only gets re-run when current_season_data is refreshed
+def process_game_level_data(df
+                            , metadata):
+  #convert a game level dataframe to a week-level dataframe
+           
+  agg_df = df.groupby('Player').mean().astype(float)
+  agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
+                                          , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
+                                          ,0)
+  agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
+                                          , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
+                                          ,0) 
+  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
+
+  agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
+  
+  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
+
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(params):
 
@@ -99,25 +117,6 @@ def get_darko_data(params):
   return all_darko, '1-16'
   
 
-
-#no need to cache this since it only gets re-run when current_season_data is refreshed
-def process_game_level_data(df
-                            , metadata):
-  #convert a game level dataframe to a week-level dataframe
-           
-  agg_df = df.groupby('Player').mean().astype(float)
-  agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
-                                          , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
-                                          ,0)
-  agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
-                                          , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
-                                          ,0) 
-  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
-
-  agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
-  
-  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
-
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False)
@@ -132,10 +131,11 @@ def get_partial_data(historical_df
   if dataset_name in list(current_data.keys()):
       df = current_data[dataset_name].copy()
   elif 'DARKO' in dataset_name:
-      df = darko_data
+      df = darko_data.copy()
+      os.write(1,bytes(str(df),'utf-8'))
   else:
       df = historical_df.loc[int(dataset_name)].copy()
-
+  
   #adjust for the display
   df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
   df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
