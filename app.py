@@ -167,7 +167,7 @@ with tab2:
 
 
 with tab3:
-  st.markdown(f"Per-game player projections below: feel free to edit. Converted to weekly by multiplying by three")
+  st.markdown(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
 
   player_stats_editable = st.data_editor(df) # 👈 An editable dataframe
   player_stats = player_stats_editable.copy()
