@@ -92,9 +92,15 @@ def process_game_level_data(df
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(params):
 
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-19.csv').set_index('Player')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-19.csv').set_index('Player')
-  all_darko = skill_projections.merge(per_game_projections, left_index = True, right_index = True)
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-19.csv')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-19.csv')
+  all_darko = skill_projections.merge(per_game_projections)
+
+  all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
+                                 ,'Nic Claxton'
+                                 ,all_darko['Player'])
+
+  all_darko = all_darko.set_index('Player') 
 
   #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
   fg3_pct = all_darko['FG3%']
