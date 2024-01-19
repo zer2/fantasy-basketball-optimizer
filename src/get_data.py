@@ -82,7 +82,7 @@ def get_darko_data(params):
   fg3_pct = all_darko['FG3%']
   fg2_pct = all_darko['FG2%']
   fg3a_pct = all_darko['FG3ARate%']	
-  fg3a = all_darko['FG3A]
+  fg3a = all_darko['FG3A']
 
   oreb = all_darko['OREB'] 
   dreb = all_darko['DREB'] 
