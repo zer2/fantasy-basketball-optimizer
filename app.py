@@ -338,7 +338,7 @@ with tab4:
           with st.form(key='my_form_to_submit'):
             h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
       
-        if h_score_button:
+        if st.session_state.run:
 
           n_players = n_drafters * n_picks
       
