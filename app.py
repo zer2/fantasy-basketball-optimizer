@@ -41,7 +41,7 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-tab1, tab2, tab3, tab4 = st.tabs([":notebook: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":man-bouncing-ball: Draft"])
+tab1, tab2, tab3, tab4 = st.tabs([":notebook_with_decorative_cover: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":man-bouncing-ball: Draft"])
 
 with tab1:
 
