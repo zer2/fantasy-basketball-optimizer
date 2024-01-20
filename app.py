@@ -21,6 +21,16 @@ with open("parameters.yaml", "r") as stream:
        params = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         print(exc) 
+
+if 'run' not in st.session_state:
+    st.session_state.run = False
+    st.session_state.result = None
+
+def run():
+    st.session_state.run = True
+
+def clear():
+    st.session_state.result = None
       
 counting_statistics = params['counting-statistics'] 
 percentage_statistics = params['percentage-statistics'] 
@@ -324,8 +334,9 @@ with tab4:
     
       with subtab3:
 
-        with st.form(key='my_form_to_submit'):
-          h_score_button = st.form_submit_button(label='Run H-score algorithm')
+        if not st.session_state.run:
+          with st.form(key='my_form_to_submit'):
+            h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
       
         if h_score_button:
 
