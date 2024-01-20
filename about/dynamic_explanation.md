@@ -99,7 +99,7 @@ Describing the parameters briefly:
 - $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
 - $\gamma$ controls how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
-$X_u(j)$ is easy-peasy to calculate, right :stuck_out_tongue:. If not, it's ok. Computers can do it for you, as implemented on this website.
+$X_u(j)$ is obviously too complicated to compute repeatedly by hand. Fortunately it is almost trivial for omputers to do it for you, as implemented on this website.
 
 ## 3. Optimizing for $j$ and $p$
 
