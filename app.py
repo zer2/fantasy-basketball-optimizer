@@ -37,7 +37,7 @@ darko_data, darko_date = get_darko_data(params)
 
 ### Make app
 
-st.title('Optimization for fantasy basketball :basketball:')
+st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
@@ -45,7 +45,7 @@ tab1, tab2, tab3, tab4 = st.tabs([":page_with_curl: About",":control_knobs: Para
 
 with tab1:
 
-  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab = st.tabs(['Intro','G-scoring','H-scoring','Data'])
+  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab = st.tabs(['Intro','G-scoring','H-scoring','Data sources'])
 
   with intro_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
@@ -68,7 +68,7 @@ with tab1:
   with data_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
       with c2:
-          dynamic_md = read_markdown_file('about/data.md')
+          dynamic_md = read_markdown_file('about/data_sources.md')
           st.markdown(dynamic_md, unsafe_allow_html=True)
       
 with tab2: 
