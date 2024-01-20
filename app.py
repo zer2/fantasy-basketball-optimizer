@@ -24,13 +24,12 @@ with open("parameters.yaml", "r") as stream:
 
 if 'run' not in st.session_state:
     st.session_state.run = False
-    st.session_state.result = None
 
 def run():
     st.session_state.run = True
 
-def clear():
-    st.session_state.result = None
+def stop_run():
+    st.session_state.run = False
       
 counting_statistics = params['counting-statistics'] 
 percentage_statistics = params['percentage-statistics'] 
@@ -377,6 +376,8 @@ with tab4:
                 c_df = c.loc[res.index].dropna().round().astype(int)
                 c_df = c_df.style.background_gradient(axis = None)
                 st.dataframe(c_df)
+                
+              stop_run()
 
     with waiver_tab:
         if len(my_players) < n_picks:
