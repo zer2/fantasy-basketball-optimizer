@@ -4,14 +4,13 @@ This website pulls data from three sources, all of which have slightly different
 
 ### Historical season data
 
-Data from old seasons is mostly for fun. See what the algorithms would say about drafting decisions for those seasons, if they had had perfect information about player stats beforehand! 
+Data from old seasons is mostly for fun. See what the algorithms would have recommended for those seasons, given perfect information about player stats! 
 
 This data was pulled from the NBA API and stored in a one-time load
 
 ### Current season data
 
-Current season data is pulled on a daily basis from the NBA's API. This data is not forward-looking at all, sO I would caution against relying on it too much. However, I realize that this 
-is a simple and standard way to evaluate players during the season, so I am including it. 
+Current season data is pulled on a daily basis from the NBA's API. Using actual season data is a standard and simple method for game-planning for the remainder of the season. 
 
 This data set excludes games when players are injured and provides no forecast for likelihood of future injury. You can write in injury risk in the "No Play %" column if you would like 
 
