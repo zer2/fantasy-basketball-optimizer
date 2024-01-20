@@ -246,10 +246,6 @@ with tab4:
          , punting = punting)
     _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
 
-
-    with st.form(key='my_form_to_submit'):
-      h_score_button = st.form_submit_button(label='Run H-score algorithm')
-
   with right:
 
     team_tab, cand_tab, waiver_tab, trade_tab = st.tabs(["Team", "Candidates","Waiver Moves","Trades"])
@@ -259,8 +255,6 @@ with tab4:
     
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
 
-
-  
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
         
       with z_tab:
@@ -329,7 +323,10 @@ with tab4:
         g_scores_display = st.dataframe(g_scores_unselected_styled)
     
       with subtab3:
-    
+
+        with st.form(key='my_form_to_submit'):
+          h_score_button = st.form_submit_button(label='Run H-score algorithm')
+      
         if h_score_button:
 
           n_players = n_drafters * n_picks
