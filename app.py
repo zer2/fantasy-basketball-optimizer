@@ -337,7 +337,10 @@ with tab4:
           with st.form(key='my_form_to_submit'):
             h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
       
-        if st.session_state.run:
+        else:
+
+          #record the fact that the run has already been invoked, no need to invoke it again
+          stop_run()
 
           n_players = n_drafters * n_picks
       
@@ -377,7 +380,6 @@ with tab4:
                 c_df = c_df.style.background_gradient(axis = None)
                 st.dataframe(c_df)
                 
-              stop_run()
 
     with waiver_tab:
         if len(my_players) < n_picks:
