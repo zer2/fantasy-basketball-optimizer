@@ -309,7 +309,10 @@ with tab4:
         g_display = st.dataframe(team_stats_g_styled, use_container_width = True)
     
       with h_tab:
-          st.markdown('The H-score of team ' + str(seat) + ' is ' + str(base_h_score.round(3).values[0]))
+        if len(my_players) < n_picks:
+            st.markdown('Your team is not full yet! Come back here when you have a full team')
+        else:
+            st.markdown('The H-score of team ' + str(seat) + ' is ' + str(base_h_score.round(3).values[0]))
           
     with cand_tab:
 
