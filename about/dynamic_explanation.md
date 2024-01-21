@@ -113,7 +113,7 @@ X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v
   }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
 $$
 
-Super simple and easy to calculate, right :stuck_out_tongue: $X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
+Super simple and easy to calculate, right :stuck_out_tongue:.$X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
 
 It might not be clear how the parameters, the two levers that we have actual control over, effect the caltulation. For some additional intution: 
 - $\omega$ controls how well punting strategies are expected to work generally
