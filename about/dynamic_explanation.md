@@ -85,17 +85,16 @@ It is simple to derive a parameterization for $X_u$ when it ignores player posit
   - All players above a certain threshold of general value have been picked, as an approximation of the fact that more valuable players will be taken earlier. We can approximate this threshold to be $0$, since $$X_u$ is defined relative to what is expected, and should have $0$ value when $j = v$ 
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-This scenario provides a launching point for calculating the expected value of $X_u$. The calculation involves many steps of linear algebra, the details of which are in the paper. The result is as follows
+This scenario provides a launching point for calculating the expected value of future draft picks, $X_u(j)$. The calculation involves many steps of linear algebra, the details of which are in the paper. The result is as follows
 
 Defining 
-- $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position 
-- $v$ is a weighting that we expect other drafters to use, perhaps corresponding to Z-score or G-score
-- $N$ is how many players the drafter has already selected
-- $\omega$ is a parameter controlling how well punting strategies are expected to work generally
-- $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
+- $\Sigma$ as the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position 
+- $v$ as a weighting that we expect other drafters to use, perhaps corresponding to Z-score or G-score
+- $N$ as how many players the drafter has already selected
+- $\omega$ as a parameter controlling how well punting strategies are expected to work generally
+- $\gamma$ as a complement to $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
-The expected value of future draft picks, $X_u(j)$, can be calculated as follows 
-
+Then
 $$
 X_u(j) = \left( 12 - N \right) \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
    \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
