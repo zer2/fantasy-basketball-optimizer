@@ -87,7 +87,6 @@ It is simple to derive a parameterization for $X_u$ when it ignores player posit
 
 This scenario provides a launching point for calculating the expected value of $X_u$. The calculation involves many steps of linear algebra, the details of which are in the paper. For those familiar with linear algebra, here is a brief sketch: 
 
-```
 Call the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position $\Sigma$. Also define $v$, a weighting that we expect other drafters to use, perhaps corresponding to Z-score or G-score. 
 
 The first result is that the standard deviation of the resulting conditional distribution with weight $j$ is
@@ -115,7 +114,6 @@ X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v
    \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
   }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
 $$
-```
 
 Super simple and easy to calculate, right :stuck_out_tongue:.$X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
 
