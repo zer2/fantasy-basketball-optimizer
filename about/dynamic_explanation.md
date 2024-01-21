@@ -99,7 +99,7 @@ $$
 \omega * \sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
 $$
 
-Where \omega is some constant. We also said that all players above a certain value threshold were picked, so the player is definitely below that in terms of overall value, but how far below? We can also approximate that by the standard deviation and another parameter called $\gamma$
+Where $\omega$ is some constant. We also said that all players above a certain value threshold were picked, so the player is definitely below that in terms of overall value, but how far below? We can also approximate that by the standard deviation and another parameter called $\gamma$
 
 $$
 \gamma * \sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
@@ -115,7 +115,7 @@ $$
 
 Super simple and easy to calculate, right :stuck_out_tongue: $X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
 
-It might not be clear how the paremeters, the two levers that we have actual control over, effect the caltulation. For some additional intution: 
+It might not be clear how the parameters, the two levers that we have actual control over, effect the caltulation. For some additional intution: 
 - $\omega$ controls how well punting strategies are expected to work generally
 - $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
