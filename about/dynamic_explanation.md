@@ -82,10 +82,30 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 It is simple to derive a parameterization for $X_u$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
 - If raw player statistics were used to calculate correlations, the model would believe that it could choose a team full of e.g. all point guards to punt Field Goal % to an extreme degree. In reality teams need to choose players from a mix of positions. Player position can be accounted for by subtracting out position means. E.g. if Centers get $+0.5$ rebounds on average, a center's rebound number could be adjusted by $-0.5$. Or, since there are some flex spots making position requirements not entirely rigid, the adjustment number could be scaled by some constant which is $\leq 1$, which we call $\nu$. So if $\nu$ is $0.8$, the previous example would instead lead to $0.4$ rebounds being subtracted out from centers' numbers
 - Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_u$ are chosen
-  - All players above a certain threshold of general value have been picked. This is an approximation of the fact that more valuable players will be taken earlier
+  - All players above a certain threshold of general value have been picked- let's say $0$ for simplicity. This is an approximation of the fact that more valuable players will be taken earlier
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-This scenario provides a launching point for calculating the expected value of $X_u$. You can find the mathematical details of the ensuing calculation in the paper if you are interested, or take it for granted that the resulting equation is 
+This scenario provides a launching point for calculating the expected value of $X_u$. The resulting calculation involves many steps of complicated math, so I will skip most of that and provide a brief sketch here.  
+
+Call the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position $\Sigma$. Also define $v$, a weighting that we expect other drafters to use, such as G-score. The first result is that the standard deviation of the resulting conditional distribution with weight $j$ is
+
+$$
+\sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
+$$
+
+The chosen player's $j$-weighted value is the maximum available. Roughly, the maximum value of a distribution is proportional to the standard deviation. So it can be said that the $j$-weighted value of the chosen player is 
+
+$$
+\omega * \sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
+$$
+
+Where \omega is some constant. We also said that all players above a certain value threshold were picked, so the player is definitely below that in terms of overall value, but how far below? We can also approximate that by the standard deviation and another parameter called $\gamma$
+
+$$
+\gamma * \sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
+$$
+
+With these two additional conditions, $X_u(j)$ can be calculated. 
 
 $$
 X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
@@ -93,13 +113,11 @@ X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v
   }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
 $$
 
-Where $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position, $v$ is a vector of weights that other drafters will be using, and $\omega$ and $\gamma$ are paremeters defining how succesful punting is expected to be. 
+Super simple and easy to calculate, right :stuck_out_tongue: $X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
 
-Describing the parameters briefly:
-- $\omega$ controls how much higher the $j$-weighted sum across categories is expected to be above the standard sum
-- $\gamma$ controls how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
-
-$X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website
+It might not be clear how the paremeters, the two levers that we have actual control over, effect the caltulation. For some additional intution: 
+- $\omega$ controls how well punting strategies are expected to work generally
+- $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
 ## 3. Optimizing for $j$ and $p$
 
