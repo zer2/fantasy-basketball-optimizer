@@ -82,7 +82,7 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 It is simple to derive a parameterization for $X_u$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
 - If raw player statistics were used to calculate correlations, the model would believe that it could choose a team full of e.g. all point guards to punt Field Goal % to an extreme degree. In reality teams need to choose players from a mix of positions. Player position can be accounted for by subtracting out position means. E.g. if Centers get $+0.5$ rebounds on average, a center's rebound number could be adjusted by $-0.5$. Or, since there are some flex spots making position requirements not entirely rigid, the adjustment number could be scaled by some constant which is $\leq 1$, which we call $\nu$. So if $\nu$ is $0.8$, the previous example would instead lead to $0.4$ rebounds being subtracted out from centers' numbers
 - Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_u$ are chosen
-  - All players above a certain threshold of general value have been picked- let's say $0$ for simplicity. This is an approximation of the fact that more valuable players will be taken earlier
+  - All players above a certain threshold of general value have been picked, as an approximation of the fact that more valuable players will be taken earlier. We can approximate this threshold to be $0$, since $$X_u$ is defined relative to what is expected, and should have $0$ value when $j = v$ 
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
 This scenario provides a launching point for calculating the expected value of $X_u$. The calculation involves many steps of linear algebra, the details of which are in the paper. For those familiar with linear algebra, here is a brief sketch: 
@@ -120,6 +120,8 @@ Super simple and easy to calculate, right :stuck_out_tongue:.$X_u(j)$ is obvious
 It might not be clear how the parameters, the two levers that we have actual control over, effect the caltulation. For some additional intution: 
 - $\omega$ controls how well punting strategies are expected to work generally
 - $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
+
+It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others. 
 
 ## 3. Optimizing for $j$ and $p$
 
