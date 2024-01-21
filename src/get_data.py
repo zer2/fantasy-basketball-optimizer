@@ -21,7 +21,9 @@ def get_current_season_data(params
           for season_type in ["Regular Season"]
       ]
   )
-           
+
+  expected_minutes_long_term = process_minutes(pgl_df)
+                            
   renamer = params['api-renamer']
   pgl_df = pgl_df.rename(columns = renamer)[list(renamer.values())].fillna(0)  
 
@@ -32,13 +34,39 @@ def get_current_season_data(params
   two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= two_weeks_ago].drop(columns = ['Game Date'])
   full_subset = pgl_df.drop(columns = ['Game Date'])
 
+
   player_metadata = get_player_metadata()
 
   data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
                ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
                ,str(season) + '-Full Season' :  process_game_level_data(full_subset, player_metadata)
               }
-  return data_dict 
+                              
+  return data_dict, expected_minutes_long_term 
+
+def process_minutes(pgl_df):
+  agg = pgl_df.groupby('Player')['MIN'].mean()
+  agg.name = 'Minutes'
+  return agg
+
+  
+#no need to cache this since it only gets re-run when current_season_data is refreshed
+def process_game_level_data(df
+                            , metadata):
+  #convert a game level dataframe to a week-level dataframe
+           
+  agg_df = df.groupby('Player').mean().astype(float)
+  agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
+                                          , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
+                                          ,0)
+  agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
+                                          , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
+                                          ,0) 
+  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
+
+  agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
+  
+  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource
@@ -70,24 +98,6 @@ def get_player_metadata():
    simplified.name = 'Position'
 
    return simplified
-
-#no need to cache this since it only gets re-run when current_season_data is refreshed
-def process_game_level_data(df
-                            , metadata):
-  #convert a game level dataframe to a week-level dataframe
-           
-  agg_df = df.groupby('Player').mean().astype(float)
-  agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
-                                          , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
-                                          ,0)
-  agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
-                                          , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
-                                          ,0) 
-  agg_df.loc[:,'No Play %'] = 0 #currently not implemented 
-
-  agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
-  
-  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
 
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(params):
