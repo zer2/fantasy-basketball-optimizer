@@ -121,7 +121,7 @@ It might not be clear how the parameters, the two levers that we have actual con
 - $\omega$ controls how well punting strategies are expected to work generally
 - $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
-It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others. 
+It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others
 
 ## 3. Optimizing for $j$ and $p$
 
