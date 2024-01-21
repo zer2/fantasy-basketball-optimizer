@@ -22,10 +22,13 @@ def get_current_season_data(params
       ]
   )
 
-  expected_minutes_long_term = process_minutes(pgl_df)
                             
   renamer = params['api-renamer']
-  pgl_df = pgl_df.rename(columns = renamer)[list(renamer.values())].fillna(0)  
+  pgl_df = pgl_df.rename(columns = renamer)
+
+  expected_minutes_long_term = process_minutes(pgl_df)
+                            
+  pgl_df = [list(renamer.values())].fillna(0)  
 
   four_weeks_ago = datetime.now() - pd.Timedelta(days = 28)
   two_weeks_ago = datetime.now() - pd.Timedelta(days = 14)
