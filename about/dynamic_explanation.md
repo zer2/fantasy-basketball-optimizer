@@ -85,41 +85,24 @@ It is simple to derive a parameterization for $X_u$ when it ignores player posit
   - All players above a certain threshold of general value have been picked, as an approximation of the fact that more valuable players will be taken earlier. We can approximate this threshold to be $0$, since $$X_u$ is defined relative to what is expected, and should have $0$ value when $j = v$ 
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-This scenario provides a launching point for calculating the expected value of $X_u$. The calculation involves many steps of linear algebra, the details of which are in the paper. For those familiar with linear algebra, here is a brief sketch: 
+This scenario provides a launching point for calculating the expected value of $X_u$. The calculation involves many steps of linear algebra, the details of which are in the paper. The result is as follows
 
-Call the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position $\Sigma$. Also define $v$, a weighting that we expect other drafters to use, perhaps corresponding to Z-score or G-score. 
+Defining 
+- $\Sigma$ is the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position 
+- $v$ is a weighting that we expect other drafters to use, perhaps corresponding to Z-score or G-score
+- $N$ is how many players the drafter has already selected
+- $\omega$ is a parameter controlling how well punting strategies are expected to work generally
+- $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
-The first result is that the standard deviation of the resulting conditional distribution with weight $j$ is
-
-$$
-\sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
-$$
-
-The chosen player's $j$-weighted value is the maximum available. Roughly, the maximum value of a distribution is proportional to the standard deviation. So it can be said that the $j$-weighted value of the chosen player is approximately
-
-$$
-j^T X = \omega * \sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
-$$
-
-Where $\omega$ is some constant. We also said that all players above a certain value threshold were picked, so the player is definitely below that in terms of overall value. We can approximate how far below with an equivalent expression, using another constant $\gamma$
-
-$$
-v^T x = - \gamma * \sqrt{\left(j -  \frac{v v^T \Sigma j}{v ^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v ^T \Sigma v}  \right) }
-$$
-
-With these two additional conditions, $X_u(j)$ can be calculated. 
+The expected value of future draft picks, $X_u(j)$, can be calculated as follows 
 
 $$
 X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
    \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
-  }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2}
+  }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2} \left( 12 - N \right)
 $$
 
 Super simple and easy to calculate, right :stuck_out_tongue:. $X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
-
-It might not be clear how the parameters, the two levers that we have actual control over, effect the caltulation. For some additional intution: 
-- $\omega$ controls how well punting strategies are expected to work generally
-- $\gamma$ complements $\omega$, controlling how much general value needs to be sacrificed in order to find the player that optimizes for the punting strategy
 
 It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others
 
