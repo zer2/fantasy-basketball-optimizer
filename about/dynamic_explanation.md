@@ -97,9 +97,9 @@ Defining
 The expected value of future draft picks, $X_u(j)$, can be calculated as follows 
 
 $$
-X_u(j) = \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
+X_u(j) = \left( 12 - N \right) \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
    \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
-  }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2} \left( 12 - N \right)
+  }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2} 
 $$
 
 Super simple and easy to calculate, right :stuck_out_tongue:. $X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
