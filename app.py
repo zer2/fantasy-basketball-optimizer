@@ -100,7 +100,7 @@ with tab2:
 
     unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
     unique_datasets_current = list(current_data.keys())
-    unique_datasets_darko = [str(x) for x in pd.unique(darko_data.index.get_level_values('Season'))]
+    unique_datasets_darko = list(darko_data.keys())
 
     all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
       
