@@ -160,6 +160,8 @@ def get_darko_long_term(all_darko, expected_minutes, params):
       
       darko_long_term.loc[:,cat] = darko_long_term['Minutes']/darko_long_term['Original Minutes'] * darko_long_term[cat]
 
+    darko_short_term.loc[:,'No Play %'] = 0 #currently not implemented 
+
     return darko_long_term
 
 #setting show spinner to false prevents flickering
