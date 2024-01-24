@@ -139,7 +139,7 @@ def get_darko_data(expected_minutes, params):
   darko_long_term = get_darko_long_term(all_darko, expected_minutes, params)[required_columns]
 
   return {'DARKO-S' : darko_short_term
-           'DARKO-L' : darko_long_term}
+           ,'DARKO-L' : darko_long_term}
 
 def get_darko_short_term(all_darko, params):
   
