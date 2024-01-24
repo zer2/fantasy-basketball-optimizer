@@ -150,7 +150,7 @@ def get_darko_short_term(all_darko, params):
 
 def get_darko_long_term(all_darko, expected_minutes, params):
 
-    all_darko = all_darko.drop(columns = 'Minutes')
+    all_darko = all_darko.rename(columns = {'Minutes' : 'Original Minutes'})
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
     inv_map = {v: k for k, v in params['darko-renamer'].items()}
@@ -158,7 +158,7 @@ def get_darko_long_term(all_darko, expected_minutes, params):
     for cat in params['counting-statistics'] + params['volume-statistics']:
       darko_column = inv_map[cat] + '/100'
       
-      darko_long_term.loc[:,'Points'] = darko_long_term['Minutes']/48 * darko_long_term['Pace'] * darko_long_term[darko_column]
+      darko_long_term.loc[:,cat] = darko_long_term['Minutes']/darko_long_term['Original Minutes'] * darko_long_term[cat]
 
     return darko_long_term
 
