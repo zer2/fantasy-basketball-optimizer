@@ -13,6 +13,8 @@ percentage-statistics:
 volume-statistics: 
   - Free Throw Attempts
   - Field Goal Attempts
+other-columns:
+  - No Play %
 api-renamer: 
  PLAYER_NAME : Player
  PTS : Points
