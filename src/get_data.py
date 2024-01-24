@@ -103,15 +103,11 @@ def get_player_metadata():
    return simplified
 
 @st.cache_resource(ttl = '1d') 
-def get_darko_data(params):
+def get_all_darko(expected_minutes, params):
 
   skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-19.csv')
   per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-19.csv')
   all_darko = skill_projections.merge(per_game_projections)
-
-  all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
-                                 ,'Nic Claxton'
-                                 ,all_darko['Player'])
 
   all_darko = all_darko.set_index('Player') 
 
@@ -128,15 +124,43 @@ def get_darko_data(params):
   all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
   all_darko.loc[:,'REB'] = dreb + oreb 
 
+  all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
+                                 ,'Nic Claxton'
+                                 ,all_darko['Player'])
+
   renamer = params['darko-renamer']
-  all_darko = all_darko.rename(columns = renamer)[list(renamer.values())].fillna(0)  
-  all_darko.loc[:,'No Play %'] = 0 #currently not implemented 
+  all_darko = all_darko.rename(columns = renamer)
 
   player_metadata = get_player_metadata()
   all_darko = all_darko.merge(player_metadata, left_index = True, right_index = True)
+    
+  required_columns = params['counting-statistics'] + params['percentage-statistics'] + params['volume-statistics'] + params['other-columns']
+  darko_short_term = get_darko_short_term(all_darko, params)[required_columns]
+  darko_long_term = get_darko_long_term(all_darko, expected_minutes, params)[required_columns]
 
-  return all_darko, '1-19'
+  return {'DARKO-S' : darko_short_term
+           'DARKO-L' : darko_long_term}
+
+def get_darko_short_term(all_darko, params):
   
+  darko_short_term = all_darko.fillna(0)  
+  darko_short_term.loc[:,'No Play %'] = 0 #currently not implemented 
+  return darko_short_term
+
+
+def get_darko_long_term(all_darko, expected_minutes, params):
+
+    all_darko = all_darko.drop(columns = 'Minutes')
+    darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
+  
+    inv_map = {v: k for k, v in params[].items()}
+
+    for cat in params['counting-statistics'] + params['volume-statistics']:
+      darko_column = inv_map[cat] + '/100'
+      
+      darko_long_term.loc[:,'Points'] = darko_long_term['Minutes']/48 * darko_long_term['Pace'] * darko_long_term[darko_column]
+
+    return darko_long_term
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
