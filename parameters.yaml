@@ -15,6 +15,7 @@ volume-statistics:
   - Field Goal Attempts
 other-columns:
   - No Play %
+  - Position
 api-renamer: 
  PLAYER_NAME : Player
  PTS : Points
