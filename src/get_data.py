@@ -153,7 +153,7 @@ def get_darko_long_term(all_darko, expected_minutes, params):
     all_darko = all_darko.drop(columns = 'Minutes')
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
-    inv_map = {v: k for k, v in params[].items()}
+    inv_map = {v: k for k, v in params['darko-renamer'].items()}
 
     for cat in params['counting-statistics'] + params['volume-statistics']:
       darko_column = inv_map[cat] + '/100'
