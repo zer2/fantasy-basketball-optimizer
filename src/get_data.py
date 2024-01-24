@@ -109,6 +109,10 @@ def get_darko_data(expected_minutes, params):
   per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-19.csv')
   all_darko = skill_projections.merge(per_game_projections)
 
+  all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
+                               ,'Nic Claxton'
+                               ,all_darko['Player'])
+  
   all_darko = all_darko.set_index('Player') 
 
   #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
@@ -123,10 +127,6 @@ def get_darko_data(expected_minutes, params):
   all_darko.loc[:,'FG%'] = fg2_pct * (1- fg3a_pct) + fg3_pct * fg3a_pct
   all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
   all_darko.loc[:,'REB'] = dreb + oreb 
-
-  all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
-                                 ,'Nic Claxton'
-                                 ,all_darko['Player'])
 
   renamer = params['darko-renamer']
   all_darko = all_darko.rename(columns = renamer)
