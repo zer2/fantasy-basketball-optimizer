@@ -41,8 +41,8 @@ g_score_player_multiplier = params['g-score-player-multiplier']
 g_score_team_multiplier = params['g-score-team-multiplier']
 
 historical_df = get_historical_data(params)
-current_data, minutes_df = get_current_season_data(params)
-darko_data, darko_date = get_darko_data(params)
+current_data, expected_minutes = get_current_season_data(params)
+darko_data = get_darko_data(expected_minutes, params)
 
 ### Make app
 
@@ -100,9 +100,9 @@ with tab2:
 
     unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
     unique_datasets_current = list(current_data.keys())
-      
+    unique_datasets_darko = [str(x) for x in pd.unique(darko_data.index.get_level_values('Season'))]
 
-    all_datasets = unique_datasets_historical + unique_datasets_current + ['DARKO as of ' + darko_date]
+    all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
       
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?'
