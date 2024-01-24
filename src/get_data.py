@@ -153,12 +153,29 @@ def get_darko_long_term(all_darko, expected_minutes, params):
     all_darko = all_darko.rename(columns = {'Minutes' : 'Original Minutes'})
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
-    inv_map = {v: k for k, v in params['darko-renamer'].items()}
+    possesions = darko_long_term['Minutes']/48 * darko_long_term['Pace']
+  
+    free_throw_attempts = possesions * darko_long_term.loc[:,'FTA/100'] * 100  
+    free_throws_made = free_throw_attempts * darko_long_term.loc[:,'FT%']
 
-    for cat in params['counting-statistics'] + params['volume-statistics']:
-      darko_column = inv_map[cat] + '/100'
-      
-      darko_long_term.loc[:,cat] = darko_long_term['Minutes']/darko_long_term['Original Minutes'] * darko_long_term[cat]
+    three_attempts = possesions * darko_long_term.loc[:,'FG3A/100'] * 100 
+    threes_made = * darko_long_term['FG3%']
+
+    two_attempts = possesions * (darko_long_term.loc[:,'FGA/100'] - darko_long_term.loc[:,'FG3A/100'] ) * 100
+    twos_made = two_attempts * darko_long_term['FG2%']
+ 
+    darko_long_term.loc[:,'Points'] = 3*threes_made + 2*twos_made + free_throws_made
+    darko_long_term.loc[:,'Rebounds'] = possesions * darko_long_term.loc[:,'REB/100'] * 100
+    darko_long_term.loc[:,'Assists'] = possesions * darko_long_term.loc[:,'AST/100'] * 100
+    darko_long_term.loc[:,'Steals'] = possesions * darko_long_term.loc[:,'STL/100'] * 100
+    darko_long_term.loc[:,'Blocks'] = possesions * darko_long_term.loc[:,'BLK/100'] * 100
+    darko_long_term.loc[:,'Threes'] =  threes_made
+    darko_long_term.loc[:,'Turnovers'] = = possesions * darko_long_term.loc[:,'TOV/100'] * 100
+    darko_long_term.loc[:,'Field Throw Attempts'] = free_throw_attempts
+    darko_long_term.loc[:,'Field Goal Attempts'] = two_attempts + three_attempts
+
+    darko_long_term.loc[:,'Field Goal %'] = (twos_made + threes_made)/(two_attempts + three_attempts)
+    darko_long_term.loc[:,'Free Throw %'] = darko_long_term.loc[:,'FT%']
 
     darko_long_term.loc[:,'No Play %'] = 0 #currently not implemented 
 
