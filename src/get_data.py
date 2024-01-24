@@ -159,7 +159,7 @@ def get_darko_long_term(all_darko, expected_minutes, params):
     free_throws_made = free_throw_attempts * darko_long_term.loc[:,'Free Throw %']
 
     three_attempts = possesions * darko_long_term.loc[:,'FG3A/100']
-    threes_made = darko_long_term['FG3%']
+    threes_made = three_attempts * darko_long_term['FG3%']
 
     two_attempts = possesions * (darko_long_term.loc[:,'FGA/100'] - darko_long_term.loc[:,'FG3A/100'] ) 
     twos_made = two_attempts * darko_long_term['FG2%']
