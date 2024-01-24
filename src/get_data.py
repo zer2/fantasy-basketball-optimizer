@@ -103,7 +103,7 @@ def get_player_metadata():
    return simplified
 
 @st.cache_resource(ttl = '1d') 
-def get_all_darko(expected_minutes, params):
+def get_darko_data(expected_minutes, params):
 
   skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-19.csv')
   per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-19.csv')
