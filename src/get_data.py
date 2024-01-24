@@ -150,7 +150,7 @@ def get_darko_short_term(all_darko, params):
 
 def get_darko_long_term(all_darko, expected_minutes, params):
 
-    all_darko = all_darko.rename(columns = {'Minutes' : 'Original Minutes'})
+    all_darko = all_darko.drop(columns = ['Minutes'])
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
     possesions = darko_long_term['Minutes']/48 * darko_long_term['Pace']
