@@ -19,11 +19,25 @@ This data set excludes games when players are injured and provides no forecast f
 [DARKO](https://apanalytics.shinyapps.io/DARKO/) is a "machine learning-driven basketball player box-score score projection system." Evidence suggests that DARKO projections are the most 
 accurate short-term forecasts available. 
 
-It should be noted that DARKO forecasts are meant to predict the next game a player plays, and sometimes diverge significantly from long-term expectations. For example, if a player is 
-coming back from injury, DARKO will understandably reduce the players' minutes in its forecast, thus driving the players' numbers down across the board. This is useful for day-to-day
-strategy but not always appropriate for long-term drop decisions. It would be an overreaction to drop a star player because their numbers are momentarily low after returning from an injury
+### DARKO-S
 
-DARKO forecasts also do not account for probability of future injury. 
+DARKO-S is my name for DARKO's 'Daily Player Per-Game Projections'. These forecasts are meant to predict statistics for the next game a player plays
+
+DARKO-S sometimes diverges significantly from long-term expectations. For example, if a player is coming back from injury, DARKO will understandably reduce the players' minutes in its 
+forecast, thus driving the players' numbers down across the board. This is useful for day-to-day strategy but not always appropriate for long-term drop decisions. It would be an overreaction
+to drop a star player because their numbers are momentarily low after returning from an injury
+
+### DARKO-L
+
+DARKO-L is an adjusted version of Darko's forecast. It uses 
+- The average number of minutes each player has played per game so far this season, excluding games where the player was injured
+- DARKO's projections of player pace (possessions per 48 minutes), from the per-game projections
+- DARKO's estimates of player skill, from 'Current Player Skill Projections'
+
+The idea of DARKO-L is to remove the short-term bias from DARKO-S by anchoring on average minutes played so far this season, rather than a short-term minutes estimate. It is potentially
+more useful for making  long-term add/drop decisions than DARKO-S, because it is not affected by recent circumstances such as injuries. However, discounting injuries can also be dangerous. 
+If a player is injured to the extent that they will miss much of the remaining fantasy season, then that injury is relevant even in the long-term. For this reason, when using DARKO-S, 
+it is wise to temper expectations with your own understanding of player injuriy status
 
 ## Additional data aspirations
 
@@ -34,5 +48,5 @@ now, you can paste their projections in manually if you have access to them
 
 ### Rest-of-season projections
 
-A DARKO-esque system meant for the rest of the fantasy season would be a boon for managers. The author of DARKO has mentioned season-long projections as a future goal, so this will likely be 
-available eventually!
+DARKo-L is a basic attempt at extending DARKO for a full season, and could be greatly improved with a more sophisticated treatment. The author of DARKO has mentioned season-long projections
+as a future goal, so this will likely be  available eventually!
