@@ -182,7 +182,8 @@ with tab2:
 
 
 with tab3:
-  st.markdown(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
+  st.header('Per-game stats')
+  st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
 
   player_stats_editable = st.data_editor(df) # 👈 An editable dataframe
   player_stats = player_stats_editable.copy()
@@ -195,7 +196,12 @@ with tab3:
 
   player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
   player_stats.index.name = 'Player'
-  
+
+  st.header('Injury list')
+  st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+  injured_players = st.multiselect('Injured players', player_stats.index, default = ['Tyrese Haliburton (G)','Desmond Bane (G)','Ja Morant (G)','Evan Mobley (C)','Marcus Smart (G)','Chris Paul (G)'])
+
+  player_stats = player_stats.drop(injured_players) 
 with tab4:
 
   rotisserie = format == 'Rotisserie'
