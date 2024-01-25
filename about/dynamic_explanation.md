@@ -1,4 +1,4 @@
-# H-scoring
+# Dynamic strategy with H-scoring
 
 Static ranking lists are convenient but suboptimal, since they lack context about team composition. An ideal algorithm would adapt its strategy based on which players have already been chosen. 
 
