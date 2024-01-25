@@ -122,6 +122,10 @@ with tab2:
 
     #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
     selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+
+    #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+    player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
+    selections = selections.astype(player_category_type)
   
   with middle: 
       st.header('Player Statistics')
@@ -211,10 +215,6 @@ with tab4:
   rotisserie = format == 'Rotisserie'
   
   info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
-
-  #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
-  player_category_type = CategoricalDtype(categories=list(player_stats.index), ordered=True)
-  selections = selections.astype(player_category_type)
 
   z_scores = info['Z-scores']
   categories = [x for x in z_scores.columns if x != 'Total']
