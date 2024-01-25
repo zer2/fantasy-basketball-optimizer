@@ -54,7 +54,7 @@ tab1, tab2, tab3, tab4 = st.tabs([":scroll: About",":control_knobs: Parameters",
 
 with tab1:
 
-  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources'])
+  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Trading'])
 
   with intro_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
@@ -79,7 +79,13 @@ with tab1:
       with c2:
           dynamic_md = read_markdown_file('about/data_sources.md')
           st.markdown(dynamic_md, unsafe_allow_html=True)
-      
+        
+  with trading_tab:
+      c2,c2,c3 = st.columns([0.1,0.8,0.1])
+      with c2:
+          trading_md = read_markdown_file('about/trading.md')
+          st.markdown(trading_md, unsafe_allow_html=True)    
+        
 with tab2: 
   left, middle, right = st.columns([0.25,0.25,0.5])
 
