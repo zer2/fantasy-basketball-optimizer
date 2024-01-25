@@ -1,3 +1,5 @@
+# Available data
+
 This website pulls data from three sources, all of which have slightly different purposes
 
 ## Historical season data
@@ -37,14 +39,14 @@ more useful for making  long-term add/drop decisions than DARKO-S, because it is
 If a player is injured to the extent that they will miss much of the remaining fantasy season, then that injury is relevant even in the long-term. For this reason, when using DARKO-S, 
 it is wise to temper expectations with your own understanding of player injuriy status
 
-## Additional data aspirations
+# Additional data aspirations
 
-### Pre-season projections
+## Pre-season projections
 
 Ideally, we could provide pre-season projections from sources such as HashTagBasketball and BasketballMonster. However, this is complicated because their projections are paid products. For 
 now, you can paste their projections in manually if you have access to them
 
-### Rest-of-season projections
+## Rest-of-season projections
 
 DARKo-L is a basic attempt at extending DARKO for a full season, and could be greatly improved with a more sophisticated treatment. The author of DARKO has mentioned season-long projections
 as a future goal, so this will likely be  available eventually!
