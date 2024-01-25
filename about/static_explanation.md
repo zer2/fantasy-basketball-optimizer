@@ -1,3 +1,4 @@
+# Static rankings from Z-score to G-score 
 
 Ranking players is a popular pasttime for fantasy basketball enthusiasts. Rankings curated by experts are useful because they allow newer drafters, or those who simply don't have the time to craft their own sophisticated strategies, to make reasonable drafting decisions. 
 
