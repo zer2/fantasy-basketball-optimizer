@@ -1,4 +1,16 @@
-Identifying mutually beneficial trades can greatly improve fantasy performance. However, the task is non-trivial, especially when trades are numerically asymmetrical. The trading module provides one perspective, leveraging H-score to evaluate the effect of the trade on both teams
+# Waiver wire and trading
+
+Fantasy basketball does not end at the draft stage. During a season, drafters can still improve their rosters via two mechanisms: the waiver wire and trading. Algorithmic approaches to both are included under the Draft tab 
+
+## The waiver wire
+
+Players that are not on any team are considered "on the waiver wire", and can be picked up as free agents. If there is a player on your team who is not contributing much or does not fit your strategy well, it might be worth exchanging them for a player on the waiver wire. Evaluating whether or not this is a good decision is accomplished simply by analyzing the change in H-score for the team when the substitution is made. If the H-score improves after the change is made, then the exchange is promising. It is worth keeping in mind that the calculation does not explicitly consider position. A waiver move might be risky if it improves your team's H-score slightly but also makes your team less positionally balanced, and might be worth it even if it decreases H-score if it greatly improves team balance. 
+
+## Trading
+
+Trading provides an alternative mechanism for improving your team. It is useful when one of your players has strong general value, but does not fit your team well. If you can find a corresponding player or set of players on another team, it is possible to construct a trade that benefits both parties. 
+
+Evaluating whether a trade is mutually beneficial is complicated, especially when trades are numerically asymmetrical. The trading module provides one perspective, leveraging H-score to evaluate the effect of the trade on both teams
 
 ### Symmetric trade
 
