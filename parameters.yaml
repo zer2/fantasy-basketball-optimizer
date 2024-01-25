@@ -46,3 +46,20 @@ z-score-player-multiplier : 50
 z-score-team-multiplier : 20
 g-score-player-multiplier : 60
 g-score-team-multiplier : 24
+injury-ignore-darko:
+- Tyrese Haliburton (G)
+- Desmond Bane (G)
+- Ja Morant (G)
+- Evan Mobley (C)
+- Marcus Smart (G)
+- Chris Paul (G)
+- LaMelo Ball (G)
+- Kristaps Porzingis (F)
+- Jakob Poeltl (C)
+- Ben Simmons (G)
+- Zach LaVine (G)
+- Franz Wagner (F)
+- Cade Cunningham (G)
+- Mark Williams (C)
+- Mitchell Robinson (C)
+- De'Anthony Melton (G)
