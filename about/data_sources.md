@@ -1,14 +1,12 @@
-## Available data
-
 This website pulls data from three sources, all of which have slightly different purposes
 
-### Historical season data
+## Historical season data
 
 Data from old seasons is mostly for fun. See what the algorithms would have recommended for those seasons, given perfect information about player stats! 
 
 This data was pulled from the NBA API and stored in a one-time load
 
-### Current season data
+## Current season data
 
 Current season data is pulled on a daily basis from the NBA's API. Using actual season data is a standard and simple method for game-planning for the remainder of the season. 
 
