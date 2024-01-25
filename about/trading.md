@@ -1,7 +1,21 @@
-Identifying mutually beneficial trades can greatly improve fantasy performance. However, the task is non-trivial, especially when trades are numerically asymmetrical. The trading module can help by leveraging H-score to evaluate the effect of the trade on both teams
+Identifying mutually beneficial trades can greatly improve fantasy performance. However, the task is non-trivial, especially when trades are numerically asymmetrical. The trading module provides one perspective, leveraging H-score to evaluate the effect of the trade on both teams
 
 ### Symmetric trade
 
 Symmetric trades are simple to evaluate. There are no choices to be made; the post-trade teams are entirely deterministic. The victory probabilities for each team can be brute-forced based on the means and variances assumed by the H-scoring algorithm
 
 ### Asymmetric trade- reducing players
+
+When a team trades down, e.g. trades two players for one, one or more positions on the team open up. This makes it more difficult to evaluate whether the trade makes sense or not. 
+
+One approach is to manually check all waiver wire candidates that could fill up the open opositions and find the set that optimizes for H-score, taking that H-score to be the post-trade value of the team. The issue with this approach is that explicitly checking every combination of players is exponentially complicated and quickly becomes intractable. With $400$ waiver candidates and four open positions, there would be 26 billion combinations to evaluate. 
+
+A more tractable approach is to simply run the H-scoring algorithm with the remaining team. One candidate is selected for explicitly, and the rest are modeled via approximation. This is how the trading module works in this case.
+
+It should be noted that a single incorrectly listed waiver wire player can render the results of this approach meaningless. If a very strong player is considered available in the waiver wire pool, when they actually should not be, that will make the H-scoring algorithm erroneously believe that it can fill holes in its roster with that very strong player. Then many trade-down scenarios will appear greatly beneficial, even when they are not. So it is important for traders to make sure that the list of players to exclude from the analysis is correct before evaluating a trade. 
+
+### Asymmetric trade- increasing players
+
+When a team trades up, e.g. trades one players for two, they need to drop a player from their resulting team. 
+
+The complexity of this case also increases drastically with the number of players needed to drop, but not to the same degree as the trade-down case because there is no need to check every player on the waiver wire. The number of combinations available if e.g. four players are added is just seventeen choose four, which is slightly over two thousand. That is a large number for a human to evaluate, but trivial for a computer. the absolute maximum possible number of combinations, resulting from the absurd scenario of a team trading its entire roster for a single player, is only twenty-five choose thirteen or around five million. Even that is doable for the computer. 
