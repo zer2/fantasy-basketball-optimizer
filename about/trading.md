@@ -1,4 +1,4 @@
-# Waiver wire and trading
+# Mid-season moves
 
 Fantasy basketball does not end at the draft stage. During a season, drafters can still improve their rosters via two mechanisms: the waiver wire and trading. Algorithmic approaches to both are included under the Draft tab 
 
