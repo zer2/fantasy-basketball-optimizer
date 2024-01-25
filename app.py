@@ -112,6 +112,9 @@ with tab2:
 
     df = get_partial_data(historical_df, current_data, darko_data, dataset_name)
 
+    df.index = df.index + ' (' + df['Position'] + ')'
+    df.index.name = 'Player'
+
     n_drafters = st.number_input(r'How many drafters are in your league?'
                     , min_value = 2
                     , value = 12)
@@ -200,9 +203,6 @@ with tab3:
   player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
-
-  player_stats.index = player_stats.index + ' (' + player_stats['Position'] + ')'
-  player_stats.index.name = 'Player'
 
   st.header('Injury list')
   st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
