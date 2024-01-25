@@ -14,7 +14,7 @@ Current season data is pulled on a daily basis from the NBA's API. Using actual 
 
 This data set excludes games when players are injured and provides no forecast for likelihood of future injury. You can write in injury risk in the "No Play %" column if you would like 
 
-### DARKO
+## DARKO
 
 [DARKO](https://apanalytics.shinyapps.io/DARKO/) is a "machine learning-driven basketball player box-score score projection system." Evidence suggests that DARKO projections are the most 
 accurate short-term forecasts available. 
