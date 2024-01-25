@@ -54,7 +54,7 @@ tab1, tab2, tab3, tab4 = st.tabs([":scroll: About",":control_knobs: Parameters",
 
 with tab1:
 
-  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Trading and Waivers'])
+  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Waivers & Trading'])
 
   with intro_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
