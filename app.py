@@ -119,6 +119,9 @@ with tab2:
     n_picks = st.number_input(r'How many players will each drafter choose?'
                 , min_value = 1
                 , value = 13)
+
+    #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
+    selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
   
   with middle: 
       st.header('Player Statistics')
@@ -201,15 +204,13 @@ with tab3:
   st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
   injured_players = st.multiselect('Injured players', player_stats.index, default = ['Tyrese Haliburton (G)','Desmond Bane (G)','Ja Morant (G)','Evan Mobley (C)','Marcus Smart (G)','Chris Paul (G)'])
 
-  player_stats = player_stats.drop(injured_players) 
+  player_stats = player_stats.drop(injured_players)
+  
 with tab4:
 
   rotisserie = format == 'Rotisserie'
   
   info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
-
-  #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-  selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
   #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
   player_category_type = CategoricalDtype(categories=list(player_stats.index), ordered=True)
