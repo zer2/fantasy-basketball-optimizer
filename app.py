@@ -218,21 +218,22 @@ with tab4:
 
   with left:
 
+    draft_tab, injury_tab = st.tabs(['Draft Bpard','Injury List'])
+
+    with draft_tab: 
+        st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
+        selections_editable = st.data_editor(selections, hide_index = True)  
+
+    with injury_tab:
+        st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+        injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
+
     seat =  st.number_input(r'Which drafter are you?'
                 , min_value = 1
                 #, value = default_seat
                , max_value = n_drafters)
 
-    st.subheader('Draft board')
-    st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
-    selections_editable = st.data_editor(selections, hide_index = True)
-
-    st.subheader('Injury list')
-    st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-    injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
-
     player_stats = player_stats.drop(injured_players)
-
     info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
 
     z_scores = info['Z-scores']
