@@ -212,7 +212,7 @@ with tab3:
 
   st.header('Injury list')
   st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-  injured_players = st.multiselect('Injured players', player_stats.index, default = ['Tyrese Haliburton (G)','Desmond Bane (G)','Ja Morant (G)','Evan Mobley (C)','Marcus Smart (G)','Chris Paul (G)'])
+  injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
 
   player_stats = player_stats.drop(injured_players)
   
