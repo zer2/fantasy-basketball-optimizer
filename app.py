@@ -473,10 +473,12 @@ with tab4:
                       'Which players are you receiving?'
                       ,second_team_selections
                     )
-
-
-                if (len(my_trade) == 0) | (len(second_trade) == 0):
+                my_trade_len = len(my_trade)
+                second_trade_len = len(second_trade)
+                if (my_trade_len == 0) | (second_trade_len == 0):
                     st.markdown('Need to trade at least one player')
+                elif abs(my_trade_len - second_trade_len) > 7:
+                    st.markdown('Too lopsided of a trade! The computer can't handle it :frowning:')
                 else:
                     my_others = [x for x in team_selections if x not in my_trade]
                     second_others = [x for x in second_team_selections if x not in second_trade]
