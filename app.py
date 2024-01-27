@@ -209,46 +209,30 @@ with tab3:
   player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
-
-  st.header('Injury list')
-  st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-  injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
-
-  player_stats = player_stats.drop(injured_players)
   
 with tab4:
 
   rotisserie = format == 'Rotisserie'
-  
-  info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
-
-  z_scores = info['Z-scores']
-  categories = [x for x in z_scores.columns if x != 'Total']
-
-  g_scores = info['G-scores']
   
   left, right = st.columns(2)
 
   with left:
 
     st.subheader('Draft board')
-    selections_editable = st.data_editor(selections, hide_index = True)
     st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
+    selections_editable = st.data_editor(selections, hide_index = True)
 
-    #figure out which drafter is next
-    #i = 0
-    #default_seat = None
-    #while (i < n_drafters * n_picks) and (default_seat is None):
-    #  round = i // n_drafters 
-    #  pick = i - round * n_drafters
-    #  drafter = pick + 1 if round % 2 == 0 else n_drafters - pick
-    #
-    #  #the condition should only trigger when the seat to check is blank 
-    #  check_seat = selections_editable.loc[round, 'Drafter ' + str(drafter)]
-    #  if check_seat != check_seat:
-    #    default_seat = drafter
-    #
-    #  i += 1 
+    st.subheader('Injury list')
+    st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+    injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
+
+    player_stats = player_stats.drop(injured_players)
+
+    info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
+
+    z_scores = info['Z-scores']
+    g_scores = info['G-scores']
+    categories = [x for x in z_scores.columns if x != 'Total']
 
     seat =  st.number_input(r'Which drafter are you?'
                     , min_value = 1
