@@ -477,7 +477,7 @@ with tab4:
                 second_trade_len = len(second_trade)
                 if (my_trade_len == 0) | (second_trade_len == 0):
                     st.markdown('Need to trade at least one player')
-                elif abs(my_trade_len - second_trade_len) > 7:
+                elif abs(my_trade_len - second_trade_len) > 6:
                     st.markdown("Too lopsided of a trade! The computer can't handle it :frowning:")
                 else:
                     my_others = [x for x in team_selections if x not in my_trade]
