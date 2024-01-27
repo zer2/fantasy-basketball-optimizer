@@ -218,6 +218,11 @@ with tab4:
 
   with left:
 
+    seat =  st.number_input(r'Which drafter are you?'
+                , min_value = 1
+                #, value = default_seat
+               , max_value = n_drafters)
+
     st.subheader('Draft board')
     st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
     selections_editable = st.data_editor(selections, hide_index = True)
@@ -233,11 +238,6 @@ with tab4:
     z_scores = info['Z-scores']
     g_scores = info['G-scores']
     categories = [x for x in z_scores.columns if x != 'Total']
-
-    seat =  st.number_input(r'Which drafter are you?'
-                    , min_value = 1
-                    #, value = default_seat
-                   , max_value = n_drafters)
 
     players_chosen = [x for x in listify(selections_editable) if x ==x]
     my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
