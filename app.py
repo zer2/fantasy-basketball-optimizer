@@ -218,12 +218,12 @@ with tab4:
 
   with left:
 
-    draft_tab, injury_tab = st.tabs(['Draft Bpard','Injury List'])
-    
     seat =  st.number_input(r'Which drafter are you?'
-            , min_value = 1
-            #, value = default_seat
-           , max_value = n_drafters)
+        , min_value = 1
+        #, value = default_seat
+       , max_value = n_drafters)
+
+    draft_tab, injury_tab = st.tabs(['Draft Bpard','Injury List'])
     
     with draft_tab: 
         st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
