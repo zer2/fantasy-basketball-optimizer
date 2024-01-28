@@ -495,7 +495,8 @@ with rank_tab:
 
       z_scores_styled = z_scores.style.format("{:.2}"
                                              ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
-                                        .map(styler_a) \
+                                        .map(styler_a
+                                            , subset = pd.IndexSlice[:,['Total']]) \
                                         .map(stat_styler
                                            , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
                                            , multiplier = z_score_player_multiplier)
