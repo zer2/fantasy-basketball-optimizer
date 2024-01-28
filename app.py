@@ -521,16 +521,22 @@ with rank_tab:
   with h_rank_tab:
       generator = H.get_h_scores(player_stats, [], [])
       for i in range(max(1,n_iterations)):
-        _, h_res = next(generator)
+        c, h_res = next(generator)
 
       h_res = h_res.sort_values(ascending = False)
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                             ,'Player' : h_res.index
                             ,'H-score' : h_res.values
-                           }).style.format("{:.3f}"
+                           })
+    
+      c_df = c.loc[h_res.index].dropna().round().astype(int)
+      h_res = h_res.merge(c, left_on = 'Player',right_index = True)
+    
+      h_res = h_res.style.format("{:.3f}"
                                              ,subset = pd.IndexSlice[:,['H-score']]) \
                                         .map(styler_a
-                                            , subset = pd.IndexSlice[:,['H-score']])
+                                            , subset = pd.IndexSlice[:,['H-score']]) \
+                                .background_gradient(axis = None, subset = c_df.columns) 
       h_score_display = st.dataframe(h_res, hide_index = True)
 
     
