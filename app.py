@@ -493,7 +493,7 @@ with rank_tab:
       z_scores.loc[:,'Player'] = z_scores.index
       z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
 
-      z_scores_styled = z_scores.style.format("{:.2}"
+      z_scores_styled = z_scores.style.format("{:.2f}"
                                              ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
                                         .map(styler_a
                                             , subset = pd.IndexSlice[:,['Total']]) \
