@@ -518,6 +518,6 @@ with rank_tab:
     
       g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
     
-    with h_rank_tab:
+  with h_rank_tab:
       st.markdown('Placeholder')
     
