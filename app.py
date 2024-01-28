@@ -365,16 +365,16 @@ with draft_tab:
                 with c1:
                   res = res.sort_values(ascending = False).round(3)
                   res.name = 'H-score'
+                  res = pd.DataFrame(res)
       
-      
-                  st.dataframe(pd.DataFrame(res))
+                  st.dataframe(res)
       
                 with c2:
                   st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
     
               with weight_tab:
                 c_df = c.loc[res.index].dropna().round().astype(int)
-                c_df = c_df.style.background_gradient(axis = None)
+                weight_display = res.merge(c_df).style.background_gradient(axis = None, subset = c_df.columns)
                 st.dataframe(c_df)
                 
 
