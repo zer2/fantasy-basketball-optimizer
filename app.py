@@ -492,7 +492,7 @@ with rank_tab:
       z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0])
       z_scores = z_scores[['Rank'] + list(z_score_columns_original)]
 
-      z_scores_styled = z_scores.map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+      z_scores_styled = z_scores.style.map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
     
       z_scores_display = st.dataframe(z_scores_styled)
   with g_rank_tab:
