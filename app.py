@@ -50,7 +50,7 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-about_tab, param_tab, stat_tab, rank_tab, draft_tab = st.tabs([":scroll: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":: Player Rankings", ":man-bouncing-ball: Draft"])
+about_tab, param_tab, stat_tab, draft_tab, rank_tab = st.tabs([":scroll: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":man-bouncing-ball: Draft", ":: Player Rankings"])
 
 with about_tab:
 
@@ -136,7 +136,7 @@ with param_tab:
     player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
     selections = selections.astype(player_category_type)
   
-  with stat_tab: 
+  with middle: 
       st.header('Player Statistics')
 
       psi = st.number_input(r'Select a $\psi$ value'
@@ -195,9 +195,6 @@ with param_tab:
       st.caption(n_iterations_str)
 
       punting = n_iterations > 0
-
-with rank_tab:
-  st.markdown('Placeholder')
   
 with stat_tab:
   st.header('Per-game stats')
@@ -485,3 +482,20 @@ with draft_tab:
                         st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
                     else:
                         st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
+                      
+with rank_tab:
+  z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
+
+  with z_rank_tab:
+      z_score_columns_original = z_scores.columns
+      z_scores.loc[:,'Rank'] = np.arange(len(z_scores))
+      z_scores = z_scores[['Rank'] + z_score_columns_original]
+      z_scores_unselected_styled = z_scores.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+      z_scores_display = st.dataframe(z_scores_unselected_styled)
+  with g_rank_tab:
+      st.markdown('Placeholder')
+  with h_rank_tab:
+      st.markdown('Placeholder')
+    
+
+  st.markdown('Placeholder')
