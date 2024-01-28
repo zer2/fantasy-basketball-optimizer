@@ -501,5 +501,3 @@ with rank_tab:
   with h_rank_tab:
       st.markdown('Placeholder')
     
-
-  st.markdown('Placeholder')
