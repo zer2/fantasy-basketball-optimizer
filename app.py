@@ -523,16 +523,15 @@ with rank_tab:
       for i in range(max(1,n_iterations)):
         c, h_res = next(generator)
         
-
+      c_df = pd.DataFrame(c, index = h_res.index, columns = categories)/info['v'].T
+      c_df = (c_df * 100).round()
+      c_df = c_df.loc[h_res.index].dropna().round().astype(int)
+    
       h_res = h_res.sort_values(ascending = False)
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                             ,'Player' : h_res.index
                             ,'H-score' : h_res.values
                            })
-
-      c_df = pd.DataFrame(c, index = h_res.index, columns = categories)/info['v'].T
-      c_df = (c_df * 100).round()
-      c_df = c_df.loc[h_res.index].dropna().round().astype(int)
     
       h_res = h_res.merge(c_df, left_on = 'Player',right_index = True)
     
