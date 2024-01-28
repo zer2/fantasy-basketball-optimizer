@@ -523,6 +523,7 @@ with rank_tab:
       for i in range(max(1,n_iterations)):
         _, h_res = next(generator)
 
+      h_res = h_res.sort_values(ascending = False)
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                             ,'Player' : h_res.index
                             ,'H-score' : h_res.values
