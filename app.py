@@ -50,7 +50,7 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-about_tab, param_tab, stat_tab, draft_tab, rank_tab = st.tabs([":scroll: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":man-bouncing-ball: Draft", ":: Player Rankings"])
+about_tab, param_tab, stat_tab, draft_tab, rank_tab = st.tabs([":scroll: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":man-bouncing-ball: Draft", ":first_place_medal: Player Rankings"])
 
 with about_tab:
 
@@ -489,7 +489,7 @@ with rank_tab:
   with z_rank_tab:
     
       z_score_columns_original = z_scores.columns
-      z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0])
+      z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
       z_scores = z_scores[['Rank'] + list(z_score_columns_original)]
 
       z_scores_styled = z_scores.style.map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
