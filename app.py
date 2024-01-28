@@ -491,9 +491,14 @@ with rank_tab:
       z_score_columns_original = z_scores.columns
       z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
       z_scores.loc[:,'Player'] = z_scores.index
-      z_scores = z_scores[['Rank','Player'] + params['counting-statistics'] + params['percentage-statistics'] + ['Total']]
+      z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
 
-      z_scores_styled = z_scores.style.map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+      z_scores_styled = z_scores.style.format("{:.2}"
+                                             ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]) \
+                                        .map(styler_a) \
+                                        .map(stat_styler
+                                           , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
+                                           , multiplier = z_score_player_multiplier)
     
       z_scores_display = st.dataframe(z_scores_styled, hide_index = True)
   with g_rank_tab:
