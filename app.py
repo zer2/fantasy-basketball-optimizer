@@ -50,9 +50,9 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-tab1, tab2, tab3, tab4 = st.tabs([":scroll: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":man-bouncing-ball: Draft"])
+about_tab, param_tab, stat_tab, rank_tab, draft_tab = st.tabs([":scroll: About",":control_knobs: Parameters", ":bar_chart: Player Stats", ":: Player Rankings", ":man-bouncing-ball: Draft"])
 
-with tab1:
+with about_tab:
 
   intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Waivers & Trading'])
 
@@ -86,7 +86,7 @@ with tab1:
           trading_md = read_markdown_file('about/trading.md')
           st.markdown(trading_md, unsafe_allow_html=True)    
         
-with tab2: 
+with param_tab: 
   left, middle, right = st.columns([0.25,0.25,0.5])
 
   with left: 
@@ -136,7 +136,7 @@ with tab2:
     player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
     selections = selections.astype(player_category_type)
   
-  with middle: 
+  with stat_tab: 
       st.header('Player Statistics')
 
       psi = st.number_input(r'Select a $\psi$ value'
@@ -196,8 +196,10 @@ with tab2:
 
       punting = n_iterations > 0
 
-
-with tab3:
+with rank_tab:
+  st.markdown('Placeholder')
+  
+with stat_tab:
   st.header('Per-game stats')
   st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
 
@@ -210,7 +212,7 @@ with tab3:
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
   
-with tab4:
+with draft_tab:
 
   rotisserie = format == 'Rotisserie'
   
