@@ -524,8 +524,8 @@ with rank_tab:
         _, h_res = next(generator)
 
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
-                            ,'Player' : res.index
-                            ,'H-score' : res.values
+                            ,'Player' : h_res.index
+                            ,'H-score' : h_res.values
                            })
       h_score_display = st.dataframe(h_res, hide_index = True)
 
