@@ -530,7 +530,7 @@ with rank_tab:
                             ,'H-score' : h_res.values
                            })
 
-      c_df = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
+      c_df = pd.DataFrame(c, index = h_res.index, columns = categories)/info['v'].T
       c_df = (c_df * 100).round()
       c_df = c_df.loc[h_res.index].dropna().round().astype(int)
     
