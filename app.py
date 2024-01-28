@@ -275,7 +275,7 @@ with draft_tab:
             team_stats_z.loc['Expected', :] = expected_z
             team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
     
-            team_stats_z_styled = team_stats_z.style.format("{:.2}").map(styler_a) \
+            team_stats_z_styled = team_stats_z.style.format("{:.2f}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier) \
@@ -298,7 +298,7 @@ with draft_tab:
             team_stats_g.loc['Expected', :] = expected_g
             team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
             
-            team_stats_g_styled = team_stats_g.style.format("{:.2}").map(styler_a) \
+            team_stats_g_styled = team_stats_g.style.format("{:.2f}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
                                                         .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                         .map(stat_styler, subset = pd.IndexSlice[team_selections, counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier) \
@@ -320,12 +320,12 @@ with draft_tab:
     
       with subtab1:
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-        z_scores_unselected_styled = z_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+        z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
         z_scores_display = st.dataframe(z_scores_unselected_styled)
         
       with subtab2:
         g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
-        g_scores_unselected_styled = g_scores_unselected.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
+        g_scores_unselected_styled = g_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
         g_scores_display = st.dataframe(g_scores_unselected_styled)
     
       with subtab3:
@@ -402,7 +402,7 @@ with draft_tab:
                 new_z =  team_stats_z.loc['Total',:] + z_scores_unselected - drop_player_stats_z
 
                 new_z = pd.concat([no_drop,new_z])
-                new_z_styled = new_z.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
+                new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
 
                 st.dataframe(new_z_styled) 
 
@@ -415,7 +415,7 @@ with draft_tab:
                 new_g =  team_stats_g.loc['Total',:] + g_scores_unselected - drop_player_stats_g
 
                 new_g = pd.concat([no_drop,new_g])
-                new_g_styled = new_g.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
+                new_g_styled = new_g.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
 
                 st.dataframe(new_g_styled) 
 
