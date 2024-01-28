@@ -490,7 +490,7 @@ with rank_tab:
       z_score_columns_original = z_scores.columns
       z_scores.loc[:,'Rank'] = np.arange(len(z_scores))
       z_scores = z_scores[['Rank'] + list(z_score_columns_original)]
-      z_scores_unselected_styled = z_scores.style.format("{:.2}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+      z_scores_unselected_styled = z_scores.style.format("{:.2}").map(styler_a, subset = z_score_columns_original).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
       z_scores_display = st.dataframe(z_scores_unselected_styled)
   with g_rank_tab:
       st.markdown('Placeholder')
