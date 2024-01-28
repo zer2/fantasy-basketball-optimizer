@@ -534,7 +534,7 @@ with rank_tab:
       c_df = (c_df * 100).round()
       c_df = c_df.loc[h_res.index].dropna().round().astype(int)
     
-      h_res = h_res.merge(c, left_on = 'Player',right_index = True)
+      h_res = h_res.merge(c_df, left_on = 'Player',right_index = True)
     
       h_res = h_res.style.format("{:.3f}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
