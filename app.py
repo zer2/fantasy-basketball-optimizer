@@ -519,5 +519,13 @@ with rank_tab:
       g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
     
   with h_rank_tab:
-      st.markdown('Placeholder')
+      generator = H.get_h_scores(player_stats, [], [])
+      for i in range(max(1,n_iterations)):
+        _, h_res = next(generator)
+
+      h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
+                            ,'Player' : res.index
+                            ,'H-score' : res.values)
+      h_score_display = st.dataframe(h_res, hide_index = True)
+
     
