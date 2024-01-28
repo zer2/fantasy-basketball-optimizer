@@ -526,7 +526,10 @@ with rank_tab:
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                             ,'Player' : h_res.index
                             ,'H-score' : h_res.values
-                           })
+                           }).style.format("{:.3f}"
+                                             ,subset = pd.IndexSlice[:,['Total']]) \
+                                        .map(styler_a
+                                            , subset = pd.IndexSlice[:,['Total']])
       h_score_display = st.dataframe(h_res, hide_index = True)
 
     
