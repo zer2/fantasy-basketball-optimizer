@@ -3,7 +3,7 @@ import yahoo_fantasy_api as yfa
 import streamlit as st
 
 import requests
-from requests_oauthlib import OAuth1Session
+from requests_oauthlib import OAuth2Session
 
 def nav_to(url):
     nav_script = """
@@ -20,43 +20,28 @@ def get_yahoo_info(league_id):
     consumer_secret = st.secrets["YAHOO_CLIENT_SECRET"]
     callback_url = 'https://localhost:8000'
     
-    # Step 1: Get a request token
-    request_token_url = 'https://api.login.yahoo.com/oauth/v2/get_request_token'
-    yahoo = OAuth1Session(consumer_key, client_secret=consumer_secret, callback_uri=callback_url)
-    fetch_response = yahoo.fetch_request_token(request_token_url)
-    
-    resource_owner_key = fetch_response.get('oauth_token')
-    resource_owner_secret = fetch_response.get('oauth_token_secret')
-    
-    # Step 2: Redirect the user to the authorization URL
-    authorization_url = 'https://api.login.yahoo.com/oauth/v2/request_auth?oauth_token='
-    authorization_url += resource_owner_key
-    
+    authorization_base_url = 'https://api.login.yahoo.com/oauth2/request_auth'
+    token_url = 'https://api.login.yahoo.com/oauth2/get_token'
+
+    # Step 1: Obtain authorization URL
+    yahoo = OAuth2Session(client_id, redirect_uri=redirect_uri, scope=['openid', 'profile', 'email'])
+    authorization_url, state = yahoo.authorization_url(authorization_base_url)
+
     print(f'Please go to {authorization_url} and authorize the application.')
-    
+
+    # Step 2: Get the authorization response
+    redirect_response = input('Paste the full redirect URL here: ')
+
     # Step 3: Get the access token
-    verifier = input('Enter the verification code: ')
-    access_token_url = 'https://api.login.yahoo.com/oauth/v2/get_token'
-    yahoo = OAuth1Session(consumer_key,
-                         client_secret=consumer_secret,
-                         resource_owner_key=resource_owner_key,
-                         resource_owner_secret=resource_owner_secret,
-                         verifier=verifier)
-    
-    yahoo_tokens = yahoo.fetch_access_token(access_token_url)
-    
-    # Now you can use yahoo_tokens['oauth_token'] and yahoo_tokens['oauth_token_secret'] for authenticated requests
-    
+    yahoo.fetch_token(token_url, authorization_response=redirect_response, client_secret=client_secret)
+
+    # Now you can use yahoo's session for authenticated requests
+
     # Example: Get user's profile information
     profile_url = 'https://api.login.yahoo.com/openid/v1/userinfo'
-    yahoo = OAuth1Session(consumer_key,
-                         client_secret=consumer_secret,
-                         resource_owner_key=yahoo_tokens['oauth_token'],
-                         resource_owner_secret=yahoo_tokens['oauth_token_secret'])
-    
     response = yahoo.get(profile_url)
     user_data = response.json()
-    
+
     print('User Profile Information:')
     print(user_data)
     
