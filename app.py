@@ -124,7 +124,7 @@ with param_tab:
 
     yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?')
 
-    if yahoo_league_id is None:
+    if len(yahoo_league_id) < 6:
       n_drafters = st.number_input(r'How many drafters are in your league?'
                 , min_value = 2
                 , value = 12)
