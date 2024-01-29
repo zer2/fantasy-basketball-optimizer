@@ -2,7 +2,7 @@ from yahoo_oauth import OAuth2
 import yahoo_fantasy_api as yfa
 import streamlit as st
 
-def get_yahoo_info(league_id = None):
+def get_yahoo_info(league_id):
   yahoo_client_id = st.secrets["YAHOO_CLIENT_ID "]
   yahoo_client_secret = st.secrets["d5d8701990a58bace6b47e58c3e173a43991949e"]
   oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
@@ -24,3 +24,5 @@ def get_yahoo_info(league_id = None):
   
   il_dict = {team: [p['name'] for p in roster if p['selected_position'] == 'IL' ] for team, roster in rosters.items()}
   all_il_players = [x for v in il_dict.values() for x in v]
+
+  return rosters, all_il_players
