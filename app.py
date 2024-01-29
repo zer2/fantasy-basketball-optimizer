@@ -246,7 +246,7 @@ with draft_tab:
         injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
 
     player_stats = player_stats.drop(injured_players)
-    info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
+    info = process_player_data(player_stats, conversion_factors, multipliers, psi, nu, n_drafters, n_picks, rotisserie, params)
 
     z_scores = info['Z-scores']
     z_scores = z_scores * multipliers.T.values[0]
