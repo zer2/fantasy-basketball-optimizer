@@ -249,9 +249,9 @@ with draft_tab:
     info = process_player_data(player_stats, conversion_factors, psi, nu, n_drafters, n_picks, rotisserie, params)
 
     z_scores = info['Z-scores']
-    z_scores = z_scores * multipliers
+    z_scores = z_scores * multipliers.T.values[0]
     g_scores = info['G-scores']
-    g_scores = g_scores * multipliers
+    g_scores = g_scores * multipliers.T.values[0]
     categories = [x for x in z_scores.columns if x != 'Total']
 
     players_chosen = [x for x in listify(selections_editable) if x ==x]
