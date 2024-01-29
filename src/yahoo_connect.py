@@ -14,7 +14,7 @@ def get_yahoo_info(league_id):
   oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
 
   uri = 'https://api.login.yahoo.com/oauth2/request_auth?redirect_uri=oob&response_type=code&client_id=' + yahoo_client_id
-  nav_to(uri) 
+  st.write("check out this [link](uri)")
 
   #convert league ID to the right format, or grab the first team id if none is listed
   if league_idea is None:
