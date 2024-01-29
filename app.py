@@ -158,7 +158,7 @@ with param_tab:
     
       st.subheader(f"Multipliers")
 
-      multiplier_df - pd.DataFrame({'Multiplier: ' : [1.0] * 9}
+      multiplier_df = pd.DataFrame({'Multiplier: ' : [1.0] * 9}
                                    , index = coefficient_df.index)
       multipliers = st.data_editor(multiplier_df)
 
