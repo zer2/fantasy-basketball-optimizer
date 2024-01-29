@@ -16,9 +16,9 @@ def get_yahoo_info(league_id):
     yahoo_client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
 
     # Replace these values with your Yahoo API credentials
-    consumer_key = st.secrets["YAHOO_CLIENT_ID"]
-    consumer_secret = st.secrets["YAHOO_CLIENT_SECRET"]
-    callback_url = 'https://localhost:8000'
+    client_id = st.secrets["YAHOO_CLIENT_ID"]
+    client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
+    redirect_uri = 'https://localhost:8000'
     
     authorization_base_url = 'https://api.login.yahoo.com/oauth2/request_auth'
     token_url = 'https://api.login.yahoo.com/oauth2/get_token'
