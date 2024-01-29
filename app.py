@@ -492,8 +492,7 @@ with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
 
   with z_rank_tab:
-    
-      z_score_columns_original = z_scores.columns
+          
       z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
       z_scores.loc[:,'Player'] = z_scores.index
       z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
