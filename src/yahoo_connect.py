@@ -18,7 +18,7 @@ def get_yahoo_info(league_id):
     # Replace these values with your Yahoo API credentials
     client_id = st.secrets["YAHOO_CLIENT_ID"]
     client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
-    redirect_uri = 'https://localhost:8000'
+    redirect_uri = 'https://fantasy-basketball-optimizer-yleby8jedyrzhfwoycwuc8.streamlit.app/oath/callback'
     
     authorization_base_url = 'https://api.login.yahoo.com/oauth2/request_auth'
     token_url = 'https://api.login.yahoo.com/oauth2/get_token'
