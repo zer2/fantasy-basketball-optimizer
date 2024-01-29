@@ -3,8 +3,8 @@ import yahoo_fantasy_api as yfa
 import streamlit as st
 
 def get_yahoo_info(league_id):
-  yahoo_client_id = st.secrets["YAHOO_CLIENT_ID "]
-  yahoo_client_secret = st.secrets["d5d8701990a58bace6b47e58c3e173a43991949e"]
+  yahoo_client_id = st.secrets["YAHOO_CLIENT_ID"]
+  yahoo_client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
   oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
 
   #convert league ID to the right format, or grab the first team id if none is listed
