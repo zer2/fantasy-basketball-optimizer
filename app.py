@@ -524,7 +524,9 @@ with rank_tab:
       g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
     
   with h_rank_tab:
-      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+      
+      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab \n Weights are calculated relative to ' + rel_score_string)
 
       generator = H.get_h_scores(player_stats, [], [])
       for i in range(max(1,n_iterations)):
