@@ -123,7 +123,7 @@ with param_tab:
     df.index.name = 'Player'
 
     yahoo_league_id = st.number_input('If loading rosters from established league: what is your league id?'
-                                      value = None)
+                                      ,value = None)
 
     if yahoo_league_id is None:
       n_drafters = st.number_input(r'How many drafters are in your league?'
