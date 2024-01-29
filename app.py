@@ -15,6 +15,7 @@ from src.helper_functions import listify, make_progress_chart, read_markdown_fil
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
+from src.yahoo_connect import get_yahoo_info
 
 with open("parameters.yaml", "r") as stream:
     try:
@@ -121,16 +122,28 @@ with param_tab:
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    n_drafters = st.number_input(r'How many drafters are in your league?'
-                    , min_value = 2
-                    , value = 12)
+    yahoo_league_id = st.number_input('If loading rosters from established league: what is your league id?'
+                                      value = None)
 
-    n_picks = st.number_input(r'How many players will each drafter choose?'
-                , min_value = 1
-                , value = 13)
+    if yahoo_league_id is None:
+      n_drafters = st.number_input(r'How many drafters are in your league?'
+                , min_value = 2
+                , value = 12)
 
-    #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-    selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+      n_picks = st.number_input(r'How many players will each drafter choose?'
+                  , min_value = 1
+                  , value =13)
+        
+      #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
+      selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+    else:
+      roster_df, injury_list = get_yahoo_info()       
+
+      n_drafters = roster_df.shape[1]
+      n_picks = roster_df.shape[0]
+
+      #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
+      selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
     #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
     player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
