@@ -122,8 +122,7 @@ with param_tab:
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    yahoo_league_id = st.number_input('If loading rosters from established league: what is your league id?'
-                                      ,value = None)
+    yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?')
 
     if yahoo_league_id is None:
       n_drafters = st.number_input(r'How many drafters are in your league?'
@@ -137,7 +136,7 @@ with param_tab:
       #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
       selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
     else:
-      roster_df, injury_list = get_yahoo_info()       
+      roster_df, injury_list = get_yahoo_info(yahoo_league_id)       
 
       n_drafters = roster_df.shape[1]
       n_picks = roster_df.shape[0]
