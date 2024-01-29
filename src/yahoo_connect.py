@@ -2,10 +2,19 @@ from yahoo_oauth import OAuth2
 import yahoo_fantasy_api as yfa
 import streamlit as st
 
+def nav_to(url):
+    nav_script = """
+        <meta http-equiv="refresh" content="0; url='%s'">
+    """ % (url)
+    st.write(nav_script, unsafe_allow_html=True)
+
 def get_yahoo_info(league_id):
   yahoo_client_id = st.secrets["YAHOO_CLIENT_ID"]
   yahoo_client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
   oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
+
+  uri = uri = 'https://api.login.yahoo.com/oauth2/request_auth?redirect_uri=oob&response_type=code&client_id=' + yahoo_client_id
+  nav_to(uri) 
 
   #convert league ID to the right format, or grab the first team id if none is listed
   if league_idea is None:
