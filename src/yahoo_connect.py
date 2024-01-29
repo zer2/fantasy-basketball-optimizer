@@ -12,8 +12,8 @@ def get_yahoo_info(league_id):
   yahoo_client_id = st.secrets["YAHOO_CLIENT_ID"]
   yahoo_client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
     
-  uri = 'https://api.login.yahoo.com/oauth2/code?client_id=' + yahoo_client_id
-  st.markdown("check out this [link](uri)", unsafe_allow_html = True)
+  redirect = 'https://api.login.yahoo.com/oauth2/code?client_id=' + yahoo_client_id
+  st.markdown("check out this [link](redirect)", unsafe_allow_html = True)
   oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
 
 
