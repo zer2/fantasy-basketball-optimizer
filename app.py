@@ -149,20 +149,26 @@ with param_tab:
     
       st.caption(psi_str)
 
-      st.subheader(f"Coefficients")
-      conversion_factors = st.data_editor(coefficient_df
-                                   , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
-                                                      )
-
-      st.caption('σ² and 𝜏² are defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
+      mult_col, coef_col = st.columns(2)
     
-      st.subheader(f"Multipliers")
+      with mult_col:
+        st.subheader(f"Multipliers")
+  
+        multiplier_df = pd.DataFrame({'Multiplier: ' : [1.0] * 9}
+                                     , index = coefficient_df.index)
+        multipliers = st.data_editor(multiplier_df)
+  
+        st.caption('Manual multipliers for Z-scores and G-scores. E.g. to downweight turnovers, set the turnovers multiplier to 0.9')
+        
+      with coef_col:
+        st.subheader(f"Coefficients")
+        conversion_factors = st.data_editor(coefficient_df
+                                     , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
+                                                        )
+  
+        st.caption('σ² and 𝜏² are defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
-      multiplier_df = pd.DataFrame({'Multiplier: ' : [1.0] * 9}
-                                   , index = coefficient_df.index)
-      multipliers = st.data_editor(multiplier_df)
 
-      st.caption('Manual multipliers for Z-scores and G-scores. E.g. to downweight turnovers, set the turnovers multiplier to 0.9')
 
   
   with right:
