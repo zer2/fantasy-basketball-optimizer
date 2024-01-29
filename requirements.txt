@@ -4,3 +4,5 @@ streamlit-extras
 scipy
 plotly
 nba_api
+yahoo_oauth
+yahoo_fantasy_api
