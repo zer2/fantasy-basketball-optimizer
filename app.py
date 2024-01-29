@@ -155,7 +155,14 @@ with param_tab:
                                                       )
 
       st.caption('σ² and 𝜏² are defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
+    
+      st.subheader(f"Multipliers")
 
+      multiplier_df - pd.DataFrame([1] * 9
+                                   , index = coefficient_df.index)
+      multipliers = st.data_editor(multiplier_df)
+
+      st.caption('Manual multipliers for Z-scores and G-scores. E.g. to downweight turnovers, set the turnovers multiplier to 0.9')
 
   
   with right:
