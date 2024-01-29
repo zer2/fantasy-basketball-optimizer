@@ -91,6 +91,7 @@ def calculate_scores_from_coefficients(player_stats
 @st.cache_data
 def process_player_data(player_stats
                         , conversion_factors
+                        , multipliers
                         , psi
                         , nu
                         , n_drafters
@@ -158,9 +159,11 @@ def process_player_data(player_stats
   
   L = np.array(x_scores_as_diff.cov()) 
 
+  z_scores = z_scores * multipliers.T.values[0]
   z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
   z_scores.sort_values('Total', ascending = False, inplace = True)
 
+  g_scores = g_scores * multipliers.T.values[0]
   g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
   g_scores.sort_values('Total', ascending = False, inplace = True)
 
