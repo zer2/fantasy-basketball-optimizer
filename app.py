@@ -87,7 +87,7 @@ with about_tab:
           st.markdown(trading_md, unsafe_allow_html=True)    
         
 with param_tab: 
-  left, middle, right = st.columns([0.2,0.4,0.4])
+  left, middle, right = st.columns([0.2,0.3,0.5])
 
   with left: 
     st.header('General')
