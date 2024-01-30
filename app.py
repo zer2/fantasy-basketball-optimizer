@@ -122,8 +122,8 @@ with param_tab:
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    #yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?')
-    yahoo_league_id = ""
+    yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?', autocomplete="")
+    # yahoo_league_id = ""
     
     if len(yahoo_league_id) < 6:
       n_drafters = st.number_input(r'How many drafters are in your league?'
