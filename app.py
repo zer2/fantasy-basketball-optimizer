@@ -190,7 +190,7 @@ with param_tab:
     left_col, right_col = st.columns(2)
 
     with left_col:
-      omega = st.number_input(r'Select a $\omega$ value', value = 1.5)
+      omega = st.number_input(r'Select a $\omega$ value', value = 1.0)
       omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
                       it quantifies how much better the optimal player choice will be compared to the player that would be 
                       chosen with baseline weights'''
