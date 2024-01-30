@@ -6,5 +6,6 @@ plotly
 nba_api
 yahoo_oauth
 yahoo_fantasy_api
+yfpy==13.0.0
 requests_oauthlib
 requests

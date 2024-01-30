@@ -1,13 +1,24 @@
-from yahoo_oauth import OAuth2
-import yahoo_fantasy_api as yfa
-import streamlit as st
-
-import requests
+from requests.auth import HTTPBasicAuth
 from requests_oauthlib import OAuth2Session
+from src import yahoo_helper
+from streamlit.logger import get_logger
+from tempfile import mkdtemp
+from yahoo_oauth import OAuth2
+from yfpy.query import YahooFantasySportsQuery
 
-def yahoo():
+import json
+import os
+import pandas as pd
+import requests
+import shutil
+import streamlit as st
+import time
+import yahoo_fantasy_api as yfa
+
+LOGGER = get_logger(__name__)
+
+def yahoo(league_id):
     # Client_ID and Secret from https://developer.yahoo.com/apps/
-    league_id = st.text_input("LeagueID", key='LeagueID')
     cid = st.secrets["YAHOO_CLIENT_ID"]
     cse = st.secrets["YAHOO_CLIENT_SECRET"]
     
@@ -68,11 +79,9 @@ def yahoo():
     
     # Use the access token
     if st.session_state['access_token']:
-        #st.write("Now you can use the access token to interact with Yahoo's API.")
-    
-        # Allow user to input league ID
-        # league_id = st.text_input("Enter your Yahoo Fantasy Sports league ID:")
-        temp_dir = tempfile.mkdtemp()
+        st.write("Now you can use the access token to interact with Yahoo's API.")
+
+        temp_dir = mkdtemp()
         if league_id:
             # Define the paths to the token and private files
             token_file_path = os.path.join(temp_dir, "token.json")
@@ -100,20 +109,25 @@ def yahoo():
             with open(private_file_path, 'w') as f:
                 json.dump(private_data, f)
 
+            teams_dict = get_teams(league_id, temp_dir)
+            st.write(f"Teams for the league currently are:")
+            for team_id, team_name in teams_dict.items():
+                st.write(f"{team_id}: {team_name}")
+            shutil.rmtree(temp_dir)
+
 @st.cache_data(ttl=3600)
-def get_yahoo_league_summary(league_id, auth_path):    
+def get_teams(league_id, auth_path):    
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     auth_directory = auth_path
     sc = YahooFantasySportsQuery(
         auth_dir=auth_directory,
         league_id=league_id,
-        game_code="nfl"
+        game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
-    mrw = yahoo_helper.get_most_recent_week(sc)
-    recap = yahoo_helper.generate_weekly_recap(sc, week=mrw)
-    return recap
+    teams_dict = yahoo_helper.get_teams(sc)
+    return teams_dict
     
 def get_yahoo_info(league_id):
     yahoo_client_id = st.secrets["YAHOO_CLIENT_ID"]

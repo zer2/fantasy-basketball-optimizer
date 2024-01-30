@@ -16,6 +16,7 @@ from src.get_data import get_historical_data, get_current_season_data, get_darko
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
 from src.yahoo_connect import get_yahoo_info
+from src.yahoo_connect import yahoo
 
 with open("parameters.yaml", "r") as stream:
     try:
@@ -137,6 +138,7 @@ with param_tab:
       #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
       selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
     else:
+      yahoo(yahoo_league_id)
       roster_df, injury_list = get_yahoo_info(yahoo_league_id)       
 
       n_drafters = roster_df.shape[1]
