@@ -473,7 +473,7 @@ with draft_tab:
                 res = res - base_h_score.values[0]
                 res.name = 'H-score differential'
 
-                win_rates_delta = win_rates - base_win_rates
+                win_rates_delta = win_rates - base_win_rates.T
                 os.write(1,bytes(str(win_rates),'utf-8'))
                 os.write(1,bytes(str(base_win_rates),'utf-8'))
 
