@@ -474,7 +474,7 @@ with draft_tab:
                 res.name = 'H-score'
 
                 base_h_score_copy = base_h_score.copy()
-                base_h_score.index = drop_player
+                base_h_score.index = [drop_player]
                 base_h_score.name = 'H-score'
               
                 win_rates_all = pd.concat([base_win_rates.T, win_rates])
