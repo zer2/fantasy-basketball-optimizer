@@ -469,13 +469,14 @@ with draft_tab:
                 res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
                 win_rates.columns = categories
-                os.write(1,bytes(str(win_rates),'utf-8'))
 
                 res = res - base_h_score.values[0]
                 res.name = 'H-score differential'
 
                 win_rates_delta = win_rates - base_win_rates
                 os.write(1,bytes(str(win_rates),'utf-8'))
+                os.write(1,bytes(str(base_win_rates),'utf-8'))
+
 
                 h_display = pd.DataFrame(res).merge(win_rates_delta, left_index = True, right_index = True)
                 h_display = h_display.sort_values('H-score differential', ascending = False).round(3)
