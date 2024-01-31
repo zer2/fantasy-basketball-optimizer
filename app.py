@@ -386,7 +386,7 @@ with draft_tab:
               
             with placeholder.container():
   
-              score_tab, weight_tab = st.tabs(['Scores','Weights'])
+              score_tab, rate_tab, weight_tab = st.tabs(['Scores','Expected Win Rates', 'Weights'])
   
               with score_tab:
                 c1, c2 = st.columns([0.3,0.7])
@@ -400,7 +400,17 @@ with draft_tab:
       
                 with c2:
                   st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
-    
+
+              with rate_tab:
+                rate_df = cdf_estimates.loc[score.index].dropna()
+                rate_display = score.merge(c_df, left_index = True, right_index = True)
+                rate_display = rate_display.style.format("{:.3f}"
+                                  ,subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                          .format('{:,.1%}', subset = rate_df.columns)
+                st.dataframe(rate_display)
               with weight_tab:
                 c_df = c.loc[score.index].dropna().round().astype(int)
                 weight_display = score.merge(c_df, left_index = True, right_index = True)
