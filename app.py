@@ -478,7 +478,7 @@ with draft_tab:
                 win_rates_delta = win_rates - base_win_rates
                 
                 h_display = res.merge(win_rates_delta, left_index = True, right_index = True)
-                h_display = h_display.sort_values('ascending = False).round(3)
+                h_display = h_display.sort_values('H-score differential', ascending = False).round(3)
     
                 st.dataframe(h_display)
 
