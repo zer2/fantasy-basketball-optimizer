@@ -403,7 +403,7 @@ with draft_tab:
     
               with weight_tab:
                 c_df = c.loc[score.index].dropna().round().astype(int)
-                weight_display = res.merge(c_df, left_index = True, right_index = True)
+                weight_display = score.merge(c_df, left_index = True, right_index = True)
                 weight_display = weight_display.style.format("{:.3f}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
