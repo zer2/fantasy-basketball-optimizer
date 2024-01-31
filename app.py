@@ -392,11 +392,11 @@ with draft_tab:
                 c1, c2 = st.columns([0.3,0.7])
       
                 with c1:
-                  res = res.sort_values(ascending = False).round(3)
-                  res.name = 'H-score'
-                  res = pd.DataFrame(res)
+                  score = score.sort_values(ascending = False).round(3)
+                  score.name = 'H-score'
+                  score = pd.DataFrame(score)
       
-                  st.dataframe(res)
+                  st.dataframe(score)
       
                 with c2:
                   st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
