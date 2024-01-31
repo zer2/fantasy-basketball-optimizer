@@ -483,6 +483,7 @@ with draft_tab:
                 scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
               
                 os.write(1,bytes(str(scores_all),'utf-8'))
+                os.write(1,bytes(str(win_rates_all),'utf-8'))
 
                 h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
                 h_display = h_display.sort_values('H-score', ascending = False)
