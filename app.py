@@ -383,10 +383,11 @@ with draft_tab:
             
             c = pd.DataFrame(c, index = score.index, columns = categories)/info['v'].T
             c = (c * 100).round()
+            
+            os.write(1,bytes(str(cdf_estimates),'utf-8'))
 
             cdf_estimates = pd.DataFrame(cdf_estimates, index = score.index, columns = categories)
             
-            os.write(1,bytes(str(c),'utf-8'))
             os.write(1,bytes(str(cdf_estimates),'utf-8'))
             
             with placeholder.container():
