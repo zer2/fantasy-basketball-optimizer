@@ -404,7 +404,7 @@ with draft_tab:
                   st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
 
               with rate_tab:
-                rate_df = cdf_estimates.loc[score.index]#.dropna()
+                rate_df = cdf_estimates.loc[score.index].dropna()
                 rate_display = score.merge(rate_df, left_index = True, right_index = True)
                 rate_display = rate_display.style.format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
