@@ -339,7 +339,7 @@ with draft_tab:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
             st.markdown('The H-score of team ' + str(seat) + ' is ' + str(base_h_score.round(3).values[0] * 100) + '%')
-            st.dataframe(base_win_rates.T.style.format('{:,.0%}'), hide_index = True)
+            st.dataframe(base_win_rates.T.style.format('{:,.1%}'), hide_index = True)
           
     with cand_tab:
 
