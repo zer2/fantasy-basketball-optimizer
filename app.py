@@ -469,8 +469,6 @@ with draft_tab:
                 res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
                 win_rates.columns = categories
-
-                res = res - base_h_score.values[0]
                 res.name = 'H-score'
 
                 base_h_score_copy = base_h_score.copy()
