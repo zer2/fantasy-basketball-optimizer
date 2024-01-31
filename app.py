@@ -490,8 +490,8 @@ with draft_tab:
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                          .format('{:,.1%}', subset = rate_df.columns)
+                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = win_rates_all.columns) \
+                          .format('{:,.1%}', subset = win_rates_all.columns)
     
                 st.dataframe(h_display)
 
