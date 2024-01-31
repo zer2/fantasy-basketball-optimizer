@@ -579,9 +579,8 @@ with rank_tab:
       for i in range(max(1,n_iterations)):
         h_res, c, cdf_estimates = next(generator)
         
-      c_df = pd.DataFrame(c, index = h_res.index, columns = categories)/info['v'].T
-      c_df = (c_df * 100).round()
-      c_df = c_df.loc[h_res.index].dropna().round().astype(int)
+      cdf_estimates.columns = categories
+      rate_df = cdf_estimates.loc[h_res.index].dropna()
     
       h_res = h_res.sort_values(ascending = False)
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
@@ -589,13 +588,16 @@ with rank_tab:
                             ,'H-score' : h_res.values
                            })
     
-      h_res = h_res.merge(c_df, left_on = 'Player',right_index = True)
+      h_res = h_res.merge(rate_df
+                          , left_on = 'Player'
+                          ,right_index = True)
     
       h_res = h_res.style.format("{:.3f}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
-                          .background_gradient(axis = None, subset = c_df.columns) 
+                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                          .format('{:,.1%}', subset = rate_df.columns)
       h_score_display = st.dataframe(h_res, hide_index = True)
 
     
