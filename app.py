@@ -276,7 +276,7 @@ with draft_tab:
          , n_picks = n_picks
          , winner_take_all = winner_take_all
          , punting = punting)
-    _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
+    _, _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
 
   with right:
 
@@ -374,11 +374,12 @@ with draft_tab:
 
           #if n_iterations is 0 we run just once with punting set to False
           for i in range(max(1,n_iterations)):
-      
-            c, res = next(generator)
-            all_res = all_res + [res]
+
+            score, weights, cdf_estimates = next(generator)
+            all_res = all_res + [score]
             #normalize weights by what we expect from other drafters
-            c = pd.DataFrame(c, index = res.index, columns = categories)/info['v'].T
+            
+            c = pd.DataFrame(c, index = score.index, columns = categories)/info['v'].T
             c = (c * 100).round()
               
             with placeholder.container():
@@ -451,7 +452,7 @@ with draft_tab:
                 st.dataframe(new_g_styled) 
 
             with h_tab:
-                _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
+                _, _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
     
                 res = res - base_h_score.values[0]
                 res = res.sort_values(ascending = False).round(3)
@@ -555,7 +556,7 @@ with rank_tab:
 
       generator = H.get_h_scores(player_stats, [], [])
       for i in range(max(1,n_iterations)):
-        c, h_res = next(generator)
+        h_res, c, cdf_estimates = next(generator)
         
       c_df = pd.DataFrame(c, index = h_res.index, columns = categories)/info['v'].T
       c_df = (c_df * 100).round()
