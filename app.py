@@ -377,7 +377,7 @@ with draft_tab:
           #if n_iterations is 0 we run just once with punting set to False
           for i in range(max(1,n_iterations)):
 
-            score, weights, cdf_estimates = next(generator)
+            score, c, cdf_estimates = next(generator)
             all_res = all_res + [score]
             #normalize weights by what we expect from other drafters
             
