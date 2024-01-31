@@ -150,12 +150,12 @@ class HAgent():
                 c = c/c.sum(axis = 1).reshape(-1,1)
 
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1) 
+                    score = cdf_estimates.mean(axis = 1) 
 
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | (self.punting & (n_players_selected < (self.n_picks - 1)) ): 
@@ -166,12 +166,12 @@ class HAgent():
                 c = None
                 
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1) 
+                    score = cdf_estimates.mean(axis = 1) 
 
             #case where no new players need to be chosen
             elif n_players_selected == self.n_picks: 
@@ -182,12 +182,12 @@ class HAgent():
                 c = None
                 
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum() 
+                    score = cdf_estimates.mean() 
 
             #case where there are too many players and some need to be removed 
             else: #n > n_picks 
@@ -206,18 +206,18 @@ class HAgent():
                                      ,index = diff_means_mod.index)
                                         
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1)
+                    score = cdf_estimates.mean(axis = 1)
 
                 c = None
 
             i = i + 1
     
-            yield c, win_sums
+            yield score, c, cdf_estimates
 
 
     ### below are functions used for the optimization procedure 
