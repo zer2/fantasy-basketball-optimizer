@@ -276,7 +276,7 @@ with draft_tab:
          , n_picks = n_picks
          , winner_take_all = winner_take_all
          , punting = punting)
-    _, _, base_h_score = next(H.get_h_scores(player_stats, my_players, players_chosen))
+    base_h_score, _, _ = next(H.get_h_scores(player_stats, my_players, players_chosen))
 
   with right:
 
@@ -452,7 +452,7 @@ with draft_tab:
                 st.dataframe(new_g_styled) 
 
             with h_tab:
-                _, _, res= next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
+                res, _, _ = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
     
                 res = res - base_h_score.values[0]
                 res = res.sort_values(ascending = False).round(3)
