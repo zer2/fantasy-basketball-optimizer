@@ -473,11 +473,25 @@ with draft_tab:
                 res = res - base_h_score.values[0]
                 res.name = 'H-score differential'
 
-                win_rates_delta = win_rates - base_win_rates.T.values.squeeze()
-                os.write(1,bytes(str(win_rates_delta),'utf-8'))
+                base_h_score_copy = base_h_score.copy()
+                base_h_score.name = drop_player
+              
+                win_rates_all = pd.concat([base_win_rates.T, win_rates])
+                win_rates_all.name = 'H-score'
+              
+                scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
+              
+                os.write(1,bytes(str(scores_all),'utf-8'))
 
-                h_display = pd.DataFrame(res).merge(win_rates_delta, left_index = True, right_index = True)
-                h_display = h_display.sort_values('H-score differential', ascending = False).round(3)
+                h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
+                h_display = h_display.sort_values('H-score differential', ascending = False)
+
+                h_display = h_display.style.format("{:.1%}"
+                                  ,subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                          .format('{:,.1%}', subset = rate_df.columns)
     
                 st.dataframe(h_display)
 
