@@ -592,7 +592,7 @@ with rank_tab:
                           , left_on = 'Player'
                           ,right_index = True)
     
-      h_res = h_res.style.format("{:.3f}"
+      h_res = h_res.style.format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
