@@ -276,7 +276,7 @@ with draft_tab:
          , n_picks = n_picks
          , winner_take_all = winner_take_all
          , punting = punting)
-    base_h_score, _, _ = next(H.get_h_scores(player_stats, my_players, players_chosen))
+    base_h_score, _, base_win_rates = next(H.get_h_scores(player_stats, my_players, players_chosen))
 
   with right:
 
@@ -339,6 +339,7 @@ with draft_tab:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
             st.markdown('The H-score of team ' + str(seat) + ' is ' + str(base_h_score.round(3).values[0]))
+            st.dataframe(base_win_rates)
           
     with cand_tab:
 
