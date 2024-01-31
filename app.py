@@ -470,13 +470,17 @@ with draft_tab:
                 st.dataframe(new_g_styled) 
 
             with h_tab:
-                res, _, _ = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
+                res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
     
                 res = res - base_h_score.values[0]
-                res = res.sort_values(ascending = False).round(3)
                 res.name = 'H-score differential'
+
+                win_rates_delta = win_rates - base_win_rates
+                
+                h_display = res.merge(win_rates_delta, left_index = True, right_index = True)
+                h_display = h_display.sort_values('ascending = False).round(3)
     
-                st.dataframe(res)
+                st.dataframe(h_display)
 
             #make a dropdown of each player on the team 
             #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
