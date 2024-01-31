@@ -177,7 +177,7 @@ class HAgent():
             elif n_players_selected == self.n_picks: 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
                               , scale = np.sqrt(self.diff_var))
-                     ,index = c.columns)
+                                            )
 
                 c = None
                 
