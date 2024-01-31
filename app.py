@@ -476,6 +476,7 @@ with draft_tab:
                 win_rates_delta = win_rates - base_win_rates.T
                 os.write(1,bytes(str(win_rates),'utf-8'))
                 os.write(1,bytes(str(base_win_rates),'utf-8'))
+                os.write(1,bytes(str(win_rates_delta),'utf-8'))
 
 
                 h_display = pd.DataFrame(res).merge(win_rates_delta, left_index = True, right_index = True)
