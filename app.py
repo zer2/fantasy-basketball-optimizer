@@ -385,7 +385,10 @@ with draft_tab:
             c = (c * 100).round()
 
             cdf_estimates = pd.DataFrame(cdf_estimates, index = score.index, columns = categories)
-              
+            
+            os.write(1,bytes(str(c),'utf-8'))
+            os.write(1,bytes(str(cdf_estimates),'utf-8'))
+            
             with placeholder.container():
   
               score_tab, rate_tab, weight_tab = st.tabs(['Scores','Expected Win Rates', 'Weights'])
