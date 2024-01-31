@@ -403,7 +403,7 @@ with draft_tab:
 
               with rate_tab:
                 rate_df = cdf_estimates.loc[score.index].dropna()
-                rate_display = score.merge(c_df, left_index = True, right_index = True)
+                rate_display = score.merge(rate_df, left_index = True, right_index = True)
                 rate_display = rate_display.style.format("{:.3f}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
