@@ -131,7 +131,7 @@ class HAgent():
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
                                           , scale = np.sqrt(self.diff_var))
                                  ,index = x_scores_available.index
-                                 , columns = diff_means.index)
+                                 , columns = c.columns)
         
                 if self.winner_take_all:
         
@@ -163,7 +163,7 @@ class HAgent():
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index
-                    , columns = diff_means.index)
+                    , columns = c.columns)
 
                 c = None
                 
@@ -179,8 +179,8 @@ class HAgent():
             elif n_players_selected == self.n_picks: 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
                               , scale = np.sqrt(self.diff_var))
-                     ,index = diff_means.index
-                     , columns = diff_means.index)
+                     ,index = c.columns
+                     , columns = c.columns)
 
                 c = None
                 
@@ -207,7 +207,7 @@ class HAgent():
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
                                               , scale = np.sqrt(self.diff_var))
                                      ,index = diff_means_mod.index
-                                      , columns = diff_means.index)
+                                      , columns = c.columns)
                                         
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
