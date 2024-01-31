@@ -484,7 +484,7 @@ with draft_tab:
                 os.write(1,bytes(str(scores_all),'utf-8'))
 
                 h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
-                h_display = h_display.sort_values('H-score differential', ascending = False)
+                h_display = h_display.sort_values('H-score', ascending = False)
 
                 h_display = h_display.style.format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
