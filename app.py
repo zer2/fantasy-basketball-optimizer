@@ -471,13 +471,13 @@ with draft_tab:
                 win_rates.columns = categories
 
                 res = res - base_h_score.values[0]
-                res.name = 'H-score differential'
+                res.name = 'H-score'
 
                 base_h_score_copy = base_h_score.copy()
-                base_h_score.name = drop_player
+                base_h_score.index = drop_player
+                base_h_score.name = 'H-score'
               
                 win_rates_all = pd.concat([base_win_rates.T, win_rates])
-                win_rates_all.name = 'H-score'
               
                 scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
               
