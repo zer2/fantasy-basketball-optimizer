@@ -9,10 +9,11 @@ def read_markdown_file(markdown_file):
     return Path(markdown_file).read_text()
   
 def stat_styler(value
-                , multiplier = 50):
+                , multiplier = 50
+                , middle = 0 ):
   #styler function used for coloring stat values red/green with varying intensities 
                     
-  intensity = min(int(abs(value)*multiplier), 255)
+  intensity = min(int(abs(value-middle)*multiplier), 255)
   if value != value:
     return f"background-color:white;color:white;" 
   elif value > 0:
