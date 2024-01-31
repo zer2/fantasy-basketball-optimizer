@@ -404,7 +404,7 @@ with draft_tab:
               with rate_tab:
                 rate_df = cdf_estimates.loc[score.index].dropna()
                 rate_display = score.merge(rate_df, left_index = True, right_index = True)
-                rate_display = rate_display.style.format("{:.3f}"
+                rate_display = rate_display.style.format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
@@ -414,7 +414,7 @@ with draft_tab:
               with weight_tab:
                 c_df = c.loc[score.index].dropna().round().astype(int)
                 weight_display = score.merge(c_df, left_index = True, right_index = True)
-                weight_display = weight_display.style.format("{:.3f}"
+                weight_display = weight_display.style.format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
