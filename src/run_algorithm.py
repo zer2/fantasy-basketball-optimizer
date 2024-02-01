@@ -369,6 +369,9 @@ def analyze_trade(team_1_other
         for i in range(n_iterations):
             score_2_1,_,rate_2_1 = next(generator)
 
+                      
+    os.write(1,bytes(str(score_1_1),'utf-8'))
+
     score_1_1_idxmax = score_1_1.idxmax()
     score_1_2_idxmax = score_1_2.idxmax()
     score_2_2_idxmax = score_2_2.idxmax()
