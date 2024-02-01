@@ -558,6 +558,7 @@ with draft_tab:
                         st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
                                  
                     pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1]], axis = 1).T
+                    pre_to_post.index = ['Pre-trade','Post-trade']
                     pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
                     st.dataframe(pre_to_post_styled)
                     
