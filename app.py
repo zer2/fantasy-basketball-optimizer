@@ -468,8 +468,14 @@ with draft_tab:
             with h_tab:
                 res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
+                res = res.sort_values(ascending = False)
+                win_rates = win_rates.loc[res.index]
+              
                 win_rates.columns = categories
                 res.name = 'H-score'
+
+                h_display = h_display.sort_values('H-score', ascending = False)
+
 
                 base_h_score_copy = base_h_score.copy()
                 base_h_score.index = [drop_player]
@@ -486,7 +492,6 @@ with draft_tab:
                 #os.write(1,bytes(str(win_rates_all),'utf-8'))
 
                 h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
-                h_display = h_display.sort_values('H-score', ascending = False)
 
                 h_display = h_display.style.format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
