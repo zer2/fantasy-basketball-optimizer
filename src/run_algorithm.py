@@ -369,10 +369,15 @@ def analyze_trade(team_1_other
         for i in range(n_iterations):
             score_2_1,_,rate_2_1 = next(generator)
 
-    team_1_info = {'pre' : (score_1_1, rate_1_1)
-                        ,'post' : (score_1_2, rate_1_2)}
-    team_2_info = {'pre' : (score_2_2, rate_2_2)
-                        ,'post' : (score_2_1, rate_2_1)}
+    score_1_1_idxmax = score_1_1.idxmax()
+    score_1_2_idxmax = score_1_2.idxmax()
+    score_2_2_idxmax = score_2_2.idxmax()
+    score_2_1_idxmax = score_2_1.idxmax()
+                      
+    team_1_info = {'pre' : (score_1_1.loc[score_1_1_idxmax], rate_1_1.loc[score_1_1_idxmax])
+                        ,'post' : (score_1_2.loc[score_1_2_idxmax], rate_1_2.loc[score_1_2_idxmax])}
+    team_2_info = {'pre' : (score_2_2.loc[score_2_2_idxmax], rate_2_2.loc[score_2_2_idxmax])
+                        ,'post' : (score_2_1.loc[score_2_1_idxmax], rate_2_1.loc[score_2_1_idxmax])}
                       
     results_dict = {1 : team_1_info
                     ,2 : team_2_info
