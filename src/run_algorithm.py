@@ -376,7 +376,10 @@ def analyze_trade(team_1_other
     score_1_2_idxmax = score_1_2.idxmax()
     score_2_2_idxmax = score_2_2.idxmax()
     score_2_1_idxmax = score_2_1.idxmax()
-                      
+
+
+    os.write(1,bytes(str(rate_1_1),'utf-8'))
+
     team_1_info = {'pre' : (score_1_1.loc[score_1_1_idxmax], rate_1_1.loc[score_1_1_idxmax])
                         ,'post' : (score_1_2.loc[score_1_2_idxmax], rate_1_2.loc[score_1_2_idxmax])}
     team_2_info = {'pre' : (score_2_2.loc[score_2_2_idxmax], rate_2_2.loc[score_2_2_idxmax])
