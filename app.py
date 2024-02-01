@@ -547,7 +547,9 @@ with draft_tab:
                     else:
                         st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
                     
-                    pre_to_post = pd.concat([your_team_pre_trade[1].T,your_team_post_trade[1].T])
+                    pre_to_post = pd.concat([your_team_pre_trade[1].T,your_team_post_trade[1].T], axis = 0)
+                    os.write(1,bytes(str(pre_to_post),'utf-8'))
+
                     pre_to_post.index = ['Pre-trade','Post-trade']
                     st.dataframe(pre_to_post)
                   
@@ -556,7 +558,7 @@ with draft_tab:
                     else:
                         st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
                                  
-                    pre_to_post = pd.concat([their_team_pre_trade[1].T,their_team_post_trade[1].T])
+                    pre_to_post = pd.concat([their_team_pre_trade[1].T,their_team_post_trade[1].T], axis = 0)
                     pre_to_post.index = ['Pre-trade','Post-trade']
                     st.dataframe(pre_to_post)         
 with rank_tab:
