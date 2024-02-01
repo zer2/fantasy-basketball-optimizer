@@ -346,28 +346,37 @@ def analyze_trade(team_1_other
                   , players_chosen
                   ,n_iterations):    
                       
-    H_1_1, _, _ = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
-    H_2_2, _, _ = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
+    score_1_1, _, rate_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
+    score_2_2, _, rate_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
 
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
         generator = H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen)
         for i in range(n_iterations):
-            H_1_2,_,_ = next(generator)
+            score_1_2,_,rate_1_2  = next(generator)
         
-        H_2_1,_,_ = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
     elif n_player_diff == 0:
-        H_1_2,_,_ = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        score_1_2,_,rate_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
 
         os.write(1, bytes(str(team_2_other + team_1_trade),'utf-8'))
-        H_2_1,_,_ = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
     else:
-        H_1_2,_,_ = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        score_1_2,_,rate_2_1 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
 
         generator = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
         for i in range(n_iterations):
-            H_2_1,_,_ = next(generator)
+            score_2_1,_,rate_2_1 = next(generator)
 
-    return H_1_1, H_1_2, H_2_1, H_2_2
+    team_1_info = {'pre' : (score_1_1, rate_1_1)
+                        ,'post' : (score_1_2, rate_1_2)}
+    team_2_info = {'pre' : (score_2_2, rate_2_2)
+                        ,'post' : (score_2_1, rate_2_1)}
+                      
+    results_dict = {1 : team_1_info
+                    ,2 : team_2_info
+                   }
+
+    return results_dict
                 
