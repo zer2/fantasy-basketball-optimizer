@@ -348,7 +348,10 @@ def analyze_trade(team_1_other
                       
     score_1_1, _, rate_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
     score_2_2, _, rate_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
-
+                      
+    rate_1_1 = rate_1_1.T #ZR: hack for now
+    rate_2_2 = rate_2_2.T #ZR: hack for now
+ 
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
@@ -362,8 +365,13 @@ def analyze_trade(team_1_other
 
         os.write(1, bytes(str(team_2_other + team_1_trade),'utf-8'))
         score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+
+        rate_2_1 = rate_2_1.T #ZR: hack for now
+        rate_1_2 = rate_1_2.T #ZR: hack for now
     else:
         score_1_2,_,rate_2_1 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+
+        
 
         generator = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
         for i in range(n_iterations):
