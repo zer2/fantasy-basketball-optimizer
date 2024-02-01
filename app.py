@@ -478,7 +478,7 @@ with draft_tab:
                 base_win_rates_copy = base_win_rates.copy().T
                 base_win_rates_copy.index = [drop_player]
               
-                win_rates_all = pd.concat([base_win_rates, win_rates])
+                win_rates_all = pd.concat([base_win_rates_copy, win_rates])
               
                 scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
               
