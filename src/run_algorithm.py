@@ -369,9 +369,7 @@ def analyze_trade(team_1_other
         rate_2_1 = rate_2_1.T #ZR: hack for now
         rate_1_2 = rate_1_2.T #ZR: hack for now
     else:
-        score_1_2,_,rate_2_1 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
-
-        
+        score_1_2,_,rate_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
 
         generator = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
         for i in range(n_iterations):
