@@ -256,7 +256,8 @@ with draft_tab:
 
     with injury_tab:
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-        injured_players = st.multiselect('Injured players', player_stats.index, default = params['injury-ignore-darko'])
+        injury_list = params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
+        injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
 
     player_stats = player_stats.drop(injured_players)
     info = process_player_data(player_stats, conversion_factors, multipliers, psi, nu, n_drafters, n_picks, rotisserie, params)
