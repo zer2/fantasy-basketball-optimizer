@@ -338,7 +338,7 @@ with draft_tab:
         if len(my_players) < n_picks:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
-            st.markdown('The H-score of team ' + str(seat) + ' is ' + str(base_h_score.round(3).values[0] * 100) + '%')
+            st.markdown('The H-score of team ' + str(seat) + ' is ' + str((base_h_score * 100).round(1).values[0]) + '%')
             base_win_rates_formatted = base_win_rates.T.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
             st.dataframe(base_win_rates_formatted, hide_index = True)
           
