@@ -537,20 +537,20 @@ with draft_tab:
                     second_others = [x for x in second_team_selections if x not in second_trade]
         
                     trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
-                    your_team_pre_trade = trade_results[0].max()
-                    your_team_post_trade = trade_results[1].max()
-                    their_team_pre_trade = trade_results[3].max()
-                    their_team_post_trade = trade_results[2].max()
+                    your_team_pre_trade = trade_results[1]['pre']
+                    your_team_post_trade = trade_results[1]['post']
+                    their_team_pre_trade = trade_results[2]['pre']
+                    their_team_post_trade = trade_results[2]['post']
 
                     if your_team_pre_trade < your_team_post_trade:
-                        st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade,2)) + ' to ' + str(np.round(your_team_post_trade,2)))
+                        st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
                     else:
-                        st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade,2)) + ' to ' + str(np.round(your_team_post_trade,2)))
+                        st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
 
                     if their_team_pre_trade < their_team_post_trade:
-                        st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
+                        st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
                     else:
-                        st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade,2)) + ' to ' + str(np.round(their_team_post_trade,2)))
+                        st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
                       
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
