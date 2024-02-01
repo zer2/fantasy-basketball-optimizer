@@ -474,9 +474,6 @@ with draft_tab:
                 win_rates.columns = categories
                 res.name = 'H-score'
 
-                h_display = h_display.sort_values('H-score', ascending = False)
-
-
                 base_h_score_copy = base_h_score.copy()
                 base_h_score.index = [drop_player]
                 base_h_score.name = 'H-score'
