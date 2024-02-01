@@ -543,9 +543,9 @@ with draft_tab:
                     their_team_post_trade = trade_results[2]['post']
 
                     if your_team_pre_trade < your_team_post_trade:
-                        st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
+                        st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
                     else:
-                        st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
+                        st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
                     
                     pre_to_post = pd.concat([your_team_pre_trade[1],your_team_post_trade[1]], axis = 1).T
                     pre_to_post.index = ['Pre-trade','Post-trade']
@@ -553,9 +553,9 @@ with draft_tab:
                     st.dataframe(pre_to_post_styled)
                   
                     if their_team_pre_trade < their_team_post_trade:
-                        st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
+                        st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
                     else:
-                        st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
+                        st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
                                  
                     pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1]], axis = 1).T
                     pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
