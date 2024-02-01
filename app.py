@@ -546,12 +546,19 @@ with draft_tab:
                         st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
                     else:
                         st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0],2)) + ' to ' + str(np.round(your_team_post_trade[0],2)))
-
+                    
+                    pre_to_post = pd.concat([your_team_pre_trade[1],your_team_post_trade[1])
+                    pre_to_post.index = ['Pre-trade','Post-trade']
+                    st.dataframe(pre_to_post)
+                  
                     if their_team_pre_trade < their_team_post_trade:
                         st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
                     else:
                         st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0],2)) + ' to ' + str(np.round(their_team_post_trade[0],2)))
-                      
+                                 
+                    pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1])
+                    pre_to_post.index = ['Pre-trade','Post-trade']
+                    st.dataframe(pre_to_post)         
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
 
