@@ -290,8 +290,7 @@ with Profiler():
            , winner_take_all = winner_take_all
            , punting = punting)
 
-         res = next(H.get_h_scores(player_stats, my_players, players_chosen))      
-         base_h_score, _, base_win_rates = get_base_h_score()
+         base_h_score, _, base_win_rates  = next(H.get_h_scores(player_stats, my_players, players_chosen))      
       
       get_base_h_score(info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting, player_stats, my_players, players_chosen)
     
