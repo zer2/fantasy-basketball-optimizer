@@ -588,9 +588,6 @@ with rank_tab:
                                          , multiplier = z_score_player_multiplier)
         
     z_scores_rank_display = st.dataframe(z_scores_styled, hide_index = True)
-    
-  with z_rank_tab:
-       make_z_rank_tab(z_scores)   
 
   @st.cache_data()
   def make_g_rank_tab(g_scores):
@@ -608,9 +605,6 @@ with rank_tab:
                                          , multiplier = z_score_player_multiplier)
   
     g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
-      
-  with g_rank_tab:
-      make_g_rank_tab(g_scores)
 
   def make_h_rank_tab(H, player_stats):
 
@@ -639,6 +633,10 @@ with rank_tab:
                           .format('{:,.1%}', subset = rate_df.columns)
       h_score_display = st.dataframe(h_res, hide_index = True)
     
+  with z_rank_tab:
+     make_z_rank_tab(z_scores)   
+  with g_rank_tab:
+      make_g_rank_tab(g_scores)  
   with h_rank_tab:
       rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
       st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
