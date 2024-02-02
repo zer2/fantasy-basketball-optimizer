@@ -572,6 +572,7 @@ with draft_tab:
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
 
+  #generally caching is used for storing data, but it can also be used to prevent re-runs 
   @st.cache_data()
   def make_z_rank_tab(z_scores):
     z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
