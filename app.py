@@ -278,8 +278,23 @@ with Profiler():
            , n_picks = n_picks
            , winner_take_all = winner_take_all
            , punting = punting)
-      base_h_score, _, base_win_rates = next(H.get_h_scores(player_stats, my_players, players_chosen))
-  
+
+      @st.cache_data()
+      def get_base_h_score(info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting, player_stats, my_players, players_chosen):
+          H = HAgent(info = info
+           , omega = omega
+           , gamma = gamma
+           , alpha = alpha
+           , beta = beta
+           , n_picks = n_picks
+           , winner_take_all = winner_take_all
+           , punting = punting)
+
+        res = next(H.get_h_scores(player_stats, my_players, players_chosen))      
+        base_h_score, _, base_win_rates = get_base_h_score()
+      
+      get_base_h_score(info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting, player_stats, my_players, players_chosen)
+    
     with right:
   
       team_tab, cand_tab, waiver_tab, trade_tab = st.tabs(["Team", "Candidates","Waiver Moves","Trades"])
