@@ -590,28 +590,28 @@ with rank_tab:
     
   with z_rank_tab:
        make_z_rank_tab(z_scores)   
+
+  @st.cache_data()
+  def make_g_rank_tab(g_scores):
+    g_score_columns_original = g_scores.columns
+    g_scores.loc[:,'Rank'] = np.arange(g_scores.shape[0]) + 1
+    g_scores.loc[:,'Player'] = g_scores.index
+    g_scores = g_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+  
+    g_scores_styled = g_scores.style.format("{:.2f}"
+                                           ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
+                                      .map(styler_a
+                                          , subset = pd.IndexSlice[:,['Total']]) \
+                                      .map(stat_styler
+                                         , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
+                                         , multiplier = z_score_player_multiplier)
+  
+    g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
       
   with g_rank_tab:
-      g_score_columns_original = g_scores.columns
-      g_scores.loc[:,'Rank'] = np.arange(g_scores.shape[0]) + 1
-      g_scores.loc[:,'Player'] = g_scores.index
-      g_scores = g_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+      make_g_tabk_tab(g_scores)
 
-      g_scores_styled = g_scores.style.format("{:.2f}"
-                                             ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
-                                        .map(styler_a
-                                            , subset = pd.IndexSlice[:,['Total']]) \
-                                        .map(stat_styler
-                                           , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
-                                           , multiplier = z_score_player_multiplier)
-    
-      g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
-    
-  with h_rank_tab:
-      
-      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
-      st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+  def make_h_rank_tab(H, player_stats):
 
       generator = H.get_h_scores(player_stats, [], [])
       for i in range(max(1,n_iterations)):
@@ -637,5 +637,11 @@ with rank_tab:
                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                           .format('{:,.1%}', subset = rate_df.columns)
       h_score_display = st.dataframe(h_res, hide_index = True)
+    
+  with h_rank_tab:
+      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+      st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+      make_h_rank_tab(H, player_stats)
 
     
