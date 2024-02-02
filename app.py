@@ -616,7 +616,16 @@ with Profiler():
       g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
     
     @st.cache_data()
-    def make_h_rank_tab(_H, player_stats):
+    def make_h_rank_tab(player_stats, info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting):
+
+        H = HAgent(info = info
+           , omega = omega
+           , gamma = gamma
+           , alpha = alpha
+           , beta = beta
+           , n_picks = n_picks
+           , winner_take_all = winner_take_all
+           , punting = punting)
   
         generator = H.get_h_scores(player_stats, [], [])
         for i in range(max(1,n_iterations)):
@@ -651,6 +660,6 @@ with Profiler():
         rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
         st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
         st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
-        make_h_rank_tab(H, player_stats)
+        make_h_rank_tab(player_stats, info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting)
   
       
