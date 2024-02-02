@@ -293,8 +293,9 @@ with draft_tab:
       team_selections = selections_editable['Drafter ' + str(seat)].dropna()
 
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
-        
-      with z_tab:
+
+      @st.cache_data()
+      def make_team_z_tab(z_scores, team_selections):
         team_stats_z = z_scores[z_scores.index.isin(team_selections)]
 
         n_players_on_team = team_stats_z.shape[0]
@@ -315,9 +316,10 @@ with draft_tab:
             team_stats_z_styled = pd.DataFrame()
 
 
-        z_display = st.dataframe(team_stats_z_styled, use_container_width = True)        
-        
-      with g_tab:
+        z_display = st.dataframe(team_stats_z_styled, use_container_width = True)     
+
+      @st.cache_data()
+      def make_team_g_tab(g_scores, team_selections):
         team_stats_g = g_scores[g_scores.index.isin(team_selections)]
 
         n_players_on_team = team_stats_g.shape[0]
@@ -338,14 +340,24 @@ with draft_tab:
             team_stats_g_styled = pd.DataFrame()
     
         g_display = st.dataframe(team_stats_g_styled, use_container_width = True)
+        
+      @st.cache_data()
+      def make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates):
+        if len(my_players) < n_picks:
+              st.markdown('Your team is not full yet! Come back here when you have a full team')
+          else:
+              st.markdown('The H-score of team ' + str(seat) + ' is ' + str((base_h_score * 100).round(1).values[0]) + '%')
+              base_win_rates_formatted = base_win_rates.T.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
+              st.dataframe(base_win_rates_formatted, hide_index = True)
+        
+      with z_tab:
+           make_team_z_tab(z_scores, team_selections)
+
+      with g_tab:
+          make_team_g_tab(g_scores, team_selections)
     
       with h_tab:
-        if len(my_players) < n_picks:
-            st.markdown('Your team is not full yet! Come back here when you have a full team')
-        else:
-            st.markdown('The H-score of team ' + str(seat) + ' is ' + str((base_h_score * 100).round(1).values[0]) + '%')
-            base_win_rates_formatted = base_win_rates.T.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
-            st.dataframe(base_win_rates_formatted, hide_index = True)
+          make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
           
     with cand_tab:
 
