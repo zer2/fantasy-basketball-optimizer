@@ -614,7 +614,8 @@ with Profiler():
                                            , multiplier = z_score_player_multiplier)
     
       g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
-  
+    
+    @st.cache_data()
     def make_h_rank_tab(H, player_stats):
   
         generator = H.get_h_scores(player_stats, [], [])
