@@ -609,7 +609,7 @@ with rank_tab:
     g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
       
   with g_rank_tab:
-      make_g_tabk_tab(g_scores)
+      make_g_rank_tab(g_scores)
 
   def make_h_rank_tab(H, player_stats):
 
