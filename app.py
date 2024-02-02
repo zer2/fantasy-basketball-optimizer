@@ -575,18 +575,18 @@ with rank_tab:
   @st.cache_data()
   def make_z_rank_tab(z_scores):
     z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
-          z_scores.loc[:,'Player'] = z_scores.index
-          z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+    z_scores.loc[:,'Player'] = z_scores.index
+    z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
     
-          z_scores_styled = z_scores.style.format("{:.2f}"
-                                                 ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
-                                            .map(styler_a
-                                                , subset = pd.IndexSlice[:,['Total']]) \
-                                            .map(stat_styler
-                                               , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
-                                               , multiplier = z_score_player_multiplier)
+    z_scores_styled = z_scores.style.format("{:.2f}"
+                                           ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
+                                      .map(styler_a
+                                          , subset = pd.IndexSlice[:,['Total']]) \
+                                      .map(stat_styler
+                                         , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
+                                         , multiplier = z_score_player_multiplier)
         
-          z_scores_rank_display = st.dataframe(z_scores_styled, hide_index = True)
+    z_scores_rank_display = st.dataframe(z_scores_styled, hide_index = True)
     
   with z_rank_tab:
        make_z_rank_tab(z_scores)   
