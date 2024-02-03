@@ -390,8 +390,8 @@ with Profiler():
             unselected = z_scores.index[z_scores.index.isin(listify(selections_editable))]
             z_scores_styled = st.session_state.z_scores_styled
             z_scores_styled_unselected = z_scores_styled.hide(unselected)
-            z_scores_display = st.table(z_scores_styled_unselected.to_html())
-            
+            #z_scores_display = st.table(z_scores_styled_unselected.to_html())
+            st.write(z_scores_styled_unselected.to_html(), unsafe_allow_html = True)
           with subtab2:
             g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
             g_scores_unselected_styled = g_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
