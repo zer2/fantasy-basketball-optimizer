@@ -1,4 +1,4 @@
-Many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $\0%$ . There is a real mathematical argument for doing something like this, but it is overblown. 
+Many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ . There is a real mathematical argument for doing something like this, but it is overblown. 
 
 ## Argument 1: Turnovers are volatile
 
