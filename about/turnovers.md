@@ -36,7 +36,7 @@ The probability of both criteria occuring can be estimated by approximating the 
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
 
-So turnovers actually end up having a low-ish likelihood of mattering, but not in a unique way compared to other categories
+So turnovers actually end up having a low-ish likelihood of mattering, though not in a unique way compared to other categories
 
 ### Each category
 
