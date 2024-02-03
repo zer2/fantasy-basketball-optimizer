@@ -1,4 +1,4 @@
-Turnovers are a unique category because turnovers are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it less likely that you will win other categories. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$.
+Turnovers are a unique category because turnovers are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it less likely that you will win other categories. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25%$ or even $0%$.
 
 Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). I had to treat turnovers like every other category. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and I did set the default weighting for turnovers to be $25\%$. Below is a justification for that decision 
 
@@ -66,11 +66,11 @@ I ran a simple test to determine if down-weighting turnovers is a good idea. To 
 
 | Weight |  Most Categories | Each Category |
 |----:|:------|:------|
-| 0 | 11.34% | 13.38% |
-| 0.1 | 10.08% | 12.26% |
-| 0.2 | 9.76% | 11.93% |
-| 0.3 | 9.5% | 11.63% |
-| 0.4 | 9.14% | 11.33% |
+| 0% | 11.34% | 13.38% |
+| 0.1% | 10.08% | 12.26% |
+| 0.2% | 9.76% | 11.93% |
+| 0.3% | 9.5% | 11.63% |
+| 0.4% | 9.14% | 11.33% |
 
 There is a clear trend for both formats that down-weighting turnovers improves chances of winning the league
 
