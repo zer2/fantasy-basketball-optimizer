@@ -30,10 +30,10 @@ In the static ranking context the expected number of category wins was a reasona
 
 Another consideration is that the drafter will have some control over the aggregate statistics of their team so the objective function should be expressed as a function of team composition. 
 
-Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
+Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning category $c$ based on $X$ and $|C|$ as the number of categories, the objective function for the Each Category format is simply 
 
 $$
-H(X) = \sum_c w_c(X)
+H(X) = \sum_c \frac{w_c(X)}{|C|}
 $$
 
 For Most Categories, $H(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
