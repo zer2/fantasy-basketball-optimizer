@@ -390,7 +390,7 @@ with Profiler():
             unselected = z_scores.index[z_scores.index.isin(listify(selections_editable))]
             z_scores_styled = st.session_state.z_scores_styled
             z_scores_styled_unselected = z_scores_styled.hide(unselected)
-            z_scores_display = st.dataframe(z_scores_styled_unselected)
+            z_scores_display = st.table(z_scores_styled_unselected)
             
           with subtab2:
             g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
