@@ -8,4 +8,3 @@ yahoo_oauth
 yahoo_fantasy_api
 requests_oauthlib
 requests
-streamlit-profiler
