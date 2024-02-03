@@ -33,7 +33,7 @@ Another consideration is that the drafter will have some control over the aggreg
 Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning category $c$ based on $X$ and $|C|$ as the number of categories, the objective function for the Each Category format is simply 
 
 $$
-H(X) = \sum_c \frac{w_c(X)}{|C|}
+H(X) = \frac{ \sum_c w_c(X)}{|C|}
 $$
 
 For Most Categories, $H(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
