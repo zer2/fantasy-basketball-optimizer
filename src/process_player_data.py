@@ -106,6 +106,8 @@ def process_player_data(player_stats
 
   coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'], params)
   z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, params, 1,0)
+  z_scores_first_order = z_scores_first_order * multipliers.T.values[0]
+
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
@@ -114,6 +116,10 @@ def process_player_data(player_stats
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, params, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params,  1,0)
   x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params, 0,1)
+
+  g_scores = g_scores * multipliers.T.values[0]
+  z_scores = z_scores * multipliers.T.values[0]
+  x_scores = x_scores * multipliers.T.values[0]
 
   #Design the score table based on what we expect other drafters to use. 
   #Z-score for rotisserie, otherwise G-score
@@ -159,7 +165,6 @@ def process_player_data(player_stats
   
   L = np.array(x_scores_as_diff.cov()) 
 
-  z_scores = z_scores * multipliers.T.values[0]
   z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
   z_scores.sort_values('Total', ascending = False, inplace = True)
 

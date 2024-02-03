@@ -1,8 +1,8 @@
 # Dynamic strategy with H-scoring
 
-Static ranking lists are convenient but suboptimal, since they lack context about team composition. An ideal algorithm would adapt its strategy based on which players have already been chosen. 
+Static ranking lists are convenient but suboptimal, since they lack context about team composition. An ideal approach would adapt based on previously chosen players. 
 
-One way that this can be useful is 'punting'- a strategy whereby a drafter gives up on winning some number of categories in order to improve their chances of winning the rest. This can be beneficial because sacrificing a category costs an expected value of $0.5$ category wins at most, and the value of over-performing in all of the other categories is often worth more than that. For example, a drafter may give up on turnovers in such a way that they gain a slight edge in every other category. If they end up with a $0\%$ chance of winning turnovers and a $60\%$ chance of winning the other categories, their expected value of categories won is $4.8$ which is above the baseline of $4.5$. 
+The most common way that real drafters adapt is by 'punting'- a strategy whereby they give up on winning some number of categories that they are already weak in, so that they can focus harder on the others. This can be beneficial because sacrificing a category costs an expected value of $0.5$ category wins at most, while the value of over-performing in all of the other categories is often worth more than that. For example, a drafter may give up on turnovers in such a way that they gain a slight edge in every other category. If they end up with a $0\%$ chance of winning turnovers and a $60\%$ chance of winning the other categories, their average probability of winning a category is $53.3\%$ which is above the baseline of $50\%$. 
 
 The simplest way to implement this strategy is calculating player values as normal, just without adding in the punted categories. This makes sense as a heuristic but lacks mathematical rigor and has obvious flaws. It would suggest that a tiny increase in a prioritized category is preferable to a huge increase in a deprioritized category, which is questionable. It also provides no mechanism for deciding how many or which categories to punt.
 
@@ -10,7 +10,7 @@ I derive a dynamic algorithm called H-scoring to improve on punting logic in the
 
 ## 1. The H-scoring approach
 
-Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is good, but figuring out the right way to incoporate it into decision-making is tricky. 
+Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is helpful, but figuring out the right way to incoporate it into decision-making is tricky. 
 
 The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
@@ -30,10 +30,10 @@ In the static ranking context the expected number of category wins was a reasona
 
 Another consideration is that the drafter will have some control over the aggregate statistics of their team so the objective function should be expressed as a function of team composition. 
 
-Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning a category based on $X$, the objective function for the Each Category format is simply 
+Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning category $c$ based on $X$ and $|C|$ as the number of categories, the objective function for the Each Category format is simply 
 
 $$
-H(X) = \sum_c w_c(X)
+H(X) = \frac{ \sum_c w_c(X)}{|C|}
 $$
 
 For Most Categories, $H(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
@@ -42,7 +42,7 @@ $$
 H(j)  = w_1(X) * w_2(X) * w_3(X) * w_4(X) * w_5(X) * (1-w_6(X)) * (1-w_7(X)) * (1-w_8(X)) * (1- w_9(X)) + \cdots
 $$
 
-Where there is a term for each scenario including five or more scenario wins. $1-w(X)$ represents a category that is lost, in the sense that a $0.8$ or $80\%$ chance of winning translates to a $o.2$ or $20\%$ chance of losing.
+Where there is a term for each scenario including five or more scenario wins. $1-w(X)$ represents a category that is lost, in the sense that a $0.8$ or $80\%$ chance of winning translates to a $0.2$ or $20\%$ chance of losing.
 
 You may also note that this formula assumes that all categories are independent from each other, given a choice of $X$. Ideally the equation would allow for correlations and compute the joint probability of each scenario. However, this turns out to be massively difficult- more on that in the limitations section
 
@@ -55,8 +55,9 @@ The discussion of static ranking lists established that point differentials betw
 ### 2c. Breaking down $X$ and $x_\mu$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
+
 - $X = A_s + X_p + X_{\mu_u} + X_u$ where
-  - $X_s$ is the aggregate statistics of team $A$'s already selected players
+  - $X_s$ is the aggregate statistics of team $A$'s already selected players: 
   - $X_p$ is the statistics of the candidate player
   - $X_{\mu_u}$ is the expected statistics of unchosen players
   - $X_u$ is a difference factor to adjust for future picks being different from expected

@@ -150,12 +150,12 @@ class HAgent():
                 c = c/c.sum(axis = 1).reshape(-1,1)
 
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1) 
+                    score = cdf_estimates.mean(axis = 1) 
 
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | (self.punting & (n_players_selected < (self.n_picks - 1)) ): 
@@ -166,28 +166,29 @@ class HAgent():
                 c = None
                 
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1) 
+                    score = cdf_estimates.mean(axis = 1) 
 
             #case where no new players need to be chosen
             elif n_players_selected == self.n_picks: 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
                               , scale = np.sqrt(self.diff_var))
-                     ,index = diff_means.index)
+                              , index = diff_means.index
+                                            )
 
                 c = None
                 
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum() 
+                    score = cdf_estimates.mean() 
 
             #case where there are too many players and some need to be removed 
             else: #n > n_picks 
@@ -206,18 +207,18 @@ class HAgent():
                                      ,index = diff_means_mod.index)
                                         
                 if self.winner_take_all:
-                    win_sums = combinatorial_calculation(cdf_estimates
+                    score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
                 else:
-                    win_sums = cdf_estimates.sum(axis = 1)
+                    score = cdf_estimates.mean(axis = 1)
 
                 c = None
 
             i = i + 1
     
-            yield c, win_sums
+            yield score, c, cdf_estimates
 
 
     ### below are functions used for the optimization procedure 
@@ -345,28 +346,52 @@ def analyze_trade(team_1_other
                   , players_chosen
                   ,n_iterations):    
                       
-    _, H_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
-    _, H_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
-
+    score_1_1, _, rate_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
+    score_2_2, _, rate_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
+                      
+    rate_1_1 = rate_1_1.T #ZR: hack for now
+    rate_2_2 = rate_2_2.T #ZR: hack for now
+ 
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
         generator = H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen)
         for i in range(n_iterations):
-            _, H_1_2 = next(generator)
+            score_1_2,_,rate_1_2  = next(generator)
+        rate_1_2.columns = rate_1_1.columns
         
-        _, H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
-    elif n_player_diff == 0:
-        _, H_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+        rate_2_1.columns = rate_1_1.columns
 
-        os.write(1, bytes(str(team_2_other + team_1_trade),'utf-8'))
-        _, H_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+    elif n_player_diff == 0:
+        score_1_2,_,rate_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+
+        rate_2_1 = rate_2_1.T #ZR: hack for now
+        rate_1_2 = rate_1_2.T #ZR: hack for now
     else:
-        _, H_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        score_1_2,_,rate_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        rate_1_2.columns = rate_1_1.columns
 
         generator = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
         for i in range(n_iterations):
-            _, H_2_1 = next(generator)
+            score_2_1,_,rate_2_1 = next(generator)
+    
+        rate_2_1.columns = rate_1_1.columns
 
-    return H_1_1, H_1_2, H_2_1, H_2_2
+    score_1_1_idxmax = score_1_1.idxmax()
+    score_1_2_idxmax = score_1_2.idxmax()
+    score_2_2_idxmax = score_2_2.idxmax()
+    score_2_1_idxmax = score_2_1.idxmax()
+
+    team_1_info = {'pre' : (score_1_1.loc[score_1_1_idxmax], rate_1_1.loc[score_1_1_idxmax])
+                        ,'post' : (score_1_2.loc[score_1_2_idxmax], rate_1_2.loc[score_1_2_idxmax])}
+    team_2_info = {'pre' : (score_2_2.loc[score_2_2_idxmax], rate_2_2.loc[score_2_2_idxmax])
+                        ,'post' : (score_2_1.loc[score_2_1_idxmax], rate_2_1.loc[score_2_1_idxmax])}
+                      
+    results_dict = {1 : team_1_info
+                    ,2 : team_2_info
+                   }
+
+    return results_dict
                 
