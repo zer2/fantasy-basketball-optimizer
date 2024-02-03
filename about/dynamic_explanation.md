@@ -55,8 +55,9 @@ The discussion of static ranking lists established that point differentials betw
 ### 2c. Breaking down $X$ and $x_\mu$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
+
 - $X = A_s + X_p + X_{\mu_u} + X_u$ where
-  - $X_s$ is the aggregate statistics of team $A$'s already selected players
+  - $X_s$ is the aggregate statistics of team $A$'s already selected players: 
   - $X_p$ is the statistics of the candidate player
   - $X_{\mu_u}$ is the expected statistics of unchosen players
   - $X_u$ is a difference factor to adjust for future picks being different from expected
