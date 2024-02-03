@@ -30,7 +30,7 @@ One way of thinking about the importance of turnovers is to break it down into t
 
 Under those two conditions, investment in turnovers will matter. If either of them are not met, investing in turnovers would not help, because the match-up would be won or lost anyway. 
 
-These probabilities can be estimated by approximating the values of all categories are multivariate normals with mean zero and sampling from the distribution many times. The result is 
+The probability of both criteria occuring can be estimated by approximating the values of all categories are multivariate normals with mean zero and sampling from the distribution many times. The result is 
 
  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
