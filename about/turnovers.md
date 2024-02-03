@@ -36,7 +36,7 @@ The probability of both criteria occuring can be estimated by approximating the 
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
 
-So turnovers actually end up having a low-end likelihood of mattering, but not in a unique way compared to other categories
+So turnovers actually end up having a low-ish likelihood of mattering, but not in a unique way compared to other categories
 
 ### Each category
 
@@ -50,7 +50,7 @@ Most players are interested in winning their league, not just doing well general
 Note what happens to the tipping point probabilities when we start with some advantage
 
 
- |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
+ | Advantage  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |----:|:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 0   | 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
 | 0.5 | 7.1\%  | 5.1\%  | 4.4\%  | 5.7\%  | 4.2\%  | 5.0\%  | 3.1\%  | 4.6\%     | 4.6\%     |
