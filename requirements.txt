@@ -9,5 +9,3 @@ yahoo_fantasy_api
 yfpy==13.0.0
 requests_oauthlib
 requests
-streamlit-profiler
-pyyaml
