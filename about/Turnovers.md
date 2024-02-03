@@ -24,9 +24,9 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the other categories. 
 
- ### Most Categories
+### Most categories 
 
-One way of thinking about the importance of turnovers for Most Categories is to break it down into two factors
+One way of thinking about the importance of turnovers is to break it down into two factors
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
@@ -38,9 +38,11 @@ These probabilities can be estimated by approximating the values of all categori
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.8% | 7.7%  | 7.1%  | 8.8%  | 6.5%  | 6.7%  | 7.1%  | 7.2%     | 6.8%     |
 
-So turnovers actually end up having a low-end likelihood of mattering, but not in a unique way compared to other categories. 
+So turnovers actually end up having a low-end likelihood of mattering, but not in a unique way compared to other categories
 
- ### Each Categoriy
+### Each category
+
+Each Category does not have the same concept of a "tipping point", so this effect is not relevant 
 
 
 ## Part 2: The need for consistent advantage
@@ -58,7 +60,21 @@ Note what happens to the tipping point probabilities when we start with some adv
 
 While all categories become less likely to matter individually in this scenario, turnovers become almost vanishly unlikely to matter. This is because with a consistent advantage in other categories, you are almost definitely not winning turnovers anyway
 
+There isn't an easy way to translate this analysis for Each Category, but in concept, the same idea should hold. Under the condition that the drafter is doing well and has a good shot at winning the entire league, they are likely not winning turnovers.
+
 ## Part 3: Testing 
+
+I ran a simple test to determine if down-weighting turnovers is a good idea. To do this test, I split up all drafters into two groups of six- one treated turnovers normally, the other down-weighted it. The results are as follows 
+
+| Weight |  Most Categories | Each Category |
+|----:|:------|:------|
+| 0 | 11.34% | 13.38% |
+| 0.1 | 10.08% | 12.26% |
+| 0.2 | 9.76% | 11.93% |
+| 0.3 | 9.5% | 11.63% |
+| 0.4 | 9.14% | 11.33% |
+
+
 
 ## Part 4: Takeaways
 
