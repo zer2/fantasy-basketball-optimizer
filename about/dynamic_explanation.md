@@ -1,8 +1,8 @@
 # Dynamic strategy with H-scoring
 
-Static ranking lists are convenient but suboptimal, since they lack context about team composition. An ideal algorithm would adapt its strategy based on which players have already been chosen. 
+Static ranking lists are convenient but suboptimal, since they lack context about team composition. An ideal approach would adapt based on previously chosen players. 
 
-One way that this can be useful is 'punting'- a strategy whereby a drafter gives up on winning some number of categories in order to improve their chances of winning the rest. This can be beneficial because sacrificing a category costs an expected value of $0.5$ category wins at most, and the value of over-performing in all of the other categories is often worth more than that. For example, a drafter may give up on turnovers in such a way that they gain a slight edge in every other category. If they end up with a $0\%$ chance of winning turnovers and a $60\%$ chance of winning the other categories, their average probability of winning a category is $53.3\%$ which is above the baseline of $50\%$. 
+The most common way that real drafters adapt is by 'punting'- a strategy whereby they give up on winning some number of categories that they are already weak in so that they can focus on other categories and build an edge in them. This can be beneficial because sacrificing a category costs an expected value of $0.5$ category wins at most, while the value of over-performing in all of the other categories is often worth more than that. For example, a drafter may give up on turnovers in such a way that they gain a slight edge in every other category. If they end up with a $0\%$ chance of winning turnovers and a $60\%$ chance of winning the other categories, their average probability of winning a category is $53.3\%$ which is above the baseline of $50\%$. 
 
 The simplest way to implement this strategy is calculating player values as normal, just without adding in the punted categories. This makes sense as a heuristic but lacks mathematical rigor and has obvious flaws. It would suggest that a tiny increase in a prioritized category is preferable to a huge increase in a deprioritized category, which is questionable. It also provides no mechanism for deciding how many or which categories to punt.
 
@@ -10,7 +10,7 @@ I derive a dynamic algorithm called H-scoring to improve on punting logic in the
 
 ## 1. The H-scoring approach
 
-Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is good, but figuring out the right way to incoporate it into decision-making is tricky. 
+Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is helpful, but figuring out the right way to incoporate it into decision-making is tricky. 
 
 The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
