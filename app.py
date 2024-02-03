@@ -380,11 +380,16 @@ with Profiler():
         with cand_tab:
     
           subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
-        
+
+          @st.cache_data()
+          def make_z_styled(z_scores):  
+            z_scores_styled = z_scores.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+              
           with subtab1:
-            z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-            z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
-            z_scores_display = st.dataframe(z_scores_unselected_styled)
+            z_scores_styled = make_z_styled(z_scores)
+            unselected = z_scores.index[z_scores.index.isin(listify(selections_editable))]
+            z_scores_styled_unselected = z_scores_styled.hide(unselected)
+            z_scores_display = st.dataframe(z_scores_styled_unselected)
             
           with subtab2:
             g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
