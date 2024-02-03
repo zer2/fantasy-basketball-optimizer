@@ -8,7 +8,7 @@ Correlation is a measure of how related two metrics are. When two metrics tend t
 
 A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance, the correlation matrix is 
                                                         
- |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throe /%   | Field Goal /%   |
+ |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw /%   | Field Goal /%   |
  |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
  | Points    | 100.0/% | 47.2/%  | 57.7/%  | 40.1/%  | 18.6/%  | 63.0/%  | -66.5/% | 17.5/%    | 19.0/%    |
  | Rebounds    | 47.2/%  | 100.0/% | 24.1/%  | 21.6/%  | 46.9/%  | 2.5/%   | -41.4/% | -20.9/%   | 27.5/%    |
@@ -32,7 +32,7 @@ Under those two conditions, investment in turnovers will matter. If either of th
 
 These probabilities can be estimated by approximating the values of all categories are multivariate normals with mean zero and sampling from the distribution many times. The result is 
 
- | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throe /%   | Field Goal /%   |
+ | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw /%   | Field Goal /%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.8/% | 7.7/%  | 7.1/%  | 8.8/%  | 6.5/%  | 6.7/%  | 7.1/%  | 7.2/%     | 6.8/%     |
 
@@ -50,7 +50,7 @@ Most players are interested in winning their league, not just doing well general
 Note what happens to the tipping point probabilities when we start with some advantage
 
 
- |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throe /%   | Field Goal /%   |
+ |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw /%   | Field Goal /%   |
 |----:|:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 0   | 10.8/% | 7.7/%  | 7.1/%  | 8.8/%  | 6.5/%  | 6.7/%  | 7.1/%  | 7.2/%     | 6.8/%     |
 | 0.5 | 7.1/%  | 5.1/%  | 4.4/%  | 5.7/%  | 4.2/%  | 5.0/%  | 3.1/%  | 4.6/%     | 4.6/%     |
