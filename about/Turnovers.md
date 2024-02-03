@@ -4,11 +4,12 @@ Unfortunately, I had to ignore the concept of correlations between categories in
 
 Long story short I think down-weighting turnovers does make sense, though to what degree depends on context
 
-## Part 1: Covariance and tipping points 
+## Part 1: Correlation and tipping points 
+
+Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero. 
+
+A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance, the correlation matrix is 
                                                         
-
-Choosing from top players and weeks randomly (with turnovers inverted), the correlation matrix looks like this 
-
  |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throe %   | Field Goal %   |
  |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
  | Points    | 100.0% | 47.2%  | 57.7%  | 40.1%  | 18.6%  | 63.0%  | -66.5% | 17.5%    | 19.0%    |
@@ -21,7 +22,11 @@ Choosing from top players and weeks randomly (with turnovers inverted), the corr
  | Free Throw % | 17.5%  | -20.9% | 11.0%  | 6.5%   | -14.8% | 21.0%  | -4.7%  | 100.0%   | -13.8%   |
  | Field Goal % | 19.0%  | 27.5%  | -9.2%  | -6.8%  | 24.0%  | -11.6% | 1.2%   | -13.8%   | 100.0%   |
 
-One way of thinking about category importance for Most Categories is to break it down into two factors
+ It is clear that the turnovers category is uniquely negatively correlated to the other categories. 
+
+ ### Most Categories
+
+One way of thinking about the importance of turnovers for Most Categories is to break it down into two factors
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
@@ -34,6 +39,9 @@ These probabilities can be estimated by approximating the values of all categori
 | 10.8% | 7.7%  | 7.1%  | 8.8%  | 6.5%  | 6.7%  | 7.1%  | 7.2%     | 6.8%     |
 
 So turnovers actually end up having a low-end likelihood of mattering, but not in a unique way compared to other categories. 
+
+ ### Each Categoriy
+
 
 ## Part 2: The need for consistent advantage
 
