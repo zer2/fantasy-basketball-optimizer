@@ -80,10 +80,10 @@ It should be remembered that this league simulation is specific, and not entirel
 
 I think turnovers ought to be downweighted somewhat most of the time. However, the appropriate re-weighting for turnovers depends heavily on context. 
 
--Format 
-  -Head to head, regular season: If your league has a top-heavy reward structure and reaching the playoffs is difficult, then it makes sense to ignore turnovers and hope that other categories propel you to the playoffs. However, if making it to the playoffs is relatively easy or the payout structure is even, then you might be able to do well even without significant good luck for most of the season. So you shouldn't downweight turnovers too much 
-  -Head to head, playoffs: Playoffs are likely evenly matched because they are always between strong teams. Turnovers are still relatively unimportant because they are unlikely to be the tipping point, but not as unimportant as when you are relying on a consistent advantage in other categories
-  -Rotissierie: Rotisserie has no playoffs, so you need exceptional performances across the board for the entire season to win. It is difficult to do this while also winning turnovers, so turnovers should be  down-weighted. [Micah Lamdin](https://hashtagbasketball.com/fantasy-basketball/content/how-to-play-fantasy-basketball-rotisserie) is one analyst who agrees with this
--Other drafters
-  -If other drafters are ignoring turnovers, you might be able to gain a small advantage by being the one drafter that does keep them in mind, without having to sacrifice much in value from the other categories
-  -If other drafters are weighing turnovers highly, it means low-turnover players will be hard to find anyway, so it makes sense to deprioritize them 
+- Format 
+  - Head to head, regular season: If your league has a top-heavy reward structure and reaching the playoffs is difficult, then it makes sense to ignore turnovers and hope that other categories propel you to the playoffs. However, if making it to the playoffs is relatively easy or the payout structure is even, then you might be able to do well even without significant good luck for most of the season. So you shouldn't downweight turnovers too much 
+  - Head to head, playoffs: Playoffs are likely evenly matched because they are always between strong teams. Turnovers are still relatively unimportant because they are unlikely to be the tipping point, but not as unimportant as when you are relying on a consistent advantage in other categories
+  - Rotissierie: Rotisserie has no playoffs, so you need exceptional performances across the board for the entire season to win. It is difficult to do this while also winning turnovers, so turnovers should be  down-weighted. [Micah Lamdin](https://hashtagbasketball.com/fantasy-basketball/content/how-to-play-fantasy-basketball-rotisserie) is one analyst who agrees with this
+- Other drafters
+  - If other drafters are ignoring turnovers, you might be able to gain a small advantage by being the one drafter that does keep them in mind, without having to sacrifice much in value from the other categories
+  - If other drafters are weighing turnovers highly, it means low-turnover players will be hard to find anyway, so it makes sense to deprioritize them 
