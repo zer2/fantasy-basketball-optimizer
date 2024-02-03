@@ -63,7 +63,7 @@ with Profiler():
            
            with about_tab:
            
-             intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Waivers & Trading'])
+             intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab, turnover_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Waivers & Trading','Turnovers'])
            
              with intro_tab:
                  c2,c2,c3 = st.columns([0.1,0.8,0.1])
@@ -94,7 +94,13 @@ with Profiler():
                  with c2:
                      trading_md = read_markdown_file('about/trading.md')
                      st.markdown(trading_md, unsafe_allow_html=True)    
-                   
+             
+             with turnover_tab:
+                 c2,c2,c3 = st.columns([0.1,0.8,0.1])
+                 with c2:
+                     trading_md = read_markdown_file('about/turnovers.md')
+                     st.markdown(trading_md, unsafe_allow_html=True)        
+                            
            with param_tab: 
              left, middle, right = st.columns([0.25,0.3,0.45])
            
