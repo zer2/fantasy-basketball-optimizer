@@ -67,19 +67,21 @@ I ran a simple test to determine if down-weighting turnovers is a good idea. To 
 | Weight |  Most Categories | Each Category |
 |----:|:------|:------|
 | 0\% | 11.3\% | 13.4\% |
-| 0.1\% | 10.1\% | 12.3\% |
-| 0.2\% | 9.8\% | 11.9\% |
-| 0.3\% | 9.5\% | 11.6\% |
-| 0.4\% | 9.1\% | 11.3\% |
+| 10\% | 10.1\% | 12.3\% |
+| 20\% | 9.8\% | 11.9\% |
+| 30\% | 9.5\% | 11.6\% |
+| 40\% | 9.1\% | 11.3\% |
 
-The baseline win rate is $8.3\%$. There is a clear trend for both formats that down-weighting turnovers improves chances of winning the league
+The baseline win rate is $8.3\%$, so there is a clear trend for both formats that down-weighting turnovers improves chances of winning the league
+
+It should be remembered that this league simulation is specific, and not entirely realistic. The take-away it not necessarily that turnovers should always be ignored 
 
 ## Part 4: Takeaways
 
 I think turnovers ought to be downweighted somewhat most of the time. However, the appropriate re-weighting for turnovers depends heavily on context. 
 
 -Format 
-  -Head to head, regular season: If your league has a top-heavy reward structure and reaching the playoffs is difficult, then it makes sense to ignore turnovers and hope that other categories propel you to the playoffs. If making it to the playoffs is relatively easy or the payout structure is even, then you might be able to do well even without significant good luck for most of the season, so you shouldn't downweight turnovers too much 
+  -Head to head, regular season: If your league has a top-heavy reward structure and reaching the playoffs is difficult, then it makes sense to ignore turnovers and hope that other categories propel you to the playoffs. However, if making it to the playoffs is relatively easy or the payout structure is even, then you might be able to do well even without significant good luck for most of the season. So you shouldn't downweight turnovers too much 
   -Head to head, playoffs: Playoffs are likely evenly matched because they are always between strong teams. Turnovers are still relatively unimportant because they are unlikely to be the tipping point, but not as unimportant as when you are relying on a consistent advantage in other categories
   -Rotissierie: Rotisserie has no playoffs, so you need exceptional performances across the board for the entire season to win. It is difficult to do this while also winning turnovers, so turnovers should be  down-weighted. [Micah Lamdin](https://hashtagbasketball.com/fantasy-basketball/content/how-to-play-fantasy-basketball-rotisserie) is one analyst who agrees with this
 -Other drafters
