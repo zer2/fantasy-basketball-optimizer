@@ -185,7 +185,7 @@ with Profiler():
                                                 , index = coefficient_df.index)
                    multipliers = st.data_editor(multiplier_df)
              
-                   st.caption('Manual multipliers for Z-scores and G-scores. E.g. to downweight turnovers, set the turnovers multiplier to 0.9')
+                   st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
                    
                  with coef_col:
                    st.subheader(f"Coefficients")
