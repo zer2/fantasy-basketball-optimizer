@@ -1,8 +1,6 @@
 Turnovers are a unique category because turnovers are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it less likely that you will win other categories. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$.
 
-Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). I had to treat turnovers like every other category. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, so I thought I would lay out my less structured thoughts on the category here. 
-
-Long story short I think down-weighting turnovers does make sense, though to what degree depends on context
+Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). I had to treat turnovers like every other category. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and I did set the default weighting for turnovers to be $25\%$. Below is a justification for that decision 
 
 ## Part 1: Correlation and tipping points 
 
@@ -64,7 +62,7 @@ There isn't an easy way to translate this analysis for Each Category, but in con
 
 ## Part 3: Testing 
 
-I ran a simple test to determine if down-weighting turnovers is a good idea. To do this test, I split up all drafters into two groups of six- one treated turnovers normally, the other down-weighted it. The results are as follows for the down-weighter's win rate:
+I ran a simple test to determine if down-weighting turnovers is a good idea. To do this test, I split up all drafters into two groups of six- one treated turnovers normally, the other down-weighted it. The team with the highest regular season record won. The results are as follows for the down-weighter's win rate:
 
 | Weight |  Most Categories | Each Category |
 |----:|:------|:------|
@@ -74,11 +72,11 @@ I ran a simple test to determine if down-weighting turnovers is a good idea. To 
 | 0.3 | 9.5% | 11.63% |
 | 0.4 | 9.14% | 11.33% |
 
-there is a clear trend for both formats that down-weighting turnovers is a good idea
+There is a clear trend for both formats that down-weighting turnovers improves chances of winning the league
 
 ## Part 4: Takeaways
 
-The appropriate re-weighting for turnovers depends heavily on context. 
+I think turnovers ought to be downweighted somewhat most of the time. However, the appropriate re-weighting for turnovers depends heavily on context. 
 
 -Format 
   -Head to head, regular season: If your league has a top-heavy reward structure and reaching the playoffs is difficult, then it makes sense to ignore turnovers and hope that other categories propel you to the playoffs. If making it to the playoffs is relatively easy or the payout structure is even, then you might be able to do well even without significant good luck for most of the season, so you shouldn't downweight turnovers too much 
