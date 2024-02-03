@@ -66,13 +66,13 @@ I ran a simple test to determine if down-weighting turnovers is a good idea. To 
 
 | Weight |  Most Categories | Each Category |
 |----:|:------|:------|
-| 0\% | 11.34\% | 13.38\% |
-| 0.1\% | 10.08\% | 12.26\% |
-| 0.2\% | 9.76\% | 11.93\% |
-| 0.3\% | 9.5\% | 11.63\% |
-| 0.4\% | 9.14\% | 11.33\% |
+| 0\% | 11.3\% | 13.4\% |
+| 0.1\% | 10.1\% | 12.3\% |
+| 0.2\% | 9.8\% | 11.9\% |
+| 0.3\% | 9.5\% | 11.6\% |
+| 0.4\% | 9.1\% | 11.3\% |
 
-There is a clear trend for both formats that down-weighting turnovers improves chances of winning the league
+The baseline win rate is $8.3\%$. There is a clear trend for both formats that down-weighting turnovers improves chances of winning the league
 
 ## Part 4: Takeaways
 
