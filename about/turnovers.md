@@ -1,6 +1,6 @@
 Turnovers are a unique category because turnovers are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it less likely that you will win other categories. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$.
 
-Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). I had to treat turnovers like every other category. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and I did set the default weighting for turnovers to be $25\\%$. Below is a justification for that decision 
+Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). I had to treat turnovers like every other category. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and I did set the default weighting for turnovers to be $25\%$. Below is a justification for that decision 
 
 ## Part 1: Correlation and tipping points 
 
