@@ -58,13 +58,13 @@ Note what happens to the tipping point probabilities when we start with some adv
 | 0.5 | 7.1%  | 5.1%  | 4.4%  | 5.7%  | 4.2%  | 5.0%  | 3.1%  | 4.6%     | 4.6%     |
 | 1   | 1.9%  | 1.9%  | 2.0%  | 2.5%  | 1.7%  | 2.2%  | 0.4%  | 1.6%     | 1.8%     |'
 
-While all categories become less likely to matter individually in this scenario, turnovers become almost vanishly unlikely to matter. This is because with a consistent advantage in other categories, you are almost definitely not winning turnovers anyway
+While all categories become less likely to matter individually in this scenario, turnovers become almost vanishly unlikely to matter. This is because with a consistent advantage in other categories, you are almost definitely not winning turnovers anyway.
 
-There isn't an easy way to translate this analysis for Each Category, but in concept, the same idea should hold. Under the condition that the drafter is doing well and has a good shot at winning the entire league, they are likely not winning turnovers.
+There isn't an easy way to translate this analysis for Each Category, but in concept, the same idea should hold. Under the condition that the drafter is doing well and has a good shot at winning the entire league, they are likely not winning turnovers
 
 ## Part 3: Testing 
 
-I ran a simple test to determine if down-weighting turnovers is a good idea. To do this test, I split up all drafters into two groups of six- one treated turnovers normally, the other down-weighted it. The results are as follows 
+I ran a simple test to determine if down-weighting turnovers is a good idea. To do this test, I split up all drafters into two groups of six- one treated turnovers normally, the other down-weighted it. The results are as follows for the down-weighter's win rate:
 
 | Weight |  Most Categories | Each Category |
 |----:|:------|:------|
@@ -74,7 +74,7 @@ I ran a simple test to determine if down-weighting turnovers is a good idea. To 
 | 0.3 | 9.5% | 11.63% |
 | 0.4 | 9.14% | 11.33% |
 
-
+there is a clear trend for both formats that down-weighting turnovers is a good idea
 
 ## Part 4: Takeaways
 
