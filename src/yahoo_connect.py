@@ -4,6 +4,7 @@ from src import yahoo_helper
 from streamlit.logger import get_logger
 from tempfile import mkdtemp
 from yahoo_oauth import OAuth2
+from yfpy.models import Team, Roster
 from yfpy.query import YahooFantasySportsQuery
 
 import json
@@ -17,7 +18,7 @@ import yahoo_fantasy_api as yfa
 
 LOGGER = get_logger(__name__)
 
-def yahoo(league_id):
+def get_yahoo_players(league_id) -> pd.DataFrame:
     # Client_ID and Secret from https://developer.yahoo.com/apps/
     cid = st.secrets["YAHOO_CLIENT_ID"]
     cse = st.secrets["YAHOO_CLIENT_SECRET"]
@@ -110,13 +111,38 @@ def yahoo(league_id):
                 json.dump(private_data, f)
 
             teams_dict = get_teams(league_id, temp_dir)
-            st.write(f"Teams for the league currently are:")
-            for team_id, team_name in teams_dict.items():
-                st.write(f"{team_id}: {team_name}")
+            # st.write(f"Teams for the league currently are:")
+            # for team_id, team_name in teams_dict.items():
+            #     st.write(f"{team_id}: {team_name}")
+
+            team_ids = list(teams_dict.keys())
+
+            rosters_dict = get_rosters(league_id, temp_dir, team_ids)
+
+            # for team_id, roster in rosters_dict.items():
+            #     st.write(f"{teams_dict[team_id]} has {len(roster.players)} players")
+
+            final_df = pd.DataFrame()
+
+            for team_id, roster in rosters_dict.items():
+                team_name = teams_dict[team_id]
+                relevant_player_names = [player.name.full for player in roster.players if player.selected_position.position != 'IL' and player.selected_position.position is not None]
+
+                if len(relevant_player_names) < 13:
+                    relevant_player_names.extend([None] * (13 - len(relevant_player_names)))
+                
+                if len(relevant_player_names) != 13:
+                    st.write(f"{team_name} has the following players:")
+                    for player in roster.players:
+                        st.write(f"{player}")
+                final_df.loc[:,team_name] = relevant_player_names
+
+            return final_df
+
             shutil.rmtree(temp_dir)
 
 @st.cache_data(ttl=3600)
-def get_teams(league_id, auth_path):    
+def get_teams(league_id: str, auth_path: str):    
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     auth_directory = auth_path
@@ -128,30 +154,25 @@ def get_teams(league_id, auth_path):
     LOGGER.info(f"sc: {sc}")
     teams_dict = yahoo_helper.get_teams(sc)
     return teams_dict
+
+@st.cache_data(ttl=3600)
+def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
+    league_id = league_id
+    LOGGER.info(f"League id: {league_id}")
+    auth_directory = auth_path
+    sc = YahooFantasySportsQuery(
+        auth_dir=auth_directory,
+        league_id=league_id,
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+
+    rosters_dict: dict[int, Roster] = {}
+
+    for team_id in team_ids:
+        roster = yahoo_helper.get_team_roster(sc, team_id)
+        rosters_dict[team_id] = roster
     
-def get_yahoo_info(league_id):
-    yahoo_client_id = st.secrets["YAHOO_CLIENT_ID"]
-    yahoo_client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
-    
-    redirect = 'https://api.login.yahoo.com/oauth2/request_auth?redirect_uri=oob&response_type=code&client_id=' + yahoo_client_id
-    st.markdown("check out this [link](" + redirect + ")", unsafe_allow_html = True)
-    oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
-
-
-    league_id = '418.1.' + league_id 
-    
-    league = gm.to_league(league_id)
-  
-    rosters = { t['name'] : league.to_team(team_id).roster(21) for team_id, t in league.teams().items()}
-  
-    roster_dict = {team: [p['name'] for p in roster if p['selected_position'] != 'IL' ] for team, roster in rosters.items()}
-    roster_df = pd.DataFrame.from_dict(roster_dict, orient='index')
-    roster_df = roster_df.transpose()
-  
-    il_dict = {team: [p['name'] for p in roster if p['selected_position'] == 'IL' ] for team, roster in rosters.items()}
-    all_il_players = [x for v in il_dict.values() for x in v]
-
-    return rosters, all_il_players
-
+    return rosters_dict
 
 

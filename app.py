@@ -9,8 +9,7 @@ from src.helper_functions import listify, make_progress_chart, read_markdown_fil
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
-from src.yahoo_connect import get_yahoo_info
-from src.yahoo_connect import yahoo
+from src.yahoo_connect import get_yahoo_players
 
 #from streamlit_profiler import Profiler
 
@@ -138,31 +137,31 @@ with param_tab:
     df.index.name = 'Player'
 
     #yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?')
-    yahoo_league_id = ""
+    yahoo_league_id = "189463"
     
-    if len(yahoo_league_id) < 6:
-      n_drafters = st.number_input(r'How many drafters are in your league?'
-                , min_value = 2
-                , value = 12)
+    team_players_df = get_yahoo_players(yahoo_league_id)
 
-      n_picks = st.number_input(r'How many players will each drafter choose?'
-                  , min_value = 1
-                  , value =13)
-        
-      #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-      selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
-    else:
-      roster_df, injury_list = get_yahoo_info(yahoo_league_id)       
+    n_drafters = team_players_df.shape[1]
 
-      n_drafters = roster_df.shape[1]
-      n_picks = roster_df.shape[0]
+    n_picks = team_players_df.shape[0]
 
-      #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-      selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+    # n_drafters = st.number_input(r'How many drafters are in your league?'
+    #           , min_value = 2
+    #           , value = 12)
+
+    # n_picks = st.number_input(r'How many players will each drafter choose?'
+    #             , min_value = 1
+    #             , value =13)
+      
+    #perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
+    # selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+
+    # Yahoo data
 
     #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
-    player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
-    selections = selections.astype(player_category_type)
+    # player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
+    
+    selections = team_players_df
   
   with middle: 
       st.header('Player Statistics')
