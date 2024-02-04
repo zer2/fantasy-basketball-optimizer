@@ -2,7 +2,7 @@
 
 Turnovers are a unique category because they are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it harder to win other categories and vice versa. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
-I think that there is a real argument to be made here, but it is overblown. For this reason the website's default is to weigh turnovers like every other category. 
+I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
 Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made and why they don't convince me, then testing the hypothesis that punting turnovers is uniquely beneficial
 
