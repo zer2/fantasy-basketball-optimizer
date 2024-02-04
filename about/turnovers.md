@@ -52,11 +52,11 @@ So turnovers actually end up having a low-ish likelihood of mattering, though no
 
 It might be surprising that turnovers are not markedly less important than the others in importance given the argument made earlier. 
 
-The flaw in the argument is that if one drafter dominates the counting stats, they are likely winning the matchup no matter what. The only important scenarios are those in which the other eight categories are tied, meaning some counting statistics must be won and some must be lost. Take an arbitrary example of a tipping point scenario
+The flaw in the argument was that it considered the probability of winning turnovers given winning all or most of the other categories. This is actually an irrelevent scenario- if one drafter is dominating so heavily, they are going to win no matter what, and no categories matter. The actually truly scenarios are the tipping points in which the other eight categories are tied, meaning some counting statistics must be won and some must be lost. Take an arbitrary example of a tipping point scenario
 - Drafter 1 wins: Points, Steals, Threes, Free Throw %
 - Drafter 2 wins: Assists, Rebounds, Blocks, Field Goal %
 
-Is it easy to tell which team had more playing time and therefore likely turnovers? Each drafter won three counting statistics, which are all highly correlated with playing time and turnovers. There's very little reason, based on this scenario, to assume that the turnover outcome is ineveitable in either direction. Maybe in some other scenarios it will be slightly more obvious, making turnovers a bit less important, but the fact will always remain that each drafter needs to win some counting statistics for the scenario to be meaningful in terms of marginal category importance
+Is it easy to tell which team had more playing time and therefore likely turnovers? Each drafter won three counting statistics, which are all highly correlated with playing time and turnovers. There's very little reason, based on this scenario, to assume that the turnover outcome is ineveitable in either direction. Maybe in some other scenarios it will be slightly more obvious, making turnovers a bit less likely to flip the result on the margin, but the fact will always remain that each drafter needs to win some counting statistics for the scenario to be meaningful in terms of marginal category importance
 
 ## 3. The third argument: Banking on overperformance
 
