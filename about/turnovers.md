@@ -27,20 +27,23 @@ The argument has intuitive appeal, but it is also a fallacy, no matter how it is
 First, the concept of playing to your outs is mostly invoked in cases where a player is likely to lose. When a drafter is likely to win, a complementary concept is at play: [win-more](https://articles.starcitygames.com/magic-the-gathering/win-more-in-commander-magic-what-it-is-and-isnt/). The concept is that there is no point strategizing around games which you are definitely going to win, because you are going to win either way. Adding it to the concept of playing to your outs, the full picture is that one should not strategize around any scenario where the outcome is guaranteed; rather, they should strategize around scenarios where the outcome hangs in the balance and could be effected. In the case of fantasy basketball, scenarios where the drafter has a significant disadvantage in terms of playing time is largely irrelevant because they are going to lose no matter what. But the flipside scenario is also irrelevant: if the drafter has a significant advantage in playing time, they are going to win no matter what. The only relevant scenarios to strategize around are those where the outcome is close, and for the outcome to be close, each drafter must win some share of the counting statistics, making it unclear which team has the advantage in turnovers. 
 
 One might appeal to the second framing of this argument as a counter. However we approach this strategically, there is the cold hard fact that succesful teams tend to do poorly in turnovers. I believe that this is the truth, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). Simplifying this drastically, consider the following results:
-- Drafter A chooses players with the same weight to all categories. Their players outperform across the board, and they win their league. Their turnover performance is bad
-- Drafter B chooses players with a down-weight on turnovers. their players outperform across the board, and the win their league. Their turnover performance is middling
-- Drafter C chooses players with the same weight on all categories. Their players underperform across the board, and they lose their league. Their turnover performance is middling
-- Drafter D chooses players with a down-weight on turnovers. Their players underperform across the board, and they lose their league. Their turnover performance is good
 
 | | Drafter A | Drafter B | Drafter C | Drafter D| 
 |:-------|:-------|:-------|:-------|:-------|
-|Turnover weight | 1 | 0 | 1 | 0 |
-|Player m/g | 30 | 15 | 30 | 15 |
+|Turnover weight | 0 | 1 | 0 | 1 |
+|Player m/g | 40 | 20 | 40 | 20 |
 |Result- turnovers | Bad | Middling | Middling | Good | 
 |Result- championship | Won | Won | Lost | Lost |
 
-This example makes it clear that the necessary condition for winning is having players overperform across the board. 
-
+Ignoring the player m/g numbers, one might naively infer two effects
+- Investing in turnovers lead to a better performance in turnovers. Evidence:
+  - Drafters B and D invested in turnovers, and were middling/good in them
+  - Drafters A and C did not invest in turnovers, and were middling/bad in them 
+- Performing badly in turnovers improves the probability of victory. Evidence:
+  - Drafters A and B won, and were middling/bad in turnovers
+  - Drafters C and D lost, and were middling/good in turnovers
+ 
+Putting these two arguments together make a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical. It can easily be seen by viewing the results holistically that turnover weight was irrelevant; the better-supported driver of victory was minutes per game. 
 
 ### Math 
 
@@ -62,9 +65,7 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. 
  
- However, does that necessarily translate to 
- 
- . One way of thinking about the importance of turnovers is to break it down into two factors
+ However, does that necessarily translate to a decreased importance. One way of thinking about the importance of turnovers is to break it down into two factors
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
@@ -76,15 +77,7 @@ The probability of both criteria occuring can be estimated by approximating the 
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
 
-So turnovers actually end up having a low-ish likelihood of mattering, though not in a unique way compared to other categories. 
-
-It might be surprising that turnovers are not markedly less important than the others in importance given the argument made earlier. 
-
-The flaw in the argument was that it considered the probability of winning turnovers given winning all or most of the other categories. This is actually an irrelevent scenario- if one drafter is dominating so heavily, they are going to win no matter what, and no categories matter. The actually truly scenarios are the tipping points in which the other eight categories are tied, meaning some counting statistics must be won and some must be lost. Take an arbitrary example of a tipping point scenario
-- Drafter 1 wins: Points, Steals, Threes, Free Throw %
-- Drafter 2 wins: Assists, Rebounds, Blocks, Field Goal %
-
-Is it easy to tell which team had more playing time and therefore likely turnovers? Each drafter won three counting statistics, which are all highly correlated with playing time and turnovers. There's very little reason, based on this scenario, to assume that the turnover outcome is ineveitable in either direction. Maybe in some other scenarios it will be slightly more obvious, making turnovers a bit less likely to flip the result on the margin, but the fact will always remain that each drafter needs to win some counting statistics for the scenario to be meaningful in terms of marginal category importance
+So turnovers actually end up having a low-ish likelihood of mattering, though not in a unique way compared to other categories
 
 ## 3. The third argument: Banking on overperformance
 
