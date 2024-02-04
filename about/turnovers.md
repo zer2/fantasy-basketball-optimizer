@@ -31,7 +31,7 @@ One might appeal to the second framing of this argument as a counter. However we
 | | Drafter A | Drafter B | Drafter C | Drafter D| 
 |:-------|:-------|:-------|:-------|:-------|
 |Turnover weight | 0 | 1 | 0 | 1 |
-|Player m/g | 40 | 20 | 40 | 20 |
+|Player m/g | 40 | 40 | 20 | 20 |
 |Result- turnovers | Bad | Middling | Middling | Good | 
 |Result- championship | Won | Won | Lost | Lost |
 
