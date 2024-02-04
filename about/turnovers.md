@@ -119,4 +119,4 @@ It should be noted that this test does not cover the third argument because all 
 
 ## Takeaways
 
-I think it makes sense to downweight turnovers to some degree when you need your players to outperform across the board to win, e.g. in Rotisserie. To what degree I am not sure- it depends on how confident you are about your predictions of player performance. Otherwise, I think it is best to weigh turnovers at least close to as highly as other categories
+It might makes sense to downweight turnovers to some degree when you need your players to outperform across the board to win, e.g. in Rotisserie. To what degree I am not sure- it depends on how confident you are about your predictions of player performance. Otherwise, I don't think there is a great reason to down-weight turnovers heavily 
