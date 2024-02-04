@@ -18,7 +18,7 @@ To deal with this, all category scores should be adjusted by the week-to-week va
 
 ### Intuition 
 
-A second argument for downweighting turnovers, specifically for Most Categories, is that winning turnovers requires having your players play fewer minutes, which is a losing strategy overall. 
+A second argument for downweighting turnovers, specifically for Most Categories, is that winning turnovers requires having players play fewer minutes, which is a losing strategy overall. 
 
 This is essentially borrowing the concept of [playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/) from strategy games. The idea of playing to your outs is that guaranteed-lose situations should be ignored in decision-making, because they will be losses no matter what. Applying this concept to turnovers make intuitive sense, but is actually a fallacy.
 
