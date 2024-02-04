@@ -10,7 +10,7 @@ Unfortunately, I had to ignore the concept of correlations between categories in
 
 One argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
 
-It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category- steals are by a large margin. 
+It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
 
 To deal with this, all category scores should be adjusted by the week-to-week variance, which is the idea of G-scores. There is no reason to treat turnover volatility different from the volatility of other categories
 
