@@ -115,7 +115,7 @@ And for rebounds
 
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
 
-It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If having this advantage is necessary, then there might still be good reason to down-weight turnovers. 
+It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If having this advantage is necessary, then there might still be good reason to down-weight turnovers
 
 ## Takeaways
 
