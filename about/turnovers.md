@@ -54,7 +54,7 @@ It might be surprising that turnovers are not markedly less important than the o
 
 Is it easy to tell who has an advantage in turnovers? Each drafter won three counting statistics, which are all highly correlated with playing time
 
-## Argument 3: Need for consistent advantage 
+## Argument 3: Banking on overperformance
 
 One might note that the math in the last section was predicated on neither player having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
 
