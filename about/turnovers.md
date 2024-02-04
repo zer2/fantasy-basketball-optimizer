@@ -24,7 +24,7 @@ This is essentially borrowing the concept of [playing to your outs](https://arti
 
 The concept of playing to your outs is mostly invoked in cases where a player is likely to lose. When a player is likely to win, a complementary concept is at play: [win-more](https://articles.starcitygames.com/magic-the-gathering/win-more-in-commander-magic-what-it-is-and-isnt/). The idea of win-more is that there is no point strategizing around situations which aure guaranteed wins for the same reason that there is no point strategizing around situations that are guaranteed losses. Adding it to the concept of playing to your outs, the full picture is that one should not strategize around any scenario where the outcome is guaranteed; rather, one should strategize around scenarios where the outcome hangs in the balance and could be affected by strategic decision-making. In the case of fantasy basketball, scenarios where the drafter has a significant disadvantage in terms of playing time are largely irrelevant because they are going to lose no matter what. But the flipside scenario is also irrelevant: if the drafter has a significant advantage in playing time, they are going to win no matter what. The only relevant scenarios to strategize around are those where the outcome is close, and for the outcome to be close, each drafter must win some share of the counting statistics, making it unclear which team has the advantage in turnovers. 
 
-One might counter with the empirical fact that succesful teams tend to do poorly in turnovers. I believe that this is the truth, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). Simplifying this drastically, consider the following results:
+One might counter with the empirical fact that succesful teams tend to do poorly in turnovers. I don't dispute the fact, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). Simplifying this drastically, consider the following results:
 
 | | Drafter A | Drafter B | Drafter C | Drafter D| 
 |:-------|:-------|:-------|:-------|:-------|
@@ -41,11 +41,11 @@ Ignoring the player m/g numbers, one might naively infer two effects
   - Drafters A and B won, and were middling/bad in turnovers
   - Drafters C and D lost, and were middling/good in turnovers
  
-Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical and the second inference was likely incorrect. It can easily be seen by viewing the results holistically that turnover weight was irrelevant; the better-supported driver of victory was minutes per game. 
+Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical and the second inference was likely incorrect. Performing badly in turnovers didn't make the drafters win- the same conditions that led to winning, having high minutes per game, led to performing badly in turnovers. It can easily be seen by viewing the results holistically that turnover weight was irrelevant and the only real driver of victory was minutes per game. So this data makes no argument for down-weighting turnovers, even if it may have appeared to at first glance
 
 ### Math 
 
-The intuitive version of the argument is not entirely clear.  Can a mathematical approach bring clarity? 
+The intuitive version of the argument is not entirely clear. Can a mathematical approach bring clarity? 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero. 
 
