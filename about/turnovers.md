@@ -39,7 +39,7 @@ Ignoring the player m/g numbers, one might naively infer two effects
   - Drafters A and B won, and were middling/bad in turnovers
   - Drafters C and D lost, and were middling/good in turnovers
  
-Putting these two arguments together make a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical. It can easily be seen by viewing the results holistically that turnover weight was irrelevant; the better-supported driver of victory was minutes per game. 
+Putting these two arguments together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical. It can easily be seen by viewing the results holistically that turnover weight was irrelevant; the better-supported driver of victory was minutes per game. 
 
 ### Math 
 
