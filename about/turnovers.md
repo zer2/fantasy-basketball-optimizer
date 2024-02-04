@@ -89,7 +89,6 @@ The results are as follows for the down-weighter's win rate:
 | Turnovers | | 
 |----:|:------|:------|
 | Weight |  Most Categories | Each Category |
-|----:|:------|:------|
 | 0\% | 11.3\% | 13.4\% |
 | 10\% | 10.1\% | 12.3\% |
 | 20\% | 9.8\% | 11.9\% |
