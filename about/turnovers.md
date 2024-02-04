@@ -69,7 +69,7 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
-Under those two conditions, investment in turnovers will matter. If either of them is not met, investing in turnovers would not help, because the match-up would be won or lost anyway. 
+Under those two conditions, investment in turnovers will matter. If either of them is not met, investing in turnovers will not help, because the match-up will be won or lost anyway. 
 
 The probability of both criteria occuring can be estimated by approximating the values of all categories as multivariate normals with mean zero and sampling from the distribution many times. I tried this with 2023 data and got 
 
