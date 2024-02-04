@@ -86,7 +86,7 @@ Down-weighting a single category can be a good strategy in general- it is essnet
 
 The results are as follows for the down-weighter's win rate:
 
-| Turnovers | | 
+| Turnovers | | |
 |----:|:------|:------|
 | Weight |  Most Categories | Each Category |
 | 0\% | 11.3\% | 13.4\% |
