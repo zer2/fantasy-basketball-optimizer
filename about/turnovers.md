@@ -32,14 +32,14 @@ One might counter with the empirical fact that succesful teams tend to do poorly
 |Result- championship | Won | Won | Lost | Lost |
 
 Ignoring the player m/g numbers, one might naively infer two effects
-- Investing in turnovers lead to a better performance in turnovers. Evidence:
+- 1: Investing in turnovers lead to a better performance in turnovers. Evidence:
   - Drafters B and D invested in turnovers, and were middling/good in them
   - Drafters A and C did not invest in turnovers, and were middling/bad in them 
-- Performing badly in turnovers improves the probability of victory. Evidence:
+- 2: Performing badly in turnovers improves the probability of victory. Evidence:
   - Drafters A and B won, and were middling/bad in turnovers
   - Drafters C and D lost, and were middling/good in turnovers
  
-Putting these two arguments together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical. It can easily be seen by viewing the results holistically that turnover weight was irrelevant; the better-supported driver of victory was minutes per game. 
+Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach was not logical and the second inference was likely incorrect. It can easily be seen by viewing the results holistically that turnover weight was irrelevant; the better-supported driver of victory was minutes per game. 
 
 ### Math 
 
