@@ -4,7 +4,7 @@ Turnovers are a unique category because turnovers are a negative asset and there
 
 I think that there is a real argument to be made here, but it is overblown. For this reason the website default is to weigh turnovers like every other category. 
 
-Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made against turnovers, then testing the hypothesis 
+Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made against turnovers, then testing the hypothesis that punting turnovers is uniquely beneficial
 
 ## 1. The first argument: Turnovers are volatile
 
