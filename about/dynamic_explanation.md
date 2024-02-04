@@ -18,7 +18,7 @@ H-scores' solution to this dilemma is conceiving of future picks as being contro
 
 Of course, being able to map a weight vector $j$ to approximate statistics for future picks is not enough for optimal draft strategy. The drafter needs to operate the other way around, and pick both a player $p$ from the available candidate pool and a weight vector $j$ for future picks such that the probability of winning (H-score) is optimized. 
 
-This is far from a trivial task. The thought process behind H-scores is to first build a full model linking $j$ and $p$ to a reward function (H-score), then use mathematical tools to choose a $j$ and $p$ that mazimize the reward function
+This is far from a trivial task. The thought process behind H-scores is to first build a full model linking $j$ and $p$ to a reward function for the likelihood of winning, then use mathematical tools to choose a $j$ and $p$ that mazimize the reward function
 
 ## 2. Calculating H-score based on $p$ and $j$
 
