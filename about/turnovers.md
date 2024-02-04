@@ -1,6 +1,6 @@
 # The curious case of turnovers
 
-The turnover category is unique in fantasy basketball as the only negative asset. While the other six counting statistics benefit from volume, turnovers suffer for it. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
+The turnover category is unique in fantasy basketball as the only negative asset. While the other six counting statistics benefit from volume, turnovers suffer for it, making it hard to optimize for all seven at the same time. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
 I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
