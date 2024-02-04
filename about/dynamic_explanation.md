@@ -18,7 +18,7 @@ H-scores' solution to this dilemma is conceiving of future picks as being contro
 
 Of course, being able to map a weight vector $j$ to approximate statistics for future picks is not enough for optimal draft strategy. The drafter needs to operate the other way around, and pick both a player $p$ from the available candidate pool and a weight vector $j$ for future picks such that the probability of winning (H-score) is optimized. 
 
-This is far from a trivial task. It can be accomplished by first building a full model linking $j$ and $p$ to H-score, then applying mathematical tools to the model to discover choices of $j$ and $p$ that mazimize the reward function
+This is far from a trivial task. It can be accomplished by first building a full model linking $p$ and $j$ to H-score, then applying mathematical tools to the model to discover choices of $p$ and $j$ that mazimize the reward function
 
 ## 2. Calculating H-score based on $p$ and $j$
 
@@ -108,7 +108,7 @@ Super simple and easy to calculate, right :stuck_out_tongue:. $X_\delta(j)$ is o
 
 It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others
 
-## 3. Optimizing for $j$ and $p$
+## 3. Optimizing for $p$ and $j$
 
 The equations in the preceding sections provide a full picture of how to map $p$ and $j$ to an H-score. The next step is finding the best possible values of $p$ and $j$.
 
