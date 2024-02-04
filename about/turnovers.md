@@ -84,16 +84,32 @@ To some degree, we can test the hypothesis that down-weighting turnovers is a go
 
 Down-weighting a single category can be a good strategy in general- it is essnetially punting. If down-weighting turnovers is a uniquely important measure to take, then the reward for down-weighting it should be greater than doing so for other categories
 
-The results are as follows for the down-weighter's win rate:
+The results are as follows for the turnover down-weighter's win rate:
 
-| Turnovers | | |
+| Weight |  Most Categories | Each Category | 
 |----:|:------|:------|
-| Weight |  Most Categories | Each Category |
-| 0\% | 11.3\% | 13.4\% |
-| 10\% | 10.1\% | 12.3\% |
-| 20\% | 9.8\% | 11.9\% |
-| 30\% | 9.5\% | 11.6\% |
-| 40\% | 9.1\% | 11.3\% |
+| 0\% | 10.6\% | 12.8\% |
+| 25\% | 9.2\% | 11.3\% |
+| 50\% | 7.9\% | 9.9\% |
+| 75\% | 6.1\% | 8.3\% |
+
+Versus for points 
+
+| Weight |  Most Categories | Each Category | 
+|----:|:------|:------|
+| 0\% | 12.0\% | 12.1\% |
+| 25\% | 10.6\% | 10.5\% |
+| 50\% | 10.3\% | 9.7\% |
+| 75\% | 11.1\% | 9.8\% |
+
+And for rebounds 
+
+| Weight |  Most Categories | Each Category | 
+|----:|:------|:------|
+| 0\% | 11.0\% | 11.4\% |
+| 25\% | 9.5\% | 10.4\% |
+| 50\% | 8.6\% | 9.5\% |
+| 75\% | 8.8\% | 9.1\% |
 
 
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
