@@ -5,13 +5,14 @@ Turnovers are unique in fantasy basketball as the only negative asset. While the
 I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
 Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made in favor of auto-punting turnovers and why they don't convince me
+
 ## 1. The first argument: turnovers are volatile
 
 One argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
 
 It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
 
-To deal with this, all category scores should be adjusted by the week-to-week variance, which is the idea of G-scores. There is no reason to treat turnover volatility different from the volatility of other categories
+G-scores deal with this by incorporating week-to-week variance. They do downweight turnovers relative Z-scores, but not in an extreme way
 
 ## 2. The second argument: playing to your outs 
 
