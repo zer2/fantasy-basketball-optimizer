@@ -1,10 +1,10 @@
 # The curious case of turnovers
 
-Turnovers are a unique category because turnovers are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it less likely that you will win other categories. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$.
+Turnovers are a unique category because they are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it harder to win other categories and vice versa. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
 I think that there is a real argument to be made here, but it is overblown. For this reason the website default is to weigh turnovers like every other category. 
 
-Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made against turnovers, then testing the hypothesis that punting turnovers is uniquely beneficial
+Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made against turnoversand why they don't convince me, then testing the hypothesis that punting turnovers is uniquely beneficial
 
 ## 1. The first argument: turnovers are volatile
 
@@ -16,7 +16,7 @@ To deal with this, all category scores should be adjusted by the week-to-week va
 
 ## 2. The second argument: players need to play 
 
-Another possible argument for downweighting turnovers, specifically for Most Categories, is that if you are going to win most categories your players will have to play a lot and therefore you will probably lose turnovers anyway, so it does not make sense to invest in them. This argument does make some sense, and can be analyzed mathematically. 
+Another argument for downweighting turnovers, specifically for Most Categories, is that if you are going to win most categories your players will have to play a lot and therefore you will probably lose turnovers anyway, so it does not make sense to invest in them. 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero. 
 
