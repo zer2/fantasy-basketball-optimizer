@@ -1,6 +1,6 @@
 # The curious case of turnovers
 
-Turnovers are unique in fantasy basketball. Because of their unique attributes, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
+Turnovers are unique in fantasy basketball as the only negative asset. Because of this fact and various mechanisms attached to it, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
 I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
