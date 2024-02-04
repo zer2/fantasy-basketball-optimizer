@@ -10,7 +10,7 @@ I derive a dynamic algorithm called H-scoring to improve on punting logic in the
 
 ## 1. The H-scoring approach
 
-Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is helpful, but figuring out the right way to incoporate it into decision-making is tricky. 
+Dynamic drafting is a fundamentally more difficult proposition than static drafting. More information about drafting context is helpful, but figuring out the right way to incorporate it into decision-making is tricky. 
 
 The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
