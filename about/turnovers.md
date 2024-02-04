@@ -1,10 +1,10 @@
 # The curious case of turnovers
 
-Turnovers are unique in fantasy basketball as the only negative asset. While the other six counting statistics benefit from volume, turnovers suffer for it, making it hard to optimize for all seven at the same time. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
+Turnovers are unique in fantasy basketball. Because of their unique attributes, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
 I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
-Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made in favor of auto-punting turnovers and why they don't convince me
+Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made in favor of auto-punting turnovers and why they don't convince me
 
 ## 1. The first argument: turnovers are volatile
 
