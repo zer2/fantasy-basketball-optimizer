@@ -34,7 +34,7 @@ One might counter with the empirical fact that succesful teams tend to do poorly
 |Result- championship | Won | Won | Lost | Lost |
 
 Ignoring the player m/g numbers, one might naively infer two effects
-- 1: Investing in turnovers lead to a better performance in turnovers. Evidence:
+- 1: Investing in turnovers leads to a better performance in turnovers. Evidence:
   - Drafters B and D invested in turnovers, and were middling/good in them
   - Drafters A and C did not invest in turnovers, and were middling/bad in them 
 - 2: Performing badly in turnovers improves the probability of victory. Evidence:
