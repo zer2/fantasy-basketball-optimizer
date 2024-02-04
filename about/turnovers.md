@@ -1,6 +1,6 @@
 # The curious case of turnovers
 
-Turnovers are unique in fantasy basketball as the only negative asset. Because of this fact and various mechanisms attached to it, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
+Turnovers are unique in fantasy basketball as the only category that rewards drafters for having a lower score. Because of this fact and various mechanisms attached to it, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
 I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
@@ -49,7 +49,7 @@ The intuitive version of the argument is not entirely clear. Can a mathematical 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero. 
 
-A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance, the correlation matrix is 
+A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance (and turnovers muliplied by -1), the correlation matrix is 
                                                         
  |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
  |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
