@@ -76,11 +76,12 @@ However, again there are catches
 ## Testing 
 
 To some degree, we can test the hypothesis that down-weighting turnovers is a good idea. I ran a test with the following setup
-- For each category, across 1,000 experiments: 
- - Divide all drafters into two groups of six
- - One group downweights the category by a certain factor. The other does not
- - Many seasons are simulated, by sampling from an the actual season of data 
- - The team with the highest regular season record wins
+- For each category
+  - Divide all drafters into two groups of six
+  - One group downweights the category by a certain factor. The other does not
+  - For each sequential arrangement of seats (6 down-weighters/6 normals, or 1 normal/6 down-weighters/5 normals, etc. )
+    - One thousand seasons are simulated by sampling from the actual season of data
+    - The team with the highest regular season record wins
 
 Down-weighting a single category can be a good strategy in general- it is essnetially punting. If down-weighting turnovers is a uniquely important measure to take, then the reward for down-weighting it should be greater than doing so for other categories
 
