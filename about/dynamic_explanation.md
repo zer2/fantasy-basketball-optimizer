@@ -14,11 +14,11 @@ Dynamic drafting is a fundamentally more difficult proposition than static draft
 
 The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the drafter's control (since the drafter does not know which players will be available later) nor completely random (since the drafter will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
-H-scores' solution to this dilemma is conceiving of future picks as being controlled by a weight vector, by which aggregate statistics of future picks can be approximated. For example, the  algorithm might give seven categories $14\%$ weight each and two categories $1\%$ each, for a total of $100\%$. The algorithm then assumes that the drafter would use the custom weighing to value future picks. That leads the algorithm to approximate statistics for future picks with a slight upwards bias in the seven up-weighted categories and a large downwards bias in the two down-weighted categories. By this mechanism, the drafter has some measure of control over future picks. 
+H-scores' solution to this dilemma is conceiving of future picks as being controlled by a weight vector, by which aggregate statistics of future picks can be approximated. For example, the  algorithm might give seven categories $14\%$ weight each and two categories $1\%$ each, for a total of $100\%$. The algorithm would then assumes that the drafter would use the custom weighing to value future picks. That would lead the algorithm to approximate statistics for future picks with a slight upwards bias in the seven up-weighted categories and a large downwards bias in the two down-weighted categories. By this mechanism, the drafter has some measure of control over future picks. 
 
 Of course, being able to map a weight vector $j$ to approximate statistics for future picks is not enough for optimal draft strategy. The drafter needs to operate the other way around, and pick both a player $p$ from the available candidate pool and a weight vector $j$ for future picks such that the probability of winning (H-score) is optimized. 
 
-This is far from a trivial task. The thought process behind H-scores is to first build a full model linking $j$ and $p$ to a reward function for the likelihood of winning, then use mathematical tools to choose a $j$ and $p$ that mazimize the reward function
+This is far from a trivial task. It can be accomplished by first building a full model linking $j$ and $p$ to H-score, then applying mathematical tools to the model to discover choices of $j$ and $p$ that mazimize the reward function
 
 ## 2. Calculating H-score based on $p$ and $j$
 
