@@ -6,13 +6,15 @@ I think that there is a real argument to be made here, but it is overblown. For 
 
 Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made against turnovers, then testing the hypothesis that punting turnovers is uniquely beneficial
 
-## 1. The first argument: Turnovers are volatile
+## 1. The first argument: turnovers are volatile
 
 One argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
 
-It is true that turnovers are relatively volatile. However, this is not unique, and turnovers are not the most volatile category: steals are by a large margin. To deal with this, all category scores should be adjusted by the week-to-week variance, which is the idea of G-scores. This does end up slightly down-weighting turnovers, though not to an extreme degree
+It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category- steals are by a large margin. 
 
-## 2. The second argument: Players need to play 
+To deal with this, all category scores should be adjusted by the week-to-week variance, which is the idea of G-scores. There is no reason to treat turnover volatility different from the volatility of other categories
+
+## 2. The second argument: players need to play 
 
 Another possible argument for downweighting turnovers, specifically for Most Categories, is that if you are going to win most categories your players will have to play a lot and therefore you will probably lose turnovers anyway, so it does not make sense to invest in them. This argument does make some sense, and can be analyzed mathematically. 
 
