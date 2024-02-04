@@ -6,13 +6,13 @@ I think that there is a real argument to be made here, but it is overblown. For 
 
 Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). So my argument here is not enormously rigorous, and not built into the logic of H-scoring. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made against turnovers, then testing the hypothesis 
 
-## Argument 1: Turnovers are volatile
+## 1. The first argument: Turnovers are volatile
 
 One argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
 
 It is true that turnovers are relatively volatile. However, this is not unique, and turnovers are not the most volatile category: steals are by a large margin. To deal with this, all category scores should be adjusted by the week-to-week variance, which is the idea of G-scores. This does end up slightly down-weighting turnovers, though not to an extreme degree
 
-## Argument 2: Players need to play 
+## 2. The second argument: Players need to play 
 
 Another possible argument for downweighting turnovers, specifically for Most Categories, is that if you are going to win most categories your players will have to play a lot and therefore you will probably lose turnovers anyway, so it does not make sense to invest in them. This argument does make some sense, and can be analyzed mathematically. 
 
@@ -54,7 +54,7 @@ It might be surprising that turnovers are not markedly less important than the o
 
 Is it easy to tell who has an advantage in turnovers? Each drafter won three counting statistics, which are all highly correlated with playing time
 
-## Argument 3: Banking on overperformance
+## 3. The third argument: Banking on overperformance
 
 One might note that the math in the last section was predicated on neither player having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
 
@@ -70,7 +70,7 @@ Note what happens to the tipping point probabilities from the last section when 
 
 I calculated the advantage by adding a small constant to all of the counting stats, then observing what percentage of the corresponding simulations were victories. Even with the significant advantage in the counting statistics, turnovers still are not drastically less important than other categories 
 
-## Testing 
+## 4. Testing 
 
 To some degree, we can test the hypothesis that down-weighting turnovers is a good idea. I ran a test with the following setup
 - For each category
@@ -113,7 +113,7 @@ Punting or soft-punting turnovers is about as beneficial as punting other catego
 
 It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. 
 
-## Conclusion
+## 5. Conclusion
 
 I have not seen a convincing mathematical argument that turnovers should be down-weighted to an extreme degree. That's why I've set the default to treating turnovers like every other category. 
 
