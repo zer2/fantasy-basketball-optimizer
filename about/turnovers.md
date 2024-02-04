@@ -1,8 +1,12 @@
+# The curious case of turnovers
+
 Turnovers are a unique category because turnovers are a negative asset and therefore are inversely correlated to other categories. That is, winning turnovers make it less likely that you will win other categories. For this reason, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$.
 
 Unfortunately, I had to ignore the concept of correlations between categories in the paper for technical reasons (it makes the math impossible, in a sense). I had to treat turnovers like every other category. Still, I realize that understanding how to treat turnovers is an important part of drafting strategy, and I did set the default weighting for turnovers to be $25\%$. Below is a justification for that decision 
 
-## Part 1: Correlation and tipping points 
+## Matchup correlations
+
+One possible argument for downweighting turnovers, specifically for Most Categories, is that most winning scenarios (e.g. winning points, assists, rebounds, blocks, and steals) make it unlikely to win turnovers. This idea can be explored mathematically. 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero. 
 
@@ -22,8 +26,6 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the other categories. 
 
-### Most categories 
-
 One way of thinking about the importance of turnovers is to break it down into two factors
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
@@ -38,17 +40,12 @@ The probability of both criteria occuring can be estimated by approximating the 
 
 So turnovers actually end up having a low-ish likelihood of mattering, though not in a unique way compared to other categories
 
-### Each category
+## Need for consistent advantage 
 
-Each Category does not have the same concept of a "tipping point", so this effect is not relevant 
-
-
-## Part 2: The need for consistent advantage
 
 Most players are interested in winning their league, not just doing well generally. This may seem like a pedantic distinction but it is actually quite important. Winning a league requires winning head-to-head matchups consistently, and in the Each Categories context, preferably by large margins. This is difficult to accomplish while also trying to win the turnovers category. 
 
-Note what happens to the tipping point probabilities when we start with some advantage
-
+Note what happens to the tipping point probabilities from the last section when we start with some advantage
 
  | Advantage  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |----:|:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
@@ -58,9 +55,8 @@ Note what happens to the tipping point probabilities when we start with some adv
 
 While all categories become less likely to matter individually in this scenario, turnovers become almost vanishly unlikely to matter. This is because with a consistent advantage in other categories, you are almost definitely not winning turnovers anyway.
 
-There isn't an easy way to translate this analysis for Each Category, but in concept, the same idea should hold. Under the condition that the drafter is doing well and has a good shot at winning the entire league, they are likely not winning turnovers
-
-## Part 3: Testing 
+This idea should also extend to Each Category. 
+## Testing 
 
 I ran a simple test to determine if down-weighting turnovers is a good idea. To do this test, I split up all drafters into two groups of six- one treated turnovers normally, the other down-weighted it. The team with the highest regular season record won. The results are as follows for the down-weighter's win rate:
 
@@ -76,7 +72,7 @@ The baseline win rate is $8.3\%$, so there is a clear trend for both formats tha
 
 It should be remembered that this league simulation is specific, and not entirely realistic. The take-away it not necessarily that turnovers should always be ignored 
 
-## Part 4: Takeaways
+## Takeaways
 
 I think turnovers ought to be downweighted somewhat most of the time. However, the appropriate re-weighting for turnovers depends heavily on context. 
 
