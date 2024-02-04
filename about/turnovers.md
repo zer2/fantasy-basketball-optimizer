@@ -14,9 +14,35 @@ It is true that turnovers are relatively volatile from week to week. However, th
 
 To deal with this, all category scores should be adjusted by the week-to-week variance, which is the idea of G-scores. There is no reason to treat turnover volatility different from the volatility of other categories
 
-## 2. The second argument: players need to play 
+## 2. The second argument: playing to your outs 
 
-Another argument for downweighting turnovers, specifically for Most Categories, is that if you are going to win most categories your players will have to play a lot and therefore you will probably lose turnovers anyway, so it does not make sense to invest in them. 
+### Intuition 
+
+A second argument for downweighting turnovers, specifically for Most Categories, is that if you are going to win a majority of the categories your players will have to play many minutes and therefore you will probably lose turnovers anyway. This can be framed in a few ways 
+- Borrowing the concept of [playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/) from strategy games, it is pointless to strategize around scenarios where you are going to lose anyway
+- Emprically, most of the best teams do poorly in turnovers, so it would seem that investing in turnovers is counterproductive
+
+The argument has intuitive appeal, but it is also a fallacy, no matter how it is framed. 
+
+First, the concept of playing to your outs is mostly invoked in cases where a player is likely to lose. When a drafter is likely to win, a complementary concept is at play: [win-more](https://articles.starcitygames.com/magic-the-gathering/win-more-in-commander-magic-what-it-is-and-isnt/). The concept is that there is no point strategizing around games which you are definitely going to win, because you are going to win either way. Adding it to the concept of playing to your outs, the full picture is that one should not strategize around any scenario where the outcome is guaranteed; rather, they should strategize around scenarios where the outcome hangs in the balance and could be effected. In the case of fantasy basketball, scenarios where the drafter has a significant disadvantage in terms of playing time is largely irrelevant because they are going to lose no matter what. But the flipside scenario is also irrelevant: if the drafter has a significant advantage in playing time, they are going to win no matter what. The only relevant scenarios to strategize around are those where the outcome is close, and for the outcome to be close, each drafter must win some share of the counting statistics, making it unclear which team has the advantage in turnovers. 
+
+One might appeal to the second framing of this argument as a counter. However we approach this strategically, there is the cold hard fact that succesful teams tend to do poorly in turnovers. I believe that this is the truth, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). Simplifying this drastically, consider the following results:
+- Drafter A chooses players with the same weight to all categories. Their players outperform across the board, and they win their league. Their turnover performance is bad
+- Drafter B chooses players with a down-weight on turnovers. their players outperform across the board, and the win their league. Their turnover performance is middling
+- Drafter C chooses players with the same weight on all categories. Their players underperform across the board, and they lose their league. Their turnover performance is middling
+- Drafter D chooses players with a down-weight on turnovers. Their players underperform across the board, and they lose their league. Their turnover performance is good
+
+| | Drafter A | Drafter B | Drafter C | Drafter D| 
+|:-------|:-------|:-------|:-------|:-------|
+|Turnover weight | 1 | 0 | 1 | 0 |
+|Player m/g | 30 | 15 | 30 | 15 |
+|Result- turnovers | Bad | Middling | Middling | Good | 
+|Result- championship | Won | Won | Lost | Lost |
+
+This example makes it clear that the necessary condition for winning is having players overperform across the board. 
+
+
+### Math 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero. 
 
@@ -34,9 +60,11 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
  | Free Throw \% | 17.5\%  | -20.9\% | 11.0\%  | 6.5\%   | -14.8\% | 21.0\%  | -4.7\%  | 100.0\%   | -13.8\%   |
  | Field Goal \% | 19.0\%  | 27.5\%  | -9.2\%  | -6.8\%  | 24.0\%  | -11.6\% | 1.2\%   | -13.8\%   | 100.0\%   |
 
- It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. However, that is not the whole story. 
-
-One way of thinking about the importance of turnovers is to break it down into two factors
+ It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. 
+ 
+ However, does that necessarily translate to 
+ 
+ . One way of thinking about the importance of turnovers is to break it down into two factors
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
