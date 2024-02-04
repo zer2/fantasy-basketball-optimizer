@@ -1,6 +1,6 @@
 # The curious case of turnovers
 
-The turnovers category is unique. Unlike all of the other counting statistics, turnovers are won by the team that ends with a lower number, rather than the team that ends with a higher number. Because of this unique property and issues caused by it, many fantasy basketball analysts recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
+The turnovers category is unique. Unlike all of the other counting statistics, turnovers are won by the team that ends with a lower number, rather than the team that ends with a higher number. This uniqueness makes turnovers a weird category to strategize around, leading many fantasy basketball analysts to recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
 I think that there is a real argument to be made here, but not to the extent that turnovers should be treated radically different from other categories. For this reason the website's default is to weigh turnovers as normal. 
 
