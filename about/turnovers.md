@@ -58,21 +58,18 @@ Is it easy to tell who has an advantage in turnovers? Each drafter won three cou
 
 One might note that the math in the last section was predicated on neither player having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
 
-Note what happens to the tipping point probabilities from the last section when we start with some advantage. The advantages are per player and per category
+Note what happens to the tipping point probabilities from the last section when we start with some advantage.
 
- | Advantage  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
-|----:|:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
-| 0   | 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
-| 0.5 | 7.1\%  | 5.1\%  | 4.4\%  | 5.7\%  | 4.2\%  | 5.0\%  | 3.1\%  | 4.6\%     | 4.6\%     |
-| 1   | 1.9\%  | 1.9\%  | 2.0\%  | 2.5\%  | 1.7\%  | 2.2\%  | 0.4\%  | 1.6\%     | 1.8\%     |'
+ | Likelihood of winning overall  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
+|-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
+| 50.0\%   | 10.4\% | 7.2\% | 7.0\% | 9.2\% | 6.1\% | 6.5\% | 7.4\% | 6.7\%    | 6.6\%    |
+| 61.4\% | 9.9\%  | 7.0\% | 6.7\% | 8.6\% | 6.8\% | 6.5\% | 6.7\% | 6.3\%    | 6.3\%    |
+| 72.1\% | 8.0\%  | 5.9\% | 5.8\% | 7.1\% | 5.8\% | 6.0\% | 5.6\% | 5.8\%    | 5.6\%    |
+| 81.0\%   | 6.9\%  | 5.1\% | 4.9\% | 6.0\% | 4.3\% | 4.5\% | 4.5\% | 4.6\%    | 4.5\%    |
+| 87.7\% | 5.0\%  | 4.0\% | 3.3\% | 4.2\% | 2.9\% | 3.7\% | 3.2\% | 3.6\%    | 3.3\%    |
 
-While all categories become less likely to matter individually in this scenario, the importance of turnovers vanishes in the most extreme way. This should lend credence to the idea that turnovers don't matter when a drafter is playing to their upside. 
+I calculated the advantage by adding a small constant to all of the counting stats, then observing what percentage of the corresponding simulations were victories. Even with the significant advantage in the counting statistics, turnovers still are not drastically less important than other categories 
 
-However, again there are catches 
-- First, the advantages in the table above are rather extreme and unlikely. the $1$ advantage scenario where turnovers are vanishingly unimportant translates to an overall $94\%$ chance of winning, which is unrealistically high
-- Second, even in the case that a drafter does have such an extreme advantage, again, none of the categories are particularly important in that scenario. The drafter is very likely to win no matter what, does it make sense to strategize around that?
-- Third, a setup where a drafter needs a significant advantage coming into every week in order to win is rare. Usually, around half of all teams get into the playoffs, so a team with only medium luck in terms of player performance can make it. Then the playoff matches are usually relatively fair, and come down to weekly variance
-  
 ## Testing 
 
 To some degree, we can test the hypothesis that down-weighting turnovers is a good idea. I ran a test with the following setup
@@ -112,11 +109,13 @@ And for rebounds
 | 50\% | 8.6\% | 9.5\% |
 | 75\% | 8.8\% | 9.1\% |
 
-
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
 
-It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If having this advantage is necessary, then there might still be good reason to down-weight turnovers
+It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. 
 
-## Takeaways
+## Conclusion
 
-It might makes sense to downweight turnovers to some degree when you need your players to outperform across the board to win, e.g. in Rotisserie. To what degree I am not sure- it depends on how confident you are about your predictions of player performance. Otherwise, I don't think there is a great reason to down-weight turnovers heavily 
+I have not seen a convincing mathematical argument that turnovers should be down-weighted to an extreme degree. That's why I've set the default to treating turnovers like every other category. 
+
+Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page
+
