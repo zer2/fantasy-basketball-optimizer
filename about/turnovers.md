@@ -75,15 +75,15 @@ The probability of both criteria occuring can be estimated by approximating the 
 
  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
-| 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
+| 10.4\% | 7.2\%  | 7.0\%  | 9.2\%  | 6.1\%  | 6.5\%  | 7.4\%  | 6.7\%     | 6.6\%     |
 
-Turnovers end up on the lower side of importance, but not to an extreme degree
+Turnovers end up having approximately average importance 
 
-## 3. The third argument: Banking on overperformance
+## 3. The third argument: banking on overperformance
 
 One might note that the math in the last section was predicated on neither player having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
 
-Note what happens to the tipping point probabilities from the last section when we start with some advantage.
+Note what happens to the tipping point probabilities from the last section when the drafter with some advantage in the counting statistics:
 
  | Likelihood of winning overall  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
@@ -93,11 +93,13 @@ Note what happens to the tipping point probabilities from the last section when 
 | 81.0\%   | 6.9\%  | 5.1\% | 4.9\% | 6.0\% | 4.3\% | 4.5\% | 4.5\% | 4.6\%    | 4.5\%    |
 | 87.7\% | 5.0\%  | 4.0\% | 3.3\% | 4.2\% | 2.9\% | 3.7\% | 3.2\% | 3.6\%    | 3.3\%    |
 
-I calculated the advantage by adding a small constant to all of the counting stats, then observing what percentage of the corresponding simulations were victories. Even with the significant advantage in the counting statistics, turnovers still are not drastically less important than other categories 
+I calculated the advantage by adding a small constant to all of the counting stats, then observing what percentage of the corresponding simulations were victories. 
+
+It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme
 
 ## 4. Testing 
 
-To some degree, we can test the hypothesis that down-weighting turnovers is a good idea. I ran a test with the following setup
+To some degree, the hypothesis that down-weighting turnovers can be tested. I ran a test with the following setup
 - For each category
   - Divide all drafters into two groups of six
   - One group downweights the category by a certain factor. The other does not
@@ -105,7 +107,7 @@ To some degree, we can test the hypothesis that down-weighting turnovers is a go
     - One thousand seasons are simulated by sampling from the actual season of data
     - The team with the highest regular season record wins
 
-Down-weighting a single category can be a good strategy in general- it is essentially punting. If down-weighting turnovers is a uniquely important measure to take, then we should expect the benefit of down-weighting turnovers to be greater than the benefits of down-weighting other categories
+Down-weighting a single category can be a good strategy in general- it is essentially punting. If down-weighting turnovers is a uniquely important measure to take, then the benefit of down-weighting turnovers to be greater than the benefits of down-weighting other categories
 
 The results are as follows for the turnover down-weighter's win rate:
 
@@ -136,7 +138,7 @@ And for rebounds
 
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
 
-It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. 
+It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section 3 is wrong or misleading, perhaps turnovers become significantly less important in that case
 
 ## 5. Conclusion
 
