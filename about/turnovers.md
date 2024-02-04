@@ -65,11 +65,11 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. 
  
- However, does that necessarily translate to a decreased importance. One way of thinking about the importance of turnovers is to break it down into two factors
+ However, does that necessarily translate to a decreased importance? One way of conceptualizing the imporance of a category is as the derivative of the reward function with respect to investment in the category. I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
-Under those two conditions, investment in turnovers will matter. If either of them are not met, investing in turnovers would not help, because the match-up would be won or lost anyway. 
+Under those two conditions, investment in turnovers will matter. If either of them is not met, investing in turnovers would not help, because the match-up would be won or lost anyway. 
 
 The probability of both criteria occuring can be estimated by approximating the values of all categories as multivariate normals with mean zero and sampling from the distribution many times. I tried this with 2023 data and got 
 
@@ -77,7 +77,7 @@ The probability of both criteria occuring can be estimated by approximating the 
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.8\% | 7.7\%  | 7.1\%  | 8.8\%  | 6.5\%  | 6.7\%  | 7.1\%  | 7.2\%     | 6.8\%     |
 
-So turnovers actually end up having a low-ish likelihood of mattering, though not in a unique way compared to other categories
+Turnovers end up on the lower side of importance, but not to an extreme degree
 
 ## 3. The third argument: Banking on overperformance
 
