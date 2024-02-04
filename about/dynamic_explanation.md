@@ -56,39 +56,39 @@ The discussion of static ranking lists established that point differentials betw
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
 
-- $X = X_s + X_p + X_{\mu_u} + X_u$ where
+- $X = X_s + X_p + X_{\phi} + X_\delta$ where
   - $X_s$ is the aggregate statistics of team $A$'s already selected players: 
   - $X_p$ is the statistics of the candidate player
-  - $X_{\mu_u}$ is the expected statistics of unchosen players
-  - $X_u$ is a difference factor to adjust for future picks being different from expected
-- $X_\mu = X_{\mu_s} + X_{\mu_u}$ where
-  - $X_{\mu_s}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
+  - $X_{\phi}$ is the expected statistics of unchosen players
+  - $X_\delta$ is a difference factor to adjust for future picks being different from expected
+- $X_\mu = X_{\theta} + X_{\phi}$ where
+  - $X_{\theta}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
 
 This allows the Bell curve's parameters to be redefined as follows 
-- The mean is $X_s + X_p - X_{\mu_s} + X_u$
+- The mean is $X_s + X_p - X_{\theta} + X_\delta$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
 
 $X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. 
 
-So every component of the equation can be accounted for, except for $X_{\mu_s}$ and $X_u$. The next sections describes how to find them
+So every component of the equation can be accounted for, except for $X_{\theta}$ and $X_\delta$. The next sections describes how to find them
 
-### 2d. Estimating $X_{\mu_s}$
+### 2d. Estimating $X_{\theta}$
 
-$X_{\mu_s}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. Obviously this is imprecise since real drafters won't draft according to any one statistic entirely, but it should still capture most of the effect of earlier draft picks tending to be more valuable, which is the point of involving $X_{\mu_s}$
+$X_{\theta}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. Obviously this is imprecise since real drafters won't draft according to any one statistic entirely, but it should still capture most of the effect of earlier draft picks tending to be more valuable, which is the main value of involving $X_{\theta}$
 
-### 2e. Estimating $X_u$
+### 2e. Estimating $X_\delta$
 
 A natural choice for modeling the statistics of draft picks is the [multivariate normal distribution](https://en.wikipedia.org/wiki/Multivariate_normal_distribution). It has two useful properties
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
 - It is relatively easy to work with. A more complicated function, while perhaps more suited to real data, would make the math much more complicated
 
-It is simple to derive a parameterization for $X_u$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
+It is simple to derive a parameterization for $X_\delta$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
 - If raw player statistics were used to calculate correlations, the model would believe that it could choose a team full of e.g. all point guards to punt Field Goal % to an extreme degree. In reality teams need to choose players from a mix of positions. Player position can be accounted for by subtracting out position means. E.g. if Centers get $+0.5$ rebounds on average, a center's rebound number could be adjusted by $-0.5$. Or, since there are some flex spots making position requirements not entirely rigid, the adjustment number could be scaled by some constant which is $\leq 1$, which we call $\nu$. So if $\nu$ is $0.8$, the previous example would instead lead to $0.4$ rebounds being subtracted out from centers' numbers
-- Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_u$ are chosen
-  - All players above a certain threshold of general value have been picked, as an approximation of the fact that more valuable players will be taken earlier. We can approximate this threshold to be $0$, since $X_u$ is defined relative to what is expected, and should have $0$ value when $j = v$ 
+- Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_\delta$ are chosen
+  - All players above a certain threshold of general value have been picked, as an approximation of the fact that more valuable players will be taken earlier. We can approximate this threshold to be $0$, since $X_\delta$ is defined relative to what is expected, and should have $0$ value when $j = v$ 
   - The chosen player is the highest-scoring of those remaining based on some custom weight vector, which we will call $j$. This reflects that the drafter will choose the best players according to their own weight vector in the future
 
-This scenario provides a launching point for calculating the expected value of future draft picks, $X_u(j)$. The calculation involves many steps of linear algebra, the details of which are in the paper. The result is as follows
+This scenario provides a launching point for calculating the expected value of future draft picks, $X_\delta(j)$. The calculation involves many steps of linear algebra, the details of which are in the paper. The result is as follows
 
 Defining 
 - $\Sigma$ as the [covariance matrix](https://en.wikipedia.org/wiki/Covariance_matrix) across players after being adjusted for position 
@@ -99,12 +99,12 @@ Defining
 
 Then
 $$
-X_u(j) = \left( 12 - N \right) \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
+X_\delta(j) = \left( 12 - N \right) \Sigma \left( v j^T - j v^T \right) \Sigma \left( - \gamma j - \omega v \right) \frac{
    \sqrt{\left(j -  \frac{v v^T \Sigma j}{v^T \Sigma v} \right) ^T \Sigma \left( j -  \frac{v v^T \Sigma j}{v^T \Sigma v}  \right) }
   }{j^T \Sigma j v^T \Sigma v - \left( v^T \Sigma j \right) ^2} 
 $$
 
-Super simple and easy to calculate, right :stuck_out_tongue:. $X_u(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
+Super simple and easy to calculate, right :stuck_out_tongue:. $X_\delta(j)$ is obviously too complicated to evaluate repeatedly by hand. Fortunately it is almost trivial for computers to do it for you, as implemented on this website.
 
 It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others
 
