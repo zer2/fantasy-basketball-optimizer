@@ -65,7 +65,7 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. 
  
- However, does that necessarily translate to a decreased importance? One way of conceptualizing the imporance of a category is as the derivative of the reward function with respect to investment in the category. I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
+ However, does that necessarily translate to a decreased importance? One way of conceptualizing the importance of a category is as the derivative of the reward function with respect to investment in the category. I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
