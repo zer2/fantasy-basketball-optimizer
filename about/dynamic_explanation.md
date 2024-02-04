@@ -110,7 +110,7 @@ It should be noted that this calculation is *very* rough because it uses many la
 
 ## 3. Optimizing for $j$ and $p$
 
-The equations in the preceding sections provide a mechanism by which a drafter can calculate the value of their objective function based on these two choices, by first calculating expected team statistics as a function of $p$ and $j$, then calculating probabilities of winning each category, and finally combining them into the overall objective function. Unfortunately, being able to calculate $H$ based on $p$ and $j$ does not immediately reveal values of $p$ and $j$ that optimize H-score. 
+The equations in the preceding sections provide a full picture of how to map $p$ and $j$ to an H-score. The next step is finding the best possible values of $p$ and $j$.
 
 There are a finite number of potential players $p$, so the drafter can simply try each of them. However $j$ presents a problem because trying all values of $j$ is not possible, since there are infinite choices for $j$. Even if the drafter were to simplify it to e.g. $10$ choices of weight per category, there would still be $\approx 10^8$ options to look through, which is a lot!
 
