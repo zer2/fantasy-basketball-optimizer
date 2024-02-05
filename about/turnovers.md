@@ -14,7 +14,9 @@ I don't dispute the fact. I do posit that inverting the logic to claim that doin
 
 If this concept is difficult to grasp intuitively, you shouldn't feel bad, because it is difficult for professional researchers and science reporters too. My favorite example of this is the oft-reported link between diet soda and obesity. Many studies have found a strong association between drinking diet soda and becoming obese, leading many researchers to suggest that some hidden mechanism makes drinking diet soda unhealthy. However, a [meta-analysis](https://academic.oup.com/nutritionreviews/article/71/7/433/1807065) summarizing all research suggests that this link is most likely ephemeral, and the result of a reverse-causality fallacy. It is true that people who drink diet soda are more likely to gain weight. But those are also the same people most likely to be worried about their weight because of individual risk factors such as their activity level or genetics. When controlling for those factors, the link disappears or even reverses. In other words- it is not drinking diet soda that makes people obese, but the risk factors for becoming obese that make someone drink diet soda. If anything, drinking diet soda likely decreases obesity risk. It only appears to be the reverse in the data because of a failure to control for countervailing factors. 
 
-The fantasy basketball equivalent of this statement is that it is not de-prioritizing turnovers that leads to success, rather, it is the conditions that lead to success which also lead to poor scores for turnovers. To see how this can look misleading in results data, consider the following simplified results table 
+The fantasy basketball equivalent of this statement is that it is not de-prioritizing turnovers that leads to success. Instead, it is the conditions that lead to success which also lead to poor scores for turnovers. 
+
+To see how this fallacy can manifest itself in real data, consider the following simplified results table 
 
 | | Drafter A | Drafter B | Drafter C | Drafter D| 
 |:-------|:-------|:-------|:-------|:-------|
