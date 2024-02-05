@@ -116,7 +116,7 @@ To some degree, the hypothesis that down-weighting turnovers can be tested. I ra
     - One thousand seasons are simulated by sampling from the actual season of data
     - The team with the highest regular season record wins
 
-Down-weighting a single category can be a good strategy in general- it is essentially punting. If down-weighting turnovers is a uniquely important measure to take, then the benefit of down-weighting turnovers to be greater than the benefits of down-weighting other categories
+Down-weighting a single category can be a good strategy in general- it is essentially punting. If down-weighting turnovers is a uniquely important measure to take, then the benefit of down-weighting turnovers would be greater than the benefits of down-weighting other categories
 
 The results are as follows for the turnover down-weighter's win rate:
 
