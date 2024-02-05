@@ -49,7 +49,7 @@ The most common theoretical argument for downweighting turnovers, specifically f
 - Winning turnovers generally only happens when the drafter's players are playing fewer minutes than their opponents. In this situation, the drafter is most likely losing the matchup
 - Ergo, winning the turnovers category is only relevant when the matchup is already lost, and therefore is not valuable 
 
-This is essentially borrowing the concept of [playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/) from strategy games. However, applying the concept here is a fallacy and utilizes a false leap in logic
+This is essentially borrowing the concept of [playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/) from strategy games. However, applying the concept here is an incomplete treatment of the problem and leads to an erroneous conclusion
 
 ### Intuition 
 
