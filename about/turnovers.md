@@ -6,17 +6,41 @@ There are real arguments to be made for this approach. However, my own analysis 
 
 Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my investigation into the arguments around turnovers has not been enormously rigorous, and is not built into the logic of H-scoring. Still, I realize that deciding how to treat turnovers is an important part of drafting strategy, and that my default may be controversial. So I will lay out a heuristic justification for treating turnovers like a normal category here, by going through the main arguments that are made in favor of auto-punting turnovers and why they don't convince me
 
-## 1. The first argument: turnovers are volatile
+## 1. Emprical evidence 
 
-One argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
+I have often seen punting turnovers justified by the empirical fact that succesful teams tend to do poorly in turnovers. I don't dispute the fact, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [reverse causality].(https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). Reverse causality is a fallacy because correlation does not imply causation. Two separate things might be associated with each other without causing each other- in fact, one of them might be actively working against the other despite the correlation in incidence. 
 
-It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
+If this concept is difficult to grasp intuitively, you shouldn't feel bad, because it haunts professional researchers and science reporters too. My favorite example of this is the oft-reported link between diet soda and obesity. Many studies have found a strong association between drinking diet soda and becoming obese, leading many researchers to suggest that some hidden mechanism makes drinking diet soda unhealthy. However, a recent [meta-analysis](https://academic.oup.com/nutritionreviews/article/71/7/433/1807065) suggests that this link is most likely ephemeral, and the result of a reverse-causality fallacy. Observationally, people who drink diet soda are more likely to gain weight. But those are also the same people most likely to be worried about their weight because of individual risk factors such as their activity level or a genetic propensity to be overweight. When controlling for those factors, the link disappears or even reverses. In other words- it is not drinking diet soda that makes people obese, but the risk factors for becoming obese that make someone drink diet soda. If anything, drinking diet soda likely decreases obesity risk. 
 
-G-scores deal with this by incorporating week-to-week variance. They do downweight turnovers relative Z-scores, but not in an extreme way
+The fantasy basketball equivalent of this statement is that it is not de-prioritizing turnovers that leads to success, rather, it is the conditions that lead to success which also lead to poor scores for turnovers. To see how this can look misleading in results data, consider the following simplified results table 
+
+| | Drafter A | Drafter B | Drafter C | Drafter D| 
+|:-------|:-------|:-------|:-------|:-------|
+|Turnover weight | 1 | 0 | 1 | 0 |
+|Player m/g | 40 | 40 | 20 | 20 |
+|Result- turnovers | Middling | Bad | Good | Middling | 
+|Result- placement | First | Second | Third | Fourth |
+
+Ignoring the player minutes per game numbers, one might naively infer two effects
+- 1: Investing in turnovers leads to a better performance in turnovers. Evidence:
+  - Drafters B and D invested in turnovers, and were middling/good in them
+  - Drafters A and C did not invest in turnovers, and were middling/bad in them 
+- 2: Doing better in turnovers leads to doing worse in the league. Evidence:
+  - Performing well in turnovers leads to an average placement of third place (drafter C finished third)
+  - Performing average in turnovers leads to an average placement of between second and third place (drafter A finished first, drafter D finished fourth)
+  - Performing badly in turnovers leads to an average of second place (drafter B finished second) 
+ 
+Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. 
+
+However, this backwards-causality approach is not logical because the second inference is an illusion of reverse causality. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers.
+
+In fact, when accounting for minutes per game, the opposite effect is uncovered. Of the two drafters whose players played $40$ minutes per game, drafter A, who cared about turnovers, did better. And of the two drafters whose players played $20$ minutes per game, drafter C, who cared about turnovers, also did better. 
+
+This will not necessarily be the case in real fantasy basketball. The point here is that raw results may be misleading and should not be over-interpreted
 
 ## 2. The second argument: playing to your outs 
 
-The most common argument for downweighting turnovers, specifically for Most Categories, is that winning turnovers requires losing other categories. Stated slightly more strategically, the idea is as follows
+The most common theoretical argument for downweighting turnovers, specifically for Most Categories, is that winning turnovers requires losing other categories. Stated slightly more strategically, the idea is as follows
 - A drafter's goal is to win the overall matchup
 - Winning turnovers generally only happens when the drafter's players are playing fewer minutes than their opponents. In this situation, the drafter is most likely losing the matchup
 - Ergo, winning the turnovers category is only relevant when the matchup is already lost, and therefore is not valuable 
@@ -58,7 +82,7 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 To answer this question we must first take a step back and be clear about what importance means in this context. The original question was how much to weight various categories. The optimal weights should lead to a sum total for each player that is directly proportional to how much benefit there is to drafting that player. Breaking that down per category, the weights should be how much benefit there is to investment in each category, relative to some unit of investment. This is roughly equivalent to the definition of a partial derivative. The operative question for each category is thus, what is the partial derivative of victory probability with respect to investment in the category? 
  
  I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
-- How likely is it that the other eight categories are tied?
+- How likely is it that the other eight categories are tied? I call this situation a "tipping point"
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
 This aligns well with the intution that strategizing should only consider scenarios that are "in the middle". The two implicit conditions in the derivative are equivalent to calculating the probability that an incremental investment in turnovers flips the result of the overall outcome. 
@@ -73,15 +97,18 @@ Turnovers end up having approximately average importance
 
 ## 3. The third argument: banking on overperformance
 
-One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
+One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. 
 
 ### Intuition 
 
 Assume that drafter A comes into a week against drafter B with higher expected values across all counting statistics, giving them an advantage in all of them except turnovers. Drafter A is highly likely to win the matchup.
 
-Again only the tipping point scenarios have relevance, because if drafter A wins or loses across the board, no marginal difference in decision-making could have changed the outcome. Again, in all tipping point scenarios, drafter A must have lost at least two counting statistics. Given that this is the case, it seems unlikely that drafter A ended up with an enormous advantage in overall playing time. Even if they did- obviously some of the counting statistics bucked the trend, and drafter A scored fewer of them despite having more playing time. Why couldn't the same happen to turnovers? 
+Again only the tipping point scenarios have relevance, because if drafter A wins or loses across the board, no marginal difference in decision-making could have changed the outcome. There are two relevant questions
+- Is it less likely for turnovers to be a potential tipping point than other categories? Maybe. I don't see any particular reason to expect this 
+- Is the probability density of turnovers being tied, given a tipping point, particularly low? Again, in all tipping point scenarios, drafter A must have lost at least two counting statistics. Given that this is the case, it seems unlikely that drafter A ended up with an enormous advantage in overall playing time. Even if they did- obviously some of the counting statistics bucked the trend, and drafter A scored fewer of them despite having more playing time. Why couldn't the same happen to turnovers? 
 
 It might be the case that with higher expected values for counting statistics, the relative importance of turnovers decreases. But if that is the case it is not clear to what degree based on intuition. 
+
 ### Math
 
 The math from the last section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week.
@@ -98,28 +125,13 @@ I calculated the advantage by adding a small constant to all of the counting sta
 
 It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme
 
-## 4. The fourth argument: Empirical evidence 
+## 4. The fourth argument: turnovers are volatile
 
-This is not an argument per se, but I have often seen punting turnovers justified by the empirical fact that succesful teams tend to do poorly in turnovers. I don't dispute the fact, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). 
+One argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
 
-Simplifying this drastically, consider the following results:
+It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
 
-| | Drafter A | Drafter B | Drafter C | Drafter D| 
-|:-------|:-------|:-------|:-------|:-------|
-|Turnover weight | 0 | 1 | 0 | 1 |
-|Player m/g | 40 | 40 | 20 | 20 |
-|Result- turnovers | Bad | Middling | Middling | Good | 
-|Result- championship | Won | Won | Lost | Lost |
-
-Ignoring the player m/g numbers, one might naively infer two effects
-- 1: Investing in turnovers leads to a better performance in turnovers. Evidence:
-  - Drafters B and D invested in turnovers, and were middling/good in them
-  - Drafters A and C did not invest in turnovers, and were middling/bad in them 
-- 2: Performing badly in turnovers improves the probability of victory. Evidence:
-  - Drafters A and B won, and were middling/bad in turnovers
-  - Drafters C and D lost, and were middling/good in turnovers
- 
-Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach is not logical because the second inference is likely incorrect. Performing badly in turnovers didn't make drafters A and B win- the same conditions that led to winning, having high minutes per game, also led to performing badly in turnovers. It can easily be seen by viewing the results holistically that turnover weight was irrelevant and the only real driver of victory was minutes per game. So this data makes no argument for down-weighting turnovers, even if it may have appeared to at first glance
+G-scores deal with this by incorporating week-to-week variance. They do downweight turnovers relative Z-scores, but not in an extreme way
 
 ## 5. Testing 
 
