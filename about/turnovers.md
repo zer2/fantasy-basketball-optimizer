@@ -55,7 +55,7 @@ The concept of playing to your outs is mostly invoked in cases where a player is
 
 In the context of fantasy basketball, scenarios where the drafter has a significant disadvantage in terms of playing time may be irrelevant because the drafter is going to lose no matter what. If that is the case, then the reverse argument should also apply: if the drafter has a significant advantage in playing time, they are going to win no matter what, and those scenarios should be excluded too. The only relevant scenarios to strategize around are those where the outcome is close. 
 
-For the outcome to be close, each drafter must win at least two of the non-turnover counting statistics. If either drafter wins five or six of them, then their victory is guaranteed. It is not clear, at least to me, if any drafter has a strong advantage in turnovers given that context. 
+For the outcome to be close, each drafter must win at least two of the non-turnover counting statistics (otherwise one drafter would have five category wins already without turnovers, and their victory would be assured). It is not clear, at least to me, if any drafter has a strong advantage in turnovers given that context. 
 
 ### Math 
 
@@ -79,23 +79,23 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. 
  
- However, does that necessarily translate to a decreased importance? 
+However, does that necessarily translate to a decreased optimal weight on turnovers? To answer this question we must first take a step back and be clear about what it means for a weight to be optimal.
 
-To answer this question we must first take a step back and be clear about what importance means in this context. The original question was how much to weight various categories. The optimal weights should lead to a sum total for each player that is directly proportional to how much benefit there is to drafting that player. Breaking that down per category, the weights should be how much benefit there is to investment in each category, relative to some unit of investment. This is roughly equivalent to the definition of a partial derivative. The operative question for each category is thus, what is the partial derivative of victory probability with respect to investment in the category? 
+The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. Its conception is to model a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
  
  I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
-- How likely is it that the other eight categories are tied? I call this situation a "tipping point"
+- How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
-This aligns well with the intution that strategizing should only consider scenarios that are "in the middle". The two implicit conditions in the derivative are equivalent to calculating the probability that an incremental investment in turnovers flips the result of the overall outcome. 
+This aligns well with the intution that strategizing should only consider scenarios that are "in the middle". The two implicit conditions in the derivative are equivalent to calculating the probability that an incremental investment in a category flips the result of the overall outcome. 
 
-The probability of both criteria occuring can be estimated by approximating the values of all categories as multivariate normals with mean zero and sampling from the distribution many times. I tried this with 2023 data and got 
+The probability of both criteria occuring can be estimated by approximating the values of all categories as multivariate normals with mean zero and sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated. I tried this with 2023 data and got 
 
  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.4\% | 7.2\%  | 7.0\%  | 9.2\%  | 6.1\%  | 6.5\%  | 7.4\%  | 6.7\%     | 6.6\%     |
 
-Turnovers end up having approximately average importance 
+Turnovers end up having approximately average importance based on this approximation
 
 ## 3. The third argument: banking on overperformance
 
