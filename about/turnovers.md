@@ -2,7 +2,7 @@
 
 The turnovers category is unique because unlike all of the other counting statistics, for turnovers, fewer is better. This uniqueness makes turnovers a weird category to strategize around and leads many fantasy basketball analysts to recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
 
-My own analysis has not turned up any evidence that such an extreme approach is warranted. As such, the website's default is to weigh turnovers as normal. 
+There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant treating turnovers so radically different from other categories. As such, the website's default is to weigh turnovers as normal. 
 
 Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my investigation into the arguments around punting has not been enormously rigorous, and not built into the logic of H-scoring. Still, I realize that deciding how to treat turnovers is an important part of drafting strategy, and that my default may be controversial. So I will lay out a heuristic justification here, going through the main arguments that are made in favor of auto-punting turnovers and why they don't convince me
 
