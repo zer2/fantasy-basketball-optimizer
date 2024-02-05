@@ -4,9 +4,9 @@ The turnovers category is unique because unlike all of the other counting statis
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant treating turnovers in such a radically different way. As such, the website's default is to weigh turnovers as normal. 
 
-Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my investigation into the arguments around turnovers has not been enormously rigorous, and is not built into the logic of H-scoring. Still, I realize that deciding how to treat turnovers is an important part of drafting strategy, and that my default may be controversial. So I will go through the arguments that are made in favor of auto-punting turnovers here and explain why they don't convince me
+This article is my attempt to explain why none of the arguments are convincing to me. As it turns out, for such a seemingly simple issue, the logic underlying the turnover dilemma gets *very interesting*. It touches on concepts that are important to seemingly unrelated topics, including the effect of diet soda on health and how voter power is distributed by the electoral college. My exploration here is wide-reaching and not enomously rigorous. So think of this more as a collection of my own thought process, rather than one cohesive argument for treating turnovers in a particular way
 
-## 1. Good teams do badly in turnovers 
+## 1. The first argument: low-turnover teams tend to lose 
 
 The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall. The statement of fact is incontrovertibly true. However, concluding that doing poorly in turnovers causally leads to success is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation), which is a fallacy because correlation does not imply causation. Two separate things might be associated with each other without causing each other- in fact, one of them might be actively working against the other despite the correlation in incidence. 
 
