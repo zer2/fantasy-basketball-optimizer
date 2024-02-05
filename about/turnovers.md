@@ -69,17 +69,26 @@ Turnovers end up having approximately average importance
 
 One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
 
-Note what happens to the tipping point probabilities from the last section when the drafter with some advantage in the counting statistics:
+### Intuition 
+
+Assume that drafter A comes into a week against drafter B with higher expected values across all counting statistics, giving them an advantage in all of them except turnovers. Drafter A is highly likely to win the matchup.
+
+Again only the tipping point scenarios have relevance, because if drafter A wins or loses across the board, no marginal difference in decision-making could have changed the outcome. Again, in all tipping point scenarios, drafter A must have lost at least two counting statistics. Given that this is the case, it seems unlikely that drafter A ended up with an enormous advantage in overall playing time. Even if they did- obviously some of the counting statistics bucked the trend, and drafter A scored fewer of them despite having more playing time. Why couldn't the same happen to turnovers? 
+
+It might be the case that with higher expected values for counting statistics, the relative importance of turnovers decreases. But if that is the case it is not clear to what degree based on intuition. 
+### Math
+
+The math from the last section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week.
 
  | Likelihood of winning overall  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
-| 50.0\%   | 10.4\% | 7.2\% | 7.0\% | 9.2\% | 6.1\% | 6.5\% | 7.4\% | 6.7\%    | 6.6\%    |
-| 61.4\% | 9.9\%  | 7.0\% | 6.7\% | 8.6\% | 6.8\% | 6.5\% | 6.7\% | 6.3\%    | 6.3\%    |
-| 72.1\% | 8.0\%  | 5.9\% | 5.8\% | 7.1\% | 5.8\% | 6.0\% | 5.6\% | 5.8\%    | 5.6\%    |
-| 81.0\%   | 6.9\%  | 5.1\% | 4.9\% | 6.0\% | 4.3\% | 4.5\% | 4.5\% | 4.6\%    | 4.5\%    |
-| 87.7\% | 5.0\%  | 4.0\% | 3.3\% | 4.2\% | 2.9\% | 3.7\% | 3.2\% | 3.6\%    | 3.3\%    |
+| 50.0   | 10.5\% | 6.8\% | 6.9\% | 9.2\% | 6.4\% | 6.7\% | 6.8\% | 7.0\%    | 7.2\%    |
+| 59.9 | 10.5\% | 7.2\% | 6.4\% | 8.5\% | 6.1\% | 6.6\% | 7.1\% | 6.4\%    | 6.8\%    |
+| 69.1 | 9.9\%  | 6.9\% | 6.2\% | 7.8\% | 5.4\% | 5.7\% | 6.6\% | 6.2\%    | 6.3\%    |
+| 77.2 | 8.1\%  | 5.6\% | 5.0\% | 6.1\% | 5.1\% | 5.0\% | 5.1\% | 5.0\%    | 5.3\%    |
+| 84.0   | 6.8\%  | 4.3\% | 4.5\% | 4.4\% | 3.8\% | 4.4\% | 4.1\% | 4.0\%    | 4.0\%    |
 
-I calculated the advantage by adding a small constant to all of the counting stats, then observing what percentage of the corresponding simulations were victories. 
+I calculated the advantage by adding a small constant to all of the counting stats (including turnovers), then observing what percentage of the corresponding simulations were victories. 
 
 It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme
 
