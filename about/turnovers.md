@@ -83,7 +83,7 @@ However, does that necessarily translate to a decreased optimal weight on turnov
 
 The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. It models a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
  
- I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
+ I calculated this derivative for the Most Categories context in the paper, and it boiled down to two factors multiplied together: 
 - How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
