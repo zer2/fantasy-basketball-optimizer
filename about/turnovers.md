@@ -48,7 +48,7 @@ The most common theoretical argument for downweighting turnovers, specifically f
 - A drafter's goal is to win an overall matchup
 - Winning turnovers generally only happens when the drafter's players are playing fewer minutes than their opponents. In this situation, the drafter is most likely losing the matchup
 - Ergo, winning the turnovers category is only relevant when the matchup is already lost
-- Ergo, there is no point in investing in turnovers
+- Ergo, investing in turnovers is not worthwhile
 
 This is essentially borrowing the concept of [playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/) from strategy games. The idea is that there no point strategizing for the right action in auto-loss scenarios, because nothing can turn those scenarios into wins. The priniciple in general is sound. However, applying it here is an incomplete treatment of the problem and leads to an erroneous conclusion
 
