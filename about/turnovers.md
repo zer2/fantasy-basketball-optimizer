@@ -6,7 +6,7 @@ There are real arguments to be made for this approach. However, my own analysis 
 
 Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my investigation into the arguments around turnovers has not been enormously rigorous, and is not built into the logic of H-scoring. Still, I realize that deciding how to treat turnovers is an important part of drafting strategy, and that my default may be controversial. So I will go through the arguments that are made in favor of auto-punting turnovers here and explain why they don't convince me
 
-## 1. Emprical evidence 
+## 1. Empirical evidence 
 
 Punting turnovers is often justified by the empirical fact that succesful teams tend to do poorly in turnovers.
 
