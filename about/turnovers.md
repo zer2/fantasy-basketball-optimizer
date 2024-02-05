@@ -4,7 +4,7 @@ The turnovers category is unique because unlike all of the other counting statis
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant treating turnovers in such a radically different way. As such, the website's default is to weigh turnovers as normal. 
 
-Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my investigation into the arguments around turnovers has not been enormously rigorous, and is not built into the logic of H-scoring. Still, I realize that deciding how to treat turnovers is an important part of drafting strategy, and that my default may be controversial. So I will go through the arguments that are made in favor of auto-punting turnovers and explain why they don't convince me
+Unfortunately, I had to ignore some relevant aspects of the math in the paper for technical reasons (it makes the math impossible, in a sense). So my investigation into the arguments around turnovers has not been enormously rigorous, and is not built into the logic of H-scoring. Still, I realize that deciding how to treat turnovers is an important part of drafting strategy, and that my default may be controversial. So I will go through the arguments that are made in favor of auto-punting turnovers here and explain why they don't convince me
 
 ## 1. Emprical evidence 
 
@@ -87,7 +87,7 @@ The discussion of static ranking lists on the G-score page gives a framework for
 - How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
-This aligns well with the intution that strategizing should only consider scenarios that are "in the middle". The two implicit conditions in the derivative are equivalent to calculating the probability that an incremental investment in a category flips the result of the overall outcome. 
+This aligns well with the intution that strategies should focus on scenarios which are close matchups, ignoring scenarios where the outcome is already guaranteed. The two implicit conditions in the derivative are equivalent to calculating the probability that an incremental investment in a category flips the result of the overall outcome. 
 
 The probability of both criteria occuring can be estimated by approximating the values of all categories as multivariate normals with mean zero and sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated. I tried this with 2023 data and got 
 
