@@ -67,7 +67,7 @@ Turnovers end up having approximately average importance
 
 ## 3. The third argument: banking on overperformance
 
-One might note that the math in the last section was predicated on neither player having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
+One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have come into each matchup with an advantage because they chose better players. 
 
 Note what happens to the tipping point probabilities from the last section when the drafter with some advantage in the counting statistics:
 
