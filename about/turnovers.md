@@ -22,10 +22,10 @@ The fantasy basketball equivalent of this statement is that it is not de-priorit
 |Result- placement | First | Second | Third | Fourth |
 
 Ignoring the player minutes per game numbers, one might naively infer two effects
-- 1: Investing in turnovers leads to a better performance in turnovers. Evidence:
+- 1: Investing in turnovers leads to a better performance in turnovers. The evidence is
   - Drafters B and D invested in turnovers, and were middling/good in them
   - Drafters A and C did not invest in turnovers, and were middling/bad in them 
-- 2: Doing better in turnovers leads to doing worse in the league. Evidence:
+- 2: Doing better in turnovers leads to doing worse in the league. The evidence is
   - Performing well in turnovers leads to an average placement of third place (drafter C finished third)
   - Performing average in turnovers leads to an average placement of between second and third place (drafter A finished first, drafter D finished fourth)
   - Performing badly in turnovers leads to an average of second place (drafter B finished second) 
