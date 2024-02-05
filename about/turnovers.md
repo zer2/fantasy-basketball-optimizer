@@ -29,25 +29,6 @@ The concept of playing to your outs is mostly invoked in cases where a player is
 
 In the case of fantasy basketball, scenarios where the drafter has a significant disadvantage in terms of playing time are largely irrelevant because they are going to lose no matter what. But the flipside scenario is also irrelevant: if the drafter has a significant advantage in playing time, they are going to win no matter what. The only relevant scenarios to strategize around are those where the outcome is close, and for the outcome to be close, each drafter must win some share of the counting statistics, making it unclear which team has the advantage in turnovers. 
 
-One might counter with the empirical fact that succesful teams tend to do poorly in turnovers. I don't dispute the fact, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). Simplifying this drastically, consider the following results:
-
-| | Drafter A | Drafter B | Drafter C | Drafter D| 
-|:-------|:-------|:-------|:-------|:-------|
-|Turnover weight | 0 | 1 | 0 | 1 |
-|Player m/g | 40 | 40 | 20 | 20 |
-|Result- turnovers | Bad | Middling | Middling | Good | 
-|Result- championship | Won | Won | Lost | Lost |
-
-Ignoring the player m/g numbers, one might naively infer two effects
-- 1: Investing in turnovers leads to a better performance in turnovers. Evidence:
-  - Drafters B and D invested in turnovers, and were middling/good in them
-  - Drafters A and C did not invest in turnovers, and were middling/bad in them 
-- 2: Performing badly in turnovers improves the probability of victory. Evidence:
-  - Drafters A and B won, and were middling/bad in turnovers
-  - Drafters C and D lost, and were middling/good in turnovers
- 
-Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach is not logical because the second inference is likely incorrect. Performing badly in turnovers didn't make drafters A and B win- the same conditions that led to winning, having high minutes per game, also led to performing badly in turnovers. It can easily be seen by viewing the results holistically that turnover weight was irrelevant and the only real driver of victory was minutes per game. So this data makes no argument for down-weighting turnovers, even if it may have appeared to at first glance
-
 ### Math 
 
 The intuitive version of the argument is not entirely clear. Can a mathematical approach bring clarity? 
@@ -102,7 +83,30 @@ I calculated the advantage by adding a small constant to all of the counting sta
 
 It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme
 
-## 4. Testing 
+## 4. The fourth argument: Empirical evidence 
+
+This is not an argument per se, but I have often seen punting turnovers justified by the empirical fact that succesful teams tend to do poorly in turnovers. I don't dispute the fact, but inverting the logic to claim that doing poorly in turnovers leads to success is a fallacy of [questionable cause](https://en.wikipedia.org/wiki/Questionable_cause). 
+
+Simplifying this drastically, consider the following results:
+
+| | Drafter A | Drafter B | Drafter C | Drafter D| 
+|:-------|:-------|:-------|:-------|:-------|
+|Turnover weight | 0 | 1 | 0 | 1 |
+|Player m/g | 40 | 40 | 20 | 20 |
+|Result- turnovers | Bad | Middling | Middling | Good | 
+|Result- championship | Won | Won | Lost | Lost |
+
+Ignoring the player m/g numbers, one might naively infer two effects
+- 1: Investing in turnovers leads to a better performance in turnovers. Evidence:
+  - Drafters B and D invested in turnovers, and were middling/good in them
+  - Drafters A and C did not invest in turnovers, and were middling/bad in them 
+- 2: Performing badly in turnovers improves the probability of victory. Evidence:
+  - Drafters A and B won, and were middling/bad in turnovers
+  - Drafters C and D lost, and were middling/good in turnovers
+ 
+Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. However, this backwards-causality approach is not logical because the second inference is likely incorrect. Performing badly in turnovers didn't make drafters A and B win- the same conditions that led to winning, having high minutes per game, also led to performing badly in turnovers. It can easily be seen by viewing the results holistically that turnover weight was irrelevant and the only real driver of victory was minutes per game. So this data makes no argument for down-weighting turnovers, even if it may have appeared to at first glance
+
+## 5. Testing 
 
 To some degree, the hypothesis that down-weighting turnovers can be tested. I ran a test with the following setup
 - For each category
