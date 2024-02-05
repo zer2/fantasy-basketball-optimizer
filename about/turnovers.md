@@ -51,7 +51,11 @@ A correlation matrix contains the pairwise correlations between many metrics. Fo
 
  It is clear that the turnovers category is uniquely negatively correlated to the counting statistics, which lends some credence to the idea that it is hard to win many categories without losing turnovers. 
  
- However, does that necessarily translate to a decreased importance? One way of conceptualizing the importance of a category is as the derivative of the reward function with respect to investment in the category. I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
+ However, does that necessarily translate to a decreased importance? 
+
+To answer this question we must first take a step back and be clear about what importance means in this context. The original question was how much to weight various categories. The optimal weights should lead to a sum total for each player that is directly proportional to how much benefit there is to drafting that player. Breaking that down per category, the weights should be how much benefit there is to investment in each category, relative to some unit of investment. This is roughly equivalent to the definition of a partial derivative. The operative question for each category is thus, what is the partial derivative of victory probability with respect to investment in the category? 
+ 
+ I calculated this derivative in the paper, and it boiled down to two factors multiplied together: 
 - How likely is it that the other eight categories are tied?
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria? 
 
