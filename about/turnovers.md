@@ -8,7 +8,7 @@ This article is my attempt to explain why none of the arguments are convincing t
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
-The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall. The statement of fact is incontrovertibly true. However, concluding that doing poorly in turnovers causally leads to success is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation), which is a fallacy because correlation does not imply causation. Two separate things might be associated with each other without causing each other- in fact, one of them might be actively working against the other despite the correlation in incidence. 
+The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall. The statement of fact is incontrovertibly true. However, concluding that doing poorly in turnovers causally leads to success is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation), which is a fallacy because correlation does not imply causation. Two separate things might be associated with each other without causing each other- in fact, one of them might be actively working against the other 
 
 ### Unpacking the fallacy 
 
