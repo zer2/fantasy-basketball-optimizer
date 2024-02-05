@@ -44,7 +44,7 @@ This will not necessarily be the case in real fantasy basketball. The point here
 
 ## 2. The second argument: playing to your outs 
 
-The most common theoretical argument for downweighting turnovers, specifically for Most Categories, is that winning turnovers requires losing other categories. Stated slightly more strategically, the idea is as follows
+The most common theoretical argument for downweighting turnovers, specifically for Most Categories, is that winning turnovers requires losing other categories. Stated more strategically, the idea is as follows
 - A drafter's goal is to win the overall matchup
 - Winning turnovers generally only happens when the drafter's players are playing fewer minutes than their opponents. In this situation, the drafter is most likely losing the matchup
 - Ergo, winning the turnovers category is only relevant when the matchup is already lost, and therefore is not valuable 
