@@ -16,8 +16,8 @@ The fantasy basketball equivalent of this statement is that it is not de-priorit
 
 | | Drafter A | Drafter B | Drafter C | Drafter D| 
 |:-------|:-------|:-------|:-------|:-------|
-|Turnover weight | 1 | 0 | 1 | 0 |
-|Player m/g | 40 | 40 | 20 | 20 |
+|Turnover weight | $100/%$ | $0/%$ | $1/%$ | $0$ |
+|Player m/g | $40$ | $40$ | $20$ | $20$ |
 |Result- turnovers | Middling | Bad | Good | Middling | 
 |Result- placement | First | Second | Third | Fourth |
 
