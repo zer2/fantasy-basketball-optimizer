@@ -64,6 +64,8 @@ Correlation is a measure of how related two metrics are. When two metrics tend t
  | Free Throw \% | 17.5\%  | -20.9\% | 11.0\%  | 6.5\%   | -14.8\% | 21.0\%  | -4.7\%  | 100.0\%   | -13.8\%   |
  | Field Goal \% | 19.0\%  | 27.5\%  | -9.2\%  | -6.8\%  | 24.0\%  | -11.6\% | 1.2\%   | -13.8\%   | 100.0\%   |
 
+(You might note that this is the correlation matrix for individual players and not for teams. Fortunately the two are equivalent, since correlation, variance, and covariance are all bilinear)
+
 Simulating the multivariate distribution with that correlation matrix, it is easy to confirm the expected result, that turnovers are usually lost in overall wins and won in overall losses
 
  |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
