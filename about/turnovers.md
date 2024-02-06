@@ -8,7 +8,7 @@ This article is my attempt to explain why none of the arguments are convincing t
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
-The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall. The statement of fact is incontrovertibly true. However, concluding that doing poorly in turnovers causally leads to success is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation), which is a fallacy because correlation does not imply causation. Two separate things might be associated with each other without causing each other- in fact, one of them might be actively working against the other 
+The most common argument for ignoring turnovers, especially for the Most Categories format, is that teams which perform poorly in turnovers tend to do better overall. The statement of fact is incontrovertibly true. However, concluding that doing poorly in turnovers causally leads to success is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation), which is a fallacy because correlation does not imply causation. Two separate things might be associated with each other without causing each other- in fact, one of them might be actively working against the other 
 
 ### Unpacking the fallacy 
 
@@ -68,12 +68,16 @@ Simulating the multivariate distribution with that correlation matrix, it is eas
  |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
  | Loss | 18.3\% | 28.7\% | 29.2\% | 28.8\% | 34.3\% | 29.2\% | 61.6\% | 39\%   | 36.9\% |
  | Win | 81.6\% | 71.2\% | 70.5\% | 71.1\% | 65.4\% | 71\%   | 38.6\% | 61.1\% | 62.8\% |
+
+The same effect would be observed in Each Categories, with a higher number of categories won being associated with losng turnovers more often. 
  
 However, as already established, just because winning turnovers is associated with losses does not mean that the effect is causal. 
 
 Let's take a step back and be clear about what "optimal category weights" really are. The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. It models a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
 
- Partial derivatives can be calculated based on the model above. I did the math in the paper, and they boiled down to two factors multiplied together: 
+ Partial derivatives can be calculated based on the model above. I did the math on them in the paper. 
+ 
+ For Most Categories, the partial derivatives and boil down to two factors multiplied together: 
 - How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
 - How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria?
 
@@ -83,27 +87,49 @@ The probability of both criteria occuring can be estimated by approximating the 
 
  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
-| 10.4\% | 7.2\%  | 7.0\%  | 9.2\%  | 6.1\%  | 6.5\%  | 7.4\%  | 6.7\%     | 6.6\%     |
+| 10.3\% | 6.8\% | 6.2\% | 9.0\% | 7.1\% | 6.6\% | 7.2\% | 7.1\%    | 7.4\%    |
 
 These can be considered proper weights, for this simplified model. Note that despite turnovers being associated with losses in aggregate, the reward for investing in turnovers is comparable to the reward for investing in other categories! 
+
+For each Category, the analysis is even simpler. The partial derivative is just the probability density of each category around zero. Re-using the experimental apparatus, the result is 
+
+ | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
+|:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
+| 33.0\% |34.0\% | 30.9\% | 27.7\% | 36.4\% | 30.6\% | 31.0\% | 33.4\% | 33.4\%   | 34.4\%   |
+
+Unsurprisingly, the importances are almost all the same 
 
 ## 2. The second argument: banking on overperformance
 
 One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. 
 
+The most reliable way for a drafter to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives them some advantage in all of the counting statistics. 
+
 The math from the previous section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week. I added a small constant to each of the counting stats (including turnovers), then re-ran the experiment, noting what percent of matchups were overall victories for each advantage state. The results are as follows
 
- | Likelihood of winning overall  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
+For Most Categories 
+
+ | Likelihood of winning the matchup  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
-| 50.0   | 10.5\% | 6.8\% | 6.9\% | 9.2\% | 6.4\% | 6.7\% | 6.8\% | 7.0\%    | 7.2\%    |
-| 59.9 | 10.5\% | 7.2\% | 6.4\% | 8.5\% | 6.1\% | 6.6\% | 7.1\% | 6.4\%    | 6.8\%    |
-| 69.1 | 9.9\%  | 6.9\% | 6.2\% | 7.8\% | 5.4\% | 5.7\% | 6.6\% | 6.2\%    | 6.3\%    |
-| 77.2 | 8.1\%  | 5.6\% | 5.0\% | 6.1\% | 5.1\% | 5.0\% | 5.1\% | 5.0\%    | 5.3\%    |
-| 84.0   | 6.8\%  | 4.3\% | 4.5\% | 4.4\% | 3.8\% | 4.4\% | 4.1\% | 4.0\%    | 4.0\%    |
+| 50/%   | 10.3\% | 6.8\% | 6.2\% | 9.0\% | 7.1\% | 6.6\% | 7.2\% | 7.1\%    | 7.4\%    |
+| 59.7/% | 10.0\% | 7.4\% | 6.7\% | 8.6\% | 5.9\% | 6.8\% | 7.0\% | 6.9\%    | 7.1\%    |
+| 68.9/% | 9.1\%  | 6.4\% | 6.1\% | 8.0\% | 5.6\% | 6.0\% | 6.5\% | 6.4\%    | 6.3\%    |
+| 77.1/% | 8.4\%  | 5.5\% | 5.1\% | 6.4\% | 4.6\% | 5.3\% | 5.2\% | 5.0\%    | 5.5\%    |
+| 83.9/% | 6.5\%  | 4.6\% | 4.3\% | 5.3\% | 3.8\% | 4.1\% | 4.0\% | 4.3\%    | 4.4\%    |
 
-It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme.
+It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, tipping points for all categories always require there to be a split among the counting statistics. Given that condition, there is no particular reason to expect that turnovers would be tipping points less often, or that tipping points would have low.
 
-Intuitively this makes sense because no matter how large the advantage state is, tipping points for all categories always require there to be a split among the counting statistics. Given that condition, there is no particular reason to expect that turnovers would be tipping points less often, or that tipping points would have low 
+For Each Categories 
+
+ | Averagte category winning %  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
+|-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
+| 50/%   | 34.0\% | 30.9\% | 27.7\% | 36.4\% | 30.6\% | 31.0\% | 33.4\% | 33.4\%   | 34.4\%   |
+| 54.3/% | 32.3\% | 30.9\% | 29.1\% | 36.4\% | 30.8\% | 30.3\% | 33.7\% | 33.4\%   | 34.4\%   |
+| 58.5/% | 29.6\% | 29.1\% | 27.3\% | 33.4\% | 28.2\% | 28.9\% | 30.9\% | 33.4\%   | 34.4\%   |
+| 62.3/% | 27.2\% | 27.0\% | 24.8\% | 29.2\% | 25.8\% | 26.0\% | 27.0\% | 33.4\%   | 34.4\%   |
+| 65.8/% | 22.8\% | 23.2\% | 21.7\% | 24.5\% | 23.0\% | 22.1\% | 24.2\% | 33.4\%   | 34.4\%   |
+
+There is an interesting takeaway from this analysis, but it has nothing to do with turnovers! It turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
 ## 3. The third argument: turnovers are volatile
 
