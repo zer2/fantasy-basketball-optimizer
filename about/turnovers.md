@@ -1,8 +1,8 @@
 # The curious case of turnovers 
 
-Turnovers are weird. When players are getting a lot of touches, typically they are contributing more by adding points, blocks, steals, etc, but they are also hurting performance in turnovers. Doing well in turnovers requires the exact opposite of what it takes to do well in other categories- the best players for turnovers are those who avoid the ball or ride the bench. 
+Turnovers are weird. Typically you want your players to play more so that they can contribute more points, blocks, steals, etc. But the best thing for the turnovers category is having your players ride the bench. 
 
-Including turnovers in player rankings punishes the stars for being stars and rewards irrelevant players, which feels wrong to many, including professional analysts. As a result, they often recommend manually down-weighting the category by $75\%$ or even $100\%$.
+Including turnovers in player rankings punishes the stars for being stars and rewards irrelevnt players, which feels wrong to many, including professional analysts. As a result, they often recommend manually down-weighting the category by $75\%$ or even $100\%$.
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant such an extreme treatment. As such, the website's default is to weigh turnovers as normal. 
 
@@ -10,7 +10,7 @@ My thinking on this topic is not entirely rigorous, which is why I am not includ
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
-The most common argument for ignoring turnovers, especially for the Most Categories format, is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implicit conclusion from this fact is that investing more in turnovers make you more likely to lose, or at least is not enormously helpful. 
+The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implicit conclusion from this fact is that investing more in turnovers make you more likely to lose, or at least is not enormously helpful. 
 
 The statement of fact is incontrovertibly true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more__ 
 
