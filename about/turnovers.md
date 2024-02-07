@@ -106,7 +106,7 @@ For Most Categories
 | 77.1\% | 8.4\%  | 5.5\% | 5.1\% | 6.4\% | 4.6\% | 5.3\% | 5.2\% | 5.0\%    | 5.5\%    |
 | 83.9\% | 6.5\%  | 4.6\% | 4.3\% | 5.3\% | 3.8\% | 4.1\% | 4.0\% | 4.3\%    | 4.4\%    |
 
-It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, tipping points for all categories always require there to be a split among the counting statistics. Given that condition, there is no particular reason to expect that turnovers would be tipping points less often, or that tipping points would have low.
+It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, tipping points for all categories always require there to be a split among the counting statistics. Given that condition, there is no particular reason to expect that turnovers would be tipping points less often, or that turnovers would be auto-losses or auto-wins conditional on being the tipping point.
 
 We can also do this analysis for Each Category. For Each Category, the derivative of the reward function relative to investment in a category is just the probability density around zero of the team differential distribution.  The results are as follows
 
