@@ -28,7 +28,7 @@ Ignoring the player minutes per game numbers, one might naively infer that doing
   - Performing average in turnovers leads to an average placement of between second and third place (drafter A finished first, drafter D finished fourth)
   - Performing badly in turnovers leads to an average of second place (drafter B finished second) 
  
-However, this backwards-causality approach is not logical because the appearance of causality is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers. In fact, when accounting for minutes per game, the opposite effect is uncovered. Drafter A did better than drafter B and drafter C did better than drafter D. 
+However, this backwards-causality approach is not logical because the appearance of causality is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers. In fact, when accounting for minutes per game, the opposite effect is uncovered. Drafter A did better than drafter B and drafter C did better than drafter D
 
 ## 2. The second argument: Winners won't win turnovers anyway
 
