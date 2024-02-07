@@ -50,7 +50,7 @@ There are two versions of this argument. One is that specifically for Most Categ
 
 In Most Categories, it does not matter if you can win turnovers to go 1-8 instead of 0-9. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
 
-This argument seems plausible on face but is framed incorrectly because "playing to your outs" is not the only relevant concept at play. One should also keep "[win-more](https://www.lesswrong.com/posts/Dfi7Snzs4pGSAu52b/the-problem-of-win-more)" in mind; the idea being that strategists should only evaluate their decision-making in the context of scenarios they could possibly lose. Yes, winning turnovers is hard when you're dominating your competition, but why should that matter? You were already going to win! 
+This argument seems plausible on face but is framed incorrectly because "playing to your outs" is not the only relevant concept at play. One should also keep "[win-more](https://www.lesswrong.com/posts/Dfi7Snzs4pGSAu52b/the-problem-of-win-more)" in mind; the idea being that strategists should only evaluate their decision-making in the context of scenarios they could possibly lose. Yes, winning turnovers is hard when you're dominating your competition, but why should that matter? 8-1 is as much of a win as 9-0! 
 
 __The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score. It is under this framework that the question of turnover importance should be evaluated.__
 
