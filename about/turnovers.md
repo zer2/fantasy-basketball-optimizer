@@ -132,7 +132,7 @@ G-scores deal with this by incorporating week-to-week variance. They do downweig
 
 ## 4. Testing 
 
-To some degree, the hypothesis that down-weighting turnovers can be tested. I ran a test with the following setup
+To some degree, the hypothesis that down-weighting turnovers is uniquely beneficial can be tested. I ran a test with the following setup
 - For each category
   - Divide all drafters into two groups of six
   - One group downweights the category by a certain factor. The other does not
