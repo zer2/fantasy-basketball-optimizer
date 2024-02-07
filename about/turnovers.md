@@ -1,6 +1,6 @@
 # Diet soda, the electoral college, and turnovers
 
-The turnovers category is unique because unlike all of the other counting statistics, for turnovers, fewer is better. This uniqueness makes turnovers a weird category to strategize around and leads many fantasy basketball analysts to recommend down-weighting the turnovers category to a low weight like $25\%$ or even $0\%$ relative to what Z-scores would otherwise tell them. 
+The turnovers category is unique because unlike all of the other counting statistics, for turnovers, fewer is better. This uniqueness makes turnovers a weird category to strategize around and leads many fantasy basketball analysts to recommend manually down-weighting the turnovers category $75\%$ or even $100\%$.
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant treating turnovers in such a radically different way. As such, the website's default is to weigh turnovers as normal. 
 
