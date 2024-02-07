@@ -50,7 +50,7 @@ A second argument is that because winning teams tend to perform badly in turnove
 
 There are two versions of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage
 
-### Conditioning on matchup victory for Most Categories 
+### 2A. Conditioning on matchup victory for Most Categories 
 
 In Most Categories, it does not matter if you can win turnovers to go 1-8 instead of 0-9. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
 
@@ -92,7 +92,7 @@ The probability of both criteria occuring can be estimated by sampling from the 
 
 The turnover weight is in line with the weights of the other categories. This says that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to lead to flip a loss to a win
 
-### Relying on a consistent advantage  
+### 2B. Relying on a consistent advantage  
 
 One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. This argument applies to both Most Categories and Each Category.
 
@@ -173,7 +173,7 @@ And for rebounds
 
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
 
-It should be noted that this test does not cover the third argument because all player statistics are known beforehand. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section three is wrong or misleading, perhaps turnovers become significantly less important in that case
+It should be noted that this test does not cover argument 2B because all player statistics are known beforehand, making it imposssible for any drafter to have a surprisingly good team. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section 2B is wrong or misleading, perhaps turnovers become significantly less important in that case
 
 ## 5. Conclusion
 
