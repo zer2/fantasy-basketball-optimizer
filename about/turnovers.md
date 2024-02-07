@@ -124,7 +124,7 @@ Interestingly, it turns out that the percentage statistics have outsize importan
 
 All in all, what does this tell us about turnovers? 
 
-It tells us that __investment in turnovers has approximately equivalent returns as investment in other categories, even for a very good team__. The idea that teams that are in position to win benefit less from investment in turnovers than in other categories is not supported
+It tells us that __investment in turnovers has approximately equivalent returns as investment in other categories, even for a very good team__. The idea that good teams benefit less from investment in turnovers than in other categories is not supported
 
 ## 3. The third argument: turnovers are volatile
 
