@@ -42,7 +42,7 @@ There are two variants of this argument. One is that specifically for Most Categ
 
 In the Most Categories context, you want to dominate the non-turnover counting statistics to win the overall matchup. If you do that, you almost definitely are not winning turnovers. So why invest in them?
 
-This argument seems plausible on face but is framed incorrectly. __If you are already winning all of the non-turnover counting statistics, your victory is guaranteed and no categories are important. Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which are most likely to be decisive in a close match-up.__ 
+This argument seems plausible on face but is framed incorrectly. __If you are already winning all of the non-turnover counting statistics, your victory is guaranteed and no categories are important. Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which are most likely to be decisive in close match-ups.__ 
 
 At least for me it is hard to intuit whether turnovers are more or less important than other categories under the condition of a close match. Fortunately, the question can be modeled mathematically.  
 
