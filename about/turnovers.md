@@ -2,7 +2,7 @@
 
 Turnovers are weird. Typically you want your players to play more so that they can contribute more points, blocks, steals, etc. But the best thing for the turnovers category is having your players ride the bench. 
 
-Including the turnovers category in player rankings punishes the stars for being stars and rewards irrelevant players. This feels wrong to many, including professional analysts. As a result, they often recommend manually down-weighting the category by $75\%$ or even $100\%$.
+Including the turnovers category in player rankings punishes the stars for being stars and rewards irrelevant players. This feels wrong to many, including professional analysts. As a result, they often recommend manually down-weighting the category by $75\%$ or even $100\% relative to what Z-scores would otherwise tell them.
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant such an extreme treatment. As such, the website's default is to weigh turnovers as normal. 
 
