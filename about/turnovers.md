@@ -72,11 +72,11 @@ Correlation is a measure of how related two metrics are. When two metrics tend t
 
 This correlation matrix can be used to parameterize a multivariate normal distribution to approximate the score differential between two teams. (Technically I calculated this as the correlation matrix for individual players and not for differentials between teams. Fortunately the two are equivalent, since correlation, variance, and covariance are all bilinear)
 
-The probability of both criteria occuring can be estimated by sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated. 
+The probability of both criteria occuring can be estimated by sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated 
 
 #### Conclusion of the math
 
-The resulting importances are 
+The resulting approximate importances are 
 
  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
@@ -84,7 +84,7 @@ The resulting importances are
 
 The turnover weight is in line with the weights of the other categories. 
 
-This is intuitively reasonable. __For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that, it seems unlikely that one drafter would have such a massive lead in turnovers that it was unsurmountable.__ 
+This is intuitively reasonable. __For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that, it seems unlikely that one drafter would have such a massive lead in turnovers that it would be unsurmountable.__ 
 
 This means that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to flip a loss to a win.
 
