@@ -82,9 +82,11 @@ The resulting importances are
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.3\% | 6.8\% | 6.2\% | 9.0\% | 7.1\% | 6.6\% | 7.2\% | 7.1\%    | 7.4\%    |
 
-The turnover weight is in line with the weights of the other categories. This means that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to flip a loss to a win.
+The turnover weight is in line with the weights of the other categories. 
 
-This is intuitively reasonable. For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that, it seems unlikely that one drafter would have such a massive lead in turnovers that it was unsurmountable. 
+This is intuitively reasonable. __For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that, it seems unlikely that one drafter would have such a massive lead in turnovers that it was unsurmountable.__ 
+
+This means that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to flip a loss to a win.
 
 ### 2B. Relying on a consistent advantage  
 
@@ -104,7 +106,7 @@ For Most Categories
 | 77.1\% | 8.4\%  | 5.5\% | 5.1\% | 6.4\% | 4.6\% | 5.3\% | 5.2\% | 5.0\%    | 5.5\%    |
 | 83.9\% | 6.5\%  | 4.6\% | 4.3\% | 5.3\% | 3.8\% | 4.1\% | 4.0\% | 4.3\%    | 4.4\%    |
 
-It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, tipping points for all categories always require there to be a split among the counting statistics. Given that condition, there is no particular reason to expect that turnovers would be tipping points less often, or that turnovers would be auto-losses or auto-wins conditional on being the tipping point.
+It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, if the matchup ended up close then no drafter could have dominated the counting statistics. Given that the counting statistics were close, one would expect turnovers to also be relatively close. 
 
 We can also do this analysis for Each Category. For Each Category, the derivative of the reward function relative to investment in a category is just the probability density around zero of the team differential distribution.  The results are as follows
 
