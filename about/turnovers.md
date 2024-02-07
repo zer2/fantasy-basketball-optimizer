@@ -34,9 +34,9 @@ However, this backwards-causality approach is not logical because the appearance
 
 ## 2. The second argument: Winners won't win turnovers anyway
 
-A second argument is that because winning teams tend to perform badly in turnovers, they will usually be so far behind in turnovers that investing in turnovers is futile for them. 
+A more sophisticated version of the first argument is that because winning teams tend to perform badly in turnovers, they will usually be so far behind in turnovers that investing in turnovers is futile for them. 
 
-There are two versions of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage, which makes it difficult to do well in turnovers
+There are two variants of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage, which makes it difficult to do well in turnovers
 
 ### 2A. Getting over the hump in Most Categories
 
