@@ -8,7 +8,7 @@ There are real arguments to be made for this approach. However, my own analysis 
 
 My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that deciding how to treat turnovers is an important part of fantasy drafting, and that my default goes against the grain of community wisdom. So I will go through the arguments against considering turnovers equally here, and explain why they are not convincing to me.
 
-__TL;DR: It is irrelevant that winning matchups is associated with losing turnovers. What matters is whether, in match-ups that are close and therefore flippable, doing a bit better in turnovers is worth as much as doing a bit better in other categories. The math suggests that it is, meaning that there is no reason to de-weight turnovers__
+__TL;DR: It is irrelevant that winning matchups is associated with losing turnovers. What matters is whether, in match-ups that are close and therefore flippable, doing a bit better in turnovers is worth as much as doing a bit better in other categories. Math and intuition both suggest that it is, providing no justification for de-weighting turnovers__
 
 ## 1. The first argument: strong turnover teams tend to lose 
 
