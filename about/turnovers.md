@@ -36,13 +36,13 @@ However, this backwards-causality approach is not logical because the appearance
 
 A more sophisticated version of the first argument is that because winning teams tend to perform badly in turnovers, they will usually be so far behind in turnovers that investing in turnovers is futile for them. 
 
-There are two variants of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage, which makes it difficult to do well in turnovers
+There are two variants of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter does well in non-turnover counting statistics so they should only focus on those. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage, which makes it difficult to do well in turnovers
 
 ### 2A. Getting over the hump in Most Categories
 
 In the Most Categories context, you want to dominate the non-turnover counting statistics to win the overall matchup. If you do that, you almost definitely are not winning turnovers. So why invest in them?
 
-This argument seems plausible on face but is framed incorrectly. __If you are already winning all of the non-turnover counting statistics, your victory is guaranteed and no categories are important. Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which can generate category wins in match-ups that could go either way.__ 
+This argument seems plausible on face but is framed incorrectly. __If you are already winning all of the non-turnover counting statistics, your victory is guaranteed and no categories are important. Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which are most likely to be decisive in a close match-up.__ 
 
 At least for me it is hard to intuit whether turnovers are more or less important than other categories under the condition of a close match. Fortunately, the question can be modeled mathematically.  
 
@@ -90,7 +90,7 @@ Upon reflection, this is intuitively reasonable. __For a matchup to be close, ne
 
 ### 2B. Relying on a consistent advantage  
 
-One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. This argument applies to both Most Categories and Each Category.
+One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. 
 
 The most reliable way for a drafter to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives them some advantage in all of the counting statistics. 
 
@@ -181,6 +181,6 @@ It should be noted that this test does not cover argument 2B because all player 
 
 I have not seen a convincing argument that turnovers should be down-weighted to an extreme degree. That's why I've set the default to treating turnovers like every other category. 
 
-Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page
+Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page.
 
 Also, keep in mind that many other drafters ignore turnovers. Winning them reliably may take only a small investment while grabbing every player whose strength is turnovers would be overkill. So in practice you might want to downweight turnovers a bit, perhaps to $50\%$
