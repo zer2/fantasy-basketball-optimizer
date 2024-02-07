@@ -10,11 +10,9 @@ My thinking on this topic is not entirely rigorous, which is why I am not includ
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
-The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implicit conclusion from this fact is that investing more in turnovers makes you more likely to lose, or at least is not enormously helpful. 
+The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implication is that investing more in turnovers makes you more likely to lose, or at least is not enormously helpful. 
 
 The statement of fact is incontrovertibly true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more__ 
-
-### Unpacking the fallacy 
 
 If this concept is difficult to grasp intuitively, you shouldn't feel bad, because it is difficult for professional researchers and science reporters too. My favorite example of this is the oft-reported link between diet soda and obesity. Many studies have found a strong association between drinking diet soda and becoming obese, leading many researchers to suggest that some hidden mechanism makes drinking diet soda unhealthy. However, a [meta-analysis](https://academic.oup.com/nutritionreviews/article/71/7/433/1807065) summarizing all research suggests that this link is only correlational, and the causal relationship goes in the opposite direction. It is true that people who drink diet soda are more likely to gain weight. But those are also the same people who are most likely to be worried about their weight because of individual risk factors such as activity level or genetics. When controlling for those factors, the link  reverses. In other words- it is not drinking diet soda that makes people obese, but the risk factors for becoming obese that make someone drink diet soda. If anything, drinking diet soda likely decreases obesity risk. It only appears to be the reverse in the data because of a failure to control for countervailing factors. 
 
@@ -46,9 +44,9 @@ In fact, when accounting for minutes per game, the opposite effect is uncovered.
 
 This will not necessarily be the case in real fantasy basketball. The point here is that raw results may be misleading and should not be over-interpreted
 
-### Introducing math  
+## 2. The second argument: You're going to lose turnovers anyway
 
-The intuitive version of the argument is not entirely clear. Can a mathematical approach bring clarity? 
+Some argue that if you are doing well overall, then you are probably doing quite badly in turnovers. In that case, doing a little bit better in turnovers won't help you, since you will probably lose the category anyway. Why invest in it? 
 
 First, let's establish a theoretical framework which captures the idea that turnovers are generally lost by winning teams. This can be done by finding the correlation matrix of category scores then modeling the overall distribution as a corresponding multivariate normal
 
