@@ -44,7 +44,7 @@ This will not necessarily be the case in real fantasy basketball. The point here
 
 A second argument is that because winning teams tend to perform badly in turnovers, they will usually be so far behind in turnovers that investing in turnovers is futile for them. This is essentially borrowing the concept of "[playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/)" from strategy games. The idea is that strategists should only evaluate their decision-making in the context of scenarios where they could possibly win, and those scenarios make it relatively unlikely that they would win turnovers even with investment. 
 
-There are two versions of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage
+There are two versions of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage, which makes it difficult to do well in turnovers
 
 ### 2A. Conditioning on matchup victory for Most Categories 
 
