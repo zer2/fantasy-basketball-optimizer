@@ -4,13 +4,13 @@ Turnovers are unique in fantasy basketball as the only "negative" category. This
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant such an extreme treatment. As such, the website's default is to weigh turnovers as normal. 
 
-This article is my attempt to explain why none of the arguments are convincing to me. As it turns out, the underlying logic gets complicated. It touches on concepts that are important to seemingly unrelated topics, including the effect of diet soda on health and how voter power is distributed by the electoral college
+This article is my attempt to explain why none of the arguments are convincing to me. As it turns out, the underlying logic gets complicated. It touches on concepts that are important to seemingly unrelated topics, including the effect of diet soda on health and how voter power is distributed by the electoral college. Given all of this complexity, the logic presented here is not enormously rigorous. So please take it with a grain of salt and come to your own conclusions
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
 The most common argument for ignoring turnovers, especially for the Most Categories format, is that teams which perform poorly in turnovers tend to do better overall and vice versa. 
 
-The statement of fact is incontrovertibly true. However, concluding from it that doing well in turnovers does not increase overall win probability is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not mean that investing in turnovers decreases the probability of winning. Investing in turnovers could still increase the probability of winning. It could even increase the probability of winning as much as investing in other categories, or even more__ 
+The statement of fact is incontrovertibly true. However, concluding from it that doing well in turnovers does not increase overall win probability is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not mean that investing in turnovers decreases the probability of winning. Investing in turnovers could still increase the probability of winning, perhaps as much as investing in other categories does, or more__ 
 
 ### Unpacking the fallacy 
 
