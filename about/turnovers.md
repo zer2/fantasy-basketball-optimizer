@@ -1,6 +1,6 @@
 # Diet soda, the electoral college, and turnovers
 
-Turnovers are unique in fantasy basketball as the only "negative" category. This unique property makes turnovers a weird category to strategize around and leads many fantasy basketball analysts to recommend manually down-weighting the turnovers category by $75\%$ or even $100\%$.
+Turnovers are unique in fantasy basketball as the only "negative" category. This unique property makes turnovers a weird category to strategize around and leads many analysts to recommend manually down-weighting it by $75\%$ or even $100\%$.
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant such an extreme treatment. As such, the website's default is to weigh turnovers as normal. 
 
