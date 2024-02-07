@@ -8,7 +8,7 @@ There are real arguments to be made for this approach. However, my own analysis 
 
 My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that deciding how to treat turnovers is an important part of fantasy drafting, and that my default goes against the grain of community wisdom. So I will go through the arguments against considering turnovers equally here, and explain why they are not convincing to me.
 
-__TL;DR: It is irrelevant that winning turnovers is associated with losing matchups. What matters is whether, in match-ups that are close and therefore flippable, doing a bit better in turnovers is worth as much as doing a bit better in other categories. The math suggests that it is, meaning that there is no reason to de-weight turnovers__
+__TL;DR: It is irrelevant that winning matchups is associated with losing turnovers. What matters is whether, in match-ups that are close and therefore flippable, doing a bit better in turnovers is worth as much as doing a bit better in other categories. The math suggests that it is, meaning that there is no reason to de-weight turnovers__
 
 ## 1. The first argument: strong turnover teams tend to lose 
 
@@ -40,9 +40,9 @@ There are two variants of this argument. One is that specifically for Most Categ
 
 ### 2A. Getting over the hump in Most Categories
 
-In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is unhelpful. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
+In the Most Categories context, you want to dominate the non-turnover counting statistics to win the overall matchup. If you do that, you almost definitely are not winning turnovers. So why invest in them?
 
-This argument seems plausible on face but is framed incorrectly. Winning a consolation category isn't helpful, but neither is running up the score. __Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which can generate category wins in match-ups that can go either way.__ 
+This argument seems plausible on face but is framed incorrectly. __If you are already winning all of the non-turnover counting statistics, your victory is guaranteed and no categories are important. Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which can generate category wins in match-ups that could go either way.__ 
 
 At least for me it is hard to intuit whether turnovers are more or less important than other categories under the condition of a close match. Fortunately, the question can be modeled mathematically.  
 
