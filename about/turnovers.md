@@ -2,7 +2,7 @@
 
 Turnovers are unique in fantasy basketball as the only "negative" category. This unique property makes turnovers a weird category to strategize around and leads many fantasy basketball analysts to recommend manually down-weighting the turnovers category by $75\%$ or even $100\%$.
 
-There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant treating turnovers fundamentally differently from other categories. As such, the website's default is to weigh turnovers as normal. 
+There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant such an extreme treatment. As such, the website's default is to weigh turnovers as normal. 
 
 This article is my attempt to explain why none of the arguments are convincing to me. As it turns out, the underlying logic gets *very interesting*. It touches on concepts that are important to seemingly unrelated topics, including the effect of diet soda on health and how voter power is distributed by the electoral college. My exploration here is wide-reaching and not enomously rigorous. So think of this more as a collection of my own thought process, rather than one cohesive argument for treating turnovers in a particular way
 
