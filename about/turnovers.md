@@ -120,7 +120,7 @@ There is an interesting takeaway from this analysis, but it has nothing to do wi
 
 All in all, what does this tell us about turnovers? 
 
-It tells us that __investment in turnovers has approximately equivalent returns on investment as investment in other categories, even for a very good team__. The idea that teams that are in position to win benefit less from investment in turnovers than in other categories is not supported. 
+It tells us that __investment in turnovers has approximately equivalent returns on investment as investment in other categories, even for a very good team__. The idea that teams that are in position to win benefit less from investment in turnovers than in other categories is not supported
 
 ## 3. The third argument: turnovers are volatile
 
