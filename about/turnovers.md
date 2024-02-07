@@ -110,7 +110,7 @@ It does appear to be the case that with an increasing advantage, turnovers becom
 
 We can also do this analysis for Each Category. For Each Category, the derivative of the reward function relative to investment in a category is just the probability density around zero of the team differential distribution.  The results are as follows
 
- | Averagte category winning %  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
+ | Average category winning %  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 50\%   | 34.0\% | 30.9\% | 27.7\% | 36.4\% | 30.6\% | 31.0\% | 33.4\% | 33.4\%   | 34.4\%   |
 | 54.3\% | 32.3\% | 30.9\% | 29.1\% | 36.4\% | 30.8\% | 30.3\% | 33.7\% | 33.4\%   | 34.4\%   |
