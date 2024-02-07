@@ -62,7 +62,7 @@ I calculated this derivative in the paper, and it matches up well with the intui
 
 The intuition here is that the two conditions together specify a situation under which a tiny investment in a category can flip the overall result from a loss to a win. This is analagous to 538's [voter power index](https://projects.fivethirtyeight.com/2016-election-forecast/#tipping-point), a way of quantifying the importance of voters under the electoral college. The importance of a particular voter is equal to the probability that they can flip the result of their state and flipping that state flips the result of the electoral college.
 
-We can estimate these partial derivatives mathematically. First, we need a distribution that can incorporate how the various categories relate to each other. 
+We can estimate these partial derivatives mathematically. First, we need a distribution that can incorporate how the various categories relate to each other. And for that, we need a correlation matrix. 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero.  A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance (and turnovers muliplied by -1), the correlation matrix is 
                                                         
