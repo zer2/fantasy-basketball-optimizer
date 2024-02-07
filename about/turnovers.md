@@ -4,7 +4,7 @@ Turnovers are unique in fantasy basketball as the only "negative" category. This
 
 There are real arguments to be made for this approach. However, my own analysis has led me to believe that none of the arguments are strong enough to warrant such an extreme treatment. As such, the website's default is to weigh turnovers as normal. 
 
-This article is my attempt to explain why none of the arguments are convincing to me. As it turns out, the underlying logic gets *very interesting*. It touches on concepts that are important to seemingly unrelated topics, including the effect of diet soda on health and how voter power is distributed by the electoral college. My exploration here is wide-reaching and not enomously rigorous. So think of this more as a description of my own thought process, rather than a rigporous argument
+This article is my attempt to explain why none of the arguments are convincing to me. As it turns out, the underlying logic gets complicated. It touches on concepts that are important to seemingly unrelated topics, including the effect of diet soda on health and how voter power is distributed by the electoral college
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
