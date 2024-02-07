@@ -40,7 +40,7 @@ Ignoring the player minutes per game numbers, one might naively infer two effect
  
 Putting these two inferences together makes a seemingly solid case that investing in turnovers leads to bad performance. 
 
-However, this backwards-causality approach is not logical because the second inference is an illusion of reverse causality. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers.
+However, this backwards-causality approach is not logical because the second inference is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers.
 
 In fact, when accounting for minutes per game, the opposite effect is uncovered. Of the two drafters whose players played $40$ minutes per game, drafter A, who cared about turnovers, did better. And of the two drafters whose players played $20$ minutes per game, drafter C, who cared about turnovers, also did better. So the simple way of looking at the data was totally misleading and directionally incorrect. 
 
