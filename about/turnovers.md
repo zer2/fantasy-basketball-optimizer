@@ -28,9 +28,7 @@ Ignoring the player minutes per game numbers, one might naively infer that doing
   - Performing average in turnovers leads to an average placement of between second and third place (drafter A finished first, drafter D finished fourth)
   - Performing badly in turnovers leads to an average of second place (drafter B finished second) 
  
-However, this backwards-causality approach is not logical because the appearance of causality is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers.
-
-In fact, when accounting for minutes per game, the opposite effect is uncovered. Drafter A did better than drafter B and drafter C did better than drafter D. 
+However, this backwards-causality approach is not logical because the appearance of causality is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers. In fact, when accounting for minutes per game, the opposite effect is uncovered. Drafter A did better than drafter B and drafter C did better than drafter D. 
 
 This will not necessarily be the case in real fantasy basketball. The point here is that raw results may be misleading and should not be over-interpreted
 
@@ -40,15 +38,15 @@ A second argument is that because winning teams tend to perform badly in turnove
 
 There are two versions of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage, which makes it difficult to do well in turnovers
 
-### 2A. Conditioning on matchup victory for Most Categories 
+### 2A. Getting over the hump in Most Categories
 
 In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is unhelpful. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
 
-This argument seems plausible on face but is framed incorrectly. Perhaps auto-loss scenarios are not worth considering, but if so, then neither are auto-win scenarios. __The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score. It is under this framework that the question of turnover importance should be evaluated.__ 
+This argument seems plausible on face but is framed incorrectly. Winning a consolation category isn't helpful, but neither is running up the score. __Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which can generate wins in match-ups that can go either way.__ 
 
-At least for me it is not immediately clear how important turnovers are under this framework, so it is worth investigating mathematically. 
+At least for me it is hard to intuit whether turnovers are more or less important than other categories under the condition of a close match. Fortunately, the question can be modeled mathematically.  
 
-Let's start by taking a step back and being clear about what "optimal category weights" really are. The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. It models a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
+Let's start by taking a step back and being clear about what category importance and "optimal category weights" really are. The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. It models a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
 
 I calculated this derivative in the paper, and it matches up well with the intuition that category importance should be evaluated under the condition that the match-up is close. The derivative is the product of two factors
 - How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
