@@ -179,3 +179,4 @@ I have not seen a convincing mathematical argument that turnovers should be down
 
 Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page
 
+Also, one should keep in mind that many other drafters ignore turnovers. Winning them reliably may take only a small investment; grabbing every player whose strength is turnovers would be overkill
