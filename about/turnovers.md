@@ -118,7 +118,9 @@ We can also do this analysis for Each Category. For Each Category, the derivativ
 | 62.3\% | 27.2\% | 27.0\% | 24.8\% | 29.2\% | 25.8\% | 26.0\% | 27.0\% | 33.4\%   | 34.4\%   |
 | 65.8\% | 22.8\% | 23.2\% | 21.7\% | 24.5\% | 23.0\% | 22.1\% | 24.2\% | 33.4\%   | 34.4\%   |
 
-There is an interesting takeaway from this analysis, but it has nothing to do with turnovers! It turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
+Again, turnovers decline in importance at a similar rate as the other counting statistics. Possible intuition for this is that while it becomes harder to win turnovers as your advantage increases, you also lose room for improvement in the non-turnover counting statistics. If you want to eke out a small additional advantage, dominating the counting statistics to such an extreme degree that they are auto-wins may be just as difficult as making a few improbable turnover wins more possible. 
+
+Interestingly, it turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
 All in all, what does this tell us about turnovers? 
 
