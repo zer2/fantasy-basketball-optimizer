@@ -85,7 +85,7 @@ One might note that the math in the last section was predicated on neither draft
 
 The most reliable way for a drafter to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives them some advantage in all of the counting statistics. 
 
-The math from the previous section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week. I added a small constant to each of the counting stats (including turnovers), then re-ran the experiment, noting what percent of matchups were overall victories for each advantage state. The results for the resulting category importances are as follows
+The math from the previous section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week. I added a small constant to each of the counting stats (including turnovers), then re-ran the experiment, noting what percent of matchups were overall victories for each advantage state. The resulting category importances were as follows
 
 For Most Categories 
 
