@@ -179,8 +179,8 @@ It should be noted that this test does not cover argument 2B because all player 
 
 ## 5. Conclusion
 
-I have not seen a convincing mathematical argument that turnovers should be down-weighted to an extreme degree. That's why I've set the default to treating turnovers like every other category. 
+I have not seen a convincing argument that turnovers should be down-weighted to an extreme degree. That's why I've set the default to treating turnovers like every other category. 
 
 Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page
 
-Also, one should keep in mind that many other drafters ignore turnovers. Winning them reliably may take only a small investment; grabbing every player whose strength is turnovers would be overkill
+Also, keep in mind that many other drafters ignore turnovers. Winning them reliably may take only a small investment while grabbing every player whose strength is turnovers would be overkill. So in practice you might want to downweight turnovers a bit, perhaps to $50\%$
