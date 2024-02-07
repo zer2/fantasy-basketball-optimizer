@@ -30,8 +30,6 @@ Ignoring the player minutes per game numbers, one might naively infer that doing
  
 However, this backwards-causality approach is not logical because the appearance of causality is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers. In fact, when accounting for minutes per game, the opposite effect is uncovered. Drafter A did better than drafter B and drafter C did better than drafter D. 
 
-This will not necessarily be the case in real fantasy basketball. The point here is that raw results may be misleading and should not be over-interpreted
-
 ## 2. The second argument: Winners won't win turnovers anyway
 
 A second argument is that because winning teams tend to perform badly in turnovers, they will usually be so far behind in turnovers that investing in turnovers is futile for them. 
