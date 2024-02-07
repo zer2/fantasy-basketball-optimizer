@@ -10,7 +10,9 @@ This article is my attempt to explain why none of the arguments are convincing t
 
 The most common argument for ignoring turnovers, especially for the Most Categories format, is that teams which perform poorly in turnovers tend to do better overall and vice versa. 
 
-The statement of fact is incontrovertibly true. However, concluding from it that doing well in turnovers does not increase overall win probability is a fallacy of [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __Just because turnover wins are associated with overall losses, does not mean that winning turnovers leads to more losses. The opposite could be true__ 
+The statement of fact is incontrovertibly true. However, concluding from it that doing well in turnovers does not increase overall win probability is a fallacy akin to [reverse causality](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). 
+
+__It may be true that doing well in turnovers is associated with losing overall. However, that does not preclude the possibility that doing better in turnovers causally improves the chance of overall victory__ 
 
 ### Unpacking the fallacy 
 
