@@ -86,7 +86,7 @@ The probability of both criteria occuring can be estimated by sampling from the 
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.3\% | 6.8\% | 6.2\% | 9.0\% | 7.1\% | 6.6\% | 7.2\% | 7.1\%    | 7.4\%    |
 
-The turnover weight is in line with the weights of the other categories. This says that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to lead to flip a loss to a win
+The turnover weight is in line with the weights of the other categories. This says that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to flip a loss to a win
 
 ### 2B. Relying on a consistent advantage  
 
@@ -119,6 +119,10 @@ We can also do this analysis for Each Category. For Each Category, the derivativ
 | 65.8\% | 22.8\% | 23.2\% | 21.7\% | 24.5\% | 23.0\% | 22.1\% | 24.2\% | 33.4\%   | 34.4\%   |
 
 There is an interesting takeaway from this analysis, but it has nothing to do with turnovers! It turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
+
+All in all, what does this tell us about turnovers? 
+
+It tells us that __investment in turnovers has approximately equivalent returns on investment as investment in other categories, even for a very good team__. The idea that teams that are in position to win benefit less from investment in turnovers than in other categories is not supported. 
 
 ## 3. The third argument: turnovers are volatile
 
