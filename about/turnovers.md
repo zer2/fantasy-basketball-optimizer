@@ -10,7 +10,7 @@ My thinking on this topic is not entirely rigorous, which is why I am not includ
 
 ## 1. The first argument: low-turnover teams tend to lose 
 
-The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implicit conclusion from this fact is that investing more in turnovers make you more likely to lose, or at least is not enormously helpful. 
+The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implicit conclusion from this fact is that investing more in turnovers makes you more likely to lose, or at least is not enormously helpful. 
 
 The statement of fact is incontrovertibly true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more__ 
 
