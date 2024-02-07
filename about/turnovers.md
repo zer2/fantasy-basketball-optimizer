@@ -84,7 +84,7 @@ The resulting approximate importances are
 
 The turnover weight is in line with the weights of the other categories. This means that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to flip a loss to a win.
 
-Upon reflection, this is intuitively reasonable. __For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that context, one would expect turnovers to be close too.__ 
+Upon reflection, this is intuitively reasonable. __For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that context, one would expect turnovers to be close and flipabble too.__ 
 
 ### 2B. Relying on a consistent advantage  
 
