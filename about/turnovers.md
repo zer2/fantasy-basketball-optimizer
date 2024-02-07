@@ -8,9 +8,9 @@ There are real arguments to be made for this approach. However, my own analysis 
 
 My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that deciding how to treat turnovers is an important part of fantasy drafting, and that my default goes against the grain of community wisdom. So I will go through the arguments against considering turnovers equally here, and explain why they are not convincing to me
 
-## 1. The first argument: low-turnover teams tend to lose 
+## 1. The first argument: strong turnover teams tend to lose 
 
-The most common argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implication is that investing more in turnovers makes you more likely to lose, or at least is not enormously helpful. 
+The simplest argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implication is that investing more in turnovers makes you more likely to lose, or at least is not enormously helpful. 
 
 The statement of fact is incontrovertibly true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more__ 
 
@@ -44,11 +44,29 @@ In fact, when accounting for minutes per game, the opposite effect is uncovered.
 
 This will not necessarily be the case in real fantasy basketball. The point here is that raw results may be misleading and should not be over-interpreted
 
-## 2. The second argument: You're going to lose turnovers anyway
+## 2. The second argument: Winners won't win turnovers anyway
 
-Some argue that if you are doing well overall, then you are probably doing quite badly in turnovers. In that case, doing a little bit better in turnovers won't help you, since you will probably lose the category anyway. Why invest in it? 
+A second argument is that because winning teams tend to perform badly in turnovers, they will usually be so far behind in turnovers that investing in turnovers is futile for them. This is essentially borrowing the concept of "[playing to your outs](https://articles.starcitygames.com/articles/learning-to-truly-play-to-your-outs/)" from strategy games. The idea is that strategists should only evaluate their decision-making in the context of scenarios where they could possibly win, and those scenarios make it relatively unlikely that they would win turnovers even with investment. 
 
-First, let's establish a theoretical framework which captures the idea that turnovers are generally lost by winning teams. This can be done by finding the correlation matrix of category scores then modeling the overall distribution as a corresponding multivariate normal
+There are two versions of this argument. One is that specifically for Most Categories, winning a matchup is only possible when a drafter is doing well overall. The second is that over the course of an entire season, winning teams are banking on having a consistent advantage
+
+### Conditioning on matchup victory for Most Categories 
+
+In Most Categories, it does not matter if you can win turnovers to go 1-8 instead of 0-9. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
+
+This argument seems plausible on face but is framed incorrectly because "playing to your outs" is not the only relevant concept at play. One should also keep "[win-more](https://www.lesswrong.com/posts/Dfi7Snzs4pGSAu52b/the-problem-of-win-more)" in mind; the idea being that strategists should only evaluate their decision-making in the context of scenarios they could possibly lose. Yes, winning turnovers is hard when you're dominating your competition, but why should that matter? You are already going to win! 
+
+__The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score. It is under this framework that the question of turnover importance should be evaluated.__
+
+Let's take a step back and be clear about what "optimal category weights" really are. The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. It models a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
+
+I calculated this derivative in the paper, and it matches up well with the intuition that category importance should be evaluated under the condition that the match-up is close. For Most Categories, the derivative is the product of two factors
+- How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
+- How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria?
+
+The intuition here is that the two conditions together specify a situation under which a tiny investment in a category can flip the overall result from a loss to a win. This is analagous to 538's [voter power index](https://projects.fivethirtyeight.com/2016-election-forecast/#tipping-point), a way of quantifying the importance of voters under the electoral college. The importance of a particular voter is equal to the probability that they can flip the result of their state and flipping that state flips the result of the electoral college.
+
+We can estimate these partial derivatives mathematically. First, we need a distribution that can incorporate how the various categories relate to each other. 
 
 Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. when they are totally unrelated, they are uncorrelated, or have a correlation of zero.  A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance (and turnovers muliplied by -1), the correlation matrix is 
                                                         
@@ -64,52 +82,23 @@ Correlation is a measure of how related two metrics are. When two metrics tend t
  | Free Throw \% | 17.5\%  | -20.9\% | 11.0\%  | 6.5\%   | -14.8\% | 21.0\%  | -4.7\%  | 100.0\%   | -13.8\%   |
  | Field Goal \% | 19.0\%  | 27.5\%  | -9.2\%  | -6.8\%  | 24.0\%  | -11.6\% | 1.2\%   | -13.8\%   | 100.0\%   |
 
-(You might note that this is the correlation matrix for individual players and not for teams. Fortunately the two are equivalent, since correlation, variance, and covariance are all bilinear)
+(Technically I calculated this as the correlation matrix for individual players and not for differentials between teams. Fortunately the two are equivalent, since correlation, variance, and covariance are all bilinear)
 
-Simulating the multivariate distribution with that correlation matrix, it is easy to confirm the expected result, that turnovers are usually lost in overall wins and won in overall losses
-
- |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
- |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
- | Loss | 18.3\% | 28.7\% | 29.2\% | 28.8\% | 34.3\% | 29.2\% | 61.6\% | 39\%   | 36.9\% |
- | Win | 81.6\% | 71.2\% | 70.5\% | 71.1\% | 65.4\% | 71\%   | 38.6\% | 61.1\% | 62.8\% |
-
-The same effect would be observed in Each Categories, with a higher number of categories won being associated with losng turnovers more often. 
- 
-However, as already established, just because winning turnovers is associated with losses does not mean that the effect is causal. 
-
-Let's take a step back and be clear about what "optimal category weights" really are. The discussion of static ranking lists on the G-score page gives a framework for thinking about proper weighting. It models a situation wherein all players except one have been selected from a pool with arbitrary statistics. The proper weighting is designed so that a player's overall score is proportional to the benefit they incur to the reward function. On an individual category level, the weights then reflect the marginal improvement in the reward function earned by each increment of investment into the categories. This is equivalent to the definition of a partial derivative. So another way to frame the proper weight of a category is the partial derivative of the reward function (in this case, the probability of winning a matchup) with respect to investment in that category. 
-
- Partial derivatives can be calculated based on the model above. I did the math on them in the paper. 
- 
- For Most Categories, the partial derivatives and boil down to two factors multiplied together: 
-- How likely is it that the other eight categories are tied? I call this situation a "tipping point" for the category
-- How likely is it that an incremental improvement in turnovers flips the category from a loss to a win? Or in a more technical sense, what is the probability density of turnovers around zero, conditional on the first criteria?
-
-The intuition here is that the two conditions together specify a situation under which a tiny investment in a category can flip the overall result from a loss to a win. This is analagous to 538's [voter power index](https://projects.fivethirtyeight.com/2016-election-forecast/#tipping-point), a way of quantifying the importance of voters under the electoral college. The importance of a particular voter is equal to the probability that they can flip the result of their state and flipping that state flips the result of the electoral college. 
-
-The probability of both criteria occuring can be estimated by approximating the values of all categories as multivariate normals with mean zero and sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated. I tried this and got
+The probability of both criteria occuring can be estimated by sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated. I tried this and got
 
  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 10.3\% | 6.8\% | 6.2\% | 9.0\% | 7.1\% | 6.6\% | 7.2\% | 7.1\%    | 7.4\%    |
 
-These can be considered proper weights, for this simplified model. Note that despite turnovers being associated with losses in aggregate, the reward for investing in turnovers is comparable to the reward for investing in other categories! 
+The turnover weight is in line with the weights of the other categories. This says that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to lead to flip a loss to a win
 
-For each Category, the analysis is even simpler. The partial derivative is just the probability density of each category around zero. Re-using the experimental apparatus, the result is 
+### Relying on a consistent advantage  
 
- | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
-|:------|:------|:------|:------|:------|:------|:------|:---------|:---------|
-| 33.0\% |34.0\% | 30.9\% | 27.7\% | 36.4\% | 30.6\% | 31.0\% | 33.4\% | 33.4\%   | 34.4\%   |
-
-Unsurprisingly, the importances are almost all the same 
-
-## 2. The second argument: banking on overperformance
-
-One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. 
+One might note that the math in the last section was predicated on neither drafter having an advantage in any category coming into the week. That assumption is arguably problematic, because in many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins. Presumably the top drafter will have to come into each matchup with an advantage because they chose better players. This argument applies to both Most Categories and Each Category.
 
 The most reliable way for a drafter to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives them some advantage in all of the counting statistics. 
 
-The math from the previous section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week. I added a small constant to each of the counting stats (including turnovers), then re-ran the experiment, noting what percent of matchups were overall victories for each advantage state. The results are as follows
+The math from the previous section can be expanded to the situation where one drafter has an advantage in the counting stats coming into the week. I added a small constant to each of the counting stats (including turnovers), then re-ran the experiment, noting what percent of matchups were overall victories for each advantage state. The results for the resulting category importances are as follows
 
 For Most Categories 
 
@@ -123,7 +112,7 @@ For Most Categories
 
 It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, tipping points for all categories always require there to be a split among the counting statistics. Given that condition, there is no particular reason to expect that turnovers would be tipping points less often, or that tipping points would have low.
 
-For Each Categories 
+We can also do this analysis for Each Category. For Each Category, the derivative of the reward function relative to investment in a category is just the probability density around zero of the team differential distribution.  The results are as follows
 
  | Averagte category winning %  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
