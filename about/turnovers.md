@@ -40,7 +40,7 @@ There are two versions of this argument. One is that specifically for Most Categ
 
 In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is unhelpful. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
 
-This argument seems plausible on face but is framed incorrectly. Winning a consolation category isn't helpful, but neither is running up the score. __Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which can generate wins in match-ups that can go either way.__ 
+This argument seems plausible on face but is framed incorrectly. Winning a consolation category isn't helpful, but neither is running up the score. __Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which can generate category wins in match-ups that can go either way.__ 
 
 At least for me it is hard to intuit whether turnovers are more or less important than other categories under the condition of a close match. Fortunately, the question can be modeled mathematically.  
 
