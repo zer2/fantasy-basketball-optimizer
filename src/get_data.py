@@ -105,8 +105,8 @@ def get_player_metadata():
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(expected_minutes, params):
 
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-30.csv')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-30.csv')
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-02-05.csv')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-02-05.csv')
   all_darko = skill_projections.merge(per_game_projections)
 
   all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
