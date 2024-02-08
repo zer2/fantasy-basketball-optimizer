@@ -8,7 +8,7 @@ There are real arguments to be made for this approach. However, my own analysis 
 
 My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that deciding how to treat turnovers is an important part of fantasy drafting, and that my default goes against the grain of community wisdom. So I will go through the arguments against considering turnovers equally here, and explain why they are not convincing to me.
 
-__TL;DR: It is irrelevant that winning matchups is associated with losing turnovers. What matters is whether, in match-ups that are close and therefore flippable, improving performance in turnovers is worth as much as improving performance in other categories. Math and intuition both suggest that it is, providing no justification for de-weighting turnovers__
+__TL;DR: It is irrelevant that winning matchups is associated with losing turnovers. What matters is whether, in match-ups that are close and therefore flippable, improving performance in turnovers is worth as much as improving performance in other categories. Intuition and math both suggest that it is, providing no justification for de-weighting turnovers__
 
 ## 1. The first argument: strong turnover teams tend to lose 
 
@@ -44,7 +44,9 @@ In the Most Categories context, you want to dominate the non-turnover counting s
 
 This argument seems plausible on face but is framed incorrectly. __If you are already winning all of the non-turnover counting statistics, your victory is guaranteed and no categories are important. Only close match-ups, for which outcomes are uncertain, are relevant. The most important categories are those which are most likely to be decisive in close match-ups.__ 
 
-At least for me it is hard to intuit whether turnovers are more or less important than other categories under the condition of a close match. Fortunately, the question can be modeled mathematically.  
+__For a matchup to be close, the non-turnover counting statistics cannot be a blowout. Intuitively, that would imply that turnovers would not be a blowout, either, suggesting that turnovers are indeed important.__
+
+The intuition here is not the most cut and dry, so confirming with a mathematical approach would be reassuring 
 
 #### Math
 
@@ -85,8 +87,6 @@ The resulting approximate importances are
 | 10.3\% | 6.8\% | 6.2\% | 9.0\% | 7.1\% | 6.6\% | 7.2\% | 7.1\%    | 7.4\%    |
 
 The turnover weight is in line with the weights of the other categories. This means that for a single Most Categories match-up, if neither drafter has an advantage in any category, an investment in turnovers is roughly as likely as an investment in any other category to flip a loss to a win.
-
-Upon reflection, this is intuitively reasonable. __For a matchup to be close, neither drafter can dominate the non-turnover counting statistics. Given that context, one would expect turnovers to be close and flipabble too__ 
 
 ### 2B. Relying on a consistent advantage  
 
