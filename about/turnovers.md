@@ -127,7 +127,7 @@ Interestingly, it turns out that the percentage statistics have outsize importan
 
 ## 3. One other argument: turnovers are volatile
 
-One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
+One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in for head-to-head formats
 
 It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
 
