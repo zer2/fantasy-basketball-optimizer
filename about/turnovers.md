@@ -50,9 +50,7 @@ In many contexts, drafters need to have some advantage to have any shot at winni
 
 It would be correct to say that given an across the board advantage, a drafter is more likely to lose turnovers than other categories. However, as discussed before, it is a fallacy to imply anything causal from that statement.
 
-Let's say a drafter has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. It is undeniable that investing in turnovers would become less likely to improve performance, because it would be difficult to overcome their significant disadvantage. However, there is also a countervailing effect: the other counting statistics would also become less rewarding to invest in, because there is minimal room to improvement. If you are already winning say rebounds nine times out of ten, how much can you really gain by investing more in it? 
-
-Intuitively, at least to me, it is not clear which of these effects is more significant
+Let's say a drafter has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. It is undeniable that investing in turnovers would become less likely to improve performance, because it would be difficult to overcome their significant disadvantage. However, there is also a countervailing effect: the other counting statistics would also become less rewarding to invest in, because there would be minimal room to improvement. If you were already winning say rebounds nine times out of ten, how much could you really gain by investing more in it? Intuitively, I would guess that these effects are roughly equivalent and so would cancel each other out
 
 ### 2B. Modeling the problem mathematically
 
@@ -127,7 +125,7 @@ Again, turnovers decline in importance at a similar rate as the other counting s
 
 Interestingly, it turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
-## 3. The third argument: turnovers are volatile
+## 3. One other argument: turnovers are volatile
 
 One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in. 
 
@@ -176,7 +174,7 @@ And for rebounds
 
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
 
-It should be noted that this test does not cover argument 2B because all player statistics are known beforehand, making it imposssible for any drafter to have a surprisingly good team. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section 2B is wrong or misleading, perhaps turnovers become significantly less important in that case
+It should be noted that this test does not cover argument the circumstance under which one drafter has an overall advantage, because all player statistics are known beforehand, making it imposssible for any drafter to have a surprisingly good team. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section 2B is wrong or misleading, perhaps turnovers become significantly less important in that case
 
 ## 5. Conclusion
 
