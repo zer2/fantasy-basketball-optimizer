@@ -106,7 +106,7 @@ For Most Categories
 | 77.1\% | 8.4\%  | 5.5\% | 5.1\% | 6.4\% | 4.6\% | 5.3\% | 5.2\% | 5.0\%    | 5.5\%    |
 | 83.9\% | 6.5\%  | 4.6\% | 4.3\% | 5.3\% | 3.8\% | 4.1\% | 4.0\% | 4.3\%    | 4.4\%    |
 
-It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. Intuitively this makes sense because no matter how large the advantage state is, if the matchup ended up close then no drafter could have dominated the counting statistics. Given that the counting statistics were close, one would expect turnovers to also be relatively close. 
+It does appear to be the case that with an increasing advantage, turnovers become less likely to be a tipping point relative to other categories. However this effect is small even when the advantage is extreme. This is likely because no matter how large the advantage state is, if a matchup ends up close, then no drafter could have dominated the counting statistics. Given that the counting statistics were close, one would expect turnovers to also be relatively close. 
 
 We can also do this analysis for Each Category. For Each Category, the derivative of the reward function relative to investment in a category is just the probability density around zero of the team differential distribution.  The results are as follows
 
@@ -118,7 +118,7 @@ We can also do this analysis for Each Category. For Each Category, the derivativ
 | 62.3\% | 27.2\% | 27.0\% | 24.8\% | 29.2\% | 25.8\% | 26.0\% | 27.0\% | 33.4\%   | 34.4\%   |
 | 65.8\% | 22.8\% | 23.2\% | 21.7\% | 24.5\% | 23.0\% | 22.1\% | 24.2\% | 33.4\%   | 34.4\%   |
 
-Again, turnovers decline in importance at a similar rate as the other counting statistics. Possible intuition for this is that while it becomes harder to win turnovers as your advantage increases, you also lose room for improvement in the non-turnover counting statistics. If you want to eke out a small additional advantage, dominating the counting statistics to such an extreme degree that they are auto-wins may be just as difficult as making a few improbable turnover wins more possible. 
+Again, turnovers decline in importance at a similar rate as the other counting statistics. One way to explain this is that while it becomes harder to win turnovers as your advantage increases, you also lose room for improvement in the non-turnover counting statistics. If you want to eke out a small additional advantage, dominating the counting statistics to such an extreme degree that they are auto-wins may be just as difficult as making a few improbable turnover wins more possible. 
 
 Interestingly, it turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
