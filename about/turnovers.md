@@ -40,15 +40,15 @@ I can imagine two causal mechanisms by which turnovers would be relatively unimp
 
 In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is unhelpful. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
 
-This argument seems plausible on face but is framed incorrectly. Perhaps auto-loss scenarios are not worth considering, but if so, then neither are auto-win scenarios. __The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score. It is under this framework that the question of turnover importance should be evaluated.__
+This argument seems plausible on face but is framed incorrectly. Perhaps auto-loss scenarios are not worth considering, but if so, then neither are auto-win scenarios. __The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score.__
 
-Given that a match-up is close, neither drafter could be dominating the counting statistics. In that circumstance, there is no reason to believe that either drafter is likely to have such a significant advantage in turnovers that investing in turnovers would be futile to the other. So intuitively, I would guess that turnovers are just as likely to be the deciding factor as any other categories 
+Given that a match-up is close, neither drafter could be dominating the counting statistics. In that circumstance, there is no reason to expect either drafter to have such a significant advantage in turnovers that investing in it would be futile for the other. So intuitively, I would guess that turnovers are just as likely to be the deciding factor as any other categories 
 
 #### Relying on a consistent advantage 
 
 In many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins the league. Presumably the top drafter would have to come into each matchup with an advantage because they chose better players. 
 
-It would be correct to say that given an across the board advantage, a drafter is more likely to lose turnovers than other categories. However, as discussed before, it is a fallacy to imply anything causal from that statement.
+It would be correct to say that given an across the board advantage, a drafter is more likely to lose turnovers than other categories. However, as already established, correlation does not imply causation. What matters is whether they can improve their overall performances through turnovers as much as through other categories. 
 
 Let's say a drafter has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. It is undeniable that investing in turnovers would become less likely to improve performance, because it would be difficult to overcome their significant disadvantage. However, there is also a countervailing effect: the other counting statistics would also become less rewarding to invest in, because there would be minimal room to improvement. If you were already winning say rebounds nine times out of ten, how much could you really gain by investing more in it? Intuitively, I would guess that these effects are roughly equivalent and so would cancel each other out
 
