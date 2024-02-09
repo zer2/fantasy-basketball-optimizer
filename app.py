@@ -403,12 +403,13 @@ with draft_tab:
     
       with subtab3:
 
-        if not st.session_state.run:
+        if len(my_players) == n_picks:
+           st.markdown('Team is complete!')
+                   
+        elif not st.session_state.run:
           with st.form(key='my_form_to_submit'):
             h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
-
-        elif len(my_players) == n_picks:
-           st.markdown('Team is complete!')
+                     
         else:
 
           #record the fact that the run has already been invoked, no need to invoke it again
