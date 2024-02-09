@@ -50,13 +50,14 @@ class HAgent():
                   , df
                   , my_players
                   , players_chosen
-                  ,):
+                  ,): #ZR: whats going on with this extra comma?
 
         """Performs the H-score algorithm
 
         Args:
-            player_assignments: dict of format
-                   player : team that picked them
+            df: #ZR note: should be removed as input. This isn't actually used for anything
+            my_players : list of players picked by other teams
+            players_chosen : list of all players chosen, including my_players
 
         Returns:
             String indicating chosen player
