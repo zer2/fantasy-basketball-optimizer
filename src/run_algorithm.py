@@ -96,7 +96,7 @@ class HAgent():
                                        , x_scores_available)
 
     def perform_iterations(self
-                           ,c
+                           ,weights
                            ,my_players
                            ,n_players_selected
                            , diff_means
@@ -109,7 +109,7 @@ class HAgent():
          Case (4): If n_players_selected > n_picks, all subsets of possible players are evaluated for the best subset
 
         Args:
-            c: Starting choice of weights. Relevant for case (1)
+            weights: Starting choice of weights. Relevant for case (1)
             my_players: list of players selected by the current drafter
             n_players_selected: integer, number of players already selected by the current drafter 
                                 This is a param in addition to my_players because n_players_selected is already calculated in the parent function
@@ -125,9 +125,9 @@ class HAgent():
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.punting):
-                del_full = self.get_del_full(c)
+                del_full = self.get_del_full(weights)
         
-                expected_x = self.get_x_mu(c)
+                expected_x = self.get_x_mu(weights)
 
                 expected_future_diff = ((12-n_players_selected) * expected_x).reshape(-1,9)
         
@@ -149,11 +149,11 @@ class HAgent():
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
                 step_size = self.alpha * (i + 1)**(-self.beta) 
-                change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
+                change_weights = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
         
-                c = c + change_c
-                c[c < 0] = 0
-                c = c/c.sum(axis = 1).reshape(-1,1)
+                weights = weights + change_weights
+                weights[weights < 0] = 0
+                weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -169,7 +169,7 @@ class HAgent():
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
 
-                c = None
+                weights = None
                 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -186,7 +186,7 @@ class HAgent():
                               , index = diff_means.index
                                             )
 
-                c = None
+                weights = None
                 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -201,12 +201,11 @@ class HAgent():
 
                 extra_players = n_players_selected - self.n_picks 
                 players_to_remove_possibilities = combinations(my_players,extra_players)
-                best_score = 0
 
                 diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
                                                        ,axis = 1).T
 
-                os.write(1,bytes(str(diff_means_mod), 'utf-8'))
+                #os.write(1,bytes(str(diff_means_mod), 'utf-8'))
 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
                                               , scale = np.sqrt(self.diff_var))
@@ -220,11 +219,11 @@ class HAgent():
                 else:
                     score = cdf_estimates.mean(axis = 1)
 
-                c = None
+                weights = None
 
             i = i + 1
     
-            yield score, c, cdf_estimates
+            yield score, weights, cdf_estimates
 
 
     ### below are functions used for the optimization procedure 
