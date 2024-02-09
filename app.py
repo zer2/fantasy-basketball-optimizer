@@ -305,7 +305,7 @@ with draft_tab:
 
       return next(H.get_h_scores(player_stats, my_players, players_chosen))      
 
-    if len(my_players) < n_picks:
+    if len(my_players) == n_picks:
       base_h_score, _, base_win_rates = get_base_h_score(info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting, player_stats, my_players, players_chosen)
   
   with right:
