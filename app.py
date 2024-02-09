@@ -498,10 +498,12 @@ with draft_tab:
                 new_z =  team_stats_z.loc['Total',:] + z_scores_unselected - drop_player_stats_z
 
                 new_z = pd.concat([no_drop,new_z])
-           
 
                 os.write(1,bytes(str(new_z),'utf-8'))
                 os.write(1,bytes(str(new_z.index[new_z.index.duplicated()]),'utf-8'))
+                os.write(1,bytes(str(new_z[new_z.index[new_z.index == 'Immanuel Quickley (G)']),'utf-8'))
+
+                       
 
                 new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
 
