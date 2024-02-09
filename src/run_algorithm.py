@@ -230,30 +230,34 @@ class HAgent():
     ### below are functions used for the optimization procedure 
 
     def get_x_mu(self,c):
+        #uses the pre-simplified formula for x_mu from page 19 of the paper. Using the simplified form would work just as well
 
         factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
 
         c_mod = c - factor
         sigma = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1))
+        
         U = np.array([[self.v.reshape(9),c_0.reshape(9)] for c_0 in c])
         b = np.array([[-self.gamma * s,self.omega * s] for s in sigma]).reshape(-1,2,1)
-
         U_T = np.swapaxes(U, 1, 2)
-
+        
         q = np.einsum('aij, ajk -> aik', U.dot(self.L), U_T)
-
         inverse_part = np.linalg.inv(q)
 
         r = np.einsum('ij, ajk -> aik', self.L, U_T)
 
         x = np.einsum('aij, ajk -> aik', r, inverse_part)
 
-        #inverse_part = np.linalg.inv(U.dot(self.L).dot(U.T))
-        #X_mu = self.L.dot(U.T).dot(inverse_part).dot(b)
-
         X_mu = np.einsum('aij, ajk -> aik', x, b)
 
         return X_mu
+
+    #below functions use the simplified form of X_mu 
+    #term 1: L (covariance)
+    #term 2: vj^T - jv^T
+    #term 3: L (covariance)
+    #term 4: -gamma * j - omega * v
+    #term 5: sigma / (j^T L j v^T L V - (v^T L j)^2) 
 
     def get_term_two(self,c):
         #v = self.v.reshape(9,1)
