@@ -406,7 +406,9 @@ with draft_tab:
         if not st.session_state.run:
           with st.form(key='my_form_to_submit'):
             h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
-      
+
+        elif len(my_players) == n_picks:
+           st.markdown('Team is complete!')
         else:
 
           #record the fact that the run has already been invoked, no need to invoke it again
@@ -482,9 +484,9 @@ with draft_tab:
 
             mod_my_players = [x for x in my_players if x != drop_player]
 
-            z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
+            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-            with z_tab:
+            with z_waiver_tab:
                 st.markdown('Projected team stats with chosen player:')
                 no_drop = team_stats_z.loc[['Total'],:]
                 no_drop.index = [drop_player]
@@ -497,7 +499,7 @@ with draft_tab:
 
                 st.dataframe(new_z_styled) 
 
-            with g_tab:
+            with g_waiver_tab:
                 st.markdown('Projected team stats with chosen player:')
                 no_drop = team_stats_g.loc[['Total'],:]
                 no_drop.index = [drop_player]
@@ -510,7 +512,7 @@ with draft_tab:
 
                 st.dataframe(new_g_styled) 
 
-            with h_tab:
+            with h_waiver_tab:
                 res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
                 res = res.sort_values(ascending = False)
