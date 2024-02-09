@@ -395,7 +395,7 @@ with draft_tab:
       subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
           
       with subtab1:
-        z_scores_unselected = z_scores[~g_scores.index.isin(listify(selections_editable))]
+        z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
         z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
         z_scores_display = st.dataframe(z_scores_unselected_styled)
       with subtab2:
@@ -502,8 +502,6 @@ with draft_tab:
                 os.write(1,bytes(str(new_z),'utf-8'))
                 os.write(1,bytes(str(new_z.index[new_z.index.duplicated()]),'utf-8'))
                 os.write(1,bytes(str(new_z[new_z.index == 'Immanuel Quickley (G)']),'utf-8'))
-
-                       
 
                 new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
 
