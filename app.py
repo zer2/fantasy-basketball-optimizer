@@ -366,7 +366,7 @@ with draft_tab:
         
       with z_tab:
            team_stats_z = z_scores[z_scores.index.isin(team_selections)]
-           expected_z = z_scores[0:len(my_players)*n_drafters].mean() * n_players_on_team
+           expected_z = z_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
 
            team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
     
@@ -376,7 +376,7 @@ with draft_tab:
 
       with g_tab:
            team_stats_g = g_scores[g_scores.index.isin(team_selections)]
-           expected_g = g_scores[0:len(my_players)*n_drafters].mean() * n_players_on_team
+           expected_g = g_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
 
            team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
 
