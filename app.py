@@ -325,10 +325,7 @@ with draft_tab:
         n_players_on_team = team_stats_z.shape[0]
 
         if n_players_on_team > 0:
-            expected_z = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-    
-            team_stats_z.loc['Expected', :] = expected_z
-            team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
+
     
             team_stats_z_styled = team_stats_z.style.format("{:.2f}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
@@ -347,11 +344,6 @@ with draft_tab:
         n_players_on_team = team_stats_g.shape[0]
 
         if n_players_on_team > 0:
-
-            expected_g = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-                   
-            team_stats_g.loc['Expected', :] = expected_g
-            team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
             
             team_stats_g_styled = team_stats_g.style.format("{:.2f}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
@@ -374,12 +366,22 @@ with draft_tab:
         
       with z_tab:
            team_stats_z = z_scores[z_scores.index.isin(team_selections)]
+           expected_z = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+
            team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
+    
+           team_stats_z.loc['Expected', :] = expected_z
+           team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
            make_team_z_tab(team_stats_z, team_selections)
 
       with g_tab:
            team_stats_g = g_scores[g_scores.index.isin(team_selections)]
+           expected_g = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
+
            team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
+
+           team_stats_g.loc['Expected', :] = expected_g
+           team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
            make_team_g_tab(team_stats_g, team_selections)
     
       with h_tab:
