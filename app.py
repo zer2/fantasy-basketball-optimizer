@@ -382,7 +382,10 @@ with draft_tab:
           make_team_g_tab(g_scores, team_selections)
     
       with h_tab:
-          make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
+           if len(my_players) == n_picks:
+                      make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
+           else:
+                      st.markdown('Team H-score not defined until team is full') 
           
     with cand_tab:
 
