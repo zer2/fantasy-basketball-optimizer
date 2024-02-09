@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.stats import norm
 import os
 from itertools import combinations
-
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points
 
 class HAgent():
@@ -74,10 +73,6 @@ class HAgent():
             previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
             diff_means = x_self_sum - previous_rounds_expected - this_round_expected
-            #os.write(1,bytes(str(previous_rounds_expected),'utf-8'))
-            #os.write(1,bytes(str(this_round_expected),'utf-8'))
-            #os.write(1,bytes(str(diff_means),'utf-8'))
-            #os.write(1,bytes(str(x_scores_available),'utf-8'))
         else:
             previous_rounds_expected = self.score_table.iloc[0:self.n_picks].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             diff_means = x_self_sum - previous_rounds_expected 
@@ -101,7 +96,7 @@ class HAgent():
                            ,n_players_selected
                            , diff_means
                            , x_scores_available):
-        """Performs one iteration of H-scoring. 
+        """Performs one iteration of H-scoring
          
          Case (1): If n_players_selected < n_picks -1, the Gaussian multivariate assumption is used for future picks and weight is chosen by gradient descent
          Case (2): If n_players_selected = n_picks -1, each candidate player is evaluated with no need for modeling future picks
@@ -115,8 +110,8 @@ class HAgent():
                                 This is a param in addition to my_players because n_players_selected is already calculated in the parent function
             diff_means: series, difference in mean between already selected players and expected
             x_scores_available: dataframe, X-scores of unselected players
-        Returns:
-            None
+        Yields:
+            Ultimate H-scores, weights used to make those H-scores, and approximate win fractions given those weights
 
         """
         i = 0
@@ -196,8 +191,8 @@ class HAgent():
                 else:
                     score = cdf_estimates.mean() 
 
-            #case where there are too many players and some need to be removed 
-            else: #n > n_picks 
+            #case where there are too many players and some need to be removed. n > n_picks
+            else: 
 
                 extra_players = n_players_selected - self.n_picks 
                 players_to_remove_possibilities = combinations(my_players,extra_players)
