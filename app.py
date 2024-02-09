@@ -319,7 +319,6 @@ with draft_tab:
 
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
-      @st.cache_data()
       def make_team_z_tab(z_scores, team_selections):
         team_stats_z = z_scores[z_scores.index.isin(team_selections)]
 
