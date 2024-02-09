@@ -21,13 +21,15 @@ class HAgent():
         """Calculates the rank order based on U-score
 
         Args:
-            season_df: dataframe with weekly data for the season
-            positions: Series of player -> list of eligible positions
-            gamma: float, how much to scale the G-score
-            epsilon: float, how much to weigh correlation
-            n_players: number of players to use for second-phase standardization
+            infh: dictionary with info related to player statistics etc. 
+            omega: float, parameter as described in the paper
+            gamma: float, parameter as described in the paper
+            alpha: float, step size parameter for gradient descent 
+            beta: float, decay parameter for gradient descent 
+            n_picks: int, number of picks each drafter gets 
             winner_take_all: Boolean of whether to optimize for the winner-take-all format
                              If False, optimizes for total categories
+            punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
         Returns:
             None
 
@@ -80,16 +82,18 @@ class HAgent():
             previous_rounds_expected = self.score_table.iloc[0:self.n_picks].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             diff_means = x_self_sum - previous_rounds_expected 
 
-
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
                       
-
-        c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
+        initial_weights = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
         
         scores = []
         weights = []
 
-        return self.perform_iterations(c,my_players, n_players_selected, diff_means, x_scores_available)
+        return self.perform_iterations(initial_weights
+                                       ,my_players
+                                       , n_players_selected
+                                       , diff_means
+                                       , x_scores_available)
 
     def perform_iterations(self
                            ,c
@@ -106,8 +110,9 @@ class HAgent():
 
         Args:
             c: Starting choice of weights. Relevant for case (1)
-            my_players: list of players selected
-            n_players_selected: integer, number of players already selected
+            my_players: list of players selected by the current drafter
+            n_players_selected: integer, number of players already selected by the current drafter 
+                                This is a param in addition to my_players because n_players_selected is already calculated in the parent function
             diff_means: series, difference in mean between already selected players and expected
             x_scores_available: dataframe, X-scores of unselected players
         Returns:
