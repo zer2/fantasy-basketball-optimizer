@@ -501,7 +501,7 @@ with draft_tab:
 
                 os.write(1,bytes(str(new_z),'utf-8'))
                 os.write(1,bytes(str(new_z.index[new_z.index.duplicated()]),'utf-8'))
-                os.write(1,bytes(str(new_z[new_z.index[new_z.index == 'Immanuel Quickley (G)']),'utf-8'))
+                os.write(1,bytes(str(new_z[new_z.index == 'Immanuel Quickley (G)']),'utf-8'))
 
                        
 
