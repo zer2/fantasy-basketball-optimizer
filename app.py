@@ -320,9 +320,9 @@ with draft_tab:
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
       @st.cache_data()
-      def make_team_z_tab(z_scores, team_selections):
+      def make_team_z_tab(team_stats_z, team_selections):
 
-        n_players_on_team = team_stats_z.shape[0]
+        n_players_on_team = team_stats_z.shape[0] - 3
 
         if n_players_on_team > 0:
 
@@ -339,9 +339,9 @@ with draft_tab:
         z_display = st.dataframe(team_stats_z_styled, use_container_width = True)     
 
       @st.cache_data()
-      def make_team_g_tab(g_scores, team_selections):
+      def make_team_g_tab(team_stats_g, team_selections):
 
-        n_players_on_team = team_stats_g.shape[0]
+        n_players_on_team = team_stats_g.shape[0] - 3
 
         if n_players_on_team > 0:
             
