@@ -181,7 +181,7 @@ with param_tab:
       with mult_col:
         st.subheader(f"Multipliers")
   
-        multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,0.25,1,1]}
+        multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
                                      , index = coefficient_df.index)
         multipliers = st.data_editor(multiplier_df)
   
