@@ -63,7 +63,7 @@ about_tab, param_tab, stat_tab, draft_tab, rank_tab = st.tabs([":scroll: About"
 
 with about_tab:
 
-  intro_tab, static_explanation_tab, dynamic_explanation_tab, data_tab,trading_tab, turnover_tab = st.tabs(['Intro','G-scoring','H-scoring','Data Sources','Waivers & Trading','Turnovers'])
+  intro_tab, static_explanation_tab, dynamic_explanation_tab, turnover_tab,trading_tab, data_tab = st.tabs(['Intro','G-scoring','H-scoring','Turnovers','Waivers & Trading','Data Sources'])
 
   with intro_tab:
       c2,c2,c3 = st.columns([0.1,0.8,0.1])
@@ -124,11 +124,12 @@ with param_tab:
     unique_datasets_darko = list(darko_data.keys())
 
     all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
+    all_datasets.reverse()
       
     dataset_name = st.selectbox(
       'Which dataset do you want to default to?'
       ,all_datasets
-      ,index = len(all_datasets)-1
+      ,index = 0
     )
 
     df = get_partial_data(historical_df, current_data, darko_data, dataset_name)
@@ -262,10 +263,10 @@ with draft_tab:
         #, value = default_seat
        , max_value = n_drafters)
 
-    draft_tab, injury_tab = st.tabs(['Draft Bpard','Injury List'])
+    draft_tab, injury_tab = st.tabs(['Draft Board','Injury List'])
     
     with draft_tab: 
-        st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
+        st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
         selections_editable = st.data_editor(selections, hide_index = True)  
 
     with injury_tab:
