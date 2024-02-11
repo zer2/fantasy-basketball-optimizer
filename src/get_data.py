@@ -189,14 +189,14 @@ def get_darko_short_term(all_darko, params):
 
 
 def get_darko_long_term(all_darko, expected_minutes, params):
-  """Get a long term version of darko, based on skill statistics and expected minutes
-
-  Args:
-      all_darko: Datafrmae of all raw DARKO forecasts
-      params: dict of parameters
-  Returns:
-      Dataframe of predictions
-  """
+    """Get a long term version of darko, based on skill statistics and expected minutes
+  
+    Args:
+        all_darko: Datafrmae of all raw DARKO forecasts
+        params: dict of parameters
+    Returns:
+        Dataframe of predictions
+    """
     all_darko = all_darko.drop(columns = ['Minutes'])
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
