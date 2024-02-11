@@ -103,7 +103,13 @@ def get_historical_data(params):
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def get_player_metadata():
-   #get player positions from the NBA API
+  """Get player data from the NBA api
+
+  Args:
+      none
+  Returns:
+      Currently: A series of the form Player Name -> Position
+  """
   
    playerindex = nba_endpoints.playerindex.PlayerIndex()
    data = playerindex.data_sets[0].get_dict()['data']
@@ -122,7 +128,14 @@ def get_player_metadata():
 
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(expected_minutes, params):
+  """Get DARKO predictions from stored CSV files
 
+  Args:
+      expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
+      params: dict of parameters
+  Returns:
+      Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
+  """
   skill_projections = pd.read_csv('data/DARKO_player_talent_2024-02-05.csv')
   per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-02-05.csv')
   all_darko = skill_projections.merge(per_game_projections)
@@ -160,6 +173,15 @@ def get_darko_data(expected_minutes, params):
            ,'DARKO-L' : darko_long_term}
 
 def get_darko_short_term(all_darko, params):
+  """Get a short term version of darko, based on next-game predictions for counting statistics
+
+  Args:
+      all_darko: Datafrmae of all raw DARKO forecasts
+      expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
+      params: dict of parameters
+  Returns:
+      Dataframe of predictions
+  """
   
   darko_short_term = all_darko.fillna(0)  
   darko_short_term.loc[:,'No Play %'] = 0 #currently not implemented 
@@ -167,7 +189,14 @@ def get_darko_short_term(all_darko, params):
 
 
 def get_darko_long_term(all_darko, expected_minutes, params):
+  """Get a long term version of darko, based on skill statistics and expected minutes
 
+  Args:
+      all_darko: Datafrmae of all raw DARKO forecasts
+      params: dict of parameters
+  Returns:
+      Dataframe of predictions
+  """
     all_darko = all_darko.drop(columns = ['Minutes'])
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
