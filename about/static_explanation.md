@@ -10,7 +10,7 @@ I realize that the paper's explanation is incomprehensible to anyone without a b
 
 ## 1.	What are Z-scores?
 
-You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
+You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how ?spread out? the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
 
 For use in fantasy basketball, a few modifications are made to basic Z-scores 
 -	The percentage categories are adjusted by volume. This is necessary because players who shoot more matter more; if a team has one player who goes $9$ for $9$ ($100\%$) and another who goes $0$ for $1$ ($0\%$) their aggregate average is $90\%$ rather than $50\%$. The fix is to multiply scores by the player's volume, relative to average volume
@@ -83,13 +83,13 @@ $$
 We already know $\mu$ and $\sigma$ for the standard statistics. Substituting them in yields
 
 $$
-CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p – m_\mu}{m_\sigma} \right]
+CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p ? m_\mu}{m_\sigma} \right]
 $$
 
 And analagously for the percentage statistics 
 
 $$
-CDF(0) = \frac{1}{2} \left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}} * \frac{ \frac{a_p}{a_\mu} \left( r_p – r_\mu \right) }{r_\sigma}\right]
+CDF(0) = \frac{1}{2} \left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}} * \frac{ \frac{a_p}{a_\mu} \left( r_p ? r_\mu \right) }{r_\sigma}\right]
 $$
 
 ### D. Implications for Z-scores
@@ -117,13 +117,13 @@ Although the mean remains the same, the standard deviation gets larger. This mak
 Most of the logic from section 2 can also be applied to Head-to-Head: Each Category. The only difference is that we need to use metrics from the pool of players and performances, as laid out in section 3, rather than just players as we did in section 2. The mean is still $m_\mu$ as shown in the example of blocks above. Therefore all we need to do is replace $m_\sigma$ with $\sqrt{m_\sigma^2 + m_\tau^2}$, which yields
 
 $$
-\frac{m_p – m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
+\frac{m_p ? m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
 $$
 
 And analagously for the percentage statistics, 
 
 $$
-\frac{\frac{a_p}{a_\mu} \left( r_p – r_\mu \right) }{\sqrt{r_\sigma^2 + r_\tau^2}} 
+\frac{\frac{a_p}{a_\mu} \left( r_p ? r_\mu \right) }{\sqrt{r_\sigma^2 + r_\tau^2}} 
 $$
 
 I call these G-scores, and it turns out that these are quite different from Z-scores. For example, steals have a very high week-to-week standard deviation, and carry less weight in G-scores than Z-scores as a result.
