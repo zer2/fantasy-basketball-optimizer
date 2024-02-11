@@ -103,13 +103,13 @@ def get_historical_data(params):
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def get_player_metadata():
-  """Get player data from the NBA api
+   """Get player data from the NBA api
 
-  Args:
+   Args:
       none
-  Returns:
+   Returns:
       Currently: A series of the form Player Name -> Position
-  """
+   """
   
    playerindex = nba_endpoints.playerindex.PlayerIndex()
    data = playerindex.data_sets[0].get_dict()['data']
