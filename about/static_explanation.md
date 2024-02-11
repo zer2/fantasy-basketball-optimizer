@@ -83,13 +83,13 @@ $$
 We already know $\mu$ and $\sigma$ for the standard statistics. Substituting them in yields
 
 $$
-CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p ? m_\mu}{m_\sigma} \right]
+CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p - m_\mu}{m_\sigma} \right]
 $$
 
 And analagously for the percentage statistics 
 
 $$
-CDF(0) = \frac{1}{2} \left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}} * \frac{ \frac{a_p}{a_\mu} \left( r_p ? r_\mu \right) }{r_\sigma}\right]
+CDF(0) = \frac{1}{2} \left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}} * \frac{ \frac{a_p}{a_\mu} \left( r_p - r_\mu \right) }{r_\sigma}\right]
 $$
 
 ### D. Implications for Z-scores
@@ -117,13 +117,13 @@ Although the mean remains the same, the standard deviation gets larger. This mak
 Most of the logic from section 2 can also be applied to Head-to-Head: Each Category. The only difference is that we need to use metrics from the pool of players and performances, as laid out in section 3, rather than just players as we did in section 2. The mean is still $m_\mu$ as shown in the example of blocks above. Therefore all we need to do is replace $m_\sigma$ with $\sqrt{m_\sigma^2 + m_\tau^2}$, which yields
 
 $$
-\frac{m_p ? m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
+\frac{m_p - m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
 $$
 
 And analagously for the percentage statistics, 
 
 $$
-\frac{\frac{a_p}{a_\mu} \left( r_p ? r_\mu \right) }{\sqrt{r_\sigma^2 + r_\tau^2}} 
+\frac{\frac{a_p}{a_\mu} \left( r_p - r_\mu \right) }{\sqrt{r_\sigma^2 + r_\tau^2}} 
 $$
 
 I call these G-scores, and it turns out that these are quite different from Z-scores. For example, steals have a very high week-to-week standard deviation, and carry less weight in G-scores than Z-scores as a result.
