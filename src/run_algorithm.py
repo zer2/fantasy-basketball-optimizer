@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.stats import norm
 import os
 from itertools import combinations
-
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points
 
 class HAgent():
@@ -21,13 +20,15 @@ class HAgent():
         """Calculates the rank order based on U-score
 
         Args:
-            season_df: dataframe with weekly data for the season
-            positions: Series of player -> list of eligible positions
-            gamma: float, how much to scale the G-score
-            epsilon: float, how much to weigh correlation
-            n_players: number of players to use for second-phase standardization
+            infh: dictionary with info related to player statistics etc. 
+            omega: float, parameter as described in the paper
+            gamma: float, parameter as described in the paper
+            alpha: float, step size parameter for gradient descent 
+            beta: float, decay parameter for gradient descent 
+            n_picks: int, number of picks each drafter gets 
             winner_take_all: Boolean of whether to optimize for the winner-take-all format
                              If False, optimizes for total categories
+            punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
         Returns:
             None
 
@@ -50,13 +51,14 @@ class HAgent():
                   , df
                   , my_players
                   , players_chosen
-                  ,):
+                  ,): #ZR: whats going on with this extra comma?
 
         """Performs the H-score algorithm
 
         Args:
-            player_assignments: dict of format
-                   player : team that picked them
+            df: #ZR note: should be removed as input. This isn't actually used for anything
+            my_players : list of players picked by other teams
+            players_chosen : list of all players chosen, including my_players
 
         Returns:
             String indicating chosen player
@@ -71,32 +73,30 @@ class HAgent():
             previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
             diff_means = x_self_sum - previous_rounds_expected - this_round_expected
-            #os.write(1,bytes(str(previous_rounds_expected),'utf-8'))
-            #os.write(1,bytes(str(this_round_expected),'utf-8'))
-            #os.write(1,bytes(str(diff_means),'utf-8'))
-            #os.write(1,bytes(str(x_scores_available),'utf-8'))
         else:
             previous_rounds_expected = self.score_table.iloc[0:self.n_picks].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
             diff_means = x_self_sum - previous_rounds_expected 
 
-
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
                       
-
-        c = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
+        initial_weights = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
         
         scores = []
         weights = []
 
-        return self.perform_iterations(c,my_players, n_players_selected, diff_means, x_scores_available)
+        return self.perform_iterations(initial_weights
+                                       ,my_players
+                                       , n_players_selected
+                                       , diff_means
+                                       , x_scores_available)
 
     def perform_iterations(self
-                           ,c
+                           ,weights
                            ,my_players
                            ,n_players_selected
                            , diff_means
                            , x_scores_available):
-        """Performs one iteration of H-scoring. 
+        """Performs one iteration of H-scoring
          
          Case (1): If n_players_selected < n_picks -1, the Gaussian multivariate assumption is used for future picks and weight is chosen by gradient descent
          Case (2): If n_players_selected = n_picks -1, each candidate player is evaluated with no need for modeling future picks
@@ -104,13 +104,14 @@ class HAgent():
          Case (4): If n_players_selected > n_picks, all subsets of possible players are evaluated for the best subset
 
         Args:
-            c: Starting choice of weights. Relevant for case (1)
-            my_players: list of players selected
-            n_players_selected: integer, number of players already selected
+            weights: Starting choice of weights. Relevant for case (1)
+            my_players: list of players selected by the current drafter
+            n_players_selected: integer, number of players already selected by the current drafter 
+                                This is a param in addition to my_players because n_players_selected is already calculated in the parent function
             diff_means: series, difference in mean between already selected players and expected
             x_scores_available: dataframe, X-scores of unselected players
-        Returns:
-            None
+        Yields:
+            Ultimate H-scores, weights used to make those H-scores, and approximate win fractions given those weights
 
         """
         i = 0
@@ -119,9 +120,9 @@ class HAgent():
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.punting):
-                del_full = self.get_del_full(c)
+                del_full = self.get_del_full(weights)
         
-                expected_x = self.get_x_mu(c)
+                expected_x = self.get_x_mu(weights)
 
                 expected_future_diff = ((12-n_players_selected) * expected_x).reshape(-1,9)
         
@@ -143,11 +144,11 @@ class HAgent():
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
                 step_size = self.alpha * (i + 1)**(-self.beta) 
-                change_c = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
+                change_weights = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
         
-                c = c + change_c
-                c[c < 0] = 0
-                c = c/c.sum(axis = 1).reshape(-1,1)
+                weights = weights + change_weights
+                weights[weights < 0] = 0
+                weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -163,7 +164,7 @@ class HAgent():
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
 
-                c = None
+                weights = None
                 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -180,7 +181,7 @@ class HAgent():
                               , index = diff_means.index
                                             )
 
-                c = None
+                weights = None
                 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -190,17 +191,16 @@ class HAgent():
                 else:
                     score = cdf_estimates.mean() 
 
-            #case where there are too many players and some need to be removed 
-            else: #n > n_picks 
+            #case where there are too many players and some need to be removed. n > n_picks
+            else: 
 
                 extra_players = n_players_selected - self.n_picks 
                 players_to_remove_possibilities = combinations(my_players,extra_players)
-                best_score = 0
 
                 diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
                                                        ,axis = 1).T
 
-                os.write(1,bytes(str(diff_means_mod), 'utf-8'))
+                #os.write(1,bytes(str(diff_means_mod), 'utf-8'))
 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
                                               , scale = np.sqrt(self.diff_var))
@@ -214,40 +214,44 @@ class HAgent():
                 else:
                     score = cdf_estimates.mean(axis = 1)
 
-                c = None
+                weights = None
 
             i = i + 1
     
-            yield score, c, cdf_estimates
+            yield score, weights, cdf_estimates
 
 
     ### below are functions used for the optimization procedure 
 
     def get_x_mu(self,c):
+        #uses the pre-simplified formula for x_mu from page 19 of the paper. Using the simplified form would work just as well
 
         factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
 
         c_mod = c - factor
         sigma = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1))
+        
         U = np.array([[self.v.reshape(9),c_0.reshape(9)] for c_0 in c])
         b = np.array([[-self.gamma * s,self.omega * s] for s in sigma]).reshape(-1,2,1)
-
         U_T = np.swapaxes(U, 1, 2)
-
+        
         q = np.einsum('aij, ajk -> aik', U.dot(self.L), U_T)
-
         inverse_part = np.linalg.inv(q)
 
         r = np.einsum('ij, ajk -> aik', self.L, U_T)
 
         x = np.einsum('aij, ajk -> aik', r, inverse_part)
 
-        #inverse_part = np.linalg.inv(U.dot(self.L).dot(U.T))
-        #X_mu = self.L.dot(U.T).dot(inverse_part).dot(b)
-
         X_mu = np.einsum('aij, ajk -> aik', x, b)
 
         return X_mu
+
+    #below functions use the simplified form of X_mu 
+    #term 1: L (covariance)
+    #term 2: vj^T - jv^T
+    #term 3: L (covariance)
+    #term 4: -gamma * j - omega * v
+    #term 5: sigma / (j^T L j v^T L V - (v^T L j)^2) 
 
     def get_term_two(self,c):
         #v = self.v.reshape(9,1)

@@ -181,7 +181,7 @@ with param_tab:
       with mult_col:
         st.subheader(f"Multipliers")
   
-        multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,0.25,1,1]}
+        multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
                                      , index = coefficient_df.index)
         multipliers = st.data_editor(multiplier_df)
   
@@ -305,7 +305,7 @@ with draft_tab:
 
       return next(H.get_h_scores(player_stats, my_players, players_chosen))      
 
-    if len(my_players) < n_picks:
+    if len(my_players) == n_picks:
       base_h_score, _, base_win_rates = get_base_h_score(info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting, player_stats, my_players, players_chosen)
   
   with right:
@@ -320,17 +320,12 @@ with draft_tab:
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
       @st.cache_data()
-      def make_team_z_tab(z_scores, team_selections):
-        team_stats_z = z_scores[z_scores.index.isin(team_selections)]
+      def make_team_z_tab(team_stats_z, team_selections):
 
-        n_players_on_team = team_stats_z.shape[0]
+        n_players_on_team = team_stats_z.shape[0] - 3
 
         if n_players_on_team > 0:
-            expected_z = z_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-    
-            team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
-            team_stats_z.loc['Expected', :] = expected_z
-            team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
+
     
             team_stats_z_styled = team_stats_z.style.format("{:.2f}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
@@ -344,17 +339,11 @@ with draft_tab:
         z_display = st.dataframe(team_stats_z_styled, use_container_width = True)     
 
       @st.cache_data()
-      def make_team_g_tab(g_scores, team_selections):
-        team_stats_g = g_scores[g_scores.index.isin(team_selections)]
+      def make_team_g_tab(team_stats_g, team_selections):
 
-        n_players_on_team = team_stats_g.shape[0]
+        n_players_on_team = team_stats_g.shape[0] - 3
 
         if n_players_on_team > 0:
-
-            expected_g = g_scores[0:n_players_on_team*n_drafters].mean() * n_players_on_team
-            team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
-            team_stats_g.loc['Expected', :] = expected_g
-            team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
             
             team_stats_g_styled = team_stats_g.style.format("{:.2f}").map(styler_a) \
                                                         .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
@@ -376,20 +365,37 @@ with draft_tab:
               st.dataframe(base_win_rates_formatted, hide_index = True)
         
       with z_tab:
-           make_team_z_tab(z_scores, team_selections)
+           team_stats_z = z_scores[z_scores.index.isin(team_selections)]
+           expected_z = z_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
+
+           team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
+    
+           team_stats_z.loc['Expected', :] = expected_z
+           team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
+           make_team_z_tab(team_stats_z, team_selections)
 
       with g_tab:
-          make_team_g_tab(g_scores, team_selections)
+           team_stats_g = g_scores[g_scores.index.isin(team_selections)]
+           expected_g = g_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
+
+           team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
+
+           team_stats_g.loc['Expected', :] = expected_g
+           team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
+           make_team_g_tab(team_stats_g, team_selections)
     
       with h_tab:
-          make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
+           if len(my_players) == n_picks:
+                      make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
+           else:
+                      st.markdown('Team H-score not defined until team is full') 
           
     with cand_tab:
 
       subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
           
       with subtab1:
-        z_scores_unselected = z_scores[~g_scores.index.isin(listify(selections_editable))]
+        z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
         z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
         z_scores_display = st.dataframe(z_scores_unselected_styled)
       with subtab2:
@@ -399,10 +405,13 @@ with draft_tab:
     
       with subtab3:
 
-        if not st.session_state.run:
+        if len(my_players) == n_picks:
+           st.markdown('Team is complete!')
+                   
+        elif not st.session_state.run:
           with st.form(key='my_form_to_submit'):
             h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
-      
+                     
         else:
 
           #record the fact that the run has already been invoked, no need to invoke it again
@@ -478,9 +487,9 @@ with draft_tab:
 
             mod_my_players = [x for x in my_players if x != drop_player]
 
-            z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
+            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-            with z_tab:
+            with z_waiver_tab:
                 st.markdown('Projected team stats with chosen player:')
                 no_drop = team_stats_z.loc[['Total'],:]
                 no_drop.index = [drop_player]
@@ -489,11 +498,12 @@ with draft_tab:
                 new_z =  team_stats_z.loc['Total',:] + z_scores_unselected - drop_player_stats_z
 
                 new_z = pd.concat([no_drop,new_z])
+
                 new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
 
                 st.dataframe(new_z_styled) 
 
-            with g_tab:
+            with g_waiver_tab:
                 st.markdown('Projected team stats with chosen player:')
                 no_drop = team_stats_g.loc[['Total'],:]
                 no_drop.index = [drop_player]
@@ -506,7 +516,7 @@ with draft_tab:
 
                 st.dataframe(new_g_styled) 
 
-            with h_tab:
+            with h_waiver_tab:
                 res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
                 res = res.sort_values(ascending = False)

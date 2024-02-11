@@ -10,7 +10,17 @@ def calculate_coefficients(player_stats
                      , representative_player_set
                      , translation_factors
                     , params):
-    #calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
+    """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
+
+    Args:
+        player_stats: dataframe of fantasy-relevant statistics 
+        representative_player_set: list of players to use as sample for coefficients
+        translation_factors: series, converts sigma^2 to tau^2
+        params: dict of parameters
+    Returns:
+        Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
+
+    """
 
     #counting stats
     var_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].var(axis = 0)

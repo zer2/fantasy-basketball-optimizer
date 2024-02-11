@@ -10,7 +10,16 @@ import os
 @st.cache_resource(ttl = '1d') 
 def get_current_season_data(params
                             , season = 2024):
-  #get all box scores from the current season and calculate various running averages 
+  """Get all box scores from the current season and calculate various running averages. Currently 2-week, 4-week, and season to date
+
+  Args:
+      params: dictionary of parameters 
+      season: int, year of season 
+              defined by the second half of the season. E.g. season that ends in 2024 is 2024
+  Returns:
+      1) Dictionary of structure name of dataset -> dataframe, where the dataframes have fantasy-relevant player statistics
+      2) Series of player -> minutes, calculated as average minutes per game played 
+  """
            
   season_str = str(season -1) + '-' + str(season -2000)
   pgl_df = pd.concat(
@@ -37,7 +46,6 @@ def get_current_season_data(params
   two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= two_weeks_ago].drop(columns = ['Game Date'])
   full_subset = pgl_df.drop(columns = ['Game Date'])
 
-
   player_metadata = get_player_metadata()
 
   data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
@@ -48,6 +56,8 @@ def get_current_season_data(params
   return data_dict, expected_minutes_long_term 
 
 def process_minutes(pgl_df):
+  #helper function which calculates average minutes per player in a dataset
+  
   agg = pgl_df.groupby('Player')['MIN'].mean()
   agg.name = 'Minutes'
   return agg
@@ -56,6 +66,14 @@ def process_minutes(pgl_df):
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def process_game_level_data(df
                             , metadata):
+  """Convert box scores to the format needed for fantasy
+
+  Args:
+      df: dataframe of game data
+      metadata: df of relevant metadata to join on. Currently just 
+  Returns:
+      Dataframe of player-level statistics needed for fantasy
+  """
   #convert a game level dataframe to a week-level dataframe
            
   agg_df = df.groupby('Player').mean().astype(float)
@@ -85,7 +103,13 @@ def get_historical_data(params):
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def get_player_metadata():
-   #get player positions from the NBA API
+   """Get player data from the NBA api
+
+   Args:
+      none
+   Returns:
+      Currently: A series of the form Player Name -> Position
+   """
   
    playerindex = nba_endpoints.playerindex.PlayerIndex()
    data = playerindex.data_sets[0].get_dict()['data']
@@ -104,9 +128,16 @@ def get_player_metadata():
 
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(expected_minutes, params):
+  """Get DARKO predictions from stored CSV files
 
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-01-30.csv')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-01-30.csv')
+  Args:
+      expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
+      params: dict of parameters
+  Returns:
+      Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
+  """
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-02-05.csv')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-02-05.csv')
   all_darko = skill_projections.merge(per_game_projections)
 
   all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
@@ -142,6 +173,15 @@ def get_darko_data(expected_minutes, params):
            ,'DARKO-L' : darko_long_term}
 
 def get_darko_short_term(all_darko, params):
+  """Get a short term version of darko, based on next-game predictions for counting statistics
+
+  Args:
+      all_darko: Datafrmae of all raw DARKO forecasts
+      expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
+      params: dict of parameters
+  Returns:
+      Dataframe of predictions
+  """
   
   darko_short_term = all_darko.fillna(0)  
   darko_short_term.loc[:,'No Play %'] = 0 #currently not implemented 
@@ -149,7 +189,14 @@ def get_darko_short_term(all_darko, params):
 
 
 def get_darko_long_term(all_darko, expected_minutes, params):
-
+    """Get a long term version of darko, based on skill statistics and expected minutes
+  
+    Args:
+        all_darko: Datafrmae of all raw DARKO forecasts
+        params: dict of parameters
+    Returns:
+        Dataframe of predictions
+    """
     all_darko = all_darko.drop(columns = ['Minutes'])
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
   
