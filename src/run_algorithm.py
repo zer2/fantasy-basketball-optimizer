@@ -188,6 +188,9 @@ class HAgent():
                                                               , 1 - cdf_estimates
                                                               , categories = cdf_estimates.columns
                                  )
+                    os.write(1,bytes(str(cdf_estimates), 'utf-8'))
+                    os.write(1,bytes(str(score), 'utf-8'))
+
                 else:
                     score = cdf_estimates.mean() 
 
