@@ -218,7 +218,7 @@ def get_darko_long_term(all_darko, expected_minutes, params):
     darko_long_term.loc[:,'Blocks'] = possesions * darko_long_term.loc[:,'BLK/100'] 
     darko_long_term.loc[:,'Threes'] =  threes_made
     darko_long_term.loc[:,'Turnovers'] = possesions * darko_long_term.loc[:,'TOV/100'] 
-    darko_long_term.loc[:,'Field Throw Attempts'] = free_throw_attempts
+    darko_long_term.loc[:,'Free Throw Attempts'] = free_throw_attempts
     darko_long_term.loc[:,'Field Goal Attempts'] = two_attempts + three_attempts
 
     darko_long_term.loc[:,'Field Goal %'] = (twos_made + threes_made)/(two_attempts + three_attempts)
