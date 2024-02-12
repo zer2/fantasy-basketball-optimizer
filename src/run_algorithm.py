@@ -180,14 +180,14 @@ class HAgent():
                               , scale = np.sqrt(self.diff_var)
                                                      )
                               , index = diff_means.index
-                                            ).T
+                                            )
 
                 weights = None
                 
                 if self.winner_take_all:
-                    score = combinatorial_calculation(cdf_estimates
-                                                              , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
+                    score = combinatorial_calculation(cdf_estimates.T
+                                                              , 1 - cdf_estimates.T
+                                                              , categories = cdf_estimates.index
                                  )
                     os.write(1,bytes(str(cdf_estimates), 'utf-8'))
                     os.write(1,bytes(str(score), 'utf-8'))
