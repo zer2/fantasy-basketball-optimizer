@@ -177,8 +177,9 @@ class HAgent():
             #case where no new players need to be chosen
             elif n_players_selected == self.n_picks: 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
-                              , scale = np.sqrt(self.diff_var))
-                              , index = diff_means.index
+                              , scale = np.sqrt(self.diff_var)
+                                                     ).T
+                              , columns = diff_means.index
                                             )
 
                 weights = None
