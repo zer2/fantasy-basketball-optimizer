@@ -90,6 +90,16 @@ def combinatorial_calculation(c
         return data
 
 def calculate_tipping_points(x):
+    """Calculate the probability of each category being a tipping point, assuming independence
+
+    Args:
+        x: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
+
+    Returns:
+        PDataFrame of shape (n,9) representing probabilities of each category being a tipping point
+
+    """
+
     #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
     
     which = np.array([list(itertools.combinations(range(9), 5))] )
@@ -115,7 +125,16 @@ def calculate_tipping_points(x):
     return final_probabilities
 
 def make_progress_chart(res):
-    #chart the progress of gradient descent in action. 
+    """Chart the progress of gradient descent in action, for the top 10 players 
+
+    Args:
+        res: List of result objects 
+
+    Returns:
+        Line chart showing scores per player by iteration
+
+    """
+    #
     #input res is the the log from H-scoring after some number of iterations
     
     data = pd.concat([pd.DataFrame({'H-score' : [r.loc[player] for r in res]
