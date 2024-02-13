@@ -9,7 +9,7 @@ from src.helper_functions import listify, make_progress_chart, read_markdown_fil
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
-from src.yahoo_connect import get_yahoo_access_token, get_yahoo_players_df
+from src.yahoo_connect import clean_up_access_token, get_yahoo_access_token, get_yahoo_players_df
 
 #from streamlit_profiler import Profiler
 
@@ -162,14 +162,14 @@ with param_tab:
 
       selections = None
 
-      auth_token_dir = get_yahoo_access_token()
+      access_token_dir = get_yahoo_access_token()
 
-      if auth_token_dir is not None:
+      if access_token_dir is not None:
         yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?')
         # yahoo_league_id = "189463"
         
         if len(yahoo_league_id) >= 6:
-          team_players_df = get_yahoo_players_df(auth_token_dir, yahoo_league_id)
+          team_players_df = get_yahoo_players_df(access_token_dir, yahoo_league_id)
           n_drafters = team_players_df.shape[1]
           n_picks = team_players_df.shape[0]
 
@@ -177,6 +177,8 @@ with param_tab:
           # player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
           
           selections = team_players_df
+
+          clean_up_access_token(access_token_dir)
 
       if selections is None:
          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
