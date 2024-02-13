@@ -116,14 +116,14 @@ def get_yahoo_access_token() -> Optional[str]:
 def clean_up_access_token(access_token_dir: str):
     shutil.rmtree(access_token_dir)
 
-def get_yahoo_players_df(access_token_dir, league_id) -> pd.DataFrame:
+def get_yahoo_players_df(access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
     teams_dict = get_teams(league_id, access_token_dir)
 
     team_ids = list(teams_dict.keys())
 
     rosters_dict = get_rosters(league_id, access_token_dir, team_ids)
 
-    players_df = get_players_df(rosters_dict, teams_dict)
+    players_df = get_players_df(rosters_dict, teams_dict, player_metadata)
 
     return players_df
 
@@ -161,7 +161,7 @@ def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int
     
     return rosters_dict
 
-def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team]):
+def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team], player_metadata: pd.Series):
     players_df = pd.DataFrame()
 
     team_players_dict = {}
@@ -171,7 +171,7 @@ def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team])
     for team_id, roster in rosters_dict.items():
         team_name = teams_dict[team_id]
         relevant_player_names = [
-            player.name.full 
+            f'{player.name.full} ({player_metadata.loc[player.name.full]})' #Appending position after player name
             for player in roster.players 
             if 
                 player.selected_position.position != 'IL'

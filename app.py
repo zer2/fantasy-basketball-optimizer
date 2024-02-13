@@ -6,7 +6,7 @@ import os
 import yaml
 
 from src.helper_functions import listify, make_progress_chart, read_markdown_file, stat_styler, styler_a,styler_b, styler_c
-from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data
+from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data, get_player_metadata
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
 from src.yahoo_connect import clean_up_access_token, get_yahoo_access_token, get_yahoo_players_df
@@ -169,7 +169,10 @@ with param_tab:
         # yahoo_league_id = "189463"
         
         if len(yahoo_league_id) >= 6:
-          team_players_df = get_yahoo_players_df(access_token_dir, yahoo_league_id)
+
+          player_metadata = get_player_metadata()
+
+          team_players_df = get_yahoo_players_df(access_token_dir, yahoo_league_id, player_metadata)
           n_drafters = team_players_df.shape[1]
           n_picks = team_players_df.shape[0]
 
@@ -179,6 +182,8 @@ with param_tab:
           selections = team_players_df
 
           clean_up_access_token(access_token_dir)
+
+          st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
       if selections is None:
          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
@@ -277,12 +282,9 @@ with draft_tab:
 
   with left:
 
-    seat =  st.number_input(r'Which drafter are you?'
-        , min_value = 1
-        #, value = default_seat
-       , max_value = n_drafters)
+    seat = st.selectbox(f'Which drafter are you?', selections.columns, index = 0)
 
-    draft_tab, injury_tab = st.tabs(['Draft Bpard','Injury List'])
+    draft_tab, injury_tab = st.tabs(['Draft Board','Injury List'])
     
     with draft_tab: 
         st.caption('P.S: The draft board is copy-pastable. You can save it in Excel after you are done')
@@ -301,7 +303,7 @@ with draft_tab:
     categories = [x for x in z_scores.columns if x != 'Total']
 
     players_chosen = [x for x in listify(selections_editable) if x ==x]
-    my_players = [p for p in selections_editable['Drafter ' + str(seat)].dropna()]
+    my_players = [p for p in selections_editable[seat].dropna()]
 
     H = HAgent(info = info
          , omega = omega
@@ -335,7 +337,7 @@ with draft_tab:
 
     with team_tab:
     
-      team_selections = selections_editable['Drafter ' + str(seat)].dropna()
+      team_selections = selections_editable[seat].dropna()
 
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
@@ -578,11 +580,13 @@ with draft_tab:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
 
-            second_seat =  st.number_input(r'Which drafter are you trading with?'
-                , min_value = 1
-               , max_value = n_drafters)
+            second_seat = st.selectbox(
+              f'Which drafter are you trading with?',
+              selections.columns,
+              index = 1
+            )
 
-            second_team_selections = selections_editable['Drafter ' + str(second_seat)].dropna()
+            second_team_selections = selections_editable[second_seat].dropna()
 
             if len(second_team_selections) < n_picks:
                 st.markdown('This team is not full yet! Come back here when it is')
