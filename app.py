@@ -177,7 +177,6 @@ with param_tab:
           n_picks = team_players_df.shape[0]
 
           #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
-          # player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
           
           selections = team_players_df
 
@@ -187,7 +186,10 @@ with param_tab:
 
       if selections is None:
          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
-  
+
+      player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
+      selections = selections.astype(player_category_type)
+
   with middle: 
       st.header('Player Statistics')
 
