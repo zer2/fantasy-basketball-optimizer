@@ -284,7 +284,7 @@ with draft_tab:
 
   with left:
 
-    seat = st.selectbox(f'Which drafter are you?', selections.columns, index = 0)
+    seat = st.selectbox(f'Which team are you?', selections.columns, index = 0)
 
     draft_tab, injury_tab = st.tabs(['Draft Board','Injury List'])
     
@@ -583,7 +583,7 @@ with draft_tab:
         else:
 
             second_seat = st.selectbox(
-              f'Which drafter are you trading with?',
+              f'Which team are you trading with?',
               selections.columns,
               index = 1
             )
