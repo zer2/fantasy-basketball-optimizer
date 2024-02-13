@@ -102,7 +102,7 @@ def get_historical_data(params):
 
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
-def get_player_metadata():
+def get_player_metadata() -> pd.Series:
    """Get player data from the NBA api
 
    Args:

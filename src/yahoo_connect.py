@@ -1,13 +1,26 @@
-from yahoo_oauth import OAuth2
-import yahoo_fantasy_api as yfa
-import streamlit as st
-
-import requests
+from requests.auth import HTTPBasicAuth
 from requests_oauthlib import OAuth2Session
+from src import yahoo_helper
+from streamlit.logger import get_logger
+from tempfile import mkdtemp
+from typing import Optional
+from yahoo_oauth import OAuth2
+from yfpy.models import Team, Roster
+from yfpy.query import YahooFantasySportsQuery
 
-def yahoo():
+import json
+import os
+import pandas as pd
+import requests
+import shutil
+import streamlit as st
+import time
+import yahoo_fantasy_api as yfa
+
+LOGGER = get_logger(__name__)
+
+def get_yahoo_access_token() -> Optional[str]:
     # Client_ID and Secret from https://developer.yahoo.com/apps/
-    league_id = st.text_input("LeagueID", key='LeagueID')
     cid = st.secrets["YAHOO_CLIENT_ID"]
     cse = st.secrets["YAHOO_CLIENT_SECRET"]
     
@@ -66,78 +79,115 @@ def yahoo():
         except Exception as err:
             st.error(f"An error occurred: {err}")
     
-    # Use the access token
+    # Store token data in file
     if st.session_state['access_token']:
-        #st.write("Now you can use the access token to interact with Yahoo's API.")
-    
-        # Allow user to input league ID
-        # league_id = st.text_input("Enter your Yahoo Fantasy Sports league ID:")
-        temp_dir = tempfile.mkdtemp()
-        if league_id:
-            # Define the paths to the token and private files
-            token_file_path = os.path.join(temp_dir, "token.json")
-            private_file_path = os.path.join(temp_dir, "private.json")
-    
-            # Create the token file with all necessary details
-            token_data = {
-                "access_token": st.session_state['access_token'],
-                "consumer_key": cid,
-                "consumer_secret": cse,
-                "guid": None,
-                "refresh_token": st.session_state['refresh_token'],
-                "expires_in": 3600, 
-                "token_time": st.session_state['token_time'],
-                "token_type": "bearer"
-                }
-            with open(token_file_path, 'w') as f:
-                json.dump(token_data, f)
-    
-            # Create the private file with consumer key and secret
-            private_data = {
-                "consumer_key": cid,
-                "consumer_secret": cse,
+        st.write("Now you can use the access token to interact with Yahoo's API.")
+
+        temp_dir = mkdtemp()
+
+        # Define the paths to the token and private files
+        token_file_path = os.path.join(temp_dir, "token.json")
+        private_file_path = os.path.join(temp_dir, "private.json")
+
+        # Create the token file with all necessary details
+        token_data = {
+            "access_token": st.session_state['access_token'],
+            "consumer_key": cid,
+            "consumer_secret": cse,
+            "guid": None,
+            "refresh_token": st.session_state['refresh_token'],
+            "expires_in": 3600, 
+            "token_time": st.session_state['token_time'],
+            "token_type": "bearer"
             }
-            with open(private_file_path, 'w') as f:
-                json.dump(private_data, f)
+        with open(token_file_path, 'w') as f:
+            json.dump(token_data, f)
+
+        # Create the private file with consumer key and secret
+        private_data = {
+            "consumer_key": cid,
+            "consumer_secret": cse,
+        }
+        with open(private_file_path, 'w') as f:
+            json.dump(private_data, f)
+
+        return temp_dir
+
+def clean_up_access_token(access_token_dir: str):
+    shutil.rmtree(access_token_dir)
+
+def get_yahoo_players_df(access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
+    teams_dict = get_teams(league_id, access_token_dir)
+
+    team_ids = list(teams_dict.keys())
+
+    rosters_dict = get_rosters(league_id, access_token_dir, team_ids)
+
+    players_df = get_players_df(rosters_dict, teams_dict, player_metadata)
+
+    return players_df
 
 @st.cache_data(ttl=3600)
-def get_yahoo_league_summary(league_id, auth_path):    
+def get_teams(league_id: str, auth_path: str) -> dict[int, Team]:    
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     auth_directory = auth_path
     sc = YahooFantasySportsQuery(
         auth_dir=auth_directory,
         league_id=league_id,
-        game_code="nfl"
+        game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
-    mrw = yahoo_helper.get_most_recent_week(sc)
-    recap = yahoo_helper.generate_weekly_recap(sc, week=mrw)
-    return recap
+    teams_dict = yahoo_helper.get_teams(sc)
+    return teams_dict
+
+@st.cache_data(ttl=3600)
+def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
+    league_id = league_id
+    LOGGER.info(f"League id: {league_id}")
+    auth_directory = auth_path
+    sc = YahooFantasySportsQuery(
+        auth_dir=auth_directory,
+        league_id=league_id,
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+
+    rosters_dict: dict[int, Roster] = {}
+
+    for team_id in team_ids:
+        roster = yahoo_helper.get_team_roster(sc, team_id)
+        rosters_dict[team_id] = roster
     
-def get_yahoo_info(league_id):
-    yahoo_client_id = st.secrets["YAHOO_CLIENT_ID"]
-    yahoo_client_secret = st.secrets["YAHOO_CLIENT_SECRET"]
-    
-    redirect = 'https://api.login.yahoo.com/oauth2/request_auth?redirect_uri=oob&response_type=code&client_id=' + yahoo_client_id
-    st.markdown("check out this [link](" + redirect + ")", unsafe_allow_html = True)
-    oauth = OAuth2(yahoo_client_id, yahoo_client_secret)
+    return rosters_dict
 
+def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team], player_metadata: pd.Series):
+    players_df = pd.DataFrame()
 
-    league_id = '418.1.' + league_id 
-    
-    league = gm.to_league(league_id)
-  
-    rosters = { t['name'] : league.to_team(team_id).roster(21) for team_id, t in league.teams().items()}
-  
-    roster_dict = {team: [p['name'] for p in roster if p['selected_position'] != 'IL' ] for team, roster in rosters.items()}
-    roster_df = pd.DataFrame.from_dict(roster_dict, orient='index')
-    roster_df = roster_df.transpose()
-  
-    il_dict = {team: [p['name'] for p in roster if p['selected_position'] == 'IL' ] for team, roster in rosters.items()}
-    all_il_players = [x for v in il_dict.values() for x in v]
+    team_players_dict = {}
 
-    return rosters, all_il_players
+    max_team_size = 0
 
+    for team_id, roster in rosters_dict.items():
+        team_name = teams_dict[team_id]
+        relevant_player_names = [
+            f'{player.name.full} ({player_metadata.loc[player.name.full]})' #Appending position after player name
+            for player in roster.players 
+            if 
+                player.selected_position.position != 'IL'
+                and player.selected_position.position is not None
+        ]
 
+        if len(relevant_player_names) > max_team_size:
+            max_team_size = len(relevant_player_names)
+
+        team_players_dict[team_name] = relevant_player_names
+
+    for team_name, player_names in team_players_dict.items():
+        if len(player_names) < max_team_size :
+            player_names.extend([None] * (max_team_size - len(player_names)))
+        
+        players_df.loc[:,team_name] = player_names
+
+    return players_df
 
