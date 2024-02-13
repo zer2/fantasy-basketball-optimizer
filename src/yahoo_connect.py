@@ -3,6 +3,7 @@ from requests_oauthlib import OAuth2Session
 from src import yahoo_helper
 from streamlit.logger import get_logger
 from tempfile import mkdtemp
+from typing import Optional
 from yahoo_oauth import OAuth2
 from yfpy.models import Team, Roster
 from yfpy.query import YahooFantasySportsQuery
@@ -18,7 +19,7 @@ import yahoo_fantasy_api as yfa
 
 LOGGER = get_logger(__name__)
 
-def get_yahoo_players(league_id) -> pd.DataFrame:
+def get_yahoo_access_token() -> Optional[str]:
     # Client_ID and Secret from https://developer.yahoo.com/apps/
     cid = st.secrets["YAHOO_CLIENT_ID"]
     cse = st.secrets["YAHOO_CLIENT_SECRET"]
@@ -78,71 +79,53 @@ def get_yahoo_players(league_id) -> pd.DataFrame:
         except Exception as err:
             st.error(f"An error occurred: {err}")
     
-    # Use the access token
+    # Store token data in file
     if st.session_state['access_token']:
         st.write("Now you can use the access token to interact with Yahoo's API.")
 
         temp_dir = mkdtemp()
-        if league_id:
-            # Define the paths to the token and private files
-            token_file_path = os.path.join(temp_dir, "token.json")
-            private_file_path = os.path.join(temp_dir, "private.json")
-    
-            # Create the token file with all necessary details
-            token_data = {
-                "access_token": st.session_state['access_token'],
-                "consumer_key": cid,
-                "consumer_secret": cse,
-                "guid": None,
-                "refresh_token": st.session_state['refresh_token'],
-                "expires_in": 3600, 
-                "token_time": st.session_state['token_time'],
-                "token_type": "bearer"
-                }
-            with open(token_file_path, 'w') as f:
-                json.dump(token_data, f)
-    
-            # Create the private file with consumer key and secret
-            private_data = {
-                "consumer_key": cid,
-                "consumer_secret": cse,
+
+        # Define the paths to the token and private files
+        token_file_path = os.path.join(temp_dir, "token.json")
+        private_file_path = os.path.join(temp_dir, "private.json")
+
+        # Create the token file with all necessary details
+        token_data = {
+            "access_token": st.session_state['access_token'],
+            "consumer_key": cid,
+            "consumer_secret": cse,
+            "guid": None,
+            "refresh_token": st.session_state['refresh_token'],
+            "expires_in": 3600, 
+            "token_time": st.session_state['token_time'],
+            "token_type": "bearer"
             }
-            with open(private_file_path, 'w') as f:
-                json.dump(private_data, f)
+        with open(token_file_path, 'w') as f:
+            json.dump(token_data, f)
 
-            teams_dict = get_teams(league_id, temp_dir)
-            # st.write(f"Teams for the league currently are:")
-            # for team_id, team_name in teams_dict.items():
-            #     st.write(f"{team_id}: {team_name}")
+        # Create the private file with consumer key and secret
+        private_data = {
+            "consumer_key": cid,
+            "consumer_secret": cse,
+        }
+        with open(private_file_path, 'w') as f:
+            json.dump(private_data, f)
 
-            team_ids = list(teams_dict.keys())
+        return temp_dir
 
-            rosters_dict = get_rosters(league_id, temp_dir, team_ids)
+def get_yahoo_players_df(access_token_dir, league_id) -> pd.DataFrame:
+    teams_dict = get_teams(league_id, access_token_dir)
 
-            # for team_id, roster in rosters_dict.items():
-            #     st.write(f"{teams_dict[team_id]} has {len(roster.players)} players")
+    team_ids = list(teams_dict.keys())
 
-            final_df = pd.DataFrame()
+    rosters_dict = get_rosters(league_id, access_token_dir, team_ids)
 
-            for team_id, roster in rosters_dict.items():
-                team_name = teams_dict[team_id]
-                relevant_player_names = [player.name.full for player in roster.players if player.selected_position.position != 'IL' and player.selected_position.position is not None]
+    players_df = get_players_df(rosters_dict, teams_dict)
 
-                if len(relevant_player_names) < 13:
-                    relevant_player_names.extend([None] * (13 - len(relevant_player_names)))
-                
-                if len(relevant_player_names) != 13:
-                    st.write(f"{team_name} has the following players:")
-                    for player in roster.players:
-                        st.write(f"{player}")
-                final_df.loc[:,team_name] = relevant_player_names
-
-            return final_df
-
-            shutil.rmtree(temp_dir)
+    return players_df
 
 @st.cache_data(ttl=3600)
-def get_teams(league_id: str, auth_path: str):    
+def get_teams(league_id: str, auth_path: str) -> dict[int, Team]:    
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     auth_directory = auth_path
@@ -175,4 +158,33 @@ def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int
     
     return rosters_dict
 
+def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team]):
+    players_df = pd.DataFrame()
+
+    team_players_dict = {}
+
+    max_team_size = 0
+
+    for team_id, roster in rosters_dict.items():
+        team_name = teams_dict[team_id]
+        relevant_player_names = [
+            player.name.full 
+            for player in roster.players 
+            if 
+                player.selected_position.position != 'IL'
+                and player.selected_position.position is not None
+        ]
+
+        if len(relevant_player_names) > max_team_size:
+            max_team_size = len(relevant_player_names)
+
+        team_players_dict[team_name] = relevant_player_names
+
+    for team_name, player_names in team_players_dict.items():
+        if len(player_names) < max_team_size :
+            player_names.extend([None] * (max_team_size - len(player_names)))
+        
+        players_df.loc[:,team_name] = player_names
+
+    return players_df
 
