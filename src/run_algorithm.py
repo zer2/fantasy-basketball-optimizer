@@ -177,17 +177,21 @@ class HAgent():
             #case where no new players need to be chosen
             elif n_players_selected == self.n_picks: 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
-                              , scale = np.sqrt(self.diff_var))
+                              , scale = np.sqrt(self.diff_var)
+                                                     )
                               , index = diff_means.index
                                             )
 
                 weights = None
                 
                 if self.winner_take_all:
-                    score = combinatorial_calculation(cdf_estimates
-                                                              , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
+                    score = combinatorial_calculation(cdf_estimates.T
+                                                              , 1 - cdf_estimates.T
+                                                              , categories = cdf_estimates.index
                                  )
+                    os.write(1,bytes(str(cdf_estimates), 'utf-8'))
+                    os.write(1,bytes(str(score), 'utf-8'))
+
                 else:
                     score = cdf_estimates.mean() 
 

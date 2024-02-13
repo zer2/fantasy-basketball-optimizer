@@ -136,8 +136,8 @@ def get_darko_data(expected_minutes, params):
   Returns:
       Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
   """
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-02-05.csv')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-02-05.csv')
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-02-12.csv')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-02-12.csv')
   all_darko = skill_projections.merge(per_game_projections)
 
   all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
@@ -218,7 +218,7 @@ def get_darko_long_term(all_darko, expected_minutes, params):
     darko_long_term.loc[:,'Blocks'] = possesions * darko_long_term.loc[:,'BLK/100'] 
     darko_long_term.loc[:,'Threes'] =  threes_made
     darko_long_term.loc[:,'Turnovers'] = possesions * darko_long_term.loc[:,'TOV/100'] 
-    darko_long_term.loc[:,'Field Throw Attempts'] = free_throw_attempts
+    darko_long_term.loc[:,'Free Throw Attempts'] = free_throw_attempts
     darko_long_term.loc[:,'Field Goal Attempts'] = two_attempts + three_attempts
 
     darko_long_term.loc[:,'Field Goal %'] = (twos_made + threes_made)/(two_attempts + three_attempts)
