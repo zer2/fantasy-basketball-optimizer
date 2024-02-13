@@ -187,8 +187,8 @@ with param_tab:
       if selections is None:
          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
-      player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
-      selections = selections.astype(player_category_type)
+    player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
+    selections = selections.astype(player_category_type)
 
   with middle: 
       st.header('Player Statistics')
