@@ -30,27 +30,27 @@ def stat_styler(value
 
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
 
-def styler_a(value):
+def styler_a(value : float) -> str:
     return f"background-color: grey; color:white;" 
 
-def styler_b(value):
+def styler_b(value : float) -> str:
     return f"background-color: lightgrey; color:black;" 
 
-def styler_c(value):
+def styler_c(value : float) -> str:
     return f"background-color: darkgrey; color:black;" 
     
-def listify(x):
+def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
 
     x = x.values.tolist()
     return [item for row in x for item in row]
 
-def combinatorial_calculation(c
-                              , c_comp
-                              , categories
+def combinatorial_calculation(c : pd.DataFrame
+                              , c_comp : pd.DataFrame
+                              , categories : list
                               , data = 1 #the latest probabilities. Defaults to 1 at start
-                              , level = 0 #the number of categories that have been worked into the probability
-                              , n_false = 0 #the number of category losses that have been trackes so far
+                              , level : int = 0 #the number of categories that have been worked into the probability
+                              , n_false : int = 0 #the number of category losses that have been trackes so far
                              ):
     """This recursive functions enumerates winning probabilities for the Gaussian optimizer
 
@@ -89,14 +89,14 @@ def combinatorial_calculation(c
     else: #a series where all 9 categories has been processed, and n_false <= the cutoff, can be added to the total %
         return data
 
-def calculate_tipping_points(x):
+def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
     """Calculate the probability of each category being a tipping point, assuming independence
 
     Args:
         x: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
 
     Returns:
-        PDataFrame of shape (n,9) representing probabilities of each category being a tipping point
+        DataFrame of shape (n,9) representing probabilities of each category being a tipping point
 
     """
 

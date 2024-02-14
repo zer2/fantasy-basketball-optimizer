@@ -6,10 +6,10 @@ from scipy.signal import savgol_filter
 import os
 import streamlit as st
 
-def calculate_coefficients(player_stats
-                     , representative_player_set
-                     , translation_factors
-                    , params):
+def calculate_coefficients(player_stats : pd.DataFrame
+                     , representative_player_set : list
+                     , translation_factors : pd.Series
+                    , params : dict) -> dict:
     """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
 
     Args:
@@ -68,13 +68,22 @@ def calculate_coefficients(player_stats
   
 
 
-def calculate_scores_from_coefficients(player_stats
-                                       ,coefficients
-                                       , params
-                                       ,alpha_weight = 1
-                                       ,beta_weight = 1):
-    #Calculate scores based on player info and coefficients. alpha_weight is for \sigma, beta_weight is for \tau
-        
+def calculate_scores_from_coefficients(player_stats : pd.DataFrame
+                                       ,coefficients :pd.DataFrame
+                                       , params : dict
+                                       ,alpha_weight : float = 1
+                                       ,beta_weight : float = 1):
+    """Calculate scores based on player info and coefficients
+
+    Args:
+        player_stats: Dataframe of fantasy-relevant statistics 
+        coefficients: Dataframe of coefficients- mean of means, var of means, mean of vars
+        params: dict of parameters
+        alpha_weight: weight for /sigma
+        beta_weight: weight for /tau
+    Returns:
+        Dataframe of scores, by player/category
+    """
     counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
     counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
     counting_cat_mean_of_vars = coefficients.loc[params['counting-statistics'],'Mean of Variances']
@@ -99,17 +108,30 @@ def calculate_scores_from_coefficients(player_stats
     return res
 
 @st.cache_data
-def process_player_data(player_stats
-                        , conversion_factors
-                        , multipliers
-                        , psi
-                        , nu
-                        , n_drafters
-                        , n_picks
-                        , rotisserie
-                        , params):
-  #Based on player stats and parameters, do all calculations to set up for running algorithms
+def process_player_data(player_stats : pd.DataFrame
+                        , conversion_factors :pd.Series
+                        , multipliers : pd.Series
+                        , psi : float
+                        , nu : float
+                        , n_drafters : int
+                        , n_picks : int
+                        , rotisserie : bool
+                        , params : dict) -> dict:
+  """Based on player stats and parameters, do all calculations to set up for running algorithms
 
+  Args:
+      player_stats: Dataframe of fantasy-relevant statistics 
+      conversion_factors: Conversion factors for /sigma^2 to /tau^2
+      multipliers: Manual multipliers for categories, based on user inputs
+      psi: parameter scaling the influence of no_play rate
+      nu: parameter scaling the influence of category means in covariance calculation
+      n_drafters: number of drafters
+      n_picks: number of picks per drafter
+      rotisserie: True if the format is Roto, False if H2H
+      params: dictionary of params
+  Returns:
+      Info dictionary with many pieces of information relevant to the algorithm 
+  """
   n_players = n_drafters * n_picks
 
   player_stats[params['counting-statistics'] + params['volume-statistics']] = player_stats[params['counting-statistics'] + params['volume-statistics']].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
