@@ -10,5 +10,3 @@ yfpy==13.0.0
 requests_oauthlib
 requests
 pyyaml
-jinja2=3.1.2
-pandas=2.1.0
