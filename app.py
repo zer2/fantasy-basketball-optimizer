@@ -457,7 +457,7 @@ with draft_tab:
             #normalize weights by what we expect from other drafters
             
             c = pd.DataFrame(c, index = score.index, columns = categories)/info['v'].T
-            c = (c * 100).round()
+            print(c)
             
             cdf_estimates.columns = categories
             
@@ -494,9 +494,11 @@ with draft_tab:
                           .format('{:,.1%}', subset = rate_df.columns)
                 st.dataframe(rate_display)
               with weight_tab:
-                c_df = c.loc[score.index].dropna().round().astype(int)
+                c_df = c.loc[score.index].dropna()
                 weight_display = score.merge(c_df, left_index = True, right_index = True)
-                weight_display = weight_display.style.format("{:.1%}"
+                weight_display = weight_display.style.format("{:.0%}"
+                                                            , subset = c_df.columns)\
+                          .format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
