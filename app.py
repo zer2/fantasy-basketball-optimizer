@@ -502,7 +502,7 @@ with draft_tab:
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
-                          .background_gradient(axis = None, subset = c_df.columns) 
+                          .background_gradient(axis = None,subset = c_df.columns) 
                 st.dataframe(weight_display, use_container_width = True)
                 
 
