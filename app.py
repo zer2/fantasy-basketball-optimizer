@@ -410,10 +410,10 @@ with draft_tab:
            make_team_g_tab(team_stats_g, team_selections)
     
       with h_tab:
-           if len(my_players) == n_picks:
-                      make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
-           else:
-                      st.markdown('Team H-score not defined until team is full') 
+        if len(my_players) == n_picks:
+          make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
+        else:
+          st.markdown('Team H-score not defined until team is full') 
           
     with cand_tab:
 
@@ -472,8 +472,13 @@ with draft_tab:
                   score = score.sort_values(ascending = False).round(3)
                   score.name = 'H-score'
                   score = pd.DataFrame(score)
+                  
+                  score_styled = score.style.format("{:.1%}"
+                                  ,subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']])
       
-                  st.dataframe(score)
+                  st.dataframe(score_styled, use_container_width = True)
       
                 with c2:
                   st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
@@ -650,7 +655,7 @@ with rank_tab:
   def make_z_rank_tab(z_scores):
     z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
     z_scores.loc[:,'Player'] = z_scores.index
-    z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+    z_scores = z_scores[['Rank','Player','Total'] + counting_statistics + percentage_statistics]
     
     z_scores_styled = z_scores.style.format("{:.2f}"
                                            ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
@@ -667,7 +672,7 @@ with rank_tab:
     g_score_columns_original = g_scores.columns
     g_scores.loc[:,'Rank'] = np.arange(g_scores.shape[0]) + 1
     g_scores.loc[:,'Player'] = g_scores.index
-    g_scores = g_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+    g_scores = g_scores[['Rank','Player','Total'] + counting_statistics + percentage_statistics]
   
     g_scores_styled = g_scores.style.format("{:.2f}"
                                            ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \

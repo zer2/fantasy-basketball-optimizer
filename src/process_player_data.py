@@ -197,14 +197,13 @@ def process_player_data(player_stats : pd.DataFrame
   
   L = np.array(x_scores_as_diff.cov()) 
 
-  z_scores.loc[:,'Total'] = z_scores.sum(axis = 1)
+  z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
+
   z_scores.sort_values('Total', ascending = False, inplace = True)
 
   g_scores = g_scores * multipliers.T.values[0]
-  g_scores.loc[:,'Total'] = g_scores.sum(axis = 1)
+  g_scores.insert(loc = 0, column = 'Total', value = g_scores.sum(axis = 1))
   g_scores.sort_values('Total', ascending = False, inplace = True)
-
-  #os.write(1,b'HIII')
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
