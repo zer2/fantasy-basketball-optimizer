@@ -48,9 +48,9 @@ def get_current_season_data(params
 
   player_metadata = get_player_metadata()
 
-  data_dict = {str(season) + '-Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
-               ,str(season) + '-Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
-               ,str(season) + '-Full Season' :  process_game_level_data(full_subset, player_metadata)
+  data_dict = {str(season) + '- Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
+               ,str(season) + '- Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
+               ,str(season) + '- Season to Date' :  process_game_level_data(full_subset, player_metadata)
               }
                               
   return data_dict, expected_minutes_long_term 

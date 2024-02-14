@@ -1,16 +1,16 @@
 # The curious case of turnovers 
 
-The conventional wisdom is that turnovers are relatively unimportant, and as such should be downweighted by $~75\%$. I am not convinced. 
+The conventional wisdom is that turnovers are relatively unimportant, and as such should be downweighted by $~75\%$ or more by default. I believe that this conventional wisdom is wrong. 
 
-It is natural to look at results and conclude that turnovers are not important to invest in. So many winning teams lose turnovers, and so many losing teams win it. Of course, seeing that, anyone would naturally start to believe that investing in turnovers is not very helpful or important. But that is not exactly logical. What matters is the causal relationship between investing in turnovers and doing well: on the margins, does investing in turnovers help you do better as much as investing in other categories? My analysis suggests that it does, which is why this website's default is to treat turnovers like every other category (multiplied by -1 of course). 
+It is natural to look at results and conclude that turnovers are not important to invest in. So many winning teams lose turnovers, and so many losing teams win it. Of course, seeing that, anyone would naturally start to believe that investing in turnovers is not very helpful. But that is not exactly logical. What matters is the causal relationship between investing in turnovers and doing well: on the margins, does investing in turnovers yield a similar return to investing in other categories? My analysis suggests that it does, which is why this website's default is to treat turnovers like every other category (multiplied by -1 of course). 
 
-My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that deciding how to treat turnovers is important, and that my default goes against the grain of community wisdom. So I will walk through my thought process here 
+My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that if I am going to disregard conventional wisdom, I should at least explain my thought my process. I will do that here
 
 ## 1. Correlation does not imply causation
 
-The simplest argument for ignoring turnovers is that teams which perform poorly in turnovers tend to do better overall and vice versa. The implication is that investing more in turnovers must make you more likely to lose, or at least not be enormously helpful. 
+It is often noted that teams which perform poorly in turnovers tend to do better overall and vice versa. 
 
-The statement of fact is incontrovertibly true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more.__ 
+The statement of fact is probably true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more.__ 
 
 To see how this fallacy can manifest itself in real data, consider the following simplified results table 
 
@@ -18,31 +18,34 @@ To see how this fallacy can manifest itself in real data, consider the following
 |:-------|:-------|:-------|:-------|:-------|
 |Turnover weight | $100\%$ | $0\%$ | $100\%$ | $0\%$ |
 |Player m/g | $40$ | $40$ | $20$ | $20$ |
-|Result- turnovers | Middling | Bad | Good | Middling | 
-|Result- placement | First | Second | Third | Fourth |
+|Result- turnovers | $20$ | $30$ | $10$ | $20$ | 
+|Result- placement | $1$st | $2$nd | $3$rd | $4$th |
 
-Ignoring the player minutes per game numbers, one might naively infer that doing better in turnovers leads to doing worse overall. The evidence is: 
-  - Performing well in turnovers leads to an average placement of third place (drafter C finished third)
-  - Performing average in turnovers leads to an average placement of between second and third place (drafter A finished first, drafter D finished fourth)
-  - Performing badly in turnovers leads to an average of second place (drafter B finished second) 
- 
-However, this backwards-causality approach is not logical because the appearance of causality is an illusion. Performing badly in turnovers didn't help the drafters succeed- their players getting more minutes per game did, and that harmed their performance in turnovers. In fact, when accounting for minutes per game, the opposite effect is uncovered. Drafter A did better than drafter B and drafter C did better than drafter D
+Teams that invested more in turnovers made fewer turnovers. Also, teams which made fewer turnovers did worse overall. One might naively conclude from this that investing in turnovers led to worse performance. However- upon closer inspection of the data, it is apparent that investing in turnovers actually improved performance 
+
+<iframe width = "672" height = "378" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/b167980e-3947-4abe-a4a8-72ae22cff6d1"> </iframe>
+
+This happened because there was a third cause, minutes per game, which both made teams succesful and increased the number of turnovers. It was not making many turnovers which helped teams do well- it was the conditions required for doing well that caused more turnovers. 
+
+This example is not necessarily illustrative of actual fantasy basketball. The point is just that it could be, so we cannot draw conclusions directly from correlations
 
 ## 2. Return on investment  
 
-What matters is the causal effect of investing in turnovers on overall performance. Let's analyze this, first with intuition and then with some degree of rigor 
+What actually matters is the causal effect of investing in turnovers on overall performance. Let's analyze this, first with intuition and then with some degree of rigor 
 
-### 2A. Thinking it through intuitively 
+### 2A. The intuitive approach
 
 I can imagine two causal mechanisms by which turnovers would be relatively unimportant 
 
 #### Most Categories 
 
-In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is unhelpful. A loss is a loss. So why invest in turnovers, which are easiest to win when you are already losing? 
+In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is unhelpful. A loss is a loss. So why invest in turnovers, which are easiest to win when a team is already losing? 
 
 This argument seems plausible on face but is framed incorrectly. Perhaps auto-loss scenarios are not worth considering, but if so, then neither are auto-win scenarios. __The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score.__
 
-Given that a match-up is close, neither drafter could be dominating the counting statistics. In that circumstance, there is no reason to expect either drafter to have such a significant advantage in turnovers that investing in it would be futile for the other. So intuitively, I would guess that turnovers are just as likely to be the deciding factor as any other categories 
+Given that a match-up is close, neither drafter could be dominating the counting statistics. In that circumstance, there is no reason to expect either drafter to have such a significant advantage in turnovers that investing in it would be futile for the other. So intuitively, I would guess that turnovers are just as likely to be the deciding factor as any other category 
+
+<iframe width = "672" height = "378" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/b0373be6-ce75-4c55-89fc-8ad29939ce24"> </iframe>
 
 #### Relying on a consistent advantage 
 
@@ -50,7 +53,7 @@ In many contexts, drafters need to have some advantage to have any shot at winni
 
 It would be correct to say that given an across the board advantage, a drafter is more likely to lose turnovers than other categories. However, as already established, correlation does not imply causation. What matters is whether they can improve their overall performances through turnovers as much as through other categories. 
 
-Let's say a drafter has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. It is undeniable that investing in turnovers would become less likely to improve performance, because it would be difficult to overcome their significant disadvantage. However, there is also a countervailing effect: the other counting statistics would also become less rewarding to invest in, because there would be minimal room to improvement. If you were already winning say rebounds nine times out of ten, how much could you really gain by investing more in it? Intuitively, I would guess that these effects are roughly equivalent and so would cancel each other out
+Let's say a drafter has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. One would expect that investing in turnovers would become less likely to translate to more category wins, since the investment would only matter if an opponent had an anomolously bad week for turnovers. However, the other counting statistics would also become less rewarding to invest in, since those investments would only matter if an opponent had an anomolously good week for that category. Ultimately, all of the counting statistics would be less rewarding to invest in. So why single out turnovers? 
 
 ### 2B. Modeling the problem mathematically
 
@@ -64,7 +67,7 @@ I calculated this derivative in the paper, and it matches up well with the intui
 
 The intuition here is that the two conditions together specify a situation under which a tiny investment in a category can flip the overall result from a loss to a win. This is analagous to 538's [voter power index](https://projects.fivethirtyeight.com/2016-election-forecast/#tipping-point), a way of quantifying the importance of voters under the electoral college. The importance of a particular voter is equal to the probability that they can flip the result of their state and flipping that state flips the result of the electoral college.
 
-For Each Category and Rotisserrie, the analysis is even simpler. The partial derivative is just the probability density of each category around zero
+For Each Category and Rotisserrie, the analysis is even simpler. The partial derivative is just the probability density of each category around zero.
 
 The most reliable way for a drafter to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives them some advantage in all of the counting statistics. So we can set up the distribution such that one drafter has a constant advantage across all of the counting statistics (disadvantage for turnovers). 
 
@@ -72,7 +75,7 @@ The most reliable way for a drafter to obtain a consistent advantage is by choos
 
 To estimate the required partial derivatives, we need a distribution that can incorporate how the various categories relate to each other. And for that, we need a correlation matrix. 
 
-Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. When they are totally unrelated, they are uncorrelated, or have a correlation of zero.  A correlation matrix contains the pairwise correlations between many metrics. For the fantasy basketball setting, with scores normalized by week-to-week variance (and turnovers muliplied by -1), the correlation matrix is 
+Correlation is a measure of how related two metrics are. When two metrics tend to be either both high or both low, they are highly correlated. When they tend to be either high/low or low/high, they are negatively correlated. When they are totally unrelated, they are uncorrelated, or have a correlation of zero.  A correlation matrix contains the pairwise correlations between many metrics. For the 2023 season, with scores normalized by week-to-week variance (and turnovers muliplied by -1), I calculated the correlation matrix to be
                                                         
  |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
  |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
@@ -86,20 +89,15 @@ Correlation is a measure of how related two metrics are. When two metrics tend t
  | Free Throw \% | 17.5\%  | -20.9\% | 11.0\%  | 6.5\%   | -14.8\% | 21.0\%  | -4.7\%  | 100.0\%   | -13.8\%   |
  | Field Goal \% | 19.0\%  | 27.5\%  | -9.2\%  | -6.8\%  | 24.0\%  | -11.6\% | 1.2\%   | -13.8\%   | 100.0\%   |
 
+As expected, turnovers are negatively correlated with the other counting statistics to a unique degree.
+
 This correlation matrix can be used to parameterize a multivariate normal distribution to approximate the score differential between two teams. (Technically I calculated this as the correlation matrix for individual players and not for differentials between teams. Fortunately the two are equivalent, since correlation, variance, and covariance are all bilinear)
 
-Simulating the multivariate distribution with that correlation matrix, it is easy to confirm the expected result, that turnovers are usually lost in overall wins and won in overall losses
-
- |        | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
- |:-------|:-------|:-------|:-------|:-------|:-------|:-------|:-------|:---------|:---------|
- | Loss | 18.3\% | 28.7\% | 29.2\% | 28.8\% | 34.3\% | 29.2\% | 61.6\% | 39\%   | 36.9\% |
- | Win | 81.6\% | 71.2\% | 70.5\% | 71.1\% | 65.4\% | 71\%   | 38.6\% | 61.1\% | 62.8\% |
-
-To see the influence of advantage states, we can model the distribution with a constant added to all of the counting statistics (including turnovers, for which it is a disadvantage). This will increase the overall probability of winning, and perhaps change importances. 
-
-The probability of both criteria occuring can be estimated by sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated 
+To model the advantage state, we can use a small positive number as the mean for the non-turnover counting statistic differentials, and negative the same number for the mean of the turnover differential
 
 #### Results of the math for Most Categories
+
+The probability of both derivative criteria occuring can be estimated by sampling from the distribution many times. For each scenario with five category wins, all of the winning categories are considered tipping points. For each scenario with four category wins, the losing categories are considered tipping points. Then after the tipping points are identified, the probability of the tipping point category being around zero is estimated 
 
  | Likelihood of winning the matchup  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
@@ -113,6 +111,8 @@ As expected intuitively, turnovers are about as important as other categories. T
 
 #### Results of the math for Each Category and Rotisserie
 
+Analyzing for this case is easier, since the partial derivative is just the density of the corresponding probability density function around zero. This can be directly estimated from the same experiment
+
  | Average category winning %  | Points    | Rebounds    | Assists    | Steals    | Blocks    | Threes    | Turnovers    | Free Throw \%   | Field Goal \%   |
 |-----:|:-------|:------|:------|:------|:------|:------|:------|:---------|:---------|
 | 50.0\%   | 34.0\% | 30.9\% | 27.7\% | 36.4\% | 30.6\% | 31.0\% | 33.4\% | 33.4\%   | 34.4\%   |
@@ -123,11 +123,11 @@ As expected intuitively, turnovers are about as important as other categories. T
 
 As expected, turnovers decline in importance at a similar rate as the other counting statistics. 
 
-Interestingly, it turns out that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. In retrospect this is obvious: with the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
+It is interesting to note that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. With the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
 ## 3. One other argument: turnovers are volatile
 
-One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in for head-to-head formats
+One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in for head-to-head formats.
 
 It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
 
