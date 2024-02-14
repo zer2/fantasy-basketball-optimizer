@@ -422,11 +422,11 @@ with draft_tab:
       with subtab1:
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
         z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
-        z_scores_display = st.dataframe(z_scores_unselected_styled)
+        z_scores_display = st.dataframe(z_scores_unselected_styled, use_container_width = True)
       with subtab2:
         g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
         g_scores_unselected_styled = g_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
-        g_scores_display = st.dataframe(g_scores_unselected_styled)
+        g_scores_display = st.dataframe(g_scores_unselected_styled, use_container_width = True)
     
       with subtab3:
 
@@ -492,7 +492,7 @@ with draft_tab:
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                           .format('{:,.1%}', subset = rate_df.columns)
-                st.dataframe(rate_display)
+                st.dataframe(rate_display, use_container_width = True)
               with weight_tab:
                 c_df = c.loc[score.index].dropna()
                 weight_display = score.merge(c_df, left_index = True, right_index = True)
@@ -503,7 +503,7 @@ with draft_tab:
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .background_gradient(axis = None, subset = c_df.columns) 
-                st.dataframe(weight_display)
+                st.dataframe(weight_display, use_container_width = True)
                 
 
     with waiver_tab:
@@ -533,7 +533,7 @@ with draft_tab:
 
                 new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
 
-                st.dataframe(new_z_styled) 
+                st.dataframe(new_z_styled, use_container_width = True) 
 
             with g_waiver_tab:
                 st.markdown('Projected team stats with chosen player:')
@@ -546,7 +546,7 @@ with draft_tab:
                 new_g = pd.concat([no_drop,new_g])
                 new_g_styled = new_g.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
 
-                st.dataframe(new_g_styled) 
+                st.dataframe(new_g_styled, use_container_width = True) 
 
             with h_waiver_tab:
                 res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
@@ -580,7 +580,7 @@ with draft_tab:
                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = win_rates_all.columns) \
                           .format('{:,.1%}', subset = win_rates_all.columns)
     
-                st.dataframe(h_display)
+                st.dataframe(h_display, use_container_width = True)
 
             #make a dropdown of each player on the team 
             #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
@@ -637,7 +637,7 @@ with draft_tab:
                     pre_to_post = pd.concat([your_team_pre_trade[1],your_team_post_trade[1]], axis = 1).T
                     pre_to_post.index = ['Pre-trade','Post-trade']
                     pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
-                    st.dataframe(pre_to_post_styled)
+                    st.dataframe(pre_to_post_styled, use_container_width = True)
                   
                     if their_team_pre_trade < their_team_post_trade:
                         st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
@@ -647,7 +647,7 @@ with draft_tab:
                     pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1]], axis = 1).T
                     pre_to_post.index = ['Pre-trade','Post-trade']
                     pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
-                    st.dataframe(pre_to_post_styled)
+                    st.dataframe(pre_to_post_styled, use_container_width = True)
                     
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
