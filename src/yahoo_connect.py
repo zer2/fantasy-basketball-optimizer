@@ -117,12 +117,12 @@ def clean_up_access_token(access_token_dir: str):
     shutil.rmtree(access_token_dir)
 
 @st.cache_data(ttl=3600)
-def get_yahoo_players_df(access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
-    teams_dict = get_teams(league_id, access_token_dir)
+def get_yahoo_players_df(_access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
+    teams_dict = get_teams(league_id, _access_token_dir)
 
     team_ids = list(teams_dict.keys())
 
-    rosters_dict = get_rosters(league_id, access_token_dir, team_ids)
+    rosters_dict = get_rosters(league_id, _access_token_dir, team_ids)
 
     players_df = get_players_df(rosters_dict, teams_dict, player_metadata)
 
@@ -144,6 +144,10 @@ def get_teams(league_id: str, auth_path: str) -> dict[int, Team]:
 
 @st.cache_data(ttl=3600)
 def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
+
+    print(league_id)
+    print(auth_path)
+    print(team_ids)
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     auth_directory = auth_path

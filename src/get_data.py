@@ -101,7 +101,7 @@ def get_historical_data(params):
   return full_df
 
 
-#no need to cache this since it only gets re-run when current_season_data is refreshed
+@st.cache_resource(ttl = '1d') 
 def get_player_metadata() -> pd.Series:
    """Get player data from the NBA api
 
