@@ -145,9 +145,6 @@ def get_teams(league_id: str, auth_path: str) -> dict[int, Team]:
 @st.cache_data(ttl=3600)
 def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
 
-    print(league_id)
-    print(auth_path)
-    print(team_ids)
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     auth_directory = auth_path
