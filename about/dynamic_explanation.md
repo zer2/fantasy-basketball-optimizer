@@ -2,7 +2,7 @@
 
 Every seasoned fantasy drafter knows that performing well at the highest level of competition requires adapting to draft circumstances on the fly. Picking directly from a static ranking list can easily lead to an unbalanced, incohesive team. 
 
-In general, the way that the best drafters adapt is more of an art than a science. Drafters might "punt" some number of categories, then choose players in such a way that they are above average in the other categories. The idea is that since margins do not matter, winning many categories by small margins is worth losing a few by large margins.
+In general, the way that the best drafters adapt is more of an art than a science. They might "punt" some number of categories, then choose players in such a way that they are above average in the other categories. The idea is that since margins do not matter, winning many categories by small margins is worth losing a few by large margins.
 
 In the [paper](https://arxiv.org/abs/2307.02188), I derive an algorithm called H-scoring to translate this intuition into a rigorous procedure. By framing draft strategy as an optimization problem, it implicitly understands how to rebalance teams for optimal performance, sacrificing some categories and shoring up others. While imperfect, I believe that the logic is sound, and evidence suggests that it works, at least in a simplified context. 
 
