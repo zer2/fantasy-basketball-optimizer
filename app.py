@@ -16,14 +16,14 @@ from src.yahoo_connect import clean_up_access_token, get_yahoo_access_token, get
 #with Profiler():
 
 st.set_page_config(page_title='Fantasy BBall Optimization'
-           , page_icon=':basketball:'
-           , layout="wide"
-           , initial_sidebar_state="auto"
-           , menu_items=None)
+          , page_icon=':basketball:'
+          , layout="wide"
+          , initial_sidebar_state="auto"
+          , menu_items=None)
 
 with open("parameters.yaml", "r") as stream:
     try:
-       params = yaml.safe_load(stream)
+      params = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         print(exc) 
 
@@ -56,10 +56,10 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 about_tab, param_tab, stat_tab, draft_tab, rank_tab = st.tabs([":scroll: About"
-                                                               ,":control_knobs: Parameters"
-                                                               , ":bar_chart: Player Stats"
-                                                               , ":man-bouncing-ball: Draft"
-                                                               , ":first_place_medal: Player Rankings"])
+                                                              ,":control_knobs: Parameters"
+                                                              ,":bar_chart: Player Stats"
+                                                              ,":man-bouncing-ball: Draft"
+                                                              ,":first_place_medal: Player Rankings"])
 
 with about_tab:
 
@@ -100,7 +100,7 @@ with about_tab:
       with c2:
           trading_md = read_markdown_file('about/turnovers.md')
           st.markdown(trading_md, unsafe_allow_html=True)        
-                 
+                
 with param_tab: 
   left, middle, right = st.columns([0.25,0.3,0.45])
 
@@ -186,7 +186,7 @@ with param_tab:
           st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
       if selections is None:
-         selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+        selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
     player_category_type = CategoricalDtype(categories=list(df.index), ordered=True)
     selections = selections.astype(player_category_type)
@@ -197,7 +197,7 @@ with param_tab:
       psi = st.number_input(r'Select a $\psi$ value'
                         , min_value = 0.0
                         , value = 0.85
-                       , max_value = 1.0)
+                      , max_value = 1.0)
       psi_str = r'''$\psi$ controls how injury rates are dealt with. If $\psi$ is $X\%$, and a player is expected to miss $Y\%$ of weeks
                     entirely, their counting statistics will be multiplied by $(1-Y*X)$. So for example is if $\psi$ is $50\%$ and a 
                     player is expected to miss $20\%$ of weeks, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
@@ -210,7 +210,7 @@ with param_tab:
         st.subheader(f"Multipliers")
   
         multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
-                                     , index = coefficient_df.index)
+                                    , index = coefficient_df.index)
         multipliers = st.data_editor(multiplier_df)
   
         st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
@@ -218,7 +218,7 @@ with param_tab:
       with coef_col:
         st.subheader(f"Coefficients")
         conversion_factors = st.data_editor(coefficient_df
-                                     , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
+                                    , column_config = {'Conversion Factor' :  '𝜏² / σ²'}
                                                         )
   
         st.caption('σ² and 𝜏² are defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
@@ -241,7 +241,7 @@ with param_tab:
       gamma = st.number_input(r'Select a $\gamma$ value', value = 0.1)
       gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
               tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-               players that  work best for its strategy'''
+              players that  work best for its strategy'''
       st.caption(gamma_str)
   
       nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0.0, max_value = 1.0)
@@ -309,24 +309,24 @@ with draft_tab:
     my_players = [p for p in selections_editable[seat].dropna()]
 
     H = HAgent(info = info
-         , omega = omega
-         , gamma = gamma
-         , alpha = alpha
-         , beta = beta
-         , n_picks = n_picks
-         , winner_take_all = winner_take_all
-         , punting = punting)
+        , omega = omega
+        , gamma = gamma
+        , alpha = alpha
+        , beta = beta
+        , n_picks = n_picks
+        , winner_take_all = winner_take_all
+        , punting = punting)
 
     @st.cache_data()
     def get_base_h_score(info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting, player_stats, my_players, players_chosen):
       H = HAgent(info = info
-         , omega = omega
-         , gamma = gamma
-         , alpha = alpha
-         , beta = beta
-         , n_picks = n_picks
-         , winner_take_all = winner_take_all
-         , punting = punting)
+        , omega = omega
+        , gamma = gamma
+        , alpha = alpha
+        , beta = beta
+        , n_picks = n_picks
+        , winner_take_all = winner_take_all
+        , punting = punting)
 
       return next(H.get_h_scores(player_stats, my_players, players_chosen))      
 
@@ -390,53 +390,65 @@ with draft_tab:
               st.dataframe(base_win_rates_formatted, hide_index = True)
         
       with z_tab:
-           team_stats_z = z_scores[z_scores.index.isin(team_selections)]
-           expected_z = z_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
+          team_stats_z = z_scores[z_scores.index.isin(team_selections)]
+          expected_z = z_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
 
-           team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
+          team_stats_z.loc['Total', :] = team_stats_z.sum(axis = 0)
     
-           team_stats_z.loc['Expected', :] = expected_z
-           team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
-           make_team_z_tab(team_stats_z, team_selections)
+          team_stats_z.loc['Expected', :] = expected_z
+          team_stats_z.loc['Difference', :] = team_stats_z.loc['Total',:] - team_stats_z.loc['Expected',:]
+          make_team_z_tab(team_stats_z, team_selections)
 
       with g_tab:
-           team_stats_g = g_scores[g_scores.index.isin(team_selections)]
-           expected_g = g_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
+          team_stats_g = g_scores[g_scores.index.isin(team_selections)]
+          expected_g = g_scores[0:len(my_players)*n_drafters].mean() * len(my_players)
 
-           team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
+          team_stats_g.loc['Total', :] = team_stats_g.sum(axis = 0)
 
-           team_stats_g.loc['Expected', :] = expected_g
-           team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
-           make_team_g_tab(team_stats_g, team_selections)
+          team_stats_g.loc['Expected', :] = expected_g
+          team_stats_g.loc['Difference', :] = team_stats_g.loc['Total',:] - team_stats_g.loc['Expected',:]
+          make_team_g_tab(team_stats_g, team_selections)
     
       with h_tab:
-           if len(my_players) == n_picks:
-                      make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
-           else:
-                      st.markdown('Team H-score not defined until team is full') 
+        if len(my_players) == n_picks:
+          make_team_h_tab(my_players, seat, n_picks, base_h_score, base_win_rates)
+        else:
+          st.markdown('Team H-score not defined until team is full') 
           
     with cand_tab:
 
       subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
           
       with subtab1:
+
+        @st.cache_data()
+        def make_z_score_cand_tab(z_scores_unselected):
+
+          z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
+          z_scores_display = st.dataframe(z_scores_unselected_styled, use_container_width = True)
+        
         z_scores_unselected = z_scores[~z_scores.index.isin(listify(selections_editable))]
-        z_scores_unselected_styled = z_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_player_multiplier)
-        z_scores_display = st.dataframe(z_scores_unselected_styled)
+        make_z_score_cand_tab(z_scores_unselected)
+
       with subtab2:
+
+        @st.cache_data()
+        def make_g_score_cand_tab(g_scores_unselected):
+          g_scores_unselected_styled = g_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
+          g_scores_display = st.dataframe(g_scores_unselected_styled, use_container_width = True)
+        
         g_scores_unselected = g_scores[~g_scores.index.isin(listify(selections_editable))]
-        g_scores_unselected_styled = g_scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_player_multiplier)
-        g_scores_display = st.dataframe(g_scores_unselected_styled)
-    
+        make_g_score_cand_tab(g_scores_unselected)
+
       with subtab3:
 
         if len(my_players) == n_picks:
-           st.markdown('Team is complete!')
-                   
+          st.markdown('Team is complete!')
+                  
         elif not st.session_state.run:
           with st.form(key='my_form_to_submit'):
             h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
-                     
+                    
         else:
 
           #record the fact that the run has already been invoked, no need to invoke it again
@@ -457,7 +469,7 @@ with draft_tab:
             #normalize weights by what we expect from other drafters
             
             c = pd.DataFrame(c, index = score.index, columns = categories)/info['v'].T
-            c = (c * 100).round()
+            print(c)
             
             cdf_estimates.columns = categories
             
@@ -472,8 +484,13 @@ with draft_tab:
                   score = score.sort_values(ascending = False).round(3)
                   score.name = 'H-score'
                   score = pd.DataFrame(score)
+                  
+                  score_styled = score.style.format("{:.1%}"
+                                  ,subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']])
       
-                  st.dataframe(score)
+                  st.dataframe(score_styled, use_container_width = True)
       
                 with c2:
                   st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
@@ -487,16 +504,18 @@ with draft_tab:
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                           .format('{:,.1%}', subset = rate_df.columns)
-                st.dataframe(rate_display)
+                st.dataframe(rate_display, use_container_width = True)
               with weight_tab:
-                c_df = c.loc[score.index].dropna().round().astype(int)
+                c_df = c.loc[score.index].dropna()
                 weight_display = score.merge(c_df, left_index = True, right_index = True)
-                weight_display = weight_display.style.format("{:.1%}"
+                weight_display = weight_display.style.format("{:.0%}"
+                                                            , subset = c_df.columns)\
+                          .format("{:.1%}"
                                   ,subset = pd.IndexSlice[:,['H-score']]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
-                          .background_gradient(axis = None, subset = c_df.columns) 
-                st.dataframe(weight_display)
+                          .background_gradient(axis = None,subset = c_df.columns) 
+                st.dataframe(weight_display, use_container_width = True)
                 
 
     with waiver_tab:
@@ -524,9 +543,13 @@ with draft_tab:
 
                 new_z = pd.concat([no_drop,new_z])
 
-                new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
+                @st.cache_data()
+                def make_z_waiver_df(new_z):
 
-                st.dataframe(new_z_styled) 
+                  new_z_styled = new_z.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = z_score_team_multiplier)
+                  st.dataframe(new_z_styled, use_container_width = True) 
+
+                make_z_waiver_df(new_z)
 
             with g_waiver_tab:
                 st.markdown('Projected team stats with chosen player:')
@@ -537,47 +560,53 @@ with draft_tab:
                 new_g =  team_stats_g.loc['Total',:] + g_scores_unselected - drop_player_stats_g
 
                 new_g = pd.concat([no_drop,new_g])
-                new_g_styled = new_g.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
 
-                st.dataframe(new_g_styled) 
+                @st.cache_data()
+                def make_g_waiver_df(new_g):
+                  new_g_styled = new_g.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = g_score_team_multiplier)
+                  st.dataframe(new_g_styled, use_container_width = True) 
+
+                make_g_waiver_df(new_g)
 
             with h_waiver_tab:
-                res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
-                res = res.sort_values(ascending = False)
-                win_rates = win_rates.loc[res.index]
-              
-                win_rates.columns = categories
-                res.name = 'H-score'
+                @st.cache_data()
+                def make_h_waiver_df(mod_my_players):
+                  res, _, win_rates = next(H.get_h_scores(player_stats, mod_my_players, players_chosen))
 
-                base_h_score_copy = base_h_score.copy()
-                base_h_score.index = [drop_player]
-                base_h_score.name = 'H-score'
+                  res = res.sort_values(ascending = False)
+                  win_rates = win_rates.loc[res.index]
+                
+                  win_rates.columns = categories
+                  res.name = 'H-score'
 
-                base_win_rates_copy = base_win_rates.copy().T
-                base_win_rates_copy.index = [drop_player]
-              
-                win_rates_all = pd.concat([base_win_rates_copy, win_rates])
-              
-                scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
-              
-                #os.write(1,bytes(str(scores_all),'utf-8'))
-                #os.write(1,bytes(str(win_rates_all),'utf-8'))
+                  base_h_score_copy = base_h_score.copy()
+                  base_h_score.index = [drop_player]
+                  base_h_score.name = 'H-score'
 
-                h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
+                  base_win_rates_copy = base_win_rates.copy().T
+                  base_win_rates_copy.index = [drop_player]
+                
+                  win_rates_all = pd.concat([base_win_rates_copy, win_rates])
+                
+                  scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
+                
+                  #os.write(1,bytes(str(scores_all),'utf-8'))
+                  #os.write(1,bytes(str(win_rates_all),'utf-8'))
 
-                h_display = h_display.style.format("{:.1%}"
-                                  ,subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = win_rates_all.columns) \
-                          .format('{:,.1%}', subset = win_rates_all.columns)
-    
-                st.dataframe(h_display)
+                  h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
 
-            #make a dropdown of each player on the team 
-            #for each player, try removing that player, then run the H-scoring generator once to generate a recommended replacement and whether they would be better for the team
-        
+                  h_display = h_display.style.format("{:.1%}"
+                                    ,subset = pd.IndexSlice[:,['H-score']]) \
+                            .map(styler_a
+                                  , subset = pd.IndexSlice[:,['H-score']]) \
+                            .map(stat_styler, middle = 0.5, multiplier = 300, subset = win_rates_all.columns) \
+                            .format('{:,.1%}', subset = win_rates_all.columns)
+      
+                  st.dataframe(h_display, use_container_width = True)
+
+                make_h_waiver_df(mod_my_players)
+
     with trade_tab:
         if len(my_players) < n_picks:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
@@ -606,41 +635,47 @@ with draft_tab:
                       'Which players are you receiving?'
                       ,second_team_selections
                     )
-                my_trade_len = len(my_trade)
-                second_trade_len = len(second_trade)
-                if (my_trade_len == 0) | (second_trade_len == 0):
-                    st.markdown('Need to trade at least one player')
-                elif abs(my_trade_len - second_trade_len) > 6:
-                    st.markdown("Too lopsided of a trade! The computer can't handle it :frowning:")
-                else:
-                    my_others = [x for x in team_selections if x not in my_trade]
-                    second_others = [x for x in second_team_selections if x not in second_trade]
-        
-                    trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
-                    your_team_pre_trade = trade_results[1]['pre']
-                    your_team_post_trade = trade_results[1]['post']
-                    their_team_pre_trade = trade_results[2]['pre']
-                    their_team_post_trade = trade_results[2]['post']
 
-                    if your_team_pre_trade < your_team_post_trade:
-                        st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
-                    else:
-                        st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
+                @st.cache_data()
+                def make_trade_display(my_trade, second_trade):
+                  my_trade_len = len(my_trade)
+                  second_trade_len = len(second_trade)
+
+                  if (my_trade_len == 0) | (second_trade_len == 0):
+                      st.markdown('Need to trade at least one player')
+                  elif abs(my_trade_len - second_trade_len) > 6:
+                      st.markdown("Too lopsided of a trade! The computer can't handle it :frowning:")
+                  else:
+                      my_others = [x for x in team_selections if x not in my_trade]
+                      second_others = [x for x in second_team_selections if x not in second_trade]
+          
+                      trade_results = analyze_trade(my_others, my_trade, second_others, second_trade,H, player_stats, players_chosen,n_iterations)
+                      your_team_pre_trade = trade_results[1]['pre']
+                      your_team_post_trade = trade_results[1]['post']
+                      their_team_pre_trade = trade_results[2]['pre']
+                      their_team_post_trade = trade_results[2]['post']
+
+                      if your_team_pre_trade < your_team_post_trade:
+                          st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
+                      else:
+                          st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
+                      
+                      pre_to_post = pd.concat([your_team_pre_trade[1],your_team_post_trade[1]], axis = 1).T
+                      pre_to_post.index = ['Pre-trade','Post-trade']
+                      pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
+                      st.dataframe(pre_to_post_styled, use_container_width = True)
                     
-                    pre_to_post = pd.concat([your_team_pre_trade[1],your_team_post_trade[1]], axis = 1).T
-                    pre_to_post.index = ['Pre-trade','Post-trade']
-                    pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
-                    st.dataframe(pre_to_post_styled)
-                  
-                    if their_team_pre_trade < their_team_post_trade:
-                        st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
-                    else:
-                        st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
-                                 
-                    pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1]], axis = 1).T
-                    pre_to_post.index = ['Pre-trade','Post-trade']
-                    pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
-                    st.dataframe(pre_to_post_styled)
+                      if their_team_pre_trade < their_team_post_trade:
+                          st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
+                      else:
+                          st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
+                                  
+                      pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1]], axis = 1).T
+                      pre_to_post.index = ['Pre-trade','Post-trade']
+                      pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
+                      st.dataframe(pre_to_post_styled, use_container_width = True)
+
+                make_trade_display(my_trade, second_trade)
                     
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
@@ -650,15 +685,15 @@ with rank_tab:
   def make_z_rank_tab(z_scores):
     z_scores.loc[:,'Rank'] = np.arange(z_scores.shape[0]) + 1
     z_scores.loc[:,'Player'] = z_scores.index
-    z_scores = z_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+    z_scores = z_scores[['Rank','Player','Total'] + counting_statistics + percentage_statistics]
     
     z_scores_styled = z_scores.style.format("{:.2f}"
-                                           ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
+                                          ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
                                       .map(styler_a
                                           , subset = pd.IndexSlice[:,['Total']]) \
                                       .map(stat_styler
-                                         , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
-                                         , multiplier = z_score_player_multiplier)
+                                        , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
+                                        , multiplier = z_score_player_multiplier)
         
     z_scores_rank_display = st.dataframe(z_scores_styled, hide_index = True)
 
@@ -667,15 +702,15 @@ with rank_tab:
     g_score_columns_original = g_scores.columns
     g_scores.loc[:,'Rank'] = np.arange(g_scores.shape[0]) + 1
     g_scores.loc[:,'Player'] = g_scores.index
-    g_scores = g_scores[['Rank','Player'] + counting_statistics + percentage_statistics + ['Total']]
+    g_scores = g_scores[['Rank','Player','Total'] + counting_statistics + percentage_statistics]
   
     g_scores_styled = g_scores.style.format("{:.2f}"
-                                           ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
+                                          ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
                                       .map(styler_a
                                           , subset = pd.IndexSlice[:,['Total']]) \
                                       .map(stat_styler
-                                         , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
-                                         , multiplier = z_score_player_multiplier)
+                                        , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
+                                        , multiplier = z_score_player_multiplier)
   
     g_scores_rank_display = st.dataframe(g_scores_styled, hide_index = True)  
   
@@ -683,13 +718,13 @@ with rank_tab:
   def make_h_rank_tab(player_stats, info, omega, gamma, alpha, beta, n_picks, winner_take_all, punting):
 
       H = HAgent(info = info
-         , omega = omega
-         , gamma = gamma
-         , alpha = alpha
-         , beta = beta
-         , n_picks = n_picks
-         , winner_take_all = winner_take_all
-         , punting = punting)
+        , omega = omega
+        , gamma = gamma
+        , alpha = alpha
+        , beta = beta
+        , n_picks = n_picks
+        , winner_take_all = winner_take_all
+        , punting = punting)
 
       generator = H.get_h_scores(player_stats, [], [])
       for i in range(max(1,n_iterations)):
@@ -702,7 +737,7 @@ with rank_tab:
       h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                             ,'Player' : h_res.index
                             ,'H-score' : h_res.values
-                           })
+                          })
     
       h_res = h_res.merge(rate_df
                           , left_on = 'Player'
@@ -717,7 +752,7 @@ with rank_tab:
       h_score_display = st.dataframe(h_res, hide_index = True)
     
   with z_rank_tab:
-     make_z_rank_tab(z_scores)   
+    make_z_rank_tab(z_scores)   
   with g_rank_tab:
       make_g_rank_tab(g_scores)  
   with h_rank_tab:
