@@ -47,7 +47,10 @@ z-score-team-multiplier : 20
 g-score-player-multiplier : 60
 g-score-team-multiplier : 24
 injury-ignore-darko:
-- Tyrese Haliburton (G)
+- Joel Embiid (C)
+- Fred VanVleet (G)
+- OG Anunoby (F)
+- Deandre Ayton (C) 
 - Desmond Bane (G)
 - Ja Morant (G)
 - Evan Mobley (C)
