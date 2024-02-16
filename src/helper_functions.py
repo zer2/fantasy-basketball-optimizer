@@ -4,9 +4,21 @@ import plotly.express as px
 import plotly.graph_objs as go
 import itertools
 from pathlib import Path
+import streamlit as st
 
 def read_markdown_file(markdown_file):
     return Path(markdown_file).read_text()
+
+@st.cache_data()
+def make_about_tab(md_path):
+    c2,c2,c3 = st.columns([0.1,0.8,0.1])
+    with c2:
+        intro_md = read_markdown_file('about/' + md_path)
+        st.markdown(intro_md, unsafe_allow_html=True)
+
+def get_categories():
+    return st.session_state.params['counting-statistics'] + \
+            st.session_state.params['percentage-statistics'] 
   
 def stat_styler(value
                 , multiplier = 50

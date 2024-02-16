@@ -8,12 +8,10 @@ import os
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
-def get_current_season_data(params
-                            , season = 2024):
+def get_current_season_data(season : int = 2024):
   """Get all box scores from the current season and calculate various running averages. Currently 2-week, 4-week, and season to date
 
   Args:
-      params: dictionary of parameters 
       season: int, year of season 
               defined by the second half of the season. E.g. season that ends in 2024 is 2024
   Returns:
@@ -32,7 +30,7 @@ def get_current_season_data(params
   )
 
                             
-  renamer = params['api-renamer']
+  renamer = st.session_state.params['api-renamer']
   pgl_df = pgl_df.rename(columns = renamer)
 
   expected_minutes_long_term = process_minutes(pgl_df)
@@ -91,13 +89,14 @@ def process_game_level_data(df
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource
-def get_historical_data(params):
+def get_historical_data():
   #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
   
   full_df = pd.read_csv('./data/stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
 
   #adjust for the fact that historical data is week-based on game-based
-  full_df[params['counting-statistics'] + params['volume-statistics'] ] = full_df[params['counting-statistics'] + params['volume-statistics']]/3
+  all_counting_stats = st.session_state.params['counting-statistics'] + st.session_state.params['volume-statistics']
+  full_df[all_counting_stats] = full_df[all_counting_stats]/3
   return full_df
 
 
@@ -127,12 +126,11 @@ def get_player_metadata() -> pd.Series:
    return simplified
 
 @st.cache_resource(ttl = '1d') 
-def get_darko_data(expected_minutes, params):
+def get_darko_data(expected_minutes):
   """Get DARKO predictions from stored CSV files
 
   Args:
       expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
-      params: dict of parameters
   Returns:
       Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
   """
@@ -159,26 +157,28 @@ def get_darko_data(expected_minutes, params):
   all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
   all_darko.loc[:,'REB'] = dreb + oreb 
 
-  renamer = params['darko-renamer']
+  renamer = st.session_state.params['darko-renamer']
   all_darko = all_darko.rename(columns = renamer)
 
   player_metadata = get_player_metadata()
   all_darko = all_darko.merge(player_metadata, left_index = True, right_index = True)
     
-  required_columns = params['counting-statistics'] + params['percentage-statistics'] + params['volume-statistics'] + params['other-columns']
-  darko_short_term = get_darko_short_term(all_darko, params)[required_columns]
-  darko_long_term = get_darko_long_term(all_darko, expected_minutes, params)[required_columns]
+  required_columns = st.session_state.params['counting-statistics'] + \
+                    st.session_state.params['percentage-statistics'] + \
+                    st.session_state.params['volume-statistics'] + \
+                    st.session_state.params['other-columns']
+  darko_short_term = get_darko_short_term(all_darko)[required_columns]
+  darko_long_term = get_darko_long_term(all_darko, expected_minutes)[required_columns]
 
   return {'DARKO-S' : darko_short_term
            ,'DARKO-L' : darko_long_term}
 
-def get_darko_short_term(all_darko, params):
+def get_darko_short_term(all_darko):
   """Get a short term version of darko, based on next-game predictions for counting statistics
 
   Args:
       all_darko: Datafrmae of all raw DARKO forecasts
       expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
-      params: dict of parameters
   Returns:
       Dataframe of predictions
   """
@@ -188,12 +188,11 @@ def get_darko_short_term(all_darko, params):
   return darko_short_term
 
 
-def get_darko_long_term(all_darko, expected_minutes, params):
+def get_darko_long_term(all_darko, expected_minutes):
     """Get a long term version of darko, based on skill statistics and expected minutes
   
     Args:
         all_darko: Datafrmae of all raw DARKO forecasts
-        params: dict of parameters
     Returns:
         Dataframe of predictions
     """
@@ -251,5 +250,8 @@ def get_partial_data(historical_df
   df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
   df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
   df[r'No Play %'] = (df[r'No Play %'] * 100).round(1)
+
+  df.index = df.index + ' (' + df['Position'] + ')'
+  df.index.name = 'Player'
   return df.round(2) 
 
