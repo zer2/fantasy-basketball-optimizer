@@ -4,14 +4,44 @@ import plotly.express as px
 import plotly.graph_objs as go
 import itertools
 from pathlib import Path
+import streamlit as st
 
-def read_markdown_file(markdown_file):
-    return Path(markdown_file).read_text()
+def get_categories():
+    #convenience function to get the list of categories used for fantasy basketball
+    return st.session_state.params['counting-statistics'] + \
+            st.session_state.params['percentage-statistics'] 
+
+def listify(x : pd.DataFrame) -> list:
+    #get all values from a dataframe into a list. Useful for listing all chosen players 
+
+    x = x.values.tolist()
+    return [item for row in x for item in row]
+
+@st.cache_data()
+def make_about_tab(md_path : str):
+    """Make one of the tabs on the about page
+
+    Args:
+      md_path : string representing the path to the relevant markdown file for display
+    Returns:
+      None
+    """
+    c2,c2,c3 = st.columns([0.1,0.8,0.1])
+    with c2:
+        intro_md = Path('about/' + md_path).read_text()
+        st.markdown(intro_md, unsafe_allow_html=True)
+
   
-def stat_styler(value
-                , multiplier = 50
-                , middle = 0 ):
-  #styler function used for coloring stat values red/green with varying intensities 
+def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> str:
+  """Styler function used for coloring stat values red/green with varying intensities 
+
+  Args:
+    value: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
+    multiplier: degree to which intensity of color scales relative to input value 
+    middle: value that should map to pure white 
+  Returns:
+    String describing format for a pandas styler object
+  """
                     
   intensity = min(int(abs(value-middle)*multiplier), 255)
   if value != value:
@@ -38,12 +68,6 @@ def styler_b(value : float) -> str:
 
 def styler_c(value : float) -> str:
     return f"background-color: darkgrey; color:black;" 
-    
-def listify(x : pd.DataFrame) -> list:
-    #get all values from a dataframe into a list. Useful for listing all chosen players 
-
-    x = x.values.tolist()
-    return [item for row in x for item in row]
 
 def combinatorial_calculation(c : pd.DataFrame
                               , c_comp : pd.DataFrame
@@ -97,11 +121,9 @@ def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         DataFrame of shape (n,9) representing probabilities of each category being a tipping point
-
     """
 
     #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
-    
     which = np.array([list(itertools.combinations(range(9), 5))] )
     grid = np.zeros((126, 9), dtype="bool")     
     grid[np.arange(126)[None].T, which] = True
@@ -124,18 +146,16 @@ def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
     
     return final_probabilities
 
-def make_progress_chart(res):
+def make_progress_chart(res : list[pd.DataFrame]):
     """Chart the progress of gradient descent in action, for the top 10 players 
 
     Args:
-        res: List of result objects 
+        res: List of dataframes of H-scoring results
 
     Returns:
         Line chart showing scores per player by iteration
 
     """
-    #
-    #input res is the the log from H-scoring after some number of iterations
     
     data = pd.concat([pd.DataFrame({'H-score' : [r.loc[player] for r in res]
                                 , 'Player' : player
