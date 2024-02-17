@@ -1,5 +1,3 @@
-#1: based on player stats: calculate coefficients and score tables and such
-
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
@@ -8,19 +6,19 @@ import streamlit as st
 
 def calculate_coefficients(player_stats : pd.DataFrame
                      , representative_player_set : list
-                     , translation_factors : pd.Series
-                    , params : dict) -> dict:
+                     , translation_factors : pd.Series) -> dict:
     """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
 
     Args:
         player_stats: dataframe of fantasy-relevant statistics 
         representative_player_set: list of players to use as sample for coefficients
         translation_factors: series, converts sigma^2 to tau^2
-        params: dict of parameters
     Returns:
         Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
 
     """
+
+    params = st.session_state.params
 
     #counting stats
     var_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
@@ -54,10 +52,6 @@ def calculate_coefficients(player_stats : pd.DataFrame
     translation_factors['Field Goal Attempts'] = 0
 
     mean_of_vars = var_of_means * translation_factors
-    #os.write(1,bytes(str(translation_factors),'utf-8'))
-    #os.write(1,bytes(str(mean_of_means),'utf-8'))
-    #os.write(1,bytes(str(mean_of_vars),'utf-8'))
-
 
     coefficients = pd.DataFrame({'Mean of Means' : mean_of_means
                                 ,'Variance of Means' : var_of_means

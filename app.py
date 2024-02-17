@@ -6,7 +6,7 @@ import os
 import yaml
 
 from src.helper_functions import listify, make_progress_chart, make_about_tab, stat_styler, styler_a,styler_b, styler_c
-from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_partial_data, get_player_metadata
+from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
 from src.yahoo_connect import clean_up_access_token, get_yahoo_access_token, get_yahoo_players_df
@@ -122,7 +122,7 @@ with param_tab:
         ,index = 0
       )
 
-      raw_stats_df = get_partial_data(historical_df, current_data, darko_data, dataset_name)
+      raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
 
     with board_param_column: 
       st.header('Board Setup')
@@ -279,6 +279,7 @@ with draft_tab:
     with draft_tab: 
         st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
         selections_editable = st.data_editor(selections, hide_index = True)  
+        selection_list = listify(selections_editable)
 
     with injury_tab:
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
@@ -286,7 +287,14 @@ with draft_tab:
         injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
 
     player_stats = player_stats.drop(injured_players)
-    info = process_player_data(player_stats, conversion_factors, multipliers, psi, nu, n_drafters, n_picks, rotisserie, st.session_state.params)
+    info = process_player_data(player_stats
+                            ,conversion_factors
+                            ,multipliers
+                            ,psi
+                            ,nu
+                            ,n_drafters
+                            ,n_picks
+                            ,rotisserie)
 
     z_scores = info['Z-scores']
     g_scores = info['G-scores']
@@ -352,8 +360,7 @@ with draft_tab:
     with cand_tab:
 
       subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
-          
-      selection_list = listify(selections_editable)
+                
       with subtab1:
         
         z_scores_unselected = make_cand_tab(z_scores, selection_list, z_score_player_multiplier)
@@ -442,6 +449,7 @@ with draft_tab:
     with waiver_tab:
         if len(my_players) < n_picks:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
+
         else:
                   
             drop_player = st.selectbox(
@@ -455,8 +463,8 @@ with draft_tab:
             z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
             with z_waiver_tab:
-                st.markdown('Projected team stats with chosen player:')
 
+                st.markdown('Projected team stats with chosen player:')
                 make_waiver_tab(z_scores
                               , z_scores_unselected
                               , team_stats_z
@@ -464,13 +472,14 @@ with draft_tab:
                               , z_score_team_multiplier)
 
             with g_waiver_tab:
-                st.markdown('Projected team stats with chosen player:')
 
+                st.markdown('Projected team stats with chosen player:')
                 make_waiver_tab(g_scores
                               , g_scores_unselected
                               , team_stats_g
                               , drop_player
                               , g_score_team_multiplier)
+
             with h_waiver_tab:
 
                 make_h_waiver_df(H
@@ -495,20 +504,22 @@ with draft_tab:
             their_players = selections_editable[second_seat].dropna()
 
             if len(their_players) < n_picks:
-                st.markdown('This team is not full yet! Come back here when it is')
+                st.markdown('Their team is not full yet! Come back here when it is')
+
             elif second_seat == seat:
                 st.markdown('You cannot trade with yourself!')
+
             else:
 
                 my_trade = st.multiselect(
                   'Which players are you trading?'
                   ,my_players
-                )
+                  )
     
                 their_trade = st.multiselect(
                       'Which players are you receiving?'
                       ,their_players
-                    )
+                  )
 
                 make_trade_display(H
                                 , player_stats 
@@ -523,22 +534,24 @@ with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
     
   with z_rank_tab:
-    make_rank_tab(z_scores, z_score_player_multiplier)   
+    make_rank_tab(z_scores, z_score_player_multiplier)  
+
   with g_rank_tab:
     make_rank_tab(g_scores, g_score_player_multiplier)  
+
   with h_rank_tab:
-      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
-      st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
-      make_h_rank_tab(info
-                    , omega
-                    , gamma
-                    , alpha
-                    , beta
-                    , n_picks
-                    , n_iterations
-                    , winner_take_all
-                    , punting
-                    , player_stats)
+    rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+    st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+    st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+    make_h_rank_tab(info
+                  ,omega
+                  ,gamma
+                  ,alpha
+                  ,beta
+                  ,n_picks
+                  ,n_iterations
+                  ,winner_take_all
+                  ,punting
+                  ,player_stats)
 
 

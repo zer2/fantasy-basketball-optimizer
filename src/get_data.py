@@ -8,7 +8,7 @@ import os
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
-def get_current_season_data(season : int = 2024):
+def get_current_season_data(season : int = 2024) -> tuple:
   """Get all box scores from the current season and calculate various running averages. Currently 2-week, 4-week, and season to date
 
   Args:
@@ -53,7 +53,7 @@ def get_current_season_data(season : int = 2024):
                               
   return data_dict, expected_minutes_long_term 
 
-def process_minutes(pgl_df):
+def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
   #helper function which calculates average minutes per player in a dataset
   
   agg = pgl_df.groupby('Player')['MIN'].mean()
@@ -62,13 +62,13 @@ def process_minutes(pgl_df):
 
   
 #no need to cache this since it only gets re-run when current_season_data is refreshed
-def process_game_level_data(df
-                            , metadata):
+def process_game_level_data(df : pd.DataFrame
+                            , metadata : pd.Series) -> pd.DataFrame:
   """Convert box scores to the format needed for fantasy
 
   Args:
       df: dataframe of game data
-      metadata: df of relevant metadata to join on. Currently just 
+      metadata: Series of relevant metadata to join on. Currently just position
   Returns:
       Dataframe of player-level statistics needed for fantasy
   """
@@ -126,7 +126,7 @@ def get_player_metadata() -> pd.Series:
    return simplified
 
 @st.cache_resource(ttl = '1d') 
-def get_darko_data(expected_minutes):
+def get_darko_data(expected_minutes : pd.Series):
   """Get DARKO predictions from stored CSV files
 
   Args:
@@ -173,7 +173,7 @@ def get_darko_data(expected_minutes):
   return {'DARKO-S' : darko_short_term
            ,'DARKO-L' : darko_long_term}
 
-def get_darko_short_term(all_darko):
+def get_darko_short_term(all_darko : pd.DataFrame) -> pd.DataFrame:
   """Get a short term version of darko, based on next-game predictions for counting statistics
 
   Args:
@@ -188,11 +188,13 @@ def get_darko_short_term(all_darko):
   return darko_short_term
 
 
-def get_darko_long_term(all_darko, expected_minutes):
+def get_darko_long_term(all_darko : pd.DataFrame
+                        , expected_minutes : pd.Series) -> pd.DataFrame:
     """Get a long term version of darko, based on skill statistics and expected minutes
   
     Args:
         all_darko: Datafrmae of all raw DARKO forecasts
+        expected_minutes: series of expected minutes to use for DARKO recalibration
     Returns:
         Dataframe of predictions
     """
@@ -230,12 +232,20 @@ def get_darko_long_term(all_darko, expected_minutes):
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False)
-def get_partial_data(historical_df
-                     , current_data
-                     , darko_data
-                     , dataset_name):
-  #fetch the data subset which will be used for the algorithms
+def get_specified_stats(historical_df : pd.DataFrame
+                     , current_data : dict
+                     , darko_data : dict
+                     , dataset_name : str) -> pd.DataFrame:
+  """fetch the data subset which will be used for the algorithms
+  Args:
+    historical_df: Dataframe of raw historical fantasy metrics by player/season
+    current_data: dictionary mapping to datasets based on the current season
+    darko_data: dictionary mapping to datasets based on DARKO
+    dataset_name: the name of the dataset to fetch
 
+  Returns:
+    Dataframe of fantasy statistics 
+  """
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
   if dataset_name in list(current_data.keys()):

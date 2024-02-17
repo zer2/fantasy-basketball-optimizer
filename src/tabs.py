@@ -77,9 +77,9 @@ def make_team_h_tab(my_players : list
 ### Candidate tabs 
 
 @st.cache_data()
-def make_cand_tab(scores
-              , selection_list
-              , player_multiplier):
+def make_cand_tab(scores : pd.DataFrame
+              , selection_list : list
+              , player_multiplier : float):
   """Make a tab showing stats for players that have not yet been drafted
 
   Args:
@@ -242,7 +242,7 @@ def make_trade_display(_H
                   , their_trade : list
                   , my_players : list
                   , their_players : list):
-  """Analyze a trade 
+  """show the results of a potential trade
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
@@ -305,8 +305,7 @@ def make_trade_display(_H
 ### Rank tabs 
 
 @st.cache_data()
-def make_rank_tab(scores : pd.DataFrame
-                , player_multiplier : float):
+def make_rank_tab(scores : pd.DataFrame, player_multiplier : float):
   """Show rankings my general value
 
   Args:
@@ -334,16 +333,16 @@ def make_rank_tab(scores : pd.DataFrame
   rank_display = st.dataframe(scores_styled, hide_index = True)
 
 @st.cache_data()
-def make_h_rank_tab( info
-                  , omega
-                  , gamma
-                  , alpha
-                  , beta
-                  , n_picks
-                  , n_iterations
-                  , winner_take_all
-                  , punting
-                  , player_stats):
+def make_h_rank_tab( info : dict
+                  , omega : float
+                  , gamma : float
+                  , alpha : float
+                  , beta : float
+                  , n_picks : int
+                  , n_iterations : int
+                  , winner_take_all : bool
+                  , punting : bool
+                  , player_stats : pd.DataFrame):
   """Make ranks by H-score
 
   Args:

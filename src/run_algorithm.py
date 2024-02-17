@@ -20,7 +20,7 @@ class HAgent():
         """Calculates the rank order based on U-score
 
         Args:
-            infh: dictionary with info related to player statistics etc. 
+            info: dictionary with info related to player statistics etc. 
             omega: float, parameter as described in the paper
             gamma: float, parameter as described in the paper
             alpha: float, step size parameter for gradient descent 
@@ -345,14 +345,30 @@ class HAgent():
     def get_del_full(self,c):
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
 
-def analyze_trade(team_1_other
-                  , team_1_trade
-                  , team_2_other
-                  , team_2_trade
+def analyze_trade(team_1_other : list
+                  , team_1_trade : list
+                  , team_2_other : list
+                  , team_2_trade : list
                   , H
-                  , player_stats
-                  , players_chosen
-                  ,n_iterations):    
+                  , player_stats : pd.DataFrame
+                  , players_chosen : list
+                  ,n_iterations : int) -> dict:    
+
+  """Compute the results of a potential trade
+
+  Args:
+    team_1_other: remaining players, not to be traded from the first team
+    team_1_trade: player(s) to be traded from the first team
+    team_2_other: remaining players, not to be traded from the first team
+    team_2_trade: player(s) to be traded from the second team
+    H: H-scoring agent, which can be used to calculate H-score 
+    player_stats: DataFrame of player statistics 
+    players_chosen: list of all chosen players
+    n_iterations: int, number of gradient descent steps
+
+  Returns:
+    Dictionary with results of the trade
+  """
                       
     score_1_1, _, rate_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
     score_2_2, _, rate_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
