@@ -8,10 +8,11 @@ from src.run_algorithm import HAgent, analyze_trade
 
 @st.cache_data()
 def make_team_tab(scores : pd.DataFrame
-              , my_players : list
+              , my_players : list[str]
               , n_drafters : int
               , player_multiplier : float
-              , team_multiplier : float) -> pd.DataFrame:
+              , team_multiplier : float
+              ) -> pd.DataFrame:
   """Make a tab summarizing your team as it currently stands
 
   Args:
@@ -50,10 +51,11 @@ def make_team_tab(scores : pd.DataFrame
   return team_stats
   
 @st.cache_data()
-def make_team_h_tab(my_players : list
+def make_team_h_tab(my_players : list[str]
                   , n_picks : int
                   , base_h_score : float
-                  , base_win_rates: pd.Series ) -> pd.DataFrame:
+                  , base_win_rates: pd.Series 
+                  ) -> pd.DataFrame:
   """Display the H-score for your team
 
   Args:
@@ -78,7 +80,7 @@ def make_team_h_tab(my_players : list
 
 @st.cache_data()
 def make_cand_tab(scores : pd.DataFrame
-              , selection_list : list
+              , selection_list : list[str]
               , player_multiplier : float):
   """Make a tab showing stats for players that have not yet been drafted
 
@@ -147,8 +149,8 @@ def get_base_h_score(info : dict
                 , winner_take_all : bool
                 , punting : bool
                 , player_stats : pd.DataFrame
-                , my_players : list
-                , players_chosen : list):
+                , my_players : list[str]
+                , players_chosen : list[str]):
   """Calculate your team's H-score
 
   Args:
@@ -177,14 +179,14 @@ def get_base_h_score(info : dict
     , winner_take_all = winner_take_all
     , punting = punting)
 
-  return next(H.get_h_scores(player_stats, my_players, players_chosen))   
+  return next(H.get_h_scores(my_players, players_chosen))   
 
 @st.cache_data()
 def make_h_waiver_df(_H
                   , player_stats : pd.DataFrame
-                  , mod_my_players : list
+                  , mod_my_players : list[str]
                   , drop_player : str
-                  , players_chosen : list
+                  , players_chosen : list[str]
                   , base_h_score : float
                   , base_win_rates : pd.Series):
 
@@ -236,12 +238,12 @@ def make_h_waiver_df(_H
 @st.cache_data()
 def make_trade_display(_H
                   , player_stats : pd.DataFrame
-                  , players_chosen : list
+                  , players_chosen : list[str]
                   , n_iterations : int
-                  , my_trade : list
-                  , their_trade : list
-                  , my_players : list
-                  , their_players : list):
+                  , my_trade : list[str]
+                  , their_trade : list[str]
+                  , my_players : list[str]
+                  , their_players : list[str]):
   """show the results of a potential trade
 
   Args:
@@ -370,7 +372,7 @@ def make_h_rank_tab( info : dict
     , winner_take_all = winner_take_all
     , punting = punting)
 
-  generator = H.get_h_scores(player_stats, [], [])
+  generator = H.get_h_scores([], [])
   for i in range(max(1,n_iterations)):
     h_res, c, cdf_estimates = next(generator)
     

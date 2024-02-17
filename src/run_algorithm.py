@@ -8,15 +8,15 @@ from src.helper_functions import combinatorial_calculation, calculate_tipping_po
 class HAgent():
 
     def __init__(self
-                 , info
-                 , omega
-                 , gamma
-                 , alpha
-                 , beta
-                 , n_picks
-                 , winner_take_all
-                 , punting
-):
+                 , info : dict
+                 , omega : float
+                 , gamma : float
+                 , alpha : float
+                 , beta : float
+                 , n_picks : int
+                 , winner_take_all : bool
+                 , punting : bool
+                    ):
         """Calculates the rank order based on U-score
 
         Args:
@@ -48,15 +48,13 @@ class HAgent():
         self.punting = punting
       
     def get_h_scores(self
-                  , df
-                  , my_players
-                  , players_chosen
-                  ,): #ZR: whats going on with this extra comma?
+                  , my_players : list[str]
+                  , players_chosen : list[str]
+                  ) -> tuple: 
 
         """Performs the H-score algorithm
 
         Args:
-            df: #ZR note: should be removed as input. This isn't actually used for anything
             my_players : list of players picked by other teams
             players_chosen : list of all players chosen, including my_players
 
@@ -91,11 +89,12 @@ class HAgent():
                                        , x_scores_available)
 
     def perform_iterations(self
-                           ,weights
-                           ,my_players
-                           ,n_players_selected
-                           , diff_means
-                           , x_scores_available):
+                           ,weights : pd.DataFrame
+                           ,my_players : list[str]
+                           ,n_players_selected : int
+                           ,diff_means : pd.Series
+                           ,x_scores_available : pd.DataFrame
+                           ) -> tuple:
         """Performs one iteration of H-scoring
          
          Case (1): If n_players_selected < n_picks -1, the Gaussian multivariate assumption is used for future picks and weight is chosen by gradient descent
@@ -345,33 +344,34 @@ class HAgent():
     def get_del_full(self,c):
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
 
-def analyze_trade(team_1_other : list
-                  , team_1_trade : list
-                  , team_2_other : list
-                  , team_2_trade : list
-                  , H
-                  , player_stats : pd.DataFrame
-                  , players_chosen : list
-                  ,n_iterations : int) -> dict:    
+def analyze_trade(team_1_other : list[str]
+                  ,team_1_trade : list[str]
+                  ,team_2_other : list[str]
+                  ,team_2_trade : list[str]
+                  ,H
+                  ,player_stats : pd.DataFrame
+                  ,players_chosen : list[str]
+                  ,n_iterations : int
+                  ) -> dict:    
 
-  """Compute the results of a potential trade
+    """Compute the results of a potential trade
 
-  Args:
-    team_1_other: remaining players, not to be traded from the first team
-    team_1_trade: player(s) to be traded from the first team
-    team_2_other: remaining players, not to be traded from the first team
-    team_2_trade: player(s) to be traded from the second team
-    H: H-scoring agent, which can be used to calculate H-score 
-    player_stats: DataFrame of player statistics 
-    players_chosen: list of all chosen players
-    n_iterations: int, number of gradient descent steps
+    Args:
+      team_1_other: remaining players, not to be traded from the first team
+      team_1_trade: player(s) to be traded from the first team
+      team_2_other: remaining players, not to be traded from the first team
+      team_2_trade: player(s) to be traded from the second team
+      H: H-scoring agent, which can be used to calculate H-score 
+      player_stats: DataFrame of player statistics 
+      players_chosen: list of all chosen players
+      n_iterations: int, number of gradient descent steps
 
-  Returns:
-    Dictionary with results of the trade
-  """
+    Returns:
+      Dictionary with results of the trade
+    """
                       
-    score_1_1, _, rate_1_1 = next(H.get_h_scores(player_stats, team_1_other + team_1_trade, players_chosen))
-    score_2_2, _, rate_2_2 = next(H.get_h_scores(player_stats, team_2_other + team_2_trade, players_chosen))
+    score_1_1, _, rate_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
+    score_2_2, _, rate_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
                       
     rate_1_1 = rate_1_1.T #ZR: hack for now
     rate_2_2 = rate_2_2.T #ZR: hack for now
@@ -379,25 +379,25 @@ def analyze_trade(team_1_other : list
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
-        generator = H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen)
+        generator = H.get_h_scores(team_1_other + team_2_trade, players_chosen)
         for i in range(n_iterations):
             score_1_2,_,rate_1_2  = next(generator)
         rate_1_2.columns = rate_1_1.columns
         
-        score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
         rate_2_1.columns = rate_1_1.columns
 
     elif n_player_diff == 0:
-        score_1_2,_,rate_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
-        score_2_1,_,rate_2_1 = next(H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen))
+        score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores( team_2_other + team_1_trade, players_chosen))
 
         rate_2_1 = rate_2_1.T #ZR: hack for now
         rate_1_2 = rate_1_2.T #ZR: hack for now
     else:
-        score_1_2,_,rate_1_2 = next(H.get_h_scores(player_stats, team_1_other + team_2_trade, players_chosen))
+        score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
         rate_1_2.columns = rate_1_1.columns
 
-        generator = H.get_h_scores(player_stats, team_2_other + team_1_trade, players_chosen)
+        generator = H.get_h_scores(team_2_other + team_1_trade, players_chosen)
         for i in range(n_iterations):
             score_2_1,_,rate_2_1 = next(generator)
     

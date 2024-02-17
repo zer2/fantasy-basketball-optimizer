@@ -6,7 +6,8 @@ import streamlit as st
 
 def calculate_coefficients(player_stats : pd.DataFrame
                      , representative_player_set : list
-                     , translation_factors : pd.Series) -> dict:
+                     , translation_factors : pd.Series
+                     ) -> dict:
     """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
 
     Args:
@@ -60,13 +61,12 @@ def calculate_coefficients(player_stats : pd.DataFrame
                                )
     return coefficients
   
-
-
 def calculate_scores_from_coefficients(player_stats : pd.DataFrame
                                        ,coefficients :pd.DataFrame
                                        , params : dict
                                        ,alpha_weight : float = 1
-                                       ,beta_weight : float = 1):
+                                       ,beta_weight : float = 1
+                                       ) -> pd.DataFrame:
     """Calculate scores based on player info and coefficients
 
     Args:
@@ -78,6 +78,8 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     Returns:
         Dataframe of scores, by player/category
     """
+    params = st.session_state.params
+
     counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
     counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
     counting_cat_mean_of_vars = coefficients.loc[params['counting-statistics'],'Mean of Variances']
@@ -110,7 +112,7 @@ def process_player_data(player_stats : pd.DataFrame
                         , n_drafters : int
                         , n_picks : int
                         , rotisserie : bool
-                        , params : dict) -> dict:
+                        ) -> dict:
   """Based on player stats and parameters, do all calculations to set up for running algorithms
 
   Args:
@@ -122,22 +124,23 @@ def process_player_data(player_stats : pd.DataFrame
       n_drafters: number of drafters
       n_picks: number of picks per drafter
       rotisserie: True if the format is Roto, False if H2H
-      params: dictionary of params
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
+  params = st.session_state.params
+
   n_players = n_drafters * n_picks
 
   player_stats[params['counting-statistics'] + params['volume-statistics']] = player_stats[params['counting-statistics'] + params['volume-statistics']].mul(( 1- player_stats['No Play %'] * psi), axis = 0)
 
-  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'], params)
+  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'])
   z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, params, 1,0)
   z_scores_first_order = z_scores_first_order * multipliers.T.values[0]
 
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors['Conversion Factor'], params)
+  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors['Conversion Factor'])
                          
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, params, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params,  1,0)

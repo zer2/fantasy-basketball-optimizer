@@ -19,13 +19,13 @@ def listify(x : pd.DataFrame) -> list:
 
 @st.cache_data()
 def make_about_tab(md_path : str):
-  """Make one of the tabs on the about page
+    """Make one of the tabs on the about page
 
-  Args:
-    md_path : string representing the path to the relevant markdown file for display
-  Returns:
-    None
-  """
+    Args:
+      md_path : string representing the path to the relevant markdown file for display
+    Returns:
+      None
+    """
     c2,c2,c3 = st.columns([0.1,0.8,0.1])
     with c2:
         intro_md = Path('about/' + md_path).read_text()
@@ -146,7 +146,7 @@ def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
     
     return final_probabilities
 
-def make_progress_chart(res : list):
+def make_progress_chart(res : list[pd.DataFrame]):
     """Chart the progress of gradient descent in action, for the top 10 players 
 
     Args:

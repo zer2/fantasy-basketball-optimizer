@@ -385,7 +385,7 @@ with draft_tab:
 
           n_players = n_drafters * n_picks
       
-          generator = H.get_h_scores(player_stats, my_players, players_chosen)
+          generator = H.get_h_scores(my_players, players_chosen)
     
           placeholder = st.empty()
           all_res = []
