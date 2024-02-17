@@ -528,7 +528,8 @@ with draft_tab:
                                 , my_trade
                                 , their_trade
                                 , my_players
-                                , their_players)
+                                , their_players
+                                , second_seat)
                     
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])

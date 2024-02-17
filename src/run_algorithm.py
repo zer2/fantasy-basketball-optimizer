@@ -403,15 +403,19 @@ def analyze_trade(team_1_other : list[str]
     
         rate_2_1.columns = rate_1_1.columns
 
-    score_1_1_idxmax = score_1_1.idxmax()
-    score_1_2_idxmax = score_1_2.idxmax()
-    score_2_2_idxmax = score_2_2.idxmax()
-    score_2_1_idxmax = score_2_1.idxmax()
+    #helper function just for this procedure
+    def get_full_row(scores, rates):
 
-    team_1_info = {'pre' : (score_1_1.loc[score_1_1_idxmax], rate_1_1.loc[score_1_1_idxmax])
-                        ,'post' : (score_1_2.loc[score_1_2_idxmax], rate_1_2.loc[score_1_2_idxmax])}
-    team_2_info = {'pre' : (score_2_2.loc[score_2_2_idxmax], rate_2_2.loc[score_2_2_idxmax])
-                        ,'post' : (score_2_1.loc[score_2_1_idxmax], rate_2_1.loc[score_2_1_idxmax])}
+        idxmax = scores.idxmax()
+        score = pd.Series([scores[idxmax]], index = ['H-score'])
+        rate = rates.loc[idxmax]
+
+        return pd.concat([score, rate])
+
+    team_1_info = {'pre' : get_full_row(score_1_1, rate_1_1)
+                        ,'post' : get_full_row(score_1_2, rate_1_2)}
+    team_2_info = {'pre' : get_full_row(score_2_2, rate_2_2)
+                        ,'post' : get_full_row(score_2_1, rate_2_1)}
                       
     results_dict = {1 : team_1_info
                     ,2 : team_2_info

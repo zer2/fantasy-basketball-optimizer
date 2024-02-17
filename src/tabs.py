@@ -203,7 +203,7 @@ def make_h_waiver_df(_H
   Returns:
       None
   """
-  res, _, win_rates = next(_H.get_h_scores(player_stats, mod_my_players, players_chosen))
+  res, _, win_rates = next(_H.get_h_scores(mod_my_players, players_chosen))
 
   res = res.sort_values(ascending = False)
   win_rates = win_rates.loc[res.index]
@@ -243,7 +243,8 @@ def make_trade_display(_H
                   , my_trade : list[str]
                   , their_trade : list[str]
                   , my_players : list[str]
-                  , their_players : list[str]):
+                  , their_players : list[str]
+                  , their_team_name : str):
   """show the results of a potential trade
 
   Args:
@@ -255,7 +256,7 @@ def make_trade_display(_H
     their_trade: player(s) to be traded for
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
-                                  ,H
+    their_team_name: name of counterparty team
 )
   Returns:
       None
@@ -284,24 +285,32 @@ def make_trade_display(_H
       their_team_pre_trade = trade_results[2]['pre']
       their_team_post_trade = trade_results[2]['post']
 
-      if your_team_pre_trade < your_team_post_trade:
-          st.markdown('This trade benefits your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
+      if your_team_pre_trade['H-score'] < your_team_post_trade['H-score']:
+          st.markdown('This trade benefits your team :slightly_smiling_face:')
       else:
-          st.markdown('This trade does not benefit your team. H-score goes from ' + str(np.round(your_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(your_team_post_trade[0]*100,1)) + '%')
+          st.markdown('This trade does not benefit your team :slightly_frowning_face:')
       
-      pre_to_post = pd.concat([your_team_pre_trade[1],your_team_post_trade[1]], axis = 1).T
+      pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
-      pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
+      pre_to_post_styled = pre_to_post.style.format("{:.1%}") \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_categories())
+                          
       st.dataframe(pre_to_post_styled, use_container_width = True)
     
-      if their_team_pre_trade < their_team_post_trade:
-          st.markdown('This trade benefits their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
+      if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
+          st.markdown('This trade benefits their team :slightly_smiling_face:')
       else:
-          st.markdown('This trade does not benefit their team. H-score goes from ' + str(np.round(their_team_pre_trade[0]*100,1)) + '% to ' + str(np.round(their_team_post_trade[0]*100,1)) + '%')
+          st.markdown('This trade does not benefit ' + their_team_name + ' :slightly_frowning_face:')
                   
-      pre_to_post = pd.concat([their_team_pre_trade[1],their_team_post_trade[1]], axis = 1).T
+      pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
-      pre_to_post_styled = pre_to_post.style.map(stat_styler, middle = 0.5, multiplier = 300).format('{:,.1%}')
+      pre_to_post_styled = pre_to_post.style.format("{:.1%}") \
+                                .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']]) \
+                                .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_categories())
+                          
       st.dataframe(pre_to_post_styled, use_container_width = True)
 
 ### Rank tabs 
