@@ -56,17 +56,24 @@ The discussion of static ranking lists established that point differentials betw
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
 
-- $X = X_s + X_p + X_{\phi} + X_\delta$ where
+- $X = X_s + X_p + X_{\phi_1}$ where
   - $X_s$ is the aggregate statistics of team $A$'s already selected players: 
   - $X_p$ is the statistics of the candidate player
-  - $X_{\phi}$ is the expected statistics of unchosen players
-  - $X_\delta$ is a difference factor to adjust for future picks being different from expected
-- $X_\mu = X_{\theta} + X_{\phi}$ where
+  - $X_{\phi_1}$ is the expected statistics of unchosen players
+- $X_\mu = X_{\theta} + X_{\phi_2}$ where
   - $X_{\theta}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
+  - $X_{\phi_2}$ is the expected aggregate statistics of players drafted past the round player $p$ is being drafted
+
+  The define 
+  - $X_\delta = X_{\phi_1} - X_{\phi_2}$. In other words, how we expect the drafter's future draft statistics to differ from what would otherwise would be expected
 
 This allows the Bell curve's parameters to be redefined as follows 
 - The mean is $X_s + X_p - X_{\theta} + X_\delta$
 - The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
+
+Graphically, for pick four of twelve this looks like 
+
+<iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/2c8150b0-2c1a-47d1-a2a8-3f016d37fe15"> </iframe>
 
 $X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. 
 
@@ -108,6 +115,12 @@ Super simple and easy to calculate, right :stuck_out_tongue:. $X_\delta(j)$ is o
 
 It should be noted that this calculation is *very* rough because it uses many layers of approximation. Still, it captures the main effects that are important: higher weight for a category increases the expectation for that category, weights that are more different from standard weights lead to more extreme statistics, and some combinations of categories work better together than others
 
+For intuition, see an animated version of how the algorithm works for two categories below 
+
+<iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/7ca9674a-8780-4839-9bbb-02025bf33f6f"> </iframe>
+
+In this example $j$ weighs $C_1$ above $C_2$, so the algorithm's contour lines are askew from the line of general value. The algorithm can sacrifice a small amount of general value by moving to the left in order to find a player that fits $j$ better, with a high value for $C_1$ and a low value for $C_2$
+
 ## 3. Optimizing for $p$ and $j$
 
 The equations in the preceding sections provide a full picture of how to map $p$ and $j$ to an H-score. The next step is finding the best possible values of $p$ and $j$.
@@ -120,7 +133,7 @@ Instead of looking through all the options for $j$ at random for each possible c
 
 You may recognize that this method doesn't guarantee finding the absolute minimum or maximum, it just keeps going until it gets stuck. While this is not ideal it is also impossible to avoid, since there is no guaranteed way to find the optimal point unless the space has a special property ([convexity](https://en.wikipedia.org/wiki/Convex_function)) which $H(j)$ does not have.
 
-Another downside of gradient descent is that it necessitates recalculating the slope every time it moves, which takes time. Computers can do this calculation fairly quickly but the temporal cost of doing it many times in a row does add up, especially when we are running the process seperately to optimize $j$ based on choice of $p$.
+Another downside of gradient descent is that it necessitates recalculating the slope every time it moves, which takes time. Computers can do this calculation fairly quickly but the temporal cost of doing it many times in a row does add up, especially when we are running the process separately to optimize $j$ based on choice of $p$.
 
 After performing gradient descent, each player $p$ is paired with an optimal or close to optimal $j$. One of those pairs has the highest H-score. The player $p$ associated with that pair is the one most recommended by the H-score algorithm
 
