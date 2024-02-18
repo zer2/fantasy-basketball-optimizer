@@ -62,8 +62,7 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
 
   
 #no need to cache this since it only gets re-run when current_season_data is refreshed
-def process_game_level_data(df : pd.DataFrame
-                            , metadata : pd.Series) -> pd.DataFrame:
+def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataFrame:
   """Convert box scores to the format needed for fantasy
 
   Args:
@@ -126,7 +125,7 @@ def get_player_metadata() -> pd.Series:
    return simplified
 
 @st.cache_resource(ttl = '1d') 
-def get_darko_data(expected_minutes : pd.Series):
+def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
 
   Args:
@@ -188,8 +187,7 @@ def get_darko_short_term(all_darko : pd.DataFrame) -> pd.DataFrame:
   return darko_short_term
 
 
-def get_darko_long_term(all_darko : pd.DataFrame
-                        , expected_minutes : pd.Series) -> pd.DataFrame:
+def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) -> pd.DataFrame:
     """Get a long term version of darko, based on skill statistics and expected minutes
   
     Args:
