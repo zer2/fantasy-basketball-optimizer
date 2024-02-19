@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.stats import norm
 import os
 from itertools import combinations
-from src.helper_functions import combinatorial_calculation, calculate_tipping_points
+from src.helper_functions import combinatorial_calculation, calculate_tipping_points, get_categories
 
 class HAgent():
 
@@ -216,6 +216,8 @@ class HAgent():
                 weights = None
 
             i = i + 1
+
+            cdf_estimates.columns = get_categories()
     
             yield score, weights, cdf_estimates
 

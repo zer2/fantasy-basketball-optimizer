@@ -71,12 +71,10 @@ def make_team_h_tab(my_players : list[str]
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
 
-        new_values = [base_h_score] + list(base_win_rates.values)
-        new_index = ['H-score'] + list(base_win_rates.index)
+        base_win_rates_copy = base_win_rates.copy()
+        base_win_rates_copy.insert(0, 'H-score', base_h_score)
 
-        base_win_rates.insert(0, 'H-score', base_h_score)
-
-        base_win_rates_formatted = h_percentage_styler(base_win_rates)
+        base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
         st.dataframe(base_win_rates_formatted, hide_index = True)
   
 ### Candidate tabs 
@@ -221,7 +219,9 @@ def make_h_waiver_df(_H
 
   scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
 
-  h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
+  h_display = pd.DataFrame(scores_all).merge(win_rates_all
+                                        , left_index = True
+                                        , right_index = True)
 
   h_display = h_percentage_styler(h_display)
 
