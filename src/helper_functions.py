@@ -31,7 +31,43 @@ def make_about_tab(md_path : str):
         intro_md = Path('about/' + md_path).read_text()
         st.markdown(intro_md, unsafe_allow_html=True)
 
-  
+def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
+  """Helper function for styling tables of Z or G scores
+
+  Args:
+    df: DataFrame with columns per category and total. Additional columns optional
+    
+  Returns:
+    Styled dataframe
+  """
+  df_styled = df.style.format("{:.2f}"
+                              , subset = pd.IndexSlice[:,['Total'] + get_categories()]) \
+                            .map(styler_a
+                                ,subset = pd.IndexSlice[:,['Total']]) \
+                            .map(stat_styler
+                              , subset = pd.IndexSlice[:,get_categories()]
+                              , multiplier = multiplier)
+  return df_styled
+
+def h_percentage_styler(df : pd.DataFrame) -> pd.DataFrame:
+  """Helper function for styling tables of H-score results
+
+  Args:
+    df: DataFrame with columns per category and overall H-score. Additional columns optional
+        Values are ratios between 0 and 1
+  Returns:
+    Styled dataframe
+  """
+  df_styled = df.style.format("{:.1%}"
+                                , subset = pd.IndexSlice[:,['H-score'] + get_categories()]) \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(stat_styler
+                              , middle = 0.5
+                              , multiplier = 300
+                              , subset = get_categories())
+  return df_styled
+
 def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> str:
   """Styler function used for coloring stat values red/green with varying intensities 
 
