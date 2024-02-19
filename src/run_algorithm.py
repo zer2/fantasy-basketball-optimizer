@@ -190,7 +190,7 @@ class HAgent():
                                  )
 
                 else:
-                    score = cdf_estimates.mean() 
+                    score = cdf_estimates.mean(axis = 1) 
 
             #case where there are too many players and some need to be removed. n > n_picks
             else: 
@@ -368,9 +368,6 @@ def analyze_trade(team_1_other : list[str]
                       
     score_1_1, _, rate_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
     score_2_2, _, rate_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
-                      
-    rate_1_1 = rate_1_1 #ZR: hack for now
-    rate_2_2 = rate_2_2 #ZR: hack for now
  
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
@@ -387,8 +384,6 @@ def analyze_trade(team_1_other : list[str]
         score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
         score_2_1,_,rate_2_1 = next(H.get_h_scores( team_2_other + team_1_trade, players_chosen))
 
-        rate_2_1 = rate_2_1 #ZR: hack for now
-        rate_1_2 = rate_1_2 #ZR: hack for now
     else:
         score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
         rate_1_2.columns = rate_1_1.columns
