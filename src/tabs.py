@@ -70,6 +70,9 @@ def make_team_h_tab(my_players : list[str]
         st.markdown('Your team is not full yet! Come back here when you have a full team')
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
+    
+        os.write(1,bytes(str(base_win_rates),'utf-8'))
+        os.write(1,bytes('NEXT','utf-8'))
 
         new_values = [float(base_h_score)] + list(base_win_rates.values)
         new_index = ['H-score'] + list(base_win_rates.index)
