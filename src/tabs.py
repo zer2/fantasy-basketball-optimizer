@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helper_functions import  stat_styler, styler_a,styler_b, styler_c, get_categories
+from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories
 from src.run_algorithm import HAgent, analyze_trade
-
+  
 ### Team tabs 
 
 @st.cache_data()
@@ -71,9 +71,12 @@ def make_team_h_tab(my_players : list[str]
         st.markdown('Your team is not full yet! Come back here when you have a full team')
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
-        base_win_rates_formatted = base_win_rates.T.style.map(stat_styler
-                                                        , middle = 0.5
-                                                        , multiplier = 300).format('{:,.1%}')
+        
+        new_values = [base_h_score] + list(base_win_rates.values)
+        new_index = ['H-score'] + list(base_win_rates.index)
+        base_win_rates = pd.DataFrame({ind : val for ind, val in zip(new_index, new_values)})
+
+        base_win_rates_formatted = h_percentage_styler(base_win_rates)
         st.dataframe(base_win_rates_formatted, hide_index = True)
   
 ### Candidate tabs 
@@ -93,13 +96,12 @@ def make_cand_tab(scores : pd.DataFrame
       DataFrame of stats of unselected players, to use in other tabs
   """
               
-
   counting_statistics = st.session_state.params['counting-statistics'] 
   percentage_statistics = st.session_state.params['percentage-statistics'] 
 
   scores_unselected = scores[~scores.index.isin(selection_list)]
 
-  scores_unselected_styled = scores_unselected.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = player_multiplier)
+  scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 
   return scores_unselected
@@ -124,9 +126,6 @@ def make_waiver_tab(scores : pd.DataFrame
   Returns:
       None
   """
-            
-  counting_statistics = st.session_state.params['counting-statistics'] 
-  percentage_statistics = st.session_state.params['percentage-statistics'] 
 
   no_drop = team_stats.loc[['Total'],:]
   no_drop.index = [drop_player]
@@ -136,7 +135,7 @@ def make_waiver_tab(scores : pd.DataFrame
 
   new = pd.concat([no_drop,new])
 
-  new_styled = new.style.format("{:.2f}").map(styler_a).map(stat_styler, subset = pd.IndexSlice[:,counting_statistics + percentage_statistics], multiplier = team_multiplier)
+  new_styled = static_score_styler(new, team_multiplier)
   st.dataframe(new_styled, use_container_width = True) 
 
 @st.cache_data()
@@ -224,12 +223,7 @@ def make_h_waiver_df(_H
 
   h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
 
-  h_display = h_display.style.format("{:.1%}"
-                    ,subset = pd.IndexSlice[:,['H-score']]) \
-            .map(styler_a
-                  , subset = pd.IndexSlice[:,['H-score']]) \
-            .map(stat_styler, middle = 0.5, multiplier = 300, subset = win_rates_all.columns) \
-            .format('{:,.1%}', subset = win_rates_all.columns)
+  h_display = h_percentage_styler(h_display)
 
   st.dataframe(h_display, use_container_width = True)
 
@@ -292,11 +286,7 @@ def make_trade_display(_H
       
       pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
-      pre_to_post_styled = pre_to_post.style.format("{:.1%}") \
-                          .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_categories())
-                          
+      pre_to_post_styled = h_percentage_styler(pre_to_post)
       st.dataframe(pre_to_post_styled, use_container_width = True)
     
       if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
@@ -306,11 +296,7 @@ def make_trade_display(_H
                   
       pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
-      pre_to_post_styled = pre_to_post.style.format("{:.1%}") \
-                                .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
-                                .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_categories())
-                          
+      pre_to_post_styled = h_percentage_styler(pre_to_post)
       st.dataframe(pre_to_post_styled, use_container_width = True)
 
 ### Rank tabs 
@@ -326,20 +312,11 @@ def make_rank_tab(scores : pd.DataFrame, player_multiplier : float):
   Returns:
       None
   """
-  counting_statistics = st.session_state.params['counting-statistics'] 
-  percentage_statistics = st.session_state.params['percentage-statistics'] 
-
   scores.loc[:,'Rank'] = np.arange(scores.shape[0]) + 1
   scores.loc[:,'Player'] = scores.index
-  scores = scores[['Rank','Player','Total'] + counting_statistics + percentage_statistics]
+  scores = scores[['Rank','Player','Total'] + get_categories()]
   
-  scores_styled = scores.style.format("{:.2f}"
-                                        ,subset = pd.IndexSlice[:,counting_statistics + percentage_statistics + ['Total']]) \
-                                    .map(styler_a
-                                        , subset = pd.IndexSlice[:,['Total']]) \
-                                    .map(stat_styler
-                                      , subset = pd.IndexSlice[:,counting_statistics + percentage_statistics]
-                                      , multiplier = player_multiplier)
+  scores_styled = static_score_styler(scores,player_multiplier)
       
   rank_display = st.dataframe(scores_styled, hide_index = True)
 
@@ -398,10 +375,5 @@ def make_h_rank_tab( info : dict
                       , left_on = 'Player'
                       ,right_index = True)
 
-  h_res = h_res.style.format("{:.1%}"
-                              ,subset = pd.IndexSlice[:,['H-score']]) \
-                      .map(styler_a
-                            , subset = pd.IndexSlice[:,['H-score']]) \
-                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns)
+  h_res = h_percentage_styler(h_res)
   h_score_display = st.dataframe(h_res, hide_index = True)
