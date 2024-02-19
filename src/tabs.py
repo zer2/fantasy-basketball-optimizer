@@ -71,9 +71,10 @@ def make_team_h_tab(my_players : list[str]
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
 
-        base_win_rates.insert(0, 'H-score', base_h_score)
+        base_win_rates_copy = base_win_rates.copy()
+        base_win_rates_copy.insert(0, 'H-score', base_h_score)
 
-        base_win_rates_formatted = h_percentage_styler(base_win_rates)
+        base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
         st.dataframe(base_win_rates_formatted, hide_index = True)
   
 ### Candidate tabs 
@@ -215,10 +216,6 @@ def make_h_waiver_df(_H
   base_win_rates_copy.index = [drop_player]
 
   win_rates_all = pd.concat([base_win_rates_copy, win_rates])
-
-  #no idea why this happens, but sometimes H-score shows up as a column were it should not
-  if 'H-score' in win_rates_all.columns:
-    win_rates_all = win_rates_all.drop(columns = 'H-score')
 
   scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
 
