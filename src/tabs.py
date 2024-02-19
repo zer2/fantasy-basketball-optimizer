@@ -71,13 +71,8 @@ def make_team_h_tab(my_players : list[str]
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
 
-        os.write(1,bytes(str(base_h_score),'utf-8'))
-
-        new_values = [base_h_score] + list(base_win_rates.values)
+        new_values = [float(base_h_score)] + list(base_win_rates.values)
         new_index = ['H-score'] + list(base_win_rates.index)
-
-        os.write(1,bytes(str(new_values),'utf-8'))
-        os.write(1,bytes(str(new_index),'utf-8'))
 
         base_win_rates = pd.DataFrame({ind : val for ind, val in zip(new_index, new_values)}
                                         , index = ['Base'])
