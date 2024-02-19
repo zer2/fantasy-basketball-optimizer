@@ -72,7 +72,7 @@ def make_team_h_tab(my_players : list[str]
         
         new_values = [base_h_score] + list(base_win_rates.values)
         new_index = ['H-score'] + list(base_win_rates.index)
-        base_win_rates = pd.DataFrame({ind : val for ind, val in zip(new_index, new_values)})
+        base_win_rates = pd.DataFrame({ind : [val] for ind, val in zip(new_index, new_values)})
 
         base_win_rates_formatted = h_percentage_styler(base_win_rates)
         st.dataframe(base_win_rates_formatted, hide_index = True)
