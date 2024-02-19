@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
 from src.run_algorithm import HAgent, analyze_trade
+import os
   
 ### Team tabs 
 
