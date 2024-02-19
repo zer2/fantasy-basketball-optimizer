@@ -157,8 +157,6 @@ def process_player_data(player_stats : pd.DataFrame
   else:
     x_scores = x_scores.loc[g_scores.sum(axis = 1).sort_values(ascending = False).index]
 
-  os.write(1,bytes(str(x_scores),'utf-8'))
-
   positions = player_stats[['Position']]
 
   score_table = x_scores.groupby([np.floor(x/n_drafters) for x in range(len(x_scores))]).agg(['mean','var'])
