@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
 from src.run_algorithm import HAgent, analyze_trade
+import os
   
 ### Team tabs 
 
@@ -69,7 +70,7 @@ def make_team_h_tab(my_players : list[str]
         st.markdown('Your team is not full yet! Come back here when you have a full team')
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
-        
+
         base_win_rates.insert(0, 'H-score', base_h_score)
 
         base_win_rates_formatted = h_percentage_styler(base_win_rates)
