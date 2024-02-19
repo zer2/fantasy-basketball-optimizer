@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories
+from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
 from src.run_algorithm import HAgent, analyze_trade
   
 ### Team tabs 
@@ -25,8 +25,6 @@ def make_team_tab(scores : pd.DataFrame
   Returns:
       DataFrame of team stats, to use in other tabs
   """
-  counting_statistics = st.session_state.params['counting-statistics'] 
-  percentage_statistics = st.session_state.params['percentage-statistics'] 
 
   team_stats = scores[scores.index.isin(my_players)]
   expected = scores[0:len(my_players)*n_drafters].mean() * len(my_players)
@@ -41,10 +39,10 @@ def make_team_tab(scores : pd.DataFrame
   if n_players_on_team > 0:
 
       team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
-                                                  .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], counting_statistics + percentage_statistics]) \
+                                                  .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], get_categories()]) \
                                                   .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
-                                                  .map(stat_styler, subset = pd.IndexSlice[my_players, counting_statistics + percentage_statistics], multiplier = player_multiplier) \
-                                                  .applymap(stat_styler, subset = pd.IndexSlice['Difference', counting_statistics + percentage_statistics], multiplier = team_multiplier)
+                                                  .map(stat_styler, subset = pd.IndexSlice[my_players, get_categories()], multiplier = player_multiplier) \
+                                                  .applymap(stat_styler, subset = pd.IndexSlice['Difference', get_categories()], multiplier = team_multiplier)
       display = st.dataframe(team_stats_styled, use_container_width = True)     
   else:
     st.markdown('Your team does not have any players yet!')
