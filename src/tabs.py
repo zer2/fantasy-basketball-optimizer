@@ -74,8 +74,7 @@ def make_team_h_tab(my_players : list[str]
         new_values = [base_h_score] + list(base_win_rates.values)
         new_index = ['H-score'] + list(base_win_rates.index)
 
-        base_win_rates = pd.DataFrame({ind : val for ind, val in zip(new_index, new_values)}
-                                        , index = ['Base'])
+        base_win_rates.insert(0, 'H-score', base_h_score)
 
         base_win_rates_formatted = h_percentage_styler(base_win_rates)
         st.dataframe(base_win_rates_formatted, hide_index = True)
@@ -215,7 +214,7 @@ def make_h_waiver_df(_H
   base_h_score.index = [drop_player]
   base_h_score.name = 'H-score'
 
-  base_win_rates_copy = base_win_rates.copy().T
+  base_win_rates_copy = base_win_rates.copy()
   base_win_rates_copy.index = [drop_player]
 
   win_rates_all = pd.concat([base_win_rates_copy, win_rates])
