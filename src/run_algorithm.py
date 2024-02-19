@@ -179,17 +179,15 @@ class HAgent():
                               , scale = np.sqrt(self.diff_var)
                                                      )
                               , index = diff_means.index
-                                            )
+                                            ).T
 
                 weights = None
                 
                 if self.winner_take_all:
-                    score = combinatorial_calculation(cdf_estimates.T
-                                                              , 1 - cdf_estimates.T
-                                                              , categories = cdf_estimates.index
+                    score = combinatorial_calculation(cdf_estimates
+                                                              , 1 - cdf_estimates
+                                                              , categories = cdf_estimates.columns
                                  )
-                    os.write(1,bytes(str(cdf_estimates), 'utf-8'))
-                    os.write(1,bytes(str(score), 'utf-8'))
 
                 else:
                     score = cdf_estimates.mean() 
@@ -202,8 +200,6 @@ class HAgent():
 
                 diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
                                                        ,axis = 1).T
-
-                #os.write(1,bytes(str(diff_means_mod), 'utf-8'))
 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
                                               , scale = np.sqrt(self.diff_var))
@@ -373,8 +369,8 @@ def analyze_trade(team_1_other : list[str]
     score_1_1, _, rate_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
     score_2_2, _, rate_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
                       
-    rate_1_1 = rate_1_1.T #ZR: hack for now
-    rate_2_2 = rate_2_2.T #ZR: hack for now
+    rate_1_1 = rate_1_1 #ZR: hack for now
+    rate_2_2 = rate_2_2 #ZR: hack for now
  
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
@@ -391,8 +387,8 @@ def analyze_trade(team_1_other : list[str]
         score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
         score_2_1,_,rate_2_1 = next(H.get_h_scores( team_2_other + team_1_trade, players_chosen))
 
-        rate_2_1 = rate_2_1.T #ZR: hack for now
-        rate_1_2 = rate_1_2.T #ZR: hack for now
+        rate_2_1 = rate_2_1 #ZR: hack for now
+        rate_1_2 = rate_1_2 #ZR: hack for now
     else:
         score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
         rate_1_2.columns = rate_1_1.columns
