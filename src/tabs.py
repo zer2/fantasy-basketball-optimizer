@@ -215,9 +215,15 @@ def make_h_waiver_df(_H
 
   win_rates_all = pd.concat([base_win_rates_copy, win_rates])
 
+  #no idea why this happens, but sometimes H-score shows up as a column were it should not
+  if 'H-score' in win_rates_all.columns:
+    win_rates_all = win_rates_all.drop(columns = 'H-score')
+
   scores_all = pd.concat([pd.DataFrame(base_h_score), pd.DataFrame(res)])
 
-  h_display = pd.DataFrame(scores_all).merge(win_rates_all, left_index = True, right_index = True)
+  h_display = pd.DataFrame(scores_all).merge(win_rates_all
+                                        , left_index = True
+                                        , right_index = True)
 
   h_display = h_percentage_styler(h_display)
 
