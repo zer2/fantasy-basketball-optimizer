@@ -285,12 +285,15 @@ def make_trade_candidate_display(_H
                           )
   st.dataframe(values_to_team_styled)
 
+  return values_to_team
+
 @st.cache_data()
 def make_trade_target_display(_H
                   , player_stats : pd.DataFrame
                   , my_players : list[str]
                   , their_players : list[str]
                   , players_chosen : list[str]
+                  , values_to_team : pd.Series
                   , format : str
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
@@ -301,6 +304,7 @@ def make_trade_target_display(_H
     my_players: list of players on your team
     their_players_dict: list of players on the other team
     players_chosen: list of all chosen players
+    values_to_team: value of your own players to the selected team
     format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
 )
@@ -330,18 +334,30 @@ def make_trade_target_display(_H
   values_to_me = values_to_me - values_to_me.mean() - \
                 (values_to_them - values_to_them.mean())
 
-  values_to_me.name = 'H-score differential'
+  values_to_me.name = 'H-score differential for me'
+  values_to_team.name = 'H-score differential for them'
 
   values_to_me = values_to_me.sort_values(ascending = False)
+  values_to_team = values_to_team.sort_values(ascending = False)
 
-  values_to_me_styled = values_to_me.to_frame().style.format("{:.2%}") \
-                          .map(stat_styler
-                              , middle = 0
-                              , multiplier = 15000
-                          )
+  c1, c2 = st.columns([0.5,0.5])
 
-  st.dataframe(values_to_me_styled
-            , use_container_width = True)  
+  with c1: 
+    values_to_me_styled = values_to_me.to_frame().style.format("{:.2%}") \
+                            .map(stat_styler
+                                , middle = 0
+                                , multiplier = 15000
+                            )
+    st.dataframe(values_to_me_styled, use_container_width = True)  
+
+  with c2: 
+    values_to_team_styled = values_to_team.to_frame().style.format("{:.2%}") \
+                            .map(stat_styler
+                                , middle = 0
+                                , multiplier = 15000
+                            )
+    st.dataframe(values_to_team_styled, use_container_width = True)  
+
 
 
 @st.cache_data()

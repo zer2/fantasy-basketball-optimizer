@@ -505,13 +505,13 @@ with draft_tab:
 
           with candidate_tab:
 
-            make_trade_candidate_display(H
-                  , player_stats
-                  , my_players 
-                  , their_players_dict 
-                  , players_chosen 
-                  , format
-                        )
+            values_to_team = make_trade_candidate_display(H
+                                  , player_stats
+                                  , my_players 
+                                  , their_players_dict 
+                                  , players_chosen 
+                                  , format
+                                        )
 
           with target_tab:
             target_seat = st.selectbox(
@@ -525,6 +525,7 @@ with draft_tab:
                   , my_players 
                   , their_players_dict[target_seat]
                   , players_chosen 
+                  , values_to_team[target_seat]
                   , format
                         )
 
