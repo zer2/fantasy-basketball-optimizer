@@ -510,6 +510,7 @@ with draft_tab:
                   , my_players 
                   , their_players_dict 
                   , players_chosen 
+                  , format
                         )
 
           with target_tab:
@@ -524,6 +525,7 @@ with draft_tab:
                   , my_players 
                   , their_players_dict[target_seat]
                   , players_chosen 
+                  , format
                         )
 
           with inspection_tab:
@@ -561,7 +563,8 @@ with draft_tab:
                                 , their_trade
                                 , my_players
                                 , their_players
-                                , second_seat)
+                                , second_seat
+                                , format)
                     
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])

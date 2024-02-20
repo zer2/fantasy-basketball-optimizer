@@ -235,6 +235,7 @@ def make_trade_candidate_display(_H
                   , my_players : list[str]
                   , their_players_dict : dict[list[str]]
                   , players_chosen : list[str]
+                  , format : str
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
 
@@ -244,7 +245,8 @@ def make_trade_candidate_display(_H
     my_players: list of players on your team
     their_players_dict: dict relating other team names to their players 
     players_chosen: list of all chosen players
-
+    format: Name of format. Included as input because it it an input to H
+            and the cache should be re-calculated when format changes
 )
   Returns:
       None
@@ -279,7 +281,7 @@ def make_trade_candidate_display(_H
   values_to_team_styled = values_to_team.style.format("{:.2%}") \
                           .map(stat_styler
                               , middle = 0
-                              , multiplier = 20000
+                              , multiplier = 15000
                           )
   st.dataframe(values_to_team_styled)
 
@@ -289,6 +291,7 @@ def make_trade_target_display(_H
                   , my_players : list[str]
                   , their_players : list[str]
                   , players_chosen : list[str]
+                  , format : str
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
 
@@ -298,7 +301,8 @@ def make_trade_target_display(_H
     my_players: list of players on your team
     their_players_dict: list of players on the other team
     players_chosen: list of all chosen players
-
+    format: Name of format. Included as input because it it an input to H
+            and the cache should be re-calculated when format changes
 )
   Returns:
       None
@@ -333,7 +337,7 @@ def make_trade_target_display(_H
   values_to_me_styled = values_to_me.to_frame().style.format("{:.2%}") \
                           .map(stat_styler
                               , middle = 0
-                              , multiplier = 20000
+                              , multiplier = 15000
                           )
 
   st.dataframe(values_to_me_styled
@@ -349,7 +353,8 @@ def make_trade_display(_H
                   , their_trade : list[str]
                   , my_players : list[str]
                   , their_players : list[str]
-                  , their_team_name : str):
+                  , their_team_name : str
+                  , format : str):
   """show the results of a potential trade
 
   Args:
@@ -362,6 +367,8 @@ def make_trade_display(_H
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     their_team_name: name of counterparty team
+    format: Name of format. Included as input because it it an input to H
+            and the cache should be re-calculated when format changes
 )
   Returns:
       None
