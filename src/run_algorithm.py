@@ -416,3 +416,27 @@ def analyze_trade(team_1_other : list[str]
 
     return results_dict
                 
+def analyze_trade_value(player : list[str]
+                  ,rest_of_team : list[str]
+                  ,H
+                  ,player_stats : pd.DataFrame
+                  ,players_chosen : list[str]
+                  ) -> float:    
+
+    """Compute the results of a potential trade
+
+    Args:
+      team_1_other: remaining players, not to be traded from the first team
+      team_1_trade: player(s) to be traded from the first team
+      H: H-scoring agent, which can be used to calculate H-score 
+      player_stats: DataFrame of player statistics 
+      players_chosen: list of all chosen players
+
+    Returns:
+      Float, relative H-score value
+    """
+    score_without_player, _, _ = next(H.get_h_scores(rest_of_team, players_chosen))
+    score_with_player, _, _ = next(H.get_h_scores(rest_of_team + [player], players_chosen))
+
+    res = (score_with_player.max() - score_without_player.max())
+    return res

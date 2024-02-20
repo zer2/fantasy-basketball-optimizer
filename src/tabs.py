@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
-from src.run_algorithm import HAgent, analyze_trade
+from src.run_algorithm import HAgent, analyze_trade, analyze_trade_value
 import os
   
 ### Team tabs 
@@ -228,6 +228,117 @@ def make_h_waiver_df(_H
   st.dataframe(h_display, use_container_width = True)
 
 ### Trade tabs
+
+@st.cache_data()
+def make_trade_candidate_display(_H
+                  , player_stats : pd.DataFrame
+                  , my_players : list[str]
+                  , their_players_dict : dict[list[str]]
+                  , players_chosen : list[str]
+                        ):
+  """Make a dataframe showing which of your players would be good candidates to send to which other teams
+
+  Args:
+    _H: H-scoring agent, which can be used to calculate H-score 
+    player_stats: DataFrame of player statistics 
+    my_players: list of players on your team
+    their_players_dict: dict relating other team names to their players 
+    players_chosen: list of all chosen players
+
+)
+  Returns:
+      None
+  """
+  values_to_me = pd.Series([analyze_trade_value(player
+                                      , [other_player for other_player in my_players if other_player != player]
+                                      , _H
+                                      , player_stats
+                                      , players_chosen) for player in my_players
+                    ]
+                    , index = my_players)
+  values_to_me = np.clip(values_to_me, 0, 1)
+
+  values_to_team = pd.DataFrame(
+                              {team : [analyze_trade_value(player
+                                                    , list(their_players)
+                                                    , _H
+                                                    , player_stats
+                                                    , players_chosen) 
+                                        for player in my_players]
+                                for team, their_players in their_players_dict.items()
+                                }
+                                , index = my_players
+                                )
+  values_to_team = np.clip(values_to_team, 0, 1)
+
+  for col, vals in values_to_team.items():
+    
+    values_to_team[col] = values_to_team[col] - values_to_team[col].mean() - \
+                            (values_to_me - values_to_me.mean())
+
+  values_to_team_styled = values_to_team.style.format("{:.2%}") \
+                          .map(stat_styler
+                              , middle = 0
+                              , multiplier = 20000
+                          )
+  st.dataframe(values_to_team_styled)
+
+@st.cache_data()
+def make_trade_target_display(_H
+                  , player_stats : pd.DataFrame
+                  , my_players : list[str]
+                  , their_players : list[str]
+                  , players_chosen : list[str]
+                        ):
+  """Make a dataframe showing which of your players would be good candidates to send to which other teams
+
+  Args:
+    _H: H-scoring agent, which can be used to calculate H-score 
+    player_stats: DataFrame of player statistics 
+    my_players: list of players on your team
+    their_players_dict: list of players on the other team
+    players_chosen: list of all chosen players
+
+)
+  Returns:
+      None
+  """
+  values_to_me = pd.Series([analyze_trade_value(player
+                                      , list(my_players)
+                                      , _H
+                                      , player_stats
+                                      , players_chosen) for player in their_players
+                    ]
+                    , index = their_players)
+  values_to_me = np.clip(values_to_me,0, 1)
+
+  #make this into a team-wise dict
+  value_to_them = pd.Series([analyze_trade_value(player
+                                      , [other_player for other_player in their_players if other_player != player]
+                                      , _H
+                                      , player_stats
+                                      , players_chosen) for player in their_players
+                    ]
+                    , index = their_players)
+
+  values_to_them = np.clip(value_to_them, 0, 1)
+
+  values_to_me = values_to_me - values_to_me.mean() - \
+                (values_to_them - values_to_them.mean())
+
+  values_to_me.name = 'H-score differential'
+
+  values_to_me = values_to_me.sort_values(ascending = False)
+
+  values_to_me_styled = values_to_me.to_frame().style.format("{:.2%}") \
+                          .map(stat_styler
+                              , middle = 0
+                              , multiplier = 20000
+                          )
+
+  st.dataframe(values_to_me_styled
+            , use_container_width = True)  
+
 
 @st.cache_data()
 def make_trade_display(_H
