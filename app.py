@@ -534,7 +534,7 @@ with draft_tab:
 
           with target_tab:
 
-            make_trade_target_display(H
+            values_to_me = make_trade_target_display(H
                   , player_stats
                   , my_players 
                   , their_players
@@ -547,8 +547,10 @@ with draft_tab:
 
              if rotisserie:
               general_value = z_scores.sum(axis = 1)
+              replacement_value = z_scores_unselected.iloc[0].sum()
              else:
               general_value = g_scores.sum(axis = 1)
+              replacement_value = g_scores_unselected.iloc[0].sum()
 
              make_trade_suggestion_display(H
                   , player_stats 
@@ -556,6 +558,9 @@ with draft_tab:
                   , my_players 
                   , their_players
                   , general_value
+                  , replacement_value
+                  , values_to_me
+                  , values_to_team[second_seat]
                   , format )
 
           with inspection_tab:
