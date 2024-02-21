@@ -469,7 +469,7 @@ def make_trade_suggestion_display(_H
 
   full_dataframe = full_dataframe.reset_index().drop(columns = 'index')
   if len(full_dataframe) > 0:
-    goodness = full_dataframe['Your Differential'] + full_dataframe['Their Differential']* 0.2
+    goodness = full_dataframe['Your Differential']
     full_dataframe = full_dataframe.loc[list(goodness.sort_values(ascending = False).index)]
 
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
