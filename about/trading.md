@@ -31,3 +31,29 @@ It should be noted that a single incorrectly listed waiver wire player can rende
 When a team trades up, e.g. trades one players for two, they need to drop a player from their resulting team. 
 
 The complexity of this kind of trade also increases drastically with the number of players needed to drop, but not to the same degree as the trade-down case. The number of combinations available if e.g. four players are added is just seventeen choose four, which is slightly over two thousand. That is trivial for a computer. Trading down more than six players does run into memory issues, so that is disabled, but a trade that lopsided is not common
+
+## Heuristic trade guide
+
+In addition to evaluating trade suggestions, the app also provides some guidance on the most promising avenues for trades. This guidance can be used as inspitation for concrete trade ideas to evaluate
+
+### Evaluating trade candidates
+
+Good trade candidates would have more value on other teams than on your team. The trade candidates tab quantifies this value disparity for all combinations of your own players and possible receiving teams.
+
+For a particular player/receiving team pair it does this by:
+- Evaluating the impact of the player to your team. For this it uses an equivalent methodology to the asymmetric trade with decreasing players, meaning that the algorithm finds the best free agent/waiver wire replacement and observes how much worse the team gets with that replacement. If the team actually gets better when the player gets dropped, the value is set to zero
+- Evaluating the impact of adding the player to the receiving team, with equivalent methodology to the asymmetric trade with increasing players. That is, the algorithm runs through all drop options and finds the one which works the best to determine the post-addition score, then observes how much higher it is than the pre-addition score 
+- Subtracting the benefit the player offers to you from the benefit they would offer to the receiving team 
+
+After all values are calculated, there is also a "regularization" step for each receiving team. Some constant is added or subtracted from all the differential values to get a set of values that average to zero. The reason for this step is that some teams may have very poor-fitting players, leading to high values given to all potential trade acquisitions, since jettisoning the poor-fitting player would be a boon to the team. The regularization step makes it so that such teams do not stand out as attractive trade destinations for all players across the board. 
+
+### Evaluating trade targets
+
+Good trade targets would have more value on your team than on their current team. The trade targets tab quantifies this value disparity for all of another team's players
+
+For a particular player it does this by:
+- Evaluating the impact of the player to its current team. For this it uses an equivalent methodology to the asymmetric trade with decreasing players, meaning that the algorithm finds the best free agent/waiver wire replacement and observes how much worse the team gets with that replacement. If the team actually gets better when the player gets dropped, the value is set to zero
+- Evaluating the impact of adding the player to your team, with equivalent methodology to the asymmetric trade with increasing players. That is, the algorithm runs through all drop options and finds the one which works the best to determine the post-addition score, then observes how much higher it is than the pre-addition score 
+- Subtracting the benefit the player offers to their current team from the benefit they would offer to you
+
+After all values are calculated, there is also a "regularization" step for each sending team. This is to keep the averages around zero and in line with the candidates tab

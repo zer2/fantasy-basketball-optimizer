@@ -49,7 +49,9 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
                               , multiplier = multiplier)
   return df_styled
 
-def h_percentage_styler(df : pd.DataFrame) -> pd.DataFrame:
+def h_percentage_styler(df : pd.DataFrame
+                        , middle : float = 0.5
+                        , multiplier : float = 300) -> pd.DataFrame:
   """Helper function for styling tables of H-score results
 
   Args:
@@ -63,8 +65,8 @@ def h_percentage_styler(df : pd.DataFrame) -> pd.DataFrame:
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .map(stat_styler
-                              , middle = 0.5
-                              , multiplier = 300
+                              , middle = middle
+                              , multiplier = multiplier
                               , subset = get_categories())
   return df_styled
 

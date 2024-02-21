@@ -61,7 +61,7 @@ coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 param_tab, stat_tab, draft_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
                                                               ,":bar_chart: Player Stats"
-                                                              ,":man-bouncing-ball: Draft"
+                                                              ,":man-bouncing-ball: Draft/Analysis"
                                                               ,":first_place_medal: Player Rankings"
                                                               ,":scroll: About"])
 
@@ -274,7 +274,7 @@ with draft_tab:
 
     seat = st.selectbox(f'Which team are you?', selections.columns, index = 0)
 
-    draft_tab, injury_tab = st.tabs(['Draft Board','Injury List'])
+    draft_tab, injury_tab = st.tabs(['Rosters/Draft Board','Injury List'])
     
     with draft_tab: 
         st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
@@ -495,9 +495,44 @@ with draft_tab:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
 
+          candidate_tab, target_tab, inspection_tab = st.tabs(['Candidates'
+                                                              ,'Targets'
+                                                              ,'Trade Inspection'])
+
+          their_players_dict = { team : players for team, players in selections_editable.items() 
+                                  if ((team != seat) & (not  any(p!=p for p in players)))
+                                    }
+
+          with candidate_tab:
+
+            values_to_team = make_trade_candidate_display(H
+                                  , player_stats
+                                  , my_players 
+                                  , their_players_dict 
+                                  , players_chosen 
+                                  , format
+                                        )
+
+          with target_tab:
+            target_seat = st.selectbox(
+              f'Which team are you targeting?',
+              [s for s in their_players_dict.keys()],
+              index = 1
+            )
+
+            make_trade_target_display(H
+                  , player_stats
+                  , my_players 
+                  , their_players_dict[target_seat]
+                  , players_chosen 
+                  , values_to_team[target_seat]
+                  , format
+                        )
+
+          with inspection_tab:
             second_seat = st.selectbox(
               f'Which team are you trading with?',
-              selections.columns,
+              [s for s in their_players_dict.keys()],
               index = 1
             )
 
@@ -529,7 +564,8 @@ with draft_tab:
                                 , their_trade
                                 , my_players
                                 , their_players
-                                , second_seat)
+                                , second_seat
+                                , format)
                     
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
