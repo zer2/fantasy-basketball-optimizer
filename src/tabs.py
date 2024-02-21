@@ -334,8 +334,8 @@ def make_trade_target_display(_H
   values_to_me = values_to_me - values_to_me.mean() - \
                 (values_to_them - values_to_them.mean())
 
-  values_to_me.name = 'H-score differential for me'
-  values_to_team.name = 'H-score differential for them'
+  values_to_me.name = 'Relative Trade Value'
+  values_to_team.name = 'Relative Trade Value'
 
   values_to_me = values_to_me.sort_values(ascending = False)
   values_to_team = values_to_team.sort_values(ascending = False)
