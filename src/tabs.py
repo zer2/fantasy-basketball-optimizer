@@ -45,7 +45,9 @@ def make_team_tab(scores : pd.DataFrame
                                                   .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                   .map(stat_styler, subset = pd.IndexSlice[my_players, get_categories()], multiplier = player_multiplier) \
                                                   .applymap(stat_styler, subset = pd.IndexSlice['Difference', get_categories()], multiplier = team_multiplier)
-      display = st.dataframe(team_stats_styled, use_container_width = True)     
+      display = st.dataframe(team_stats_styled
+                          , use_container_width = True
+                                                    )     
   else:
     st.markdown('Your team does not have any players yet!')
   return team_stats
@@ -371,6 +373,9 @@ def make_trade_suggestion_display(_H
                   , replacement_value : float
                   , values_to_me : pd.Series
                   , values_to_them : pd.Series
+                  , your_differential_threshold : float
+                  , their_differential_threshold : float
+                  , combo_params : list[tuple]
                   , format : str):
   """Shows automatic trade suggestions 
 
@@ -421,13 +426,7 @@ def make_trade_suggestion_display(_H
     
     return full_dataframe_separated[meets_threshold]
 
-  all_combos = pd.concat([get_cross_combos(1,1,1)
-                        #, get_cross_combos(2,1,0.5)
-                        #, get_cross_combos(1,2,0.5)
-                        , get_cross_combos(2,2,0.25)
-                        , get_cross_combos(3,3,0.1)
-
-                        ])
+  all_combos = pd.concat([get_cross_combos(n,m,v) for n,m,v in combo_params])
 
   full_dataframe = pd.DataFrame()
 
@@ -459,7 +458,8 @@ def make_trade_suggestion_display(_H
     your_differential = your_score_post_trade - your_score_pre_trade
     their_differential = their_score_post_trade - their_score_pre_trade
 
-    if ( your_differential > 0.001 ) & (their_differential > 0.0002 ):
+    if ( your_differential > your_differential_threshold ) & \
+          (their_differential > their_differential_threshold ):
       new_row = pd.DataFrame({ 'Send' : [my_trade]
                                 ,'Receive' : [their_trade]
                                 ,'Your Differential' : [your_differential]
@@ -479,7 +479,12 @@ def make_trade_suggestion_display(_H
                                 , multiplier = 15000
                                 , subset = ['Your Differential','Their Differential']
                             )
-    st.dataframe(full_dataframe_styled, hide_index = True)
+    st.dataframe(full_dataframe_styled
+                , hide_index = True
+                , column_config={
+                             "Send": st.column_config.ListColumn("Send", width='large')
+                             ,"Receive": st.column_config.ListColumn("Receive", width='large')
+                                                    })
   else: 
     st.markdown('No promising trades found')
     

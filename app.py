@@ -191,7 +191,7 @@ with param_tab:
       selections = selections.astype(player_category_type)
 
   with advanced_param_tab: 
-    player_param_column, algorithm_param_column = st.columns([0.5,0.5])
+    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.4,0.4,0.2])
 
     with player_param_column:
       st.header('Player Statistics')
@@ -259,7 +259,52 @@ with param_tab:
         st.caption(n_iterations_str)
 
         punting = n_iterations > 0
-  
+
+    with trade_param_column:
+        st.header('Trading Parameters')
+
+        your_differential_threshold = st.number_input(
+              r'Your differential threshold for the automatic trade suggester'
+              , value = 0.1)
+        ydt_str = r'''Only trades which improve your H-score 
+                      by the threshold (as a percentage) will be shown'''
+        st.caption(ydt_str)
+        your_differential_threshold = your_differential_threshold /100
+
+        their_differential_threshold = st.number_input(
+              r'Counterparty differential threshold for the automatic trade suggester'
+              , value = 0.02)
+        tdt_str = r'''Only trades which improve the counterparty's H-score 
+                    by the threshold (as a percentage) will be shown'''
+        st.caption(tdt_str)
+        their_differential_threshold = their_differential_threshold/100
+
+        combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
+                                      ,'N-received' : [1,2,3]
+                                      ,'M' : [1,0.25,0.1]}
+                                      )
+
+        combo_params_df = st.data_editor(combo_params_default
+                                          , hide_index = True
+                                          , num_rows = "dynamic"
+                                          , column_config={
+                             "N-traded": st.column_config.NumberColumn("N-traded", default=1)
+                             ,"N-received": st.column_config.NumberColumn("N-received", default=1)
+                             ,"M": st.column_config.NumberColumn("M", default=0)
+                                                    }
+                                            ) 
+        combo_params_df[['N-traded','N-received']] = \
+              combo_params_df[['N-traded','N-received']].astype(int)
+              
+        combo_params_str =  \
+          """Each row is a specification for a kind of trade that will be automatically evaluated. 
+          N-traded is the number of players traded from your team, and N-received is the number of 
+          players to receive in the trade. M is a threshold of general value, trades that have 
+          general value differentials larger than M will not be evaluated"""
+        st.caption(combo_params_str)
+
+        combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
+
 with stat_tab:
   st.header('Per-game stats')
   st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
@@ -517,7 +562,7 @@ with draft_tab:
           
           their_players = their_players_dict[second_seat]
 
-          candidate_tab, target_tab, suggestions_tab, inspection_tab = st.tabs(['Candidates'
+          candidate_tab, target_tab, suggestions_tab, inspection_tab = st.tabs(['Destinations'
                                                               ,'Targets'
                                                               ,'Trade Suggesions'
                                                               ,'Trade Inspection'])
@@ -547,7 +592,7 @@ with draft_tab:
 
              if rotisserie:
               general_value = z_scores.sum(axis = 1)
-              replacement_value = z_scores_unselected.iloc[0].sum()
+              replacement_value = z_scores_unselected.iloc[0].sum() 
              else:
               general_value = g_scores.sum(axis = 1)
               replacement_value = g_scores_unselected.iloc[0].sum()
@@ -561,6 +606,9 @@ with draft_tab:
                   , replacement_value
                   , values_to_me
                   , values_to_team[second_seat]
+                  , your_differential_threshold
+                  , their_differential_threshold
+                  , combo_params
                   , format )
 
           with inspection_tab:
