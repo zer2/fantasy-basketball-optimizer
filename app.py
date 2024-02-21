@@ -545,11 +545,17 @@ with draft_tab:
 
           with suggestions_tab:
 
+             if rotisserie:
+              general_value = z_scores.sum(axis = 1)
+             else:
+              general_value = g_scores.sum(axis = 1)
+
              make_trade_suggestion_display(H
                   , player_stats 
                   , players_chosen 
                   , my_players 
                   , their_players
+                  , general_value
                   , format )
 
           with inspection_tab:

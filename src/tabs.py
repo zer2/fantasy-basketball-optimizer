@@ -364,6 +364,7 @@ def make_trade_suggestion_display(_H
                   , players_chosen : list[str]
                   , my_players : list[str]
                   , their_players : list[str]
+                  , general_values : pd.Series
                   , format : str):
   """Shows automatic trade suggestions 
 
@@ -373,42 +374,65 @@ def make_trade_suggestion_display(_H
     players_chosen: list of all chosen players
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
+    general_values : series representing general values, for filtering purposes
     format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
       None
   """
-  combinations = itertools.product(my_players, their_players)
+  combinations_one_one = list(itertools.product(itertools.combinations(my_players,1)
+                                          ,itertools.combinations(their_players,1)
+                                          )
+                              )
+
+  
+  combinations_two_two = list(itertools.product(itertools.combinations(my_players,2)
+                                          ,itertools.combinations(their_players,2)
+                                          )
+                              )
+
+  #Vectorize this! 
+
   full_dataframe = pd.DataFrame()
 
-  for my_trade, their_trade in combinations:
+  for my_trade, their_trade in combinations_one_one + combinations_two_two:
 
-    my_others = [x for x in my_players if x not in my_trade]
-    their_others = [x for x in their_players if x not in their_trade]
+    my_trade = list(my_trade)
+    their_trade = list(their_trade)
+    #check if the general value disparity is extreme. If it is, pass 
+    my_general_value = general_values.loc[my_trade].sum()
+    their_general_value = general_values.loc[their_trade].sum()
 
-    trade_results = analyze_trade(my_others
-                              , [my_trade]
-                              , their_others
-                              , [their_trade]
-                              , _H
-                              , player_stats
-                              , players_chosen
-                              , 1)
-    your_score_pre_trade = trade_results[1]['pre']['H-score']
-    your_score_post_trade = trade_results[1]['post']['H-score']
-    their_score_pre_trade = trade_results[2]['pre']['H-score']
-    their_score_post_trade = trade_results[2]['post']['H-score']
+    general_value_differential = my_general_value - their_general_value
+    if abs(general_value_differential) <= 1:
 
-    your_differential = your_score_post_trade - your_score_pre_trade
-    their_differential = their_score_post_trade - their_score_pre_trade
+      my_others = [x for x in my_players if x not in my_trade]
+      their_others = [x for x in their_players if x not in their_trade]
 
-    if ( your_differential > 0 ) & (their_differential > - 0.0001 ):
-      new_row = pd.DataFrame({ 'Send' : [my_trade]
-                                ,'Receive' : [their_trade]
-                                ,'Your Differential' : [your_differential]
-                                ,'Their Differential' : [their_differential]
-                                })
-      full_dataframe = pd.concat([full_dataframe, new_row])
+      trade_results = analyze_trade(my_others
+                                , my_trade
+                                , their_others
+                                , their_trade
+                                , _H
+                                , player_stats
+                                , players_chosen
+                                , 1)
+      your_score_pre_trade = trade_results[1]['pre']['H-score']
+      your_score_post_trade = trade_results[1]['post']['H-score']
+      their_score_pre_trade = trade_results[2]['pre']['H-score']
+      their_score_post_trade = trade_results[2]['post']['H-score']
+
+      your_differential = your_score_post_trade - your_score_pre_trade
+      their_differential = their_score_post_trade - their_score_pre_trade
+
+      if ( your_differential > 0 ) & (their_differential > - 0.0001 ):
+        new_row = pd.DataFrame({ 'Send' : [my_trade]
+                                  ,'Receive' : [their_trade]
+                                  ,'Your Differential' : [your_differential]
+                                  ,'Their Differential' : [their_differential]
+                                  ,'Your General Value Differential' : [general_value_differential]
+                                  })
+        full_dataframe = pd.concat([full_dataframe, new_row])
 
   if len(full_dataframe) > 0:
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
