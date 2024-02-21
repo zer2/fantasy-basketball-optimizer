@@ -45,7 +45,9 @@ def make_team_tab(scores : pd.DataFrame
                                                   .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
                                                   .map(stat_styler, subset = pd.IndexSlice[my_players, get_categories()], multiplier = player_multiplier) \
                                                   .applymap(stat_styler, subset = pd.IndexSlice['Difference', get_categories()], multiplier = team_multiplier)
-      display = st.dataframe(team_stats_styled, use_container_width = True)     
+      display = st.dataframe(team_stats_styled
+                          , use_container_width = True
+                                                    )     
   else:
     st.markdown('Your team does not have any players yet!')
   return team_stats
@@ -359,11 +361,21 @@ def make_trade_target_display(_H
                             )
     st.dataframe(values_to_team_styled, use_container_width = True)  
 
+  return values_to_me
+
+@st.cache_data()
 def make_trade_suggestion_display(_H
                   , player_stats : pd.DataFrame
                   , players_chosen : list[str]
                   , my_players : list[str]
                   , their_players : list[str]
+                  , general_values : pd.Series
+                  , replacement_value : float
+                  , values_to_me : pd.Series
+                  , values_to_them : pd.Series
+                  , your_differential_threshold : float
+                  , their_differential_threshold : float
+                  , combo_params : list[tuple]
                   , format : str):
   """Shows automatic trade suggestions 
 
@@ -373,23 +385,67 @@ def make_trade_suggestion_display(_H
     players_chosen: list of all chosen players
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
+    general_values : series representing general values, for filtering purposes
     format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
       None
   """
-  combinations = itertools.product(my_players, their_players)
+
+  my_candidate_players = [p for p in my_players if values_to_them[p] > -0.001 ]
+  their_candidate_players = [p for p in their_players if values_to_me[p] > -0.001 ]
+
+  my_players_with_weight = [(p,general_values[p]) for p in my_candidate_players]
+  their_players_with_weight = [(p,general_values[p])  for p in their_players]
+
+  def get_combos(players_with_weight, n):
+    player_combos_with_weight = list(itertools.combinations(players_with_weight,n))
+    player_combos_with_total_weight = [(list(z[0] for z in m), sum(z[1] for z in m)) 
+                                        for m in player_combos_with_weight]
+    return player_combos_with_total_weight
+
+  def get_cross_combos(n, m, threshold):
+    cross_combos = list(itertools.product(get_combos(my_players_with_weight, n)
+                                          ,get_combos(their_players_with_weight, m)
+                                          )
+                               )
+
+    full_dataframe = pd.DataFrame(cross_combos)
+    full_dataframe_separated = pd.concat([pd.DataFrame(full_dataframe[0].tolist()
+                                                       , index=full_dataframe.index)
+                                   ,pd.DataFrame(full_dataframe[1].tolist()
+                                                 , index=full_dataframe.index)], axis = 1
+                                      )
+    full_dataframe_separated.columns = ['My Trade','My Value','Their Trade','Their Value']
+    
+    if n!= m:
+        full_dataframe_separated['My Value'] += replacement_value * (m-n)
+    
+    value_differential = full_dataframe_separated['My Value'] - full_dataframe_separated['Their Value']
+    meets_threshold = abs(value_differential) <= threshold
+    
+    return full_dataframe_separated[meets_threshold]
+
+  all_combos = pd.concat([get_cross_combos(n,m,v) for n,m,v in combo_params])
+
   full_dataframe = pd.DataFrame()
 
-  for my_trade, their_trade in combinations:
+  for key, row in all_combos.iterrows():
+
+    my_trade = row['My Trade']
+    their_trade = row['Their Trade']
+
+    my_general_value = row['My Value']
+    their_general_value = row['Their Value']
+    #check if the general value disparity is extreme. If it is, pass 
 
     my_others = [x for x in my_players if x not in my_trade]
     their_others = [x for x in their_players if x not in their_trade]
 
     trade_results = analyze_trade(my_others
-                              , [my_trade]
+                              , my_trade
                               , their_others
-                              , [their_trade]
+                              , their_trade
                               , _H
                               , player_stats
                               , players_chosen
@@ -402,7 +458,8 @@ def make_trade_suggestion_display(_H
     your_differential = your_score_post_trade - your_score_pre_trade
     their_differential = their_score_post_trade - their_score_pre_trade
 
-    if ( your_differential > 0 ) & (their_differential > - 0.0001 ):
+    if ( your_differential > your_differential_threshold ) & \
+          (their_differential > their_differential_threshold ):
       new_row = pd.DataFrame({ 'Send' : [my_trade]
                                 ,'Receive' : [their_trade]
                                 ,'Your Differential' : [your_differential]
@@ -410,7 +467,11 @@ def make_trade_suggestion_display(_H
                                 })
       full_dataframe = pd.concat([full_dataframe, new_row])
 
+  full_dataframe = full_dataframe.reset_index().drop(columns = 'index')
   if len(full_dataframe) > 0:
+    goodness = full_dataframe['Your Differential']
+    full_dataframe = full_dataframe.loc[list(goodness.sort_values(ascending = False).index)]
+
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
                                       , subset = ['Your Differential','Their Differential']) \
                             .map(stat_styler
@@ -418,7 +479,12 @@ def make_trade_suggestion_display(_H
                                 , multiplier = 15000
                                 , subset = ['Your Differential','Their Differential']
                             )
-    st.dataframe(full_dataframe_styled, hide_index = True)
+    st.dataframe(full_dataframe_styled
+                , hide_index = True
+                , column_config={
+                             "Send": st.column_config.ListColumn("Send", width='large')
+                             ,"Receive": st.column_config.ListColumn("Receive", width='large')
+                                                    })
   else: 
     st.markdown('No promising trades found')
     
