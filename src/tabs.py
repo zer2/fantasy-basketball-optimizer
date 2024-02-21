@@ -4,6 +4,7 @@ import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
 from src.run_algorithm import HAgent, analyze_trade, analyze_trade_value
 import os
+import itertools
   
 ### Team tabs 
 
@@ -358,8 +359,69 @@ def make_trade_target_display(_H
                             )
     st.dataframe(values_to_team_styled, use_container_width = True)  
 
+def make_trade_suggestion_display(_H
+                  , player_stats : pd.DataFrame
+                  , players_chosen : list[str]
+                  , my_players : list[str]
+                  , their_players : list[str]
+                  , format : str):
+  """Shows automatic trade suggestions 
 
+  Args:
+    _H: H-scoring agent, which can be used to calculate H-score 
+    player_stats: DataFrame of player statistics 
+    players_chosen: list of all chosen players
+    my_players: initial list of players on your team
+    their_players: initial list of players on other team 
+    format: Name of format. Included as input because it is an input to H
+            and the cache should be re-calculated when format changes
+  Returns:
+      None
+  """
+  combinations = itertools.product(my_players, their_players)
+  full_dataframe = pd.DataFrame()
 
+  for my_trade, their_trade in combinations:
+
+    my_others = [x for x in my_players if x not in my_trade]
+    their_others = [x for x in their_players if x not in their_trade]
+
+    trade_results = analyze_trade(my_others
+                              , [my_trade]
+                              , their_others
+                              , [their_trade]
+                              , _H
+                              , player_stats
+                              , players_chosen
+                              , 1)
+    your_score_pre_trade = trade_results[1]['pre']['H-score']
+    your_score_post_trade = trade_results[1]['post']['H-score']
+    their_score_pre_trade = trade_results[2]['pre']['H-score']
+    their_score_post_trade = trade_results[2]['post']['H-score']
+
+    your_differential = your_score_post_trade - your_score_pre_trade
+    their_differential = their_score_post_trade - their_score_pre_trade
+
+    if ( your_differential > 0 ) & (their_differential > - 0.0001 ):
+      new_row = pd.DataFrame({ 'Send' : [my_trade]
+                                ,'Receive' : [their_trade]
+                                ,'Your Differential' : [your_differential]
+                                ,'Their Differential' : [their_differential]
+                                })
+      full_dataframe = pd.concat([full_dataframe, new_row])
+
+  if len(full_dataframe) > 0:
+    full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
+                                      , subset = ['Your Differential','Their Differential']) \
+                            .map(stat_styler
+                                , middle = 0
+                                , multiplier = 15000
+                                , subset = ['Your Differential','Their Differential']
+                            )
+    st.dataframe(full_dataframe_styled, hide_index = True)
+  else: 
+    st.markdown('No promising trades found')
+    
 @st.cache_data()
 def make_trade_display(_H
                   , player_stats : pd.DataFrame

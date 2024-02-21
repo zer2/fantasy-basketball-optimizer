@@ -31,14 +31,23 @@ if 'params' not in st.session_state:
           print(exc) 
 
 
-if 'run' not in st.session_state:
-    st.session_state.run = False
+if 'run_h_score' not in st.session_state:
+    st.session_state.run_h_score = False
 
-def run():
-    st.session_state.run = True
+def run_h_score():
+    st.session_state.run_h_score = True
 
-def stop_run():
-    st.session_state.run = False
+def stop_run_h_score():
+    st.session_state.run_score = False
+
+if 'run_trade' not in st.session_state:
+    st.session_state.run_trade = False
+
+def run_trade():
+    st.session_state.run_trade = True
+
+def stop_run_trade():
+    st.session_state.run_trade = False
       
 counting_statistics = st.session_state.params['counting-statistics'] 
 percentage_statistics = st.session_state.params['percentage-statistics'] 
@@ -374,14 +383,15 @@ with draft_tab:
         if len(my_players) == n_picks:
           st.markdown('Team is complete!')
                   
-        elif not st.session_state.run:
+        elif not st.session_state.run_h_score:
           with st.form(key='my_form_to_submit'):
-            h_score_button = st.form_submit_button(label='Run H-score algorithm', on_click = run) 
+            h_score_button = st.form_submit_button(label='Run H-score algorithm'
+                                                , on_click = run_h_score) 
                     
         else:
 
           #record the fact that the run has already been invoked, no need to invoke it again
-          stop_run()
+          stop_run_h_score()
 
           n_players = n_drafters * n_picks
       
@@ -494,14 +504,23 @@ with draft_tab:
         if len(my_players) < n_picks:
             st.markdown('Your team is not full yet! Come back here when you have a full team')
         else:
-
-          candidate_tab, target_tab, inspection_tab = st.tabs(['Candidates'
-                                                              ,'Targets'
-                                                              ,'Trade Inspection'])
-
+          
           their_players_dict = { team : players for team, players in selections_editable.items() 
                                   if ((team != seat) & (not  any(p!=p for p in players)))
                                     }
+
+          second_seat = st.selectbox(
+              f'Which team are you considering trading with?',
+              [s for s in their_players_dict.keys()],
+              index = 1
+            )
+          
+          their_players = their_players_dict[second_seat]
+
+          candidate_tab, target_tab, suggestions_tab, inspection_tab = st.tabs(['Candidates'
+                                                              ,'Targets'
+                                                              ,'Trade Suggesions'
+                                                              ,'Trade Inspection'])
 
           with candidate_tab:
 
@@ -514,35 +533,31 @@ with draft_tab:
                                         )
 
           with target_tab:
-            target_seat = st.selectbox(
-              f'Which team are you targeting?',
-              [s for s in their_players_dict.keys()],
-              index = 1
-            )
 
             make_trade_target_display(H
                   , player_stats
                   , my_players 
-                  , their_players_dict[target_seat]
+                  , their_players
                   , players_chosen 
-                  , values_to_team[target_seat]
+                  , values_to_team[second_seat]
                   , format
                         )
 
+          with suggestions_tab:
+
+             make_trade_suggestion_display(H
+                  , player_stats 
+                  , players_chosen 
+                  , my_players 
+                  , their_players
+                  , format )
+
           with inspection_tab:
-            second_seat = st.selectbox(
-              f'Which team are you trading with?',
-              [s for s in their_players_dict.keys()],
-              index = 1
-            )
 
             their_players = selections_editable[second_seat].dropna()
 
             if len(their_players) < n_picks:
                 st.markdown('Their team is not full yet! Come back here when it is')
-
-            elif second_seat == seat:
-                st.markdown('You cannot trade with yourself!')
 
             else:
 
