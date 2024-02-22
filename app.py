@@ -73,7 +73,7 @@ coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 param_tab, stat_tab, draft_tab, move_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
                                                               ,":bar_chart: Player Stats"
                                                               ,":man-bouncing-ball: Drafting/Rosters"
-                                                              , ":man-running: Move Analysis"
+                                                              ,":clipboard: Move Analysis"
                                                               ,":first_place_medal: Player Rankings"
                                                               ,":scroll: About"])
 
