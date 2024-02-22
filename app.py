@@ -204,7 +204,7 @@ with param_tab:
       selections = selections.astype(player_category_type)
 
   with advanced_param_tab: 
-    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.4,0.4,0.2])
+    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
 
     with player_param_column:
       st.header('Player Statistics')
