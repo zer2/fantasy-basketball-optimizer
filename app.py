@@ -349,8 +349,7 @@ with draft_tab:
 
     seat = st.selectbox(f'Which team are you?'
                       , selections.columns
-                      , index = 0
-                      , label_visibility = 'collapsed')
+                      , index = 0)
 
     draft_tab, injury_tab = st.tabs(['Rosters/Draft Board','Injury List'])
     
