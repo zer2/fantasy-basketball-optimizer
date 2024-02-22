@@ -564,7 +564,7 @@ def make_trade_display(_H
       pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
       pre_to_post_styled = h_percentage_styler(pre_to_post)
-      st.dataframe(pre_to_post_styled, use_container_width = True)
+      st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
     
       if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
           st.markdown('This trade benefits their team :slightly_smiling_face:')
@@ -574,7 +574,7 @@ def make_trade_display(_H
       pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
       pre_to_post_styled = h_percentage_styler(pre_to_post)
-      st.dataframe(pre_to_post_styled, use_container_width = True)
+      st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
 
 ### Rank tabs 
 
