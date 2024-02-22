@@ -352,7 +352,10 @@ def make_trade_target_display(_H
                                 , middle = 0
                                 , multiplier = 15000
                             )
-    st.dataframe(values_to_me_styled, use_container_width = True)  
+    st.dataframe(values_to_me_styled
+              , use_container_width = True
+              , height = len(values_to_me) * 35 + 38
+)  
 
   with c2: 
     values_to_team_styled = values_to_team.to_frame().style.format("{:.2%}") \
@@ -360,7 +363,10 @@ def make_trade_target_display(_H
                                 , middle = 0
                                 , multiplier = 15000
                             )
-    st.dataframe(values_to_team_styled, use_container_width = True)  
+    st.dataframe(values_to_team_styled
+              , use_container_width = True
+              , height = len(values_to_team) * 35 + 38
+)  
 
   return values_to_me
 
