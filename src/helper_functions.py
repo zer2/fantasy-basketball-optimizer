@@ -60,8 +60,10 @@ def h_percentage_styler(df : pd.DataFrame
   Returns:
     Styled dataframe
   """
-  df_styled = df.style.format("{:.1%}"
-                                , subset = pd.IndexSlice[:,['H-score'] + get_categories()]) \
+  df_styled = df.style.format("{:.2%}"
+                                , subset = pd.IndexSlice[:,['H-score']] ) \
+                          .format("{:.1%}"
+                                , subset = pd.IndexSlice[:,get_categories()]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .map(stat_styler
