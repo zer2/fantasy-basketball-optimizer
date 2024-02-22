@@ -1,11 +1,9 @@
 from requests.auth import HTTPBasicAuth
-from requests_oauthlib import OAuth2Session
 from src import yahoo_helper
 from streamlit.logger import get_logger
 from tempfile import mkdtemp
-from typing import Optional
-from yahoo_oauth import OAuth2
-from yfpy.models import Team, Roster
+from typing import List, Optional
+from yfpy.models import League, Team, Roster
 from yfpy.query import YahooFantasySportsQuery
 
 import json
@@ -118,38 +116,33 @@ def clean_up_access_token(access_token_dir: str):
 
 @st.cache_data(ttl=3600)
 def get_yahoo_players_df(_access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
-    teams_dict = get_teams(league_id, _access_token_dir)
-
+    teams_dict = get_teams_dict(league_id, _access_token_dir)
     team_ids = list(teams_dict.keys())
-
-    rosters_dict = get_rosters(league_id, _access_token_dir, team_ids)
-
-    players_df = get_players_df(rosters_dict, teams_dict, player_metadata)
+    rosters_dict = get_rosters_dict(league_id, _access_token_dir, team_ids)
+    players_df = _get_players_df(rosters_dict, teams_dict, player_metadata)
 
     return players_df
 
 @st.cache_data(ttl=3600)
-def get_teams(league_id: str, auth_path: str) -> dict[int, Team]:    
-    league_id = league_id
+def get_teams_dict(league_id: str, auth_path: str) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
-    auth_directory = auth_path
     sc = YahooFantasySportsQuery(
-        auth_dir=auth_directory,
+        auth_dir=auth_path,
         league_id=league_id,
         game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
-    teams_dict = yahoo_helper.get_teams(sc)
+    teams = yahoo_helper.get_teams(sc)
+    teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
     return teams_dict
 
 @st.cache_data(ttl=3600)
-def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
+def get_rosters_dict(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
 
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
-    auth_directory = auth_path
     sc = YahooFantasySportsQuery(
-        auth_dir=auth_directory,
+        auth_dir=auth_path,
         league_id=league_id,
         game_code="nba"
     )
@@ -163,7 +156,21 @@ def get_rosters(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int
     
     return rosters_dict
 
-def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team], player_metadata: pd.Series):
+@st.cache_data(ttl=3600)
+def get_user_leagues(auth_path: str) -> List[League]:
+    sc = YahooFantasySportsQuery(
+        auth_dir=auth_path,
+        league_id="", # Shouldn't actually matter what this is since we are retrieving the user's leagues
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+    leagues = yahoo_helper.get_user_leagues(sc)
+    
+    # Sort in reverse chronological order
+    sorted_leagues = sorted(leagues, key = lambda league: league.season, reverse=True)
+    return sorted_leagues
+
+def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str], player_metadata: pd.Series):
     players_df = pd.DataFrame()
 
     team_players_dict = {}
@@ -192,4 +199,3 @@ def get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, Team],
         players_df.loc[:,team_name] = player_names
 
     return players_df
-

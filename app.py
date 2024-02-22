@@ -3,14 +3,16 @@ import pandas as pd
 from pandas.api.types import CategoricalDtype
 import numpy as np
 import os 
+from typing import Callable
 import yaml
+from yfpy.models import League
 
 from src.helper_functions import listify, make_progress_chart, make_about_tab, stat_styler, styler_a,styler_b, styler_c
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
-from src.yahoo_connect import clean_up_access_token, get_yahoo_access_token, get_yahoo_players_df
-from src.tabs import * 
+from src import yahoo_connect
+from src.tabs import *
 
 #from streamlit_profiler import Profiler
 
@@ -162,17 +164,28 @@ with param_tab:
 
         selections = None
 
-        access_token_dir = get_yahoo_access_token()
+        access_token_dir = yahoo_connect.get_yahoo_access_token()
 
         if access_token_dir is not None:
-          yahoo_league_id = st.text_input('If loading rosters from established league: what is your league id?')
-          # yahoo_league_id = "189463"
+
+          user_leagues = yahoo_connect.get_user_leagues(access_token_dir)
+
+          get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
+
+          yahoo_league = st.selectbox(
+             label='Which league should player data be pulled from?',
+             options=user_leagues,
+             format_func=get_league_labels,
+             index=None
+          )
           
-          if len(yahoo_league_id) >= 6:
+          if yahoo_league is not None:
+
+            yahoo_league_id = yahoo_league.league_id
 
             player_metadata = get_player_metadata()
 
-            team_players_df = get_yahoo_players_df(access_token_dir, yahoo_league_id, player_metadata)
+            team_players_df = yahoo_connect.get_yahoo_players_df(access_token_dir, yahoo_league_id, player_metadata)
             n_drafters = team_players_df.shape[1]
             n_picks = team_players_df.shape[0]
 
@@ -180,7 +193,7 @@ with param_tab:
             
             selections = team_players_df
 
-            clean_up_access_token(access_token_dir)
+            yahoo_connect.clean_up_access_token(access_token_dir)
 
             st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
