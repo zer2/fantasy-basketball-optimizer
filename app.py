@@ -70,9 +70,10 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-param_tab, stat_tab, draft_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
+param_tab, stat_tab, draft_tab, move_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
                                                               ,":bar_chart: Player Stats"
-                                                              ,":man-bouncing-ball: Draft/Analysis"
+                                                              ,":man-bouncing-ball: Drafting/Rosters"
+                                                              , ":man-running: Move Analysis"
                                                               ,":first_place_medal: Player Rankings"
                                                               ,":scroll: About"])
 
@@ -346,12 +347,11 @@ with draft_tab:
 
   with left:
 
-
     seat = st.selectbox(f'Which team are you?'
                       , selections.columns
                       , index = 0)
 
-    draft_tab, injury_tab = st.tabs(['Rosters/Draft Board','Injury List'])
+    draft_tab, injury_tab = st.tabs(['Draft Board/Rosters','Injury List'])
     
     with draft_tab: 
         st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
@@ -391,7 +391,7 @@ with draft_tab:
 
   with right:
 
-    team_tab, cand_tab, waiver_tab, trade_tab = st.tabs(["Team", "Candidates","Waiver Moves","Trades"])
+    team_tab, cand_tab = st.tabs(["Team", "Candidates"])
 
     with team_tab:
     
@@ -524,141 +524,141 @@ with draft_tab:
                 st.dataframe(weight_display, use_container_width = True)
                 
 
-    with waiver_tab:
-        if len(my_players) < n_picks:
-            st.markdown('Your team is not full yet! Come back here when you have a full team')
+with move_tab:
 
-        else:
-                  
-            drop_player = st.selectbox(
-              'Which player are you considering dropping?'
-              ,my_players
-              ,index = len(my_players)-1
-            )
+  waiver_tab, trade_tab = st.tabs(['Waivers/Free Agents','Trades'])
 
-            mod_my_players = [x for x in my_players if x != drop_player]
+  with waiver_tab:
+      if len(my_players) < n_picks:
+          st.markdown('Your team is not full yet! Come back here when you have a full team')
 
-            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+      else:
+                
+          drop_player = st.selectbox(
+            'Which player are you considering dropping?'
+            ,my_players
+            ,index = len(my_players)-1
+          )
 
-            with z_waiver_tab:
+          mod_my_players = [x for x in my_players if x != drop_player]
 
-                st.markdown('Projected team stats with chosen player:')
-                make_waiver_tab(z_scores
-                              , z_scores_unselected
-                              , team_stats_z
-                              , drop_player
-                              , z_score_team_multiplier)
+          z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-            with g_waiver_tab:
+          with z_waiver_tab:
 
-                st.markdown('Projected team stats with chosen player:')
-                make_waiver_tab(g_scores
-                              , g_scores_unselected
-                              , team_stats_g
-                              , drop_player
-                              , g_score_team_multiplier)
-
-            with h_waiver_tab:
-
-                make_h_waiver_df(H
-                            , player_stats
-                            , mod_my_players
+              st.markdown('Projected team stats with chosen player:')
+              make_waiver_tab(z_scores
+                            , z_scores_unselected
+                            , team_stats_z
                             , drop_player
-                            , players_chosen
-                            , base_h_score
-                            , base_win_rates)
+                            , z_score_team_multiplier)
 
-    with trade_tab:
-        if len(my_players) < n_picks:
-            st.markdown('Your team is not full yet! Come back here when you have a full team')
-        else:
-          
-          their_players_dict = { team : players for team, players in selections_editable.items() 
-                                  if ((team != seat) & (not  any(p!=p for p in players)))
-                                    }
+          with g_waiver_tab:
 
-          second_seat = st.selectbox(
-              f'Which team are you considering trading with?',
-              [s for s in their_players_dict.keys()],
-              index = 0
-            )
-          
-          their_players = their_players_dict[second_seat]
+              st.markdown('Projected team stats with chosen player:')
+              make_waiver_tab(g_scores
+                            , g_scores_unselected
+                            , team_stats_g
+                            , drop_player
+                            , g_score_team_multiplier)
 
-          candidate_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
-                                                              ,'Targets'
-                                                              ,'Trade Inspection'
-                                                              ,'Trade Suggesions'
-                                                              ])
+          with h_waiver_tab:
 
-          with candidate_tab:
+              make_h_waiver_df(H
+                          , player_stats
+                          , mod_my_players
+                          , drop_player
+                          , players_chosen
+                          , base_h_score
+                          , base_win_rates)
 
-            values_to_team = make_trade_candidate_display(H
-                                  , player_stats
-                                  , my_players 
-                                  , their_players_dict 
-                                  , players_chosen 
-                                  , format
-                                        )
+  with trade_tab:
+      if len(my_players) < n_picks:
+          st.markdown('Your team is not full yet! Come back here when you have a full team')
+      else:
+        
+        their_players_dict = { team : players for team, players in selections_editable.items() 
+                                if ((team != seat) & (not  any(p!=p for p in players)))
+                                  }
 
-          with target_tab:
+        second_seat = st.selectbox(
+            f'Which team are you considering trading with?',
+            [s for s in their_players_dict.keys()],
+            index = 0
+          )
+        
+        their_players = their_players_dict[second_seat]
 
-            values_to_me = make_trade_target_display(H
-                  , player_stats
-                  , my_players 
-                  , their_players
-                  , players_chosen 
-                  , values_to_team[second_seat]
-                  , format
-                        )
+        candidate_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
+                                                            ,'Targets'
+                                                            ,'Trade Inspection'
+                                                            ,'Trade Suggesions'
+                                                            ])
 
-          with inspection_tab:
+        with candidate_tab:
 
+          values_to_team = make_trade_candidate_display(H
+                                , player_stats
+                                , my_players 
+                                , their_players_dict 
+                                , players_chosen 
+                                , format
+                                      )
+
+        with target_tab:
+
+          values_to_me = make_trade_target_display(H
+                , player_stats
+                , my_players 
+                , their_players
+                , players_chosen 
+                , values_to_team[second_seat]
+                , format
+                      )
+
+        with inspection_tab:
+
+          c1, c2 = st.columns(2)
+
+          with c1: 
             their_players = selections_editable[second_seat].dropna()
 
-            if len(their_players) < n_picks:
-                st.markdown('Their team is not full yet! Come back here when it is')
+            with st.form("trade inspection form"):
 
-            else:
+              my_trade = st.multiselect(
+                'Which players are you trading?'
+                ,my_players
+                )
+                
+              their_trade = st.multiselect(
+                    'Which players are you receiving?'
+                    ,their_players
+                )
 
-                with st.form("trade inspection form"):
+              submitted = st.form_submit_button("Submit", use_container_width = True)
 
-                  my_c, their_c = st.columns(2)
+          with c2: 
+            make_trade_display(H
+                            , player_stats 
+                            , players_chosen 
+                            , n_iterations 
+                            , my_trade
+                            , their_trade
+                            , my_players
+                            , their_players
+                            , second_seat
+                            , format)
 
-                  with my_c:
-                    my_trade = st.multiselect(
-                      'Which players are you trading?'
-                      ,my_players
-                      )
-                  with their_c:
-                    their_trade = st.multiselect(
-                          'Which players are you receiving?'
-                          ,their_players
-                      )
+          with suggestions_tab:
 
-                  submitted = st.form_submit_button("Submit", use_container_width = True)
-
-
-                make_trade_display(H
-                                , player_stats 
-                                , players_chosen 
-                                , n_iterations 
-                                , my_trade
-                                , their_trade
-                                , my_players
-                                , their_players
-                                , second_seat
-                                , format)
-            with suggestions_tab:
-
-             if rotisserie:
+            if rotisserie:
               general_value = z_scores.sum(axis = 1)
               replacement_value = z_scores_unselected.iloc[0].sum() 
-             else:
+            else:
               general_value = g_scores.sum(axis = 1)
               replacement_value = g_scores_unselected.iloc[0].sum()
 
-             make_trade_suggestion_display(H
+              make_trade_suggestion_display(H
                   , player_stats 
                   , players_chosen 
                   , my_players 
@@ -670,7 +670,8 @@ with draft_tab:
                   , your_differential_threshold
                   , their_differential_threshold
                   , combo_params
-                  , format )                    
+                  , format )               
+
 with rank_tab:
   z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
     
