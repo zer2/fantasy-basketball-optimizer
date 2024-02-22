@@ -233,7 +233,7 @@ def make_h_waiver_df(_H
 ### Trade tabs
 
 @st.cache_data()
-def make_trade_candidate_display(_H
+def make_trade_destination_display(_H
                   , player_stats : pd.DataFrame
                   , my_players : list[str]
                   , their_players_dict : dict[list[str]]
@@ -281,12 +281,12 @@ def make_trade_candidate_display(_H
     values_to_team[col] = values_to_team[col] - values_to_team[col].mean() - \
                             (values_to_me - values_to_me.mean())
 
-  values_to_team_styled = values_to_team.style.format("{:.2%}") \
+  values_to_team_styled = values_to_team.T.style.format("{:.2%}") \
                           .map(stat_styler
                               , middle = 0
                               , multiplier = 15000
                           )
-  st.dataframe(values_to_team_styled)
+  st.dataframe(values_to_team_styled, use_container_width = True)
 
   return values_to_team
 

@@ -589,15 +589,15 @@ with move_tab:
         
         their_players = their_players_dict[second_seat]
 
-        candidate_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
+        destinations_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
                                                             ,'Targets'
                                                             ,'Trade Inspection'
                                                             ,'Trade Suggesions'
                                                             ])
 
-        with candidate_tab:
+        with destinations_tab:
 
-          values_to_team = make_trade_candidate_display(H
+          values_to_team = make_trade_destination_display(H
                                 , player_stats
                                 , my_players 
                                 , their_players_dict 
