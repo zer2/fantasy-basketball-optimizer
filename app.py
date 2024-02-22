@@ -618,15 +618,23 @@ with draft_tab:
 
             else:
 
-                my_trade = st.multiselect(
-                  'Which players are you trading?'
-                  ,my_players
-                  )
-    
-                their_trade = st.multiselect(
-                      'Which players are you receiving?'
-                      ,their_players
-                  )
+                with st.form("trade inspection form"):
+
+                  my_c, their_c = st.columns(2)
+
+                  with my_c:
+                    my_trade = st.multiselect(
+                      'Which players are you trading?'
+                      ,my_players
+                      )
+                  with their_c:
+                    their_trade = st.multiselect(
+                          'Which players are you receiving?'
+                          ,their_players
+                      )
+
+                  submitted = st.form_submit_button("Submit")
+
 
                 make_trade_display(H
                                 , player_stats 
