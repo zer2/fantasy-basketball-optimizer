@@ -103,7 +103,7 @@ with param_tab:
 
   with general_param_tab: 
 
-    board_param_column, other_param_column, _ = st.columns([0.25,0.5,0.25])
+    board_param_column, other_param_column, _ = st.columns([0.4,0.4,0.2])
 
     #this column is written first so that it can pass the selected player stats dataframe
     with other_param_column: 
@@ -293,27 +293,31 @@ with param_tab:
         st.caption(tdt_str)
         their_differential_threshold = their_differential_threshold/100
 
-        combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
-                                      ,'N-received' : [1,2,3]
-                                      ,'T1' : [0,0,0]
-                                      ,'T2' : [1,0.25,0.1]}
-                                      )
+        with st.form("Combo params"):
+          combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
+                                        ,'N-received' : [1,2,3]
+                                        ,'T1' : [0,0,0]
+                                        ,'T2' : [1,0.25,0.1]}
+                                        )
 
-        combo_params_df = st.data_editor(combo_params_default
-                                          , hide_index = True
-                                          , num_rows = "dynamic"
-                                          , column_config={
-                             "N-traded": st.column_config.NumberColumn("N-traded", default=1)
-                             ,"N-received": st.column_config.NumberColumn("N-received", default=1)
-                             ,"T1": st.column_config.NumberColumn("T1", default=0)
-                             ,"T2": st.column_config.NumberColumn("T2", default=0)
+          combo_params_df = st.data_editor(combo_params_default
+                                            , hide_index = True
+                                            , num_rows = "dynamic"
+                                            , column_config={
+                              "N-traded": st.column_config.NumberColumn("N-traded", default=1)
+                              ,"N-received": st.column_config.NumberColumn("N-received", default=1)
+                              ,"T1": st.column_config.NumberColumn("T1", default=0)
+                              ,"T2": st.column_config.NumberColumn("T2", default=0)
 
-                                                    }
-                                            ) 
-        combo_params_df[['N-traded','N-received']] = \
-              combo_params_df[['N-traded','N-received']].astype(int)
+                                                      }
+                                              ) 
+          combo_params_df[['N-traded','N-received']] = \
+                combo_params_df[['N-traded','N-received']].astype(int)
 
-        combo_params_df['T1'] = combo_params_df['T1']/100
+          combo_params_df['T1'] = combo_params_df['T1']/100
+          
+          submitted = st.form_submit_button("Submit", use_container_width = True)
+
 
         combo_params_str =  \
           """Each row is a specification for a kind of trade that will be automatically evaluated. 
