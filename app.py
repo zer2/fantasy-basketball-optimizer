@@ -633,7 +633,7 @@ with draft_tab:
                           ,their_players
                       )
 
-                  submitted = st.form_submit_button("Submit")
+                  submitted = st.form_submit_button("Submit", use_container_width = True)
 
 
                 make_trade_display(H
