@@ -46,9 +46,11 @@ def get_current_season_data(season : int = 2024) -> tuple:
 
   player_metadata = get_player_metadata()
 
-  data_dict = {str(season) + '- Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
-               ,str(season) + '- Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
-               ,str(season) + '- Season to Date' :  process_game_level_data(full_subset, player_metadata)
+  season_display_string = str(season - 1) + '-' + str(season)
+
+  data_dict = {season_display_string + ': Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
+               ,season_display_string + ': Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
+               ,season_display_string + ': Season to Date' :  process_game_level_data(full_subset, player_metadata)
               }
                               
   return data_dict, expected_minutes_long_term 
@@ -91,7 +93,11 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
 def get_historical_data():
   #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
   
-  full_df = pd.read_csv('./data/stat_df.csv').set_index(['Season','Player']).sort_index().fillna(0)  
+  full_df = pd.read_csv('./data/stat_df.csv')
+
+  full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
+  
+  full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
 
   #adjust for the fact that historical data is week-based on game-based
   all_counting_stats = st.session_state.params['counting-statistics'] + st.session_state.params['volume-statistics']
