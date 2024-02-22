@@ -47,6 +47,7 @@ def make_team_tab(scores : pd.DataFrame
                                                   .applymap(stat_styler, subset = pd.IndexSlice['Difference', get_categories()], multiplier = team_multiplier)
       display = st.dataframe(team_stats_styled
                           , use_container_width = True
+                          , height = len(team_stats) * 35 + 38
                                                     )     
   else:
     st.markdown('Your team does not have any players yet!')
@@ -233,7 +234,7 @@ def make_h_waiver_df(_H
 ### Trade tabs
 
 @st.cache_data()
-def make_trade_candidate_display(_H
+def make_trade_destination_display(_H
                   , player_stats : pd.DataFrame
                   , my_players : list[str]
                   , their_players_dict : dict[list[str]]
@@ -281,12 +282,12 @@ def make_trade_candidate_display(_H
     values_to_team[col] = values_to_team[col] - values_to_team[col].mean() - \
                             (values_to_me - values_to_me.mean())
 
-  values_to_team_styled = values_to_team.style.format("{:.2%}") \
+  values_to_team_styled = values_to_team.T.style.format("{:.2%}") \
                           .map(stat_styler
                               , middle = 0
                               , multiplier = 15000
                           )
-  st.dataframe(values_to_team_styled)
+  st.dataframe(values_to_team_styled, use_container_width = True)
 
   return values_to_team
 
@@ -351,7 +352,10 @@ def make_trade_target_display(_H
                                 , middle = 0
                                 , multiplier = 15000
                             )
-    st.dataframe(values_to_me_styled, use_container_width = True)  
+    st.dataframe(values_to_me_styled
+              , use_container_width = True
+              , height = len(values_to_me) * 35 + 38
+)  
 
   with c2: 
     values_to_team_styled = values_to_team.to_frame().style.format("{:.2%}") \
@@ -359,7 +363,10 @@ def make_trade_target_display(_H
                                 , middle = 0
                                 , multiplier = 15000
                             )
-    st.dataframe(values_to_team_styled, use_container_width = True)  
+    st.dataframe(values_to_team_styled
+              , use_container_width = True
+              , height = len(values_to_team) * 35 + 38
+)  
 
   return values_to_me
 
@@ -564,7 +571,7 @@ def make_trade_display(_H
       pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
       pre_to_post_styled = h_percentage_styler(pre_to_post)
-      st.dataframe(pre_to_post_styled, use_container_width = True)
+      st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
     
       if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
           st.markdown('This trade benefits their team :slightly_smiling_face:')
@@ -574,7 +581,7 @@ def make_trade_display(_H
       pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
       pre_to_post_styled = h_percentage_styler(pre_to_post)
-      st.dataframe(pre_to_post_styled, use_container_width = True)
+      st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
 
 ### Rank tabs 
 
