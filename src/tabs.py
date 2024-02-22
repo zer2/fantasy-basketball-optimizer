@@ -386,25 +386,38 @@ def make_trade_suggestion_display(_H
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     general_values : series representing general values, for filtering purposes
+    replacement_value : generic value of the top replacement player
+    values_to_me : targetedness of counterparty players to you
+    values_to_them : targetedness of your players to counterparty
+    your_differential_threshold : for display, only include trades above this level of value for you
+    their_differential_threshold : for display, only include trades above this level of value for counterparty
+    combo_params : list of parameter sets for combos to try. See options page for details 
     format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
       None
   """
 
-  my_candidate_players = [p for p in my_players if values_to_them[p] > -0.001 ]
-  their_candidate_players = [p for p in their_players if values_to_me[p] > -0.001 ]
 
-  my_players_with_weight = [(p,general_values[p]) for p in my_candidate_players]
-  their_players_with_weight = [(p,general_values[p])  for p in their_players]
-
-  def get_combos(players_with_weight, n):
+  def get_combos(players_with_weight : list[tuple]
+              , n : int) -> list[tuple]:
+    #helper function just for getting all 1,2,3 combos etc. from a set of candidates
     player_combos_with_weight = list(itertools.combinations(players_with_weight,n))
     player_combos_with_total_weight = [(list(z[0] for z in m), sum(z[1] for z in m)) 
                                         for m in player_combos_with_weight]
     return player_combos_with_total_weight
 
-  def get_cross_combos(n, m, threshold):
+  def get_cross_combos(n : int
+                        , m : int
+                        , heuristic_differential_threshold : float
+                        , value_threshold : float) -> pd.DataFrame :
+    #helper function for getting trades between combos. Creates a dataframe for vectorized filtering
+    my_candidate_players = [p for p in my_players if values_to_them[p] > heuristic_differential_threshold ]
+    their_candidate_players = [p for p in their_players if values_to_me[p] > heuristic_differential_threshold ]
+
+    my_players_with_weight = [(p,general_values[p]) for p in my_candidate_players]
+    their_players_with_weight = [(p,general_values[p])  for p in their_players]
+
     cross_combos = list(itertools.product(get_combos(my_players_with_weight, n)
                                           ,get_combos(their_players_with_weight, m)
                                           )
@@ -422,11 +435,11 @@ def make_trade_suggestion_display(_H
         full_dataframe_separated['My Value'] += replacement_value * (m-n)
     
     value_differential = full_dataframe_separated['My Value'] - full_dataframe_separated['Their Value']
-    meets_threshold = abs(value_differential) <= threshold
+    meets_threshold = abs(value_differential) <= value_threshold
     
     return full_dataframe_separated[meets_threshold]
 
-  all_combos = pd.concat([get_cross_combos(n,m,v) for n,m,v in combo_params])
+  all_combos = pd.concat([get_cross_combos(n,m,hdt,vt) for n,m,hdt,vt in combo_params])
 
   full_dataframe = pd.DataFrame()
 
@@ -478,7 +491,9 @@ def make_trade_suggestion_display(_H
                                 , middle = 0
                                 , multiplier = 15000
                                 , subset = ['Your Differential','Their Differential']
-                            )
+                            ).set_properties(**{
+                                  'font-size': '12pt',
+                              })
     st.dataframe(full_dataframe_styled
                 , hide_index = True
                 , column_config={
