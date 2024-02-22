@@ -346,7 +346,11 @@ with draft_tab:
 
   with left:
 
-    seat = st.selectbox(f'Which team are you?', selections.columns, index = 0)
+
+    seat = st.selectbox(f'Which team are you?'
+                      , selections.columns
+                      , index = 0
+                      , label_visibility = 'collapsed')
 
     draft_tab, injury_tab = st.tabs(['Rosters/Draft Board','Injury List'])
     
@@ -577,7 +581,7 @@ with draft_tab:
           second_seat = st.selectbox(
               f'Which team are you considering trading with?',
               [s for s in their_players_dict.keys()],
-              index = 1
+              index = 0
             )
           
           their_players = their_players_dict[second_seat]
