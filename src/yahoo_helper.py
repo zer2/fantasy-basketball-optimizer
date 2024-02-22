@@ -1,38 +1,37 @@
-from yfpy.models import Team, Roster
+from typing import List
+from yfpy.models import League, Team, Roster
 from yfpy.query import YahooFantasySportsQuery
+import streamlit as st
 from streamlit.logger import get_logger
 LOGGER = get_logger(__name__)
 
-def _get_teams_dict(teams):
+def get_user_leagues(sc: YahooFantasySportsQuery) -> List[League]:
     """
-    Extracts team ids and names from the provided teams data.
-    
-    Parameters:
-    - teams (list): A list of Team instances.
-    
-    Returns:
-    - dict: A dictionary mapping team ids to team names.
-    """
-    try:
-        return {team.team_id: team.name.decode('UTF-8') for team in teams}
-    except Exception as e:
-        LOGGER.exception("Failed to get team ids")
-        raise e  # Reraise the exception after logging it
-
-def get_teams(sc: YahooFantasySportsQuery):
-    """
-    Generates a dict of team ids mapped to team names
+    Generates a list of leagues that the user has been a part of
     
     Parameters:
     - sc (object): The YahooFantasySportsQuery object.
 
     Returns:
-    - dict: A dictionary mapping the team ids to team names.
+    - List[League]: A list of the leagues.
+    """
+    league_dicts: List[dict[str, League]] = sc.get_user_leagues_by_game_key(game_key="nba") # type: ignore
+    leagues = [league_dict["league"] for league_dict in league_dicts] # The yfpy method for some reason returns a list of dicts rather than the leagues directly
+    return leagues
+
+def get_teams(sc: YahooFantasySportsQuery) -> List[Team]:
+    """
+    Generates a list of teams for the given league id
+    
+    Parameters:
+    - sc (object): The YahooFantasySportsQuery object.
+
+    Returns:
+    - List[Team]: A list of the teams in the league.
     """
 
     teams = sc.get_league_teams()
-    teams_dict = _get_teams_dict(teams)
-    return teams_dict
+    return teams
 
 def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:
     """
@@ -44,5 +43,5 @@ def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:
     Returns:
     - Roster: The roster for the given team id.
     """
-    roster = sc.get_team_roster_by_week(team_id)
+    roster = sc.get_team_roster_by_week(team_id=team_id)
     return roster
