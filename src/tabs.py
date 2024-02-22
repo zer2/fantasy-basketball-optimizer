@@ -47,6 +47,7 @@ def make_team_tab(scores : pd.DataFrame
                                                   .applymap(stat_styler, subset = pd.IndexSlice['Difference', get_categories()], multiplier = team_multiplier)
       display = st.dataframe(team_stats_styled
                           , use_container_width = True
+                          , height = len(team_stats) * 35 + 38
                                                     )     
   else:
     st.markdown('Your team does not have any players yet!')
