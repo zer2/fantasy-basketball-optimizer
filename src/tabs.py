@@ -682,7 +682,7 @@ def make_rank_tab(scores : pd.DataFrame, player_multiplier : float):
   
   scores_styled = static_score_styler(scores_copy,player_multiplier)
       
-  rank_display = st.dataframe(scores_styled, hide_index = True)
+  rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
 @st.cache_data()
 def make_h_rank_tab( info : dict
@@ -740,4 +740,4 @@ def make_h_rank_tab( info : dict
                       ,right_index = True)
 
   h_res = h_percentage_styler(h_res)
-  h_score_display = st.dataframe(h_res, hide_index = True)
+  h_score_display = st.dataframe(h_res, hide_index = True, use_container_width = True)
