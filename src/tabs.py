@@ -194,7 +194,8 @@ def make_matchup_tab(x_scores : pd.DataFrame
     
     else: 
 
-      st.markdown('Not enough full teams yet for matchups')
+      st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
+            "Drafting & Teams" page then come back here""")
 
 
 
