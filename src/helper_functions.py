@@ -82,11 +82,13 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> s
   Returns:
     String describing format for a pandas styler object
   """
-                    
-  intensity = min(int(abs(value-middle)*multiplier), 255)
+         
   if value != value:
     return f"background-color:white;color:white;" 
-  elif value - middle > 0:
+
+  intensity = min(int(abs(value-middle)*multiplier), 255)
+
+  if value - middle > 0:
     rgb = (255 -  intensity,255 , 255 -  intensity)
   else:
     rgb = (255, 255 - intensity, 255 - intensity)

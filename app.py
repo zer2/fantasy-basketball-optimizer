@@ -70,9 +70,10 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-param_tab, stat_tab, draft_tab, move_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
+param_tab, stat_tab, draft_tab, matchup_tab, move_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
                                                               ,":bar_chart: Player Stats"
                                                               ,":man-bouncing-ball: Drafting/Rosters"
+                                                              ,":crossed_swords: Matchups"
                                                               ,":clipboard: Move Analysis"
                                                               ,":first_place_medal: Player Rankings"
                                                               ,":scroll: About"])
@@ -526,7 +527,13 @@ with draft_tab:
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .background_gradient(axis = None,subset = c_df.columns) 
                 st.dataframe(weight_display, use_container_width = True)
-                
+
+with matchup_tab:
+  make_matchup_tab(info['X-scores']
+                  ,info['Diff-var']
+                  ,selections_editable
+                  ,format
+                  )
 
 with move_tab:
 
