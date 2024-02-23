@@ -296,13 +296,14 @@ def make_h_waiver_df(_H
   h_display = pd.DataFrame(scores_all).merge(win_rates_all
                                         , left_index = True
                                         , right_index = True)
-
   h_display.index.name = 'Player'
+
+  h_display = h_display.sort_values('H-score', ascending = False).reset_index()
 
   def color_blue(label):
     return "background-color: blue; color:white" if label == drop_player else None
 
-  h_display = h_percentage_styler(h_display.reset_index())
+  h_display = h_percentage_styler(h_display)
   h_display = h_display.map(color_blue, subset = pd.IndexSlice[:,['Player']])
 
   st.dataframe(h_display, use_container_width = True, hide_index = True)
