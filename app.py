@@ -493,9 +493,9 @@ with draft_tab:
             all_res = all_res + [score]
             #normalize weights by what we expect from other drafters
             
-            c = pd.DataFrame(c, index = score.index, columns = categories)/info['v'].T
+            c = pd.DataFrame(c, index = score.index, columns = get_categories())/info['v'].T
             
-            cdf_estimates.columns = categories
+            cdf_estimates.columns = get_categories()
             
             with placeholder.container():
   
