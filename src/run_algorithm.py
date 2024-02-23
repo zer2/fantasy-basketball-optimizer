@@ -342,6 +342,39 @@ class HAgent():
     def get_del_full(self,c):
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
 
+def estimate_matchup_result(team_1_x_scores : pd.Series
+                            , team_2_x_scores : pd.Series
+                            , n_picks : int
+                            , format : str) -> float:
+    """Based on X scores, estimates the result of a matchup
+
+    Args:
+      team_1_x_scores: Series of x-scores for one team
+      team_2_x_scores: Series of x-scores for other team
+      n_picks: number of players on each team
+      format: format to use for analysis
+
+    Returns:
+      Dictionary with results of the trade
+    """
+
+    cdf_estimates = pd.DataFrame(norm.cdf(team_2_x_scores - team_1_x_scores
+                                        , scale = np.sqrt(n_picks*2)
+                                        )
+                            ).T
+
+    if format == 'Head to Head: Most Categories':
+        score = combinatorial_calculation(cdf_estimates
+                                                    , 1 - cdf_estimates
+                                                    , categories = cdf_estimates.columns
+                        )
+
+    else:
+        score = cdf_estimates.mean(axis = 1) 
+
+    return float(score)
+
+
 def analyze_trade(team_1_other : list[str]
                   ,team_1_trade : list[str]
                   ,team_2_other : list[str]
@@ -384,7 +417,7 @@ def analyze_trade(team_1_other : list[str]
 
     elif n_player_diff == 0:
         score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
-        score_2_1,_,rate_2_1 = next(H.get_h_scores( team_2_other + team_1_trade, players_chosen))
+        score_2_1,_,rate_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
 
     else:
         score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
