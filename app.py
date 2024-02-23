@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import listify, make_progress_chart, make_about_tab, stat_styler, styler_a,styler_b, styler_c, get_categories()
+from src.helper_functions import listify, make_progress_chart, make_about_tab, stat_styler, styler_a,styler_b, styler_c, get_categories
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
