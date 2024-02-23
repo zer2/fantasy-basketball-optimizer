@@ -70,33 +70,25 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-param_tab, stat_tab, draft_tab, matchup_tab, move_tab, rank_tab, about_tab = st.tabs([":control_knobs: Parameters"
-                                                              ,":bar_chart: Player Stats"
-                                                              ,":man-bouncing-ball: Drafting/Rosters"
-                                                              ,":crossed_swords: Matchups"
-                                                              ,":clipboard: Move Analysis"
-                                                              ,":first_place_medal: Player Rankings"
-                                                              ,":scroll: About"])
+main_tabs = st.tabs([":control_knobs: Parameters"
+                ,":bar_chart: Player Stats"
+                ,":female-doctor: Injury Status"
+                ,":first_place_medal: Player Rankings"
+                ,":man-bouncing-ball: Drafting & Teams"
+                ,":crossed_swords: Matchups"
+                ,":man_standing: Waiver Wire & Free Agents"
+                ,":clipboard: Trading"
+                ,":scroll: About"])
 
-with about_tab:
-
-  tabs = st.tabs(['Intro'
-                  ,'G-scoring'
-                  ,'H-scoring'
-                  ,'Turnovers'
-                  ,'Waivers & Trading'
-                  ,'Data Sources'])
-
-  about_paths = ['intro.md'
-                ,'static_explanation.md'
-                ,'dynamic_explanation.md'
-                ,'turnovers.md'
-                ,'data_sources.md'
-                ,'trading.md']
-
-  for tab, path in zip(tabs, about_paths):
-    with tab:
-      make_about_tab(path)   
+param_tab = main_tabs[0]
+stat_tab = main_tabs[1]
+injury_tab = main_tabs[2]
+rank_tab = main_tabs[3]
+draft_tab = main_tabs[4]
+matchup_tab = main_tabs[5]
+waiver_tab = main_tabs[6]
+trade_tab = main_tabs[7]
+about_tab = main_tabs[8]
                 
 with param_tab: 
 
@@ -185,6 +177,7 @@ with param_tab:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
       winner_take_all = format == 'Head to Head: Most Categories'
+      rotisserie = format == 'Rotisserie'
 
       unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
       unique_datasets_current = list(current_data.keys())
@@ -342,10 +335,50 @@ with stat_tab:
   player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
   player_stats[r'No Play %'] = player_stats[r'No Play %']/100
   player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
-  
-with draft_tab:
 
-  rotisserie = format == 'Rotisserie'
+with injury_tab:
+    st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+    injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
+    injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
+
+player_stats = player_stats.drop(injured_players)
+info = process_player_data(player_stats
+                        ,conversion_factors
+                        ,multipliers
+                        ,psi
+                        ,nu
+                        ,n_drafters
+                        ,n_picks
+                        ,rotisserie)
+
+z_scores = info['Z-scores']
+g_scores = info['G-scores']
+
+with rank_tab:
+  z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
+    
+  with z_rank_tab:
+    make_rank_tab(z_scores, z_score_player_multiplier)  
+
+  with g_rank_tab:
+    make_rank_tab(g_scores, g_score_player_multiplier)  
+
+  with h_rank_tab:
+    rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+    st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+    st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+    make_h_rank_tab(info
+                  ,omega
+                  ,gamma
+                  ,alpha
+                  ,beta
+                  ,n_picks
+                  ,n_iterations
+                  ,winner_take_all
+                  ,punting
+                  ,player_stats)
+
+with draft_tab:
   
   left, right = st.columns(2)
 
@@ -355,31 +388,10 @@ with draft_tab:
                       , selections.columns
                       , index = 0)
 
-    draft_tab, injury_tab = st.tabs(['Draft Board/Rosters','Injury List'])
     
-    with draft_tab: 
-        st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
-        selections_editable = st.data_editor(selections, hide_index = True)  
-        selection_list = listify(selections_editable)
-
-    with injury_tab:
-        st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-        injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
-        injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
-
-    player_stats = player_stats.drop(injured_players)
-    info = process_player_data(player_stats
-                            ,conversion_factors
-                            ,multipliers
-                            ,psi
-                            ,nu
-                            ,n_drafters
-                            ,n_picks
-                            ,rotisserie)
-
-    z_scores = info['Z-scores']
-    g_scores = info['G-scores']
-    categories = [x for x in z_scores.columns if x != 'Total']
+    st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
+    selections_editable = st.data_editor(selections, hide_index = True)  
+    selection_list = listify(selections_editable)
 
     players_chosen = [x for x in listify(selections_editable) if x ==x]
     my_players = selections_editable[seat].dropna()
@@ -402,6 +414,8 @@ with draft_tab:
       z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
       with z_tab:
+
+          print(z_scores)
 
           team_stats_z = make_team_tab(z_scores
                                   , my_players
@@ -533,176 +547,168 @@ with matchup_tab:
                   ,format
                   )
 
-with move_tab:
+with waiver_tab:
+    if len(my_players) < n_picks:
+        st.markdown("""Your team is not full yet! Fill it out on the 
+                    "Drafting & Teams" page then come back here""")
 
-  waiver_tab, trade_tab = st.tabs(['Waivers/Free Agents','Trades'])
+    else:
+        drop_player = st.selectbox(
+          'Which player are you considering dropping?'
+          ,my_players
+          ,index = len(my_players)-1
+        )
 
-  with waiver_tab:
-      if len(my_players) < n_picks:
-          st.markdown('Your team is not full yet! Come back here when you have a full team')
+        mod_my_players = [x for x in my_players if x != drop_player]
 
-      else:
-                
-          drop_player = st.selectbox(
-            'Which player are you considering dropping?'
-            ,my_players
-            ,index = len(my_players)-1
-          )
+        z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-          mod_my_players = [x for x in my_players if x != drop_player]
+        with z_waiver_tab:
 
-          z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
-
-          with z_waiver_tab:
-
-              st.markdown('Projected team stats with chosen player:')
-              make_waiver_tab(z_scores
-                            , z_scores_unselected
-                            , team_stats_z
-                            , drop_player
-                            , z_score_team_multiplier)
-
-          with g_waiver_tab:
-
-              st.markdown('Projected team stats with chosen player:')
-              make_waiver_tab(g_scores
-                            , g_scores_unselected
-                            , team_stats_g
-                            , drop_player
-                            , g_score_team_multiplier)
-
-          with h_waiver_tab:
-
-              make_h_waiver_df(H
-                          , player_stats
-                          , mod_my_players
+            st.markdown('Projected team stats with chosen player:')
+            make_waiver_tab(z_scores
+                          , z_scores_unselected
+                          , team_stats_z
                           , drop_player
-                          , players_chosen
-                          , base_h_score
-                          , base_win_rates)
+                          , z_score_team_multiplier)
 
-  with trade_tab:
-      if len(my_players) < n_picks:
-          st.markdown('Your team is not full yet! Come back here when you have a full team')
-      else:
-        
-        their_players_dict = { team : players for team, players in selections_editable.items() 
-                                if ((team != seat) & (not  any(p!=p for p in players)))
-                                  }
+        with g_waiver_tab:
 
-        second_seat = st.selectbox(
-            f'Which team are you considering trading with?',
-            [s for s in their_players_dict.keys()],
-            index = 0
-          )
-        
-        their_players = their_players_dict[second_seat]
+            st.markdown('Projected team stats with chosen player:')
+            make_waiver_tab(g_scores
+                          , g_scores_unselected
+                          , team_stats_g
+                          , drop_player
+                          , g_score_team_multiplier)
 
-        destinations_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
-                                                            ,'Targets'
-                                                            ,'Trade Inspection'
-                                                            ,'Trade Suggesions'
-                                                            ])
+        with h_waiver_tab:
 
-        with destinations_tab:
+            make_h_waiver_df(H
+                        , player_stats
+                        , mod_my_players
+                        , drop_player
+                        , players_chosen
+                        , base_h_score
+                        , base_win_rates)
 
-          values_to_team = make_trade_destination_display(H
-                                , player_stats
-                                , my_players 
-                                , their_players_dict 
-                                , players_chosen 
-                                , format
-                                      )
+with trade_tab:
+    if len(my_players) < n_picks:
+        st.markdown("""Your team is not full yet! Fill it and other teams out on the 
+                    "Drafting & Teams" page then come back here""")
+    else:
+      
+      their_players_dict = { team : players for team, players in selections_editable.items() 
+                              if ((team != seat) & (not  any(p!=p for p in players)))
+                                }
 
-        with target_tab:
+      second_seat = st.selectbox(
+          f'Which team are you considering trading with?',
+          [s for s in their_players_dict.keys()],
+          index = 0
+        )
+      
+      their_players = their_players_dict[second_seat]
 
-          values_to_me = make_trade_target_display(H
-                , player_stats
+      destinations_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
+                                                          ,'Targets'
+                                                          ,'Trade Inspection'
+                                                          ,'Trade Suggesions'
+                                                          ])
+
+      with destinations_tab:
+
+        values_to_team = make_trade_destination_display(H
+                              , player_stats
+                              , my_players 
+                              , their_players_dict 
+                              , players_chosen 
+                              , format
+                                    )
+
+      with target_tab:
+
+        values_to_me = make_trade_target_display(H
+              , player_stats
+              , my_players 
+              , their_players
+              , players_chosen 
+              , values_to_team[second_seat]
+              , format
+                    )
+
+      with inspection_tab:
+
+        c1, c2 = st.columns(2)
+
+        with c1: 
+          their_players = selections_editable[second_seat].dropna()
+
+          with st.form("trade inspection form"):
+
+            my_trade = st.multiselect(
+              'Which players are you trading?'
+              ,my_players
+              )
+              
+            their_trade = st.multiselect(
+                  'Which players are you receiving?'
+                  ,their_players
+              )
+
+            submitted = st.form_submit_button("Submit", use_container_width = True)
+
+        with c2: 
+          make_trade_display(H
+                          , player_stats 
+                          , players_chosen 
+                          , n_iterations 
+                          , my_trade
+                          , their_trade
+                          , my_players
+                          , their_players
+                          , second_seat
+                          , format)
+
+        with suggestions_tab:
+
+          if rotisserie:
+            general_value = z_scores.sum(axis = 1)
+            replacement_value = z_scores_unselected.iloc[0].sum() 
+          else:
+            general_value = g_scores.sum(axis = 1)
+            replacement_value = g_scores_unselected.iloc[0].sum()
+
+            make_trade_suggestion_display(H
+                , player_stats 
+                , players_chosen 
                 , my_players 
                 , their_players
-                , players_chosen 
+                , general_value
+                , replacement_value
+                , values_to_me
                 , values_to_team[second_seat]
-                , format
-                      )
+                , your_differential_threshold
+                , their_differential_threshold
+                , combo_params
+                , format )               
 
-        with inspection_tab:
+with about_tab:
 
-          c1, c2 = st.columns(2)
+  tabs = st.tabs(['Intro'
+                  ,'G-scoring'
+                  ,'H-scoring'
+                  ,'Turnovers'
+                  ,'Waivers & Trading'
+                  ,'Data Sources'])
 
-          with c1: 
-            their_players = selections_editable[second_seat].dropna()
+  about_paths = ['intro.md'
+                ,'static_explanation.md'
+                ,'dynamic_explanation.md'
+                ,'turnovers.md'
+                ,'data_sources.md'
+                ,'trading.md']
 
-            with st.form("trade inspection form"):
-
-              my_trade = st.multiselect(
-                'Which players are you trading?'
-                ,my_players
-                )
-                
-              their_trade = st.multiselect(
-                    'Which players are you receiving?'
-                    ,their_players
-                )
-
-              submitted = st.form_submit_button("Submit", use_container_width = True)
-
-          with c2: 
-            make_trade_display(H
-                            , player_stats 
-                            , players_chosen 
-                            , n_iterations 
-                            , my_trade
-                            , their_trade
-                            , my_players
-                            , their_players
-                            , second_seat
-                            , format)
-
-          with suggestions_tab:
-
-            if rotisserie:
-              general_value = z_scores.sum(axis = 1)
-              replacement_value = z_scores_unselected.iloc[0].sum() 
-            else:
-              general_value = g_scores.sum(axis = 1)
-              replacement_value = g_scores_unselected.iloc[0].sum()
-
-              make_trade_suggestion_display(H
-                  , player_stats 
-                  , players_chosen 
-                  , my_players 
-                  , their_players
-                  , general_value
-                  , replacement_value
-                  , values_to_me
-                  , values_to_team[second_seat]
-                  , your_differential_threshold
-                  , their_differential_threshold
-                  , combo_params
-                  , format )               
-
-with rank_tab:
-  z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
-    
-  with z_rank_tab:
-    make_rank_tab(z_scores, z_score_player_multiplier)  
-
-  with g_rank_tab:
-    make_rank_tab(g_scores, g_score_player_multiplier)  
-
-  with h_rank_tab:
-    rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-    st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
-    st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
-    make_h_rank_tab(info
-                  ,omega
-                  ,gamma
-                  ,alpha
-                  ,beta
-                  ,n_picks
-                  ,n_iterations
-                  ,winner_take_all
-                  ,punting
-                  ,player_stats)
-
+  for tab, path in zip(tabs, about_paths):
+    with tab:
+      make_about_tab(path)   
 
