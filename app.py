@@ -74,7 +74,7 @@ param_tab, stat_tab, draft_tab, matchup_tab, move_tab, rank_tab, about_tab = st.
                                                               ,":bar_chart: Player Stats"
                                                               ,":man-bouncing-ball: Drafting/Rosters"
                                                               ,":crossed_swords: Matchups"
-                                                              ,":clipboard: Trade Analysis"
+                                                              ,":clipboard: Move Analysis"
                                                               ,":first_place_medal: Player Rankings"
                                                               ,":scroll: About"])
 
