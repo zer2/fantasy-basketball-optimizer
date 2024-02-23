@@ -84,7 +84,7 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> s
   """
          
   if value != value:
-    return f"background-color:white;color:white;" 
+    return f"color:transparent;" 
 
   intensity = min(int(abs(value-middle)*multiplier), 255)
 

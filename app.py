@@ -74,7 +74,7 @@ param_tab, stat_tab, draft_tab, matchup_tab, move_tab, rank_tab, about_tab = st.
                                                               ,":bar_chart: Player Stats"
                                                               ,":man-bouncing-ball: Drafting/Rosters"
                                                               ,":crossed_swords: Matchups"
-                                                              ,":clipboard: Move Analysis"
+                                                              ,":clipboard: Trade Analysis"
                                                               ,":first_place_medal: Player Rankings"
                                                               ,":scroll: About"])
 
@@ -105,37 +105,6 @@ with param_tab:
   with general_param_tab: 
 
     board_param_column, other_param_column, _ = st.columns([0.4,0.4,0.2])
-
-    #this column is written first so that it can pass the selected player stats dataframe
-    with other_param_column: 
-      st.header('Other Info')
-      
-      format = st.selectbox(
-        'Which format are you playing?',
-        ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
-        , index = 1)
-    
-      if format == 'Rotisserie':
-        st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
-      else:
-        st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
-
-      winner_take_all = format == 'Head to Head: Most Categories'
-
-      unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
-      unique_datasets_current = list(current_data.keys())
-      unique_datasets_darko = list(darko_data.keys())
-
-      all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
-      all_datasets.reverse()
-        
-      dataset_name = st.selectbox(
-        'Which dataset do you want to default to?'
-        ,all_datasets
-        ,index = 0
-      )
-
-      raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
 
     with board_param_column: 
       st.header('Board Setup')
@@ -202,8 +171,38 @@ with param_tab:
         if selections is None:
           selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
-      player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-      selections = selections.astype(player_category_type)
+    with other_param_column: 
+      st.header('Other Info')
+      
+      format = st.selectbox(
+        'Which format are you playing?',
+        ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
+        , index = 1)
+    
+      if format == 'Rotisserie':
+        st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
+      else:
+        st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
+
+      winner_take_all = format == 'Head to Head: Most Categories'
+
+      unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
+      unique_datasets_current = list(current_data.keys())
+      unique_datasets_darko = list(darko_data.keys())
+
+      all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
+      all_datasets.reverse()
+        
+      dataset_name = st.selectbox(
+        'Which dataset do you want to default to?'
+        ,all_datasets
+        ,index = 0
+      )
+
+      raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
+
+  player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+  selections = selections.astype(player_category_type)
 
   with advanced_param_tab: 
     player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
@@ -530,7 +529,6 @@ with draft_tab:
 
 with matchup_tab:
   make_matchup_tab(info['X-scores']
-                  ,info['Diff-var']
                   ,selections_editable
                   ,format
                   )

@@ -140,15 +140,26 @@ def make_waiver_tab(scores : pd.DataFrame
   new_styled = static_score_styler(new, team_multiplier)
   st.dataframe(new_styled, use_container_width = True) 
 
-#@st.cache_data()
-def make_matchup_tab(x_scores
-                  , diff_var
-                  , selections
-                  , format):
+@st.cache_data()
+def make_matchup_tab(x_scores : pd.DataFrame
+                  , selections : pd.DataFrame
+                  , format : str):
+    """Make a tab for a matchup matrix, showing how likely you are to win against any particular opponent
+
+    Args:
+        x_scores: Dataframe of floats, rows by player and columns by category
+        selections: Dataframe of which teams have which players
+        format: format to use for analysis 
+
+    Returns:
+        None
+    """
 
     selections_full = selections.dropna(axis = 1)
 
     if selections_full.shape[1] > 1:
+
+      n_picks = selections_full.shape[0]
 
       team_stats = {team : x_scores.loc[players].sum(axis = 0) for team,players in selections_full.items()}
 
@@ -164,7 +175,7 @@ def make_matchup_tab(x_scores
 
         result = estimate_matchup_result(team_1_x_scores
                               , team_2_x_scores
-                              , diff_var
+                              , n_picks
                               , format)
 
         matchup_df.loc[combo[1],combo[0]] = result
@@ -174,9 +185,11 @@ def make_matchup_tab(x_scores
         matchup_df.loc[team,team] = np.nan
 
       matchup_df_styled = matchup_df.style.format("{:.1%}") \
+                            .highlight_null(props="color: transparent;") \
                             .map(stat_styler
                                 , middle = 0.5
-                                , multiplier = 1000)
+                                , multiplier = 500) \
+                           
       st.dataframe(matchup_df_styled)
     
     else: 
