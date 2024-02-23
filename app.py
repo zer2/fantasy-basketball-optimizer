@@ -52,7 +52,6 @@ def stop_run_trade():
     st.session_state.run_trade = False
       
 counting_statistics = st.session_state.params['counting-statistics'] 
-percentage_statistics = st.session_state.params['percentage-statistics'] 
 volume_statistics = st.session_state.params['percentage-statistics'] 
 
 z_score_player_multiplier = st.session_state.params['z-score-player-multiplier']
@@ -71,9 +70,7 @@ st.title('Optimization for Fantasy Basketball :basketball:')
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 main_tabs = st.tabs([":control_knobs: Parameters"
-                ,":bar_chart: Player Stats"
-                ,":female-doctor: Injury Status"
-                ,":first_place_medal: Player Rankings"
+                ,":bar_chart: Player Info"
                 ,":man-bouncing-ball: Drafting & Teams"
                 ,":crossed_swords: Matchups"
                 ,":man_standing: Waiver Wire & Free Agents"
@@ -81,14 +78,12 @@ main_tabs = st.tabs([":control_knobs: Parameters"
                 ,":scroll: About"])
 
 param_tab = main_tabs[0]
-stat_tab = main_tabs[1]
-injury_tab = main_tabs[2]
-rank_tab = main_tabs[3]
-draft_tab = main_tabs[4]
-matchup_tab = main_tabs[5]
-waiver_tab = main_tabs[6]
-trade_tab = main_tabs[7]
-about_tab = main_tabs[8]
+info_tab = main_tabs[1]
+draft_tab = main_tabs[2]
+matchup_tab = main_tabs[3]
+waiver_tab = main_tabs[4]
+trade_tab = main_tabs[5]
+about_tab = main_tabs[6]
                 
 with param_tab: 
 
@@ -317,66 +312,73 @@ with param_tab:
           N-traded is the number of players traded from your team, and N-received is the number of 
           players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
           column. Only players with the specified targetedness or above will be considered. T2 is a 
-          threshold of general value, trades that have general value differentials larger than T2 will 
-          not be evaluated"""
+          threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
+          differences larger than T2 will not be evaluated"""
         st.caption(combo_params_str)
 
         combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
 
-with stat_tab:
-  st.header('Per-game stats')
-  st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
+with info_tab:
 
-  player_stats_editable = st.data_editor(raw_stats_df) # 👈 An editable dataframe
-  player_stats = player_stats_editable.copy()
+  stat_tab, injury_tab, rank_tab = st.tabs([
+                  "Player Stats"
+                  ,"Injury Status"
+                  ,"Player Rankings"])
 
-  #re-adjust from user inputs
-  player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
-  player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-  player_stats[r'No Play %'] = player_stats[r'No Play %']/100
-  player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
+  with stat_tab:
+    st.header('Per-game stats')
+    st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
+
+    player_stats_editable = st.data_editor(raw_stats_df) # 👈 An editable dataframe
+    player_stats = player_stats_editable.copy()
+
+    #re-adjust from user inputs
+    player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
+    player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
+    player_stats[r'No Play %'] = player_stats[r'No Play %']/100
+    player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
 
 with injury_tab:
     st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
     injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
     injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
 
-player_stats = player_stats.drop(injured_players)
-info = process_player_data(player_stats
-                        ,conversion_factors
-                        ,multipliers
-                        ,psi
-                        ,nu
-                        ,n_drafters
-                        ,n_picks
-                        ,rotisserie)
+    player_stats = player_stats.drop(injured_players)
+    info = process_player_data(player_stats
+                            ,conversion_factors
+                            ,multipliers
+                            ,psi
+                            ,nu
+                            ,n_drafters
+                            ,n_picks
+                            ,rotisserie)
 
-z_scores = info['Z-scores']
-g_scores = info['G-scores']
+    z_scores = info['Z-scores']
+    g_scores = info['G-scores']
 
 with rank_tab:
-  z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
-    
-  with z_rank_tab:
-    make_rank_tab(z_scores, z_score_player_multiplier)  
+    z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
+      
+    with z_rank_tab:
+      make_rank_tab(z_scores, z_score_player_multiplier)  
 
-  with g_rank_tab:
-    make_rank_tab(g_scores, g_score_player_multiplier)  
+    with g_rank_tab:
+      make_rank_tab(g_scores, g_score_player_multiplier)  
 
-  with h_rank_tab:
-    rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-    st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
-    st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
-    make_h_rank_tab(info
-                  ,omega
-                  ,gamma
-                  ,alpha
-                  ,beta
-                  ,n_picks
-                  ,n_iterations
-                  ,winner_take_all
-                  ,punting
-                  ,player_stats)
+    with h_rank_tab:
+      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+      st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+      make_h_rank_tab(info
+                    ,omega
+                    ,gamma
+                    ,alpha
+                    ,beta
+                    ,n_picks
+                    ,n_iterations
+                    ,winner_take_all
+                    ,punting
+                    ,player_stats)
 
 with draft_tab:
   
@@ -389,7 +391,8 @@ with draft_tab:
                       , index = 0)
 
     
-    st.caption('Enter draft selections below. P.S: The draft board is copy-pastable. You can save it in Excel after you are done, then copy back later.')
+    st.caption("""Enter which player is on which team below. This can be used as a draft board during a draft,
+                or a repository for team information during the fantasy season""")
     selections_editable = st.data_editor(selections, hide_index = True)  
     selection_list = listify(selections_editable)
 
@@ -499,25 +502,11 @@ with draft_tab:
             
             with placeholder.container():
   
-              score_tab, rate_tab, weight_tab = st.tabs(['Scores','Expected Win Rates', 'Weights'])
-  
-              with score_tab:
-                c1, c2 = st.columns([0.3,0.7])
-      
-                with c1:
-                  score = score.sort_values(ascending = False).round(3)
-                  score.name = 'H-score'
-                  score = pd.DataFrame(score)
+              rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
                   
-                  score_styled = score.style.format("{:.1%}"
-                                  ,subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']])
-      
-                  st.dataframe(score_styled, use_container_width = True)
-      
-                with c2:
-                  st.plotly_chart(make_progress_chart(all_res), use_container_width = True)
+              score = score.sort_values(ascending = False).round(3)
+              score.name = 'H-score'
+              score = pd.DataFrame(score)
 
               with rate_tab:
                 rate_df = cdf_estimates.loc[score.index].dropna()
@@ -553,11 +542,18 @@ with waiver_tab:
                     "Drafting & Teams" page then come back here""")
 
     else:
+        if rotisserie:
+          worst_player = list(z_scores.index[z_scores.index.isin(my_players)])[-1]
+        else:
+          worst_player = list(g_scores.index[g_scores.index.isin(my_players)])[-1]
+
+        default_index = list(my_players).index(worst_player)
         drop_player = st.selectbox(
           'Which player are you considering dropping?'
           ,my_players
-          ,index = len(my_players)-1
+          ,index = default_index
         )
+
 
         mod_my_players = [x for x in my_players if x != drop_player]
 

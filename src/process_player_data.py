@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
+from src.helper_functions import get_categories
 import os
 import streamlit as st
 
@@ -99,8 +100,8 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     fgp_numerator = player_stats.loc[:, 'Field Goal Attempts']/coefficients.loc['Field Goal Attempts','Mean of Means'] * (player_stats['Field Goal %']  - coefficients.loc['Field Goal %','Mean of Means'])
     fgp_score = fgp_numerator.divide(fgp_denominator)
     
-    res = pd.concat([main_scores, ftp_score, fgp_score],axis = 1)  
-    res.columns = params['counting-statistics'] + params['percentage-statistics'] 
+    res = pd.concat([fgp_score, ftp_score, main_scores],axis = 1)  
+    res.columns = get_categories()
     return res
 
 @st.cache_data
@@ -179,8 +180,8 @@ def process_player_data(player_stats : pd.DataFrame
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
   
-  mov = coefficients.loc[params['counting-statistics'] + params['percentage-statistics'] , 'Mean of Variances']
-  vom = coefficients.loc[params['counting-statistics'] + params['percentage-statistics'] , 'Variance of Means']
+  mov = coefficients.loc[get_categories() , 'Mean of Variances']
+  vom = coefficients.loc[get_categories() , 'Variance of Means']
   if rotisserie:  #get weights of X to Z 
     v = np.sqrt(mov/vom)  
   else:   #get weights of X to G 

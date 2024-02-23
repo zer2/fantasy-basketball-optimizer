@@ -8,8 +8,7 @@ import streamlit as st
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
-    return st.session_state.params['counting-statistics'] + \
-            st.session_state.params['percentage-statistics'] 
+    return st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
 
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
@@ -84,7 +83,7 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> s
   """
          
   if value != value:
-    return f"color:transparent;" 
+    return f"background-color:white;color:white" 
 
   intensity = min(int(abs(value-middle)*multiplier), 255)
 
