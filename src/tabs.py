@@ -29,22 +29,18 @@ def make_team_tab(scores : pd.DataFrame
   """
 
   team_stats = scores[scores.index.isin(my_players)]
-  expected = scores[0:len(my_players)*n_drafters].mean() * len(my_players)
 
   team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
-  team_stats.loc['Expected', :] = expected
-  team_stats.loc['Difference', :] = team_stats.loc['Total',:] - team_stats.loc['Expected',:]
-
-  n_players_on_team = team_stats.shape[0] - 3
+  n_players_on_team = team_stats.shape[0] - 1
 
   if n_players_on_team > 0:
 
       team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
-                                                  .map(styler_b, subset = pd.IndexSlice[['Expected','Total'], get_categories()]) \
-                                                  .map(styler_c, subset = pd.IndexSlice[['Expected','Total'], ['Total']]) \
+                                                  .map(styler_c, subset = pd.IndexSlice[['Total'], get_categories()]) \
+                                                  .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
                                                   .map(stat_styler, subset = pd.IndexSlice[my_players, get_categories()], multiplier = player_multiplier) \
-                                                  .applymap(stat_styler, subset = pd.IndexSlice['Difference', get_categories()], multiplier = team_multiplier)
+                                                  .applymap(stat_styler, subset = pd.IndexSlice['Total', get_categories()], multiplier = team_multiplier)
       display = st.dataframe(team_stats_styled
                           , use_container_width = True
                           , height = len(team_stats) * 35 + 38
@@ -136,9 +132,17 @@ def make_waiver_tab(scores : pd.DataFrame
   new =  team_stats.loc['Total',:] + scores_unselected - drop_player_stats
 
   new = pd.concat([no_drop,new])
+  new.index.name = 'Player'
+  new = new.sort_values('Total', ascending = False).reset_index()
 
   new_styled = static_score_styler(new, team_multiplier)
-  st.dataframe(new_styled, use_container_width = True) 
+
+  def color_blue(label):
+    return "background-color: blue; color:white" if label == drop_player else None
+
+  new_styled = new_styled.map(color_blue, subset = pd.IndexSlice[:,['Player']])
+
+  st.dataframe(new_styled, use_container_width = True, hide_index = True) 
 
 @st.cache_data()
 def make_matchup_tab(x_scores : pd.DataFrame
@@ -182,14 +186,21 @@ def make_matchup_tab(x_scores : pd.DataFrame
         matchup_df.loc[combo[0],combo[1]] = 1 - result
 
       for team in selections_full.columns:
-        matchup_df.loc[team,team] = np.nan
+        matchup_df.loc[team,team] = 0.5
 
       matchup_df_styled = matchup_df.style.format("{:.1%}") \
                             .highlight_null(props="color: transparent;") \
                             .map(stat_styler
                                 , middle = 0.5
-                                , multiplier = 500) \
+                                , multiplier = 500) 
+      
+      def highlight_diag(df):
+        a = np.full(df.shape, '', dtype='<U24')
+        np.fill_diagonal(a, f"background-color:black")
+
+        return pd.DataFrame(a, index=df.index, columns=df.columns)
                            
+      matchup_df_styled = matchup_df_styled.apply(highlight_diag, axis = None)
       st.dataframe(matchup_df_styled)
     
     else: 
@@ -286,9 +297,15 @@ def make_h_waiver_df(_H
                                         , left_index = True
                                         , right_index = True)
 
-  h_display = h_percentage_styler(h_display)
+  h_display.index.name = 'Player'
 
-  st.dataframe(h_display, use_container_width = True)
+  def color_blue(label):
+    return "background-color: blue; color:white" if label == drop_player else None
+
+  h_display = h_percentage_styler(h_display.reset_index())
+  h_display = h_display.map(color_blue, subset = pd.IndexSlice[:,['Player']])
+
+  st.dataframe(h_display, use_container_width = True, hide_index = True)
 
 ### Trade tabs
 
@@ -541,22 +558,24 @@ def make_trade_suggestion_display(_H
           (their_differential > their_differential_threshold ):
       new_row = pd.DataFrame({ 'Send' : [my_trade]
                                 ,'Receive' : [their_trade]
-                                ,'Your Differential' : [your_differential]
-                                ,'Their Differential' : [their_differential]
+                                ,'Your H-score Differential' : [your_differential]
+                                ,'Their H-score Differential' : [their_differential]
                                 })
       full_dataframe = pd.concat([full_dataframe, new_row])
 
   full_dataframe = full_dataframe.reset_index().drop(columns = 'index')
   if len(full_dataframe) > 0:
-    goodness = full_dataframe['Your Differential']
+    goodness = full_dataframe['Your H-score Differential']
     full_dataframe = full_dataframe.loc[list(goodness.sort_values(ascending = False).index)]
 
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
-                                      , subset = ['Your Differential','Their Differential']) \
+                                      , subset = ['Your H-score Differential'
+                                                ,'Their H-score Differential']) \
                             .map(stat_styler
                                 , middle = 0
                                 , multiplier = 15000
-                                , subset = ['Your Differential','Their Differential']
+                                , subset = ['Your H-score Differential'
+                                          ,'Their H-score Differential']
                             ).set_properties(**{
                                   'font-size': '12pt',
                               })
@@ -655,11 +674,13 @@ def make_rank_tab(scores : pd.DataFrame, player_multiplier : float):
   Returns:
       None
   """
-  scores.loc[:,'Rank'] = np.arange(scores.shape[0]) + 1
-  scores.loc[:,'Player'] = scores.index
-  scores = scores[['Rank','Player','Total'] + get_categories()]
+  scores_copy = scores.copy()
+
+  scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
+  scores_copy.loc[:,'Player'] = scores_copy.index
+  scores_copy = scores_copy[['Rank','Player','Total'] + get_categories()]
   
-  scores_styled = static_score_styler(scores,player_multiplier)
+  scores_styled = static_score_styler(scores_copy,player_multiplier)
       
   rank_display = st.dataframe(scores_styled, hide_index = True)
 
