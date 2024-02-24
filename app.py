@@ -41,15 +41,6 @@ def run_h_score():
 
 def stop_run_h_score():
     st.session_state.run_score = False
-
-if 'run_trade' not in st.session_state:
-    st.session_state.run_trade = False
-
-def run_trade():
-    st.session_state.run_trade = True
-
-def stop_run_trade():
-    st.session_state.run_trade = False
       
 counting_statistics = st.session_state.params['counting-statistics'] 
 volume_statistics = st.session_state.params['percentage-statistics'] 
@@ -267,7 +258,7 @@ with param_tab:
 
         your_differential_threshold = st.number_input(
               r'Your differential threshold for the automatic trade suggester'
-              , value = 0.1)
+              , value = 0)
         ydt_str = r'''Only trades which improve your H-score 
                       by the threshold (as a percentage) will be shown'''
         st.caption(ydt_str)
@@ -275,17 +266,17 @@ with param_tab:
 
         their_differential_threshold = st.number_input(
               r'Counterparty differential threshold for the automatic trade suggester'
-              , value = 0.02)
+              , value = 0)
         tdt_str = r'''Only trades which improve the counterparty's H-score 
                     by the threshold (as a percentage) will be shown'''
         st.caption(tdt_str)
         their_differential_threshold = their_differential_threshold/100
 
         with st.form("Combo params"):
-          combo_params_default = pd.DataFrame({'N-traded' : [1,1,2,2,2,3,3,3,4,4]
-                                        ,'N-received' : [1,2,1,2,3,2,3,4,3,4]
-                                        ,'T1' : [0,0,0,0,0,0,0,0,0,0]
-                                        ,'T2' : [1,0.5,0.5,0.25,0.2,0.2,0.1,0.1,0.1,0.1]}
+          combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
+                                        ,'N-received' : [1,2,3]
+                                        ,'T1' : [0,0,0]
+                                        ,'T2' : [1,0.25,0.1]}
                                         )
 
           combo_params_df = st.data_editor(combo_params_default
@@ -605,33 +596,11 @@ with trade_tab:
       
       their_players = their_players_dict[second_seat]
 
-      destinations_tab, target_tab, inspection_tab, suggestions_tab = st.tabs(['Destinations'
+      inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
+                                                          ,'Destinations'
                                                           ,'Targets'
-                                                          ,'Trade Inspection'
                                                           ,'Trade Suggesions'
                                                           ])
-
-      with destinations_tab:
-
-        values_to_team = make_trade_destination_display(H
-                              , player_stats
-                              , my_players 
-                              , their_players_dict 
-                              , players_chosen 
-                              , format
-                                    )
-
-      with target_tab:
-
-        values_to_me = make_trade_target_display(H
-              , player_stats
-              , my_players 
-              , their_players
-              , players_chosen 
-              , values_to_team[second_seat]
-              , format
-                    )
-
       with inspection_tab:
 
         c1, c2 = st.columns(2)
@@ -665,6 +634,27 @@ with trade_tab:
                           , second_seat
                           , format)
 
+      with destinations_tab:
+
+        values_to_team = make_trade_destination_display(H
+                              , player_stats
+                              , my_players 
+                              , their_players_dict 
+                              , players_chosen 
+                              , format
+                                    )
+
+      with target_tab:
+
+        values_to_me = make_trade_target_display(H
+              , player_stats
+              , my_players 
+              , their_players
+              , players_chosen 
+              , values_to_team[second_seat]
+              , format
+                    )
+
         with suggestions_tab:
 
           if rotisserie:
@@ -674,19 +664,25 @@ with trade_tab:
             general_value = g_scores.sum(axis = 1)
             replacement_value = g_scores_unselected.iloc[0].sum()
 
-            make_trade_suggestion_display(H
-                , player_stats 
-                , players_chosen 
-                , my_players 
-                , their_players
-                , general_value
-                , replacement_value
-                , values_to_me
-                , values_to_team[second_seat]
-                , your_differential_threshold
-                , their_differential_threshold
-                , combo_params
-                , format )               
+          trade_filter = st.multiselect('Which kinds of trades do you want to look at'
+                                    , [(1,1),(2,2),(3,3)]
+                                    , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
+                                    , default = [(1,1)])
+
+          make_trade_suggestion_display(H
+              , player_stats 
+              , players_chosen 
+              , my_players 
+              , their_players
+              , general_value
+              , replacement_value
+              , values_to_me
+              , values_to_team[second_seat]
+              , your_differential_threshold
+              , their_differential_threshold
+              , combo_params
+              , trade_filter
+              , format )               
 
 with about_tab:
 
