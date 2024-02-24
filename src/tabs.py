@@ -513,17 +513,14 @@ def get_combos(players_with_weight : list[tuple]
   return player_combos_with_total_weight
 
 @st.cache_data()
-def make_combo_tab(combos : list
+def make_combo_df(all_combos : list
                   , player_stats : pd.DataFrame
-                  , uneven : bool
                   , my_players : list[str]
                   , their_players : list[str]
                   , _H
                   , players_chosen : list[str]
-                  , your_differential_threshold : float
-                  , their_differential_threshold : float
-                  , format : str):
-  """Shows automatic trade suggestions for a particular kind of trade, e.g. 2 to 2
+                  , format : str) -> pd.DataFrame:
+  """Makes a dataframe of all trade possibilities according to specifications
 
   Args:
     combos: list of trades to try. These are tuples where the first specifies players to send, and the second to receive 
@@ -532,8 +529,6 @@ def make_combo_tab(combos : list
     their_players: initial list of players on other team 
     _H: H-scoring agent, which can be used to calculate H-score 
     players_chosen: list of all chosen players
-    your_differential_threshold : for display, only include trades above this level of value for you
-    their_differential_threshold : for display, only include trades above this level of value for counterparty
     format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
@@ -541,37 +536,35 @@ def make_combo_tab(combos : list
   """
   
   full_dataframe = pd.DataFrame()
+    
+  for key, row in all_combos.iterrows():
 
-  for key, row in combos.iterrows():
+      my_trade = row['My Trade']
+      their_trade = row['Their Trade']
 
-    my_trade = row['My Trade']
-    their_trade = row['Their Trade']
+      my_general_value = row['My Value']
+      their_general_value = row['Their Value']
+      #check if the general value disparity is extreme. If it is, pass 
 
-    my_general_value = row['My Value']
-    their_general_value = row['Their Value']
-    #check if the general value disparity is extreme. If it is, pass 
+      my_others = [x for x in my_players if x not in my_trade]
+      their_others = [x for x in their_players if x not in their_trade]
 
-    my_others = [x for x in my_players if x not in my_trade]
-    their_others = [x for x in their_players if x not in their_trade]
+      trade_results = analyze_trade(my_others
+                                , my_trade
+                                , their_others
+                                , their_trade
+                                , _H
+                                , player_stats
+                                , players_chosen
+                                , 1)
+      your_score_pre_trade = trade_results[1]['pre']['H-score']
+      your_score_post_trade = trade_results[1]['post']['H-score']
+      their_score_pre_trade = trade_results[2]['pre']['H-score']
+      their_score_post_trade = trade_results[2]['post']['H-score']
 
-    trade_results = analyze_trade(my_others
-                              , my_trade
-                              , their_others
-                              , their_trade
-                              , _H
-                              , player_stats
-                              , players_chosen
-                              , 1)
-    your_score_pre_trade = trade_results[1]['pre']['H-score']
-    your_score_post_trade = trade_results[1]['post']['H-score']
-    their_score_pre_trade = trade_results[2]['pre']['H-score']
-    their_score_post_trade = trade_results[2]['post']['H-score']
+      your_differential = your_score_post_trade - your_score_pre_trade
+      their_differential = their_score_post_trade - their_score_pre_trade
 
-    your_differential = your_score_post_trade - your_score_pre_trade
-    their_differential = their_score_post_trade - their_score_pre_trade
-
-    if ( your_differential > your_differential_threshold ) & \
-          (their_differential > their_differential_threshold ):
       new_row = pd.DataFrame({ 'Send' : [my_trade]
                                 ,'Receive' : [their_trade]
                                 ,'Your H-score Differential' : [your_differential]
@@ -579,16 +572,78 @@ def make_combo_tab(combos : list
                                 })
       full_dataframe = pd.concat([full_dataframe, new_row])
 
-  full_dataframe = full_dataframe.reset_index().drop(columns = 'index')
+  full_dataframe = full_dataframe.sort_values('Your H-score Differential', ascending = False)
+
+  return full_dataframe
+
+@st.cache_data()
+def make_trade_suggestion_display(_H
+                  , player_stats : pd.DataFrame
+                  , players_chosen : list[str]
+                  , my_players : list[str]
+                  , their_players : list[str]
+                  , general_values : pd.Series
+                  , replacement_value : float
+                  , values_to_me : pd.Series
+                  , values_to_them : pd.Series
+                  , your_differential_threshold : float
+                  , their_differential_threshold : float
+                  , combo_params : list[tuple]
+                  , trade_filter : list[tuple[int]]
+                  , format : str):
+  """Shows automatic trade suggestions 
+
+  Args:
+    _H: H-scoring agent, which can be used to calculate H-score 
+    player_stats: DataFrame of player statistics 
+    players_chosen: list of all chosen players
+    my_players: initial list of players on your team
+    their_players: initial list of players on other team 
+    general_values : series representing general values, for filtering purposes
+    replacement_value : generic value of the top replacement player
+    values_to_me : targetedness of counterparty players to you
+    values_to_them : targetedness of your players to counterparty
+    your_differential_threshold : for display, only include trades above this level of value for you
+    their_differential_threshold : for display, only include trades above this level of value for counterparty
+    combo_params : list of parameter sets for combos to try. See options page for details 
+    trade_filter : show only trades with this number of players involved
+    format: Name of format. Included as input because it is an input to H
+            and the cache should be re-calculated when format changes
+  Returns:
+      None
+  """
+
+  all_combos = pd.concat([get_cross_combos(n
+                                , m
+                                , my_players 
+                                , their_players 
+                                , general_values 
+                                , replacement_value 
+                                , values_to_me 
+                                , values_to_them 
+                                , hdt
+                                , vt) for n,m,hdt,vt in combo_params])
+
+  full_dataframe = make_combo_df(all_combos
+                  , player_stats 
+                  , my_players 
+                  , their_players
+                  , _H
+                  , players_chosen 
+                  , format) 
 
   if len(full_dataframe) > 0:
 
-    if uneven:
-      st.markdown("""*Note that asymmetrical trade analysis can be misleading when one team has a suboptimal player. Any chance to trade up in 
-                  number allows the team to drop the player, which appears highly beneficial*""")
+    my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
+    their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
+    
+    lens = pd.Series(zip(full_dataframe['Send'].map(len), full_dataframe['Receive'].map(len))
+                      , index = full_dataframe.index)
 
-    goodness = full_dataframe['Your H-score Differential']
-    full_dataframe = full_dataframe.loc[list(goodness.sort_values(ascending = False).index)]
+    lens_criteria = lens.isin(trade_filter)
+
+    full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria & \
+                                    lens_criteria]
 
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
                                       , subset = ['Your H-score Differential'
@@ -610,71 +665,6 @@ def make_combo_tab(combos : list
   else: 
     st.markdown('No promising trades found')
 
-def make_trade_suggestion_display(_H
-                  , player_stats : pd.DataFrame
-                  , players_chosen : list[str]
-                  , my_players : list[str]
-                  , their_players : list[str]
-                  , general_values : pd.Series
-                  , replacement_value : float
-                  , values_to_me : pd.Series
-                  , values_to_them : pd.Series
-                  , your_differential_threshold : float
-                  , their_differential_threshold : float
-                  , combo_params : list[tuple]
-                  , format : str):
-  """Shows automatic trade suggestions 
-
-  Args:
-    _H: H-scoring agent, which can be used to calculate H-score 
-    player_stats: DataFrame of player statistics 
-    players_chosen: list of all chosen players
-    my_players: initial list of players on your team
-    their_players: initial list of players on other team 
-    general_values : series representing general values, for filtering purposes
-    replacement_value : generic value of the top replacement player
-    values_to_me : targetedness of counterparty players to you
-    values_to_them : targetedness of your players to counterparty
-    your_differential_threshold : for display, only include trades above this level of value for you
-    their_differential_threshold : for display, only include trades above this level of value for counterparty
-    combo_params : list of parameter sets for combos to try. See options page for details 
-    format: Name of format. Included as input because it is an input to H
-            and the cache should be re-calculated when format changes
-  Returns:
-      None
-  """
-
-  all_combos = [get_cross_combos(n
-                                , m
-                                , my_players 
-                                , their_players 
-                                , general_values 
-                                , replacement_value 
-                                , values_to_me 
-                                , values_to_them 
-                                , hdt
-                                , vt) for n,m,hdt,vt in combo_params]
-
-  combo_names = [str(n) + ' for ' + str(m) for n, m, _, _ in combo_params ]
-
-  is_uneven = [n != m for n,m,_,_ in combo_params]
-
-  tabs = st.tabs(combo_names)
-
-  for tab, combos, uneven in zip(tabs, all_combos, is_uneven):
-
-    with tab:
-    
-      make_combo_tab(combos
-                        , player_stats
-                        , uneven
-                        , my_players
-                        , their_players
-                        , _H
-                        , players_chosen
-                        , your_differential_threshold
-                        , their_differential_threshold
-                        , format)
 @st.cache_data()
 def make_trade_display(_H
                   , player_stats : pd.DataFrame
