@@ -400,7 +400,8 @@ def analyze_trade(team_1_other : list[str]
     Returns:
       Dictionary with results of the trade
     """
-                      
+
+
     score_1_1, _, rate_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
     score_2_2, _, rate_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
  
