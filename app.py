@@ -664,7 +664,7 @@ with trade_tab:
             general_value = g_scores.sum(axis = 1)
             replacement_value = g_scores_unselected.iloc[0].sum()
 
-          trade_filter = st.multiselect('Which kinds of trades do you want to look at'
+          trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
                                     , [(1,1),(2,2),(3,3)]
                                     , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
                                     , default = [(1,1)])
