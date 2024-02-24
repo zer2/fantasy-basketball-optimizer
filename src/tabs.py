@@ -632,18 +632,20 @@ def make_trade_suggestion_display(_H
                   , players_chosen 
                   , format) 
 
+  my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
+  their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
+  
+  lens = pd.Series(zip(full_dataframe['Send'].map(len), full_dataframe['Receive'].map(len))
+                    , index = full_dataframe.index)
+
+  lens_criteria = lens.isin(trade_filter)
+
+  full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria & \
+                                  lens_criteria]
+
   if len(full_dataframe) > 0:
 
-    my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
-    their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
-    
-    lens = pd.Series(zip(full_dataframe['Send'].map(len), full_dataframe['Receive'].map(len))
-                      , index = full_dataframe.index)
 
-    lens_criteria = lens.isin(trade_filter)
-
-    full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria & \
-                                    lens_criteria]
 
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
                                       , subset = ['Your H-score Differential'
