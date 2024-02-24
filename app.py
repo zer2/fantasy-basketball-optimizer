@@ -282,10 +282,10 @@ with param_tab:
         their_differential_threshold = their_differential_threshold/100
 
         with st.form("Combo params"):
-          combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
-                                        ,'N-received' : [1,2,3]
-                                        ,'T1' : [0,0,0]
-                                        ,'T2' : [1,0.25,0.1]}
+          combo_params_default = pd.DataFrame({'N-traded' : [1,1,2,2,2,3,3,3,4,4]
+                                        ,'N-received' : [1,2,1,2,3,2,3,4,3,4]
+                                        ,'T1' : [0,0,0,0,0,0,0,0,0,0]
+                                        ,'T2' : [1,0.5,0.5,0.25,0.2,0.2,0.1,0.1,0.1,0.1]}
                                         )
 
           combo_params_df = st.data_editor(combo_params_default

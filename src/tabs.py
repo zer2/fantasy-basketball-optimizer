@@ -500,7 +500,7 @@ def make_trade_suggestion_display(_H
     their_candidate_players = [p for p in their_players if values_to_me[p] > heuristic_differential_threshold ]
 
     my_players_with_weight = [(p,general_values[p]) for p in my_candidate_players]
-    their_players_with_weight = [(p,general_values[p])  for p in their_players]
+    their_players_with_weight = [(p,general_values[p])  for p in their_candidate_players]
 
     cross_combos = list(itertools.product(get_combos(my_players_with_weight, n)
                                           ,get_combos(their_players_with_weight, m)
@@ -523,71 +523,85 @@ def make_trade_suggestion_display(_H
     
     return full_dataframe_separated[meets_threshold]
 
-  all_combos = pd.concat([get_cross_combos(n,m,hdt,vt) for n,m,hdt,vt in combo_params])
+  all_combos = [get_cross_combos(n,m,hdt,vt) for n,m,hdt,vt in combo_params]
 
-  full_dataframe = pd.DataFrame()
+  combo_names = [str(n) + ' for ' + str(m) for n, m, _, _ in combo_params ]
 
-  for key, row in all_combos.iterrows():
+  is_uneven = [n != m for n,m,_,_ in combo_params]
 
-    my_trade = row['My Trade']
-    their_trade = row['Their Trade']
+  tabs = st.tabs(combo_names)
 
-    my_general_value = row['My Value']
-    their_general_value = row['Their Value']
-    #check if the general value disparity is extreme. If it is, pass 
+  for tab, combos, uneven in zip(tabs, all_combos, is_uneven):
 
-    my_others = [x for x in my_players if x not in my_trade]
-    their_others = [x for x in their_players if x not in their_trade]
+    with tab:
 
-    trade_results = analyze_trade(my_others
-                              , my_trade
-                              , their_others
-                              , their_trade
-                              , _H
-                              , player_stats
-                              , players_chosen
-                              , 1)
-    your_score_pre_trade = trade_results[1]['pre']['H-score']
-    your_score_post_trade = trade_results[1]['post']['H-score']
-    their_score_pre_trade = trade_results[2]['pre']['H-score']
-    their_score_post_trade = trade_results[2]['post']['H-score']
+      if uneven:
+        st.markdown("""*Note that asymmetrical trade analysis can be misleading when one team has a suboptimal player. Any chance to trade up in 
+                    number allows the team to drop the player, which appears highly beneficial*""")
+      
+      full_dataframe = pd.DataFrame()
 
-    your_differential = your_score_post_trade - your_score_pre_trade
-    their_differential = their_score_post_trade - their_score_pre_trade
+      for key, row in combos.iterrows():
 
-    if ( your_differential > your_differential_threshold ) & \
-          (their_differential > their_differential_threshold ):
-      new_row = pd.DataFrame({ 'Send' : [my_trade]
-                                ,'Receive' : [their_trade]
-                                ,'Your H-score Differential' : [your_differential]
-                                ,'Their H-score Differential' : [their_differential]
-                                })
-      full_dataframe = pd.concat([full_dataframe, new_row])
+        my_trade = row['My Trade']
+        their_trade = row['Their Trade']
 
-  full_dataframe = full_dataframe.reset_index().drop(columns = 'index')
-  if len(full_dataframe) > 0:
-    goodness = full_dataframe['Your H-score Differential']
-    full_dataframe = full_dataframe.loc[list(goodness.sort_values(ascending = False).index)]
+        my_general_value = row['My Value']
+        their_general_value = row['Their Value']
+        #check if the general value disparity is extreme. If it is, pass 
 
-    full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
-                                      , subset = ['Your H-score Differential'
-                                                ,'Their H-score Differential']) \
-                            .map(stat_styler
-                                , middle = 0
-                                , multiplier = 15000
-                                , subset = ['Your H-score Differential'
-                                          ,'Their H-score Differential']
-                            ).set_properties(**{
-                                  'font-size': '12pt',
-                              })
-    st.dataframe(full_dataframe_styled
-                , hide_index = True
-                , column_config={
-                             "Send": st.column_config.ListColumn("Send", width='large')
-                             ,"Receive": st.column_config.ListColumn("Receive", width='large')
-                                                    })
-  else: 
-    st.markdown('No promising trades found')
+        my_others = [x for x in my_players if x not in my_trade]
+        their_others = [x for x in their_players if x not in their_trade]
+
+        trade_results = analyze_trade(my_others
+                                  , my_trade
+                                  , their_others
+                                  , their_trade
+                                  , _H
+                                  , player_stats
+                                  , players_chosen
+                                  , 1)
+        your_score_pre_trade = trade_results[1]['pre']['H-score']
+        your_score_post_trade = trade_results[1]['post']['H-score']
+        their_score_pre_trade = trade_results[2]['pre']['H-score']
+        their_score_post_trade = trade_results[2]['post']['H-score']
+
+        your_differential = your_score_post_trade - your_score_pre_trade
+        their_differential = their_score_post_trade - their_score_pre_trade
+
+        if ( your_differential > your_differential_threshold ) & \
+              (their_differential > their_differential_threshold ):
+          new_row = pd.DataFrame({ 'Send' : [my_trade]
+                                    ,'Receive' : [their_trade]
+                                    ,'Your H-score Differential' : [your_differential]
+                                    ,'Their H-score Differential' : [their_differential]
+                                    })
+          full_dataframe = pd.concat([full_dataframe, new_row])
+
+      full_dataframe = full_dataframe.reset_index().drop(columns = 'index')
+      if len(full_dataframe) > 0:
+        goodness = full_dataframe['Your H-score Differential']
+        full_dataframe = full_dataframe.loc[list(goodness.sort_values(ascending = False).index)]
+
+        full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
+                                          , subset = ['Your H-score Differential'
+                                                    ,'Their H-score Differential']) \
+                                .map(stat_styler
+                                    , middle = 0
+                                    , multiplier = 15000
+                                    , subset = ['Your H-score Differential'
+                                              ,'Their H-score Differential']
+                                ).set_properties(**{
+                                      'font-size': '12pt',
+                                  })
+        st.dataframe(full_dataframe_styled
+                    , hide_index = True
+                    , column_config={
+                                "Send": st.column_config.ListColumn("Send", width='large')
+                                ,"Receive": st.column_config.ListColumn("Receive", width='large')
+                                                        })
+      else: 
+        st.markdown('No promising trades found')
     
 @st.cache_data()
 def make_trade_display(_H
