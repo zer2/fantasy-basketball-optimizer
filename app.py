@@ -62,6 +62,7 @@ coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 main_tabs = st.tabs([":control_knobs: Parameters"
                 ,":bar_chart: Player Info"
+                ,":first_place_medal: Player Scores & Rankings"
                 ,":man-bouncing-ball: Drafting & Teams"
                 ,":crossed_swords: Matchups"
                 ,":man_standing: Waiver Wire & Free Agents"
@@ -70,11 +71,12 @@ main_tabs = st.tabs([":control_knobs: Parameters"
 
 param_tab = main_tabs[0]
 info_tab = main_tabs[1]
-draft_tab = main_tabs[2]
-matchup_tab = main_tabs[3]
-waiver_tab = main_tabs[4]
-trade_tab = main_tabs[5]
-about_tab = main_tabs[6]
+rank_tab = main_tabs[2]
+draft_tab = main_tabs[3]
+matchup_tab = main_tabs[4]
+waiver_tab = main_tabs[5]
+trade_tab = main_tabs[6]
+about_tab = main_tabs[7]
                 
 with param_tab: 
 
@@ -311,10 +313,9 @@ with param_tab:
 
 with info_tab:
 
-  stat_tab, injury_tab, rank_tab = st.tabs([
+  stat_tab, injury_tab = st.tabs([
                   "Player Stats"
-                  ,"Injury Status"
-                  ,"Player Rankings"])
+                  ,"Injury Status"])
 
   with stat_tab:
     st.header('Per-game stats')
@@ -330,23 +331,23 @@ with info_tab:
     player_stats[r'No Play %'] = player_stats[r'No Play %']/100
     player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
 
-with injury_tab:
-    st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-    injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
-    injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
+  with injury_tab:
+      st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+      injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
+      injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
 
-    player_stats = player_stats.drop(injured_players)
-    info = process_player_data(player_stats
-                            ,conversion_factors
-                            ,multipliers
-                            ,psi
-                            ,nu
-                            ,n_drafters
-                            ,n_picks
-                            ,rotisserie)
+      player_stats = player_stats.drop(injured_players)
+      info = process_player_data(player_stats
+                              ,conversion_factors
+                              ,multipliers
+                              ,psi
+                              ,nu
+                              ,n_drafters
+                              ,n_picks
+                              ,rotisserie)
 
-    z_scores = info['Z-scores']
-    g_scores = info['G-scores']
+      z_scores = info['Z-scores']
+      g_scores = info['G-scores']
 
 with rank_tab:
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
