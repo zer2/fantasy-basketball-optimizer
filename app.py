@@ -24,7 +24,6 @@ st.set_page_config(page_title='Fantasy BBall Optimization'
           , initial_sidebar_state="auto"
           , menu_items=None)
 
-
 if 'params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
       try:
@@ -663,6 +662,21 @@ with trade_tab:
           else:
             general_value = g_scores.sum(axis = 1)
             replacement_value = g_scores_unselected.iloc[0].sum()
+
+          #slightly hacky way to make all of the multiselects blue
+          st.markdown("""
+              <style>
+                  span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                      background-color: lightblue; color:black;
+                  }
+                  span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                      background-color: lightblue; color:black;
+                  }
+                  span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                      background-color: lightblue; color:black;
+                  }
+              </style>
+              """, unsafe_allow_html=True)
 
           trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
                                     , [(1,1),(2,2),(3,3)]
