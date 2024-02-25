@@ -13,6 +13,7 @@ from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
 from src import yahoo_connect
 from src.tabs import *
+from src.data_editor import make_data_editor
 
 #from streamlit_profiler import Profiler
 
@@ -319,7 +320,8 @@ with info_tab:
     st.header('Per-game stats')
     st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
 
-    player_stats_editable = st.data_editor(raw_stats_df) # 👈 An editable dataframe
+    #player_stats_editable = st.data_editor(raw_stats_df, key = 'player_stats') # 👈 An editable dataframe
+    player_stats_editable = make_data_editor(raw_stats_df)
     player_stats = player_stats_editable.copy()
 
     #re-adjust from user inputs
@@ -543,7 +545,6 @@ with waiver_tab:
           ,my_players
           ,index = default_index
         )
-
 
         mod_my_players = [x for x in my_players if x != drop_player]
 
