@@ -89,7 +89,7 @@ with param_tab:
 
       data_source = st.selectbox(
         'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
-        ('Enter your own data', 'Retrieve from yahoo fantasy')
+        ('Enter your own data', 'Retrieve from Yahoo Fantasy')
         , index = 0)
       
       # Setting default values
