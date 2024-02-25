@@ -138,7 +138,7 @@ def make_waiver_tab(scores : pd.DataFrame
   new_styled = static_score_styler(new, team_multiplier)
 
   def color_blue(label):
-    return "background-color: blue; color:white" if label == drop_player else None
+    return "background-color: lightblue; color:black" if label == drop_player else None
 
   new_styled = new_styled.map(color_blue, subset = pd.IndexSlice[:,['Player']])
 
@@ -188,6 +188,16 @@ def make_matchup_tab(x_scores : pd.DataFrame
       for team in selections_full.columns:
         matchup_df.loc[team,team] = 0.5
 
+      #A hack to make all of the columns similar width
+      max_len_team_name = max([len(x) for x in matchup_df.columns])
+      new_team_names = [x + (max_len_team_name - len(x)) * ' ' for x in matchup_df.columns]
+
+      print(new_team_names)
+
+      matchup_df.columns = new_team_names
+      matchup_df.index = new_team_names
+
+
       matchup_df_styled = matchup_df.style.format("{:.1%}") \
                             .highlight_null(props="color: transparent;") \
                             .map(stat_styler
@@ -196,11 +206,18 @@ def make_matchup_tab(x_scores : pd.DataFrame
       
       def highlight_diag(df):
         a = np.full(df.shape, '', dtype='<U24')
-        np.fill_diagonal(a, f"background-color:black")
+        np.fill_diagonal(a, f"background-color:grey;")
 
         return pd.DataFrame(a, index=df.index, columns=df.columns)
-                           
-      matchup_df_styled = matchup_df_styled.apply(highlight_diag, axis = None)
+
+      def highlight_diag_2(df):
+        a = np.full(df.shape, '', dtype='<U24')
+        np.fill_diagonal(a, f"color:grey;")
+
+        return pd.DataFrame(a, index=df.index, columns=df.columns)     
+
+      matchup_df_styled = matchup_df_styled.apply(highlight_diag, axis = None) \
+                                          .apply(highlight_diag_2, axis = None)
       st.dataframe(matchup_df_styled)
     
     else: 
