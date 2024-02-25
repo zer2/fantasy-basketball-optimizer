@@ -138,7 +138,7 @@ def make_waiver_tab(scores : pd.DataFrame
   new_styled = static_score_styler(new, team_multiplier)
 
   def color_blue(label):
-    return "background-color: blue; color:white" if label == drop_player else None
+    return "background-color: lightblue; color:black" if label == drop_player else None
 
   new_styled = new_styled.map(color_blue, subset = pd.IndexSlice[:,['Player']])
 
