@@ -121,12 +121,13 @@ class HAgent():
             if (n_players_selected < self.n_picks - 1) & (self.punting):
                 del_full = self.get_del_full(weights)
         
-                expected_x = self.get_x_mu(weights)
+                expected_future_diff_single = self.get_x_mu(weights)
 
-                expected_future_diff = ((12-n_players_selected) * expected_x).reshape(-1,9)
+                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9)
         
                 pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
                                           , scale = np.sqrt(self.diff_var))
+
                 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
                                           , scale = np.sqrt(self.diff_var))
@@ -219,8 +220,9 @@ class HAgent():
 
             cdf_estimates.columns = get_categories()
     
-            yield score, weights, cdf_estimates
-
+            yield {'Scores' : score
+                    ,'Weights' : weights
+                    ,'Rates' : cdf_estimates}
 
     ### below are functions used for the optimization procedure 
 
@@ -345,14 +347,14 @@ class HAgent():
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
                             , n_picks : int
-                            , format : str) -> float:
+                            , scoring_format : str) -> float:
     """Based on X scores, estimates the result of a matchup
 
     Args:
       team_1_x_scores: Series of x-scores for one team
       team_2_x_scores: Series of x-scores for other team
       n_picks: number of players on each team
-      format: format to use for analysis
+      scoring_format: format to use for analysis
 
     Returns:
       Dictionary with results of the trade
@@ -363,7 +365,7 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
                                         )
                             ).T
 
-    if format == 'Head to Head: Most Categories':
+    if scoring_format == 'Head to Head: Most Categories':
         score = combinatorial_calculation(cdf_estimates
                                                     , 1 - cdf_estimates
                                                     , categories = cdf_estimates.columns
@@ -401,35 +403,29 @@ def analyze_trade(team_1_other : list[str]
       Dictionary with results of the trade
     """
 
-
-    score_1_1, _, rate_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
-    score_2_2, _, rate_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
+    res_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
+    res_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
  
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
         generator = H.get_h_scores(team_1_other + team_2_trade, players_chosen)
         for i in range(n_iterations):
-            score_1_2,_,rate_1_2  = next(generator)
-        rate_1_2.columns = rate_1_1.columns
+            res_1_2  = next(generator)
         
-        score_2_1,_,rate_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
-        rate_2_1.columns = rate_1_1.columns
+        res_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
 
     elif n_player_diff == 0:
-        score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
-        score_2_1,_,rate_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
+        res_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
+        res_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
 
     else:
-        score_1_2,_,rate_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
-        rate_1_2.columns = rate_1_1.columns
+        res_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
 
         generator = H.get_h_scores(team_2_other + team_1_trade, players_chosen)
         for i in range(n_iterations):
-            score_2_1,_,rate_2_1 = next(generator)
+            res_2_1= next(generator)
     
-        rate_2_1.columns = rate_1_1.columns
-
     #helper function just for this procedure
     def get_full_row(scores, rates):
 
@@ -439,10 +435,10 @@ def analyze_trade(team_1_other : list[str]
 
         return pd.concat([score, rate])
 
-    team_1_info = {'pre' : get_full_row(score_1_1, rate_1_1)
-                        ,'post' : get_full_row(score_1_2, rate_1_2)}
-    team_2_info = {'pre' : get_full_row(score_2_2, rate_2_2)
-                        ,'post' : get_full_row(score_2_1, rate_2_1)}
+    team_1_info = {'pre' : get_full_row(res_1_1['Scores'], res_1_1['Rates'])
+                        ,'post' : get_full_row(res_1_2['Scores'], res_1_2['Rates'])}
+    team_2_info = {'pre' : get_full_row(res_2_2['Scores'], res_2_2['Rates'])
+                        ,'post' : get_full_row(res_2_1['Scores'], res_2_1['Rates'])}
                       
     results_dict = {1 : team_1_info
                     ,2 : team_2_info
@@ -450,18 +446,18 @@ def analyze_trade(team_1_other : list[str]
 
     return results_dict
                 
-def analyze_trade_value(player : list[str]
+def analyze_trade_value(player : str
                   ,rest_of_team : list[str]
                   ,H
                   ,player_stats : pd.DataFrame
                   ,players_chosen : list[str]
                   ) -> float:    
 
-    """Compute the results of a potential trade
+    """Estimate how valuable a player would be to a particular team
 
     Args:
-      team_1_other: remaining players, not to be traded from the first team
-      team_1_trade: player(s) to be traded from the first team
+      player: player to evaluate
+      rest_of_team: other player(s) on team
       H: H-scoring agent, which can be used to calculate H-score 
       player_stats: DataFrame of player statistics 
       players_chosen: list of all chosen players
@@ -469,8 +465,8 @@ def analyze_trade_value(player : list[str]
     Returns:
       Float, relative H-score value
     """
-    score_without_player, _, _ = next(H.get_h_scores(rest_of_team, players_chosen))
-    score_with_player, _, _ = next(H.get_h_scores(rest_of_team + [player], players_chosen))
+    res_without_player= next(H.get_h_scores(rest_of_team, players_chosen))
+    res_with_player = next(H.get_h_scores(rest_of_team + [player], players_chosen))
 
-    res = (score_with_player.max() - score_without_player.max())
+    res = (res_with_player['Scores'].max() - res_without_player['Scores'].max())
     return res

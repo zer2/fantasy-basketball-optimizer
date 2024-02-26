@@ -4,11 +4,8 @@
 import pandas as pd
 import streamlit as st
 
-if 'key' not in st.session_state:
-    st.session_state.key = 0
-
 def reset():
-    st.session_state.key += 1
+    st.session_state.player_stats_key += 1
 
 def highlight_changes(val):
     color = f"color: black;" if val else "color:lightgray;"
@@ -66,19 +63,13 @@ def show_diff(
 
     return changes
 
-    #print(editor_key.get("edited_rows"))
-
-    #st.subheader("Inserted Rows")
-    #inserted = pd.DataFrame(editor_key.get("added_rows"))
-    #st.dataframe(inserted, use_container_width=True)
-    #st.subheader("Deleted Rows")
-    #st.dataframe(source_df.iloc[editor_key.get("deleted_rows")], use_container_width=True)
-
 def make_data_editor(data):
 
     with st.form("Edit your data ⬇️"):
         editor_df = st.data_editor(
-            data, key=st.session_state.key, num_rows="dynamic", use_container_width=True
+            data, key=st.session_state.player_stats_key
+                    , num_rows="dynamic"
+                    , use_container_width=True
         )
         submitted = st.form_submit_button("Lock in Player Stats"
                                         , use_container_width = True
@@ -87,7 +78,7 @@ def make_data_editor(data):
     changes = show_diff(
                     source_df=data
                     , modified_df=editor_df
-                    , editor_key=st.session_state[st.session_state.key]
+                    , editor_key=st.session_state[st.session_state.player_stats_key]
     )
 
     if len(changes) > 0:
@@ -95,6 +86,5 @@ def make_data_editor(data):
             , on_click=reset
             , use_container_width = True
             , type = 'primary')
-
     
     return editor_df
