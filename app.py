@@ -38,13 +38,13 @@ def run_h_score():
 def stop_run_h_score():
     st.session_state.run_score = False
 
-  def finish_intro():
-    st.session_state.intro_complete = True
+def finish_intro():
+  st.session_state.intro_complete = True
 
-    st.session_state.n_drafters = n_drafters
-    st.session_state.n_picks = n_picks
-    st.session_state.selections = selections
-    st.session_state.mode = mode
+  st.session_state.n_drafters = n_drafters
+  st.session_state.n_picks = n_picks
+  st.session_state.selections = selections
+  st.session_state.mode = mode
         
 if 'params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
@@ -56,11 +56,6 @@ if 'params' not in st.session_state:
 counting_statistics = st.session_state.params['counting-statistics'] 
 volume_statistics = st.session_state.params['percentage-statistics'] 
 
-z_score_player_multiplier = st.session_state.params['z-score-player-multiplier']
-z_score_team_multiplier = st.session_state.params['z-score-team-multiplier']
-g_score_player_multiplier = st.session_state.params['g-score-player-multiplier']
-g_score_team_multiplier = st.session_state.params['g-score-team-multiplier']
-
 historical_df = get_historical_data()
 current_data, expected_minutes = get_current_season_data()
 darko_data = get_darko_data(expected_minutes)
@@ -68,6 +63,9 @@ darko_data = get_darko_data(expected_minutes)
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 st.title('Optimization for Fantasy Basketball :basketball:')
+
+
+### Get intro information
 
 if 'intro_complete' not in st.session_state:
     st.session_state.intro_complete = False
@@ -150,6 +148,8 @@ if not st.session_state.intro_complete:
     intro_complete = st.form_submit_button("Go!"
                                       , use_container_width = True
                                       , on_click = finish_intro)
+
+### Build app 
 
 else:
 
@@ -401,10 +401,12 @@ else:
       z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
         
       with z_rank_tab:
-        make_rank_tab(z_scores, z_score_player_multiplier)  
+        make_rank_tab(z_scores
+                      , st.session_state.params['z-score-player-multiplier'])  
 
       with g_rank_tab:
-        make_rank_tab(g_scores, g_score_player_multiplier)  
+        make_rank_tab(g_scores
+                      , st.session_state.params['g-score-player-multiplier'])  
 
       with h_rank_tab:
         rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
@@ -470,27 +472,27 @@ else:
                             ,my_players
                             ,n_drafters
                             ,n_picks
-                            ,z_score_player_multiplier
-                            ,z_score_team_multiplier
-                            ,g_score_player_multiplier
-                            ,g_score_team_multiplier
                             ,base_h_score
                             ,base_win_rates
                             )
               
         with cand_tab:
 
-          subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
+          z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
                     
-          with subtab1:
+          with z_cand_tab:
             
-            z_scores_unselected = make_cand_tab(z_scores, selection_list, z_score_player_multiplier)
+            z_scores_unselected = make_cand_tab(z_scores
+                                          , selection_list
+                                          , st.session_state.params['z-score-player-multiplier'])
 
-          with subtab2:
+          with g_cand_tab:
 
-            g_scores_unselected = make_cand_tab(g_scores, selection_list, g_score_player_multiplier)
+            g_scores_unselected = make_cand_tab(g_scores
+                                          , selection_list
+                                          , st.session_state.params['g-score-player-multiplier'])
 
-          with subtab3:
+          with h_cand_tab:
 
             if len(my_players) == n_picks:
               st.markdown('Team is complete!')
@@ -586,10 +588,6 @@ else:
                                                     ,my_players
                                                     ,n_drafters
                                                     ,n_picks
-                                                    ,z_score_player_multiplier
-                                                    ,z_score_team_multiplier
-                                                    ,g_score_player_multiplier
-                                                    ,g_score_team_multiplier
                                                     ,base_h_score
                                                     ,base_win_rates
                                                     )
@@ -629,7 +627,7 @@ else:
                               , z_scores_unselected
                               , team_stats_z
                               , drop_player
-                              , z_score_team_multiplier)
+                              , st.session_state.params['z-score-team-multiplier'])
 
             with g_waiver_tab:
 
@@ -638,7 +636,7 @@ else:
                               , g_scores_unselected
                               , team_stats_g
                               , drop_player
-                              , g_score_team_multiplier)
+                              , st.session_state.params['g-score-team-multiplier'])
 
             with h_waiver_tab:
 

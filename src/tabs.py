@@ -82,14 +82,23 @@ def make_full_team_tab(z_scores : pd.DataFrame
                   ,my_players : list[str]
                   ,n_drafters : int
                   ,n_picks : int
-                  ,z_score_player_multiplier : float
-                  ,z_score_team_multiplier : float
-                  ,g_score_player_multiplier : float
-                  ,g_score_team_multiplier : float
                   ,base_h_score : float
                   ,base_win_rates : float
                   ):
+  """Make a tab summarizing your team as it currently stands
 
+  Args:
+      z_scores: Dataframe of floats, rows by player and columns by category
+      g_scores: Dataframe of floats, rows by player and columns by category\
+      my_players: list of players on 'your' team
+      n_drafters: number of drafters in the relevant league
+      n_picks: number of picks per drafter
+      base_h_score: The H-score of your full team
+      base_win_rates: expected win rates for each category
+
+  Returns:
+      DataFrame of team stats, to use in other tabs
+  """
   z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
   with z_tab:
@@ -97,16 +106,16 @@ def make_full_team_tab(z_scores : pd.DataFrame
       team_stats_z = make_team_tab(z_scores
                               , my_players
                               , n_drafters
-                              , z_score_player_multiplier
-                              , z_score_team_multiplier)
+                              , st.session_state.params['z-score-player-multiplier']
+                              , st.session_state.params['z-score-team-multiplier'])
 
   with g_tab:
 
       team_stats_g = make_team_tab(g_scores
                               , my_players
                               , n_drafters
-                              , g_score_player_multiplier
-                              , g_score_team_multiplier)    
+                              , st.session_state.params['g-score-player-multiplier']
+                              , st.session_state.params['g-score-team-multiplier'])    
   with h_tab:
     if len(my_players) == n_picks:
 
