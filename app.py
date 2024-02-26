@@ -554,7 +554,7 @@ else:
                                           ,players_chosen)
 
             base_h_score = base_h_res['Scores']
-            base_win_rates = base_h_res['Weights']
+            base_win_rates = base_h_res['Rates']
 
           else:
             base_h_score = None
@@ -593,7 +593,7 @@ else:
 
         with right: 
 
-          base_h_score, _, base_win_rates = get_base_h_score(info
+          base_h_res = get_base_h_score(info
                                         ,omega
                                         ,gamma
                                         ,alpha
@@ -604,6 +604,9 @@ else:
                                         ,player_stats
                                         ,inspection_players
                                         ,players_chosen)
+
+          base_h_score = base_h_res['Scores']
+          base_win_rates = base_h_res['Rates']
 
           team_stats_z, team_stats_g = make_full_team_tab(z_scores
                                                         ,g_scores
