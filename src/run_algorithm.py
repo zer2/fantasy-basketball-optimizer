@@ -345,14 +345,14 @@ class HAgent():
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
                             , n_picks : int
-                            , format : str) -> float:
+                            , scoring_format : str) -> float:
     """Based on X scores, estimates the result of a matchup
 
     Args:
       team_1_x_scores: Series of x-scores for one team
       team_2_x_scores: Series of x-scores for other team
       n_picks: number of players on each team
-      format: format to use for analysis
+      scoring_format: format to use for analysis
 
     Returns:
       Dictionary with results of the trade
@@ -363,7 +363,7 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
                                         )
                             ).T
 
-    if format == 'Head to Head: Most Categories':
+    if scoring_format == 'Head to Head: Most Categories':
         score = combinatorial_calculation(cdf_estimates
                                                     , 1 - cdf_estimates
                                                     , categories = cdf_estimates.columns
@@ -400,7 +400,6 @@ def analyze_trade(team_1_other : list[str]
     Returns:
       Dictionary with results of the trade
     """
-
 
     score_1_1, _, rate_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
     score_2_2, _, rate_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))

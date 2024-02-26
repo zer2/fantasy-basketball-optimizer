@@ -610,6 +610,7 @@ else:
               worst_player = list(g_scores.index[g_scores.index.isin(my_players)])[-1]
 
             default_index = list(my_players).index(worst_player)
+            
             drop_player = st.selectbox(
               'Which player are you considering dropping?'
               ,my_players
