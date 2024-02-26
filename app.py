@@ -666,6 +666,21 @@ else:
 
             with h_waiver_tab:
 
+                base_h_res = get_base_h_score(info
+                                ,omega
+                                ,gamma
+                                ,alpha
+                                ,beta
+                                ,n_picks
+                                ,winner_take_all
+                                ,punting
+                                ,player_stats
+                                ,my_players
+                                ,players_chosen)
+
+                base_h_score = base_h_res['Scores']
+                base_win_rates = base_h_res['Rates']
+
                 make_h_waiver_df(H
                             , player_stats
                             , mod_my_players
