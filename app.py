@@ -656,52 +656,54 @@ else:
                 ,index = default_index
               )
 
-        mod_waiver_players = [x for x in waiver_players if x != drop_player]
+        if len(waiver_players) == n_picks:
 
-        z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+          mod_waiver_players = [x for x in waiver_players if x != drop_player]
 
-        with z_waiver_tab:
+          z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(z_scores
-                          , z_scores_unselected
-                          , waiver_team_stats_z
+          with z_waiver_tab:
+
+              st.markdown('Projected team stats with chosen player:')
+              make_waiver_tab(z_scores
+                            , z_scores_unselected
+                            , waiver_team_stats_z
+                            , drop_player
+                            , st.session_state.params['z-score-team-multiplier'])
+
+          with g_waiver_tab:
+
+              st.markdown('Projected team stats with chosen player:')
+              make_waiver_tab(g_scores
+                            , g_scores_unselected
+                            , waiver_team_stats_g
+                            , drop_player
+                            , st.session_state.params['g-score-team-multiplier'])
+
+          with h_waiver_tab:
+
+              base_h_res = get_base_h_score(info
+                              ,omega
+                              ,gamma
+                              ,alpha
+                              ,beta
+                              ,n_picks
+                              ,winner_take_all
+                              ,punting
+                              ,player_stats
+                              ,waiver_players
+                              ,players_chosen)
+
+              waiver_base_h_score = base_h_res['Scores']
+              waiver_base_win_rates = base_h_res['Rates']
+
+              make_h_waiver_df(H
+                          , player_stats
+                          , mod_waiver_players
                           , drop_player
-                          , st.session_state.params['z-score-team-multiplier'])
-
-        with g_waiver_tab:
-
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(g_scores
-                          , g_scores_unselected
-                          , waiver_team_stats_g
-                          , drop_player
-                          , st.session_state.params['g-score-team-multiplier'])
-
-        with h_waiver_tab:
-
-            base_h_res = get_base_h_score(info
-                            ,omega
-                            ,gamma
-                            ,alpha
-                            ,beta
-                            ,n_picks
-                            ,winner_take_all
-                            ,punting
-                            ,player_stats
-                            ,waiver_players
-                            ,players_chosen)
-
-            waiver_base_h_score = base_h_res['Scores']
-            waiver_base_win_rates = base_h_res['Rates']
-
-            make_h_waiver_df(H
-                        , player_stats
-                        , mod_waiver_players
-                        , drop_player
-                        , players_chosen
-                        , waiver_base_h_score
-                        , waiver_base_win_rates)
+                          , players_chosen
+                          , waiver_base_h_score
+                          , waiver_base_win_rates)
 
     with trade_tab:
 
@@ -733,107 +735,113 @@ else:
           
           trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
 
-      inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
-                                                          ,'Destinations'
-                                                          ,'Targets'
-                                                          ,'Trade Suggestions'
-                                                          ])
-      with inspection_tab:
+      if len(trade_party_players) == n_picks:
 
-        c1, c2 = st.columns(2)
+        if len(trade_counterparty_players) < n_picks:
+          st.markdown('The other team is not full yet!')
+        else:
 
-        with c1: 
+          inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
+                                                              ,'Destinations'
+                                                              ,'Targets'
+                                                              ,'Trade Suggestions'
+                                                              ])
+          with inspection_tab:
 
-          with st.form("trade inspection form"):
+            c1, c2 = st.columns(2)
 
-            players_sent = st.multiselect(
-              'Which players are you trading?'
-              ,trade_party_players
-              )
-              
-            players_received = st.multiselect(
-                  'Which players are you receiving?'
-                  ,trade_counterparty_players
-              )
+            with c1: 
 
-            submitted = st.form_submit_button("Submit", use_container_width = True)
+              with st.form("trade inspection form"):
 
-        with c2: 
-          make_trade_display(H
-                          , player_stats 
-                          , players_chosen 
-                          , n_iterations 
-                          , players_sent
-                          , players_received
-                          , trade_party_players
-                          , trade_counterparty_players
-                          , trade_counterparty_seat
-                          , scoring_format)
+                players_sent = st.multiselect(
+                  'Which players are you trading?'
+                  ,trade_party_players
+                  )
+                  
+                players_received = st.multiselect(
+                      'Which players are you receiving?'
+                      ,trade_counterparty_players
+                  )
 
-      with destinations_tab:
+                submitted = st.form_submit_button("Submit", use_container_width = True)
 
-        values_to_team = make_trade_destination_display(H
-                              , player_stats
-                              , trade_party_players 
-                              , counterparty_players_dict 
+            with c2: 
+              make_trade_display(H
+                              , player_stats 
                               , players_chosen 
-                              , scoring_format
-                                    )
+                              , n_iterations 
+                              , players_sent
+                              , players_received
+                              , trade_party_players
+                              , trade_counterparty_players
+                              , trade_counterparty_seat
+                              , scoring_format)
 
-      with target_tab:
+          with destinations_tab:
 
-        values_to_me = make_trade_target_display(H
-              , player_stats
-              , trade_party_players 
-              , trade_counterparty_players
-              , players_chosen 
-              , values_to_team[trade_counterparty_seat]
-              , scoring_format
-                    )
+            values_to_team = make_trade_destination_display(H
+                                  , player_stats
+                                  , trade_party_players 
+                                  , counterparty_players_dict 
+                                  , players_chosen 
+                                  , scoring_format
+                                        )
 
-        with suggestions_tab:
+          with target_tab:
 
-          if rotisserie:
-            general_value = z_scores.sum(axis = 1)
-            replacement_value = z_scores_unselected.iloc[0].sum() 
-          else:
-            general_value = g_scores.sum(axis = 1)
-            replacement_value = g_scores_unselected.iloc[0].sum()
+            values_to_me = make_trade_target_display(H
+                  , player_stats
+                  , trade_party_players 
+                  , trade_counterparty_players
+                  , players_chosen 
+                  , values_to_team[trade_counterparty_seat]
+                  , scoring_format
+                        )
 
-          #slightly hacky way to make all of the multiselects blue
-          st.markdown("""
-              <style>
-                  span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                      background-color: lightblue; color:black;
-                  }
-                  span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                      background-color: lightblue; color:black;
-                  }
-                  span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                      background-color: lightblue; color:black;
-                  }
-              </style>
-              """, unsafe_allow_html=True)
+            with suggestions_tab:
 
-          trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
-                                    , [(1,1),(2,2),(3,3)]
-                                    , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
-                                    , default = [(1,1)])
+              if rotisserie:
+                general_value = z_scores.sum(axis = 1)
+                replacement_value = z_scores_unselected.iloc[0].sum() 
+              else:
+                general_value = g_scores.sum(axis = 1)
+                replacement_value = g_scores_unselected.iloc[0].sum()
 
-          make_trade_suggestion_display(H
-              , player_stats 
-              , players_chosen 
-              , trade_party_players 
-              , trade_counterparty_players
-              , general_value
-              , replacement_value
-              , values_to_me
-              , values_to_team[trade_counterparty_seat]
-              , your_differential_threshold
-              , their_differential_threshold
-              , combo_params
-              , trade_filter
-              , scoring_format )               
+              #slightly hacky way to make all of the multiselects blue
+              st.markdown("""
+                  <style>
+                      span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                          background-color: lightblue; color:black;
+                      }
+                      span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                          background-color: lightblue; color:black;
+                      }
+                      span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                          background-color: lightblue; color:black;
+                      }
+                  </style>
+                  """, unsafe_allow_html=True)
+
+              trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
+                                        , [(1,1),(2,2),(3,3)]
+                                        , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
+                                        , default = [(1,1)])
+
+              make_trade_suggestion_display(H
+                  , player_stats 
+                  , players_chosen 
+                  , trade_party_players 
+                  , trade_counterparty_players
+                  , general_value
+                  , replacement_value
+                  , values_to_me
+                  , values_to_team[trade_counterparty_seat]
+                  , your_differential_threshold
+                  , their_differential_threshold
+                  , combo_params
+                  , trade_filter
+                  , scoring_format )               
 
   with about_tab:
 
