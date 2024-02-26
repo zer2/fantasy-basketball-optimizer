@@ -36,7 +36,7 @@ def run_h_score():
     st.session_state.run_h_score = True
 
 def stop_run_h_score():
-    st.session_state.run_score = False
+    st.session_state.run_h_score = False
 
 def finish_intro():
   st.session_state.intro_complete = True
@@ -175,8 +175,7 @@ else:
     main_tabs = st.tabs([":control_knobs: Parameters"
                     ,":bar_chart: Player Info"
                     ,":first_place_medal: Player Scores & Rankings"
-                    ,":stadium: Teams"
-                    ,":man-bouncing-ball: My Team"
+                    ,":stadium: Rosters"
                     ,":crossed_swords: Matchups"
                     ,":man_standing: Waiver Wire & Free Agents"
                     ,":clipboard: Trading"
@@ -185,12 +184,11 @@ else:
     param_tab = main_tabs[0]
     info_tab = main_tabs[1]
     rank_tab = main_tabs[2]
-    teams_tab = main_tabs[3]
-    my_team_tab = main_tabs[4]
-    matchup_tab = main_tabs[5]
-    waiver_tab = main_tabs[6]
-    trade_tab = main_tabs[7]
-    about_tab = main_tabs[8]
+    rosters_tab = main_tabs[3]
+    matchup_tab = main_tabs[4]
+    waiver_tab = main_tabs[5]
+    trade_tab = main_tabs[6]
+    about_tab = main_tabs[7]
                   
   with param_tab: 
 
@@ -198,18 +196,18 @@ else:
 
     with general_params:
       
-      format = st.selectbox(
+      scoring_format = st.selectbox(
         'Which format are you playing?',
         ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
         , index = 1)
     
-      if format == 'Rotisserie':
+      if scoring_format == 'Rotisserie':
         st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
       else:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
-      winner_take_all = format == 'Head to Head: Most Categories'
-      rotisserie = format == 'Rotisserie'
+      winner_take_all = scoring_format == 'Head to Head: Most Categories'
+      rotisserie = scoring_format == 'Rotisserie'
 
       unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
       unique_datasets_current = list(current_data.keys())
@@ -410,7 +408,7 @@ else:
 
       with h_rank_tab:
         rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-        st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+        st.caption('Note that these scores are unique to the ' + scoring_format + ' format and all the H-scoring parameters defined on the parameter tab')
         st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
         make_h_rank_tab(info
                       ,omega
@@ -451,30 +449,7 @@ else:
 
       with right:
 
-        team_tab, cand_tab = st.tabs(["Team", "Candidates"])
-
-        with team_tab:
-
-          base_h_score, _, base_win_rates = get_base_h_score(info
-                                              ,omega
-                                              ,gamma
-                                              ,alpha
-                                              ,beta
-                                              ,n_picks
-                                              ,winner_take_all
-                                              ,punting
-                                              ,player_stats
-                                              ,my_players
-                                              ,players_chosen)
-
-          team_stats_z, team_stats_g = make_full_team_tab(z_scores
-                            ,g_scores
-                            ,my_players
-                            ,n_drafters
-                            ,n_picks
-                            ,base_h_score
-                            ,base_win_rates
-                            )
+        cand_tab, team_tab = st.tabs(["Candidates","Team"])
               
         with cand_tab:
 
@@ -517,13 +492,19 @@ else:
               #if n_iterations is 0 we run just once with punting set to False
               for i in range(max(1,n_iterations)):
 
-                score, c, cdf_estimates = next(generator)
+                res = next(generator)
+                score = res['Scores']
+                weights = res['Weights']
+                win_rates = res['Rates']
+
                 all_res = all_res + [score]
                 #normalize weights by what we expect from other drafters
                 
-                c = pd.DataFrame(c, index = score.index, columns = get_categories())/info['v'].T
+                weights = pd.DataFrame(weights
+                              , index = score.index
+                              , columns = get_categories())/info['v'].T
                 
-                cdf_estimates.columns = get_categories()
+                win_rates.columns = get_categories()
                 
                 with placeholder.container():
       
@@ -534,7 +515,7 @@ else:
                   score = pd.DataFrame(score)
 
                   with rate_tab:
-                    rate_df = cdf_estimates.loc[score.index].dropna()
+                    rate_df = win_rates.loc[score.index].dropna()
                     rate_display = score.merge(rate_df, left_index = True, right_index = True)
                     rate_display = rate_display.style.format("{:.1%}"
                                       ,subset = pd.IndexSlice[:,['H-score']]) \
@@ -544,58 +525,99 @@ else:
                               .format('{:,.1%}', subset = rate_df.columns)
                     st.dataframe(rate_display, use_container_width = True)
                   with weight_tab:
-                    c_df = c.loc[score.index].dropna()
-                    weight_display = score.merge(c_df, left_index = True, right_index = True)
+                    weight_df = weights.loc[score.index].dropna()
+                    weight_display = score.merge(weight_df
+                                          , left_index = True
+                                          , right_index = True)
                     weight_display = weight_display.style.format("{:.0%}"
-                                                                , subset = c_df.columns)\
+                                                                , subset = weight_df.columns)\
                               .format("{:.1%}"
                                       ,subset = pd.IndexSlice[:,['H-score']]) \
                               .map(styler_a
                                     , subset = pd.IndexSlice[:,['H-score']]) \
-                              .background_gradient(axis = None,subset = c_df.columns) 
+                              .background_gradient(axis = None,subset = weight_df.columns) 
                     st.dataframe(weight_display, use_container_width = True)
 
+        with team_tab:
+
+          if len(my_players) == n_picks:
+            base_h_res = get_base_h_score(info
+                                          ,omega
+                                          ,gamma
+                                          ,alpha
+                                          ,beta
+                                          ,n_picks
+                                          ,winner_take_all
+                                          ,punting
+                                          ,player_stats
+                                          ,my_players
+                                          ,players_chosen)
+
+            base_h_score = base_h_res['Scores']
+            base_win_rates = base_h_res['Weights']
+
+          else:
+            base_h_score = None
+            base_win_rates = None
+
+          team_stats_z, team_stats_g = make_full_team_tab(z_scores
+                            ,g_scores
+                            ,my_players
+                            ,n_drafters
+                            ,n_picks
+                            ,base_h_score
+                            ,base_win_rates
+                            )
   elif mode == 'Roster Mode':
 
-    with teams_tab:
+    with rosters_tab:
+
+      left, right = st.columns([0.5,0.5])
         
-      st.caption("""Enter which player is on which team below""")
-      selections_editable = st.data_editor(selections, hide_index = True)  
-      selection_list = listify(selections_editable)
+      with left:
 
-      players_chosen = [x for x in listify(selections_editable) if x ==x]
-      my_players = selections_editable[seat].dropna()
+        inspection_seat = st.selectbox(f'Which team so you want to look at?'
+            , selections.columns
+            , index = 0)
 
-      z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
-      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+        st.caption("""Enter which player is on which team below""")
+        selections_editable = st.data_editor(selections, hide_index = True)  
+        selection_list = listify(selections_editable)
 
-    with my_team_tab:
+        players_chosen = [x for x in listify(selections_editable) if x ==x]
+        inspection_players = selections_editable[inspection_seat].dropna()
+        my_players = selections_editable[seat].dropna()
 
-      base_h_score, _, base_win_rates = get_base_h_score(info
-                                    ,omega
-                                    ,gamma
-                                    ,alpha
-                                    ,beta
-                                    ,n_picks
-                                    ,winner_take_all
-                                    ,punting
-                                    ,player_stats
-                                    ,my_players
-                                    ,players_chosen)
+        z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
+        g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
 
-      team_stats_z, team_stats_g = make_full_team_tab(z_scores
-                                                    ,g_scores
-                                                    ,my_players
-                                                    ,n_drafters
-                                                    ,n_picks
-                                                    ,base_h_score
-                                                    ,base_win_rates
-                                                    )
+        with right: 
+
+          base_h_score, _, base_win_rates = get_base_h_score(info
+                                        ,omega
+                                        ,gamma
+                                        ,alpha
+                                        ,beta
+                                        ,n_picks
+                                        ,winner_take_all
+                                        ,punting
+                                        ,player_stats
+                                        ,inspection_players
+                                        ,players_chosen)
+
+          team_stats_z, team_stats_g = make_full_team_tab(z_scores
+                                                        ,g_scores
+                                                        ,inspection_players
+                                                        ,n_drafters
+                                                        ,n_picks
+                                                        ,base_h_score
+                                                        ,base_win_rates
+                                                        )
 
     with matchup_tab:
       make_matchup_tab(info['X-scores']
                       ,selections_editable
-                      ,format
+                      ,scoring_format
                       )
 
     with waiver_tab:
@@ -610,7 +632,7 @@ else:
               worst_player = list(g_scores.index[g_scores.index.isin(my_players)])[-1]
 
             default_index = list(my_players).index(worst_player)
-            
+
             drop_player = st.selectbox(
               'Which player are you considering dropping?'
               ,my_players
@@ -703,7 +725,7 @@ else:
                               , my_players
                               , their_players
                               , second_seat
-                              , format)
+                              , scoring_format)
 
           with destinations_tab:
 
@@ -712,7 +734,7 @@ else:
                                   , my_players 
                                   , their_players_dict 
                                   , players_chosen 
-                                  , format
+                                  , scoring_format
                                         )
 
           with target_tab:
@@ -723,7 +745,7 @@ else:
                   , their_players
                   , players_chosen 
                   , values_to_team[second_seat]
-                  , format
+                  , scoring_format
                         )
 
             with suggestions_tab:
@@ -768,7 +790,7 @@ else:
                   , their_differential_threshold
                   , combo_params
                   , trade_filter
-                  , format )               
+                  , scoring_format )               
 
   with about_tab:
 

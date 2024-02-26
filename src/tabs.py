@@ -195,13 +195,13 @@ def make_waiver_tab(scores : pd.DataFrame
 @st.cache_data()
 def make_matchup_tab(x_scores : pd.DataFrame
                   , selections : pd.DataFrame
-                  , format : str):
+                  , scoring_format : str):
     """Make a tab for a matchup matrix, showing how likely you are to win against any particular opponent
 
     Args:
         x_scores: Dataframe of floats, rows by player and columns by category
         selections: Dataframe of which teams have which players
-        format: format to use for analysis 
+        scoring_format: format to use for analysis 
 
     Returns:
         None
@@ -228,7 +228,7 @@ def make_matchup_tab(x_scores : pd.DataFrame
         result = estimate_matchup_result(team_1_x_scores
                               , team_2_x_scores
                               , n_picks
-                              , format)
+                              , scoring_format)
 
         matchup_df.loc[combo[1],combo[0]] = result
         matchup_df.loc[combo[0],combo[1]] = 1 - result
@@ -272,7 +272,6 @@ def make_matchup_tab(x_scores : pd.DataFrame
 
       st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
             "Drafting & Teams" page then come back here""")
-
 
 
 @st.cache_data()
@@ -339,7 +338,10 @@ def make_h_waiver_df(_H
   Returns:
       None
   """
-  res, _, win_rates = next(_H.get_h_scores(mod_my_players, players_chosen))
+  h_score_results = next(_H.get_h_scores(mod_my_players, players_chosen))
+
+  res = h_score_results['Scores']
+  win_rates = h_score_results['Rates']
 
   res = res.sort_values(ascending = False)
   win_rates = win_rates.loc[res.index]
@@ -381,7 +383,7 @@ def make_trade_destination_display(_H
                   , my_players : list[str]
                   , their_players_dict : dict[list[str]]
                   , players_chosen : list[str]
-                  , format : str
+                  , scoring_format : str
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
 
@@ -391,7 +393,7 @@ def make_trade_destination_display(_H
     my_players: list of players on your team
     their_players_dict: dict relating other team names to their players 
     players_chosen: list of all chosen players
-    format: Name of format. Included as input because it it an input to H
+    scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
 )
   Returns:
@@ -440,7 +442,7 @@ def make_trade_target_display(_H
                   , their_players : list[str]
                   , players_chosen : list[str]
                   , values_to_team : pd.Series
-                  , format : str
+                  , scoring_format : str
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
 
@@ -451,7 +453,7 @@ def make_trade_target_display(_H
     their_players_dict: list of players on the other team
     players_chosen: list of all chosen players
     values_to_team: value of your own players to the selected team
-    format: Name of format. Included as input because it it an input to H
+    scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
 )
   Returns:
@@ -584,7 +586,7 @@ def make_combo_df(all_combos : list
                   , their_players : list[str]
                   , _H
                   , players_chosen : list[str]
-                  , format : str) -> pd.DataFrame:
+                  , scoring_format : str) -> pd.DataFrame:
   """Makes a dataframe of all trade possibilities according to specifications
 
   Args:
@@ -594,7 +596,7 @@ def make_combo_df(all_combos : list
     their_players: initial list of players on other team 
     _H: H-scoring agent, which can be used to calculate H-score 
     players_chosen: list of all chosen players
-    format: Name of format. Included as input because it is an input to H
+    scoring_format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
       None
@@ -655,7 +657,7 @@ def make_trade_suggestion_display(_H
                   , their_differential_threshold : float
                   , combo_params : list[tuple]
                   , trade_filter : list[tuple[int]]
-                  , format : str):
+                  , scoring_format : str):
   """Shows automatic trade suggestions 
 
   Args:
@@ -672,7 +674,7 @@ def make_trade_suggestion_display(_H
     their_differential_threshold : for display, only include trades above this level of value for counterparty
     combo_params : list of parameter sets for combos to try. See options page for details 
     trade_filter : show only trades with this number of players involved
-    format: Name of format. Included as input because it is an input to H
+    scoring_format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
       None
@@ -695,7 +697,7 @@ def make_trade_suggestion_display(_H
                   , their_players
                   , _H
                   , players_chosen 
-                  , format) 
+                  , scoring_format) 
 
   my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
   their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
@@ -740,7 +742,7 @@ def make_trade_display(_H
                   , my_players : list[str]
                   , their_players : list[str]
                   , their_team_name : str
-                  , format : str):
+                  , scoring_format : str):
   """show the results of a potential trade
 
   Args:
@@ -753,7 +755,7 @@ def make_trade_display(_H
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     their_team_name: name of counterparty team
-    format: Name of format. Included as input because it it an input to H
+    scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
 )
   Returns:
@@ -866,7 +868,12 @@ def make_h_rank_tab( info : dict
 
   generator = H.get_h_scores([], [])
   for i in range(max(1,n_iterations)):
-    h_res, c, cdf_estimates = next(generator)
+    res = next(generator)
+
+
+  h_res = res['Scores']
+  c = res['Weights']
+  cdf_estimates = res['Rates']
     
   cdf_estimates.columns = get_categories()
   rate_df = cdf_estimates.loc[h_res.index].dropna()
