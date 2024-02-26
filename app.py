@@ -19,19 +19,15 @@ from src.data_editor import make_data_editor
 
 #with Profiler():
 
+### SETUP
 st.set_page_config(page_title='Fantasy BBall Optimization'
           , page_icon=':basketball:'
           , layout="wide"
           , initial_sidebar_state="auto"
           , menu_items=None)
 
-if 'params' not in st.session_state:
-  with open("parameters.yaml", "r") as stream:
-      try:
-        st.session_state.params = yaml.safe_load(stream)
-      except yaml.YAMLError as exc:
-          print(exc) 
-
+if 'player_stats_key' not in st.session_state:
+    st.session_state.player_stats_key = 0
 
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
@@ -41,7 +37,22 @@ def run_h_score():
 
 def stop_run_h_score():
     st.session_state.run_score = False
-      
+
+  def finish_intro():
+    st.session_state.intro_complete = True
+
+    st.session_state.n_drafters = n_drafters
+    st.session_state.n_picks = n_picks
+    st.session_state.selections = selections
+    st.session_state.mode = mode
+        
+if 'params' not in st.session_state:
+  with open("parameters.yaml", "r") as stream:
+      try:
+        st.session_state.params = yaml.safe_load(stream)
+      except yaml.YAMLError as exc:
+          print(exc) 
+
 counting_statistics = st.session_state.params['counting-statistics'] 
 volume_statistics = st.session_state.params['percentage-statistics'] 
 
@@ -54,105 +65,138 @@ historical_df = get_historical_data()
 current_data, expected_minutes = get_current_season_data()
 darko_data = get_darko_data(expected_minutes)
 
-### Make app
+coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 st.title('Optimization for Fantasy Basketball :basketball:')
 
-coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
+if 'intro_complete' not in st.session_state:
+    st.session_state.intro_complete = False
 
-main_tabs = st.tabs([":control_knobs: Parameters"
+if not st.session_state.intro_complete:
+
+  mode = st.selectbox(
+    'Which mode do you want to use?',
+    ('Draft Mode', 'Roster Mode')
+    , index = 0)
+
+  # Setting default values
+  n_drafters = 12
+  n_picks = 13
+
+  if mode == 'Roster Mode':
+
+    data_source = st.selectbox(
+      'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
+      ('Enter your own data', 'Retrieve from Yahoo Fantasy')
+      , index = 0)
+
+  else:
+    data_source = 'Enter your own data'
+    
+  if data_source == 'Enter your own data':
+    n_drafters = st.number_input(r'How many drafters are in your league?'
+                                  , min_value = 2
+                                  , value = 12)
+
+    n_picks = st.number_input(r'How many players will each drafter choose?'
+                  , min_value = 1
+                  , value =13)
+        
+    # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
+    
+    selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+
+  else:
+
+    selections = None
+
+    access_token_dir = yahoo_connect.get_yahoo_access_token()
+
+    if access_token_dir is not None:
+
+      user_leagues = yahoo_connect.get_user_leagues(access_token_dir)
+
+      get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
+
+      yahoo_league = st.selectbox(
+        label='Which league should player data be pulled from?',
+        options=user_leagues,
+        format_func=get_league_labels,
+        index=None
+      )
+      
+      if yahoo_league is not None:
+
+        yahoo_league_id = yahoo_league.league_id
+
+        player_metadata = get_player_metadata()
+
+        team_players_df = yahoo_connect.get_yahoo_players_df(access_token_dir, yahoo_league_id, player_metadata)
+        n_drafters = team_players_df.shape[1]
+        n_picks = team_players_df.shape[0]
+
+        #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+        
+        selections = team_players_df
+
+        yahoo_connect.clean_up_access_token(access_token_dir)
+
+        st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
+
+    if selections is None:
+      selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+
+  with st.form('Intro'):
+    intro_complete = st.form_submit_button("Go!"
+                                      , use_container_width = True
+                                      , on_click = finish_intro)
+
+else:
+
+  n_drafters = st.session_state.n_drafters
+  n_picks = st.session_state.n_picks
+  selections = st.session_state.selections
+  mode = st.session_state.mode
+
+  if mode == 'Draft Mode':
+    main_tabs = st.tabs([":control_knobs: Parameters"
                 ,":bar_chart: Player Info"
                 ,":first_place_medal: Player Scores & Rankings"
-                ,":man-bouncing-ball: Drafting & Teams"
-                ,":crossed_swords: Matchups"
-                ,":man_standing: Waiver Wire & Free Agents"
-                ,":clipboard: Trading"
+                ,":man-bouncing-ball: Drafting"
                 ,":scroll: About"])
 
-param_tab = main_tabs[0]
-info_tab = main_tabs[1]
-rank_tab = main_tabs[2]
-draft_tab = main_tabs[3]
-matchup_tab = main_tabs[4]
-waiver_tab = main_tabs[5]
-trade_tab = main_tabs[6]
-about_tab = main_tabs[7]
-                
-with param_tab: 
+    param_tab = main_tabs[0]
+    info_tab = main_tabs[1]
+    rank_tab = main_tabs[2]
+    draft_tab = main_tabs[3]
+    about_tab = main_tabs[4]
+                  
+  elif mode == 'Roster Mode':
+    main_tabs = st.tabs([":control_knobs: Parameters"
+                    ,":bar_chart: Player Info"
+                    ,":first_place_medal: Player Scores & Rankings"
+                    ,":stadium: Teams"
+                    ,":man-bouncing-ball: My Team"
+                    ,":crossed_swords: Matchups"
+                    ,":man_standing: Waiver Wire & Free Agents"
+                    ,":clipboard: Trading"
+                    ,":scroll: About"])
 
-  general_param_tab, advanced_param_tab = st.tabs(['General','Advanced'])
+    param_tab = main_tabs[0]
+    info_tab = main_tabs[1]
+    rank_tab = main_tabs[2]
+    teams_tab = main_tabs[3]
+    my_team_tab = main_tabs[4]
+    matchup_tab = main_tabs[5]
+    waiver_tab = main_tabs[6]
+    trade_tab = main_tabs[7]
+    about_tab = main_tabs[8]
+                  
+  with param_tab: 
 
-  with general_param_tab: 
+    general_params, advanced_params = st.tabs(['General','Advanced'])
 
-    board_param_column, other_param_column, _ = st.columns([0.4,0.4,0.2])
-
-    with board_param_column: 
-      st.header('Board Setup')
-
-      data_source = st.selectbox(
-        'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
-        ('Enter your own data', 'Retrieve from Yahoo Fantasy')
-        , index = 0)
-      
-      # Setting default values
-      n_drafters = 12
-      n_picks = 13
-      
-      if data_source == 'Enter your own data':
-        n_drafters = st.number_input(r'How many drafters are in your league?'
-                                      , min_value = 2
-                                      , value = 12)
-
-        n_picks = st.number_input(r'How many players will each drafter choose?'
-                      , min_value = 1
-                      , value =13)
-            
-        # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-        
-        selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
-
-      else:
-
-        selections = None
-
-        access_token_dir = yahoo_connect.get_yahoo_access_token()
-
-        if access_token_dir is not None:
-
-          user_leagues = yahoo_connect.get_user_leagues(access_token_dir)
-
-          get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
-
-          yahoo_league = st.selectbox(
-             label='Which league should player data be pulled from?',
-             options=user_leagues,
-             format_func=get_league_labels,
-             index=None
-          )
-          
-          if yahoo_league is not None:
-
-            yahoo_league_id = yahoo_league.league_id
-
-            player_metadata = get_player_metadata()
-
-            team_players_df = yahoo_connect.get_yahoo_players_df(access_token_dir, yahoo_league_id, player_metadata)
-            n_drafters = team_players_df.shape[1]
-            n_picks = team_players_df.shape[0]
-
-            #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
-            
-            selections = team_players_df
-
-            yahoo_connect.clean_up_access_token(access_token_dir)
-
-            st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
-
-        if selections is None:
-          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
-
-    with other_param_column: 
-      st.header('Other Info')
+    with general_params:
       
       format = st.selectbox(
         'Which format are you playing?',
@@ -182,541 +226,568 @@ with param_tab:
 
       raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
 
-  player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-  selections = selections.astype(player_category_type)
+      player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+      selections = selections.astype(player_category_type)
 
-  with advanced_param_tab: 
-    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
+      seat = st.selectbox(f'Which team are you?'
+                  , selections.columns
+                  , index = 0)
 
-    with player_param_column:
-      st.header('Player Statistics')
+    with advanced_params:
 
-      psi = st.number_input(r'Select a $\psi$ value'
-                        , min_value = 0.0
-                        , value = 0.85
-                      , max_value = 1.0)
-      psi_str = r'''$\psi$ controls how injury rates are dealt with. For example is if $\psi$ is $50\%$ and a 
-                    player is expected to miss $20\%$ of weeks, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
-    
-      st.caption(psi_str)
+      player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
 
-      mult_col, coef_col = st.columns(2)
-    
-      st.subheader(f"Multipliers")
+      with player_param_column:
+        st.header('Player Statistics')
 
-      multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
-                                  , index = coefficient_df.index).T
-      multipliers = st.data_editor(multiplier_df, hide_index = True)
-      multipliers = multipliers.T
-  
-      st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
-        
-      st.subheader(f"Coefficients")
-      conversion_factors = st.data_editor(coefficient_df.T, hide_index = True)
-      conversion_factors = conversion_factors.T                                                      
-
-      st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
-
-    with algorithm_param_column:
-      st.header('H-scoring Parameters')
-
-      left_algo_param_col, right_algo_param_col = st.columns(2)
-
-      with left_algo_param_col:
-        omega = st.number_input(r'Select a $\omega$ value', value = 1.0)
-        omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
-                        it quantifies how much better the optimal player choice will be compared to the player that would be 
-                        chosen with baseline weights'''
-        st.caption(omega_str)
+        psi = st.number_input(r'Select a $\psi$ value'
+                          , min_value = 0.0
+                          , value = 0.85
+                        , max_value = 1.0)
+        psi_str = r'''$\psi$ controls how injury rates are dealt with. For example is if $\psi$ is $50\%$ and a 
+                      player is expected to miss $20\%$ of weeks, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
       
-        gamma = st.number_input(r'Select a $\gamma$ value', value = 0.1)
-        gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
-                tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-                players that  work best for its strategy'''
-        st.caption(gamma_str)
+        st.caption(psi_str)
+
+        mult_col, coef_col = st.columns(2)
+      
+        st.subheader(f"Multipliers")
+
+        multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
+                                    , index = coefficient_df.index).T
+        multipliers = st.data_editor(multiplier_df, hide_index = True)
+        multipliers = multipliers.T
     
-        nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0.0, max_value = 1.0)
-        nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
-                    if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
-        st.caption(nu_str)
+        st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
+          
+        st.subheader(f"Coefficients")
+        conversion_factors = st.data_editor(coefficient_df.T, hide_index = True)
+        conversion_factors = conversion_factors.T                                                      
 
-      with right_algo_param_col:
-        alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01, min_value = 0.0)
-        alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
-        st.caption(alpha_str)
-    
-        beta = st.number_input(r'Select a $\beta$ value', value = 0.25, min_value = 0.0)
-        beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
-        st.caption(beta_str)
-    
-        n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 0, max_value = 10000)
-        n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
-        st.caption(n_iterations_str)
+        st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
-        punting = n_iterations > 0
+      with algorithm_param_column:
+        st.header('H-scoring Parameters')
 
-    with trade_param_column:
-        st.header('Trading Parameters')
+        left_algo_param_col, right_algo_param_col = st.columns(2)
 
-        your_differential_threshold = st.number_input(
-              r'Your differential threshold for the automatic trade suggester'
-              , value = 0)
-        ydt_str = r'''Only trades which improve your H-score 
+        with left_algo_param_col:
+          omega = st.number_input(r'Select a $\omega$ value', value = 1.0)
+          omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
+                          it quantifies how much better the optimal player choice will be compared to the player that would be 
+                          chosen with baseline weights'''
+          st.caption(omega_str)
+        
+          gamma = st.number_input(r'Select a $\gamma$ value', value = 0.1)
+          gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+                  tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
+                  players that  work best for its strategy'''
+          st.caption(gamma_str)
+      
+          nu = st.number_input(r'Select a $\nu$ value', value = 0.77, min_value = 0.0, max_value = 1.0)
+          nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
+                      if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
+          st.caption(nu_str)
+
+        with right_algo_param_col:
+          alpha = st.number_input(r'Select a $\alpha$ value', value = 0.01, min_value = 0.0)
+          alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
+          st.caption(alpha_str)
+      
+          beta = st.number_input(r'Select a $\beta$ value', value = 0.25, min_value = 0.0)
+          beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
+          st.caption(beta_str)
+      
+          n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run', value = 30, min_value = 0, max_value = 10000)
+          n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
+          st.caption(n_iterations_str)
+
+          punting = n_iterations > 0
+
+      with trade_param_column:
+          st.header('Trading Parameters')
+
+          your_differential_threshold = st.number_input(
+                r'Your differential threshold for the automatic trade suggester'
+                , value = 0)
+          ydt_str = r'''Only trades which improve your H-score 
+                        by the threshold (as a percentage) will be shown'''
+          st.caption(ydt_str)
+          your_differential_threshold = your_differential_threshold /100
+
+          their_differential_threshold = st.number_input(
+                r'Counterparty differential threshold for the automatic trade suggester'
+                , value = 0)
+          tdt_str = r'''Only trades which improve the counterparty's H-score 
                       by the threshold (as a percentage) will be shown'''
-        st.caption(ydt_str)
-        your_differential_threshold = your_differential_threshold /100
+          st.caption(tdt_str)
+          their_differential_threshold = their_differential_threshold/100
 
-        their_differential_threshold = st.number_input(
-              r'Counterparty differential threshold for the automatic trade suggester'
-              , value = 0)
-        tdt_str = r'''Only trades which improve the counterparty's H-score 
-                    by the threshold (as a percentage) will be shown'''
-        st.caption(tdt_str)
-        their_differential_threshold = their_differential_threshold/100
+          with st.form("Combo params"):
+            combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
+                                          ,'N-received' : [1,2,3]
+                                          ,'T1' : [0,0,0]
+                                          ,'T2' : [1,0.25,0.1]}
+                                          )
 
-        with st.form("Combo params"):
-          combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
-                                        ,'N-received' : [1,2,3]
-                                        ,'T1' : [0,0,0]
-                                        ,'T2' : [1,0.25,0.1]}
-                                        )
+            combo_params_df = st.data_editor(combo_params_default
+                                              , hide_index = True
+                                              , num_rows = "dynamic"
+                                              , column_config={
+                                "N-traded": st.column_config.NumberColumn("N-traded", default=1)
+                                ,"N-received": st.column_config.NumberColumn("N-received", default=1)
+                                ,"T1": st.column_config.NumberColumn("T1", default=0)
+                                ,"T2": st.column_config.NumberColumn("T2", default=0)
 
-          combo_params_df = st.data_editor(combo_params_default
-                                            , hide_index = True
-                                            , num_rows = "dynamic"
-                                            , column_config={
-                              "N-traded": st.column_config.NumberColumn("N-traded", default=1)
-                              ,"N-received": st.column_config.NumberColumn("N-received", default=1)
-                              ,"T1": st.column_config.NumberColumn("T1", default=0)
-                              ,"T2": st.column_config.NumberColumn("T2", default=0)
+                                                        }
+                                                ) 
+            combo_params_df[['N-traded','N-received']] = \
+                  combo_params_df[['N-traded','N-received']].astype(int)
 
-                                                      }
-                                              ) 
-          combo_params_df[['N-traded','N-received']] = \
-                combo_params_df[['N-traded','N-received']].astype(int)
-
-          combo_params_df['T1'] = combo_params_df['T1']/100
-          
-          submitted = st.form_submit_button("Submit", use_container_width = True)
-
-
-        combo_params_str =  \
-          """Each row is a specification for a kind of trade that will be automatically evaluated. 
-          N-traded is the number of players traded from your team, and N-received is the number of 
-          players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
-          column. Only players with the specified targetedness or above will be considered. T2 is a 
-          threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
-          differences larger than T2 will not be evaluated"""
-        st.caption(combo_params_str)
-
-        combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
-
-with info_tab:
-
-  stat_tab, injury_tab = st.tabs([
-                  "Player Stats"
-                  ,"Injury Status"])
-
-  with stat_tab:
-    st.header('Per-game stats')
-    st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
-
-    #player_stats_editable = st.data_editor(raw_stats_df, key = 'player_stats') # 👈 An editable dataframe
-    player_stats_editable = make_data_editor(raw_stats_df)
-    player_stats = player_stats_editable.copy()
-
-    #re-adjust from user inputs
-    player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
-    player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-    player_stats[r'No Play %'] = player_stats[r'No Play %']/100
-    player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
-
-  with injury_tab:
-      st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-      injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
-      injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
-
-      player_stats = player_stats.drop(injured_players)
-      info = process_player_data(player_stats
-                              ,conversion_factors
-                              ,multipliers
-                              ,psi
-                              ,nu
-                              ,n_drafters
-                              ,n_picks
-                              ,rotisserie)
-
-      z_scores = info['Z-scores']
-      g_scores = info['G-scores']
-
-with rank_tab:
-    z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
-      
-    with z_rank_tab:
-      make_rank_tab(z_scores, z_score_player_multiplier)  
-
-    with g_rank_tab:
-      make_rank_tab(g_scores, g_score_player_multiplier)  
-
-    with h_rank_tab:
-      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-      st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
-      st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
-      make_h_rank_tab(info
-                    ,omega
-                    ,gamma
-                    ,alpha
-                    ,beta
-                    ,n_picks
-                    ,n_iterations
-                    ,winner_take_all
-                    ,punting
-                    ,player_stats)
-
-with draft_tab:
-  
-  left, right = st.columns(2)
-
-  with left:
-
-    seat = st.selectbox(f'Which team are you?'
-                      , selections.columns
-                      , index = 0)
-
-    
-    st.caption("""Enter which player is on which team below. This can be used as a draft board during a draft,
-                or a repository for team information during the fantasy season""")
-    selections_editable = st.data_editor(selections, hide_index = True)  
-    selection_list = listify(selections_editable)
-
-    players_chosen = [x for x in listify(selections_editable) if x ==x]
-    my_players = selections_editable[seat].dropna()
-
-    H = HAgent(info = info
-        , omega = omega
-        , gamma = gamma
-        , alpha = alpha
-        , beta = beta
-        , n_picks = n_picks
-        , winner_take_all = winner_take_all
-        , punting = punting)   
-
-  with right:
-
-    team_tab, cand_tab = st.tabs(["Team", "Candidates"])
-
-    with team_tab:
-    
-      z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
-
-      with z_tab:
-
-          print(z_scores)
-
-          team_stats_z = make_team_tab(z_scores
-                                  , my_players
-                                  , n_drafters
-                                  , z_score_player_multiplier
-                                  , z_score_team_multiplier)
-
-      with g_tab:
-
-          team_stats_g = make_team_tab(g_scores
-                                  , my_players
-                                  , n_drafters
-                                  , g_score_player_multiplier
-                                  , g_score_team_multiplier)    
-      with h_tab:
-        if len(my_players) == n_picks:
-
-          base_h_score, _, base_win_rates = get_base_h_score(info
-                                                        ,omega
-                                                        ,gamma
-                                                        ,alpha
-                                                        ,beta
-                                                        ,n_picks
-                                                        ,winner_take_all
-                                                        ,punting
-                                                        ,player_stats
-                                                        ,my_players
-                                                        ,players_chosen)
-  
-          make_team_h_tab(my_players
-                        ,n_picks
-                        ,base_h_score
-                        ,base_win_rates)
-        else:
-          st.markdown('Team H-score not defined until team is full') 
-          
-    with cand_tab:
-
-      subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
-                
-      with subtab1:
-        
-        z_scores_unselected = make_cand_tab(z_scores, selection_list, z_score_player_multiplier)
-
-      with subtab2:
-
-        g_scores_unselected = make_cand_tab(g_scores, selection_list, g_score_player_multiplier)
-
-      with subtab3:
-
-        if len(my_players) == n_picks:
-          st.markdown('Team is complete!')
-                  
-        elif not st.session_state.run_h_score:
-          with st.form(key='my_form_to_submit'):
-            h_score_button = st.form_submit_button(label='Run H-score algorithm'
-                                                , on_click = run_h_score) 
-                    
-        else:
-
-          #record the fact that the run has already been invoked, no need to invoke it again
-          stop_run_h_score()
-
-          n_players = n_drafters * n_picks
-      
-          generator = H.get_h_scores(my_players, players_chosen)
-    
-          placeholder = st.empty()
-          all_res = []
-
-          #if n_iterations is 0 we run just once with punting set to False
-          for i in range(max(1,n_iterations)):
-
-            score, c, cdf_estimates = next(generator)
-            all_res = all_res + [score]
-            #normalize weights by what we expect from other drafters
+            combo_params_df['T1'] = combo_params_df['T1']/100
             
-            c = pd.DataFrame(c, index = score.index, columns = get_categories())/info['v'].T
-            
-            cdf_estimates.columns = get_categories()
-            
-            with placeholder.container():
-  
-              rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
-                  
-              score = score.sort_values(ascending = False).round(3)
-              score.name = 'H-score'
-              score = pd.DataFrame(score)
-
-              with rate_tab:
-                rate_df = cdf_estimates.loc[score.index].dropna()
-                rate_display = score.merge(rate_df, left_index = True, right_index = True)
-                rate_display = rate_display.style.format("{:.1%}"
-                                  ,subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                          .format('{:,.1%}', subset = rate_df.columns)
-                st.dataframe(rate_display, use_container_width = True)
-              with weight_tab:
-                c_df = c.loc[score.index].dropna()
-                weight_display = score.merge(c_df, left_index = True, right_index = True)
-                weight_display = weight_display.style.format("{:.0%}"
-                                                            , subset = c_df.columns)\
-                          .format("{:.1%}"
-                                  ,subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
-                          .background_gradient(axis = None,subset = c_df.columns) 
-                st.dataframe(weight_display, use_container_width = True)
-
-with matchup_tab:
-  make_matchup_tab(info['X-scores']
-                  ,selections_editable
-                  ,format
-                  )
-
-with waiver_tab:
-    if len(my_players) < n_picks:
-        st.markdown("""Your team is not full yet! Fill it out on the 
-                    "Drafting & Teams" page then come back here""")
-
-    else:
-        if rotisserie:
-          worst_player = list(z_scores.index[z_scores.index.isin(my_players)])[-1]
-        else:
-          worst_player = list(g_scores.index[g_scores.index.isin(my_players)])[-1]
-
-        default_index = list(my_players).index(worst_player)
-        drop_player = st.selectbox(
-          'Which player are you considering dropping?'
-          ,my_players
-          ,index = default_index
-        )
-
-        mod_my_players = [x for x in my_players if x != drop_player]
-
-        z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
-
-        with z_waiver_tab:
-
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(z_scores
-                          , z_scores_unselected
-                          , team_stats_z
-                          , drop_player
-                          , z_score_team_multiplier)
-
-        with g_waiver_tab:
-
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(g_scores
-                          , g_scores_unselected
-                          , team_stats_g
-                          , drop_player
-                          , g_score_team_multiplier)
-
-        with h_waiver_tab:
-
-            make_h_waiver_df(H
-                        , player_stats
-                        , mod_my_players
-                        , drop_player
-                        , players_chosen
-                        , base_h_score
-                        , base_win_rates)
-
-with trade_tab:
-    if len(my_players) < n_picks:
-        st.markdown("""Your team is not full yet! Fill it and other teams out on the 
-                    "Drafting & Teams" page then come back here""")
-    else:
-      
-      their_players_dict = { team : players for team, players in selections_editable.items() 
-                              if ((team != seat) & (not  any(p!=p for p in players)))
-                                }
-
-      second_seat = st.selectbox(
-          f'Which team are you considering trading with?',
-          [s for s in their_players_dict.keys()],
-          index = 0
-        )
-      
-      their_players = their_players_dict[second_seat]
-
-      inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
-                                                          ,'Destinations'
-                                                          ,'Targets'
-                                                          ,'Trade Suggesions'
-                                                          ])
-      with inspection_tab:
-
-        c1, c2 = st.columns(2)
-
-        with c1: 
-          their_players = selections_editable[second_seat].dropna()
-
-          with st.form("trade inspection form"):
-
-            my_trade = st.multiselect(
-              'Which players are you trading?'
-              ,my_players
-              )
-              
-            their_trade = st.multiselect(
-                  'Which players are you receiving?'
-                  ,their_players
-              )
-
             submitted = st.form_submit_button("Submit", use_container_width = True)
 
-        with c2: 
-          make_trade_display(H
-                          , player_stats 
-                          , players_chosen 
-                          , n_iterations 
-                          , my_trade
-                          , their_trade
-                          , my_players
-                          , their_players
-                          , second_seat
-                          , format)
+          combo_params_str =  \
+            """Each row is a specification for a kind of trade that will be automatically evaluated. 
+            N-traded is the number of players traded from your team, and N-received is the number of 
+            players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
+            column. Only players with the specified targetedness or above will be considered. T2 is a 
+            threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
+            differences larger than T2 will not be evaluated"""
+          st.caption(combo_params_str)
 
-      with destinations_tab:
+          combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
 
-        values_to_team = make_trade_destination_display(H
-                              , player_stats
-                              , my_players 
-                              , their_players_dict 
+  with info_tab:
+
+    stat_tab, injury_tab = st.tabs([
+                    "Player Stats"
+                    ,"Injury Status"])
+
+    with stat_tab:
+      st.header('Per-game stats')
+      st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
+
+      #player_stats_editable = st.data_editor(raw_stats_df, key = 'player_stats') # 👈 An editable dataframe
+      player_stats_editable = make_data_editor(raw_stats_df)
+      player_stats = player_stats_editable.copy()
+
+      #re-adjust from user inputs
+      player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
+      player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
+      player_stats[r'No Play %'] = player_stats[r'No Play %']/100
+      player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
+
+    with injury_tab:
+        st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+        injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
+        injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
+
+        player_stats = player_stats.drop(injured_players)
+        info = process_player_data(player_stats
+                                ,conversion_factors
+                                ,multipliers
+                                ,psi
+                                ,nu
+                                ,n_drafters
+                                ,n_picks
+                                ,rotisserie)
+
+        z_scores = info['Z-scores']
+        g_scores = info['G-scores']
+
+  with rank_tab:
+      z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
+        
+      with z_rank_tab:
+        make_rank_tab(z_scores, z_score_player_multiplier)  
+
+      with g_rank_tab:
+        make_rank_tab(g_scores, g_score_player_multiplier)  
+
+      with h_rank_tab:
+        rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+        st.caption('Note that these scores are unique to the ' + format + ' format and all the H-scoring parameters defined on the parameter tab')
+        st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+        make_h_rank_tab(info
+                      ,omega
+                      ,gamma
+                      ,alpha
+                      ,beta
+                      ,n_picks
+                      ,n_iterations
+                      ,winner_take_all
+                      ,punting
+                      ,player_stats)
+
+  H = HAgent(info = info
+      , omega = omega
+      , gamma = gamma
+      , alpha = alpha
+      , beta = beta
+      , n_picks = n_picks
+      , winner_take_all = winner_take_all
+      , punting = punting)   
+
+  if mode == 'Draft Mode':
+    with draft_tab:
+      
+      left, right = st.columns(2)
+
+      with left:
+        
+        st.caption("""Enter which players have been drafted by which teams below""")
+        selections_editable = st.data_editor(selections, hide_index = True)  
+        selection_list = listify(selections_editable)
+
+        players_chosen = [x for x in listify(selections_editable) if x ==x]
+        my_players = selections_editable[seat].dropna()
+
+        z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
+        g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+
+      with right:
+
+        team_tab, cand_tab = st.tabs(["Team", "Candidates"])
+
+        with team_tab:
+
+          base_h_score, _, base_win_rates = get_base_h_score(info
+                                              ,omega
+                                              ,gamma
+                                              ,alpha
+                                              ,beta
+                                              ,n_picks
+                                              ,winner_take_all
+                                              ,punting
+                                              ,player_stats
+                                              ,my_players
+                                              ,players_chosen)
+
+          team_stats_z, team_stats_g = make_full_team_tab(z_scores
+                            ,g_scores
+                            ,my_players
+                            ,n_drafters
+                            ,n_picks
+                            ,z_score_player_multiplier
+                            ,z_score_team_multiplier
+                            ,g_score_player_multiplier
+                            ,g_score_team_multiplier
+                            ,base_h_score
+                            ,base_win_rates
+                            )
+              
+        with cand_tab:
+
+          subtab1, subtab2, subtab3 = st.tabs(["Z-score", "G-score", "H-score"])
+                    
+          with subtab1:
+            
+            z_scores_unselected = make_cand_tab(z_scores, selection_list, z_score_player_multiplier)
+
+          with subtab2:
+
+            g_scores_unselected = make_cand_tab(g_scores, selection_list, g_score_player_multiplier)
+
+          with subtab3:
+
+            if len(my_players) == n_picks:
+              st.markdown('Team is complete!')
+                      
+            elif not st.session_state.run_h_score:
+              with st.form(key='my_form_to_submit'):
+                h_score_button = st.form_submit_button(label='Run H-score algorithm'
+                                                    , on_click = run_h_score) 
+                        
+            else:
+
+              #record the fact that the run has already been invoked, no need to invoke it again
+              stop_run_h_score()
+
+              n_players = n_drafters * n_picks
+          
+              generator = H.get_h_scores(my_players, players_chosen)
+        
+              placeholder = st.empty()
+              all_res = []
+
+              #if n_iterations is 0 we run just once with punting set to False
+              for i in range(max(1,n_iterations)):
+
+                score, c, cdf_estimates = next(generator)
+                all_res = all_res + [score]
+                #normalize weights by what we expect from other drafters
+                
+                c = pd.DataFrame(c, index = score.index, columns = get_categories())/info['v'].T
+                
+                cdf_estimates.columns = get_categories()
+                
+                with placeholder.container():
+      
+                  rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
+                      
+                  score = score.sort_values(ascending = False).round(3)
+                  score.name = 'H-score'
+                  score = pd.DataFrame(score)
+
+                  with rate_tab:
+                    rate_df = cdf_estimates.loc[score.index].dropna()
+                    rate_display = score.merge(rate_df, left_index = True, right_index = True)
+                    rate_display = rate_display.style.format("{:.1%}"
+                                      ,subset = pd.IndexSlice[:,['H-score']]) \
+                              .map(styler_a
+                                    , subset = pd.IndexSlice[:,['H-score']]) \
+                              .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                              .format('{:,.1%}', subset = rate_df.columns)
+                    st.dataframe(rate_display, use_container_width = True)
+                  with weight_tab:
+                    c_df = c.loc[score.index].dropna()
+                    weight_display = score.merge(c_df, left_index = True, right_index = True)
+                    weight_display = weight_display.style.format("{:.0%}"
+                                                                , subset = c_df.columns)\
+                              .format("{:.1%}"
+                                      ,subset = pd.IndexSlice[:,['H-score']]) \
+                              .map(styler_a
+                                    , subset = pd.IndexSlice[:,['H-score']]) \
+                              .background_gradient(axis = None,subset = c_df.columns) 
+                    st.dataframe(weight_display, use_container_width = True)
+
+  elif mode == 'Roster Mode':
+
+    with teams_tab:
+        
+      st.caption("""Enter which player is on which team below""")
+      selections_editable = st.data_editor(selections, hide_index = True)  
+      selection_list = listify(selections_editable)
+
+      players_chosen = [x for x in listify(selections_editable) if x ==x]
+      my_players = selections_editable[seat].dropna()
+
+      z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
+      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+
+    with my_team_tab:
+
+      base_h_score, _, base_win_rates = get_base_h_score(info
+                                    ,omega
+                                    ,gamma
+                                    ,alpha
+                                    ,beta
+                                    ,n_picks
+                                    ,winner_take_all
+                                    ,punting
+                                    ,player_stats
+                                    ,my_players
+                                    ,players_chosen)
+
+      team_stats_z, team_stats_g = make_full_team_tab(z_scores
+                                                    ,g_scores
+                                                    ,my_players
+                                                    ,n_drafters
+                                                    ,n_picks
+                                                    ,z_score_player_multiplier
+                                                    ,z_score_team_multiplier
+                                                    ,g_score_player_multiplier
+                                                    ,g_score_team_multiplier
+                                                    ,base_h_score
+                                                    ,base_win_rates
+                                                    )
+
+    with matchup_tab:
+      make_matchup_tab(info['X-scores']
+                      ,selections_editable
+                      ,format
+                      )
+
+    with waiver_tab:
+        if len(my_players) < n_picks:
+            st.markdown("""Your team is not full yet! Fill it out on the 
+                        "Teams" page then come back here""")
+
+        else:
+            if rotisserie:
+              worst_player = list(z_scores.index[z_scores.index.isin(my_players)])[-1]
+            else:
+              worst_player = list(g_scores.index[g_scores.index.isin(my_players)])[-1]
+
+            default_index = list(my_players).index(worst_player)
+            drop_player = st.selectbox(
+              'Which player are you considering dropping?'
+              ,my_players
+              ,index = default_index
+            )
+
+            mod_my_players = [x for x in my_players if x != drop_player]
+
+            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+
+            with z_waiver_tab:
+
+                st.markdown('Projected team stats with chosen player:')
+                make_waiver_tab(z_scores
+                              , z_scores_unselected
+                              , team_stats_z
+                              , drop_player
+                              , z_score_team_multiplier)
+
+            with g_waiver_tab:
+
+                st.markdown('Projected team stats with chosen player:')
+                make_waiver_tab(g_scores
+                              , g_scores_unselected
+                              , team_stats_g
+                              , drop_player
+                              , g_score_team_multiplier)
+
+            with h_waiver_tab:
+
+                make_h_waiver_df(H
+                            , player_stats
+                            , mod_my_players
+                            , drop_player
+                            , players_chosen
+                            , base_h_score
+                            , base_win_rates)
+
+    with trade_tab:
+        if len(my_players) < n_picks:
+            st.markdown("""Your team is not full yet! Fill it and other teams out on the 
+                        "Teams" page then come back here""")
+        else:
+          
+          their_players_dict = { team : players for team, players in selections_editable.items() 
+                                  if ((team != seat) & (not  any(p!=p for p in players)))
+                                    }
+
+          second_seat = st.selectbox(
+              f'Which team are you considering trading with?',
+              [s for s in their_players_dict.keys()],
+              index = 0
+            )
+          
+          their_players = their_players_dict[second_seat]
+
+          inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
+                                                              ,'Destinations'
+                                                              ,'Targets'
+                                                              ,'Trade Suggestions'
+                                                              ])
+          with inspection_tab:
+
+            c1, c2 = st.columns(2)
+
+            with c1: 
+              their_players = selections_editable[second_seat].dropna()
+
+              with st.form("trade inspection form"):
+
+                my_trade = st.multiselect(
+                  'Which players are you trading?'
+                  ,my_players
+                  )
+                  
+                their_trade = st.multiselect(
+                      'Which players are you receiving?'
+                      ,their_players
+                  )
+
+                submitted = st.form_submit_button("Submit", use_container_width = True)
+
+            with c2: 
+              make_trade_display(H
+                              , player_stats 
                               , players_chosen 
-                              , format
-                                    )
+                              , n_iterations 
+                              , my_trade
+                              , their_trade
+                              , my_players
+                              , their_players
+                              , second_seat
+                              , format)
 
-      with target_tab:
+          with destinations_tab:
 
-        values_to_me = make_trade_target_display(H
-              , player_stats
-              , my_players 
-              , their_players
-              , players_chosen 
-              , values_to_team[second_seat]
-              , format
-                    )
+            values_to_team = make_trade_destination_display(H
+                                  , player_stats
+                                  , my_players 
+                                  , their_players_dict 
+                                  , players_chosen 
+                                  , format
+                                        )
 
-        with suggestions_tab:
+          with target_tab:
 
-          if rotisserie:
-            general_value = z_scores.sum(axis = 1)
-            replacement_value = z_scores_unselected.iloc[0].sum() 
-          else:
-            general_value = g_scores.sum(axis = 1)
-            replacement_value = g_scores_unselected.iloc[0].sum()
+            values_to_me = make_trade_target_display(H
+                  , player_stats
+                  , my_players 
+                  , their_players
+                  , players_chosen 
+                  , values_to_team[second_seat]
+                  , format
+                        )
 
-          #slightly hacky way to make all of the multiselects blue
-          st.markdown("""
-              <style>
-                  span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                      background-color: lightblue; color:black;
-                  }
-                  span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                      background-color: lightblue; color:black;
-                  }
-                  span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                      background-color: lightblue; color:black;
-                  }
-              </style>
-              """, unsafe_allow_html=True)
+            with suggestions_tab:
 
-          trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
-                                    , [(1,1),(2,2),(3,3)]
-                                    , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
-                                    , default = [(1,1)])
+              if rotisserie:
+                general_value = z_scores.sum(axis = 1)
+                replacement_value = z_scores_unselected.iloc[0].sum() 
+              else:
+                general_value = g_scores.sum(axis = 1)
+                replacement_value = g_scores_unselected.iloc[0].sum()
 
-          make_trade_suggestion_display(H
-              , player_stats 
-              , players_chosen 
-              , my_players 
-              , their_players
-              , general_value
-              , replacement_value
-              , values_to_me
-              , values_to_team[second_seat]
-              , your_differential_threshold
-              , their_differential_threshold
-              , combo_params
-              , trade_filter
-              , format )               
+              #slightly hacky way to make all of the multiselects blue
+              st.markdown("""
+                  <style>
+                      span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                          background-color: lightblue; color:black;
+                      }
+                      span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                          background-color: lightblue; color:black;
+                      }
+                      span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                          background-color: lightblue; color:black;
+                      }
+                  </style>
+                  """, unsafe_allow_html=True)
 
-with about_tab:
+              trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
+                                        , [(1,1),(2,2),(3,3)]
+                                        , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
+                                        , default = [(1,1)])
 
-  tabs = st.tabs(['Intro'
-                  ,'G-scoring'
-                  ,'H-scoring'
-                  ,'Turnovers'
-                  ,'Waivers & Trading'
-                  ,'Data Sources'])
+              make_trade_suggestion_display(H
+                  , player_stats 
+                  , players_chosen 
+                  , my_players 
+                  , their_players
+                  , general_value
+                  , replacement_value
+                  , values_to_me
+                  , values_to_team[second_seat]
+                  , your_differential_threshold
+                  , their_differential_threshold
+                  , combo_params
+                  , trade_filter
+                  , format )               
 
-  about_paths = ['intro.md'
-                ,'static_explanation.md'
-                ,'dynamic_explanation.md'
-                ,'turnovers.md'
-                ,'data_sources.md'
-                ,'trading.md']
+  with about_tab:
 
-  for tab, path in zip(tabs, about_paths):
-    with tab:
-      make_about_tab(path)   
+    tabs = st.tabs(['Intro'
+                    ,'G-scoring'
+                    ,'H-scoring'
+                    ,'Turnovers'
+                    ,'Waivers & Trading'
+                    ,'Data Sources'])
+
+    about_paths = ['intro.md'
+                  ,'static_explanation.md'
+                  ,'dynamic_explanation.md'
+                  ,'turnovers.md'
+                  ,'data_sources.md'
+                  ,'trading.md']
+
+    for tab, path in zip(tabs, about_paths):
+      with tab:
+        make_about_tab(path)   
 

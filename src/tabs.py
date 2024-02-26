@@ -77,10 +77,51 @@ def make_team_h_tab(my_players : list[str]
         base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
         st.dataframe(base_win_rates_formatted, hide_index = True)
   
+def make_full_team_tab(z_scores : pd.DataFrame
+                  ,g_scores : pd.DataFrame
+                  ,my_players : list[str]
+                  ,n_drafters : int
+                  ,n_picks : int
+                  ,z_score_player_multiplier : float
+                  ,z_score_team_multiplier : float
+                  ,g_score_player_multiplier : float
+                  ,g_score_team_multiplier : float
+                  ,base_h_score : float
+                  ,base_win_rates : float
+                  ):
+
+  z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
+
+  with z_tab:
+
+      team_stats_z = make_team_tab(z_scores
+                              , my_players
+                              , n_drafters
+                              , z_score_player_multiplier
+                              , z_score_team_multiplier)
+
+  with g_tab:
+
+      team_stats_g = make_team_tab(g_scores
+                              , my_players
+                              , n_drafters
+                              , g_score_player_multiplier
+                              , g_score_team_multiplier)    
+  with h_tab:
+    if len(my_players) == n_picks:
+
+      make_team_h_tab(my_players
+                    ,n_picks
+                    ,base_h_score
+                    ,base_win_rates)
+    else:
+      st.markdown('Team H-score not defined until team is full') 
+
+  return team_stats_z, team_stats_g
 ### Candidate tabs 
 
 @st.cache_data()
-def make_cand_tab(scores : pd.DataFrame
+def make_cand_tab(scores_unselected : pd.DataFrame
               , selection_list : list[str]
               , player_multiplier : float):
   """Make a tab showing stats for players that have not yet been drafted
@@ -96,8 +137,6 @@ def make_cand_tab(scores : pd.DataFrame
               
   counting_statistics = st.session_state.params['counting-statistics'] 
   percentage_statistics = st.session_state.params['percentage-statistics'] 
-
-  scores_unselected = scores[~scores.index.isin(selection_list)]
 
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
@@ -661,8 +700,6 @@ def make_trade_suggestion_display(_H
                                   lens_criteria]
 
   if len(full_dataframe) > 0:
-
-
 
     full_dataframe_styled = full_dataframe.reset_index(drop = True).style.format("{:.2%}"
                                       , subset = ['Your H-score Differential'
