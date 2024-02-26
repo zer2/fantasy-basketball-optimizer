@@ -97,13 +97,13 @@ def make_full_team_tab(z_scores : pd.DataFrame
       base_win_rates: expected win rates for each category
 
   Returns:
-      DataFrame of team stats, to use in other tabs
+      None
   """
   z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
 
   with z_tab:
 
-      team_stats_z = make_team_tab(z_scores
+      make_team_tab(z_scores
                               , my_players
                               , n_drafters
                               , st.session_state.params['z-score-player-multiplier']
@@ -111,7 +111,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
 
   with g_tab:
 
-      team_stats_g = make_team_tab(g_scores
+      make_team_tab(g_scores
                               , my_players
                               , n_drafters
                               , st.session_state.params['g-score-player-multiplier']
@@ -125,19 +125,15 @@ def make_full_team_tab(z_scores : pd.DataFrame
                     ,base_win_rates)
     else:
       st.markdown('Team H-score not defined until team is full') 
-
-  return team_stats_z, team_stats_g
 ### Candidate tabs 
 
 @st.cache_data()
 def make_cand_tab(scores_unselected : pd.DataFrame
-              , selection_list : list[str]
               , player_multiplier : float):
   """Make a tab showing stats for players that have not yet been drafted
 
   Args:
       scores: Dataframe of floats, rows by player and columns by category
-      selection_list: list of all players that have already been drafted
       player_multiplier: scaling factor to use for color-coded display of player stats
 
   Returns:
