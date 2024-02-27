@@ -374,6 +374,52 @@ def make_h_waiver_df(_H
 ### Trade tabs
 
 @st.cache_data()
+def make_trade_score_tab(scores : pd.DataFrame
+              , players_sent : list[str]
+              , players_received : list[str]
+              , player_multiplier : float
+              , team_multiplier : float
+              ) -> None:
+  """Make a tab summarizing your team as it currently stands
+
+  Args:
+      scores: Dataframe of floats, rows by player and columns by category\
+      players_sent: Players you are sending in the trade
+      players_received: Players you are receiving in the trade
+      player_multiplier: scaling factor to use for color-coded display of player stats
+      team_multiplier: scaling factor to use for color-coded display of team stats
+
+  Returns:
+      None
+  """
+
+  sent_stats = scores[scores.index.isin(players_sent)]
+  sent_stats.loc['Total Sent', :] = sent_stats.sum(axis = 0)
+
+  received_stats = scores[scores.index.isin(players_received)]
+  received_stats.loc['Total Received', :] = received_stats.sum(axis = 0)
+
+  full_frame = pd.concat([sent_stats,received_stats])
+  full_frame.loc['Total Difference', :] = received_stats.loc['Total Received', :] - sent_stats.loc['Total Sent', :]
+
+  full_frame_styled = full_frame.style.format("{:.2f}").map(styler_a, subset = pd.IndexSlice[['Total Difference']
+                                                                                    , ['Total']]) \
+                                              .map(styler_b, subset = pd.IndexSlice[players_sent + players_received
+                                                                                    , ['Total']]) \
+                                              .map(styler_c, subset = pd.IndexSlice[['Total Sent','Total Received']
+                                                                                , ['Total'] + get_categories()]) \
+                                              .map(stat_styler, subset = pd.IndexSlice[players_sent + players_received
+                                                                                  , get_categories()]
+                                                                                  , multiplier = player_multiplier) \
+                                              .map(stat_styler, subset = pd.IndexSlice[['Total Difference']
+                                                                                  , get_categories()]
+                                                                                  , multiplier = player_multiplier)  
+  display = st.dataframe(full_frame_styled
+                      , use_container_width = True
+                      , height = len(full_frame) * 35 + 38
+                                                )     
+
+@st.cache_data()
 def make_trade_destination_display(_H
                   , player_stats : pd.DataFrame
                   , my_players : list[str]
