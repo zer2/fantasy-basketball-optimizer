@@ -116,11 +116,11 @@ if not st.session_state.intro_complete:
 
     selections = None
 
-    access_token_dir = yahoo_connect.get_yahoo_access_token()
+    auth_dir = yahoo_connect.get_yahoo_access_token()
 
-    if access_token_dir is not None:
+    if auth_dir is not None:
 
-      user_leagues = yahoo_connect.get_user_leagues(access_token_dir)
+      user_leagues = yahoo_connect.get_user_leagues(auth_dir)
 
       get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
 
@@ -137,7 +137,7 @@ if not st.session_state.intro_complete:
 
         player_metadata = get_player_metadata()
 
-        team_players_df = yahoo_connect.get_yahoo_players_df(access_token_dir, yahoo_league_id, player_metadata)
+        team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, yahoo_league_id, player_metadata)
         n_drafters = team_players_df.shape[1]
         n_picks = team_players_df.shape[0]
 
@@ -148,7 +148,7 @@ if not st.session_state.intro_complete:
         st.session_state['intro_button_disabled'] = False
 
         #Just trying for now!
-        player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, access_token_dir, player_metadata)
+        player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, auth_dir, player_metadata)
 
         st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
                                                                 (player_statuses['Status'] == 'INJ')
@@ -157,7 +157,7 @@ if not st.session_state.intro_complete:
                                                         )
                                                   )
 
-        yahoo_connect.clean_up_access_token(access_token_dir)
+        yahoo_connect.clean_up_access_token(auth_dir)
         
         st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 

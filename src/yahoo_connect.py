@@ -111,14 +111,14 @@ def get_yahoo_access_token() -> Optional[str]:
 
         return temp_dir
 
-def clean_up_access_token(access_token_dir: str):
-    shutil.rmtree(access_token_dir)
+def clean_up_access_token(auth_dir: str):
+    shutil.rmtree(auth_dir)
 
 @st.cache_data(ttl=3600)
-def get_yahoo_players_df(_access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
-    teams_dict = get_teams_dict(league_id, _access_token_dir)
+def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
+    teams_dict = get_teams_dict(league_id, _auth_dir)
     team_ids = list(teams_dict.keys())
-    rosters_dict = get_rosters_dict(league_id, _access_token_dir, team_ids)
+    rosters_dict = get_rosters_dict(league_id, _auth_dir, team_ids)
     players_df = _get_players_df(rosters_dict, teams_dict, player_metadata)
 
     return players_df
