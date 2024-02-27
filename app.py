@@ -32,6 +32,9 @@ if 'player_stats_key' not in st.session_state:
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
+if 'intro_button_disabled' not in st.session_state:
+    st.session_state.intro_button_disabled = False
+
 def run_h_score():
     st.session_state.run_h_score = True
 
@@ -106,6 +109,8 @@ if not st.session_state.intro_complete:
 
   else:
 
+    st.session_state['intro_button_disabled'] = True
+
     selections = None
 
     access_token_dir = yahoo_connect.get_yahoo_access_token()
@@ -139,15 +144,17 @@ if not st.session_state.intro_complete:
 
         yahoo_connect.clean_up_access_token(access_token_dir)
 
+        st.session_state['intro_button_disabled'] = False
+
         st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
     if selections is None:
       selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
-  with st.form('Intro'):
-    intro_complete = st.form_submit_button("Go!"
-                                      , use_container_width = True
-                                      , on_click = finish_intro)
+  intro_complete = st.button("Go!"
+                                    , use_container_width = True
+                                    , disabled = st.session_state['intro_button_disabled']
+                                    , on_click = finish_intro)
 
 ### Build app 
 
