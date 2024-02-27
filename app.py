@@ -767,16 +767,80 @@ else:
                 submitted = st.form_submit_button("Submit", use_container_width = True)
 
             with c2: 
-              make_trade_display(H
-                              , player_stats 
-                              , players_chosen 
-                              , n_iterations 
-                              , players_sent
-                              , players_received
-                              , trade_party_players
-                              , trade_counterparty_players
-                              , trade_counterparty_seat
-                              , scoring_format)
+
+              h_tab, z_tab, g_tab = st.tabs(['H-score','G-score','Z-score'])
+
+              if (len(players_sent) == 0) | (len(players_received) == 0):
+                st.markdown('A trade must include at least one player from each team')
+
+              else:
+
+                with h_tab:
+                  make_trade_display(H
+                                  , player_stats 
+                                  , players_chosen 
+                                  , n_iterations 
+                                  , players_sent
+                                  , players_received
+                                  , trade_party_players
+                                  , trade_counterparty_players
+                                  , trade_counterparty_seat
+                                  , scoring_format)
+
+                with z_tab:
+                  st.markdown('Package sent:')
+
+                  make_team_tab(z_scores 
+                      , players_sent 
+                      , len(players_sent)
+                      , st.session_state.params['z-score-player-multiplier']
+                      , st.session_state.params['z-score-team-multiplier']
+                      )
+
+                  st.markdown('Package received:')
+
+                  make_team_tab(z_scores
+                    , players_received 
+                    , len(players_received)
+                    , st.session_state.params['z-score-player-multiplier']
+                    , st.session_state.params['z-score-team-multiplier']
+                    )
+
+                  st.markdown('Difference:')
+                  diff = z_scores.loc[players_received].sum() - z_scores.loc[players_sent].sum()
+
+                  st.dataframe(static_score_styler(diff.to_frame().T, 
+                                                st.session_state.params['g-score-team-multiplier'])
+                                                , hide_index = True
+                              )
+
+                with g_tab: 
+
+                  st.markdown('Package sent:')
+                  make_team_tab(g_scores 
+                      , players_sent 
+                      , len(players_sent)
+                      , st.session_state.params['g-score-player-multiplier']
+                      , st.session_state.params['g-score-team-multiplier']
+                      )
+
+                  st.markdown('Package received:')
+                  make_team_tab(z_scores 
+                    , players_received 
+                    , len(players_received)
+                    , st.session_state.params['g-score-player-multiplier']
+                    , st.session_state.params['g-score-team-multiplier']
+                    )
+
+                  st.markdown('Difference:')
+                  diff = g_scores.loc[players_received].sum() - g_scores.loc[players_sent].sum()
+
+                  st.dataframe(static_score_styler(diff.to_frame().T, 
+                                                st.session_state.params['g-score-team-multiplier']
+                                                )
+  
+                                                , hide_index = True
+                                            )
 
           with destinations_tab:
 
