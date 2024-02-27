@@ -207,10 +207,10 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
     return players_df
 
 @st.cache_data(ttl=3600)
-def get_player_statuses(league_id: str, auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
+def get_player_statuses(league_id: str, _auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
-        auth_dir=auth_path,
+        auth_dir=_auth_path,
         league_id=league_id,
         game_code="nba"
     )
