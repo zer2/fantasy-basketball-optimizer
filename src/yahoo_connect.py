@@ -187,6 +187,12 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
                 and player.selected_position.position is not None
         ]
 
+        for player in roster.players:
+            if player.selected_position.position == 'IL':
+                st.session_state['injured_players'].add( \
+                            f'{player.name.full} ({player_metadata.loc[player.name.full]})' 
+                                                        )
+
         if len(relevant_player_names) > max_team_size:
             max_team_size = len(relevant_player_names)
 
@@ -199,3 +205,19 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
         players_df.loc[:,team_name] = player_names
 
     return players_df
+
+@st.cache_data(ttl=3600)
+def get_player_statuses(league_id: str, auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
+    LOGGER.info(f"League id: {league_id}")
+    sc = YahooFantasySportsQuery(
+        auth_dir=auth_path,
+        league_id=league_id,
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+    player_status_records = yahoo_helper.get_league_players(sc, player_metadata)
+
+    ##Fill out below
+    player_status_series = pd.DataFrame.from_records(player_status_records)
+
+    return player_status_series

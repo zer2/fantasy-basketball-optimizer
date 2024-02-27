@@ -35,6 +35,9 @@ if 'run_h_score' not in st.session_state:
 if 'intro_button_disabled' not in st.session_state:
     st.session_state.intro_button_disabled = False
 
+if 'injured_players' not in st.session_state:
+    st.session_state['injured_players'] = set()
+
 def run_h_score():
     st.session_state.run_h_score = True
 
@@ -142,10 +145,20 @@ if not st.session_state.intro_complete:
         
         selections = team_players_df
 
-        yahoo_connect.clean_up_access_token(access_token_dir)
-
         st.session_state['intro_button_disabled'] = False
 
+        #Just trying for now!
+        player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, access_token_dir, player_metadata)
+
+        st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
+                                                                (player_statuses['Status'] == 'INJ')
+                                                                ]
+                                                                )
+                                                        )
+                                                  )
+
+        yahoo_connect.clean_up_access_token(access_token_dir)
+        
         st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
     if selections is None:
@@ -382,8 +395,13 @@ else:
 
     with injury_tab:
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-        injury_list = st.session_state.params['injury-ignore-darko'] if 'DARKO' in dataset_name else None
-        injured_players = st.multiselect('Injured players', player_stats.index, default = injury_list)
+        default_injury_list = [p for p in st.session_state['injured_players'] \
+                               if (p in player_stats.index) and (not (p in listify(selections))) 
+                               ]
+        
+        injured_players = st.multiselect('Injured players'
+                                , player_stats.index
+                                , default = default_injury_list)
 
         player_stats = player_stats.drop(injured_players)
         info = process_player_data(player_stats
