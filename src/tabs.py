@@ -8,7 +8,7 @@ import itertools
   
 ### Team tabs 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_team_tab(scores : pd.DataFrame
               , my_players : list[str]
               , n_drafters : int
@@ -49,7 +49,7 @@ def make_team_tab(scores : pd.DataFrame
     st.markdown('Your team does not have any players yet!')
   return team_stats
   
-#@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_team_h_tab(my_players : list[str]
                   , n_picks : int
                   , base_h_score : float
@@ -127,7 +127,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
       st.markdown('Team H-score not defined until team is full') 
 ### Candidate tabs 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_cand_tab(scores_unselected : pd.DataFrame
               , player_multiplier : float):
   """Make a tab showing stats for players that have not yet been drafted
@@ -150,7 +150,7 @@ def make_cand_tab(scores_unselected : pd.DataFrame
 
 ### Waiver tabs 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_waiver_tab(scores : pd.DataFrame
                 , scores_unselected : pd.DataFrame
                 , team_stats : pd.Series
@@ -188,7 +188,7 @@ def make_waiver_tab(scores : pd.DataFrame
 
   st.dataframe(new_styled, use_container_width = True, hide_index = True) 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_matchup_tab(x_scores : pd.DataFrame
                   , selections : pd.DataFrame
                   , scoring_format : str):
@@ -270,7 +270,7 @@ def make_matchup_tab(x_scores : pd.DataFrame
             "Drafting & Teams" page then come back here""")
 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def get_base_h_score(info : dict
                 , omega : float
                 , gamma : float
@@ -312,7 +312,7 @@ def get_base_h_score(info : dict
 
   return next(H.get_h_scores(my_players, players_chosen))   
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_h_waiver_df(_H
                   , player_stats : pd.DataFrame
                   , mod_my_players : list[str]
@@ -373,7 +373,7 @@ def make_h_waiver_df(_H
 
 ### Trade tabs
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_trade_score_tab(scores : pd.DataFrame
               , players_sent : list[str]
               , players_received : list[str]
@@ -419,7 +419,7 @@ def make_trade_score_tab(scores : pd.DataFrame
                       , height = len(full_frame) * 35 + 38
                                                 )     
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_trade_destination_display(_H
                   , player_stats : pd.DataFrame
                   , my_players : list[str]
@@ -477,7 +477,7 @@ def make_trade_destination_display(_H
 
   return values_to_team
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_trade_target_display(_H
                   , player_stats : pd.DataFrame
                   , my_players : list[str]
@@ -685,7 +685,8 @@ def make_combo_df(all_combos : list
 
   return full_dataframe
 
-@st.cache_data()
+@st.cache_data(show_spinner = """Finding suggested trades. How long this will take depends on 
+                                  the trade parameters""")
 def make_trade_suggestion_display(_H
                   , player_stats : pd.DataFrame
                   , players_chosen : list[str]
