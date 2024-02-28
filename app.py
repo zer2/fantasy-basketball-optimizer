@@ -393,8 +393,6 @@ else:
       #re-adjust from user inputs
       player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
       player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-      player_stats[r'No Play %'] = player_stats[r'No Play %']/100
-
 
     with games_played_tab: 
       st.caption(f"""Projections for games played below, broken down by number of potential games and 
@@ -881,13 +879,13 @@ else:
               st.markdown("""
                   <style>
                       span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                          background-color: lightblue; color:black;
+                          background-color: #3580BB; color:white;
                       }
                       span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                          background-color: lightblue; color:black;
+                          background-color: #3580BB; color:white;
                       }
                       span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                          background-color: lightblue; color:black;
+                          background-color: #3580BB; color:white;
                       }
                   </style>
                   """, unsafe_allow_html=True)

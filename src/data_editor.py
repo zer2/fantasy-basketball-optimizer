@@ -8,8 +8,8 @@ def reset(key_name):
     st.session_state[key_name] += 1
 
 def highlight_changes(val):
-    color = f"color: black;" if val else "color:lightgrey;"
-    background = f"background-color:lightblue;" if val else ""
+    color = f"color: white;" if val else "color:lightgrey;"
+    background = f"background-color:#3580BB;" if val else ""
     return f"{color} {background}"
 
 @st.cache_data(show_spinner = False)
