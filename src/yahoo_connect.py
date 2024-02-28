@@ -111,14 +111,14 @@ def get_yahoo_access_token() -> Optional[str]:
 
         return temp_dir
 
-def clean_up_access_token(access_token_dir: str):
-    shutil.rmtree(access_token_dir)
+def clean_up_access_token(auth_dir: str):
+    shutil.rmtree(auth_dir)
 
 @st.cache_data(ttl=3600)
-def get_yahoo_players_df(_access_token_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
-    teams_dict = get_teams_dict(league_id, _access_token_dir)
+def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
+    teams_dict = get_teams_dict(league_id, _auth_dir)
     team_ids = list(teams_dict.keys())
-    rosters_dict = get_rosters_dict(league_id, _access_token_dir, team_ids)
+    rosters_dict = get_rosters_dict(league_id, _auth_dir, team_ids)
     players_df = _get_players_df(rosters_dict, teams_dict, player_metadata)
 
     return players_df
@@ -187,6 +187,12 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
                 and player.selected_position.position is not None
         ]
 
+        for player in roster.players:
+            if player.selected_position.position == 'IL':
+                st.session_state['injured_players'].add( \
+                            f'{player.name.full} ({player_metadata.loc[player.name.full]})' 
+                                                        )
+
         if len(relevant_player_names) > max_team_size:
             max_team_size = len(relevant_player_names)
 
@@ -199,3 +205,19 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
         players_df.loc[:,team_name] = player_names
 
     return players_df
+
+@st.cache_data(ttl=3600)
+def get_player_statuses(league_id: str, _auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
+    LOGGER.info(f"League id: {league_id}")
+    sc = YahooFantasySportsQuery(
+        auth_dir=_auth_path,
+        league_id=league_id,
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+    player_status_records = yahoo_helper.get_league_players(sc, player_metadata)
+
+    ##Fill out below
+    player_status_series = pd.DataFrame.from_records(player_status_records)
+
+    return player_status_series
