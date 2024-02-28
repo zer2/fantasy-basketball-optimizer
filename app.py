@@ -70,7 +70,6 @@ coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 st.title('Optimization for Fantasy Basketball :basketball:')
 
-
 ### Get intro information
 
 if 'intro_complete' not in st.session_state:
