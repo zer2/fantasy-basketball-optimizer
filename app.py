@@ -410,12 +410,8 @@ else:
       game_stats = game_stats_editable.copy()
       game_stats['Percent of Games Played'] = 1 - psi * (1- game_stats['Percent of Games Played']/100)
 
-      st.write(player_stats)
-
       for col in counting_statistics + volume_statistics:
         player_stats[col] = player_stats_editable[col] * game_stats.prod(axis = 1)
-
-      st.write(player_stats)
 
     with injury_tab:
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
