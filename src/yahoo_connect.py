@@ -136,7 +136,8 @@ def get_teams_dict(league_id: str, auth_path: str) -> dict[int, str]:
     teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
     return teams_dict
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600
+                , show_spinner = "Fetching rosters from your Yahoo league. This should take about ten seconds")
 def get_rosters_dict(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
 
     league_id = league_id
@@ -206,7 +207,8 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
 
     return players_df
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600
+                , show_spinner = "Fetching player status information from Yahoo. This should take about thirty seconds")
 def get_player_statuses(league_id: str, _auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
