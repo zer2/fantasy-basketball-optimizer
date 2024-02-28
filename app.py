@@ -63,7 +63,7 @@ if 'params' not in st.session_state:
           print(exc) 
 
 counting_statistics = st.session_state.params['counting-statistics'] 
-volume_statistics = st.session_state.params['percentage-statistics'] 
+volume_statistics = st.session_state.params['volume-statistics'] 
 
 historical_df = get_historical_data()
 current_data, expected_minutes = get_current_season_data()
@@ -261,7 +261,7 @@ else:
                           , value = 0.85
                         , max_value = 1.0)
         psi_str = r'''$\psi$ controls how injury rates are dealt with. For example is if $\psi$ is $50\%$ and a 
-                      player is expected to miss $20\%$ of weeks, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
+                      player is expected to miss $20\%$ of games, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
       
         st.caption(psi_str)
 
@@ -407,9 +407,15 @@ else:
                                         , key_name = 'game_stats_editable_key'
                                         , lock_in_button_str = "Lock in Game Volume")
 
-      player_stats[counting_statistics + volume_statistics] = \
-            player_stats[counting_statistics + volume_statistics].mul(game_stats_editable.prod(axis = 1)/100
-                                                                , axis = 0)
+      game_stats = game_stats_editable.copy()
+      game_stats['Percent of Games Played'] = 1 - psi * (1- game_stats['Percent of Games Played']/100)
+
+      st.write(player_stats)
+
+      for col in counting_statistics + volume_statistics:
+        player_stats[col] = player_stats_editable[col] * game_stats.prod(axis = 1)
+
+      st.write(player_stats)
 
     with injury_tab:
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
