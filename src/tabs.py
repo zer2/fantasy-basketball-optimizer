@@ -775,7 +775,7 @@ def make_trade_suggestion_display(_H
     st.markdown('No promising trades found')
 
 @st.cache_data()
-def make_trade_display(_H
+def make_trade_h_tab(_H
                   , player_stats : pd.DataFrame
                   , players_chosen : list[str]
                   , n_iterations : int

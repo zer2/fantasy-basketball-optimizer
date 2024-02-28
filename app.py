@@ -793,24 +793,13 @@ else:
 
             with c2: 
 
-              h_tab, z_tab, g_tab = st.tabs(['H-score','Z-score','G-score'])
+              z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
 
               if (len(players_sent) == 0) | (len(players_received) == 0):
                 st.markdown('A trade must include at least one player from each team')
 
               else:
 
-                with h_tab:
-                  make_trade_display(H
-                                  , player_stats 
-                                  , players_chosen 
-                                  , n_iterations 
-                                  , players_sent
-                                  , players_received
-                                  , trade_party_players
-                                  , trade_counterparty_players
-                                  , trade_counterparty_seat
-                                  , scoring_format)
                 with z_tab:
                   make_trade_score_tab(z_scores 
                                     , players_sent
@@ -825,7 +814,17 @@ else:
                                     , st.session_state.params['g-score-player-multiplier']
                                     , st.session_state.params['g-score-team-multiplier']
                                     )
-
+                with h_tab:
+                  make_trade_h_tab(H
+                                  , player_stats 
+                                  , players_chosen 
+                                  , n_iterations 
+                                  , players_sent
+                                  , players_received
+                                  , trade_party_players
+                                  , trade_counterparty_players
+                                  , trade_counterparty_seat
+                                  , scoring_format)
 
 
           with destinations_tab:
