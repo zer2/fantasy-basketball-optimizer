@@ -114,7 +114,7 @@ def get_yahoo_access_token() -> Optional[str]:
 def clean_up_access_token(auth_dir: str):
     shutil.rmtree(auth_dir)
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner = False)
 def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
     teams_dict = get_teams_dict(league_id, _auth_dir)
     team_ids = list(teams_dict.keys())
@@ -123,7 +123,7 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
 
     return players_df
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner = False)
 def get_teams_dict(league_id: str, auth_path: str) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
@@ -157,7 +157,7 @@ def get_rosters_dict(league_id: str, auth_path: str, team_ids: list[int]) -> dic
     
     return rosters_dict
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner = False)
 def get_user_leagues(auth_path: str) -> List[League]:
     sc = YahooFantasySportsQuery(
         auth_dir=auth_path,

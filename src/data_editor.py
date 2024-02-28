@@ -4,15 +4,15 @@
 import pandas as pd
 import streamlit as st
 
-def reset():
-    st.session_state.player_stats_key += 1
+def reset(key_name):
+    st.session_state[key_name] += 1
 
 def highlight_changes(val):
-    color = f"color: black;" if val else "color:lightgray;"
-    background = f"background-color:lightgray;" if val else ""
+    color = f"color: black;" if val else "color:lightgrey;"
+    background = f"background-color:lightblue;" if val else ""
     return f"{color} {background}"
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def show_diff(
     source_df: pd.DataFrame
     , modified_df: pd.DataFrame
@@ -63,22 +63,22 @@ def show_diff(
 
     return changes
 
-def make_data_editor(data):
+def make_data_editor(data, key_name, lock_in_button_str):
 
-    with st.form("Edit your data ⬇️"):
+    with st.form("Edit your data ⬇️ " + key_name):
         editor_df = st.data_editor(
-            data, key=st.session_state.player_stats_key
+            data, key=st.session_state[key_name]
                     , num_rows="dynamic"
                     , use_container_width=True
         )
-        submitted = st.form_submit_button("Lock in Player Stats"
+        submitted = st.form_submit_button(lock_in_button_str
                                         , use_container_width = True
                                         , type = 'primary')
 
     changes = show_diff(
                     source_df=data
                     , modified_df=editor_df
-                    , editor_key=st.session_state[st.session_state.player_stats_key]
+                    , editor_key=st.session_state[st.session_state[key_name]]
     )
 
     if len(changes) > 0:

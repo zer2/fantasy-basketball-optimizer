@@ -26,8 +26,11 @@ st.set_page_config(page_title='Fantasy BBall Optimization'
           , initial_sidebar_state="auto"
           , menu_items=None)
 
-if 'player_stats_key' not in st.session_state:
-    st.session_state.player_stats_key = 0
+if 'player_stats_editable_key' not in st.session_state:
+    st.session_state.player_stats_editable_key = 0
+
+if 'game_stats_editable_key' not in st.session_state:
+    st.session_state.game_stats_editable_key = 10000
 
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
@@ -374,23 +377,41 @@ else:
 
   with info_tab:
 
-    stat_tab, injury_tab = st.tabs([
+    stat_tab, games_played_tab, injury_tab = st.tabs([
                     "Player Stats"
+                    ,"Game Volume"
                     ,"Injury Status"])
 
     with stat_tab:
-      st.header('Per-game stats')
-      st.caption(f"Per-game player projections below, from default data source. feel free to edit as you see fit")
+      st.caption(f"Per-game player projections below, from default data source. Edit as you see fit")
 
-      #player_stats_editable = st.data_editor(raw_stats_df, key = 'player_stats') # 👈 An editable dataframe
-      player_stats_editable = make_data_editor(raw_stats_df)
+      player_stats_editable = make_data_editor(raw_stats_df
+                                          , key_name = 'player_stats_editable_key'
+                                          , lock_in_button_str = "Lock in Player Stats")
       player_stats = player_stats_editable.copy()
 
       #re-adjust from user inputs
       player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
       player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
       player_stats[r'No Play %'] = player_stats[r'No Play %']/100
-      player_stats[counting_statistics + volume_statistics] = player_stats[counting_statistics + volume_statistics] * 3
+
+
+    with games_played_tab: 
+      st.caption(f"""Projections for games played below, broken down by number of potential games and 
+                    percent actually played. Edit as you see fit""")
+
+      game_stats_default = pd.DataFrame({ 'Potential Games' : [3] * len(player_stats)
+                                    ,'Percent of Games Played' : [100] * len(player_stats)
+                                    }
+                                ,index = player_stats.index)
+
+      game_stats_editable = make_data_editor(game_stats_default
+                                        , key_name = 'game_stats_editable_key'
+                                        , lock_in_button_str = "Lock in Game Volume")
+
+      player_stats[counting_statistics + volume_statistics] = \
+            player_stats[counting_statistics + volume_statistics].mul(game_stats_editable.prod(axis = 1)/100
+                                                                , axis = 0)
 
     with injury_tab:
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
