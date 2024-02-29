@@ -4,6 +4,7 @@ import streamlit as st
 from datetime import datetime
 from nba_api.stats import endpoints as nba_endpoints
 import numpy as np
+import requests
 import os
 
 #cache this globally so it doesn't have to be rerun constantly 
@@ -142,9 +143,8 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-02-21.csv')
   all_darko = skill_projections.merge(per_game_projections)
 
-  all_darko['Player'] = np.where(all_darko['Player'] == 'Nicolas Claxton' 
-                               ,'Nic Claxton'
-                               ,all_darko['Player'])
+  player_renamer = st.session_state.params['darko-player-renamer']
+  all_darko['Player'] = all_darko['Player'].replace(player_renamer)
   
   all_darko = all_darko.set_index('Player') 
 
@@ -161,7 +161,7 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
   all_darko.loc[:,'REB'] = dreb + oreb 
 
-  renamer = st.session_state.params['darko-renamer']
+  renamer = st.session_state.params['darko-column-renamer']
   all_darko = all_darko.rename(columns = renamer)
 
   player_metadata = get_player_metadata()
@@ -263,4 +263,19 @@ def get_specified_stats(historical_df : pd.DataFrame
   df.index = df.index + ' (' + df['Position'] + ')'
   df.index.name = 'Player'
   return df.round(2) 
+
+@st.cache_data()
+def get_nba_schedule():
+    nba_schedule = requests.get(st.session_state.params['schedule-url']).json()
+    game_dates = nba_schedule['leagueSchedule']['gameDates']
+
+    def get_all_teams_playing(game_date):
+         return [game['homeTeam']['teamTricode'] for game in game_date['games']] + \
+                [game['awayTeam']['teamTricode'] for game in game_date['games']]
+
+    teams_playing = { game_date['gameDate'] : get_all_teams_playing(game_date)
+                            for game_date in game_dates
+    }
+
+    return teams_playing
 

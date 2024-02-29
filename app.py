@@ -41,6 +41,9 @@ if 'intro_button_disabled' not in st.session_state:
 if 'injured_players' not in st.session_state:
     st.session_state['injured_players'] = set()
 
+if 'schedule' not in st.session_state:
+    st.session_state['schedule'] = {}
+
 def run_h_score():
     st.session_state.run_h_score = True
 
@@ -158,6 +161,10 @@ if not st.session_state.intro_complete:
                                                                 )
                                                         )
                                                   )
+
+        st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(yahoo_league_id
+                                                                    , auth_dir
+                                                                    , player_metadata)
 
         yahoo_connect.clean_up_access_token(auth_dir)
         
@@ -395,14 +402,30 @@ else:
       player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
 
     with games_played_tab: 
-      st.caption(f"""Projections for games played below, broken down by number of potential games and 
-                    percent actually played. Edit as you see fit""")
 
-      game_stats_default = pd.DataFrame({ 'Potential Games' : [3] * len(player_stats)
+      #get schedule: 
+      #get game weeks: with yfpy query.get_game_weeks_by_game_id
+
+      schedule = st.session_state['schedule'] 
+      week_chosen = st.selectbox('Select a particular fantasy week, if desired'
+                                ,[None] + list(schedule.keys()))
+      if week_chosen:
+        default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
+        game_stats_default = pd.DataFrame({ 'Potential Games' : default_potential_games
                                     ,'Percent of Games Played' : [100] * len(player_stats)
                                     }
-                                ,index = player_stats.index)
+                                    ,index = player_stats.index
+                                      )
 
+      else:
+        game_stats_default = pd.DataFrame({ 'Potential Games' : [3] * len(player_stats)
+                                      ,'Percent of Games Played' : [100] * len(player_stats)
+                                      }
+                                  ,index = player_stats.index)
+
+      st.caption(f"""Projections for games played below, broken down by number of potential games and 
+                    percent actually played. Edit as you see fit""")
+                    
       game_stats_editable = make_data_editor(game_stats_default
                                         , key_name = 'game_stats_editable_key'
                                         , lock_in_button_str = "Lock in Game Volume")
