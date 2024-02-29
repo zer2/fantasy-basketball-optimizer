@@ -5,6 +5,8 @@ from tempfile import mkdtemp
 from typing import List, Optional
 from yfpy.models import League, Team, Roster
 from yfpy.query import YahooFantasySportsQuery
+from src.get_data import get_nba_schedule
+from collections import Counter
 
 import json
 import os
@@ -223,3 +225,45 @@ def get_player_statuses(league_id: str, _auth_path: str, player_metadata: pd.Ser
     player_status_series = pd.DataFrame.from_records(player_status_records)
 
     return player_status_series
+
+@st.cache_resource(ttl=3600)
+def get_yahoo_weeks(league_id: str, _auth_path: str) -> dict[int, str]:
+    LOGGER.info(f"League id: {league_id}")
+    sc = YahooFantasySportsQuery(
+        auth_dir=_auth_path,
+        league_id=league_id,
+        game_code="nba"
+    )
+    
+    LOGGER.info(f"sc: {sc}")
+    weeks = sc.get_game_weeks_by_game_id("nba")
+
+    return weeks
+
+@st.cache_resource(ttl=3600)
+def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
+    yahoo_weeks = get_yahoo_weeks(league_id, _auth_path)
+    nba_schedule = get_nba_schedule()
+
+    league_players = get_player_statuses(league_id
+                                            , _auth_path
+                                            , player_metadata)
+
+    league_players = league_players.set_index('Player')
+
+    week_dict = {}
+    for game_week in yahoo_weeks: 
+        teams_playing_list = []
+        for date in pd.date_range(game_week.start, game_week.end, freq = '1D'): 
+            date_formatted = date.strftime("%m/%d/%Y %H:%M:%S")
+            if date_formatted in nba_schedule:  
+                teams_playing = nba_schedule[date_formatted]
+                teams_playing_list = teams_playing_list + teams_playing
+
+        game_counts = Counter(teams_playing_list)
+        week_str = 'Week ' + str(game_week.display_name) + ': ' + \
+                                    str(game_week.start) + ' to ' + \
+                                    str(game_week.end)
+        week_dict[week_str] = league_players['Team'].map(game_counts)
+
+    return week_dict
