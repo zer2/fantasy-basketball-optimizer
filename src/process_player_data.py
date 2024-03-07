@@ -20,7 +20,7 @@ def calculate_coefficients(player_stats : pd.DataFrame
 
     """
 
-    params = st.session_state.params
+    params = st.session_state['params']
 
     #counting stats
     var_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
@@ -79,7 +79,7 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     Returns:
         Dataframe of scores, by player/category
     """
-    params = st.session_state.params
+    params = st.session_state['params']
 
     counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
     counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
@@ -128,7 +128,7 @@ def process_player_data(player_stats : pd.DataFrame
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
-  params = st.session_state.params
+  params = st.session_state['params']
 
   n_players = n_drafters * n_picks
 

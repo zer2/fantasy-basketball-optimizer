@@ -17,7 +17,7 @@ class HAgent():
                  , winner_take_all : bool
                  , punting : bool
                     ):
-        """Calculates the rank order based on U-score
+        """Calculates the rank order based on H-score
 
         Args:
             info: dictionary with info related to player statistics etc. 
@@ -87,6 +87,23 @@ class HAgent():
                                        , n_players_selected
                                        , diff_means
                                        , x_scores_available)
+
+    def get_diff_means(players_chosen, x_scores_available, my_players):
+        #version A
+        #Test this! Needs a good testing setup 
+        
+        x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
+
+        sum_so_far = self.x_scores.loc[players_chosen].sum()
+
+        extra_players_needed = (len(my_players)+1) * 8 - len(sum_so_far)
+        sum_extra_players = x_scores_available.iloc[0:extra_players_needed].sum()
+
+        average_team_so_far = (sum_so_far + sum_extra_players)/self.n_drafters
+
+        diff_means = x_self_sum - average_team_so_far
+
+        return diff_means 
 
     def perform_iterations(self
                            ,weights : pd.DataFrame
@@ -343,6 +360,39 @@ class HAgent():
 
     def get_del_full(self,c):
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
+
+    def make_pick(self
+                  , player_assignments : dict[list]
+                  , j : int
+                  ): 
+
+        my_players = player_assignments[j]
+        players_chosen = [x for v in player_assignments.values() for x in v]
+
+        generator = self.get_h_scores(my_players, players_chosen)
+        for i in range(30):
+            res  = next(generator)
+
+        scores = res['Scores']
+
+        best_player = scores.idxmax()
+
+        return best_player
+
+class SimpleAgent():
+    #Comment
+
+    def __init__(self, order):
+        self.order = order
+
+    def make_pick(self, player_assignments, j):
+
+        players_chosen = [x for v in player_assignments.values() for x in v]
+
+        available_players = self.order[~self.order.index.isin(players_chosen)]
+        player = available_players[0]
+
+        return player
 
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series

@@ -12,6 +12,7 @@ def get_categories():
 
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
+    #Goes row by row- very important! 
 
     x = x.values.tolist()
     return [item for row in x for item in row]
