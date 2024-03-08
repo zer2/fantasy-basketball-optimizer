@@ -86,9 +86,9 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> s
   if value != value:
     return f"background-color:white;color:white" 
 
-  intensity = min(int(abs(value-middle)*multiplier), 255)
+  intensity = min(int(abs((value-middle)*multiplier)), 255)
 
-  if value - middle > 0:
+  if (value - middle)*multiplier > 0:
     rgb = (255 -  intensity,255 , 255 -  intensity)
   else:
     rgb = (255, 255 - intensity, 255 - intensity)
@@ -110,6 +110,10 @@ def styler_b(value : float) -> str:
 
 def styler_c(value : float) -> str:
     return f"background-color: darkgrey; color:black;" 
+
+def rotate(l, n):
+  #rotate list l by n positions 
+  return l[-n:] + l[:-n]
 
 def combinatorial_calculation(c : pd.DataFrame
                               , c_comp : pd.DataFrame

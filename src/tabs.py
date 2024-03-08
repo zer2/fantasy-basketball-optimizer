@@ -277,6 +277,7 @@ def get_base_h_score(info : dict
                 , alpha : float
                 , beta : float
                 , n_picks : int
+                , n_drafters : int
                 , winner_take_all : bool
                 , punting : bool
                 , player_stats : pd.DataFrame
@@ -291,6 +292,7 @@ def get_base_h_score(info : dict
     alpha: float, step size parameter for gradient descent 
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
+    n_drafters: int, number of drafters
     winner_take_all: Boolean of whether to optimize for the winner-take-all format
                       If False, optimizes for total categories
     punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
@@ -307,6 +309,7 @@ def get_base_h_score(info : dict
     , alpha = alpha
     , beta = beta
     , n_picks = n_picks
+    , n_drafters = n_drafters
     , winner_take_all = winner_take_all
     , punting = punting)
 
@@ -878,6 +881,7 @@ def make_h_rank_tab( info : dict
                   , alpha : float
                   , beta : float
                   , n_picks : int
+                  , n_drafters : int
                   , n_iterations : int
                   , winner_take_all : bool
                   , punting : bool
@@ -891,6 +895,7 @@ def make_h_rank_tab( info : dict
     alpha: float, step size parameter for gradient descent 
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
+    n_drafters: int, number of drafters
     n_iterations: int, number of gradient descent steps
     winner_take_all: Boolean of whether to optimize for the winner-take-all format
                       If False, optimizes for total categories
@@ -906,6 +911,7 @@ def make_h_rank_tab( info : dict
     , alpha = alpha
     , beta = beta
     , n_picks = n_picks
+    , n_drafters = n_drafters
     , winner_take_all = winner_take_all
     , punting = punting)
 

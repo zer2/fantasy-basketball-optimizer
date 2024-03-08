@@ -4,6 +4,7 @@ from scipy.stats import norm
 import os
 from itertools import combinations
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points, get_categories
+import streamlit as st 
 
 class HAgent():
 
@@ -14,6 +15,7 @@ class HAgent():
                  , alpha : float
                  , beta : float
                  , n_picks : int
+                 , n_drafters : int
                  , winner_take_all : bool
                  , punting : bool
                     ):
@@ -26,6 +28,7 @@ class HAgent():
             alpha: float, step size parameter for gradient descent 
             beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
+            n_drafters : int, number of drafters
             winner_take_all: Boolean of whether to optimize for the winner-take-all format
                              If False, optimizes for total categories
             punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
@@ -38,6 +41,7 @@ class HAgent():
         self.alpha = alpha
         self.beta = beta
         self.n_picks = n_picks 
+        self.n_drafters = n_drafters
         self.winner_take_all = winner_take_all 
         self.x_scores = info['X-scores']
         self.score_table = info['Score-table']
@@ -55,7 +59,7 @@ class HAgent():
         """Performs the H-score algorithm
 
         Args:
-            my_players : list of players picked by other teams
+            my_players : list of players chosen already by this team
             players_chosen : list of all players chosen, including my_players
 
         Returns:
@@ -65,18 +69,15 @@ class HAgent():
 
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
 
+        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
+
         #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
         #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
-        if n_players_selected < (self.n_picks - 1):
-            previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
-            this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
-            diff_means = x_self_sum - previous_rounds_expected - this_round_expected
-        else:
-            previous_rounds_expected = self.score_table.iloc[0:self.n_picks].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
-            diff_means = x_self_sum - previous_rounds_expected 
 
-        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
-                      
+        diff_means = self.get_diff_means(players_chosen
+                                        , x_scores_available
+                                        , my_players)
+
         initial_weights = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
         
         scores = []
@@ -88,15 +89,27 @@ class HAgent():
                                        , diff_means
                                        , x_scores_available)
 
-    def get_diff_means(players_chosen, x_scores_available, my_players):
-        #version A
-        #Test this! Needs a good testing setup 
+    def get_diff_means(self
+                    , players_chosen : list[str]
+                    , x_scores_available : pd.DataFrame
+                    , my_players : list[str]) -> pd.Series:
+        """Calculates diff-means based on the dynamic method 
+
+        Args:
+            players_chosen : list of all players chosen, including my_players
+            x_scores_available: DataFrame of x-scores, excluding players chosen by any team
+            my_players : list of players chosen already by this team
+
+        Returns:
+            Series of form {cat : expected value of opposing teams for the cat}
+        """
         
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
 
         sum_so_far = self.x_scores.loc[players_chosen].sum()
 
-        extra_players_needed = (len(my_players)+1) * 8 - len(sum_so_far)
+        #assume that players for the rest of the round will be chosen from the default ordering 
+        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen)
         sum_extra_players = x_scores_available.iloc[0:extra_players_needed].sum()
 
         average_team_so_far = (sum_so_far + sum_extra_players)/self.n_drafters
@@ -136,6 +149,7 @@ class HAgent():
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.punting):
+
                 del_full = self.get_del_full(weights)
         
                 expected_future_diff_single = self.get_x_mu(weights)
@@ -176,12 +190,13 @@ class HAgent():
                     score = cdf_estimates.mean(axis = 1) 
 
             #case where one more player needs to be chosen
-            elif (n_players_selected == (self.n_picks - 1)) | (self.punting & (n_players_selected < (self.n_picks - 1)) ): 
+            elif (n_players_selected == (self.n_picks - 1)) | (not self.punting & (n_players_selected < (self.n_picks)) ): 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
 
                 weights = None
+                expected_future_diff = None
                 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -192,7 +207,7 @@ class HAgent():
                     score = cdf_estimates.mean(axis = 1) 
 
             #case where no new players need to be chosen
-            elif n_players_selected == self.n_picks: 
+            elif (n_players_selected == self.n_picks): 
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
                               , scale = np.sqrt(self.diff_var)
                                                      )
@@ -200,6 +215,7 @@ class HAgent():
                                             ).T
 
                 weights = None
+                expected_future_diff = None
                 
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -208,6 +224,7 @@ class HAgent():
                                  )
 
                 else:
+
                     score = cdf_estimates.mean(axis = 1) 
 
             #case where there are too many players and some need to be removed. n > n_picks
@@ -232,6 +249,7 @@ class HAgent():
                     score = cdf_estimates.mean(axis = 1)
 
                 weights = None
+                expected_future_diff = None
 
             i = i + 1
 
@@ -239,7 +257,8 @@ class HAgent():
     
             yield {'Scores' : score
                     ,'Weights' : weights
-                    ,'Rates' : cdf_estimates}
+                    ,'Rates' : cdf_estimates
+                    ,'Diff' : expected_future_diff}
 
     ### below are functions used for the optimization procedure 
 
@@ -377,6 +396,13 @@ class HAgent():
 
         best_player = scores.idxmax()
 
+        #if (j == 0) & (not self.winner_take_all):
+        #    st.write('HELLO')
+        #    st.write(len(my_players))
+        #    st.write(best_player)
+        #    st.write(res['Scores'])
+        #    st.write(res['Rates'])
+
         return best_player
 
 class SimpleAgent():
@@ -385,11 +411,12 @@ class SimpleAgent():
     def __init__(self, order):
         self.order = order
 
-    def make_pick(self, player_assignments, j):
+    def make_pick(self, player_assignments : dict[list], j : int) -> str:
 
         players_chosen = [x for v in player_assignments.values() for x in v]
 
-        available_players = self.order[~self.order.index.isin(players_chosen)]
+        #ZR: Can this be done more efficiently?
+        available_players = [p for p in self.order if not p in players_chosen]
         player = available_players[0]
 
         return player

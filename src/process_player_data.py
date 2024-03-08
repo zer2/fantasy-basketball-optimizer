@@ -20,7 +20,7 @@ def calculate_coefficients(player_stats : pd.DataFrame
 
     """
 
-    params = st.session_state['params']
+    params = st.session_state.params
 
     #counting stats
     var_of_means = player_stats.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
@@ -79,7 +79,7 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     Returns:
         Dataframe of scores, by player/category
     """
-    params = st.session_state['params']
+    params = st.session_state.params
 
     counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
     counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
@@ -102,7 +102,7 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     
     res = pd.concat([fgp_score, ftp_score, main_scores],axis = 1)  
     res.columns = get_categories()
-    return res
+    return res.fillna(0)
 
 @st.cache_data
 def process_player_data(player_stats : pd.DataFrame
@@ -128,7 +128,7 @@ def process_player_data(player_stats : pd.DataFrame
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
-  params = st.session_state['params']
+  params = st.session_state.params
 
   n_players = n_drafters * n_picks
 
@@ -139,7 +139,9 @@ def process_player_data(player_stats : pd.DataFrame
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors['Conversion Factor'])
+  coefficients = calculate_coefficients(player_stats
+                                    , representative_player_set
+                                    , conversion_factors['Conversion Factor'])
                          
   g_scores = calculate_scores_from_coefficients(player_stats, coefficients, params, 1,1)
   z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params,  1,0)
@@ -193,7 +195,6 @@ def process_player_data(player_stats : pd.DataFrame
 
   z_scores.sort_values('Total', ascending = False, inplace = True)
 
-  g_scores = g_scores * multipliers.T.values[0]
   g_scores.insert(loc = 0, column = 'Total', value = g_scores.sum(axis = 1))
   g_scores.sort_values('Total', ascending = False, inplace = True)
 

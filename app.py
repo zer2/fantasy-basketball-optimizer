@@ -480,6 +480,7 @@ else:
                       ,alpha
                       ,beta
                       ,n_picks
+                      ,n_drafters
                       ,n_iterations
                       ,winner_take_all
                       ,punting
@@ -491,6 +492,7 @@ else:
       , alpha = alpha
       , beta = beta
       , n_picks = n_picks
+      , n_drafters = n_drafters
       , winner_take_all = winner_take_all
       , punting = punting)   
 
@@ -613,6 +615,7 @@ else:
                                           ,alpha
                                           ,beta
                                           ,n_picks
+                                          ,n_drafters
                                           ,winner_take_all
                                           ,punting
                                           ,player_stats
