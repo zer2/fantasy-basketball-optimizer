@@ -145,7 +145,7 @@ For a heuristic way of seeing this, we can look at some real data and approximat
 One must note that this is a very heuristic approach, because it does not account for position. Still, one would expect that the most profitable categories to punt would show the most benefit from this procedure on average. 
 
 
-<iframe width = "1344" height = "550" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/c08ebcc5-6b04-434f-8d32-8be0f0150046"> </iframe>
+<iframe width = "1344" height = "550" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab7df34f-8a36-4f06-811e-3376be8f8370"> </iframe>
 
 Turnovers are high, but not the highest. Punting free throws and threes both appear to be more valuable, at least in isolation.
 
