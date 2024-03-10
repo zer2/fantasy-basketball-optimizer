@@ -190,7 +190,8 @@ class HAgent():
                     score = cdf_estimates.mean(axis = 1) 
 
             #case where one more player needs to be chosen
-            elif (n_players_selected == (self.n_picks - 1)) | (not self.punting & (n_players_selected < (self.n_picks)) ): 
+            elif (n_players_selected == (self.n_picks - 1)) | ((not self.punting) & (n_players_selected < (self.n_picks)) ): 
+
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
                               , scale = np.sqrt(self.diff_var))
                      ,index = x_scores_available.index)
@@ -208,6 +209,7 @@ class HAgent():
 
             #case where no new players need to be chosen
             elif (n_players_selected == self.n_picks): 
+
                 cdf_estimates = pd.DataFrame(norm.cdf(diff_means
                               , scale = np.sqrt(self.diff_var)
                                                      )

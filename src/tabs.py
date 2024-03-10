@@ -303,6 +303,7 @@ def get_base_h_score(info : dict
   Returns:
       None
   """
+
   H = HAgent(info = info
     , omega = omega
     , gamma = gamma
