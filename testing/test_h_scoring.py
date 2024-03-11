@@ -40,10 +40,6 @@ def test_h_score_calculation_and_gradient():
         check_all_gradients(c, H.get_last_four_terms, H.get_del_last_four_terms)
         check_all_gradients(c, H.get_x_mu_simplified_form, H.get_del_full)
         
-
-    #check end to end value 
-    
-
 def check_all_gradients(c, func, del_func):
     for j in range(9):
         check_gradient(c, func, del_func, j)
