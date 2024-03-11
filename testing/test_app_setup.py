@@ -14,3 +14,5 @@ def test_draft_defaults():
         assert at.number_input(option_name).value == at.session_state.params['options'][option_name]['default']
         assert at.number_input(option_name).min == at.session_state.params['options'][option_name]['min']
         assert at.number_input(option_name).max == at.session_state.params['options'][option_name]['max']
+
+    #check what tabs are available? is that possible?

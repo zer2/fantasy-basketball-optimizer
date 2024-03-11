@@ -470,7 +470,8 @@ with info_tab:
                               ,n_picks
                               ,rotisserie
                               ,st.session_state.player_stats_editable_version)
-      #self.session_state.info = info
+      st.session_state.info = info #useful for testing
+      
       z_scores = info['Z-scores']
       g_scores = info['G-scores']
 

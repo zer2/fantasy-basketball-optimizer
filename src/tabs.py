@@ -251,8 +251,6 @@ def make_matchup_tab(_x_scores : pd.DataFrame
       max_len_team_name = max([len(x) for x in matchup_df.columns])
       new_team_names = [x + (max_len_team_name - len(x)) * ' ' for x in matchup_df.columns]
 
-      print(new_team_names)
-
       matchup_df.columns = new_team_names
       matchup_df.index = new_team_names
 

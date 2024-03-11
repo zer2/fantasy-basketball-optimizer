@@ -152,7 +152,7 @@ class HAgent():
 
                 del_full = self.get_del_full(weights)
         
-                expected_future_diff_single = self.get_x_mu(weights)
+                expected_future_diff_single = self.get_x_mu_simplified_form(weights)
 
                 expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9)
         
@@ -263,9 +263,9 @@ class HAgent():
                     ,'Diff' : expected_future_diff}
 
     ### below are functions used for the optimization procedure 
-
-    def get_x_mu(self,c):
-        #uses the pre-simplified formula for x_mu from page 19 of the paper. Using the simplified form would work just as well
+    
+    def get_x_mu_long_form(self,c):
+        #uses the pre-simplified formula for x_mu from page 19 of the paper
 
         factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
 
@@ -283,9 +283,15 @@ class HAgent():
 
         x = np.einsum('aij, ajk -> aik', r, inverse_part)
 
-        X_mu = np.einsum('aij, ajk -> aik', x, b)
+        x_mu = np.einsum('aij, ajk -> aik', x, b)
 
-        return X_mu
+        return x_mu
+
+    def get_x_mu_simplified_form(self,c):
+        last_four_terms = self.get_last_four_terms(c)
+        x_mu = np.einsum('ij, ajk -> aik',self.L, last_four_terms)
+        return x_mu
+
 
     #below functions use the simplified form of X_mu 
     #term 1: L (covariance)
@@ -370,7 +376,9 @@ class HAgent():
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_terms_four_five(c))
 
     def get_last_four_terms(self,c):
-        return np.einsum('ij, ajk -> aik', self.get_term_two(c), self.get_last_three_terms(c))
+        term_two = self.get_term_two(c)
+        last_three = self.get_last_three_terms(c)
+        return np.einsum('aij, ajk -> aik', term_two, last_three)
 
     def get_del_last_four_terms(self,c):
         comp_i = self.get_del_term_two(c)
@@ -397,13 +405,6 @@ class HAgent():
         scores = res['Scores']
 
         best_player = scores.idxmax()
-
-        #if (j == 0) & (not self.winner_take_all):
-        #    st.write('HELLO')
-        #    st.write(len(my_players))
-        #    st.write(best_player)
-        #    st.write(res['Scores'])
-        #    st.write(res['Rates'])
 
         return best_player
 

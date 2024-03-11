@@ -48,7 +48,6 @@ def show_diff(
 
     change_markers = changes.copy()
 
-    print(change_markers)
     for cl in change_markers:
         if cl in after_columns:
             new_col = cl.replace("_AFTER", "_BEFORE")

@@ -1,3 +1,4 @@
+
 import numpy as np
 import pandas as pd
 from src.run_algorithm import HAgent, SimpleAgent
@@ -5,29 +6,14 @@ from src.helper_functions import get_categories, stat_styler, styler_a, rotate
 from src.process_player_data import process_player_data
 from src.get_data import get_player_metadata
 from src.tabs import make_team_tab
-import streamlit as st
-import yaml
 import copy
 import datetime
-
-if 'params' not in st.session_state:
-  with open("parameters.yaml", "r") as stream:
-      try:
-        st.session_state.params = yaml.safe_load(stream)
-      except yaml.YAMLError as exc:
-          print(exc) 
+import streamlit as st
 
 #ZR: this can be cleaned up probably
 cols = ['Free Throws','Free Throw Attempts','Field Goals','Field Goal Attempts'
         ,'Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
         
-st.set_page_config(page_title='Fantasy BBall Optimization- Testing Page'
-          , page_icon=':basketball:'
-          , layout="wide"
-          , initial_sidebar_state="auto"
-          , menu_items=None)
-
-st.title('Testing algorithms for Fantasy Basketball :basketball:')
 
 def make_weekly_df(season_df : pd.DataFrame):
     """Prepares a stat dataframe and a position series for a season"""
@@ -282,7 +268,6 @@ def try_strategy(_primary_agent
         
     return victory_res, detailed_res, team_dict, all_times
 
-
 def validate() -> None:
 
     season_df = pd.read_csv('data/2022-23_complete.csv')
@@ -316,14 +301,14 @@ def validate() -> None:
                             , index = conversion_factors.index)
 
     #these should all be part of the params file
-    psi = st.session_state.params['defaults']['psi']
-    nu = st.session_state.params['defaults']['nu']
-    n_drafters = st.session_state.params['defaults']['n_drafters']
-    n_picks = st.session_state.params['defaults']['n_picks']
-    omega = st.session_state.params['defaults']['omega']
-    gamma = st.session_state.params['defaults']['gamma']
-    alpha = st.session_state.params['defaults']['alpha']
-    beta = st.session_state.params['defaults']['beta']
+    psi = st.session_state.params['options']['psi']['default']
+    nu = st.session_state.params['options']['nu']['default']
+    n_drafters = st.session_state.params['options']['n_drafters']['default']
+    n_picks = st.session_state.params['options']['n_picks']['default']
+    omega = st.session_state.params['options']['omega']['default']
+    gamma = st.session_state.params['options']['gamma']['default']
+    alpha = st.session_state.params['options']['alpha']['default']
+    beta = st.session_state.params['options']['beta']['default']
     n_seasons = 1000
 
     info = process_player_data(player_averages
@@ -334,6 +319,7 @@ def validate() -> None:
                         , n_drafters
                         , n_picks
                         , False
+                        , None
                         )
 
     g_scores = info['G-scores']
@@ -398,7 +384,7 @@ def validate() -> None:
 
             win_rate_df_styled = win_rate_df.style.format("{:.1%}") \
                                             .map(stat_styler
-                                            , middle = 0.08333, multiplier = 300) \
+                                            ,middle = 0.08333, multiplier = 300) \
                                             .map(styler_a, subset = pd.IndexSlice['Aggregate',:])
 
             st.subheader('Ultimate win rates')
@@ -510,5 +496,3 @@ def validate() -> None:
                                                 , multiplier = -50
             )
             st.dataframe(timing_df_ec)
-
-validate()
