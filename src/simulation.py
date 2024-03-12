@@ -204,7 +204,7 @@ def run_multiple_seasons(teams : dict[list]
         results_agg = pd.concat([cat_wins_agg, cat_ties_agg])
         return wins_by_teams, results_agg.reorder_levels(['Team','Result'])
 
-@st.cache_data()
+#@st.cache_data()
 def try_strategy(_primary_agent
                  , _default_agent
                  , n_drafters : int
@@ -429,6 +429,7 @@ def validate() -> None:
                                     , n_drafters 
                                     , st.session_state.params['g-score-player-multiplier']
                                     , st.session_state.params['g-score-team-multiplier']
+                                    , None
                                     ) 
 
 
@@ -469,6 +470,7 @@ def validate() -> None:
                                     , n_drafters 
                                     , st.session_state.params['g-score-player-multiplier']
                                     , st.session_state.params['g-score-team-multiplier']
+                                    , None
                                     ) 
 
     with timing_tab:

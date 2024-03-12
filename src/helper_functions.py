@@ -115,12 +115,11 @@ def rotate(l, n):
   #rotate list l by n positions 
   return l[-n:] + l[:-n]
 
-def combinatorial_calculation(c : pd.DataFrame
-                              , c_comp : pd.DataFrame
-                              , categories : list
+def combinatorial_calculation(c : np.array
+                              , c_comp : np.array
                               , data = 1 #the latest probabilities. Defaults to 1 at start
                               , level : int = 0 #the number of categories that have been worked into the probability
-                              , n_false : int = 0 #the number of category losses that have been trackes so far
+                              , n_false : int = 0 #the number of category losses that have been tracked so far
                              ):
     """This recursive functions enumerates winning probabilities for the Gaussian optimizer
 
@@ -138,24 +137,26 @@ def combinatorial_calculation(c : pd.DataFrame
     lost the last 1). Ultimately it is about five times faster than the equivalent with list comprehension
     
     Args:
-        c: Dataframe of all category winning probabilities. One column per category, one row per player
+        c: Array of all category winning probabilities. Dimensions are (player, category, opponent)
         c_comp: 1 - c
-        categories: list of the relevant categories
         data: probability of the node's scenario. Defaults to 1 because no categories are required at first
         level: the number of categories that have been worked into the probability
         n_false: the number of category losses that have been tracked so far. When it gets high enough 
                  we write off the node; the remaining scenarios do not contribute to winning chances
 
     Returns:
-        Probability of winning a majority of categories for each player 
+        DataFrame with probability of winning a majority of categories for each player 
+
+        axis 0: player 
+        axis 1: opponent
 
     """
-    if n_false > (len(categories) -1)/2: #scenarios where a majority of categories are losses are overall losses
+    if n_false > (c.shape[1] -1)/2: #scenarios where a majority of categories are losses are overall losses
         return 0 
-    elif level < len(categories):
+    elif level < c.shape[1] :
         #find the total winning probability of both branches from this point- if we win or lose the current category 
-        return combinatorial_calculation(c, c_comp, categories, data * c[categories[level]], level + 1, n_false) + \
-                combinatorial_calculation(c, c_comp, categories, data * c_comp[categories[level]], level + 1, n_false + 1)
+        return combinatorial_calculation(c, c_comp, data * c[:,level,:], level + 1, n_false) + \
+                combinatorial_calculation(c, c_comp, data * c_comp[:,level,:], level + 1, n_false + 1)
     else: #a series where all 9 categories has been processed, and n_false <= the cutoff, can be added to the total %
         return data
 
@@ -163,10 +164,11 @@ def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
     """Calculate the probability of each category being a tipping point, assuming independence
 
     Args:
-        x: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
+        x: DataFrame of shape (n,9,m) representing probabilities of winning each of the 9 categories 
 
     Returns:
-        DataFrame of shape (n,9) representing probabilities of each category being a tipping point
+        DataFrame of shape (n,9,m) representing probabilities of each category being a tipping point
+        m is number of opponents
     """
 
     #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
@@ -174,20 +176,25 @@ def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
     grid = np.zeros((126, 9), dtype="bool")     
     grid[np.arange(126)[None].T, which] = True
 
+    grid = np.expand_dims(grid, axis = 2)
+
     #copy grid for each row in x 
     grid = np.array([grid] * x.shape[0])
 
-    x = x.reshape(x.shape[0],1,9)
+    x = x.reshape(x.shape[0],1,9, x.shape[2])
+
+    print(x.shape)
+    print(grid.shape)
 
     #get the probabilities of the scenarios and filter them by which categories they apply to
     #the categories that are won all become tipping points
     positive_case_probabilities = ((grid * x + (1-grid) * (1-x)) \
-                                   .prod(axis = 2).reshape(x.shape[0],126,1) * grid).sum(axis = 1)
+                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3]) * grid).sum(axis = 1)
 
     #do the same but for the inverse scenarios, where 5 categories are lost and 4 are won
     #in this case the lost categories become tipping points 
     negative_case_probabilities = (((1 - grid) * x + grid * (1-x)) \
-                                   .prod(axis = 2).reshape(x.shape[0],126,1) * grid).sum(axis = 1)
+                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3]) * grid).sum(axis = 1)
     final_probabilities = positive_case_probabilities + negative_case_probabilities
     
     return final_probabilities

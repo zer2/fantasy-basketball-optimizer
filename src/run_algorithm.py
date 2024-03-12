@@ -78,7 +78,9 @@ class HAgent():
                                         , x_scores_available
                                         , my_players)
 
-        initial_weights = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
+        x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
+
+        initial_weights = ((diff_means + x_scores_available_array)/((self.v.T * 500)) + self.v.T).mean(axis = 2)
         
         scores = []
         weights = []
@@ -87,7 +89,8 @@ class HAgent():
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
-                                       , x_scores_available)
+                                       , x_scores_available_array
+                                       , x_scores_available.index)
 
     def get_diff_means(self
                     , players_chosen : list[str]
@@ -114,7 +117,11 @@ class HAgent():
 
         average_team_so_far = (sum_so_far + sum_extra_players)/self.n_drafters
 
-        diff_means = x_self_sum - average_team_so_far
+        diff_means = np.array(x_self_sum - average_team_so_far).reshape(1,9,1)
+
+        #currently diff_means is one-dimensional 
+        #should switch diff_means to be two-dimension, but not aligned with x-candidates
+        #so it should be of size (1,9,n_opponents)
 
         return diff_means 
 
@@ -123,7 +130,8 @@ class HAgent():
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
-                           ,x_scores_available : pd.DataFrame
+                           ,x_scores_available_array : pd.DataFrame
+                           ,result_index
                            ) -> tuple:
         """Performs one iteration of H-scoring
          
@@ -154,24 +162,23 @@ class HAgent():
         
                 expected_future_diff_single = self.get_x_mu_simplified_form(weights)
 
-                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9)
-        
-                pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
-                                          , scale = np.sqrt(self.diff_var))
+                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
+                x_diff_array = diff_means + x_scores_available_array + expected_future_diff
+
+
+                pdf_estimates = self.get_pdf(x_diff_array)
                 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
-                                          , scale = np.sqrt(self.diff_var))
-                                 ,index = x_scores_available.index)
+                cdf_estimates = self.get_cdf(x_diff_array)
         
                 if self.winner_take_all:
         
                     tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
         
-                    pdf_weights = (tipping_points*pdf_estimates)
+                    pdf_weights = (tipping_points*pdf_estimates).mean(axis = 2)
                 else:
-                    pdf_weights = pdf_estimates
-        
+                    pdf_weights = pdf_estimates.mean(axis = 2)
+
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
                 step_size = self.alpha * (i + 1)**(-self.beta) 
@@ -184,17 +191,16 @@ class HAgent():
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
                 else:
-                    score = cdf_estimates.mean(axis = 1) 
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.punting) & (n_players_selected < (self.n_picks)) ): 
 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
-                              , scale = np.sqrt(self.diff_var))
-                     ,index = x_scores_available.index)
+                x_diff_array = diff_means + x_scores_available_array
+
+                cdf_estimates = self.get_cdf(x_diff_array)
 
                 weights = None
                 expected_future_diff = None
@@ -202,10 +208,9 @@ class HAgent():
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
                 else:
-                    score = cdf_estimates.mean(axis = 1) 
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
             #case where no new players need to be chosen
             elif (n_players_selected == self.n_picks): 
@@ -222,12 +227,11 @@ class HAgent():
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
 
                 else:
 
-                    score = cdf_estimates.mean(axis = 1) 
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
             #case where there are too many players and some need to be removed. n > n_picks
             else: 
@@ -245,25 +249,50 @@ class HAgent():
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
                 else:
-                    score = cdf_estimates.mean(axis = 1)
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1)
 
                 weights = None
                 expected_future_diff = None
 
             i = i + 1
 
-            cdf_estimates.columns = get_categories()
-    
-            yield {'Scores' : score
-                    ,'Weights' : weights
-                    ,'Rates' : cdf_estimates
-                    ,'Diff' : expected_future_diff}
+            cdf_means = cdf_estimates.mean(axis = 2)
+
+            if expected_future_diff is not None:
+                expected_diff_means = expected_future_diff.mean(axis = 2)
+            else:
+                expected_diff_means = None
+
+            yield {'Scores' : pd.Series(score, index = result_index)
+                    ,'Weights' : pd.DataFrame(weights, index = result_index, columns = get_categories())
+                    ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = get_categories())
+                    ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = get_categories())}
 
     ### below are functions used for the optimization procedure 
+    def get_pdf(self, x_diff_array):
+
+        #need to resize
+        diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]*x_diff_array.shape[2], -1)
+
+        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(self.diff_var))
+
+        pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
+
+        return pdf_estimates_reshaped
     
+    def get_cdf(self, x_diff_array):
+
+        #need to resize
+        diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]*x_diff_array.shape[2], -1)
+
+        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(self.diff_var))
+
+        cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
+
+        return cdf_estimates_reshaped
+
     def get_x_mu_long_form(self,c):
         #uses the pre-simplified formula for x_mu from page 19 of the paper
 

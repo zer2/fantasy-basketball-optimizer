@@ -1,6 +1,8 @@
 from src.run_algorithm import HAgent
+from src.helper_functions import combinatorial_calculation, calculate_tipping_points
 from streamlit.testing.v1 import AppTest
 import numpy as np 
+import pandas as pd
 
 def test_h_score_calculation_and_gradient():
     """Make sure the H-score calculations are working"""
@@ -28,6 +30,12 @@ def test_h_score_calculation_and_gradient():
 
         x_mu_long = H.get_x_mu_long_form(c)
         x_mu_simplified = H.get_x_mu_simplified_form(c)
+
+        print(x_mu_long.shape)
+        print(x_mu_simplified.shape)
+        sdgsdg
+
+        assert x_mu_long.shape == x_mu_simplified.shape
         assert (abs(x_mu_long - x_mu_simplified) < 0.01).all()
 
         check_all_gradients(c, H.get_term_five_a, H.get_del_term_five_a)
@@ -39,7 +47,25 @@ def test_h_score_calculation_and_gradient():
         check_all_gradients(c, H.get_last_three_terms, H.get_del_last_three_terms)
         check_all_gradients(c, H.get_last_four_terms, H.get_del_last_four_terms)
         check_all_gradients(c, H.get_x_mu_simplified_form, H.get_del_full)
-        
+
+def test_combinatorial_calculation():
+    c = np.array([[[1/2,0]]*9] * 2)
+
+    res = combinatorial_calculation(c, 1 -c)
+
+    expected_result = np.array([[1/2,0],[1/2,0]])
+
+    assert (abs(res - expected_result) < 0.01).all()
+
+def test_tipping_point_calculation():
+    x = np.array([[[1/2,0]]*9] * 2)
+
+    res = calculate_tipping_points(x)
+
+    expected_result = np.array([[[0.2734,0]] * 9] * 2)
+
+    assert (abs(res - expected_result) < 0.01).all()
+
 def check_all_gradients(c, func, del_func):
     for j in range(9):
         check_gradient(c, func, del_func, j)
