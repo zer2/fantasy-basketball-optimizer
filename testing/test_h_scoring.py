@@ -31,10 +31,6 @@ def test_h_score_calculation_and_gradient():
         x_mu_long = H.get_x_mu_long_form(c)
         x_mu_simplified = H.get_x_mu_simplified_form(c)
 
-        print(x_mu_long.shape)
-        print(x_mu_simplified.shape)
-        sdgsdg
-
         assert x_mu_long.shape == x_mu_simplified.shape
         assert (abs(x_mu_long - x_mu_simplified) < 0.01).all()
 
