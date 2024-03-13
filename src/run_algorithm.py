@@ -82,7 +82,9 @@ class HAgent():
         
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
-        initial_weights = ((diff_means + x_scores_available_array)/((self.v.T * 500)) + self.v.T).mean(axis = 2)
+        default_weights = self.v.T.reshape(1,9,1)
+        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * 500)) + \
+                            default_weights).mean(axis = 2)
         
         scores = []
         weights = []
@@ -95,6 +97,45 @@ class HAgent():
                                        , x_scores_available.index)
 
     def get_diff_means(self
+                    , player_assignments : dict[list[str]]
+                    , drafter
+                    , x_scores_available : pd.DataFrame) -> pd.Series:
+        """Calculates diff-means based on the dynamic method 
+
+        Args:
+            players_chosen : list of all players chosen, including my_players
+            x_scores_available: DataFrame of x-scores, excluding players chosen by any team
+            my_players : list of players chosen already by this team
+
+        Returns:
+            Series of form {cat : expected value of opposing teams for the cat}
+        """
+        my_players = player_assignments[drafter]
+        x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis = 0))
+
+        #assume that players for the rest of the round will be chosen from the default ordering 
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen)
+        mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean()
+
+        other_team_sums = np.vstack(
+            [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
+                                    in player_assignments.items()]
+        ).T
+        
+        diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters)
+
+        return diff_means
+
+    def get_opposing_team_stats(self, players, replacement_value, n_players):
+        n_extra_players = n_players + 1 - len(players)
+
+        opposing_team_stats = np.array(self.x_scores.loc[players].sum(axis =0) + \
+                                        n_extra_players * replacement_value)
+
+        return opposing_team_stats 
+
+    def get_diff_means_old(self
                     , player_assignments : dict[list[str]]
                     , drafter
                     , x_scores_available : pd.DataFrame) -> pd.Series:
@@ -168,7 +209,6 @@ class HAgent():
                 expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
-
 
                 pdf_estimates = self.get_pdf(x_diff_array)
                 

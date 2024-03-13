@@ -243,8 +243,10 @@ def try_strategy(_primary_agent
     detailed_res = pd.DataFrame()
     team_dict = {}
     all_times = {}
-    
-    for i in range(n_drafters):
+     
+    #for i in range(n_drafters):
+    for i in range(1):
+
         #we need to deepcopy the agents so that they don't share references with each other
         agents =  [copy.deepcopy(_primary_agent) for x in range(n_primary)] + \
                     [copy.deepcopy(_default_agent) for x in range(n_drafters-n_primary)]
