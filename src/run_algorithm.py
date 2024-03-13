@@ -118,7 +118,7 @@ class HAgent():
         #assume that players for the rest of the round will be chosen from the default ordering 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
         extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
-        mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean()
+        mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
 
         other_team_sums = np.vstack(
             [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
