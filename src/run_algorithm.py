@@ -67,7 +67,7 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
-        my_players = player_assignments[drafter]
+        my_players = [p for p in player_assignments[drafter] if p ==p]
         n_players_selected = len(my_players) 
 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
@@ -111,7 +111,8 @@ class HAgent():
         Returns:
             Series of form {cat : expected value of opposing teams for the cat}
         """
-        my_players = player_assignments[drafter]
+        my_players = [p for p in player_assignments[drafter] if p ==p]
+
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis = 0))
 
         #assume that players for the rest of the round will be chosen from the default ordering 
@@ -152,7 +153,6 @@ class HAgent():
         Returns:
             Series of form {cat : expected value of opposing teams for the cat}
         """
-        my_players = player_assignments[drafter]
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
