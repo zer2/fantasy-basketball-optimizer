@@ -59,6 +59,9 @@ def run_h_score():
 def stop_run_h_score():
     st.session_state.run_h_score = False
 
+def increment_player_stats_version():
+  st.session_state.player_stats_editable_version += 1
+
 if 'params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
       try:
@@ -458,7 +461,8 @@ with info_tab:
       
       injured_players = st.multiselect('Injured players'
                               , player_stats.index
-                              , default = default_injury_list)
+                              , default = default_injury_list
+                              , on_change = increment_player_stats_version)
 
       player_stats = player_stats.drop(injured_players)
       info = process_player_data(player_stats
@@ -530,7 +534,8 @@ if st.session_state['mode'] == 'Draft Mode':
                                           , hide_index = True)  
       selection_list = listify(selections_editable)
 
-      players_chosen = [x for x in listify(selections_editable) if x ==x]
+      player_assignments = selections_editable.to_dict('list')
+
       my_players = selections_editable[draft_seat].dropna()
 
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
@@ -574,7 +579,7 @@ if st.session_state['mode'] == 'Draft Mode':
 
             n_players = n_drafters * n_picks
         
-            generator = H.get_h_scores(my_players, players_chosen)
+            generator = H.get_h_scores(player_assignments, draft_seat)
       
             placeholder = st.empty()
             all_res = []
@@ -640,8 +645,8 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,n_drafters
                                         ,winner_take_all
                                         ,punting
-                                        ,my_players
-                                        ,players_chosen
+                                        ,player_assignments
+                                        ,draft_seat
                                         ,st.session_state.info_key)
 
           base_h_score = base_h_res['Scores']
@@ -675,8 +680,9 @@ elif st.session_state['mode'] == 'Season Mode':
       st.caption("""Enter which player is on which team below""")
       selections_editable = st.data_editor(selections, hide_index = True)  
       selection_list = listify(selections_editable)
+      player_assignments = selections_editable.to_dict('list')
 
-      players_chosen = [x for x in listify(selections_editable) if x ==x]
+
       inspection_players = selections_editable[roster_inspection_seat].dropna()
 
       z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
@@ -695,8 +701,8 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,n_drafters
                                         ,winner_take_all
                                         ,punting
-                                        ,inspection_players
-                                        ,players_chosen
+                                        ,player_assignments
+                                        ,roster_inspection_seat
                                         ,st.session_state.info_key)
 
           base_h_score = base_h_res['Scores']
@@ -796,8 +802,8 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,n_drafters
                             ,winner_take_all
                             ,punting
-                            ,waiver_players
-                            ,players_chosen
+                            ,player_assignments
+                            ,waiver_inspection_seat
                             ,st.session_state.info_key)
 
             waiver_base_h_score = base_h_res['Scores']
@@ -807,7 +813,8 @@ elif st.session_state['mode'] == 'Season Mode':
                         , player_stats
                         , mod_waiver_players
                         , drop_player
-                        , players_chosen
+                        , player_assignments
+                        , waiver_inspection_seat
                         , waiver_base_h_score
                         , waiver_base_win_rates
                         , st.session_state.info_key)
@@ -901,13 +908,12 @@ elif st.session_state['mode'] == 'Season Mode':
               with h_tab:
                 make_trade_h_tab(H
                                 , player_stats 
-                                , players_chosen 
+                                , player_assignments 
                                 , n_iterations 
+                                , trade_party_seat
                                 , players_sent
-                                , players_received
-                                , trade_party_players
-                                , trade_counterparty_players
                                 , trade_counterparty_seat
+                                , players_received
                                 , scoring_format
                                 , st.session_state.info_key)
 
@@ -916,9 +922,8 @@ elif st.session_state['mode'] == 'Season Mode':
 
           values_to_team = make_trade_destination_display(H
                                 , player_stats
-                                , trade_party_players 
-                                , counterparty_players_dict 
-                                , players_chosen 
+                                , player_assignments 
+                                , trade_party_seat 
                                 , scoring_format
                                 , st.session_state.info_key
                                       )
@@ -927,9 +932,9 @@ elif st.session_state['mode'] == 'Season Mode':
 
           values_to_me = make_trade_target_display(H
                 , player_stats
-                , trade_party_players 
-                , trade_counterparty_players
-                , players_chosen 
+                , trade_party_seat
+                , trade_counterparty_seat
+                , player_assignments
                 , values_to_team[trade_counterparty_seat]
                 , scoring_format
                 , st.session_state.info_key
@@ -966,9 +971,9 @@ elif st.session_state['mode'] == 'Season Mode':
 
             make_trade_suggestion_display(H
                 , player_stats 
-                , players_chosen 
-                , trade_party_players 
-                , trade_counterparty_players
+                , player_assignments
+                , trade_party_seat
+                , trade_counterparty_seat
                 , general_value
                 , replacement_value
                 , values_to_me

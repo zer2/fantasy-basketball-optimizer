@@ -52,32 +52,34 @@ class HAgent():
         self.punting = punting
       
     def get_h_scores(self
-                  , my_players : list[str]
-                  , players_chosen : list[str]
+                  , player_assignments : dict[list[str]]
+                  , drafter
+                  , exclusion_list = []
                   ) -> tuple: 
 
         """Performs the H-score algorithm
 
         Args:
-            my_players : list of players chosen already by this team
-            players_chosen : list of all players chosen, including my_players
+            player_assignments : dictionary of form team -> list of players chosen by that team 
+            player: which drafter to perform H-scoring for
 
         Returns:
             String indicating chosen player
         """
+        my_players = player_assignments[drafter]
         n_players_selected = len(my_players) 
 
-        x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
-
-        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list)]
 
         #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
         #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
 
-        diff_means = self.get_diff_means(players_chosen
+        diff_means = self.get_diff_means(player_assignments
+                                        , drafter
                                         , x_scores_available
-                                        , my_players)
-
+        )
+        
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
         initial_weights = ((diff_means + x_scores_available_array)/((self.v.T * 500)) + self.v.T).mean(axis = 2)
@@ -93,9 +95,9 @@ class HAgent():
                                        , x_scores_available.index)
 
     def get_diff_means(self
-                    , players_chosen : list[str]
-                    , x_scores_available : pd.DataFrame
-                    , my_players : list[str]) -> pd.Series:
+                    , player_assignments : dict[list[str]]
+                    , drafter
+                    , x_scores_available : pd.DataFrame) -> pd.Series:
         """Calculates diff-means based on the dynamic method 
 
         Args:
@@ -106,9 +108,10 @@ class HAgent():
         Returns:
             Series of form {cat : expected value of opposing teams for the cat}
         """
-        
+        my_players = player_assignments[drafter]
         x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
 
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
         sum_so_far = self.x_scores.loc[players_chosen].sum()
 
         #assume that players for the rest of the round will be chosen from the default ordering 
@@ -215,11 +218,7 @@ class HAgent():
             #case where no new players need to be chosen
             elif (n_players_selected == self.n_picks): 
 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means
-                              , scale = np.sqrt(self.diff_var)
-                                                     )
-                              , index = diff_means.index
-                                            ).T
+                cdf_estimates = self.get_cdf(diff_means)
 
                 weights = None
                 expected_future_diff = None
@@ -232,6 +231,8 @@ class HAgent():
                 else:
 
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
+                
+                result_index = ['']
 
             #case where there are too many players and some need to be removed. n > n_picks
             else: 
@@ -239,12 +240,15 @@ class HAgent():
                 extra_players = n_players_selected - self.n_picks 
                 players_to_remove_possibilities = combinations(my_players,extra_players)
 
-                diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
+                drop_potentials = pd.concat(
+                    (self.x_scores.loc[list(players_to_remove)].sum(axis = 0) \
+                    for players_to_remove in players_to_remove_possibilities
+                    )
                                                        ,axis = 1).T
+                drop_potentials_array = np.expand_dims(np.array(drop_potentials), axis = 2)
+                diff_means_mod = diff_means - drop_potentials_array
 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
-                                              , scale = np.sqrt(self.diff_var))
-                                     ,index = diff_means_mod.index)
+                cdf_estimates = self.get_cdf(diff_means_mod)
                                         
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -252,6 +256,8 @@ class HAgent():
                                  ).mean(axis = 1)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1)
+
+                result_index = drop_potentials.index
 
                 weights = None
                 expected_future_diff = None
@@ -424,10 +430,7 @@ class HAgent():
                   , j : int
                   ): 
 
-        my_players = player_assignments[j]
-        players_chosen = [x for v in player_assignments.values() for x in v]
-
-        generator = self.get_h_scores(my_players, players_chosen)
+        generator = self.get_h_scores(player_assignments, j)
         for i in range(30):
             res  = next(generator)
 
@@ -486,13 +489,13 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
     return float(score)
 
 
-def analyze_trade(team_1_other : list[str]
+def analyze_trade(team_1
                   ,team_1_trade : list[str]
-                  ,team_2_other : list[str]
+                  ,team_2
                   ,team_2_trade : list[str]
                   ,H
                   ,player_stats : pd.DataFrame
-                  ,players_chosen : list[str]
+                  ,player_assignments : dict[list[str]]
                   ,n_iterations : int
                   ) -> dict:    
 
@@ -512,26 +515,35 @@ def analyze_trade(team_1_other : list[str]
       Dictionary with results of the trade
     """
 
-    res_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
-    res_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
+
+    post_trade_team_1 = [p for p in player_assignments[team_1] if p not in team_1_trade] + team_2_trade
+    post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
+
+    post_trade_assignments = player_assignments.copy()
+
+    post_trade_assignments[team_1] = post_trade_team_1
+    post_trade_assignments[team_2] = post_trade_team_2
+
+    res_1_1 = next(H.get_h_scores(player_assignments, team_1))
+    res_2_2 = next(H.get_h_scores(player_assignments, team_2))
  
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
-        generator = H.get_h_scores(team_1_other + team_2_trade, players_chosen)
+        generator = H.get_h_scores(post_trade_assignments, team_1)
         for i in range(n_iterations):
             res_1_2  = next(generator)
         
-        res_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
+        res_2_1 = next(H.get_h_scores(post_trade_assignments, team_2))
 
     elif n_player_diff == 0:
-        res_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
-        res_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
+        res_1_2 = next(H.get_h_scores(post_trade_assignments, team_1))
+        res_2_1 = next(H.get_h_scores(post_trade_assignments, team_2))
 
     else:
-        res_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
+        res_1_2 = next(H.get_h_scores(post_trade_assignments, team_1))
 
-        generator = H.get_h_scores(team_2_other + team_1_trade, players_chosen)
+        generator = H.get_h_scores(post_trade_assignments, team_2)
         for i in range(n_iterations):
             res_2_1= next(generator)
     
@@ -556,10 +568,10 @@ def analyze_trade(team_1_other : list[str]
     return results_dict
                 
 def analyze_trade_value(player : str
-                  ,rest_of_team : list[str]
+                  ,team : str
                   ,H
                   ,player_stats : pd.DataFrame
-                  ,players_chosen : list[str]
+                  ,player_assignments : dict[list[str]]
                   ) -> float:    
 
     """Estimate how valuable a player would be to a particular team
@@ -574,8 +586,18 @@ def analyze_trade_value(player : str
     Returns:
       Float, relative H-score value
     """
-    res_without_player= next(H.get_h_scores(rest_of_team, players_chosen))
-    res_with_player = next(H.get_h_scores(rest_of_team + [player], players_chosen))
+
+    without_player = player_assignments.copy()
+    without_player[team] = [p for p in without_player[team] if p != player]
+
+    with_player = player_assignments.copy()
+    if player not in with_player[team]:
+        with_player[team] = with_player[team] + [player]
+
+
+    res_without_player= next(H.get_h_scores(without_player,team, [player]))
+    res_with_player = next(H.get_h_scores(with_player, team))
 
     res = (res_with_player['Scores'].max() - res_without_player['Scores'].max())
+
     return res
