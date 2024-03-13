@@ -5,6 +5,8 @@ import plotly.graph_objs as go
 import itertools
 from pathlib import Path
 import streamlit as st
+import numexpr as ne
+from datetime import datetime
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
@@ -160,43 +162,51 @@ def combinatorial_calculation(c : np.array
     else: #a series where all 9 categories has been processed, and n_false <= the cutoff, can be added to the total %
         return data
 
-def calculate_tipping_points(x : pd.DataFrame) -> pd.DataFrame:
-    """Calculate the probability of each category being a tipping point, assuming independence
-
-    Args:
-        x: DataFrame of shape (n,9,m) representing probabilities of winning each of the 9 categories 
-
-    Returns:
-        DataFrame of shape (n,9,m) representing probabilities of each category being a tipping point
-        m is number of opponents
-    """
-
+@st.cache_data()
+def get_grid():
     #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
+
     which = np.array([list(itertools.combinations(range(9), 5))] )
     grid = np.zeros((126, 9), dtype="bool")     
     grid[np.arange(126)[None].T, which] = True
 
     grid = np.expand_dims(grid, axis = 2)
 
+    return grid
+
+def calculate_tipping_points(x : np.array) -> np.array:
+    """Calculate the probability of each category being a tipping point, assuming independence
+
+    Args:
+        x: Array of shape (n,9,m) representing probabilities of winning each of the 9 categories 
+
+    Returns:
+        DataFrame of shape (n,9,m) representing probabilities of each category being a tipping point
+        m is number of opponents
+    """
+
+    grid = get_grid()
+
     #copy grid for each row in x 
     grid = np.array([grid] * x.shape[0])
 
     x = x.reshape(x.shape[0],1,9, x.shape[2])
 
-    print(x.shape)
-    print(grid.shape)
-
     #get the probabilities of the scenarios and filter them by which categories they apply to
     #the categories that are won all become tipping points
-    positive_case_probabilities = ((grid * x + (1-grid) * (1-x)) \
-                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3]) * grid).sum(axis = 1)
+
+    first_part = ne.evaluate('grid * x + (1-grid) * (1-x)') \
+                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    positive_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
 
     #do the same but for the inverse scenarios, where 5 categories are lost and 4 are won
     #in this case the lost categories become tipping points 
-    negative_case_probabilities = (((1 - grid) * x + grid * (1-x)) \
-                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3]) * grid).sum(axis = 1)
-    final_probabilities = positive_case_probabilities + negative_case_probabilities
-    
+    first_part = ne.evaluate('(1 - grid) * x + grid * (1-x)') \
+                                  .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    negative_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
+
+    final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
+
     return final_probabilities
 
 def make_progress_chart(res : list[pd.DataFrame]):

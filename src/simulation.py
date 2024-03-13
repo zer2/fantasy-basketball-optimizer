@@ -244,8 +244,7 @@ def try_strategy(_primary_agent
     team_dict = {}
     all_times = {}
      
-    #for i in range(n_drafters):
-    for i in range(1):
+    for i in range(n_drafters): 
 
         #we need to deepcopy the agents so that they don't share references with each other
         agents =  [copy.deepcopy(_primary_agent) for x in range(n_primary)] + \
@@ -352,6 +351,15 @@ def validate() -> None:
                 , punting = True
                 )
 
+    res_wta =  try_strategy(primary_agent_wta
+                , default_agent
+                , n_drafters
+                , n_picks
+                , weekly_df
+                , n_seasons
+                , n_primary = 1
+                , winner_take_all = True)
+
     res_ec =  try_strategy(primary_agent_ec
                 , default_agent
                 , n_drafters
@@ -361,14 +369,6 @@ def validate() -> None:
                 , n_primary = 1
                 , winner_take_all = False)
 
-    res_wta =  try_strategy(primary_agent_wta
-                , default_agent
-                , n_drafters
-                , n_picks
-                , weekly_df
-                , n_seasons
-                , n_primary = 1
-                , winner_take_all = True)
 
     with results_tab:
 

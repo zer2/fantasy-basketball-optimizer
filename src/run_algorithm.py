@@ -5,6 +5,7 @@ import os
 from itertools import combinations
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points, get_categories
 import streamlit as st 
+import numexpr as ne
 
 class HAgent():
 
@@ -115,19 +116,21 @@ class HAgent():
 
         #assume that players for the rest of the round will be chosen from the default ordering 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen)
+        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
         mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean()
 
         other_team_sums = np.vstack(
             [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
-                                    in player_assignments.items()]
+                                    in player_assignments.items() if team != drafter]
         ).T
         
-        diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters)
+        diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
 
         return diff_means
 
     def get_opposing_team_stats(self, players, replacement_value, n_players):
+        players = [p for p in players if p == p]
+
         n_extra_players = n_players + 1 - len(players)
 
         opposing_team_stats = np.array(self.x_scores.loc[players].sum(axis =0) + \
