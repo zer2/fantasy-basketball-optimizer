@@ -171,7 +171,7 @@ def process_player_data(_player_stats : pd.DataFrame
   score_table = x_scores.groupby([np.floor(x/n_drafters) for x in range(len(x_scores))]).agg(['mean','var'])
   score_table_smoothed = x_scores.transform(lambda x: savgol_filter(x,10,1))
   weekly_var = 0 if rotisserie else n_picks * 2
-  diff_var =  weekly_var + x_scores[0:n_players].var() * n_picks
+  cross_player_var =  x_scores[0:n_players].var()
                           
   players_and_positions = pd.merge(x_scores
                            , positions
@@ -211,7 +211,7 @@ def process_player_data(_player_stats : pd.DataFrame
           ,'X-scores' : x_scores
           , 'Score-table' : score_table
           , 'Score-table-smoothed' : score_table_smoothed
-          , 'Diff-var' : diff_var
+          , 'Var' : cross_player_var
           , 'Positions' : positions
           , 'v' : v
           , 'L' : L}

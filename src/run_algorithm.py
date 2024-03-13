@@ -47,7 +47,7 @@ class HAgent():
         self.x_scores = info['X-scores']
         self.score_table = info['Score-table']
         self.score_table_smoothed = info['Score-table-smoothed']
-        self.diff_var = info['Diff-var']
+        self.cross_player_var = info['Var']
         self.v = info['v']
         self.L = info['L']
         self.punting = punting
@@ -76,6 +76,10 @@ class HAgent():
         #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
         #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
 
+        total_players = self.n_picks * self.n_drafters
+        diff_var = self.n_picks * \
+                (2 +  self.cross_player_var * (total_players - len(players_chosen))/(total_players))
+
         diff_means = self.get_diff_means(player_assignments
                                         , drafter
                                         , x_scores_available
@@ -94,6 +98,7 @@ class HAgent():
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
+                                       , diff_var
                                        , x_scores_available_array
                                        , x_scores_available.index)
 
@@ -177,6 +182,7 @@ class HAgent():
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
+                           ,diff_var : pd.Series
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
                            ) -> tuple:
@@ -193,6 +199,7 @@ class HAgent():
             n_players_selected: integer, number of players already selected by the current drafter 
                                 This is a param in addition to my_players because n_players_selected is already calculated in the parent function
             diff_means: series, difference in mean between already selected players and expected
+            diff_var: total variance expected in the end result for each category
             x_scores_available: dataframe, X-scores of unselected players
         Yields:
             Ultimate H-scores, weights used to make those H-scores, and approximate win fractions given those weights
@@ -213,9 +220,9 @@ class HAgent():
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
-                pdf_estimates = self.get_pdf(x_diff_array)
+                pdf_estimates = self.get_pdf(x_diff_array, diff_var)
                 
-                cdf_estimates = self.get_cdf(x_diff_array)
+                cdf_estimates = self.get_cdf(x_diff_array, diff_var)
         
                 if self.winner_take_all:
         
@@ -246,7 +253,7 @@ class HAgent():
 
                 x_diff_array = diff_means + x_scores_available_array
 
-                cdf_estimates = self.get_cdf(x_diff_array)
+                cdf_estimates = self.get_cdf(x_diff_array, diff_var)
 
                 weights = None
                 expected_future_diff = None
@@ -261,7 +268,7 @@ class HAgent():
             #case where no new players need to be chosen
             elif (n_players_selected == self.n_picks): 
 
-                cdf_estimates = self.get_cdf(diff_means)
+                cdf_estimates = self.get_cdf(diff_means, diff_var)
 
                 weights = None
                 expected_future_diff = None
@@ -291,7 +298,7 @@ class HAgent():
                 drop_potentials_array = np.expand_dims(np.array(drop_potentials), axis = 2)
                 diff_means_mod = diff_means - drop_potentials_array
 
-                cdf_estimates = self.get_cdf(diff_means_mod)
+                cdf_estimates = self.get_cdf(diff_means_mod, diff_var)
                                         
                 if self.winner_take_all:
                     score = combinatorial_calculation(cdf_estimates
@@ -320,23 +327,23 @@ class HAgent():
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = get_categories())}
 
     ### below are functions used for the optimization procedure 
-    def get_pdf(self, x_diff_array):
+    def get_pdf(self, x_diff_array, diff_var):
 
         #need to resize
         diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]*x_diff_array.shape[2], -1)
 
-        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(self.diff_var))
+        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_var))
 
         pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
 
         return pdf_estimates_reshaped
     
-    def get_cdf(self, x_diff_array):
+    def get_cdf(self, x_diff_array, diff_var):
 
         #need to resize
         diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]*x_diff_array.shape[2], -1)
 
-        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(self.diff_var))
+        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_var))
 
         cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
 
