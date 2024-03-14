@@ -17,7 +17,7 @@ def test_h_score_calculation_and_gradient():
         , beta = at.number_input('beta').value
         , n_picks = at.number_input('n_picks').value
         , n_drafters = at.number_input('n_drafters').value
-        , winner_take_all = True
+        , scoring_format = 'Head to Head: Most Categories'
         , punting = True)
 
     c_list = [np.array([1/8] * 8 + [0]).reshape(1,9)
