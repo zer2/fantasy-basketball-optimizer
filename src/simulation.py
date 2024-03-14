@@ -106,7 +106,7 @@ def run_multiple_seasons(teams : dict[list]
                          , season_df : pd.DataFrame
                          , n_seasons : int = 100 
                          , n_weeks : int = 25
-                         , scoring_format : str = 'Each Category'
+                         , scoring_format : str = 'Head to Head: Each Category'
                          , return_detailed_results : bool = False ):
     """Simulate multiple seasons with the same drafters 
     
@@ -144,7 +144,7 @@ def run_multiple_seasons(teams : dict[list]
     performances.loc[:,'Week'] = performances.groupby('Player').cumcount()
     performances.loc[:,'Season'] = performances['Week'] // n_weeks #integer division seperates weeks in groups 
 
-    if scoring_format in ('Most Categories','Each Category'):
+    if scoring_format in ('Head to Head: Most Categories','Head to Head: Each Category'):
 
         #total team performances are simply the sum of statistics for each player 
         team_performances = performances.groupby(['Season','Team','Week']).sum()
@@ -166,10 +166,10 @@ def run_multiple_seasons(teams : dict[list]
         tot_cat_wins = cat_wins.sum(axis = 1)
         tot_cat_ties = cat_ties.sum(axis = 1)
         
-        if scoring_format == 'Most Categories':
+        if scoring_format == 'Head to Head: Most Categories':
             team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_categories())/2
             team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_categories())/2
-        elif scoring_format == 'Each Category':
+        elif scoring_format == 'Head to Head: Each Category':
             team_performances.loc[:,'Tie'] = tot_cat_ties
             team_performances.loc[:,'Win'] = tot_cat_wins
             
@@ -195,7 +195,6 @@ def run_multiple_seasons(teams : dict[list]
         
     wins_by_teams = winners_after_ties.groupby('Team')['Winner Points Adjusted'].sum()/winners_after_ties['Winner Points Adjusted'].sum()
         
-
     if not return_detailed_results:
         return wins_by_teams
     else:
@@ -340,7 +339,7 @@ def validate() -> None:
                 , beta = beta
                 , n_picks = n_picks
                 , n_drafters = n_drafters
-                , scoring_format = 'Each Category'
+                , scoring_format = 'Head to Head: Each Category'
                 , punting = True
                 )
 
@@ -352,7 +351,7 @@ def validate() -> None:
                 , beta = beta
                 , n_picks = n_picks
                 , n_drafters = n_drafters
-                , scoring_format = 'Most Categories'
+                , scoring_format = 'Head to Head: Most Categories'
                 , punting = True
                 )
 
@@ -363,7 +362,7 @@ def validate() -> None:
                 , weekly_df
                 , n_seasons
                 , n_primary = 1
-                , scoring_format = 'Most Categories')
+                , scoring_format = 'Head to Head: Most Categories')
 
     res_ec =  try_strategy(primary_agent_ec
                 , default_agent
@@ -372,20 +371,24 @@ def validate() -> None:
                 , weekly_df
                 , n_seasons
                 , n_primary = 1
-                , scoring_format = 'Each Category')
+                , scoring_format = 'Head to Head: Each Category')
 
 
     with results_tab:
 
-        t1, t2, t3 = st.tabs(['Overall','Most Categories-Detailed','Each Category-Detailed'])
+        t1, t2, t3 = st.tabs(['Overall'
+                            ,'Head to Head: Most Categories Details'
+                            ,'Head to Head: Each Category Details'])
 
         with t1: 
-            win_rate_df = pd.DataFrame({'Winner take All' : res_wta[0]
-                                        ,'Each Category' : res_ec[0] }
+            win_rate_df = pd.DataFrame({'Head to Head: Winner take All' : res_wta[0]
+                                        ,'Head to Head: Each Category' : res_ec[0] }
                                         , index = ['Seat ' + str(x) for x in range(n_drafters)])
 
-            averages_df = pd.DataFrame({'Winner take All' : [win_rate_df['Winner take All'].mean()]
-                                                ,'Each Category' : [win_rate_df['Each Category'].mean()] }
+            averages_df = pd.DataFrame({'Head to Head: Winner take All' : \
+                                                    [win_rate_df['Head to Head: Winner take All'].mean()]
+                                                ,'Head to Head: Each Category' : \
+                                                    [win_rate_df['Head to Head: Each Category'].mean()] }
                                                         , index = ['Aggregate'])
             win_rate_df = pd.concat([averages_df, win_rate_df])
 
@@ -449,7 +452,7 @@ def validate() -> None:
 
                 detailed_rates_collapsed_ec.index = ['Seat ' + str(x) for x in range(n_drafters)]
 
-                overall_win_rate = win_rate_df[['Each Category']]
+                overall_win_rate = win_rate_df[['Head to Head: Each Category']]
                 overall_win_rate.columns = ['Overall Win %']
 
                 detailed_rates_collapsed_ec = overall_win_rate.merge(detailed_rates_collapsed_ec
@@ -482,7 +485,7 @@ def validate() -> None:
 
     with timing_tab:
         
-        wta_tab, ec_tab = st.tabs(['Winner take All','Each Category']) 
+        wta_tab, ec_tab = st.tabs(['Head to Head: Most Categories','Head to Head: Each Category']) 
 
         with wta_tab:
             time_df = pd.DataFrame(res_wta[3])
