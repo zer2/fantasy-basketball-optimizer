@@ -51,3 +51,40 @@ z-score-player-multiplier : 50
 z-score-team-multiplier : 20
 g-score-player-multiplier : 60
 g-score-team-multiplier : 24
+options : 
+ psi : 
+  default : 0
+  min : 0
+  max: 1
+ nu : 
+  default : 0.77
+  min : 0
+  max : 1
+ n_drafters : 
+  default : 12
+  min : 2
+  max: 
+ n_picks : 
+  default : 13
+  min : 1
+  max : 
+ omega : 
+  default : 1.0
+  min : 0.0
+  max: 2.0
+ gamma :
+  default : 0.1
+  min : 0.0
+  max : 0.5
+ alpha : 
+  default : 0.01
+  min : 0.0001
+  max : 1
+ beta : 
+  default : 0.25
+  min : 0.1
+  max: 1
+ n_iterations : 
+  default : 30
+  min : 0
+  max: 10000

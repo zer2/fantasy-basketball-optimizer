@@ -126,10 +126,10 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
     return players_df
 
 @st.cache_data(ttl=3600, show_spinner = False)
-def get_teams_dict(league_id: str, auth_path: str) -> dict[int, str]:
+def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
-        auth_dir=auth_path,
+        auth_dir=_auth_path,
         league_id=league_id,
         game_code="nba"
     )
@@ -140,12 +140,12 @@ def get_teams_dict(league_id: str, auth_path: str) -> dict[int, str]:
 
 @st.cache_data(ttl=3600
                 , show_spinner = "Fetching rosters from your Yahoo league. This should take about ten seconds")
-def get_rosters_dict(league_id: str, auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
+def get_rosters_dict(league_id: str, _auth_path: str, team_ids: list[int]) -> dict[int, Roster]:    
 
     league_id = league_id
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
-        auth_dir=auth_path,
+        auth_dir=_auth_path,
         league_id=league_id,
         game_code="nba"
     )
@@ -160,9 +160,9 @@ def get_rosters_dict(league_id: str, auth_path: str, team_ids: list[int]) -> dic
     return rosters_dict
 
 @st.cache_data(ttl=3600, show_spinner = False)
-def get_user_leagues(auth_path: str) -> List[League]:
+def get_user_leagues(_auth_path: str) -> List[League]:
     sc = YahooFantasySportsQuery(
-        auth_dir=auth_path,
+        auth_dir=_auth_path,
         league_id="", # Shouldn't actually matter what this is since we are retrieving the user's leagues
         game_code="nba"
     )

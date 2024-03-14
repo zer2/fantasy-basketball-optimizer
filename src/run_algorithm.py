@@ -4,6 +4,8 @@ from scipy.stats import norm
 import os
 from itertools import combinations
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points, get_categories
+import streamlit as st 
+import numexpr as ne
 
 class HAgent():
 
@@ -14,10 +16,11 @@ class HAgent():
                  , alpha : float
                  , beta : float
                  , n_picks : int
-                 , winner_take_all : bool
+                 , n_drafters : int
+                 , scoring_format : str
                  , punting : bool
                     ):
-        """Calculates the rank order based on U-score
+        """Calculates the rank order based on H-score
 
         Args:
             info: dictionary with info related to player statistics etc. 
@@ -26,8 +29,8 @@ class HAgent():
             alpha: float, step size parameter for gradient descent 
             beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
-            winner_take_all: Boolean of whether to optimize for the winner-take-all format
-                             If False, optimizes for total categories
+            n_drafters : int, number of drafters
+            scoring_format
             punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
         Returns:
             None
@@ -38,46 +41,58 @@ class HAgent():
         self.alpha = alpha
         self.beta = beta
         self.n_picks = n_picks 
-        self.winner_take_all = winner_take_all 
-        self.x_scores = info['X-scores']
-        self.score_table = info['Score-table']
-        self.score_table_smoothed = info['Score-table-smoothed']
-        self.diff_var = info['Diff-var']
-        self.v = info['v']
+        self.n_drafters = n_drafters
+
+        mov = info['Mov']
+        vom = info['Vom']
+        x_scores = info['X-scores']
+
+        if scoring_format == 'Rotisserie':
+            self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
+            v = np.sqrt(mov/vom)  
+        else:
+            self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
+            v = np.sqrt(mov/(mov + vom))
+
+        self.v = np.array(v/v.sum()).reshape(9,1)
+
+        self.cross_player_var = info['Var']
         self.L = info['L']
         self.punting = punting
+        self.scoring_format = scoring_format
       
     def get_h_scores(self
-                  , my_players : list[str]
-                  , players_chosen : list[str]
+                  , player_assignments : dict[list[str]]
+                  , drafter
+                  , exclusion_list = []
                   ) -> tuple: 
 
         """Performs the H-score algorithm
 
         Args:
-            my_players : list of players picked by other teams
-            players_chosen : list of all players chosen, including my_players
+            player_assignments : dictionary of form team -> list of players chosen by that team 
+            player: which drafter to perform H-scoring for
 
         Returns:
             String indicating chosen player
         """
+        my_players = [p for p in player_assignments[drafter] if p ==p]
         n_players_selected = len(my_players) 
 
-        x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list)]
+        total_players = self.n_picks * self.n_drafters
 
-        #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
-        #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
-        if n_players_selected < (self.n_picks - 1):
-            previous_rounds_expected = self.score_table.iloc[0:n_players_selected].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
-            this_round_expected = self.score_table_smoothed.iloc[len(players_chosen)].values
-            diff_means = x_self_sum - previous_rounds_expected - this_round_expected
-        else:
-            previous_rounds_expected = self.score_table.iloc[0:self.n_picks].sum().loc[(self.x_scores.columns,'mean')].droplevel(1)
-            diff_means = x_self_sum - previous_rounds_expected 
+        diff_means, diff_vars = self.get_diff_distributions(player_assignments
+                                        , drafter
+                                        , x_scores_available
+        )
+        
+        x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
-        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen)]
-                      
-        initial_weights = np.array((diff_means + x_scores_available)/(self.v.T * 500) + self.v.T)
+        default_weights = self.v.T.reshape(1,9,1)
+        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * 500)) + \
+                            default_weights).mean(axis = 2)
         
         scores = []
         weights = []
@@ -86,14 +101,109 @@ class HAgent():
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
-                                       , x_scores_available)
+                                       , diff_vars
+                                       , x_scores_available_array
+                                       , x_scores_available.index)
+
+    def get_diff_distributions(self
+                    , player_assignments : dict[list[str]]
+                    , drafter
+                    , x_scores_available : pd.DataFrame) -> pd.Series:
+        """Calculates diff-means based on the dynamic method 
+
+        Args:
+            players_chosen : list of all players chosen, including my_players
+            x_scores_available: DataFrame of x-scores, excluding players chosen by any team
+            my_players : list of players chosen already by this team
+
+        Returns:
+            Series of form {cat : expected value of opposing teams for the cat}
+        """
+        my_players = [p for p in player_assignments[drafter] if p ==p]
+
+        x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis = 0))
+
+        #assume that players for the rest of the round will be chosen from the default ordering 
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
+        mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
+
+        other_team_sums = np.vstack(
+            [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
+                                    in player_assignments.items() if team != drafter]
+        ).T
+
+        other_team_vars = np.vstack(
+            [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
+                                    in player_assignments.items() if team != drafter]
+        ).T
+        
+        diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
+
+        diff_vars = other_team_vars.reshape(1,9,self.n_drafters - 1)
+
+        return diff_means, diff_vars
+
+    def get_opposing_team_stats(self, players, replacement_value, n_players):
+        players = [p for p in players if p == p]
+
+        n_extra_players = n_players + 1 - len(players)
+
+        opposing_team_stats = np.array(self.x_scores.loc[players].sum(axis =0) + \
+                                        n_extra_players * replacement_value)
+
+        return opposing_team_stats 
+    
+    def get_diff_var(self, n_their_players):
+        if self.scoring_format == 'Rotisserie':
+            diff_var = self.n_picks * \
+                (2/25 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+        else:
+            diff_var = self.n_picks * \
+                (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+        return diff_var
+
+    def get_diff_means_old(self
+                    , player_assignments : dict[list[str]]
+                    , drafter
+                    , x_scores_available : pd.DataFrame) -> pd.Series:
+        """Calculates diff-means based on the dynamic method 
+
+        Args:
+            players_chosen : list of all players chosen, including my_players
+            x_scores_available: DataFrame of x-scores, excluding players chosen by any team
+            my_players : list of players chosen already by this team
+
+        Returns:
+            Series of form {cat : expected value of opposing teams for the cat}
+        """
+        x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
+
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        sum_so_far = self.x_scores.loc[players_chosen].sum()
+
+        #assume that players for the rest of the round will be chosen from the default ordering 
+        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen)
+        sum_extra_players = x_scores_available.iloc[0:extra_players_needed].sum()
+
+        average_team_so_far = (sum_so_far + sum_extra_players)/self.n_drafters
+
+        diff_means = np.array(x_self_sum - average_team_so_far).reshape(1,9,1)
+
+        #currently diff_means is one-dimensional 
+        #should switch diff_means to be two-dimension, but not aligned with x-candidates
+        #so it should be of size (1,9,n_opponents)
+
+        return diff_means 
 
     def perform_iterations(self
                            ,weights : pd.DataFrame
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
-                           ,x_scores_available : pd.DataFrame
+                           ,diff_vars : pd.Series
+                           ,x_scores_available_array : pd.DataFrame
+                           ,result_index
                            ) -> tuple:
         """Performs one iteration of H-scoring
          
@@ -108,6 +218,7 @@ class HAgent():
             n_players_selected: integer, number of players already selected by the current drafter 
                                 This is a param in addition to my_players because n_players_selected is already calculated in the parent function
             diff_means: series, difference in mean between already selected players and expected
+            diff_var: total variance expected in the end result for each category
             x_scores_available: dataframe, X-scores of unselected players
         Yields:
             Ultimate H-scores, weights used to make those H-scores, and approximate win fractions given those weights
@@ -119,28 +230,27 @@ class HAgent():
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.punting):
+
                 del_full = self.get_del_full(weights)
         
-                expected_future_diff_single = self.get_x_mu(weights)
+                expected_future_diff_single = self.get_x_mu_simplified_form(weights)
 
-                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9)
-        
-                pdf_estimates = norm.pdf(diff_means + x_scores_available + expected_future_diff
-                                          , scale = np.sqrt(self.diff_var))
+                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
+                x_diff_array = diff_means + x_scores_available_array + expected_future_diff
+
+                pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
                 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available + expected_future_diff
-                                          , scale = np.sqrt(self.diff_var))
-                                 ,index = x_scores_available.index)
+                cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
         
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
         
                     tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
         
-                    pdf_weights = (tipping_points*pdf_estimates)
+                    pdf_weights = (tipping_points*pdf_estimates).mean(axis = 2)
                 else:
-                    pdf_weights = pdf_estimates
-        
+                    pdf_weights = pdf_estimates.mean(axis = 2)
+
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
                 step_size = self.alpha * (i + 1)**(-self.beta) 
@@ -150,48 +260,48 @@ class HAgent():
                 weights[weights < 0] = 0
                 weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
                 else:
-                    score = cdf_estimates.mean(axis = 1) 
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
             #case where one more player needs to be chosen
-            elif (n_players_selected == (self.n_picks - 1)) | (self.punting & (n_players_selected < (self.n_picks - 1)) ): 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means + x_scores_available
-                              , scale = np.sqrt(self.diff_var))
-                     ,index = x_scores_available.index)
+            elif (n_players_selected == (self.n_picks - 1)) | ((not self.punting) & (n_players_selected < (self.n_picks)) ): 
+
+                x_diff_array = diff_means + x_scores_available_array
+
+                cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
 
                 weights = None
+                expected_future_diff = None
                 
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
                 else:
-                    score = cdf_estimates.mean(axis = 1) 
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
             #case where no new players need to be chosen
-            elif n_players_selected == self.n_picks: 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means
-                              , scale = np.sqrt(self.diff_var)
-                                                     )
-                              , index = diff_means.index
-                                            ).T
+            elif (n_players_selected == self.n_picks): 
+
+                cdf_estimates = self.get_cdf(diff_means, diff_vars)
 
                 weights = None
+                expected_future_diff = None
                 
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
 
                 else:
-                    score = cdf_estimates.mean(axis = 1) 
+
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
+                
+                result_index = ['']
 
             #case where there are too many players and some need to be removed. n > n_picks
             else: 
@@ -199,35 +309,71 @@ class HAgent():
                 extra_players = n_players_selected - self.n_picks 
                 players_to_remove_possibilities = combinations(my_players,extra_players)
 
-                diff_means_mod = diff_means - pd.concat((self.x_scores.loc[list(players_to_remove)].sum(axis = 0) for players_to_remove in players_to_remove_possibilities)
+                drop_potentials = pd.concat(
+                    (self.x_scores.loc[list(players_to_remove)].sum(axis = 0) \
+                    for players_to_remove in players_to_remove_possibilities
+                    )
                                                        ,axis = 1).T
+                drop_potentials_array = np.expand_dims(np.array(drop_potentials), axis = 2)
+                diff_means_mod = diff_means - drop_potentials_array
 
-                cdf_estimates = pd.DataFrame(norm.cdf(diff_means_mod
-                                              , scale = np.sqrt(self.diff_var))
-                                     ,index = diff_means_mod.index)
+                cdf_estimates = self.get_cdf(diff_means_mod, diff_vars)
                                         
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
-                                                              , categories = cdf_estimates.columns
-                                 )
+                                 ).mean(axis = 1)
                 else:
-                    score = cdf_estimates.mean(axis = 1)
+                    score = cdf_estimates.mean(axis = 2).mean(axis = 1)
+
+                result_index = drop_potentials.index
 
                 weights = None
+                expected_future_diff = None
 
             i = i + 1
 
-            cdf_estimates.columns = get_categories()
-    
-            yield {'Scores' : score
-                    ,'Weights' : weights
-                    ,'Rates' : cdf_estimates}
+            cdf_means = cdf_estimates.mean(axis = 2)
+
+            if expected_future_diff is not None:
+                expected_diff_means = expected_future_diff.mean(axis = 2)
+            else:
+                expected_diff_means = None
+
+            yield {'Scores' : pd.Series(score, index = result_index)
+                    ,'Weights' : pd.DataFrame(weights, index = result_index, columns = get_categories())
+                    ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = get_categories())
+                    ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = get_categories())}
 
     ### below are functions used for the optimization procedure 
+    def get_pdf(self, x_diff_array, diff_vars):
 
-    def get_x_mu(self,c):
-        #uses the pre-simplified formula for x_mu from page 19 of the paper. Using the simplified form would work just as well
+        #need to resize
+        diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]
+                                                    , x_diff_array.shape[1] * x_diff_array.shape[2])
+        diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
+
+        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
+
+        pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
+
+        return pdf_estimates_reshaped
+    
+    def get_cdf(self, x_diff_array, diff_vars):
+
+        #need to resize
+        diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]
+                                                    , x_diff_array.shape[1] * x_diff_array.shape[2])
+        diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
+
+        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
+
+        cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
+
+        return cdf_estimates_reshaped
+
+    def get_x_mu_long_form(self,c):
+        #uses the pre-simplified formula for x_mu from page 19 of the paper
 
         factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
 
@@ -245,9 +391,15 @@ class HAgent():
 
         x = np.einsum('aij, ajk -> aik', r, inverse_part)
 
-        X_mu = np.einsum('aij, ajk -> aik', x, b)
+        x_mu = np.einsum('aij, ajk -> aik', x, b)
 
-        return X_mu
+        return x_mu
+
+    def get_x_mu_simplified_form(self,c):
+        last_four_terms = self.get_last_four_terms(c)
+        x_mu = np.einsum('ij, ajk -> aik',self.L, last_four_terms)
+        return x_mu
+
 
     #below functions use the simplified form of X_mu 
     #term 1: L (covariance)
@@ -332,7 +484,9 @@ class HAgent():
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_terms_four_five(c))
 
     def get_last_four_terms(self,c):
-        return np.einsum('ij, ajk -> aik', self.get_term_two(c), self.get_last_three_terms(c))
+        term_two = self.get_term_two(c)
+        last_three = self.get_last_three_terms(c)
+        return np.einsum('aij, ajk -> aik', term_two, last_three)
 
     def get_del_last_four_terms(self,c):
         comp_i = self.get_del_term_two(c)
@@ -343,6 +497,37 @@ class HAgent():
 
     def get_del_full(self,c):
         return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
+
+    def make_pick(self
+                  , player_assignments : dict[list]
+                  , j : int
+                  ): 
+
+        generator = self.get_h_scores(player_assignments, j)
+        for i in range(30):
+            res  = next(generator)
+
+        scores = res['Scores']
+
+        best_player = scores.idxmax()
+
+        return best_player
+
+class SimpleAgent():
+    #Comment
+
+    def __init__(self, order):
+        self.order = order
+
+    def make_pick(self, player_assignments : dict[list], j : int) -> str:
+
+        players_chosen = [x for v in player_assignments.values() for x in v]
+
+        #ZR: Can this be done more efficiently?
+        available_players = [p for p in self.order if not p in players_chosen]
+        player = available_players[0]
+
+        return player
 
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
@@ -365,25 +550,26 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
                                         )
                             ).T
 
+    cdf_array = np.expand_dims(np.array(cdf_estimates),2)
+
     if scoring_format == 'Head to Head: Most Categories':
-        score = combinatorial_calculation(cdf_estimates
-                                                    , 1 - cdf_estimates
-                                                    , categories = cdf_estimates.columns
+        score = combinatorial_calculation(cdf_array
+                                                    , 1 - cdf_array
                         )
 
     else:
-        score = cdf_estimates.mean(axis = 1) 
+        score = cdf_array.mean() 
 
     return float(score)
 
 
-def analyze_trade(team_1_other : list[str]
+def analyze_trade(team_1
                   ,team_1_trade : list[str]
-                  ,team_2_other : list[str]
+                  ,team_2
                   ,team_2_trade : list[str]
                   ,H
                   ,player_stats : pd.DataFrame
-                  ,players_chosen : list[str]
+                  ,player_assignments : dict[list[str]]
                   ,n_iterations : int
                   ) -> dict:    
 
@@ -403,26 +589,35 @@ def analyze_trade(team_1_other : list[str]
       Dictionary with results of the trade
     """
 
-    res_1_1 = next(H.get_h_scores(team_1_other + team_1_trade, players_chosen))
-    res_2_2 = next(H.get_h_scores(team_2_other + team_2_trade, players_chosen))
+
+    post_trade_team_1 = [p for p in player_assignments[team_1] if p not in team_1_trade] + team_2_trade
+    post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
+
+    post_trade_assignments = player_assignments.copy()
+
+    post_trade_assignments[team_1] = post_trade_team_1
+    post_trade_assignments[team_2] = post_trade_team_2
+
+    res_1_1 = next(H.get_h_scores(player_assignments, team_1))
+    res_2_2 = next(H.get_h_scores(player_assignments, team_2))
  
     n_player_diff = len(team_1_trade) - len(team_2_trade)
 
     if n_player_diff > 0:
-        generator = H.get_h_scores(team_1_other + team_2_trade, players_chosen)
+        generator = H.get_h_scores(post_trade_assignments, team_1)
         for i in range(n_iterations):
             res_1_2  = next(generator)
         
-        res_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
+        res_2_1 = next(H.get_h_scores(post_trade_assignments, team_2))
 
     elif n_player_diff == 0:
-        res_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
-        res_2_1 = next(H.get_h_scores(team_2_other + team_1_trade, players_chosen))
+        res_1_2 = next(H.get_h_scores(post_trade_assignments, team_1))
+        res_2_1 = next(H.get_h_scores(post_trade_assignments, team_2))
 
     else:
-        res_1_2 = next(H.get_h_scores(team_1_other + team_2_trade, players_chosen))
+        res_1_2 = next(H.get_h_scores(post_trade_assignments, team_1))
 
-        generator = H.get_h_scores(team_2_other + team_1_trade, players_chosen)
+        generator = H.get_h_scores(post_trade_assignments, team_2)
         for i in range(n_iterations):
             res_2_1= next(generator)
     
@@ -447,10 +642,10 @@ def analyze_trade(team_1_other : list[str]
     return results_dict
                 
 def analyze_trade_value(player : str
-                  ,rest_of_team : list[str]
+                  ,team : str
                   ,H
                   ,player_stats : pd.DataFrame
-                  ,players_chosen : list[str]
+                  ,player_assignments : dict[list[str]]
                   ) -> float:    
 
     """Estimate how valuable a player would be to a particular team
@@ -465,8 +660,18 @@ def analyze_trade_value(player : str
     Returns:
       Float, relative H-score value
     """
-    res_without_player= next(H.get_h_scores(rest_of_team, players_chosen))
-    res_with_player = next(H.get_h_scores(rest_of_team + [player], players_chosen))
+
+    without_player = player_assignments.copy()
+    without_player[team] = [p for p in without_player[team] if p != player]
+
+    with_player = player_assignments.copy()
+    if player not in with_player[team]:
+        with_player[team] = with_player[team] + [player]
+
+
+    res_without_player= next(H.get_h_scores(without_player,team, [player]))
+    res_with_player = next(H.get_h_scores(with_player, team))
 
     res = (res_with_player['Scores'].max() - res_without_player['Scores'].max())
+
     return res

@@ -125,7 +125,31 @@ As expected, turnovers decline in importance at a similar rate as the other coun
 
 It is interesting to note that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. With the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
-## 3. One other argument: turnovers are volatile
+## 3. Punting
+
+One may note that the analysis of the previous section assumed that when a drafter had a counting statistic advantage, that advantage was uniform across the counting statistics. But what if a drafter was particularly bad at turnovers- in other words, if they had already punted the category? It stands to reason that in that case, turnovers would be less important on the margins than other categories. 
+
+Of course, this argument applies equally well to all categories. Once you have decided to punt a category, that category becomes less important to invest in. And punting a specific category cannot be a universally good idea, because that would defeat the idea of punting in the first place. But perhaps there is an argument that against a field of opponents who are not punting anything, punting turnovers is a uniquely good strategy. 
+
+There is one potential mechanism for this- punting turnovers improving your performance in the other eight categories more than punting other categories would improve their respective other eights. 
+
+H-scoring handles this implicitly, and it does often recommend punting turnovers. E.g. as of this writing, the algorithm likes the idea of punting turnovers when drafting Luka Doncic. However, this recommendation is far from universal, even for high-usage players. For example, while Nikola Jokic has an above average turnover rate, the algorithm does not recommend punting turnovers when drafting him. 
+
+For a heuristic way of seeing this, we can look at some real data and approximate how much benefit we get from punting each category. One procedure is as follows: 
+1. Remove the top N players by total score (they have already been chosen)
+2. Find the remaining player with the highest total score. Find their score with the punted category ignored 
+3. Find the remaining player with the highest score, ignoring the punted category
+4. Determine how much more value the player from step 3 has (with the punted category ignored) than the player from step 2 
+5. Repeat the above process from players 1 to K, to get the average extra value of punting up to that point in the draft
+
+One must note that this is a very heuristic approach, because it does not account for position. Still, one would expect that the most profitable categories to punt would show the most benefit from this procedure on average. 
+
+
+<iframe width = "1344" height = "550" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab7df34f-8a36-4f06-811e-3376be8f8370"> </iframe>
+
+Turnovers are high, but not the highest. Punting free throws and threes both appear to be more valuable, at least in isolation.
+
+## 4. One other argument: turnovers are volatile
 
 One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in for head-to-head formats.
 
@@ -133,7 +157,7 @@ It is true that turnovers are relatively volatile from week to week. However, th
 
 G-scores deal with this by incorporating week-to-week variance. They do downweight turnovers relative Z-scores, but not in an extreme way
 
-## 4. Testing 
+## 5. Testing 
 
 To some degree, the hypothesis that down-weighting turnovers is uniquely beneficial can be tested. I ran a test with the following setup
 - For each category
@@ -176,7 +200,7 @@ Punting or soft-punting turnovers is about as beneficial as punting other catego
 
 It should be noted that this test does not cover argument the circumstance under which one drafter has an overall advantage, because all player statistics are known beforehand, making it imposssible for any drafter to have a surprisingly good team. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section 2B is wrong or misleading, perhaps turnovers become significantly less important in that case
 
-## 5. Conclusion
+## 6. Conclusion
 
 I have not seen a convincing argument that turnovers should be down-weighted to an extreme degree. That's why I've set the default to treating turnovers like every other category. 
 

@@ -9,11 +9,12 @@ import itertools
 ### Team tabs 
 
 @st.cache_data(show_spinner = False)
-def make_team_tab(scores : pd.DataFrame
+def make_team_tab(_scores : pd.DataFrame
               , my_players : list[str]
               , n_drafters : int
               , player_multiplier : float
               , team_multiplier : float
+              , info_key : int
               ) -> pd.DataFrame:
   """Make a tab summarizing your team as it currently stands
 
@@ -23,12 +24,13 @@ def make_team_tab(scores : pd.DataFrame
       n_drafters: number of drafters in the relevant league
       player_multiplier: scaling factor to use for color-coded display of player stats
       team_multiplier: scaling factor to use for color-coded display of team stats
+      info_key: to detect changes
 
   Returns:
       DataFrame of team stats, to use in other tabs
   """
 
-  team_stats = scores[scores.index.isin(my_players)]
+  team_stats = _scores[_scores.index.isin(my_players)]
 
   team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
@@ -84,6 +86,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
                   ,n_picks : int
                   ,base_h_score : float
                   ,base_win_rates : float
+                  ,info_key : int
                   ):
   """Make a tab summarizing your team as it currently stands
 
@@ -95,6 +98,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
       n_picks: number of picks per drafter
       base_h_score: The H-score of your full team
       base_win_rates: expected win rates for each category
+      info_key : used to detect changes
 
   Returns:
       None
@@ -107,7 +111,8 @@ def make_full_team_tab(z_scores : pd.DataFrame
                               , my_players
                               , n_drafters
                               , st.session_state.params['z-score-player-multiplier']
-                              , st.session_state.params['z-score-team-multiplier'])
+                              , st.session_state.params['z-score-team-multiplier']
+                              , info_key)
 
   with g_tab:
 
@@ -115,7 +120,8 @@ def make_full_team_tab(z_scores : pd.DataFrame
                               , my_players
                               , n_drafters
                               , st.session_state.params['g-score-player-multiplier']
-                              , st.session_state.params['g-score-team-multiplier'])    
+                              , st.session_state.params['g-score-team-multiplier']
+                              , info_key)    
   with h_tab:
     if len(my_players) == n_picks:
 
@@ -128,13 +134,17 @@ def make_full_team_tab(z_scores : pd.DataFrame
 ### Candidate tabs 
 
 @st.cache_data(show_spinner = False)
-def make_cand_tab(scores_unselected : pd.DataFrame
-              , player_multiplier : float):
+def make_cand_tab(_scores : pd.DataFrame
+              , selection_list : list[str]
+              , player_multiplier : float
+              , info_key : None):
   """Make a tab showing stats for players that have not yet been drafted
 
   Args:
       scores: Dataframe of floats, rows by player and columns by category
+      selection_list: list of players that have already been selected
       player_multiplier: scaling factor to use for color-coded display of player stats
+      info_key: for detecting changes
 
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
@@ -143,36 +153,39 @@ def make_cand_tab(scores_unselected : pd.DataFrame
   counting_statistics = st.session_state.params['counting-statistics'] 
   percentage_statistics = st.session_state.params['percentage-statistics'] 
 
+  scores_unselected = _scores[~_scores.index.isin(selection_list)]
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
-
-  return scores_unselected
 
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False)
-def make_waiver_tab(scores : pd.DataFrame
-                , scores_unselected : pd.DataFrame
+def make_waiver_tab(_scores : pd.DataFrame
+                , selection_list : list
                 , team_stats : pd.Series
                 , drop_player : str
-                , team_multiplier : float):
+                , team_multiplier : float
+                , info_key : int):
   """Display how your team will change based on a waiver wire move 
 
   Args:
       scores: Dataframe of floats, rows by player and columns by category
-      scores_unselected: scores, but filtered for only available players 
+      selection_list: list of unavailable players
       team_stats: Your team's stats as they stand currently
       drop_player: Candidate player to replace on the waiver wire
       team_multiplier: scaling factor to use for color-coded display of team stats
+      info_key: for detecting changes
 
   Returns:
       None
   """
 
+  scores_unselected = _scores[~_scores.index.isin(selection_list)]
+
   no_drop = team_stats.loc[['Total'],:]
   no_drop.index = [drop_player]
   
-  drop_player_stats = scores.loc[drop_player]
+  drop_player_stats = _scores.loc[drop_player]
   new =  team_stats.loc['Total',:] + scores_unselected - drop_player_stats
 
   new = pd.concat([no_drop,new])
@@ -189,15 +202,17 @@ def make_waiver_tab(scores : pd.DataFrame
   st.dataframe(new_styled, use_container_width = True, hide_index = True) 
 
 @st.cache_data(show_spinner = False)
-def make_matchup_tab(x_scores : pd.DataFrame
+def make_matchup_tab(_x_scores : pd.DataFrame
                   , selections : pd.DataFrame
-                  , scoring_format : str):
+                  , scoring_format : str
+                  , info_key : int):
     """Make a tab for a matchup matrix, showing how likely you are to win against any particular opponent
 
     Args:
         x_scores: Dataframe of floats, rows by player and columns by category
         selections: Dataframe of which teams have which players
         scoring_format: format to use for analysis 
+        info_key: key for the info dict, used to detect changes
 
     Returns:
         None
@@ -209,7 +224,7 @@ def make_matchup_tab(x_scores : pd.DataFrame
 
       n_picks = selections_full.shape[0]
 
-      team_stats = {team : x_scores.loc[players].sum(axis = 0) for team,players in selections_full.items()}
+      team_stats = {team : _x_scores.loc[players].sum(axis = 0) for team,players in selections_full.items()}
 
       selections_combos = itertools.combinations(list(selections_full.columns), 2)
 
@@ -235,8 +250,6 @@ def make_matchup_tab(x_scores : pd.DataFrame
       #A hack to make all of the columns similar width
       max_len_team_name = max([len(x) for x in matchup_df.columns])
       new_team_names = [x + (max_len_team_name - len(x)) * ' ' for x in matchup_df.columns]
-
-      print(new_team_names)
 
       matchup_df.columns = new_team_names
       matchup_df.index = new_team_names
@@ -271,17 +284,18 @@ def make_matchup_tab(x_scores : pd.DataFrame
 
 
 @st.cache_data(show_spinner = False)
-def get_base_h_score(info : dict
+def get_base_h_score(_info : dict
                 , omega : float
                 , gamma : float
                 , alpha : float
                 , beta : float
                 , n_picks : int
-                , winner_take_all : bool
+                , n_drafters : int
+                , scoring_format : str
                 , punting : bool
-                , player_stats : pd.DataFrame
-                , my_players : list[str]
-                , players_chosen : list[str]):
+                , player_assignments : dict[list[str]]
+                , team : str
+                , info_key : int):
   """Calculate your team's H-score
 
   Args:
@@ -291,35 +305,38 @@ def get_base_h_score(info : dict
     alpha: float, step size parameter for gradient descent 
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
-    winner_take_all: Boolean of whether to optimize for the winner-take-all format
-                      If False, optimizes for total categories
+    n_drafters: int, number of drafters
+    scoring_format: 
     punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
-    player_stats: DataFrame of player statistics 
-    my_players: list of the players you have chosen
-    players_chosen: list of all chosen players
+    player_assignments : player assignment dictionary
+    team: name of team to evaluate
 
   Returns:
       None
   """
-  H = HAgent(info = info
+
+  H = HAgent(info = _info
     , omega = omega
     , gamma = gamma
     , alpha = alpha
     , beta = beta
     , n_picks = n_picks
-    , winner_take_all = winner_take_all
+    , n_drafters = n_drafters
+    , scoring_format = scoring_format
     , punting = punting)
 
-  return next(H.get_h_scores(my_players, players_chosen))   
+  return next(H.get_h_scores(player_assignments, team))   
 
 @st.cache_data(show_spinner = False)
 def make_h_waiver_df(_H
-                  , player_stats : pd.DataFrame
+                  , _player_stats : pd.DataFrame
                   , mod_my_players : list[str]
                   , drop_player : str
-                  , players_chosen : list[str]
+                  , player_assignments : dict[list[str]]
+                  , team : str
                   , base_h_score : float
-                  , base_win_rates : pd.Series):
+                  , base_win_rates : pd.Series
+                  , info_key : int):
 
   """Show how your H-score would change based on waiver wire moves 
 
@@ -327,17 +344,21 @@ def make_h_waiver_df(_H
     _H: H-scoring agent, which can be used to calculate H-score 
     mod_my_players: list of your players, excluding the player who is a candidate to be dropped
     drop_player: Candidate to be dropped
-    players_chosen: list of all chosen players
+    player_assignments:
     base_h_score: H-score of your team before modification
     base_win_rates: expected win rates before modifications 
 
   Returns:
       None
   """
-  h_score_results = next(_H.get_h_scores(mod_my_players, players_chosen))
+  player_assignments_post_drop = player_assignments.copy()
+  player_assignments_post_drop[team] = mod_my_players
+  h_score_results = next(_H.get_h_scores(player_assignments_post_drop, team))
 
   res = h_score_results['Scores']
-  win_rates = h_score_results['Rates']
+  res = res.drop(index = [drop_player])
+  win_rates = h_score_results['Rates'] 
+  win_rates = win_rates.drop(index = [drop_player]) #we can think about other ways to do this
 
   res = res.sort_values(ascending = False)
   win_rates = win_rates.loc[res.index]
@@ -374,29 +395,31 @@ def make_h_waiver_df(_H
 ### Trade tabs
 
 @st.cache_data(show_spinner = False)
-def make_trade_score_tab(scores : pd.DataFrame
+def make_trade_score_tab(_scores : pd.DataFrame
               , players_sent : list[str]
               , players_received : list[str]
               , player_multiplier : float
               , team_multiplier : float
+              , info_key : int
               ) -> None:
-  """Make a tab summarizing your team as it currently stands
+  """Make a tab summarizing a trade by total scores
 
   Args:
-      scores: Dataframe of floats, rows by player and columns by category\
+      scores: Dataframe of floats, rows by player and columns by category
       players_sent: Players you are sending in the trade
       players_received: Players you are receiving in the trade
       player_multiplier: scaling factor to use for color-coded display of player stats
       team_multiplier: scaling factor to use for color-coded display of team stats
+      info_key: for keeping track of changes
 
   Returns:
       None
   """
 
-  sent_stats = scores[scores.index.isin(players_sent)]
+  sent_stats = _scores[_scores.index.isin(players_sent)]
   sent_stats.loc['Total Sent', :] = sent_stats.sum(axis = 0)
 
-  received_stats = scores[scores.index.isin(players_received)]
+  received_stats = _scores[_scores.index.isin(players_received)]
   received_stats.loc['Total Received', :] = received_stats.sum(axis = 0)
 
   full_frame = pd.concat([sent_stats,received_stats])
@@ -419,45 +442,56 @@ def make_trade_score_tab(scores : pd.DataFrame
                       , height = len(full_frame) * 35 + 38
                                                 )     
 
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def make_trade_destination_display(_H
-                  , player_stats : pd.DataFrame
-                  , my_players : list[str]
-                  , their_players_dict : dict[list[str]]
-                  , players_chosen : list[str]
+                  , _player_stats : pd.DataFrame
+                  , player_assignments : dict[list[str]]
+                  , my_team : list[str]
                   , scoring_format : str
+                  , info_key : int
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
     player_stats: DataFrame of player statistics 
-    my_players: list of players on your team
-    their_players_dict: dict relating other team names to their players 
-    players_chosen: list of all chosen players
+    player_assignments:
+    my_team:
+    their_team:
     scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
+    info_key: for detecting changes
 )
   Returns:
       None
   """
+  my_players = player_assignments[my_team]
+
+  their_players_dict = player_assignments.copy()
+  their_players_dict.pop(my_team)
+
+  teams = list(their_players_dict.keys())
+  for team in teams:
+    if any([p != p for p in their_players_dict[team]]):
+      their_players_dict.pop(team)
+
   values_to_me = pd.Series([analyze_trade_value(player
-                                      , [other_player for other_player in my_players if other_player != player]
+                                      , my_team
                                       , _H
-                                      , player_stats
-                                      , players_chosen) for player in my_players
+                                      , _player_stats
+                                      , player_assignments) for player in my_players
                     ]
                     , index = my_players)
   values_to_me = np.clip(values_to_me, 0, 1)
 
   values_to_team = pd.DataFrame(
-                              {team : [analyze_trade_value(player
-                                                    , list(their_players)
+                              {their_team : [analyze_trade_value(player
+                                                    , their_team
                                                     , _H
-                                                    , player_stats
-                                                    , players_chosen) 
+                                                    , _player_stats
+                                                    , player_assignments) 
                                         for player in my_players]
-                                for team, their_players in their_players_dict.items()
+                                for their_team, their_players in their_players_dict.items()
                                 }
                                 , index = my_players
                                 )
@@ -479,43 +513,47 @@ def make_trade_destination_display(_H
 
 @st.cache_data(show_spinner = False)
 def make_trade_target_display(_H
-                  , player_stats : pd.DataFrame
-                  , my_players : list[str]
-                  , their_players : list[str]
-                  , players_chosen : list[str]
+                  , _player_stats : pd.DataFrame
+                  , my_team : str
+                  , their_team : str
+                  , player_assignments : dict[list[str]]
                   , values_to_team : pd.Series
                   , scoring_format : str
+                  , info_key : int
                         ):
   """Make a dataframe showing which of your players would be good candidates to send to which other teams
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
     player_stats: DataFrame of player statistics 
-    my_players: list of players on your team
-    their_players_dict: list of players on the other team
-    players_chosen: list of all chosen players
+    my_team: 
+    their_team: 
+    player_assignments:
     values_to_team: value of your own players to the selected team
     scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
+    info_key : for detecting changes
 )
   Returns:
       None
   """
+  their_players = player_assignments[their_team]
+
   values_to_me = pd.Series([analyze_trade_value(player
-                                      , list(my_players)
+                                      , my_team
                                       , _H
-                                      , player_stats
-                                      , players_chosen) for player in their_players
+                                      , _player_stats
+                                      , player_assignments) for player in their_players
                     ]
                     , index = their_players)
   values_to_me = np.clip(values_to_me,0, 1)
 
   #make this into a team-wise dict
   value_to_them = pd.Series([analyze_trade_value(player
-                                      , [other_player for other_player in their_players if other_player != player]
+                                      , their_team
                                       , _H
-                                      , player_stats
-                                      , players_chosen) for player in their_players
+                                      , _player_stats
+                                      , player_assignments) for player in their_players
                     ]
                     , index = their_players)
 
@@ -624,10 +662,10 @@ def get_combos(players_with_weight : list[tuple]
 @st.cache_data()
 def make_combo_df(all_combos : list
                   , player_stats : pd.DataFrame
-                  , my_players : list[str]
-                  , their_players : list[str]
+                  , my_team : str
+                  , their_team : str
                   , _H
-                  , players_chosen : list[str]
+                  , player_assignments : dict[list[str]]
                   , scoring_format : str) -> pd.DataFrame:
   """Makes a dataframe of all trade possibilities according to specifications
 
@@ -637,7 +675,7 @@ def make_combo_df(all_combos : list
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     _H: H-scoring agent, which can be used to calculate H-score 
-    players_chosen: list of all chosen players
+    player_assignments: 
     scoring_format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
@@ -655,16 +693,13 @@ def make_combo_df(all_combos : list
       their_general_value = row['Their Value']
       #check if the general value disparity is extreme. If it is, pass 
 
-      my_others = [x for x in my_players if x not in my_trade]
-      their_others = [x for x in their_players if x not in their_trade]
-
-      trade_results = analyze_trade(my_others
+      trade_results = analyze_trade(my_team
                                 , my_trade
-                                , their_others
+                                , their_team
                                 , their_trade
                                 , _H
                                 , player_stats
-                                , players_chosen
+                                , player_assignments
                                 , 1)
       your_score_pre_trade = trade_results[1]['pre']['H-score']
       your_score_post_trade = trade_results[1]['post']['H-score']
@@ -688,10 +723,10 @@ def make_combo_df(all_combos : list
 @st.cache_data(show_spinner = """Finding suggested trades. How long this will take depends on 
                                   the trade parameters""")
 def make_trade_suggestion_display(_H
-                  , player_stats : pd.DataFrame
-                  , players_chosen : list[str]
-                  , my_players : list[str]
-                  , their_players : list[str]
+                  , _player_stats : pd.DataFrame
+                  , player_assignments : dict[list[str]]
+                  , my_team : str
+                  , their_team : str
                   , general_values : pd.Series
                   , replacement_value : float
                   , values_to_me : pd.Series
@@ -700,13 +735,14 @@ def make_trade_suggestion_display(_H
                   , their_differential_threshold : float
                   , combo_params : list[tuple]
                   , trade_filter : list[tuple[int]]
-                  , scoring_format : str):
+                  , scoring_format : str
+                  , info_key : int):
   """Shows automatic trade suggestions 
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
     player_stats: DataFrame of player statistics 
-    players_chosen: list of all chosen players
+    player_assignments: 
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     general_values : series representing general values, for filtering purposes
@@ -719,9 +755,13 @@ def make_trade_suggestion_display(_H
     trade_filter : show only trades with this number of players involved
     scoring_format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
+    info_key : for detecting changes
   Returns:
       None
   """
+
+  my_players = player_assignments[my_team]
+  their_players = player_assignments[their_team]
 
   all_combos = pd.concat([get_cross_combos(n
                                 , m
@@ -735,11 +775,11 @@ def make_trade_suggestion_display(_H
                                 , vt) for n,m,hdt,vt in combo_params])
 
   full_dataframe = make_combo_df(all_combos
-                  , player_stats 
-                  , my_players 
-                  , their_players
+                  , _player_stats 
+                  , my_team
+                  , their_team
                   , _H
-                  , players_chosen 
+                  , player_assignments 
                   , scoring_format) 
 
   my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
@@ -777,21 +817,21 @@ def make_trade_suggestion_display(_H
 
 @st.cache_data()
 def make_trade_h_tab(_H
-                  , player_stats : pd.DataFrame
-                  , players_chosen : list[str]
+                  , _player_stats : pd.DataFrame
+                  , player_assignments : dict[list[str]]
                   , n_iterations : int
+                  , my_team : str
                   , my_trade : list[str]
+                  , their_team : str
                   , their_trade : list[str]
-                  , my_players : list[str]
-                  , their_players : list[str]
-                  , their_team_name : str
-                  , scoring_format : str):
+                  , scoring_format : str
+                  , info_key : int):
   """show the results of a potential trade
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
     player_stats: DataFrame of player statistics 
-    players_chosen: list of all chosen players
+    player_assignments: 
     n_iterations: int, number of gradient descent steps
     my_trade: player(s) to be traded from your team
     their_trade: player(s) to be traded for
@@ -800,6 +840,7 @@ def make_trade_h_tab(_H
     their_team_name: name of counterparty team
     scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
+    info_key: for detecting changes
 )
   Returns:
       None
@@ -812,16 +853,14 @@ def make_trade_h_tab(_H
   elif abs(my_trade_len - their_trade_len) > 6:
       st.markdown("Too lopsided of a trade! The computer can't handle it :frowning:")
   else:
-      my_others = [x for x in my_players if x not in my_trade]
-      their_others = [x for x in their_players if x not in their_trade]
 
-      trade_results = analyze_trade(my_others
+      trade_results = analyze_trade(my_team
                                 , my_trade
-                                , their_others
+                                , their_team
                                 , their_trade
                                 , _H
-                                , player_stats
-                                , players_chosen
+                                , _player_stats
+                                , player_assignments
                                 ,n_iterations)
       your_team_pre_trade = trade_results[1]['pre']
       your_team_post_trade = trade_results[1]['post']
@@ -841,7 +880,7 @@ def make_trade_h_tab(_H
       if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
           st.markdown('This trade benefits their team :slightly_smiling_face:')
       else:
-          st.markdown('This trade does not benefit ' + their_team_name + ' :slightly_frowning_face:')
+          st.markdown('This trade does not benefit ' + their_team + ' :slightly_frowning_face:')
                   
       pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
       pre_to_post.index = ['Pre-trade','Post-trade']
@@ -851,17 +890,20 @@ def make_trade_h_tab(_H
 ### Rank tabs 
 
 @st.cache_data()
-def make_rank_tab(scores : pd.DataFrame, player_multiplier : float):
+def make_rank_tab(_scores : pd.DataFrame
+                      , player_multiplier : float
+                      , info_key : int):
   """Show rankings my general value
 
   Args:
       scores: Dataframe of floats, rows by player and columns by category
       player_multipliers: scaling factor to use for color-coded display of player stats
+      info_key: for detecting changes
   
   Returns:
       None
   """
-  scores_copy = scores.copy()
+  scores_copy = _scores.copy()
 
   scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
   scores_copy.loc[:,'Player'] = scores_copy.index
@@ -871,45 +913,47 @@ def make_rank_tab(scores : pd.DataFrame, player_multiplier : float):
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data()
-def make_h_rank_tab( info : dict
+#@st.cache_data()
+def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float
                   , alpha : float
                   , beta : float
                   , n_picks : int
+                  , n_drafters : int
                   , n_iterations : int
-                  , winner_take_all : bool
+                  , scoring_format : str
                   , punting : bool
-                  , player_stats : pd.DataFrame):
+                  , info_key : int):
   """Make ranks by H-score
 
   Args:
-    info: dictionary with info related to player statistics etc. 
+    _info: dictionary with info related to player statistics etc. 
     omega: float, parameter as described in the paper
     gamma: float, parameter as described in the paper
     alpha: float, step size parameter for gradient descent 
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
+    n_drafters: int, number of drafters
     n_iterations: int, number of gradient descent steps
-    winner_take_all: Boolean of whether to optimize for the winner-take-all format
-                      If False, optimizes for total categories
+    scoring_format: 
     punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
-    player_stats: DataFrame of player statistics 
+    info_key: key to info data, used to detect changes
 
   Returns:
       None
   """
-  H = HAgent(info = info
+  H = HAgent(info = _info
     , omega = omega
     , gamma = gamma
     , alpha = alpha
     , beta = beta
     , n_picks = n_picks
-    , winner_take_all = winner_take_all
+    , n_drafters = n_drafters
+    , scoring_format = scoring_format
     , punting = punting)
 
-  generator = H.get_h_scores([], [])
+  generator = H.get_h_scores({n : [] for n in range(n_drafters)}, 0)
   for i in range(max(1,n_iterations)):
     res = next(generator)
 

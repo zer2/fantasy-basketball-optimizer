@@ -102,17 +102,17 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     
     res = pd.concat([fgp_score, ftp_score, main_scores],axis = 1)  
     res.columns = get_categories()
-    return res
+    return res.fillna(0)
 
 @st.cache_data
-def process_player_data(player_stats : pd.DataFrame
+def process_player_data(_player_stats : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series
                         , psi : float
                         , nu : float
                         , n_drafters : int
                         , n_picks : int
-                        , rotisserie : bool
+                        , player_stats_key
                         ) -> dict:
   """Based on player stats and parameters, do all calculations to set up for running algorithms
 
@@ -124,7 +124,7 @@ def process_player_data(player_stats : pd.DataFrame
       nu: parameter scaling the influence of category means in covariance calculation
       n_drafters: number of drafters
       n_picks: number of picks per drafter
-      rotisserie: True if the format is Roto, False if H2H
+      player_stats_key: key for version number of player stats. Used to check if player stats has changed
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
@@ -132,36 +132,35 @@ def process_player_data(player_stats : pd.DataFrame
 
   n_players = n_drafters * n_picks
 
-  coefficients_first_order = calculate_coefficients(player_stats, player_stats.index, conversion_factors['Conversion Factor'])
-  z_scores_first_order =  calculate_scores_from_coefficients(player_stats, coefficients_first_order, params, 1,0)
+  coefficients_first_order = calculate_coefficients(_player_stats
+                                                  , _player_stats.index
+                                                  , conversion_factors['Conversion Factor'])
+  z_scores_first_order =  calculate_scores_from_coefficients(_player_stats
+                                                          , coefficients_first_order
+                                                          , params
+                                                          , 1
+                                                          ,0)
   z_scores_first_order = z_scores_first_order * multipliers.T.values[0]
 
   first_order_score = z_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  coefficients = calculate_coefficients(player_stats, representative_player_set, conversion_factors['Conversion Factor'])
+  coefficients = calculate_coefficients(_player_stats
+                                    , representative_player_set
+                                    , conversion_factors['Conversion Factor'])
                          
-  g_scores = calculate_scores_from_coefficients(player_stats, coefficients, params, 1,1)
-  z_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params,  1,0)
-  x_scores =  calculate_scores_from_coefficients(player_stats, coefficients, params, 0,1)
+  g_scores = calculate_scores_from_coefficients(_player_stats, coefficients, params, 1,1)
+  z_scores =  calculate_scores_from_coefficients(_player_stats, coefficients, params,  1,0)
+  x_scores =  calculate_scores_from_coefficients(_player_stats, coefficients, params, 0,1)
 
   g_scores = g_scores * multipliers.T.values[0]
   z_scores = z_scores * multipliers.T.values[0]
   x_scores = x_scores * multipliers.T.values[0]
 
-  #Design the score table based on what we expect other drafters to use. 
-  #Z-score for rotisserie, otherwise G-score
-  if rotisserie:
-    x_scores = x_scores.loc[z_scores.sum(axis = 1).sort_values(ascending = False).index]
-  else:
-    x_scores = x_scores.loc[g_scores.sum(axis = 1).sort_values(ascending = False).index]
 
-  positions = player_stats[['Position']]
+  positions = _player_stats[['Position']]
 
-  score_table = x_scores.groupby([np.floor(x/n_drafters) for x in range(len(x_scores))]).agg(['mean','var'])
-  score_table_smoothed = x_scores.transform(lambda x: savgol_filter(x,10,1))
-  weekly_var = 0 if rotisserie else n_picks * 2
-  diff_var =  weekly_var + x_scores[0:n_players].var() * n_picks
+  cross_player_var =  x_scores[0:n_players].var()
                           
   players_and_positions = pd.merge(x_scores
                            , positions
@@ -180,31 +179,25 @@ def process_player_data(player_stats : pd.DataFrame
   
   mov = coefficients.loc[get_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_categories() , 'Variance of Means']
-  if rotisserie:  #get weights of X to Z 
-    v = np.sqrt(mov/vom)  
-  else:   #get weights of X to G 
-    v = np.sqrt(mov/(mov + vom))
 
-  v = np.array(v/v.sum()).reshape(9,1)
-  
   L = np.array(x_scores_as_diff.cov()) 
 
   z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
 
   z_scores.sort_values('Total', ascending = False, inplace = True)
 
-  g_scores = g_scores * multipliers.T.values[0]
   g_scores.insert(loc = 0, column = 'Total', value = g_scores.sum(axis = 1))
   g_scores.sort_values('Total', ascending = False, inplace = True)
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
-          , 'Score-table' : score_table
-          , 'Score-table-smoothed' : score_table_smoothed
-          , 'Diff-var' : diff_var
+          , 'Var' : cross_player_var
           , 'Positions' : positions
-          , 'v' : v
+          , 'Mov' : mov
+          , 'Vom' : vom
           , 'L' : L}
+
+  st.session_state.info_key += 1 
   
   return info

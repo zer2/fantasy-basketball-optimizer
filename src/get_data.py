@@ -139,8 +139,8 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   Returns:
       Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
   """
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-03-01.csv')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-03-01.csv')
+  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-03-13.csv')
+  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-03-13.csv')
   all_darko = skill_projections.merge(per_game_projections)
 
   player_renamer = st.session_state.params['darko-player-renamer']
