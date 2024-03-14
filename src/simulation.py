@@ -106,7 +106,7 @@ def run_multiple_seasons(teams : dict[list]
                          , season_df : pd.DataFrame
                          , n_seasons : int = 100 
                          , n_weeks : int = 25
-                         , winner_take_all : bool = True
+                         , scoring_format : str = 'Each Category'
                          , return_detailed_results : bool = False ):
     """Simulate multiple seasons with the same drafters 
     
@@ -119,8 +119,7 @@ def run_multiple_seasons(teams : dict[list]
         season_df: dataframe of weekly numbers per players. These will be sampled to simulate seasons
         n_seasons: number of seasons to simulate
         n_weeks: number of weeks per season
-        winner_take_all: If True, the winner of a majority of categories in a week gets a point.
-                         If false, each player gets a point for each category won 
+        scoring_format: Each Category, Most Categories, or Rotisserie 
         return_cat_results: If True, return detailed results on category wins 
         
     Returns:
@@ -145,50 +144,58 @@ def run_multiple_seasons(teams : dict[list]
     performances.loc[:,'Week'] = performances.groupby('Player').cumcount()
     performances.loc[:,'Season'] = performances['Week'] // n_weeks #integer division seperates weeks in groups 
 
-    #total team performances are simply the sum of statistics for each player 
-    team_performances = performances.groupby(['Season','Team','Week']).sum()
-    team_performances['Free Throw %'] = (team_performances['Free Throws']/team_performances['Free Throw Attempts']).fillna(0)
-    team_performances['Field Goal %'] = (team_performances['Field Goals']/team_performances['Field Goal Attempts']).fillna(0)
-    
-    #for all categories except turnovers, higher numbers are better. So we invert turnovers 
-    team_performances['Turnovers'] = - team_performances['Turnovers'] 
-    
-    team_performances = team_performances[get_categories()] #only want category columns
-    
-    #we need to map each team to its opponent for the week. We do that with a formula for round robin pairing
-    opposing_team_schedule = [(s,round_robin_opponent(t,w),w) for s, t, w in team_performances.index]
-    opposing_team_performances = team_performances.loc[opposing_team_schedule]
+    if scoring_format in ('Most Categories','Each Category'):
 
-    cat_wins = np.greater(team_performances.values,opposing_team_performances.values)
-    cat_ties = np.equal(team_performances.values,opposing_team_performances.values)
-    
-    tot_cat_wins = cat_wins.sum(axis = 1)
-    tot_cat_ties = cat_ties.sum(axis = 1)
-    
-    if winner_take_all:
-        team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_categories())/2
-        team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_categories())/2
-    else:
-        team_performances.loc[:,'Tie'] = tot_cat_ties
-        team_performances.loc[:,'Win'] = tot_cat_wins
+        #total team performances are simply the sum of statistics for each player 
+        team_performances = performances.groupby(['Season','Team','Week']).sum()
+        team_performances['Free Throw %'] = (team_performances['Free Throws']/team_performances['Free Throw Attempts']).fillna(0)
+        team_performances['Field Goal %'] = (team_performances['Field Goals']/team_performances['Field Goal Attempts']).fillna(0)
         
-    team_results = team_performances.groupby(['Team','Season']).agg({'Win' : sum, 'Tie' : sum})
-
-    #a team cannot win the season if it has fewer wins than any other team 
-    most_wins = team_results.groupby('Season')['Win'].transform('max')
-    winners = team_results[team_results['Win'] == most_wins]
-
-    #among the teams with the most wins, ties are a tiebreaker 
-    most_ties = winners.groupby('Season')['Tie'].transform('max')
-    winners_after_ties = winners[winners['Tie'] == most_ties]
+        #for all categories except turnovers, higher numbers are better. So we invert turnovers 
+        team_performances['Turnovers'] = - team_performances['Turnovers'] 
+        
+        team_performances = team_performances[get_categories()] #only want category columns
     
+        #we need to map each team to its opponent for the week. We do that with a formula for round robin pairing
+        opposing_team_schedule = [(s,round_robin_opponent(t,w),w) for s, t, w in team_performances.index]
+        opposing_team_performances = team_performances.loc[opposing_team_schedule]
+
+        cat_wins = np.greater(team_performances.values,opposing_team_performances.values)
+        cat_ties = np.equal(team_performances.values,opposing_team_performances.values)
+        
+        tot_cat_wins = cat_wins.sum(axis = 1)
+        tot_cat_ties = cat_ties.sum(axis = 1)
+        
+        if scoring_format == 'Most Categories':
+            team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_categories())/2
+            team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_categories())/2
+        elif scoring_format == 'Each Category':
+            team_performances.loc[:,'Tie'] = tot_cat_ties
+            team_performances.loc[:,'Win'] = tot_cat_wins
+            
+        team_results = team_performances.groupby(['Team','Season']).agg({'Win' : sum, 'Tie' : sum})
+
+        #a team cannot win the season if it has fewer wins than any other team 
+        most_wins = team_results.groupby('Season')['Win'].transform('max')
+        winners = team_results[team_results['Win'] == most_wins]
+
+        #among the teams with the most wins, ties are a tiebreaker 
+        most_ties = winners.groupby('Season')['Tie'].transform('max')
+        winners_after_ties = winners[winners['Tie'] == most_ties]
+
+    elif scoring_format == 'Rotisserie':
+        team_performances = performances.groupby(['Season','Team']).sum()
+        season_points = team_performances.groupby('Season').Rank().sum(axis = 1)
+        winners_after_ties = season_points[season_points == season_points.groupby('Season').max()]
+
     #assuming that payouts are divided when multiple teams are exactly tied, we give fractional points 
     winners_after_ties.loc[:,'Winner Points'] = 1
     season_counts = winners_after_ties.groupby('Season')['Winner Points'].transform('count')
     winners_after_ties.loc[:,'Winner Points Adjusted'] = 1/season_counts
-    
+        
     wins_by_teams = winners_after_ties.groupby('Team')['Winner Points Adjusted'].sum()/winners_after_ties['Winner Points Adjusted'].sum()
-    
+        
+
     if not return_detailed_results:
         return wins_by_teams
     else:
@@ -212,7 +219,7 @@ def try_strategy(_primary_agent
                  , season_df : pd.DataFrame
                  , n_seasons : int
                  , n_primary : int
-                 , winner_take_all : bool
+                 , scoring_format : str
                  ) -> tuple:
     """Try a particular strategy (enacted by the primary agent) against a field of default agents
     
@@ -228,8 +235,7 @@ def try_strategy(_primary_agent
         season_df: dataframe with rows for (week,player) pairs. Used to simulate an actual season
         n_seasons: number of seasons to simulate
         n_primary: number of successive seats to use the primary strategy
-        winner_take_all: If True, the winner of a majority of categories in a week gets a point.
-                         If false, each player gets a point for each category won 
+        scoring_format:
         
     Returns:
         victory_res: list of average overall win rates
@@ -259,7 +265,7 @@ def try_strategy(_primary_agent
         res, details = run_multiple_seasons(teams = teams
                                    , season_df = season_df
                                    , n_seasons = n_seasons
-                                   , winner_take_all = winner_take_all
+                                   , scoring_format = scoring_format
                                    , return_detailed_results = True)
         detailed_res = pd.concat([detailed_res, details.loc[i,:]])
         
@@ -319,7 +325,6 @@ def validate() -> None:
                         , nu 
                         , n_drafters
                         , n_picks
-                        , False
                         , None
                         )
 
@@ -335,7 +340,7 @@ def validate() -> None:
                 , beta = beta
                 , n_picks = n_picks
                 , n_drafters = n_drafters
-                , winner_take_all = False
+                , scoring_format = 'Each Category'
                 , punting = True
                 )
 
@@ -347,7 +352,7 @@ def validate() -> None:
                 , beta = beta
                 , n_picks = n_picks
                 , n_drafters = n_drafters
-                , winner_take_all = True
+                , scoring_format = 'Most Categories'
                 , punting = True
                 )
 
@@ -358,7 +363,7 @@ def validate() -> None:
                 , weekly_df
                 , n_seasons
                 , n_primary = 1
-                , winner_take_all = True)
+                , scoring_format = 'Most Categories')
 
     res_ec =  try_strategy(primary_agent_ec
                 , default_agent
@@ -367,7 +372,7 @@ def validate() -> None:
                 , weekly_df
                 , n_seasons
                 , n_primary = 1
-                , winner_take_all = False)
+                , scoring_format = 'Each Category')
 
 
     with results_tab:

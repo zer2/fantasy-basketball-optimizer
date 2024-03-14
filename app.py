@@ -226,7 +226,6 @@ with param_tab:
       else:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
-      winner_take_all = scoring_format == 'Head to Head: Most Categories'
       rotisserie = scoring_format == 'Rotisserie'
 
       unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
@@ -472,7 +471,6 @@ with info_tab:
                               ,nu
                               ,n_drafters
                               ,n_picks
-                              ,rotisserie
                               ,st.session_state.player_stats_editable_version)
       st.session_state.info = info #useful for testing
       
@@ -504,7 +502,7 @@ with rank_tab:
                     ,n_picks
                     ,n_drafters
                     ,n_iterations
-                    ,winner_take_all
+                    ,scoring_format
                     ,punting
                     ,st.session_state.info_key)
 
@@ -515,7 +513,7 @@ H = HAgent(info = info
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
-    , winner_take_all = winner_take_all
+    , scoring_format = scoring_format
     , punting = punting)   
 
 if st.session_state['mode'] == 'Draft Mode':
@@ -643,7 +641,7 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,beta
                                         ,n_picks
                                         ,n_drafters
-                                        ,winner_take_all
+                                        ,scoring_format
                                         ,punting
                                         ,player_assignments
                                         ,draft_seat
@@ -699,7 +697,7 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,beta
                                         ,n_picks
                                         ,n_drafters
-                                        ,winner_take_all
+                                        ,scoring_format
                                         ,punting
                                         ,player_assignments
                                         ,roster_inspection_seat
@@ -800,7 +798,7 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,beta
                             ,n_picks
                             ,n_drafters
-                            ,winner_take_all
+                            ,scoring_format
                             ,punting
                             ,player_assignments
                             ,waiver_inspection_seat

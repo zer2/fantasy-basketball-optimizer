@@ -291,7 +291,7 @@ def get_base_h_score(_info : dict
                 , beta : float
                 , n_picks : int
                 , n_drafters : int
-                , winner_take_all : bool
+                , scoring_format : str
                 , punting : bool
                 , player_assignments : dict[list[str]]
                 , team : str
@@ -306,8 +306,7 @@ def get_base_h_score(_info : dict
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
-    winner_take_all: Boolean of whether to optimize for the winner-take-all format
-                      If False, optimizes for total categories
+    scoring_format: 
     punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
     player_assignments : player assignment dictionary
     team: name of team to evaluate
@@ -323,7 +322,7 @@ def get_base_h_score(_info : dict
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
-    , winner_take_all = winner_take_all
+    , scoring_format = scoring_format
     , punting = punting)
 
   return next(H.get_h_scores(player_assignments, team))   
@@ -923,7 +922,7 @@ def make_h_rank_tab(_info : dict
                   , n_picks : int
                   , n_drafters : int
                   , n_iterations : int
-                  , winner_take_all : bool
+                  , scoring_format : str
                   , punting : bool
                   , info_key : int):
   """Make ranks by H-score
@@ -937,8 +936,7 @@ def make_h_rank_tab(_info : dict
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
     n_iterations: int, number of gradient descent steps
-    winner_take_all: Boolean of whether to optimize for the winner-take-all format
-                      If False, optimizes for total categories
+    scoring_format: 
     punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
     info_key: key to info data, used to detect changes
 
@@ -952,7 +950,7 @@ def make_h_rank_tab(_info : dict
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
-    , winner_take_all = winner_take_all
+    , scoring_format = scoring_format
     , punting = punting)
 
   generator = H.get_h_scores({n : [] for n in range(n_drafters)}, 0)

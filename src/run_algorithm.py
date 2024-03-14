@@ -17,7 +17,7 @@ class HAgent():
                  , beta : float
                  , n_picks : int
                  , n_drafters : int
-                 , winner_take_all : bool
+                 , scoring_format : str
                  , punting : bool
                     ):
         """Calculates the rank order based on H-score
@@ -30,8 +30,7 @@ class HAgent():
             beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
             n_drafters : int, number of drafters
-            winner_take_all: Boolean of whether to optimize for the winner-take-all format
-                             If False, optimizes for total categories
+            scoring_format
             punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
         Returns:
             None
@@ -43,14 +42,24 @@ class HAgent():
         self.beta = beta
         self.n_picks = n_picks 
         self.n_drafters = n_drafters
-        self.winner_take_all = winner_take_all 
-        self.x_scores = info['X-scores']
-        self.score_table = info['Score-table']
-        self.score_table_smoothed = info['Score-table-smoothed']
+
+        mov = info['Mov']
+        vom = info['Vom']
+        x_scores = info['X-scores']
+
+        if scoring_format == 'Rotisserie':
+            self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
+            v = np.sqrt(mov/vom)  
+        else:
+            self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
+            v = np.sqrt(mov/(mov + vom))
+
+        self.v = np.array(v/v.sum()).reshape(9,1)
+
         self.cross_player_var = info['Var']
-        self.v = info['v']
         self.L = info['L']
         self.punting = punting
+        self.scoring_format = scoring_format
       
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -224,7 +233,7 @@ class HAgent():
                 
                 cdf_estimates = self.get_cdf(x_diff_array, diff_var)
         
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
         
                     tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
         
@@ -241,7 +250,7 @@ class HAgent():
                 weights[weights < 0] = 0
                 weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
@@ -258,7 +267,7 @@ class HAgent():
                 weights = None
                 expected_future_diff = None
                 
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
@@ -273,7 +282,7 @@ class HAgent():
                 weights = None
                 expected_future_diff = None
                 
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
@@ -300,7 +309,7 @@ class HAgent():
 
                 cdf_estimates = self.get_cdf(diff_means_mod, diff_var)
                                         
-                if self.winner_take_all:
+                if self.scoring_format == 'Head to Head: Most Categories':
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
@@ -527,14 +536,15 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
                                         )
                             ).T
 
+    cdf_array = np.expand_dims(np.array(cdf_estimates),2)
+
     if scoring_format == 'Head to Head: Most Categories':
-        score = combinatorial_calculation(cdf_estimates
-                                                    , 1 - cdf_estimates
-                                                    , categories = cdf_estimates.columns
+        score = combinatorial_calculation(cdf_array
+                                                    , 1 - cdf_array
                         )
 
     else:
-        score = cdf_estimates.mean(axis = 1) 
+        score = cdf_array.mean() 
 
     return float(score)
 
