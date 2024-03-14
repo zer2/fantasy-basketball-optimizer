@@ -184,9 +184,21 @@ def run_multiple_seasons(teams : dict[list]
         winners_after_ties = winners[winners['Tie'] == most_ties]
 
     elif scoring_format == 'Rotisserie':
-        team_performances = performances.groupby(['Season','Team']).sum()
-        season_points = team_performances.groupby('Season').Rank().sum(axis = 1)
-        winners_after_ties = season_points[season_points == season_points.groupby('Season').max()]
+
+        team_performances = performances.drop(columns = ['Player','Week']) \
+                                            .groupby(['Season','Team']).sum()
+
+        team_performances.loc[:,'Free Throw %'] = (team_performances['Free Throws']/team_performances['Free Throw Attempts']).fillna(0)
+        team_performances.loc[:,'Field Goal %'] = (team_performances['Field Goals']/team_performances['Field Goal Attempts']).fillna(0)
+        
+        #for all categories except turnovers, higher numbers are better. So we invert turnovers 
+        team_performances['Turnovers'] = - team_performances['Turnovers'] 
+        season_points_by_category = team_performances.groupby('Season')[get_categories()].rank()
+
+        season_points = season_points_by_category.sum(axis = 1)
+        winners_after_ties = season_points[season_points == season_points.groupby('Season').transform('max')]
+
+        winners_after_ties = pd.DataFrame({'Score' : winners_after_ties})
 
     #assuming that payouts are divided when multiple teams are exactly tied, we give fractional points 
     winners_after_ties.loc[:,'Winner Points'] = 1
@@ -198,19 +210,29 @@ def run_multiple_seasons(teams : dict[list]
     if not return_detailed_results:
         return wins_by_teams
     else:
-        cat_win_df = pd.DataFrame(cat_wins, columns = get_categories(), index = team_performances.index)
-        cat_tie_df = pd.DataFrame(cat_ties, columns = get_categories(), index = team_performances.index)
-        
-        cat_wins_agg = cat_win_df.groupby('Team').mean()
-        cat_wins_agg = pd.concat({'Win' : cat_wins_agg}, names = ['Result'])
-        
-        cat_ties_agg = cat_tie_df.groupby('Team').mean()
-        cat_ties_agg = pd.concat({'Tie' : cat_ties_agg}, names = ['Result'])
+        if scoring_format in ('Head to Head: Most Categories','Head to Head: Each Category'):
 
-        results_agg = pd.concat([cat_wins_agg, cat_ties_agg])
-        return wins_by_teams, results_agg.reorder_levels(['Team','Result'])
+            cat_win_df = pd.DataFrame(cat_wins, columns = get_categories(), index = team_performances.index)
+            cat_tie_df = pd.DataFrame(cat_ties, columns = get_categories(), index = team_performances.index)
+            
+            cat_wins_agg = cat_win_df.groupby('Team').mean()
+            cat_wins_agg = pd.concat({'Win' : cat_wins_agg}, names = ['Result'])
+            
+            cat_ties_agg = cat_tie_df.groupby('Team').mean()
+            cat_ties_agg = pd.concat({'Tie' : cat_ties_agg}, names = ['Result'])
 
-#@st.cache_data()
+            results_agg = pd.concat([cat_wins_agg, cat_ties_agg])
+            results_agg = results_agg.reorder_levels(['Team','Result'])
+
+        elif scoring_format == 'Rotisserie':
+
+            results_agg = pd.DataFrame(season_points_by_category.groupby('Team').mean())
+            results_agg.loc[:,'Result'] = 'Mean Points'
+            results_agg = results_agg.reset_index().set_index(['Team','Result'])
+
+        return wins_by_teams, results_agg
+
+@st.cache_data()
 def try_strategy(_primary_agent
                  , _default_agent
                  , n_drafters : int
@@ -274,6 +296,64 @@ def try_strategy(_primary_agent
         
     return victory_res, detailed_res, team_dict, all_times
 
+def make_detailed_results_tab(res, overall_win_rate, info, n_drafters, roto = False):
+
+    c1, c2 = st.columns([0.5,0.5])
+
+    with c1: 
+
+        if roto:
+            detailed_rates_collapsed = res[1]
+            detailed_rates_collapsed.columns = get_categories()
+
+        else: 
+            detailed_rates_collapsed = res[1].loc['Win'].reset_index(drop = True) + \
+                                        res[1].loc['Tie'].reset_index(drop = True)/2
+        overall_win_rate.columns = ['Overall Win %']
+
+        detailed_rates_collapsed.index = ['Seat ' + str(x) for x in range(n_drafters)]
+
+        detailed_rates_collapsed = overall_win_rate.merge(detailed_rates_collapsed
+                                                                            , left_index = True
+                                                                            , right_index = True)
+
+        if roto:
+            detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}", subset = ['Overall Win %']) \
+                                        .format("{:.3}"
+                                                , subset = get_categories()) \
+                                        .map(stat_styler
+                                            , middle = 6.5
+                                            , multiplier = 40
+                                            , subset = get_categories()) \
+                                        .map(styler_a
+                                            , subset = ['Overall Win %'])             
+        else: 
+            detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}") \
+                                        .map(stat_styler
+                                            , middle = 0.5
+                                            , multiplier = 150
+                                            , subset = get_categories()) \
+                                        .map(styler_a
+                                            , subset = ['Overall Win %']) 
+
+        st.dataframe(detailed_rate_df
+                , use_container_width = True
+                , height = len(detailed_rates_collapsed) * 35 + 38)
+    with c2:
+        seats = ['Seat ' + str(x) for x in range(n_drafters)]
+        team_tabs = st.tabs(seats)
+
+        for team_tab, seat in zip(team_tabs, range(n_drafters)):
+            with team_tab:
+                make_team_tab(info['G-scores'] 
+                            , res[2][seat]
+                            , n_drafters 
+                            , st.session_state.params['g-score-player-multiplier']
+                            , st.session_state.params['g-score-team-multiplier']
+                            , None
+                            ) 
+
+
 def validate() -> None:
 
     season_df = pd.read_csv('data/2022-23_complete.csv')
@@ -329,7 +409,32 @@ def validate() -> None:
 
     g_scores = info['G-scores']
     g_scores = g_scores.sort_values('Total', ascending = False)
-    default_agent = SimpleAgent(order = list(g_scores.index))
+    default_agent_hth = SimpleAgent(order = list(g_scores.index))
+
+    z_scores = info['Z-scores']
+    z_scores = z_scores.sort_values('Total', ascending = False)
+    default_agent_roto = SimpleAgent(order = list(z_scores.index))
+
+    primary_agent_roto = HAgent(
+            info = info
+            , omega = omega
+            , gamma = gamma
+            , alpha = alpha
+            , beta = beta
+            , n_picks = n_picks
+            , n_drafters = n_drafters
+            , scoring_format = 'Rotisserie'
+            , punting = True
+            )
+                
+    res_roto =  try_strategy(primary_agent_roto
+            , default_agent_roto
+            , n_drafters
+            , n_picks
+            , weekly_df
+            , n_seasons + 2
+            , n_primary = 1
+            , scoring_format = 'Rotisserie')
 
     primary_agent_ec = HAgent(
                 info = info
@@ -342,6 +447,15 @@ def validate() -> None:
                 , scoring_format = 'Head to Head: Each Category'
                 , punting = True
                 )
+
+    res_ec =  try_strategy(primary_agent_ec
+            , default_agent_hth
+            , n_drafters
+            , n_picks
+            , weekly_df
+            , n_seasons
+            , n_primary = 1
+            , scoring_format = 'Head to Head: Each Category')
 
     primary_agent_wta = HAgent(
                 info = info
@@ -356,39 +470,35 @@ def validate() -> None:
                 )
 
     res_wta =  try_strategy(primary_agent_wta
-                , default_agent
-                , n_drafters
-                , n_picks
-                , weekly_df
-                , n_seasons
-                , n_primary = 1
-                , scoring_format = 'Head to Head: Most Categories')
+            , default_agent_hth
+            , n_drafters
+            , n_picks
+            , weekly_df
+            , n_seasons
+            , n_primary = 1
+            , scoring_format = 'Head to Head: Most Categories')
 
-    res_ec =  try_strategy(primary_agent_ec
-                , default_agent
-                , n_drafters
-                , n_picks
-                , weekly_df
-                , n_seasons
-                , n_primary = 1
-                , scoring_format = 'Head to Head: Each Category')
 
 
     with results_tab:
 
-        t1, t2, t3 = st.tabs(['Overall'
+        t1, t2, t3, t4 = st.tabs(['Overall'
                             ,'Head to Head: Most Categories Details'
-                            ,'Head to Head: Each Category Details'])
+                            ,'Head to Head: Each Category Details'
+                            ,'Roto'])
 
         with t1: 
-            win_rate_df = pd.DataFrame({'Head to Head: Winner take All' : res_wta[0]
-                                        ,'Head to Head: Each Category' : res_ec[0] }
+            win_rate_df = pd.DataFrame({'Head to Head: Most Categories' : res_wta[0]
+                                        ,'Head to Head: Each Category' : res_ec[0] 
+                                        ,'Rotisserie' : res_roto[0]}
                                         , index = ['Seat ' + str(x) for x in range(n_drafters)])
 
-            averages_df = pd.DataFrame({'Head to Head: Winner take All' : \
-                                                    [win_rate_df['Head to Head: Winner take All'].mean()]
+            averages_df = pd.DataFrame({'Head to Head: Most Categories' : \
+                                                    [win_rate_df['Head to Head: Most Categories'].mean()]
                                                 ,'Head to Head: Each Category' : \
-                                                    [win_rate_df['Head to Head: Each Category'].mean()] }
+                                                    [win_rate_df['Head to Head: Each Category'].mean()] 
+                                                ,'Rotisserie' : \
+                                                    [win_rate_df['Rotisserie'].mean()]}
                                                         , index = ['Aggregate'])
             win_rate_df = pd.concat([averages_df, win_rate_df])
 
@@ -402,86 +512,18 @@ def validate() -> None:
                     , height = len(win_rate_df) * 35 + 38)
 
         with t2: 
+            overall_win_rate = win_rate_df[['Head to Head: Most Categories']]
 
-            c1, c2 = st.columns([0.5,0.5])
-
-            with c1: 
-                detailed_rates_collapsed_wta = res_wta[1].loc['Win'].reset_index(drop = True) + \
-                                            res_wta[1].loc['Tie'].reset_index(drop = True)/2
-
-                detailed_rates_collapsed_wta.index = ['Seat ' + str(x) for x in range(n_drafters)]
-
-                overall_win_rate = win_rate_df[['Winner take All']]
-                overall_win_rate.columns = ['Overall Win %']
-
-                detailed_rates_collapsed_wta = overall_win_rate.merge(detailed_rates_collapsed_wta
-                                                                                    , left_index = True
-                                                                                    , right_index = True)
-                detailed_rate_df_wta = detailed_rates_collapsed_wta.style.format("{:.1%}") \
-                                            .map(stat_styler
-                                                , middle = 0.5
-                                                , multiplier = 150
-                                                , subset = get_categories()) \
-                                            .map(styler_a
-                                                , subset = ['Overall Win %']) 
-
-                st.dataframe(detailed_rate_df_wta
-                        , use_container_width = True
-                        , height = len(detailed_rates_collapsed_wta) * 35 + 38)
-            with c2:
-                seats = ['Seat ' + str(x) for x in range(n_drafters)]
-                team_tabs = st.tabs(seats)
-
-                for team_tab, seat in zip(team_tabs, range(n_drafters)):
-                    with team_tab:
-                        make_team_tab(info['G-scores'] 
-                                    , res_wta[2][seat]
-                                    , n_drafters 
-                                    , st.session_state.params['g-score-player-multiplier']
-                                    , st.session_state.params['g-score-team-multiplier']
-                                    , None
-                                    ) 
-
-
+            make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters)
+            
         with t3: 
-            c1, c2 = st.columns([0.5,0.5])
+            overall_win_rate = win_rate_df[['Head to Head: Each Category']]
 
-            with c1: 
-                detailed_rates_collapsed_ec = res_ec[1].loc['Win'].reset_index(drop = True) + \
-                                            res_ec[1].loc['Tie'].reset_index(drop = True)/2
+            make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters)
 
-                detailed_rates_collapsed_ec.index = ['Seat ' + str(x) for x in range(n_drafters)]
-
-                overall_win_rate = win_rate_df[['Head to Head: Each Category']]
-                overall_win_rate.columns = ['Overall Win %']
-
-                detailed_rates_collapsed_ec = overall_win_rate.merge(detailed_rates_collapsed_ec
-                                                                                    , left_index = True
-                                                                                    , right_index = True)
-                detailed_rate_df_ec = detailed_rates_collapsed_ec.style.format("{:.1%}") \
-                                            .map(stat_styler
-                                                , middle = 0.5
-                                                , multiplier = 150
-                                                , subset = get_categories()) \
-                                            .map(styler_a
-                                                , subset = ['Overall Win %']) 
-
-                st.dataframe(detailed_rate_df_ec
-                        , use_container_width = True
-                        , height = len(detailed_rates_collapsed_ec) * 35 + 38)
-            with c2:
-                seats = ['Seat ' + str(x) for x in range(n_drafters)]
-                team_tabs = st.tabs(seats)
-
-                for team_tab, seat in zip(team_tabs, range(n_drafters)):
-                    with team_tab:
-                        make_team_tab(info['G-scores'] 
-                                    , res_ec[2][seat]
-                                    , n_drafters 
-                                    , st.session_state.params['g-score-player-multiplier']
-                                    , st.session_state.params['g-score-team-multiplier']
-                                    , None
-                                    ) 
+        with t4:
+            overall_win_rate = win_rate_df[['Rotisserie']]
+            make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, True)
 
     with timing_tab:
         

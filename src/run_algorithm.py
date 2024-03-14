@@ -81,10 +81,6 @@ class HAgent():
 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list)]
-
-        #we want to use the smoothed score table when the expectation for player strength is different depending on how far into the round you are drafting
-        #for the last round, it doesn't really matter, because there are no later rounds to balance it out 
-
         total_players = self.n_picks * self.n_drafters
 
         diff_means, diff_vars = self.get_diff_distributions(player_assignments
@@ -159,8 +155,12 @@ class HAgent():
         return opposing_team_stats 
     
     def get_diff_var(self, n_their_players):
-        diff_var = self.n_picks * \
-            (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+        if self.scoring_format == 'Rotisserie':
+            diff_var = self.n_picks * \
+                (2/25 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+        else:
+            diff_var = self.n_picks * \
+                (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
 
     def get_diff_means_old(self
