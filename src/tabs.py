@@ -913,7 +913,7 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data()
+#@st.cache_data()
 def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float

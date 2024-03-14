@@ -134,7 +134,7 @@ class HAgent():
         ).T
 
         other_team_vars = np.vstack(
-            [self.get_diff_var(len(players)) for team, players \
+            [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
                                     in player_assignments.items() if team != drafter]
         ).T
         

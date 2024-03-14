@@ -432,7 +432,7 @@ def validate() -> None:
             , n_drafters
             , n_picks
             , weekly_df
-            , n_seasons + 2
+            , n_seasons 
             , n_primary = 1
             , scoring_format = 'Rotisserie')
 

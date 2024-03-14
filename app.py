@@ -562,6 +562,13 @@ if st.session_state['mode'] == 'Draft Mode':
 
         with h_cand_tab:
 
+          mov = info['Mov']
+          vom = info['Vom']
+          
+          v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
+
+          v = np.array(v/v.sum()).reshape(1,9)
+
           if len(my_players) == n_picks:
             st.markdown('Team is complete!')
                     
@@ -580,7 +587,6 @@ if st.session_state['mode'] == 'Draft Mode':
             generator = H.get_h_scores(player_assignments, draft_seat)
       
             placeholder = st.empty()
-            all_res = []
 
             #if n_iterations is 0 we run just once with punting set to False
             for i in range(max(1,n_iterations)):
@@ -590,12 +596,10 @@ if st.session_state['mode'] == 'Draft Mode':
               weights = res['Weights']
               win_rates = res['Rates']
 
-              all_res = all_res + [score]
               #normalize weights by what we expect from other drafters
-              
               weights = pd.DataFrame(weights
                             , index = score.index
-                            , columns = get_categories())/info['v'].T
+                            , columns = get_categories())/v
               
               win_rates.columns = get_categories()
               
@@ -721,11 +725,15 @@ elif st.session_state['mode'] == 'Season Mode':
                             )
 
   with matchup_tab:
-    make_matchup_tab(info['X-scores']
-                    ,selections_editable
-                    ,scoring_format
-                    ,st.session_state.info_key
-                    )
+
+    if scoring_format == 'roto':
+      st.write('No matchups for Rotisserie')
+    else:
+      make_matchup_tab(info['X-scores']
+                      ,selections_editable
+                      ,scoring_format
+                      ,st.session_state.info_key
+                      )
 
   with waiver_tab:
 
