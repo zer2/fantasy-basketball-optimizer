@@ -523,22 +523,23 @@ if st.session_state['mode'] == 'Draft Mode':
 
     with left:
 
-      draft_seat = st.selectbox(f'Which team are you?'
-          , selections.columns
-          , index = 0)
-      
       st.caption("""Enter which players have been drafted by which teams below""")
       selections_editable = st.data_editor(selections
-                                          , hide_index = True)  
+                                          , hide_index = True
+                                          , height = n_picks * 35 + 50)  
       selection_list = listify(selections_editable)
 
       player_assignments = selections_editable.to_dict('list')
 
-      my_players = selections_editable[draft_seat].dropna()
-
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
 
     with right:
+
+      draft_seat = st.selectbox(f'Which team are you?'
+          , selections.columns
+          , index = 0)
+
+      my_players = selections_editable[draft_seat].dropna()
 
       cand_tab, team_tab = st.tabs(["Candidates","Team"])
             
@@ -675,17 +676,10 @@ elif st.session_state['mode'] == 'Season Mode':
       
     with left:
 
-      roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
-          , selections.columns
-          , index = 0)
-
       st.caption("""Enter which player is on which team below""")
       selections_editable = st.data_editor(selections, hide_index = True)  
       selection_list = listify(selections_editable)
       player_assignments = selections_editable.to_dict('list')
-
-
-      inspection_players = selections_editable[roster_inspection_seat].dropna()
 
       z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
@@ -693,6 +687,12 @@ elif st.session_state['mode'] == 'Season Mode':
       with right: 
 
         if len(inspection_players) == n_picks:
+
+          roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
+          , selections.columns
+          , index = 0)
+
+          inspection_players = selections_editable[roster_inspection_seat].dropna()
 
           base_h_res = get_base_h_score(info
                                         ,omega
