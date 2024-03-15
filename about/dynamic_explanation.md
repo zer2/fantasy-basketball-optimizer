@@ -18,70 +18,71 @@ H-scores' solution to this dilemma is conceiving of future picks as being contro
 
 Of course, being able to map a weight vector $j$ to approximate statistics for future picks is not enough for optimal draft strategy. The drafter needs to operate the other way around, and pick both a player $p$ from the available candidate pool and a weight vector $j$ for future picks such that the probability of winning (H-score) is optimized. 
 
-This is far from a trivial task. It can be accomplished by first building a full model linking $p$ and $j$ to H-score, then applying mathematical tools to the model to discover choices of $p$ and $j$ that mazimize the reward function
+Doing all of this algorithmically is far from a trivial task. It can be accomplished by first building a full model linking $p$ and $j$ to H-score, then applying mathematical tools to the model to discover choices of $p$ and $j$ that mazimize the reward function
 
 ## 2. Calculating H-score based on $p$ and $j$
 
-Writing out a single equation for H-score is cumbersome because the methodology behind it has so many steps. Instead, it is easiest to understand by starting from the ultimate goal of the metric and working backwards to successively fill in gaps 
+Writing out a single equation for H-score is cumbersome because the methodology behind it has so many steps. Instead, it is easiest to understand by starting from the ultimate goal of the metric and working backwards to successively fill in gaps.
+
+We'll do this for counting statistics, which are easier to work with than the percentage statistics. The percentage statistics can be dealt with in an analogous way.
 
 ### 2a. Defining the objective function
 
 In the static ranking context the expected number of category wins was a reasonable objective even for Most Categories, since strategizing how to win only five out of nine categories was impossible. In the dynamic context, more information is available, and using the appropriate objective function for the format is warranted. 
 
-Another consideration is that the drafter will have some control over the aggregate statistics of their team so the objective function should be expressed as a function of team composition. 
+Another consideration is that the drafter will have some control over the aggregate statistics of their team, so the objective function should be expressed as a function of team composition. 
 
-Define $H(X)$ as the objective function relative to the team $A$'s stat distribution $X$. With $w_c(X)$ as the probability of winning category $c$ based on $X$ and $|C|$ as the number of categories, the objective function for the Each Category format is simply 
+ With
+- $w_{c,o}(X)$ as the probability of winning category $c$ against opponent $o$ based on the drafter's aggregate team statistics $X$ 
+- $|C|$ as the number of categories
+- $|D|$ as the number of drafters
+
+A sensible choice for $H_e(X)$, the objective function relative to the team $A$'s stat distribution $X$ for Each Category, is
 
 $$
-H(X) = \frac{ \sum_c w_c(X)}{|C|}
+H_e(X) = \frac{ \sum_{c,o} w_{c,o}(X)}{|C| * (|D| - 1)}
 $$
 
-For Most Categories, $H(x)$ is slighly more complicated, since it is the probability of winning the majority of categories. It can be written as
+Its Most Categories counterpart $H_m(x)$ must be slighly more complicated, since it involves the probability of winning the majority of categories. It can be written as
 
 $$
-H(j)  = w_1(X) * w_2(X) * w_3(X) * w_4(X) * w_5(X) * (1-w_6(X)) * (1-w_7(X)) * (1-w_8(X)) * (1- w_9(X)) + \cdots
+H(j)  = \frac{ \sum_o w_{1,o}(X) * w_{2,o}(X) * w_{3,o}(X) * w_{4,o}(X) * w_{5,o}(X) * (1-w_{6,o}(X)) * (1-w_{7,o}(X)) * (1-w_{8,o}(X)) * (1- w_{9,o}(X)) + \cdots}{|D| -1}
 $$
 
-Where there is a term for each scenario including five or more scenario wins. $1-w(X)$ represents a category that is lost, in the sense that a $0.8$ or $80\%$ chance of winning translates to a $0.2$ or $20\%$ chance of losing.
+Where there is a term for each scenario including five or more scenario wins. $1-w(X)$ represents a category that is lost, in the sense that a $0.8$ or $80\%$ chance of winning translates to a $1.0 - 0.8 = 0.2$ or $20\%$ chance of losing.
 
 You may also note that this formula assumes that all categories are independent from each other, given a choice of $X$. Ideally the equation would allow for correlations and compute the joint probability of each scenario. However, this turns out to be massively difficult- more on that in the limitations section
 
-### 2b. Calculating $W_c(X)$
+### 2b. Calculating $W_{c,o}(X)$
 
-The discussion of static ranking lists established that point differentials between teams can be modeled as Bell curves. This can be applied in the dynamic context as well. One necessary modification is that players on team $A$ do not contribute to player-to-player variance, since they are under control of the drafter. The resulting curve can then be defined in the following way
-- The mean is $X - X_{\mu}$, where $X_{\mu}$ is the expected value of $X$ for other teams
-- The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
+The discussion of static ranking lists established that point differentials between teams can be modeled as Bell curves. This can be applied in the dynamic context as well. One necessary modification is that player selections do not contribute to variance in the same way, since the drafter controls their own future picks, and previous picks are known. With the assumption that the drafter's own future draft picks contribute no variance, the resulting curve can be defined in the following way
+- The mean is $X - X_{o_\mu}$, where $X_{o_\mu}$ is the expected value of $X$ for opponent $o$
+- The variance is (roughly) $(M- N) * m_{\sigma}^2 + 2 * N * m_{\tau}^2$, where $M$ is the number of players that each team will eventually have and $N$ is the total that the opponent has picked so far. 
 
-### 2c. Breaking down $X$ and $x_\mu$
+### 2c. Breaking down $X$ and $x_{o_\mu}$
 
 $X$ and $X_\mu$ are not particularly helpful in and of themselves, because it is not obvious how to estimate them. They are more helpful after being decomposed into components for each stage of the draft
 
-- $X = X_s + X_p + X_{\phi_1}$ where
+- $X = X_s + X_p + X_{\phi}$ where
   - $X_s$ is the aggregate statistics of team $A$'s already selected players: 
   - $X_p$ is the statistics of the candidate player
-  - $X_{\phi_1}$ is the expected statistics of unchosen players
-- $X_\mu = X_{\theta} + X_{\phi_2}$ where
-  - $X_{\theta}$ is the expected aggregate statistics of players drafted up to the round player $p$ is being drafted
-  - $X_{\phi_2}$ is the expected aggregate statistics of players drafted past the round player $p$ is being drafted
+  - $X_{\phi}$ is the expected statistics of unchosen players
+- $X_{o_\mu} = X_{o_\theta} + X_{o_\phi}$ where
+  - $X_{o_\theta}$ is the aggregate statistics of players drafted up to the round player $p$ is being drafted
+  - $X_{o_\phi}$ is the expected aggregate statistics of players drafted past the round player $p$ is being drafted
 
-  The define 
-  - $X_\delta = X_{\phi_1} - X_{\phi_2}$. In other words, how we expect the drafter's future draft statistics to differ from what would otherwise would be expected
+  Then define 
+  - $X_\delta = X_{\phi} - X_{o_\phi}$. In other words, how we expect the drafter's future draft statistics to differ from what would otherwise would be expected
 
-This allows the Bell curve's parameters to be redefined as follows 
-- The mean is $X_s + X_p - X_{\theta} + X_\delta$
-- The variance is $N * m_{\sigma}^2 + 2 * N * m_{\tau}^2$
+This allows us to redefine the Bell curve's mean to $X_s + X_p - X_{o_\theta} + X_\delta$. $X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. 
 
-Graphically, for pick four of twelve this looks like 
-
-<iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/2c8150b0-2c1a-47d1-a2a8-3f016d37fe15"> </iframe>
-
-$X_s$ is known to the drafter. Values of $X_p$ are known as a function of candidate player. $m_{\sigma}$ and $m_{\tau}$ are easily estimated, as discussed in the static context. 
-
-So every component of the equation can be accounted for, except for $X_{\theta}$ and $X_\delta$. The next sections describes how to find them
+So every component of the equation can be accounted for, except for $X_{o_\theta}$ and $X_\delta$. The next sections describes how to find them
 
 ### 2d. Estimating $X_{\theta}$
 
-$X_{\theta}$ can be estimated by finding the averages of all players drafted up to a certain round, based on a heuristic metric like G-score or Z-score. Obviously this is imprecise since real drafters won't draft according to any one statistic entirely, but it should still capture most of the effect of earlier draft picks tending to be more valuable, which is the main value of involving $X_{\theta}$
+$X_{o_\theta}$ depends on the opponent. If the opponent has already chosen one more player than the current drafter, $X_{o_\theta}$ is already known exactly. If they have instead chosen the same number of players, then some level of interpolation must be used to fill in the last player's statistics. 
+
+There are many possible ways to make this interpolation. H-scoring's method is ranking all available players by generic value (either G-score or Z-score) and then finding the ones that would be taken by the end of the round, if all drafters were picking purely by generic value. Then it takes the average stats of all of them to fill in the gap left by the extra player
 
 ### 2e. Estimating $X_\delta$
 
@@ -151,9 +152,8 @@ This shows a heavily bimodal distribution of category win rates, with a sharp pe
 ## 5. Limitations
 
 H-scoring is sophisticated but it is not a panacea and could be improved in many ways
-- The algorithm does not adjust for the choices of other drafters. If you notice another drafter pursuing a particular punting strategy, you might want to avoid that strategy for yourself so that you do not compete for the same players
-- As noted earlier, H-scoring does not take into account correlations between weekly values for a category. For example, even controlling for team composition, a team is likely to have many turnovers during a week when they also have many assists, so they are relatively unlikely to win both assists and turnovers on the same week. This matters for the Most Categories format because it can influence the probabilities of various scenarios. It is difficult to account for because it would require computing the joint cumulative density function of $X$, which is computationally extremely expensive. With the scipy implementation of multivariate normal, it would take many hours to run the algorithm for a single pick. The efficiency can be improved somewhat with smart coding logic but is still prhibitively time-consuming to implement, let alone test it across many seasons and picks
-  - Many fantasy basketball ranking sites largely ignore turnovers because they are so highly correlated with other categories, particularly assists. Modeling the effect of correlations would be able to test if that was truly appropriate, so it is unfortunate that doing so is infeasible. In the absence of evidence for auto-punting turnovers, H-scores treat them like any other category. It should also be noted that turnovers are already downweighted by G-scores and H-scores since they have high week-to-week variance, so the algorithm will value them somewhere between full Z-score weight and zero anyway 
+- The algorithm implicitly assumes that other drafters will pick players generically for their future picks, which is not always reasonable. It can adjust to some degree by the end of the draft when it knows nearly full teams, but that is not a perfect solution. One way that this could be a serious problem is if another drafter has the exact same punt build as you, and the algorithm does not realize that the players it wants most will be harder to get as a result. Manual intervention would help in that case 
+- As noted earlier, H-scoring does not take into account correlations between weekly values for a category. For example, even controlling for team composition, a team is likely to have many turnovers during a week when they also have many assists, so they are relatively unlikely to win both assists and turnovers on the same week. This matters for the Most Categories format because it can influence the probabilities of various scenarios. It is difficult to account for because it would require computing the joint cumulative density function of $X$, which is computationally extremely expensive. With the scipy implementation of multivariate normal, it would take many hours to run the algorithm for a single pick. The efficiency can be improved somewhat with smart coding logic but is still prhibitively time-consuming to implement, let alone test it across many seasons and picks. 
 - The approximation of future draft statistics smooths out outlier players. A particular strategy might seem to be weak in general, but a single outlier player can make it viable in a way that the approximation does not capture. So if you have an idea for a particular build that relies heavily on a small number of unusual players, it might be better than H-scoring would suggest 
 - The algorithm understands that it cannot pick all players of the same position with future picks through the $\nu$ parameter, but it does not adjust H-scores by position, even if the top scorers are heavily tilted towards some positions over others. It works this way because in my simulations, the greedy heuristic of simply taking the highest-scoring available player that can fit on the team at every stage of the draft does fine, and I have not found a value-above-replacement system which improves algorithm performance. However, this may be impractical for real drafting. Real fantasy basketball has no concrete rules around team construction and most drafters want to avoid accidentally constructing unbalanced teams. So you might want to pick players of new positions even if they have slightly lower H-scores e.g. If the algorithm is leaning towards centers to align with its punting strategy, and it finds a point guard that is only slightly below the top pick in terms of overall H-score, you might want to pick it
-- The extension of H-scoring to Rotisserie implemented in this tool is not described in the paper. It is similar to the Each Category algorithm, except that week-to-week variance is set to zero and it is assumed that other drafters will be drafting based on Z-scores. It has not been verified in the Rotisserie context, so there is even more reason for skepticism when interpreting its results than for the other formats
+- The extension of H-scoring to Rotisserie implemented in this tool is experimental and likely unreliable. For Rotisserie, week-to-week variance does not matter, which puts more emphasis on uncertainty in season-long averages. H-scoring's framework does not account for that kind of uncertainty 
