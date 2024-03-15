@@ -341,7 +341,7 @@ with param_tab:
         n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
         st.caption(n_iterations_str)
 
-        punting = n_iterations > 0
+        punting = (n_iterations > 0) & (omega > 0)
 
     with trade_param_column:
         st.header('Trading Parameters')
