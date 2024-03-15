@@ -691,7 +691,7 @@ elif st.session_state['mode'] == 'Season Mode':
       st.caption("""Enter which player is on which team below""")
       selections_editable = st.data_editor(selections
                                         , hide_index = True
-                                        , height = n_picks * 35 + 50  
+                                        , height = n_picks * 35 + 50)  
       selection_list = listify(selections_editable)
       player_assignments = selections_editable.to_dict('list')
 
@@ -700,13 +700,14 @@ elif st.session_state['mode'] == 'Season Mode':
 
       with right: 
 
+        roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
+        , selections.columns
+        , index = 0)
+
+        inspection_players = selections_editable[roster_inspection_seat].dropna()
+
         if len(inspection_players) == n_picks:
 
-          roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
-          , selections.columns
-          , index = 0)
-
-          inspection_players = selections_editable[roster_inspection_seat].dropna()
 
           base_h_res = get_base_h_score(info
                                         ,omega
