@@ -241,6 +241,17 @@ with param_tab:
         ,index = 0
       )
 
+      punting_levels = st.session_state.params['punting_defaults']
+
+      punting_level = st.selectbox(
+        'What level of punting do you want H-scores to apply when modeling your future draft picks?'
+        ,list(punting_levels.keys())
+        ,index = st.session_state.params['punting_default_index']
+      )
+
+      st.caption('''This option sets the default parameters for H-scoring. 
+                    For more granular control, use the Advanced tab which is next to this one''')
+
       raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
 
       player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
@@ -287,9 +298,10 @@ with param_tab:
       left_algo_param_col, right_algo_param_col = st.columns(2)
 
       with left_algo_param_col:
+
         omega = st.number_input(r'Select a $\omega$ value'
                               , key = 'omega'
-                              , value = float(st.session_state.params['options']['omega']['default'])
+                              , value = punting_levels[punting_level]['omega']
                               , min_value = float(st.session_state.params['options']['omega']['min'])
                               , max_value = float(st.session_state.params['options']['omega']['max']))
         omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
@@ -299,7 +311,7 @@ with param_tab:
       
         gamma = st.number_input(r'Select a $\gamma$ value'
                               , key = 'gamma'
-                              , value = float(st.session_state.params['options']['gamma']['default'])
+                              , value = punting_levels[punting_level]['gamma']
                               , min_value = float(st.session_state.params['options']['gamma']['min'])
                               , max_value = float(st.session_state.params['options']['gamma']['max']))
         gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
@@ -341,7 +353,7 @@ with param_tab:
         n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
         st.caption(n_iterations_str)
 
-        punting = (n_iterations > 0) & (omega > 0)
+        punting = (omega > 0) 
 
     with trade_param_column:
         st.header('Trading Parameters')
