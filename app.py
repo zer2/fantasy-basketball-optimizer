@@ -689,7 +689,9 @@ elif st.session_state['mode'] == 'Season Mode':
     with left:
 
       st.caption("""Enter which player is on which team below""")
-      selections_editable = st.data_editor(selections, hide_index = True)  
+      selections_editable = st.data_editor(selections
+                                        , hide_index = True
+                                        , height = n_picks * 35 + 50  
       selection_list = listify(selections_editable)
       player_assignments = selections_editable.to_dict('list')
 
