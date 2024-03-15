@@ -19,7 +19,7 @@ def listify(x : pd.DataFrame) -> list:
     x = x.values.tolist()
     return [item for row in x for item in row]
 
-#@st.cache_data()
+@st.cache_data()
 def make_about_tab(md_path : str):
     """Make one of the tabs on the about page
 
