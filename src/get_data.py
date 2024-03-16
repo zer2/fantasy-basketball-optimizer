@@ -254,7 +254,7 @@ def get_specified_stats(historical_df : pd.DataFrame
       df = darko_data[dataset_name].copy()
       os.write(1,bytes(str(df),'utf-8'))
   else:
-      df = historical_df.loc[int(dataset_name)].copy()
+      df = historical_df.loc[dataset_name].copy()
   
   #adjust for the display
   df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
