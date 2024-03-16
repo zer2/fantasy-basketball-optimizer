@@ -48,7 +48,7 @@ def make_team_tab(_scores : pd.DataFrame
                           , height = len(team_stats) * 35 + 38
                                                     )     
   else:
-    st.markdown('Your team does not have any players yet!')
+    st.markdown('This team does not have any players yet!')
   return team_stats
   
 @st.cache_data(show_spinner = False)
@@ -69,7 +69,7 @@ def make_team_h_tab(my_players : list[str]
       None
   """
   if len(my_players) < n_picks:
-        st.markdown('Your team is not full yet! Come back here when you have a full team')
+        st.markdown('This team is not full yet! Come back here when it is a full team')
   else:
         st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
 
