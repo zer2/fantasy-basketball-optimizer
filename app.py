@@ -26,14 +26,8 @@ st.set_page_config(page_title='Fantasy BBall Optimization'
 if 'player_stats_editable' not in st.session_state:
     st.session_state.player_stats_editable = 0
 
-if 'game_stats_editable' not in st.session_state:
-    st.session_state.game_stats_editable = 10000
-
 if 'player_stats_editable_version' not in st.session_state:
     st.session_state.player_stats_editable_version = 0
-
-if 'game_stats_editable_version' not in st.session_state:
-    st.session_state.game_stats_editable_version = 0
 
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
@@ -501,8 +495,12 @@ with rank_tab:
 
     with h_rank_tab:
       rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-      st.caption('Note that these scores are unique to the ' + scoring_format + ' format and all the H-scoring parameters defined on the parameter tab')
-      st.caption('Category scores are expected weekly win rates given approximate punt-adjusted future picks')
+      st.caption("""These rankings are based on estimates of win probability for an arbitrary head to head matchup,
+                given the candidate player is taken with the first overall pick and future picks are adjusted 
+                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated.""")
+
+      st.caption('Note that these scores are unique to the ' + scoring_format + \
+                 ' format and all the H-scoring parameters defined on the parameter tab')
       make_h_rank_tab(info
                     ,omega
                     ,gamma
