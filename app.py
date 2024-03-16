@@ -239,6 +239,7 @@ with param_tab:
         'Which dataset do you want to default to?'
         ,all_datasets
         ,index = 0
+        ,on_change = increment_player_stats_version
       )
 
       punting_levels = st.session_state.params['punting_defaults']

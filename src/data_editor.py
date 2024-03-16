@@ -62,7 +62,9 @@ def show_diff(
     version_key = key_name + '_version'
     st.session_state[version_key] += 1
 
-def make_data_editor(data, key_name, lock_in_button_str):
+def make_data_editor(data
+                    , key_name
+                    , lock_in_button_str):
 
     with st.form("Edit your data ⬇️ " + key_name):
         editor_df = st.data_editor(
