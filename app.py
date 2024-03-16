@@ -29,9 +29,6 @@ if 'player_stats_editable' not in st.session_state:
 if 'player_stats_editable_version' not in st.session_state:
     st.session_state.player_stats_editable_version = 0
 
-if 'game_stats_editable_version' not in st.session_state:
-    st.session_state.game_stats_editable_version = 0
-
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
 
