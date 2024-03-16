@@ -413,10 +413,17 @@ with param_tab:
 
 with info_tab:
 
-  stat_tab, games_played_tab, injury_tab = st.tabs([
-                  "Player Stats"
-                  ,"Game Volume"
-                  ,"Injury Status"])
+  if st.session_state['schedule']: 
+    stat_tab, injury_tab, games_played_tab = st.tabs([
+                "Player Stats"
+                ,"Injury Status"
+                ,"Game Volume"
+                ])
+  else:
+    stat_tab, injury_tab = st.tabs([
+                    "Player Stats"
+                    ,"Injury Status"])
+
 
   with stat_tab:
     st.caption(f"Per-game player projections below, from default data source. Edit as you see fit")
@@ -430,40 +437,9 @@ with info_tab:
     player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
     player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
 
-  with games_played_tab: 
-
-    #get schedule: 
-    #get game weeks: with yfpy query.get_game_weeks_by_game_id
-
-    schedule = st.session_state['schedule'] 
-    week_chosen = st.selectbox('Select a particular fantasy week, if desired'
-                              ,[None] + list(schedule.keys()))
-    if week_chosen:
-      default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
-      game_stats_default = pd.DataFrame({ 'Potential Games' : default_potential_games
-                                  }
-                                  ,index = player_stats.index
-                                    )
-
-    else:
-      game_stats_default = pd.DataFrame({ 'Potential Games' : [3] * len(player_stats)
-                                    }
-                                ,index = player_stats.index)
-
-    st.caption(f"""Projections for games played below, broken down by number of potential games and 
-                  percent actually played. Edit as you see fit""")
-                  
-    game_stats_editable = make_data_editor(game_stats_default
-                                      , key_name = 'game_stats_editable'
-                                      , lock_in_button_str = "Lock in Game Volume")
-
     effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
     for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col] * effective_games_played_percent * \
-                                                        game_stats_editable['Potential Games']
-
-    game_stats = game_stats_editable.copy()
-
+      player_stats[col] = player_stats_editable[col] * effective_games_played_percent * 3
 
   with injury_tab:
       st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
@@ -489,6 +465,26 @@ with info_tab:
       
       z_scores = info['Z-scores']
       g_scores = info['G-scores']
+
+  if st.session_state['schedule']:
+    with games_played_tab: 
+
+      #get schedule: 
+      #get game weeks: with yfpy query.get_game_weeks_by_game_id
+      schedule = st.session_state['schedule'] 
+      week_chosen = st.selectbox('Select a particular fantasy week'
+                                ,list(schedule.keys()))
+
+      default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
+      game_stats = pd.DataFrame({ 'Potential Games' : default_potential_games
+                                  }
+                                  ,index = player_stats.index
+                                    )
+
+      st.caption(f"""Projections for games played below, broken down by number of potential games.
+                    Just for reference, these do not effect projections""")
+                    
+      st.dataframe(game_stats)
 
 with rank_tab:
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
