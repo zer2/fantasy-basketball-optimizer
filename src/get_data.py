@@ -85,6 +85,9 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
                                           ,0) 
 
   agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
+
+  game_counts = df.groupby('Player').count()
+  agg_df.loc[:,'Games Played %'] = 1
   
   return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
 
@@ -102,6 +105,9 @@ def get_historical_data():
   #adjust for the fact that historical data is week-based on game-based
   all_counting_stats = st.session_state.params['counting-statistics'] + st.session_state.params['volume-statistics']
   full_df[all_counting_stats] = full_df[all_counting_stats]/3
+
+  full_df.loc[:,'Games Played %'] = 1
+
   return full_df
 
 
@@ -188,6 +194,8 @@ def get_darko_short_term(all_darko : pd.DataFrame) -> pd.DataFrame:
   """
   
   darko_short_term = all_darko.fillna(0)  
+  darko_short_term.loc[:,'Games Played %'] = 1
+
   return darko_short_term
 
 
@@ -227,6 +235,8 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
     darko_long_term.loc[:,'Field Goal %'] = (twos_made + threes_made)/(two_attempts + three_attempts)
     darko_long_term.loc[:,'Free Throw %'] = darko_long_term.loc[:,'Free Throw %']
 
+    darko_long_term.loc[:,'Games Played %'] = 1
+
     return darko_long_term
 
 #setting show spinner to false prevents flickering
@@ -259,6 +269,7 @@ def get_specified_stats(historical_df : pd.DataFrame
   #adjust for the display
   df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
   df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
+  df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
 
   df.index = df.index + ' (' + df['Position'] + ')'
   df.index.name = 'Player'

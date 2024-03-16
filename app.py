@@ -441,14 +441,12 @@ with info_tab:
     if week_chosen:
       default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
       game_stats_default = pd.DataFrame({ 'Potential Games' : default_potential_games
-                                  ,'Percent of Games Played' : [100] * len(player_stats)
                                   }
                                   ,index = player_stats.index
                                     )
 
     else:
       game_stats_default = pd.DataFrame({ 'Potential Games' : [3] * len(player_stats)
-                                    ,'Percent of Games Played' : [100] * len(player_stats)
                                     }
                                 ,index = player_stats.index)
 
@@ -459,11 +457,13 @@ with info_tab:
                                       , key_name = 'game_stats_editable'
                                       , lock_in_button_str = "Lock in Game Volume")
 
-    game_stats = game_stats_editable.copy()
-    game_stats['Percent of Games Played'] = 1 - psi * (1- game_stats['Percent of Games Played']/100)
-
+    effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
     for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col] * game_stats.prod(axis = 1)
+      player_stats[col] = player_stats_editable[col] * effective_games_played_percent * \
+                                                        game_stats_editable['Potential Games']
+
+    game_stats = game_stats_editable.copy()
+
 
   with injury_tab:
       st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")

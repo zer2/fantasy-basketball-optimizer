@@ -15,6 +15,7 @@ volume-statistics:
   - Free Throw Attempts
 other-columns:
   - Position
+  - Games Played %
 api-renamer: 
  PLAYER_NAME : Player
  PTS : Points
