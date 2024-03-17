@@ -201,6 +201,9 @@ with param_tab:
                                                                         , auth_dir
                                                                         , player_metadata)
 
+            st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(yahoo_league_id
+                                    , auth_dir)
+
             yahoo_connect.clean_up_access_token(auth_dir)
             
             st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
@@ -736,15 +739,62 @@ elif st.session_state['mode'] == 'Season Mode':
 
   with matchup_tab:
 
-    if scoring_format == 'roto':
-      st.write('No matchups for Rotisserie')
-    else:
-      make_matchup_tab(info['X-scores']
-                      ,selections_editable
-                      ,scoring_format
-                      ,st.session_state.info_key
-                      )
+    if (mode == 'Draft Mode') or not st.session_state.schedule:
 
+      if scoring_format == 'roto':
+        st.write('No matchups for Rotisserie')
+      else:
+        make_matchup_matrix(info['X-scores']
+                        ,selections_editable
+                        ,scoring_format
+                        ,st.session_state.info_key
+                        )
+
+    else:
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+          matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
+                                            , selections.columns
+                                            , index = 0)
+        
+        with c2:
+          matchup_week = st.selectbox(f'For which week?'
+                                    , st.session_state['schedule'].keys()
+                                    , index = 0)
+
+          week_number = int(matchup_week.split(':')[0].split(' ')[1])
+
+          relevant_matchups = st.session_state['matchups'][matchup_seat]
+
+        if week_number in relevant_matchups.keys():
+
+          opponent_seat = relevant_matchups[int(week_number)].teams[1].name.decode('UTF-8')
+
+          st.write(matchup_seat + "'s opponent for that week is " + \
+                  opponent_seat + ". Predicted win likelihoods below")
+
+        else:
+          with c3: 
+            opponent_seat = st.selectbox(f'Against which team?'
+                                              , [s for s in selections.columns if s != matchup_seat]
+                                              , index = 0)
+          st.write('Predicted win likelihoods below')
+
+        make_matchup_tab(player_stats
+                        , selections
+                        , matchup_seat
+                        , opponent_seat
+                        , matchup_week
+                        , n_picks
+                        , n_drafters
+                        , conversion_factors
+                        , multipliers
+                        , psi
+                        , nu
+                        , scoring_format )
+        ######## END TAB
   with waiver_tab:
 
       c1, c2 = st.columns([0.5,0.5])

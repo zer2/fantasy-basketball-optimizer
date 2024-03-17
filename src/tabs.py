@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
 from src.run_algorithm import HAgent, estimate_matchup_result, analyze_trade, analyze_trade_value
+from src.process_player_data import process_player_data
 import os
 import itertools
   
@@ -202,7 +203,7 @@ def make_waiver_tab(_scores : pd.DataFrame
   st.dataframe(new_styled, use_container_width = True, hide_index = True) 
 
 @st.cache_data(show_spinner = False)
-def make_matchup_tab(_x_scores : pd.DataFrame
+def make_matchup_matrix(_x_scores : pd.DataFrame
                   , selections : pd.DataFrame
                   , scoring_format : str
                   , info_key : int):
@@ -236,13 +237,13 @@ def make_matchup_tab(_x_scores : pd.DataFrame
         team_1_x_scores = team_stats[combo[0]]
         team_2_x_scores = team_stats[combo[1]]
 
-        result = estimate_matchup_result(team_1_x_scores
+        result, _  = estimate_matchup_result(team_1_x_scores
                               , team_2_x_scores
                               , n_picks
                               , scoring_format)
 
-        matchup_df.loc[combo[1],combo[0]] = result
-        matchup_df.loc[combo[0],combo[1]] = 1 - result
+        matchup_df.loc[combo[1],combo[0]] = 1- result
+        matchup_df.loc[combo[0],combo[1]] = result
 
       for team in selections_full.columns:
         matchup_df.loc[team,team] = 0.5
@@ -282,6 +283,54 @@ def make_matchup_tab(_x_scores : pd.DataFrame
       st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
             "Drafting & Teams" page then come back here""")
 
+@st.cache_data()
+def make_matchup_tab(player_stats
+                  , selections
+                  , matchup_seat
+                  , opponent_seat
+                  , matchup_week
+                  , n_picks
+                  , n_drafters
+                  , conversion_factors
+                  , multipliers
+                  , psi
+                  , nu
+                  , scoring_format):
+  ### BELOW HERE SHOULD BE IN A CACHED TAB
+  potential_games = st.session_state['schedule'][matchup_week].reindex(player_stats.index).fillna(3)
+  week_number = int(matchup_week.split(':')[0].split(' ')[1])
+
+  week_specific_player_stats = player_stats.copy()
+
+  effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
+
+  for col in st.session_state.params['counting-statistics']  + st.session_state.params['volume-statistics'] :
+    week_specific_player_stats[col] = week_specific_player_stats[col] * effective_games_played_percent * \
+                                                                        potential_games/3
+  #ZR: WE should really clean up this keying mechanism
+  week_specific_info = process_player_data(week_specific_player_stats
+                        ,conversion_factors
+                        ,multipliers
+                        ,psi
+                        ,nu
+                        ,n_drafters
+                        ,n_picks
+                        ,st.session_state.player_stats_editable_version + week_number*100)
+  
+  week_specific_x_scores = week_specific_info['X-scores']
+
+  team_1_x_scores = week_specific_x_scores.loc[selections[matchup_seat]].sum(axis = 0)
+  team_2_x_scores = week_specific_x_scores.loc[selections[opponent_seat]].sum(axis = 0)
+
+  result, win_probabilities = estimate_matchup_result(team_1_x_scores
+                        , team_2_x_scores
+                        , n_picks
+                        , scoring_format)
+
+  win_probabilities.loc[:,'Overall'] = result
+  win_probabilities = win_probabilities[['Overall'] + get_categories()]
+  win_probabilities_styled = h_percentage_styler(win_probabilities)
+  st.dataframe(win_probabilities_styled, hide_index = True)
 
 @st.cache_data(show_spinner = False)
 def get_base_h_score(_info : dict

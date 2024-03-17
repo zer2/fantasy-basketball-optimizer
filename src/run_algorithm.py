@@ -529,11 +529,12 @@ class SimpleAgent():
 
         return player
 
+@st.cache_data()
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
                             , n_picks : int
                             , scoring_format : str) -> float:
-    """Based on X scores, estimates the result of a matchup
+    """Based on X scores, estimates the result of a matchup. Chance that team 1 will beat team 2
 
     Args:
       team_1_x_scores: Series of x-scores for one team
@@ -545,7 +546,7 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
       Dictionary with results of the trade
     """
 
-    cdf_estimates = pd.DataFrame(norm.cdf(team_2_x_scores - team_1_x_scores
+    cdf_estimates = pd.DataFrame(norm.cdf(team_1_x_scores - team_2_x_scores
                                         , scale = np.sqrt(n_picks*2)
                                         )
                             ).T
@@ -560,7 +561,8 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
     else:
         score = cdf_array.mean() 
 
-    return float(score)
+    cdf_estimates.columns = get_categories()
+    return float(score), cdf_estimates
 
 
 def analyze_trade(team_1
