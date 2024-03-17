@@ -15,6 +15,10 @@ from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
 
+#from streamlit_profiler import Profiler
+
+#with Profiler():
+
 
 ### SETUP
 st.set_page_config(page_title='Fantasy BBall Optimization'
@@ -503,7 +507,8 @@ with rank_tab:
                 accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated.""")
 
       st.caption('Note that these scores are unique to the ' + scoring_format + \
-                 ' format and all the H-scoring parameters defined on the parameter tab')
+                ' format and all the H-scoring parameters defined on the parameter tab')
+
       make_h_rank_tab(info
                     ,omega
                     ,gamma
