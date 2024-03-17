@@ -237,7 +237,7 @@ def make_matchup_matrix(_x_scores : pd.DataFrame
         team_1_x_scores = team_stats[combo[0]]
         team_2_x_scores = team_stats[combo[1]]
 
-        result = estimate_matchup_result(team_1_x_scores
+        result, _  = estimate_matchup_result(team_1_x_scores
                               , team_2_x_scores
                               , n_picks
                               , scoring_format)
@@ -283,7 +283,7 @@ def make_matchup_matrix(_x_scores : pd.DataFrame
       st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
             "Drafting & Teams" page then come back here""")
 
-
+@st.cache_data()
 def make_matchup_tab(player_stats
                   , selections
                   , matchup_seat
@@ -322,11 +322,15 @@ def make_matchup_tab(player_stats
   team_1_x_scores = week_specific_x_scores.loc[selections[matchup_seat]].sum(axis = 0)
   team_2_x_scores = week_specific_x_scores.loc[selections[opponent_seat]].sum(axis = 0)
 
-  result = estimate_matchup_result(team_1_x_scores
+  result, win_probabilities = estimate_matchup_result(team_1_x_scores
                         , team_2_x_scores
                         , n_picks
                         , scoring_format)
-  st.write(result)
+
+  win_probabilities.loc[:,'Overall'] = result
+  win_probabilities = win_probabilities[['Overall'] + get_categories()]
+  win_probabilities_styled = h_percentage_styler(win_probabilities)
+  st.dataframe(win_probabilities_styled, hide_index = True)
 
 @st.cache_data(show_spinner = False)
 def get_base_h_score(_info : dict

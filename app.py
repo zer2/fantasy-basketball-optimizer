@@ -739,7 +739,7 @@ elif st.session_state['mode'] == 'Season Mode':
 
   with matchup_tab:
 
-    if mode == 'Draft Mode':
+    if (mode == 'Draft Mode') or not st.session_state.schedule:
 
       if scoring_format == 'roto':
         st.write('No matchups for Rotisserie')
@@ -752,27 +752,35 @@ elif st.session_state['mode'] == 'Season Mode':
 
     else:
 
-        matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
-                                          , selections.columns
-                                          , index = 0)
-        matchup_week = st.selectbox(f'For which week?'
-                                  , schedule.keys()
-                                  , index = 0)
+        c1, c2, c3 = st.columns(3)
 
-        week_number = int(matchup_week.split(':')[0].split(' ')[1])
+        with c1:
+          matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
+                                            , selections.columns
+                                            , index = 0)
+        
+        with c2:
+          matchup_week = st.selectbox(f'For which week?'
+                                    , st.session_state['schedule'].keys()
+                                    , index = 0)
 
-        relevant_matchups = st.session_state['matchups'][matchup_seat]
+          week_number = int(matchup_week.split(':')[0].split(' ')[1])
+
+          relevant_matchups = st.session_state['matchups'][matchup_seat]
 
         if week_number in relevant_matchups.keys():
 
           opponent_seat = relevant_matchups[int(week_number)].teams[1].name.decode('UTF-8')
 
-          st.write('The opponent is ' + opponent_seat)
+          st.write(matchup_seat + "'s opponent for that week is " + \
+                  opponent_seat + ". Predicted win likelihoods below")
 
         else:
-          opponent_seat = st.selectbox(f'Against which team?'
-                                            , [s for s in selections.columns if s != matchup_seat]
-                                            , index = 0)
+          with c3: 
+            opponent_seat = st.selectbox(f'Against which team?'
+                                              , [s for s in selections.columns if s != matchup_seat]
+                                              , index = 0)
+          st.write('Predicted win likelihoods below')
 
         make_matchup_tab(player_stats
                         , selections

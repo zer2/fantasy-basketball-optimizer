@@ -529,6 +529,7 @@ class SimpleAgent():
 
         return player
 
+@st.cache_data()
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
                             , n_picks : int
@@ -560,7 +561,8 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
     else:
         score = cdf_array.mean() 
 
-    return float(score)
+    cdf_estimates.columns = get_categories()
+    return float(score), cdf_estimates
 
 
 def analyze_trade(team_1

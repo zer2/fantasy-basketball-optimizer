@@ -62,12 +62,14 @@ def h_percentage_styler(df : pd.DataFrame
   Returns:
     Styled dataframe
   """
+  perc_column = 'H-score' if 'H-score' in df.columns else 'Overall'
+
   df_styled = df.style.format("{:.2%}"
-                                , subset = pd.IndexSlice[:,['H-score']] ) \
+                                , subset = pd.IndexSlice[:,[perc_column]] ) \
                           .format("{:.1%}"
                                 , subset = pd.IndexSlice[:,get_categories()]) \
                           .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
+                                , subset = pd.IndexSlice[:,[perc_column]]) \
                           .map(stat_styler
                               , middle = middle
                               , multiplier = multiplier
