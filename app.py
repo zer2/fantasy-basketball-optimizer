@@ -772,15 +772,16 @@ elif st.session_state['mode'] == 'Season Mode':
 
           opponent_seat = relevant_matchups[int(week_number)].teams[1].name.decode('UTF-8')
 
-          st.write(matchup_seat + "'s opponent for that week is " + \
-                  opponent_seat + ". Predicted win likelihoods below")
+          st.write(matchup_seat + "'s opponent for week " + str(week_number) + " is " + \
+                  opponent_seat)
 
         else:
           with c3: 
             opponent_seat = st.selectbox(f'Against which team?'
                                               , [s for s in selections.columns if s != matchup_seat]
                                               , index = 0)
-          st.write('Predicted win likelihoods below')
+        st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
+                  expected game volume for each player based on the NBA's schedule""")
 
         make_matchup_tab(player_stats
                         , selections
