@@ -509,7 +509,6 @@ with rank_tab:
       st.caption('Note that these scores are unique to the ' + scoring_format + \
                 ' format and all the H-scoring parameters defined on the parameter tab')
 
-      st.write(st.session_state.info_key)
       make_h_rank_tab(info
                     ,omega
                     ,gamma
