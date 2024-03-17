@@ -240,6 +240,24 @@ def get_yahoo_weeks(league_id: str, _auth_path: str) -> dict[int, str]:
 
     return weeks
 
+@st.cache_resource(ttl=3600
+            , show_spinner = "Fetching matchup details from Yahoo. This should take about twenty seconds")
+def get_yahoo_matchups(league_id: str, _auth_path: str) -> dict[int, str]:
+    LOGGER.info(f"League id: {league_id}")
+
+    teams = get_teams_dict(league_id, _auth_path)
+
+    sc = YahooFantasySportsQuery(
+        auth_dir=_auth_path,
+        league_id=league_id,
+        game_code="nba"
+    )
+    
+    LOGGER.info(f"sc: {sc}")
+    matchups = {team_name : {matchup.week : matchup for matchup in sc.get_team_matchups(team_id)} \
+                        for team_id, team_name in teams.items()}
+    return matchups
+
 @st.cache_resource(ttl=3600)
 def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Series) -> dict[int, str]:
     yahoo_weeks = get_yahoo_weeks(league_id, _auth_path)
