@@ -15,1060 +15,1066 @@ from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
 
+from streamlit_profiler import Profiler
 
-### SETUP
-st.set_page_config(page_title='Fantasy BBall Optimization'
-          , page_icon=':basketball:'
-          , layout="wide"
-          , initial_sidebar_state="auto"
-          , menu_items=None)
+with Profiler():
 
-if 'player_stats_editable' not in st.session_state:
-    st.session_state.player_stats_editable = 0
 
-if 'player_stats_editable_version' not in st.session_state:
-    st.session_state.player_stats_editable_version = 0
+  ### SETUP
+  st.set_page_config(page_title='Fantasy BBall Optimization'
+            , page_icon=':basketball:'
+            , layout="wide"
+            , initial_sidebar_state="auto"
+            , menu_items=None)
 
-if 'info_key' not in st.session_state:
-    st.session_state.info_key = 100000
+  if 'player_stats_editable' not in st.session_state:
+      st.session_state.player_stats_editable = 0
 
-if 'run_h_score' not in st.session_state:
-    st.session_state.run_h_score = False
+  if 'player_stats_editable_version' not in st.session_state:
+      st.session_state.player_stats_editable_version = 0
 
-if 'injured_players' not in st.session_state:
-    st.session_state['injured_players'] = set()
+  if 'info_key' not in st.session_state:
+      st.session_state.info_key = 100000
 
-if 'schedule' not in st.session_state:
-    st.session_state['schedule'] = {}
+  if 'run_h_score' not in st.session_state:
+      st.session_state.run_h_score = False
 
-if 'mode' not in st.session_state:
-    st.session_state['mode'] = 'Draft Mode'
+  if 'injured_players' not in st.session_state:
+      st.session_state['injured_players'] = set()
 
-if 'selections_editable_original' not in st.session_state:
-    st.session_state['selections_editable_original'] = pd.DataFrame()
+  if 'schedule' not in st.session_state:
+      st.session_state['schedule'] = {}
 
-def run_h_score():
-    st.session_state.run_h_score = True
+  if 'mode' not in st.session_state:
+      st.session_state['mode'] = 'Draft Mode'
 
-def stop_run_h_score():
-    st.session_state.run_h_score = False
+  if 'selections_editable_original' not in st.session_state:
+      st.session_state['selections_editable_original'] = pd.DataFrame()
 
-def increment_player_stats_version():
-  st.session_state.player_stats_editable_version += 1
+  def run_h_score():
+      st.session_state.run_h_score = True
 
-if 'params' not in st.session_state:
-  with open("parameters.yaml", "r") as stream:
-      try:
-        st.session_state.params = yaml.safe_load(stream)
-      except yaml.YAMLError as exc:
-          print(exc) 
+  def stop_run_h_score():
+      st.session_state.run_h_score = False
 
-counting_statistics = st.session_state.params['counting-statistics'] 
-volume_statistics = st.session_state.params['volume-statistics'] 
+  def increment_player_stats_version():
+    st.session_state.player_stats_editable_version += 1
 
-historical_df = get_historical_data()
-current_data, expected_minutes = get_current_season_data()
-darko_data = get_darko_data(expected_minutes)
+  if 'params' not in st.session_state:
+    with open("parameters.yaml", "r") as stream:
+        try:
+          st.session_state.params = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc) 
 
-coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
+  counting_statistics = st.session_state.params['counting-statistics'] 
+  volume_statistics = st.session_state.params['volume-statistics'] 
 
-st.title('Optimization for Fantasy Basketball :basketball:')
+  historical_df = get_historical_data()
+  current_data, expected_minutes = get_current_season_data()
+  darko_data = get_darko_data(expected_minutes)
 
-### Build app 
+  coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
-if st.session_state['mode'] == 'Draft Mode':
-  main_tabs = st.tabs([":control_knobs: Parameters"
-              ,":bar_chart: Player Info"
-              ,":first_place_medal: Player Scores & Rankings"
-              ,":man-bouncing-ball: Drafting"
-              ,":scroll: About"])
+  st.title('Optimization for Fantasy Basketball :basketball:')
 
-  param_tab = main_tabs[0]
-  info_tab = main_tabs[1]
-  rank_tab = main_tabs[2]
-  draft_tab = main_tabs[3]
-  about_tab = main_tabs[4]
-                
-elif st.session_state['mode'] == 'Season Mode':
-  main_tabs = st.tabs([":control_knobs: Parameters"
-                  ,":bar_chart: Player Info"
-                  ,":first_place_medal: Player Scores & Rankings"
-                  ,":stadium: Rosters"
-                  ,":crossed_swords: Matchups"
-                  ,":man_standing: Waiver Wire & Free Agents"
-                  ,":clipboard: Trading"
-                  ,":scroll: About"])
+  ### Build app 
 
-  param_tab = main_tabs[0]
-  info_tab = main_tabs[1]
-  rank_tab = main_tabs[2]
-  rosters_tab = main_tabs[3]
-  matchup_tab = main_tabs[4]
-  waiver_tab = main_tabs[5]
-  trade_tab = main_tabs[6]
-  about_tab = main_tabs[7]
-                
-with param_tab: 
+  if st.session_state['mode'] == 'Draft Mode':
+    main_tabs = st.tabs([":control_knobs: Parameters"
+                ,":bar_chart: Player Info"
+                ,":first_place_medal: Player Scores & Rankings"
+                ,":man-bouncing-ball: Drafting"
+                ,":scroll: About"])
 
-  general_params, advanced_params = st.tabs(['General','Advanced'])
+    param_tab = main_tabs[0]
+    info_tab = main_tabs[1]
+    rank_tab = main_tabs[2]
+    draft_tab = main_tabs[3]
+    about_tab = main_tabs[4]
+                  
+  elif st.session_state['mode'] == 'Season Mode':
+    main_tabs = st.tabs([":control_knobs: Parameters"
+                    ,":bar_chart: Player Info"
+                    ,":first_place_medal: Player Scores & Rankings"
+                    ,":stadium: Rosters"
+                    ,":crossed_swords: Matchups"
+                    ,":man_standing: Waiver Wire & Free Agents"
+                    ,":clipboard: Trading"
+                    ,":scroll: About"])
 
-  with general_params:
+    param_tab = main_tabs[0]
+    info_tab = main_tabs[1]
+    rank_tab = main_tabs[2]
+    rosters_tab = main_tabs[3]
+    matchup_tab = main_tabs[4]
+    waiver_tab = main_tabs[5]
+    trade_tab = main_tabs[6]
+    about_tab = main_tabs[7]
+                  
+  with param_tab: 
 
-    c1, c2 = st.columns(2)
+    general_params, advanced_params = st.tabs(['General','Advanced'])
 
-    with c1: 
+    with general_params:
 
-      mode = st.selectbox(
-        'Which mode do you want to use?',
-        ('Draft Mode', 'Season Mode')
-        , index = 0
-        , key = 'mode')
+      c1, c2 = st.columns(2)
 
-      # Setting default values
-      n_drafters = st.session_state.params['options']['n_drafters']['default']
-      n_picks = st.session_state.params['options']['n_picks']['default']
+      with c1: 
 
-      if st.session_state['mode'] == 'Season Mode':
+        mode = st.selectbox(
+          'Which mode do you want to use?',
+          ('Draft Mode', 'Season Mode')
+          , index = 0
+          , key = 'mode')
 
-        data_source = st.selectbox(
-          'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
-          ('Enter your own data', 'Retrieve from Yahoo Fantasy')
-          , index = 0)
+        # Setting default values
+        n_drafters = st.session_state.params['options']['n_drafters']['default']
+        n_picks = st.session_state.params['options']['n_picks']['default']
 
-      else:
-        data_source = 'Enter your own data'
-        
-      if data_source == 'Enter your own data':
-        n_drafters = st.number_input(r'How many drafters are in your league?'
-                                      , key = 'n_drafters'
-                                      , min_value = st.session_state.params['options']['n_drafters']['min']
-                                      , value = st.session_state.params['options']['n_drafters']['default']
-                                      )
+        if st.session_state['mode'] == 'Season Mode':
 
-        n_picks = st.number_input(r'How many players will each drafter choose?'
-                      , key = 'n_picks'
-                      , min_value = st.session_state.params['options']['n_picks']['min']
-                      , value = st.session_state.params['options']['n_picks']['default'])
-                      
-        # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-        
-        selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+          data_source = st.selectbox(
+            'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
+            ('Enter your own data', 'Retrieve from Yahoo Fantasy')
+            , index = 0)
 
-      else:
-
-        selections = None
-
-        auth_dir = yahoo_connect.get_yahoo_access_token()
-
-        if auth_dir is not None:
-
-          user_leagues = yahoo_connect.get_user_leagues(auth_dir)
-
-          get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
-
-          yahoo_league = st.selectbox(
-            label='Which league should player data be pulled from?',
-            options=user_leagues,
-            format_func=get_league_labels,
-            index=None
-          )
+        else:
+          data_source = 'Enter your own data'
           
-          if yahoo_league is not None:
-
-            yahoo_league_id = yahoo_league.league_id
-
-            player_metadata = get_player_metadata()
-
-            team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, yahoo_league_id, player_metadata)
-            n_drafters = team_players_df.shape[1]
-            n_picks = team_players_df.shape[0]
-
-            #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
-            
-            selections = team_players_df
-
-            #Just trying for now!
-            player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, auth_dir, player_metadata)
-
-            st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
-                                                                    (player_statuses['Status'] == 'INJ')
-                                                                    ]
-                                                                    )
-                                                            )
-                                                      )
-
-            st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(yahoo_league_id
-                                                                        , auth_dir
-                                                                        , player_metadata)
-
-            st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(yahoo_league_id
-                                    , auth_dir)
-
-            yahoo_connect.clean_up_access_token(auth_dir)
-            
-            st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
-
-        if selections is None:
-          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
-
-    with c2: 
-    
-      scoring_format = st.selectbox(
-        'Which format are you playing?',
-        ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
-        , index = 1)
-    
-      if scoring_format == 'Rotisserie':
-        st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
-      else:
-        st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
-
-      rotisserie = scoring_format == 'Rotisserie'
-
-      unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
-      unique_datasets_current = list(current_data.keys())
-      unique_datasets_darko = list(darko_data.keys())
-
-      all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
-      all_datasets.reverse()
-        
-      dataset_name = st.selectbox(
-        'Which dataset do you want to default to?'
-        ,all_datasets
-        ,index = 0
-        ,on_change = increment_player_stats_version
-      )
-
-      punting_levels = st.session_state.params['punting_defaults']
-
-      punting_level = st.selectbox(
-        'What level of punting do you want H-scores to apply when modeling your future draft picks?'
-        ,list(punting_levels.keys())
-        ,index = st.session_state.params['punting_default_index']
-      )
-
-      st.caption('''This option sets the default parameters for H-scoring. 
-                    For more granular control, use the Advanced tab which is next to this one''')
-
-      raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
-
-      player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-      selections = selections.astype(player_category_type)
-      
-
-  with advanced_params:
-
-    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
-
-    with player_param_column:
-      st.header('Player Statistics')
-
-      psi = st.number_input(r'Select a $\psi$ value'
-                        , key = 'psi'
-                        , min_value = float(st.session_state.params['options']['psi']['min'])
-                        , value = float(st.session_state.params['options']['psi']['default'])
-                      , max_value = float(st.session_state.params['options']['psi']['max']))
-      psi_str = r'''$\psi$ controls how injury rates are dealt with. For example is if $\psi$ is $50\%$ and a 
-                    player is expected to miss $20\%$ of games, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
-    
-      st.caption(psi_str)
-
-      mult_col, coef_col = st.columns(2)
-    
-      st.subheader(f"Multipliers")
-
-      multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
-                                  , index = coefficient_df.index).T
-      multipliers = st.data_editor(multiplier_df, hide_index = True)
-      multipliers = multipliers.T
-  
-      st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
-        
-      st.subheader(f"Coefficients")
-      conversion_factors = st.data_editor(coefficient_df.T, hide_index = True)
-      conversion_factors = conversion_factors.T                                                      
-
-      st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
-
-    with algorithm_param_column:
-      st.header('H-scoring Parameters')
-
-      left_algo_param_col, right_algo_param_col = st.columns(2)
-
-      with left_algo_param_col:
-
-        omega = st.number_input(r'Select a $\omega$ value'
-                              , key = 'omega'
-                              , value = punting_levels[punting_level]['omega']
-                              , min_value = float(st.session_state.params['options']['omega']['min'])
-                              , max_value = float(st.session_state.params['options']['omega']['max']))
-        omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
-                        it quantifies how much better the optimal player choice will be compared to the player that would be 
-                        chosen with baseline weights'''
-        st.caption(omega_str)
-      
-        gamma = st.number_input(r'Select a $\gamma$ value'
-                              , key = 'gamma'
-                              , value = punting_levels[punting_level]['gamma']
-                              , min_value = float(st.session_state.params['options']['gamma']['min'])
-                              , max_value = float(st.session_state.params['options']['gamma']['max']))
-        gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
-                tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-                players that  work best for its strategy'''
-        st.caption(gamma_str)
-    
-        nu = st.number_input(r'Select a $\nu$ value'
-                          , key = 'nu'
-                          , value = float(st.session_state.params['options']['nu']['default'])
-                          , min_value = float(st.session_state.params['options']['nu']['min'])
-                          , max_value = float(st.session_state.params['options']['nu']['max']))
-        nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
-                    if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
-        st.caption(nu_str)
-
-      with right_algo_param_col:
-        alpha = st.number_input(r'Select a $\alpha$ value'
-                          , key = 'alpha'
-                          , value = float(st.session_state.params['options']['alpha']['default'])
-                          , min_value = float(st.session_state.params['options']['alpha']['min'])
-                          , max_value = float(st.session_state.params['options']['alpha']['max']))
-        alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
-        st.caption(alpha_str)
-    
-        beta = st.number_input(r'Select a $\beta$ value'
-                              , key = 'beta'
-                              , value = float(st.session_state.params['options']['beta']['default'])
-                              , min_value = float(st.session_state.params['options']['beta']['min'])
-                              , max_value = float(st.session_state.params['options']['beta']['max']))
-        beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
-        st.caption(beta_str)
-    
-        n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
-                                  , key = 'n_iterations'
-                                  , value = st.session_state.params['options']['n_iterations']['default']
-                                  , min_value = st.session_state.params['options']['n_iterations']['min']
-                                  , max_value = st.session_state.params['options']['n_iterations']['max'])
-        n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
-        st.caption(n_iterations_str)
-
-        punting = (omega > 0) 
-
-    with trade_param_column:
-        st.header('Trading Parameters')
-
-        your_differential_threshold = st.number_input(
-              r'Your differential threshold for the automatic trade suggester'
-              , value = 0)
-        ydt_str = r'''Only trades which improve your H-score 
-                      by the threshold (as a percentage) will be shown'''
-        st.caption(ydt_str)
-        your_differential_threshold = your_differential_threshold /100
-
-        their_differential_threshold = st.number_input(
-              r'Counterparty differential threshold for the automatic trade suggester'
-              , value = 0)
-        tdt_str = r'''Only trades which improve the counterparty's H-score 
-                    by the threshold (as a percentage) will be shown'''
-        st.caption(tdt_str)
-        their_differential_threshold = their_differential_threshold/100
-
-        with st.form("Combo params"):
-          combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
-                                        ,'N-received' : [1,2,3]
-                                        ,'T1' : [0,0,0]
-                                        ,'T2' : [1,0.25,0.1]}
+        if data_source == 'Enter your own data':
+          n_drafters = st.number_input(r'How many drafters are in your league?'
+                                        , key = 'n_drafters'
+                                        , min_value = st.session_state.params['options']['n_drafters']['min']
+                                        , value = st.session_state.params['options']['n_drafters']['default']
                                         )
 
-          combo_params_df = st.data_editor(combo_params_default
-                                            , hide_index = True
-                                            , num_rows = "dynamic"
-                                            , column_config={
-                              "N-traded": st.column_config.NumberColumn("N-traded", default=1)
-                              ,"N-received": st.column_config.NumberColumn("N-received", default=1)
-                              ,"T1": st.column_config.NumberColumn("T1", default=0)
-                              ,"T2": st.column_config.NumberColumn("T2", default=0)
-
-                                                      }
-                                              ) 
-          combo_params_df[['N-traded','N-received']] = \
-                combo_params_df[['N-traded','N-received']].astype(int)
-
-          combo_params_df['T1'] = combo_params_df['T1']/100
+          n_picks = st.number_input(r'How many players will each drafter choose?'
+                        , key = 'n_picks'
+                        , min_value = st.session_state.params['options']['n_picks']['min']
+                        , value = st.session_state.params['options']['n_picks']['default'])
+                        
+          # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
           
-          submitted = st.form_submit_button("Submit", use_container_width = True)
+          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
-        combo_params_str =  \
-          """Each row is a specification for a kind of trade that will be automatically evaluated. 
-          N-traded is the number of players traded from your team, and N-received is the number of 
-          players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
-          column. Only players with the specified targetedness or above will be considered. T2 is a 
-          threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
-          differences larger than T2 will not be evaluated"""
-        st.caption(combo_params_str)
+        else:
 
-        combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
+          selections = None
 
-with info_tab:
+          auth_dir = yahoo_connect.get_yahoo_access_token()
 
-  if st.session_state['schedule']: 
-    stat_tab, injury_tab, games_played_tab = st.tabs([
-                "Player Stats"
-                ,"Injury Status"
-                ,"Game Volume"
-                ])
-  else:
-    stat_tab, injury_tab = st.tabs([
-                    "Player Stats"
-                    ,"Injury Status"])
+          if auth_dir is not None:
 
+            user_leagues = yahoo_connect.get_user_leagues(auth_dir)
 
-  with stat_tab:
-    st.caption(f"Per-game player projections below, from default data source. Edit as you see fit")
+            get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
 
-    player_stats_editable = make_data_editor(raw_stats_df
-                                        , key_name = 'player_stats_editable'
-                                        , lock_in_button_str = "Lock in Player Stats")
-    player_stats = player_stats_editable.copy()
-
-    #re-adjust from user inputs
-    player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
-    player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-
-    effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
-    for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col] * effective_games_played_percent * 3
-
-  with injury_tab:
-      st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-      default_injury_list = [p for p in st.session_state['injured_players'] \
-                              if (p in player_stats.index) and (not (p in listify(selections))) 
-                              ]
-      
-      injured_players = st.multiselect('Injured players'
-                              , player_stats.index
-                              , default = default_injury_list
-                              , on_change = increment_player_stats_version)
-
-      player_stats = player_stats.drop(injured_players)
-      info = process_player_data(player_stats
-                              ,conversion_factors
-                              ,multipliers
-                              ,psi
-                              ,nu
-                              ,n_drafters
-                              ,n_picks
-                              ,st.session_state.player_stats_editable_version)
-      st.session_state.info = info #useful for testing
-      
-      z_scores = info['Z-scores']
-      g_scores = info['G-scores']
-
-  if st.session_state['schedule']:
-    with games_played_tab: 
-
-      #get schedule: 
-      #get game weeks: with yfpy query.get_game_weeks_by_game_id
-      schedule = st.session_state['schedule'] 
-      week_chosen = st.selectbox('Select a particular fantasy week'
-                                ,list(schedule.keys()))
-
-      default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
-      game_stats = pd.DataFrame({ 'Potential Games' : default_potential_games
-                                  }
-                                  ,index = player_stats.index
-                                    )
-
-      st.caption(f"""Projections for games played below, broken down by number of potential games.
-                    Just for reference, these do not effect projections""")
-                    
-      st.dataframe(game_stats)
-
-with rank_tab:
-    z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
-      
-    with z_rank_tab:
-      make_rank_tab(z_scores
-                    , st.session_state.params['z-score-player-multiplier']
-                    , st.session_state.info_key)  
-
-    with g_rank_tab:
-      make_rank_tab(g_scores
-                    , st.session_state.params['g-score-player-multiplier']
-                    , st.session_state.info_key)  
-
-    with h_rank_tab:
-      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-      st.caption("""These rankings are based on estimates of win probability for an arbitrary head to head matchup,
-                given the candidate player is taken with the first overall pick and future picks are adjusted 
-                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated.""")
-
-      st.caption('Note that these scores are unique to the ' + scoring_format + \
-                 ' format and all the H-scoring parameters defined on the parameter tab')
-      make_h_rank_tab(info
-                    ,omega
-                    ,gamma
-                    ,alpha
-                    ,beta
-                    ,n_picks
-                    ,n_drafters
-                    ,n_iterations
-                    ,scoring_format
-                    ,punting
-                    ,st.session_state.info_key)
-
-H = HAgent(info = info
-    , omega = omega
-    , gamma = gamma
-    , alpha = alpha
-    , beta = beta
-    , n_picks = n_picks
-    , n_drafters = n_drafters
-    , scoring_format = scoring_format
-    , punting = punting)   
-
-if st.session_state['mode'] == 'Draft Mode':
-  with draft_tab:
-    
-    left, right = st.columns(2)
-
-    with left:
-
-      st.caption("""Enter which players have been drafted by which teams below""")
-      selections_editable = st.data_editor(selections
-                                          , hide_index = True
-                                          , height = n_picks * 35 + 50)  
-      selection_list = listify(selections_editable)
-
-      player_assignments = selections_editable.to_dict('list')
-
-      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
-
-    with right:
-
-      draft_seat = st.selectbox(f'Which team are you?'
-          , selections.columns
-          , index = 0)
-
-      my_players = selections_editable[draft_seat].dropna()
-
-      cand_tab, team_tab = st.tabs(["Candidates","Team"])
+            yahoo_league = st.selectbox(
+              label='Which league should player data be pulled from?',
+              options=user_leagues,
+              format_func=get_league_labels,
+              index=None
+            )
             
-      with cand_tab:
+            if yahoo_league is not None:
 
-        z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
-                  
-        with z_cand_tab:
+              yahoo_league_id = yahoo_league.league_id
+
+              player_metadata = get_player_metadata()
+
+              team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, yahoo_league_id, player_metadata)
+              n_drafters = team_players_df.shape[1]
+              n_picks = team_players_df.shape[0]
+
+              #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+              
+              selections = team_players_df
+
+              #Just trying for now!
+              player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, auth_dir, player_metadata)
+
+              st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
+                                                                      (player_statuses['Status'] == 'INJ')
+                                                                      ]
+                                                                      )
+                                                              )
+                                                        )
+
+              st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(yahoo_league_id
+                                                                          , auth_dir
+                                                                          , player_metadata)
+
+              st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(yahoo_league_id
+                                      , auth_dir)
+
+              yahoo_connect.clean_up_access_token(auth_dir)
+              
+              st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
+
+          if selections is None:
+            selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+
+      with c2: 
+      
+        scoring_format = st.selectbox(
+          'Which format are you playing?',
+          ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
+          , index = 1)
+      
+        if scoring_format == 'Rotisserie':
+          st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
+        else:
+          st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
+
+        rotisserie = scoring_format == 'Rotisserie'
+
+        unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
+        unique_datasets_current = list(current_data.keys())
+        unique_datasets_darko = list(darko_data.keys())
+
+        all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
+        all_datasets.reverse()
           
-          make_cand_tab(z_scores
-                        ,selection_list
-                        , st.session_state.params['z-score-player-multiplier']
-                        ,st.session_state.info_key)
+        dataset_name = st.selectbox(
+          'Which dataset do you want to default to?'
+          ,all_datasets
+          ,index = 0
+          ,on_change = increment_player_stats_version
+        )
 
-        with g_cand_tab:
+        punting_levels = st.session_state.params['punting_defaults']
 
-          make_cand_tab(g_scores
-                        , selection_list
-                        , st.session_state.params['g-score-player-multiplier']
-                        ,st.session_state.info_key)
+        punting_level = st.selectbox(
+          'What level of punting do you want H-scores to apply when modeling your future draft picks?'
+          ,list(punting_levels.keys())
+          ,index = st.session_state.params['punting_default_index']
+        )
 
-        with h_cand_tab:
+        st.caption('''This option sets the default parameters for H-scoring. 
+                      For more granular control, use the Advanced tab which is next to this one''')
 
-          mov = info['Mov']
-          vom = info['Vom']
+        raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
+
+        player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+        selections = selections.astype(player_category_type)
+        
+
+    with advanced_params:
+
+      player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
+
+      with player_param_column:
+        st.header('Player Statistics')
+
+        psi = st.number_input(r'Select a $\psi$ value'
+                          , key = 'psi'
+                          , min_value = float(st.session_state.params['options']['psi']['min'])
+                          , value = float(st.session_state.params['options']['psi']['default'])
+                        , max_value = float(st.session_state.params['options']['psi']['max']))
+        psi_str = r'''$\psi$ controls how injury rates are dealt with. For example is if $\psi$ is $50\%$ and a 
+                      player is expected to miss $20\%$ of games, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
+      
+        st.caption(psi_str)
+
+        mult_col, coef_col = st.columns(2)
+      
+        st.subheader(f"Multipliers")
+
+        multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
+                                    , index = coefficient_df.index).T
+        multipliers = st.data_editor(multiplier_df, hide_index = True)
+        multipliers = multipliers.T
+    
+        st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
           
-          v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
+        st.subheader(f"Coefficients")
+        conversion_factors = st.data_editor(coefficient_df.T, hide_index = True)
+        conversion_factors = conversion_factors.T                                                      
 
-          v = np.array(v/v.sum()).reshape(1,9)
+        st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
+
+      with algorithm_param_column:
+        st.header('H-scoring Parameters')
+
+        left_algo_param_col, right_algo_param_col = st.columns(2)
+
+        with left_algo_param_col:
+
+          omega = st.number_input(r'Select a $\omega$ value'
+                                , key = 'omega'
+                                , value = punting_levels[punting_level]['omega']
+                                , min_value = float(st.session_state.params['options']['omega']['min'])
+                                , max_value = float(st.session_state.params['options']['omega']['max']))
+          omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
+                          it quantifies how much better the optimal player choice will be compared to the player that would be 
+                          chosen with baseline weights'''
+          st.caption(omega_str)
+        
+          gamma = st.number_input(r'Select a $\gamma$ value'
+                                , key = 'gamma'
+                                , value = punting_levels[punting_level]['gamma']
+                                , min_value = float(st.session_state.params['options']['gamma']['min'])
+                                , max_value = float(st.session_state.params['options']['gamma']['max']))
+          gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+                  tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
+                  players that  work best for its strategy'''
+          st.caption(gamma_str)
+      
+          nu = st.number_input(r'Select a $\nu$ value'
+                            , key = 'nu'
+                            , value = float(st.session_state.params['options']['nu']['default'])
+                            , min_value = float(st.session_state.params['options']['nu']['min'])
+                            , max_value = float(st.session_state.params['options']['nu']['max']))
+          nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
+                      if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
+          st.caption(nu_str)
+
+        with right_algo_param_col:
+          alpha = st.number_input(r'Select a $\alpha$ value'
+                            , key = 'alpha'
+                            , value = float(st.session_state.params['options']['alpha']['default'])
+                            , min_value = float(st.session_state.params['options']['alpha']['min'])
+                            , max_value = float(st.session_state.params['options']['alpha']['max']))
+          alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
+          st.caption(alpha_str)
+      
+          beta = st.number_input(r'Select a $\beta$ value'
+                                , key = 'beta'
+                                , value = float(st.session_state.params['options']['beta']['default'])
+                                , min_value = float(st.session_state.params['options']['beta']['min'])
+                                , max_value = float(st.session_state.params['options']['beta']['max']))
+          beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
+          st.caption(beta_str)
+      
+          n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
+                                    , key = 'n_iterations'
+                                    , value = st.session_state.params['options']['n_iterations']['default']
+                                    , min_value = st.session_state.params['options']['n_iterations']['min']
+                                    , max_value = st.session_state.params['options']['n_iterations']['max'])
+          n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
+          st.caption(n_iterations_str)
+
+          punting = (omega > 0) 
+
+      with trade_param_column:
+          st.header('Trading Parameters')
+
+          your_differential_threshold = st.number_input(
+                r'Your differential threshold for the automatic trade suggester'
+                , value = 0)
+          ydt_str = r'''Only trades which improve your H-score 
+                        by the threshold (as a percentage) will be shown'''
+          st.caption(ydt_str)
+          your_differential_threshold = your_differential_threshold /100
+
+          their_differential_threshold = st.number_input(
+                r'Counterparty differential threshold for the automatic trade suggester'
+                , value = 0)
+          tdt_str = r'''Only trades which improve the counterparty's H-score 
+                      by the threshold (as a percentage) will be shown'''
+          st.caption(tdt_str)
+          their_differential_threshold = their_differential_threshold/100
+
+          with st.form("Combo params"):
+            combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
+                                          ,'N-received' : [1,2,3]
+                                          ,'T1' : [0,0,0]
+                                          ,'T2' : [1,0.25,0.1]}
+                                          )
+
+            combo_params_df = st.data_editor(combo_params_default
+                                              , hide_index = True
+                                              , num_rows = "dynamic"
+                                              , column_config={
+                                "N-traded": st.column_config.NumberColumn("N-traded", default=1)
+                                ,"N-received": st.column_config.NumberColumn("N-received", default=1)
+                                ,"T1": st.column_config.NumberColumn("T1", default=0)
+                                ,"T2": st.column_config.NumberColumn("T2", default=0)
+
+                                                        }
+                                                ) 
+            combo_params_df[['N-traded','N-received']] = \
+                  combo_params_df[['N-traded','N-received']].astype(int)
+
+            combo_params_df['T1'] = combo_params_df['T1']/100
+            
+            submitted = st.form_submit_button("Submit", use_container_width = True)
+
+          combo_params_str =  \
+            """Each row is a specification for a kind of trade that will be automatically evaluated. 
+            N-traded is the number of players traded from your team, and N-received is the number of 
+            players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
+            column. Only players with the specified targetedness or above will be considered. T2 is a 
+            threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
+            differences larger than T2 will not be evaluated"""
+          st.caption(combo_params_str)
+
+          combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
+
+  with info_tab:
+
+    if st.session_state['schedule']: 
+      stat_tab, injury_tab, games_played_tab = st.tabs([
+                  "Player Stats"
+                  ,"Injury Status"
+                  ,"Game Volume"
+                  ])
+    else:
+      stat_tab, injury_tab = st.tabs([
+                      "Player Stats"
+                      ,"Injury Status"])
+
+
+    with stat_tab:
+      st.caption(f"Per-game player projections below, from default data source. Edit as you see fit")
+
+      player_stats_editable = make_data_editor(raw_stats_df
+                                          , key_name = 'player_stats_editable'
+                                          , lock_in_button_str = "Lock in Player Stats")
+      player_stats = player_stats_editable.copy()
+
+      #re-adjust from user inputs
+      player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
+      player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
+
+      effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
+      for col in counting_statistics + volume_statistics:
+        player_stats[col] = player_stats_editable[col] * effective_games_played_percent * 3
+
+    with injury_tab:
+        st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+        default_injury_list = [p for p in st.session_state['injured_players'] \
+                                if (p in player_stats.index) and (not (p in listify(selections))) 
+                                ]
+        
+        injured_players = st.multiselect('Injured players'
+                                , player_stats.index
+                                , default = default_injury_list
+                                , on_change = increment_player_stats_version)
+
+        player_stats = player_stats.drop(injured_players)
+        info = process_player_data(player_stats
+                                ,conversion_factors
+                                ,multipliers
+                                ,psi
+                                ,nu
+                                ,n_drafters
+                                ,n_picks
+                                ,st.session_state.player_stats_editable_version)
+        st.session_state.info = info #useful for testing
+        
+        z_scores = info['Z-scores']
+        g_scores = info['G-scores']
+
+    if st.session_state['schedule']:
+      with games_played_tab: 
+
+        #get schedule: 
+        #get game weeks: with yfpy query.get_game_weeks_by_game_id
+        schedule = st.session_state['schedule'] 
+        week_chosen = st.selectbox('Select a particular fantasy week'
+                                  ,list(schedule.keys()))
+
+        default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
+        game_stats = pd.DataFrame({ 'Potential Games' : default_potential_games
+                                    }
+                                    ,index = player_stats.index
+                                      )
+
+        st.caption(f"""Projections for games played below, broken down by number of potential games.
+                      Just for reference, these do not effect projections""")
+                      
+        st.dataframe(game_stats)
+
+  with rank_tab:
+      z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
+        
+      with z_rank_tab:
+        make_rank_tab(z_scores
+                      , st.session_state.params['z-score-player-multiplier']
+                      , st.session_state.info_key)  
+
+      with g_rank_tab:
+        make_rank_tab(g_scores
+                      , st.session_state.params['g-score-player-multiplier']
+                      , st.session_state.info_key)  
+
+      with h_rank_tab:
+        rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
+        st.caption("""These rankings are based on estimates of win probability for an arbitrary head to head matchup,
+                  given the candidate player is taken with the first overall pick and future picks are adjusted 
+                  accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated.""")
+
+        st.caption('Note that these scores are unique to the ' + scoring_format + \
+                  ' format and all the H-scoring parameters defined on the parameter tab')
+
+        st.write(st.session_state.info_key)
+        make_h_rank_tab(info
+                      ,omega
+                      ,gamma
+                      ,alpha
+                      ,beta
+                      ,n_picks
+                      ,n_drafters
+                      ,n_iterations
+                      ,scoring_format
+                      ,punting
+                      ,st.session_state.info_key)
+
+  H = HAgent(info = info
+      , omega = omega
+      , gamma = gamma
+      , alpha = alpha
+      , beta = beta
+      , n_picks = n_picks
+      , n_drafters = n_drafters
+      , scoring_format = scoring_format
+      , punting = punting)   
+
+  if st.session_state['mode'] == 'Draft Mode':
+    with draft_tab:
+      
+      left, right = st.columns(2)
+
+      with left:
+
+        st.caption("""Enter which players have been drafted by which teams below""")
+        selections_editable = st.data_editor(selections
+                                            , hide_index = True
+                                            , height = n_picks * 35 + 50)  
+        selection_list = listify(selections_editable)
+
+        player_assignments = selections_editable.to_dict('list')
+
+        g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+
+      with right:
+
+        draft_seat = st.selectbox(f'Which team are you?'
+            , selections.columns
+            , index = 0)
+
+        my_players = selections_editable[draft_seat].dropna()
+
+        cand_tab, team_tab = st.tabs(["Candidates","Team"])
+              
+        with cand_tab:
+
+          z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
+                    
+          with z_cand_tab:
+            
+            make_cand_tab(z_scores
+                          ,selection_list
+                          , st.session_state.params['z-score-player-multiplier']
+                          ,st.session_state.info_key)
+
+          with g_cand_tab:
+
+            make_cand_tab(g_scores
+                          , selection_list
+                          , st.session_state.params['g-score-player-multiplier']
+                          ,st.session_state.info_key)
+
+          with h_cand_tab:
+
+            mov = info['Mov']
+            vom = info['Vom']
+            
+            v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
+
+            v = np.array(v/v.sum()).reshape(1,9)
+
+            if len(my_players) == n_picks:
+              st.markdown('Team is complete!')
+                      
+            elif not st.session_state.run_h_score:
+              with st.form(key='my_form_to_submit'):
+                h_score_button = st.form_submit_button(label='Run H-score algorithm'
+                                                    , on_click = run_h_score) 
+                        
+            else:
+
+              #record the fact that the run has already been invoked, no need to invoke it again
+              stop_run_h_score()
+
+              n_players = n_drafters * n_picks
+          
+              generator = H.get_h_scores(player_assignments, draft_seat)
+        
+              placeholder = st.empty()
+
+              #if n_iterations is 0 we run just once with punting set to False
+              for i in range(max(1,n_iterations)):
+
+                res = next(generator)
+                score = res['Scores']
+                weights = res['Weights']
+                win_rates = res['Rates']
+
+                #normalize weights by what we expect from other drafters
+                weights = pd.DataFrame(weights
+                              , index = score.index
+                              , columns = get_categories())/v
+                
+                win_rates.columns = get_categories()
+                
+                with placeholder.container():
+      
+                  rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
+                      
+                  score = score.sort_values(ascending = False).round(3)
+                  score.name = 'H-score'
+                  score = pd.DataFrame(score)
+
+                  with rate_tab:
+                    rate_df = win_rates.loc[score.index].dropna()
+                    rate_display = score.merge(rate_df, left_index = True, right_index = True)
+                    rate_display = rate_display.style.format("{:.1%}"
+                                      ,subset = pd.IndexSlice[:,['H-score']]) \
+                              .map(styler_a
+                                    , subset = pd.IndexSlice[:,['H-score']]) \
+                              .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                              .format('{:,.1%}', subset = rate_df.columns)
+                    st.dataframe(rate_display, use_container_width = True)
+                  with weight_tab:
+                    weight_df = weights.loc[score.index].dropna()
+                    weight_display = score.merge(weight_df
+                                          , left_index = True
+                                          , right_index = True)
+                    weight_display = weight_display.style.format("{:.0%}"
+                                                                , subset = weight_df.columns)\
+                              .format("{:.1%}"
+                                      ,subset = pd.IndexSlice[:,['H-score']]) \
+                              .map(styler_a
+                                    , subset = pd.IndexSlice[:,['H-score']]) \
+                              .background_gradient(axis = None,subset = weight_df.columns) 
+                    st.dataframe(weight_display, use_container_width = True)
+
+        with team_tab:
 
           if len(my_players) == n_picks:
-            st.markdown('Team is complete!')
-                    
-          elif not st.session_state.run_h_score:
-            with st.form(key='my_form_to_submit'):
-              h_score_button = st.form_submit_button(label='Run H-score algorithm'
-                                                  , on_click = run_h_score) 
-                      
+            base_h_res = get_base_h_score(info
+                                          ,omega
+                                          ,gamma
+                                          ,alpha
+                                          ,beta
+                                          ,n_picks
+                                          ,n_drafters
+                                          ,scoring_format
+                                          ,punting
+                                          ,player_assignments
+                                          ,draft_seat
+                                          ,st.session_state.info_key)
+
+            base_h_score = base_h_res['Scores']
+            base_win_rates = base_h_res['Rates']
+
           else:
+            base_h_score = None
+            base_win_rates = None
 
-            #record the fact that the run has already been invoked, no need to invoke it again
-            stop_run_h_score()
-
-            n_players = n_drafters * n_picks
-        
-            generator = H.get_h_scores(player_assignments, draft_seat)
-      
-            placeholder = st.empty()
-
-            #if n_iterations is 0 we run just once with punting set to False
-            for i in range(max(1,n_iterations)):
-
-              res = next(generator)
-              score = res['Scores']
-              weights = res['Weights']
-              win_rates = res['Rates']
-
-              #normalize weights by what we expect from other drafters
-              weights = pd.DataFrame(weights
-                            , index = score.index
-                            , columns = get_categories())/v
-              
-              win_rates.columns = get_categories()
-              
-              with placeholder.container():
-    
-                rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
-                    
-                score = score.sort_values(ascending = False).round(3)
-                score.name = 'H-score'
-                score = pd.DataFrame(score)
-
-                with rate_tab:
-                  rate_df = win_rates.loc[score.index].dropna()
-                  rate_display = score.merge(rate_df, left_index = True, right_index = True)
-                  rate_display = rate_display.style.format("{:.1%}"
-                                    ,subset = pd.IndexSlice[:,['H-score']]) \
-                            .map(styler_a
-                                  , subset = pd.IndexSlice[:,['H-score']]) \
-                            .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                            .format('{:,.1%}', subset = rate_df.columns)
-                  st.dataframe(rate_display, use_container_width = True)
-                with weight_tab:
-                  weight_df = weights.loc[score.index].dropna()
-                  weight_display = score.merge(weight_df
-                                        , left_index = True
-                                        , right_index = True)
-                  weight_display = weight_display.style.format("{:.0%}"
-                                                              , subset = weight_df.columns)\
-                            .format("{:.1%}"
-                                    ,subset = pd.IndexSlice[:,['H-score']]) \
-                            .map(styler_a
-                                  , subset = pd.IndexSlice[:,['H-score']]) \
-                            .background_gradient(axis = None,subset = weight_df.columns) 
-                  st.dataframe(weight_display, use_container_width = True)
-
-      with team_tab:
-
-        if len(my_players) == n_picks:
-          base_h_res = get_base_h_score(info
-                                        ,omega
-                                        ,gamma
-                                        ,alpha
-                                        ,beta
-                                        ,n_picks
-                                        ,n_drafters
-                                        ,scoring_format
-                                        ,punting
-                                        ,player_assignments
-                                        ,draft_seat
-                                        ,st.session_state.info_key)
-
-          base_h_score = base_h_res['Scores']
-          base_win_rates = base_h_res['Rates']
-
-        else:
-          base_h_score = None
-          base_win_rates = None
-
-        make_full_team_tab(z_scores
-                          ,g_scores
-                          ,my_players
-                          ,n_drafters
-                          ,n_picks
-                          ,base_h_score
-                          ,base_win_rates
-                          ,st.session_state.info_key
-                          )
-elif st.session_state['mode'] == 'Season Mode':
-
-  with rosters_tab:
-
-    left, right = st.columns([0.5,0.5])
-      
-    with left:
-
-      st.caption("""Enter which player is on which team below""")
-      selections_editable = st.data_editor(selections
-                                        , hide_index = True
-                                        , height = n_picks * 35 + 50)  
-      selection_list = listify(selections_editable)
-      player_assignments = selections_editable.to_dict('list')
-
-      z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
-      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
-
-      with right: 
-
-        roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
-        , selections.columns
-        , index = 0)
-
-        inspection_players = selections_editable[roster_inspection_seat].dropna()
-
-        if len(inspection_players) == n_picks:
-
-
-          base_h_res = get_base_h_score(info
-                                        ,omega
-                                        ,gamma
-                                        ,alpha
-                                        ,beta
-                                        ,n_picks
-                                        ,n_drafters
-                                        ,scoring_format
-                                        ,punting
-                                        ,player_assignments
-                                        ,roster_inspection_seat
-                                        ,st.session_state.info_key)
-
-          base_h_score = base_h_res['Scores']
-          base_win_rates = base_h_res['Rates']
-
-        else:
-          base_h_score = None
-          base_win_rates = None
-
-        make_full_team_tab(z_scores
+          make_full_team_tab(z_scores
                             ,g_scores
-                            ,inspection_players
+                            ,my_players
                             ,n_drafters
                             ,n_picks
                             ,base_h_score
                             ,base_win_rates
                             ,st.session_state.info_key
                             )
+  elif st.session_state['mode'] == 'Season Mode':
 
-  with matchup_tab:
+    with rosters_tab:
 
-    if (mode == 'Draft Mode') or not st.session_state.schedule:
-
-      if scoring_format == 'roto':
-        st.write('No matchups for Rotisserie')
-      else:
-        make_matchup_matrix(info['X-scores']
-                        ,selections_editable
-                        ,scoring_format
-                        ,st.session_state.info_key
-                        )
-
-    else:
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-          matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
-                                            , selections.columns
-                                            , index = 0)
+      left, right = st.columns([0.5,0.5])
         
-        with c2:
-          matchup_week = st.selectbox(f'For which week?'
-                                    , st.session_state['schedule'].keys()
-                                    , index = 0)
+      with left:
 
-          week_number = int(matchup_week.split(':')[0].split(' ')[1])
+        st.caption("""Enter which player is on which team below""")
+        selections_editable = st.data_editor(selections
+                                          , hide_index = True
+                                          , height = n_picks * 35 + 50)  
+        selection_list = listify(selections_editable)
+        player_assignments = selections_editable.to_dict('list')
 
-          relevant_matchups = st.session_state['matchups'][matchup_seat]
+        z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
+        g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
 
-        if week_number in relevant_matchups.keys():
+        with right: 
 
-          opponent_seat = relevant_matchups[int(week_number)].teams[1].name.decode('UTF-8')
+          roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
+          , selections.columns
+          , index = 0)
 
-          st.write(matchup_seat + "'s opponent for week " + str(week_number) + " is " + \
-                  opponent_seat)
+          inspection_players = selections_editable[roster_inspection_seat].dropna()
 
+          if len(inspection_players) == n_picks:
+
+
+            base_h_res = get_base_h_score(info
+                                          ,omega
+                                          ,gamma
+                                          ,alpha
+                                          ,beta
+                                          ,n_picks
+                                          ,n_drafters
+                                          ,scoring_format
+                                          ,punting
+                                          ,player_assignments
+                                          ,roster_inspection_seat
+                                          ,st.session_state.info_key)
+
+            base_h_score = base_h_res['Scores']
+            base_win_rates = base_h_res['Rates']
+
+          else:
+            base_h_score = None
+            base_win_rates = None
+
+          make_full_team_tab(z_scores
+                              ,g_scores
+                              ,inspection_players
+                              ,n_drafters
+                              ,n_picks
+                              ,base_h_score
+                              ,base_win_rates
+                              ,st.session_state.info_key
+                              )
+
+    with matchup_tab:
+
+      if (mode == 'Draft Mode') or not st.session_state.schedule:
+
+        if scoring_format == 'roto':
+          st.write('No matchups for Rotisserie')
         else:
-          with c3: 
-            opponent_seat = st.selectbox(f'Against which team?'
-                                              , [s for s in selections.columns if s != matchup_seat]
-                                              , index = 0)
-        st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
-                  expected game volume for each player based on the NBA's schedule""")
+          make_matchup_matrix(info['X-scores']
+                          ,selections_editable
+                          ,scoring_format
+                          ,st.session_state.info_key
+                          )
 
-        make_matchup_tab(player_stats
-                        , selections
-                        , matchup_seat
-                        , opponent_seat
-                        , matchup_week
-                        , n_picks
-                        , n_drafters
-                        , conversion_factors
-                        , multipliers
-                        , psi
-                        , nu
-                        , scoring_format )
-        ######## END TAB
-  with waiver_tab:
+      else:
+
+          c1, c2, c3 = st.columns(3)
+
+          with c1:
+            matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
+                                              , selections.columns
+                                              , index = 0)
+          
+          with c2:
+            matchup_week = st.selectbox(f'For which week?'
+                                      , st.session_state['schedule'].keys()
+                                      , index = 0)
+
+            week_number = int(matchup_week.split(':')[0].split(' ')[1])
+
+            relevant_matchups = st.session_state['matchups'][matchup_seat]
+
+          if week_number in relevant_matchups.keys():
+
+            opponent_seat = relevant_matchups[int(week_number)].teams[1].name.decode('UTF-8')
+
+            st.write(matchup_seat + "'s opponent for week " + str(week_number) + " is " + \
+                    opponent_seat)
+
+          else:
+            with c3: 
+              opponent_seat = st.selectbox(f'Against which team?'
+                                                , [s for s in selections.columns if s != matchup_seat]
+                                                , index = 0)
+          st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
+                    expected game volume for each player based on the NBA's schedule""")
+
+          make_matchup_tab(player_stats
+                          , selections
+                          , matchup_seat
+                          , opponent_seat
+                          , matchup_week
+                          , n_picks
+                          , n_drafters
+                          , conversion_factors
+                          , multipliers
+                          , psi
+                          , nu
+                          , scoring_format )
+          ######## END TAB
+    with waiver_tab:
+
+        c1, c2 = st.columns([0.5,0.5])
+
+        with c1: 
+          waiver_inspection_seat = st.selectbox(f'Which team so you want to drop a player from?'
+              , selections.columns
+              , index = 0)
+
+        with c2: 
+            waiver_players = selections_editable[waiver_inspection_seat].dropna()
+
+            if len(waiver_players) < n_picks:
+                st.markdown("""This team is not full yet!""")
+
+            else:
+
+              waiver_team_stats_z = z_scores[z_scores.index.isin(waiver_players)]
+              waiver_team_stats_z.loc['Total', :] = waiver_team_stats_z.sum(axis = 0)
+
+              waiver_team_stats_g = g_scores[g_scores.index.isin(waiver_players)]
+              waiver_team_stats_g.loc['Total', :] = waiver_team_stats_g.sum(axis = 0)
+
+              if rotisserie:
+                worst_player = list(z_scores.index[z_scores.index.isin(waiver_players)])[-1]
+              else:
+                worst_player = list(g_scores.index[g_scores.index.isin(waiver_players)])[-1]
+
+              default_index = list(waiver_players).index(worst_player)
+
+              drop_player = st.selectbox(
+                'Which player are you considering dropping?'
+                ,waiver_players
+                ,index = default_index
+              )
+
+        if len(waiver_players) == n_picks:
+
+          mod_waiver_players = [x for x in waiver_players if x != drop_player]
+
+          z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+
+          with z_waiver_tab:
+
+              st.markdown('Projected team stats with chosen player:')
+              make_waiver_tab(z_scores
+                            , selection_list
+                            , waiver_team_stats_z
+                            , drop_player
+                            , st.session_state.params['z-score-team-multiplier']
+                            , st.session_state.info_key)
+
+          with g_waiver_tab:
+
+              st.markdown('Projected team stats with chosen player:')
+              make_waiver_tab(g_scores
+                            , selection_list
+                            , waiver_team_stats_g
+                            , drop_player
+                            , st.session_state.params['g-score-team-multiplier']
+                            , st.session_state.info_key)
+
+          with h_waiver_tab:
+
+              base_h_res = get_base_h_score(info
+                              ,omega
+                              ,gamma
+                              ,alpha
+                              ,beta
+                              ,n_picks
+                              ,n_drafters
+                              ,scoring_format
+                              ,punting
+                              ,player_assignments
+                              ,waiver_inspection_seat
+                              ,st.session_state.info_key)
+
+              waiver_base_h_score = base_h_res['Scores']
+              waiver_base_win_rates = base_h_res['Rates']
+
+              make_h_waiver_df(H
+                          , player_stats
+                          , mod_waiver_players
+                          , drop_player
+                          , player_assignments
+                          , waiver_inspection_seat
+                          , waiver_base_h_score
+                          , waiver_base_win_rates
+                          , st.session_state.info_key)
+
+    with trade_tab:
 
       c1, c2 = st.columns([0.5,0.5])
 
       with c1: 
-        waiver_inspection_seat = st.selectbox(f'Which team so you want to drop a player from?'
+        trade_party_seat = st.selectbox(f'Which team do you want to trade from?'
             , selections.columns
             , index = 0)
 
       with c2: 
-          waiver_players = selections_editable[waiver_inspection_seat].dropna()
+        trade_party_players = selections_editable[trade_party_seat].dropna()
 
-          if len(waiver_players) < n_picks:
-              st.markdown("""This team is not full yet!""")
+        if len(trade_party_players) < n_picks:
+            st.markdown("""This team is not full yet! Fill it and other teams out on the 
+                        "Teams" page then come back here""")
 
-          else:
+        else:
+          
+          counterparty_players_dict = { team : players for team, players in selections_editable.items() 
+                                  if ((team != trade_party_seat) & (not  any(p!=p for p in players)))
+                                    }
 
-            waiver_team_stats_z = z_scores[z_scores.index.isin(waiver_players)]
-            waiver_team_stats_z.loc['Total', :] = waiver_team_stats_z.sum(axis = 0)
-
-            waiver_team_stats_g = g_scores[g_scores.index.isin(waiver_players)]
-            waiver_team_stats_g.loc['Total', :] = waiver_team_stats_g.sum(axis = 0)
-
-            if rotisserie:
-              worst_player = list(z_scores.index[z_scores.index.isin(waiver_players)])[-1]
-            else:
-              worst_player = list(g_scores.index[g_scores.index.isin(waiver_players)])[-1]
-
-            default_index = list(waiver_players).index(worst_player)
-
-            drop_player = st.selectbox(
-              'Which player are you considering dropping?'
-              ,waiver_players
-              ,index = default_index
+          trade_counterparty_seat = st.selectbox(
+              f'Which team do you want to trade with?',
+              [s for s in counterparty_players_dict.keys()],
+              index = 0
             )
+          
+          trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
 
-      if len(waiver_players) == n_picks:
+      if len(trade_party_players) == n_picks:
 
-        mod_waiver_players = [x for x in waiver_players if x != drop_player]
+        if len(trade_counterparty_players) < n_picks:
+          st.markdown('The other team is not full yet!')
+        else:
 
-        z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+          inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
+                                                              ,'Destinations'
+                                                              ,'Targets'
+                                                              ,'Trade Suggestions'
+                                                              ])
+          with inspection_tab:
 
-        with z_waiver_tab:
+            c1, c2 = st.columns(2)
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(z_scores
-                          , selection_list
-                          , waiver_team_stats_z
-                          , drop_player
-                          , st.session_state.params['z-score-team-multiplier']
-                          , st.session_state.info_key)
+            with c1: 
 
-        with g_waiver_tab:
+              with st.form("trade inspection form"):
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(g_scores
-                          , selection_list
-                          , waiver_team_stats_g
-                          , drop_player
-                          , st.session_state.params['g-score-team-multiplier']
-                          , st.session_state.info_key)
+                players_sent = st.multiselect(
+                  'Which players are you trading?'
+                  ,trade_party_players
+                  )
+                  
+                players_received = st.multiselect(
+                      'Which players are you receiving?'
+                      ,trade_counterparty_players
+                  )
 
-        with h_waiver_tab:
+                submitted = st.form_submit_button("Submit", use_container_width = True)
 
-            base_h_res = get_base_h_score(info
-                            ,omega
-                            ,gamma
-                            ,alpha
-                            ,beta
-                            ,n_picks
-                            ,n_drafters
-                            ,scoring_format
-                            ,punting
-                            ,player_assignments
-                            ,waiver_inspection_seat
-                            ,st.session_state.info_key)
+            with c2: 
 
-            waiver_base_h_score = base_h_res['Scores']
-            waiver_base_win_rates = base_h_res['Rates']
+              z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
 
-            make_h_waiver_df(H
-                        , player_stats
-                        , mod_waiver_players
-                        , drop_player
-                        , player_assignments
-                        , waiver_inspection_seat
-                        , waiver_base_h_score
-                        , waiver_base_win_rates
-                        , st.session_state.info_key)
+              if (len(players_sent) == 0) | (len(players_received) == 0):
+                st.markdown('A trade must include at least one player from each team')
 
-  with trade_tab:
+              else:
 
-    c1, c2 = st.columns([0.5,0.5])
-
-    with c1: 
-      trade_party_seat = st.selectbox(f'Which team do you want to trade from?'
-          , selections.columns
-          , index = 0)
-
-    with c2: 
-      trade_party_players = selections_editable[trade_party_seat].dropna()
-
-      if len(trade_party_players) < n_picks:
-          st.markdown("""This team is not full yet! Fill it and other teams out on the 
-                      "Teams" page then come back here""")
-
-      else:
-        
-        counterparty_players_dict = { team : players for team, players in selections_editable.items() 
-                                if ((team != trade_party_seat) & (not  any(p!=p for p in players)))
-                                  }
-
-        trade_counterparty_seat = st.selectbox(
-            f'Which team do you want to trade with?',
-            [s for s in counterparty_players_dict.keys()],
-            index = 0
-          )
-        
-        trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
-
-    if len(trade_party_players) == n_picks:
-
-      if len(trade_counterparty_players) < n_picks:
-        st.markdown('The other team is not full yet!')
-      else:
-
-        inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
-                                                            ,'Destinations'
-                                                            ,'Targets'
-                                                            ,'Trade Suggestions'
-                                                            ])
-        with inspection_tab:
-
-          c1, c2 = st.columns(2)
-
-          with c1: 
-
-            with st.form("trade inspection form"):
-
-              players_sent = st.multiselect(
-                'Which players are you trading?'
-                ,trade_party_players
-                )
-                
-              players_received = st.multiselect(
-                    'Which players are you receiving?'
-                    ,trade_counterparty_players
-                )
-
-              submitted = st.form_submit_button("Submit", use_container_width = True)
-
-          with c2: 
-
-            z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
-
-            if (len(players_sent) == 0) | (len(players_received) == 0):
-              st.markdown('A trade must include at least one player from each team')
-
-            else:
-
-              with z_tab:
-                make_trade_score_tab(z_scores 
+                with z_tab:
+                  make_trade_score_tab(z_scores 
+                                    , players_sent
+                                    , players_received 
+                                    , st.session_state.params['z-score-player-multiplier']
+                                    , st.session_state.params['z-score-team-multiplier']
+                                    , st.session_state.info_key
+                                    )
+                with g_tab:
+                  make_trade_score_tab(g_scores 
+                                    , players_sent
+                                    , players_received 
+                                    , st.session_state.params['g-score-player-multiplier']
+                                    , st.session_state.params['g-score-team-multiplier']
+                                    , st.session_state.info_key
+                                    )
+                with h_tab:
+                  make_trade_h_tab(H
+                                  , player_stats 
+                                  , player_assignments 
+                                  , n_iterations 
+                                  , trade_party_seat
                                   , players_sent
-                                  , players_received 
-                                  , st.session_state.params['z-score-player-multiplier']
-                                  , st.session_state.params['z-score-team-multiplier']
+                                  , trade_counterparty_seat
+                                  , players_received
+                                  , scoring_format
+                                  , st.session_state.info_key)
+
+
+          with destinations_tab:
+
+            values_to_team = make_trade_destination_display(H
+                                  , player_stats
+                                  , player_assignments 
+                                  , trade_party_seat 
+                                  , scoring_format
                                   , st.session_state.info_key
-                                  )
-              with g_tab:
-                make_trade_score_tab(g_scores 
-                                  , players_sent
-                                  , players_received 
-                                  , st.session_state.params['g-score-player-multiplier']
-                                  , st.session_state.params['g-score-team-multiplier']
-                                  , st.session_state.info_key
-                                  )
-              with h_tab:
-                make_trade_h_tab(H
-                                , player_stats 
-                                , player_assignments 
-                                , n_iterations 
-                                , trade_party_seat
-                                , players_sent
-                                , trade_counterparty_seat
-                                , players_received
-                                , scoring_format
-                                , st.session_state.info_key)
+                                        )
 
+          with target_tab:
 
-        with destinations_tab:
+            values_to_me = make_trade_target_display(H
+                  , player_stats
+                  , trade_party_seat
+                  , trade_counterparty_seat
+                  , player_assignments
+                  , values_to_team[trade_counterparty_seat]
+                  , scoring_format
+                  , st.session_state.info_key
+                        )
 
-          values_to_team = make_trade_destination_display(H
-                                , player_stats
-                                , player_assignments 
-                                , trade_party_seat 
-                                , scoring_format
-                                , st.session_state.info_key
-                                      )
+            with suggestions_tab:
 
-        with target_tab:
+              if rotisserie:
+                general_value = z_scores.sum(axis = 1)
+                replacement_value = z_scores_unselected.iloc[0].sum() 
+              else:
+                general_value = g_scores.sum(axis = 1)
+                replacement_value = g_scores_unselected.iloc[0].sum()
 
-          values_to_me = make_trade_target_display(H
-                , player_stats
-                , trade_party_seat
-                , trade_counterparty_seat
-                , player_assignments
-                , values_to_team[trade_counterparty_seat]
-                , scoring_format
-                , st.session_state.info_key
-                      )
+              #slightly hacky way to make all of the multiselects blue
+              st.markdown("""
+                  <style>
+                      span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                          background-color: #3580BB; color:white;
+                      }
+                      span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                          background-color: #3580BB; color:white;
+                      }
+                      span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                          background-color: #3580BB; color:white;
+                      }
+                  </style>
+                  """, unsafe_allow_html=True)
 
-          with suggestions_tab:
+              trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
+                                        , [(1,1),(2,2),(3,3)]
+                                        , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
+                                        , default = [(1,1)])
 
-            if rotisserie:
-              general_value = z_scores.sum(axis = 1)
-              replacement_value = z_scores_unselected.iloc[0].sum() 
-            else:
-              general_value = g_scores.sum(axis = 1)
-              replacement_value = g_scores_unselected.iloc[0].sum()
+              make_trade_suggestion_display(H
+                  , player_stats 
+                  , player_assignments
+                  , trade_party_seat
+                  , trade_counterparty_seat
+                  , general_value
+                  , replacement_value
+                  , values_to_me
+                  , values_to_team[trade_counterparty_seat]
+                  , your_differential_threshold
+                  , their_differential_threshold
+                  , combo_params
+                  , trade_filter
+                  , scoring_format
+                  , st.session_state.info_key)               
 
-            #slightly hacky way to make all of the multiselects blue
-            st.markdown("""
-                <style>
-                    span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                        background-color: #3580BB; color:white;
-                    }
-                    span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                        background-color: #3580BB; color:white;
-                    }
-                    span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                        background-color: #3580BB; color:white;
-                    }
-                </style>
-                """, unsafe_allow_html=True)
+  with about_tab:
 
-            trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
-                                      , [(1,1),(2,2),(3,3)]
-                                      , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
-                                      , default = [(1,1)])
+    tabs = st.tabs(['Intro'
+                    ,'G-scoring'
+                    ,'H-scoring'
+                    ,'Turnovers'
+                    ,'Waivers & Trading'
+                    ,'Data Sources'])
 
-            make_trade_suggestion_display(H
-                , player_stats 
-                , player_assignments
-                , trade_party_seat
-                , trade_counterparty_seat
-                , general_value
-                , replacement_value
-                , values_to_me
-                , values_to_team[trade_counterparty_seat]
-                , your_differential_threshold
-                , their_differential_threshold
-                , combo_params
-                , trade_filter
-                , scoring_format
-                , st.session_state.info_key)               
+    about_paths = ['intro.md'
+                  ,'static_explanation.md'
+                  ,'dynamic_explanation.md'
+                  ,'turnovers.md'
+                  ,'data_sources.md'
+                  ,'trading.md']
 
-with about_tab:
-
-  tabs = st.tabs(['Intro'
-                  ,'G-scoring'
-                  ,'H-scoring'
-                  ,'Turnovers'
-                  ,'Waivers & Trading'
-                  ,'Data Sources'])
-
-  about_paths = ['intro.md'
-                ,'static_explanation.md'
-                ,'dynamic_explanation.md'
-                ,'turnovers.md'
-                ,'data_sources.md'
-                ,'trading.md']
-
-  for tab, path in zip(tabs, about_paths):
-    with tab:
-      make_about_tab(path)   
+    for tab, path in zip(tabs, about_paths):
+      with tab:
+        make_about_tab(path)   
 
