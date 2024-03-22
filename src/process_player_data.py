@@ -157,6 +157,15 @@ def process_player_data(_player_stats : pd.DataFrame
   z_scores = z_scores * multipliers.T.values[0]
   x_scores = x_scores * multipliers.T.values[0]
 
+  z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
+
+  z_scores.sort_values('Total', ascending = False, inplace = True)
+
+  g_scores.insert(loc = 0, column = 'Total', value = g_scores.sum(axis = 1))
+  g_scores.sort_values('Total', ascending = False, inplace = True)
+
+  #need to fix this later for Roto
+  x_scores = x_scores.loc[g_scores.index]
 
   positions = _player_stats[['Position']]
 
@@ -175,23 +184,16 @@ def process_player_data(_player_stats : pd.DataFrame
 
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
-  x_scores_as_diff = x_scores_as_diff.loc[x_scores.index[0:n_players]]
   
   mov = coefficients.loc[get_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_categories() , 'Variance of Means']
 
-  L = np.array(x_scores_as_diff.cov()) 
-
-  z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
-
-  z_scores.sort_values('Total', ascending = False, inplace = True)
-
-  g_scores.insert(loc = 0, column = 'Total', value = g_scores.sum(axis = 1))
-  g_scores.sort_values('Total', ascending = False, inplace = True)
+  L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
+          ,'X-scores-as-diff' : x_scores_as_diff
           , 'Var' : cross_player_var
           , 'Positions' : positions
           , 'Mov' : mov

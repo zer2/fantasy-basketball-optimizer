@@ -10,6 +10,9 @@ import copy
 import datetime
 import streamlit as st
 
+import statsmodels.api as sm
+import plotly.express as px
+
 #ZR: this can be cleaned up probably
 cols = ['Free Throws','Free Throw Attempts','Field Goals','Field Goal Attempts'
         ,'Points','Rebounds','Assists','Steals','Blocks','Threes','Turnovers']
@@ -360,7 +363,10 @@ def validate() -> None:
 
     weekly_df = make_weekly_df(season_df)
 
-    input_tab, results_tab, timing_tab = st.tabs(['Inputs','Results','Timing'])
+    input_tab, analysis_tab, results_tab, timing_tab = st.tabs(['Inputs'
+                                                ,'Analysis'
+                                                ,'Results'
+                                                ,'Timing'])
 
     with input_tab:
         weekly_tab, averages_tab = st.tabs(['Weekly Data','Averages'])
@@ -391,8 +397,8 @@ def validate() -> None:
     nu = st.session_state.params['options']['nu']['default']
     n_drafters = st.session_state.params['options']['n_drafters']['default']
     n_picks = st.session_state.params['options']['n_picks']['default']
-    omega = st.session_state.params['options']['omega']['default']
-    gamma = st.session_state.params['options']['gamma']['default']
+    #omega = st.session_state.params['options']['omega']['default']
+    #gamma = st.session_state.params['options']['gamma']['default']
     alpha = st.session_state.params['options']['alpha']['default']
     beta = st.session_state.params['options']['beta']['default']
     n_seasons = 1000
@@ -414,6 +420,9 @@ def validate() -> None:
     z_scores = info['Z-scores']
     z_scores = z_scores.sort_values('Total', ascending = False)
     default_agent_roto = SimpleAgent(order = list(z_scores.index))
+
+    with analysis_tab: 
+        omega, gamma = get_estimate_of_omega_gamma(info)
 
     primary_agent_roto = HAgent(
             info = info
@@ -550,3 +559,88 @@ def validate() -> None:
                                                 , multiplier = -50
             )
             st.dataframe(timing_df_ec)
+
+#add function here to sim
+#check for actual values of beta, gamma 
+def get_preds_c(v,c,L):    
+    factor = v.dot(v.T).dot(L).dot(c)/v.T.dot(L).dot(v)
+    sigma = np.sqrt(((c-factor).T.dot(L).dot((c-factor))))    
+    #also check out actual correlation, in addition to the theoretical correlation?
+        
+    return sigma[0][0], sigma[0][0]
+    
+def get_actuals_c(c, v, x_scores):
+
+        unweighted = x_scores.dot(v)
+        weighted = x_scores.dot(c)
+                
+        selected = weighted == weighted.max()
+                
+        m = weighted.max() - unweighted.max()
+        
+        k = unweighted.max() - unweighted[selected]
+
+        return m,k
+    
+def estimate_values(c, v, x_scores, g_scores):
+    
+    x_scores = x_scores.loc[g_scores.sum(axis = 1).sort_values(ascending = False).index]
+    observations = [get_actuals_c(c, v, x_scores.iloc[i:]) for i in range(0,160,10)]
+
+    m_avg = np.mean([x[0] for x in observations])
+    k_avg = np.mean([x[1].values for x in observations])
+    return m_avg, k_avg
+
+def get_estimate_of_omega_gamma(info):
+
+    x_scores = info['X-scores']
+    g_scores = info['G-scores']
+    mov = info['Mov']
+    vom = info['Vom']
+    v = np.sqrt(mov/(mov + vom))
+
+    ##maybe we should modify the X-scores in the same way as L got modified? Or just retain X-scores-as-diff
+
+    v = np.array(v/v.sum()).reshape(9,1)
+
+    cs = - np.random.random(size = (100,9)) * (np.random.random(size = (100,9)) < 0.2)/20 + v.reshape(1,9)
+    cs = cs/cs.sum(axis = 1).reshape(-1,1)
+
+    L = info['L']
+
+    res = [(get_preds_c(v, c.reshape(9,1),L), estimate_values(c, v, x_scores, g_scores)) for c in cs]
+    
+    x_m = [v[0][0] for v in res]    
+    x_k = [v[0][1] for v in res]     
+
+    y_m = [v[1][0] for v in res]   
+    y_k = [v[1][1] for v in res]  
+
+    s = pd.DataFrame(cs/v.T, columns = get_categories())
+
+    s.loc[:,'sigma'] = x_k
+    s.loc[:,'Actual_k'] = y_k
+    s.loc[:,'Ratio_k'] = s['Actual_k']/s['sigma']
+
+    s.loc[:,'Actual_m'] = y_m
+    s.loc[:,'Ratio_m'] = s['Actual_m']/s['sigma']
+
+    st.dataframe(s)
+
+    k_res = sm.OLS(y_k, x_k).fit()
+    m_res = sm.OLS(y_m, x_m).fit()
+    gamma = np.round(k_res.params[0],3)
+    st.subheader('gamma: ' + str(gamma))
+    st.write(k_res.summary())
+
+    fig1 = px.scatter(x = x_k, y = y_k)
+    st.plotly_chart(fig1)
+
+    omega = np.round(m_res.params[0],3)
+    st.subheader('omega: ' + str(omega))
+    st.write(m_res.summary())
+
+    fig2 = px.scatter(x = x_m, y = y_m)
+    st.plotly_chart(fig2)
+    
+    return omega, gamma

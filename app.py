@@ -19,7 +19,6 @@ from src.data_editor import make_data_editor
 
 #with Profiler():
 
-
 ### SETUP
 st.set_page_config(page_title='Fantasy BBall Optimization'
           , page_icon=':basketball:'
