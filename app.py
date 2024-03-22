@@ -192,8 +192,6 @@ with param_tab:
 
             #Just trying for now!
             player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, auth_dir, player_metadata)
-            st.write(player_statuses)
-            adgdsgsdgsdggs
 
             st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
                                                                     (player_statuses['Status'] == 'INJ')
@@ -560,8 +558,6 @@ if st.session_state['mode'] == 'Draft Mode':
       cand_tab, team_tab = st.tabs(["Candidates","Team"])
             
       with cand_tab:
-
-        st.write()
 
         z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
                   

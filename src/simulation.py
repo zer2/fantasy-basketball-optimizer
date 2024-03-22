@@ -642,6 +642,5 @@ def get_estimate_of_omega_gamma(info):
 
     fig2 = px.scatter(x = x_m, y = y_m)
     st.plotly_chart(fig2)
-    hjgjghjg
     
     return omega, gamma

@@ -190,7 +190,6 @@ def process_player_data(_player_stats : pd.DataFrame
 
   L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
 
-
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
