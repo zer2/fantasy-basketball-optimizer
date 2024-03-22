@@ -64,6 +64,7 @@ def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[Lea
             ,'Status': player.status
             , 'Eligible Positions' : player.display_position
             , 'Team' : player.editorial_team_abbr
+            , 'ID' : player.player_id
             } #Add team
             for player in player_dicts
                     ]
