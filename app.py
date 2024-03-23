@@ -91,6 +91,19 @@ if st.session_state['mode'] == 'Draft Mode':
   rank_tab = main_tabs[2]
   draft_tab = main_tabs[3]
   about_tab = main_tabs[4]
+
+elif st.session_state['mode'] == 'Auction Mode':
+  main_tabs = st.tabs([":control_knobs: Parameters"
+              ,":bar_chart: Player Info"
+              ,":first_place_medal: Player Scores & Rankings"
+              ,":moneybag: Auction"
+              ,":scroll: About"])
+
+  param_tab = main_tabs[0]
+  info_tab = main_tabs[1]
+  rank_tab = main_tabs[2]
+  auction_tab = main_tabs[3]
+  about_tab = main_tabs[4]
                 
 elif st.session_state['mode'] == 'Season Mode':
   main_tabs = st.tabs([":control_knobs: Parameters"
@@ -123,7 +136,7 @@ with param_tab:
 
       mode = st.selectbox(
         'Which mode do you want to use?',
-        ('Draft Mode', 'Season Mode')
+        ('Draft Mode', 'Auction Mode','Season Mode')
         , index = 0
         , key = 'mode')
 
@@ -682,6 +695,22 @@ if st.session_state['mode'] == 'Draft Mode':
                           ,base_win_rates
                           ,st.session_state.info_key
                           )
+if st.session_state['mode'] == 'Auction Mode':
+  with auction_tab:
+    teams = ['Team ' + str(n + 1) for n in range(n_drafters)]
+    cols = pd.MultiIndex.from_product([teams, ['Player','$ Cost']])
+
+    selections_auctions = pd.DataFrame([[None]*n_drafters * 2] * n_picks ,columns = cols)
+
+    selections_auctions.loc[:,pd.IndexSlice[:,'Player']] = \
+        selections_auctions.loc[:,pd.IndexSlice[:,'Player']].astype(player_category_type)
+
+    st.write(selections_auctions.dtypes)
+
+    st.data_editor(selections_auctions)
+    zdgdg
+
+
 elif st.session_state['mode'] == 'Season Mode':
 
   with rosters_tab:
