@@ -42,10 +42,15 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   Returns:
     Styled dataframe
   """
+
+  agg_columns = [col for col in ['$ Value','Total'] if col in df.columns]
+
+  df = df[agg_columns + get_categories()]
+
   df_styled = df.style.format("{:.2f}"
-                              , subset = pd.IndexSlice[:,['Total'] + get_categories()]) \
+                              , subset = pd.IndexSlice[:,agg_columns + get_categories()]) \
                             .map(styler_a
-                                ,subset = pd.IndexSlice[:,['Total']]) \
+                                ,subset = pd.IndexSlice[:,agg_columns]) \
                             .map(stat_styler
                               , subset = pd.IndexSlice[:,get_categories()]
                               , multiplier = multiplier)

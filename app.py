@@ -475,6 +475,13 @@ with Profiler():
                                 ,n_picks
                                 ,st.session_state.player_stats_editable_version)
         st.session_state.info = info #useful for testing
+
+        mov = info['Mov']
+        vom = info['Vom']
+        
+        v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
+
+        v = np.array(v/v.sum()).reshape(1,9)
         
         z_scores = info['Z-scores']
         g_scores = info['G-scores']
@@ -579,23 +586,16 @@ with Profiler():
             make_cand_tab(z_scores
                           ,selection_list
                           , st.session_state.params['z-score-player-multiplier']
-                          ,st.session_state.info_key)
+                          , info_key = st.session_state.info_key)
 
           with g_cand_tab:
 
             make_cand_tab(g_scores
                           , selection_list
                           , st.session_state.params['g-score-player-multiplier']
-                          ,st.session_state.info_key)
+                          , info_key = st.session_state.info_key)
 
           with h_cand_tab:
-
-            mov = info['Mov']
-            vom = info['Vom']
-            
-            v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
-
-            v = np.array(v/v.sum()).reshape(1,9)
 
             if len(my_players) == n_picks:
               st.markdown('Team is complete!')
@@ -610,58 +610,11 @@ with Profiler():
               #record the fact that the run has already been invoked, no need to invoke it again
               stop_run_h_score()
 
-              n_players = n_drafters * n_picks
-          
-              generator = H.get_h_scores(player_assignments, draft_seat)
-        
-              placeholder = st.empty()
-
-              #if n_iterations is 0 we run just once with punting set to False
-              for i in range(max(1,n_iterations)):
-
-                res = next(generator)
-                score = res['Scores']
-                weights = res['Weights']
-                win_rates = res['Rates']
-
-                #normalize weights by what we expect from other drafters
-                weights = pd.DataFrame(weights
-                              , index = score.index
-                              , columns = get_categories())/v
-                
-                win_rates.columns = get_categories()
-                
-                with placeholder.container():
-      
-                  rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
-                      
-                  score = score.sort_values(ascending = False).round(3)
-                  score.name = 'H-score'
-                  score = pd.DataFrame(score)
-
-                  with rate_tab:
-                    rate_df = win_rates.loc[score.index].dropna()
-                    rate_display = score.merge(rate_df, left_index = True, right_index = True)
-                    rate_display = rate_display.style.format("{:.1%}"
-                                      ,subset = pd.IndexSlice[:,['H-score']]) \
-                              .map(styler_a
-                                    , subset = pd.IndexSlice[:,['H-score']]) \
-                              .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                              .format('{:,.1%}', subset = rate_df.columns)
-                    st.dataframe(rate_display, use_container_width = True)
-                  with weight_tab:
-                    weight_df = weights.loc[score.index].dropna()
-                    weight_display = score.merge(weight_df
-                                          , left_index = True
-                                          , right_index = True)
-                    weight_display = weight_display.style.format("{:.0%}"
-                                                                , subset = weight_df.columns)\
-                              .format("{:.1%}"
-                                      ,subset = pd.IndexSlice[:,['H-score']]) \
-                              .map(styler_a
-                                    , subset = pd.IndexSlice[:,['H-score']]) \
-                              .background_gradient(axis = None,subset = weight_df.columns) 
-                    st.dataframe(weight_display, use_container_width = True)
+              make_h_cand_tab(H
+                    ,player_assignments
+                    ,draft_seat
+                    ,n_iterations
+                    ,v)
 
         with team_tab:
 
@@ -701,48 +654,64 @@ with Profiler():
       left, right = st.columns([0.4,0.6])
 
       with left:
-        
+
         cash_per_team = st.number_input(r'How much cash does each team have to pick players?'
                   , min_value = 1
                   , value = 200)
 
         teams = ['Team ' + str(n) for n in range(n_drafters)]
 
-        selections_auctions = pd.DataFrame([[None] * 3] * n_picks * n_drafters
+        auction_selections_default = pd.DataFrame([[None] * 3] * n_picks * n_drafters
                                           ,columns = ['Player','Team','Cost'])
 
-        selections_auctions.loc[:'Player'] = \
-            selections_auctions.loc[:'Player'].astype(player_category_type)
+        auction_selections_default.loc[:'Player'] = \
+            auction_selections_default.loc[:'Player'].astype(player_category_type)
 
         st.caption("""Enter which players have been selected by which teams, and for how much, below""")
 
-        st.data_editor(selections_auctions
+        auction_selections = st.data_editor(auction_selections_default
                       ,column_config = 
                       {"Player" : st.column_config.SelectboxColumn(options = list(raw_stats_df.index))
-                      ,"Team" : st.column_config.SelectboxColumn(options = teams)}
+                      ,"Team" : st.column_config.SelectboxColumn(options = teams)
+                      ,'Cost' : st.column_config.NumberColumn(min_value = 0
+                                                            , step = 1)}
                       , hide_index = True
                       , use_container_width = True
                       )
 
-        selection_list = selections_auctions['Player'].dropna()
+        selection_list = auction_selections['Player'].dropna()
 
         total_cash = cash_per_team * n_drafters
 
-        st.caption('Total cash available is: ' + str(total_cash))
-
-        amount_spent = selections_auctions['Cost'].dropna().sum()
+        amount_spent = auction_selections['Cost'].dropna().sum()
 
         remaining_cash = total_cash - amount_spent
         
-        st.caption('Remaining cash available is: ' + str(remaining_cash))
+        st.caption('\$' + str(remaining_cash) + ' remains out of \$' + str(total_cash) + ' originally available' )
 
       with right: 
         auction_seat = st.selectbox(f'Which team are you?'
             , teams
             , index = 0)
 
-        matches_my_team = selections_auctions['Team'] == auction_seat
-        my_players = selections_auctions[matches_my_team].dropna()
+        cash_spent_per_team = auction_selections.dropna().groupby('Team', observed = False)['Cost'].sum()
+        cash_remaining_per_team = cash_per_team - cash_spent_per_team
+        player_assignments = auction_selections.dropna().groupby('Team', observed = False)['Player'].apply(list)
+
+        for team in teams:
+          if not team in cash_remaining_per_team.index:
+            cash_remaining_per_team.loc[team] = cash_per_team
+
+          if not team in player_assignments.index:
+            player_assignments.loc[team] = []
+
+        my_players = player_assignments[auction_seat]
+        n_my_players = len(my_players)
+
+        my_remaining_cash = cash_remaining_per_team[auction_seat]
+
+        st.caption('You have \$' + str(my_remaining_cash) + ' remaining out of \$' + str(cash_per_team) \
+                + ' to select ' + str(n_picks - n_my_players) + ' of ' + str(n_picks) + ' players')
 
         cand_tab, team_tab = st.tabs(["Candidates","Team"])
               
@@ -755,18 +724,42 @@ with Profiler():
             make_cand_tab(z_scores
                           ,selection_list
                           , st.session_state.params['z-score-player-multiplier']
-                          ,st.session_state.info_key)
+                          ,remaining_cash
+                          ,n_drafters * n_picks
+                          ,st.session_state.info_key
+)
 
           with g_cand_tab:
 
             make_cand_tab(g_scores
                           , selection_list
                           , st.session_state.params['g-score-player-multiplier']
+                          ,remaining_cash
+                          , n_drafters * n_picks
                           ,st.session_state.info_key)
 
           with h_cand_tab:
 
-            st.write('Placeholder!!!')
+            if len(my_players) == n_picks:
+              st.markdown('Team is complete!')
+                      
+            elif not st.session_state.run_h_score:
+              with st.form(key='my_form_to_submit'):
+                h_score_button = st.form_submit_button(label='Run H-score algorithm'
+                                                    , on_click = run_h_score) 
+                        
+            else:
+
+              #record the fact that the run has already been invoked, no need to invoke it again
+              stop_run_h_score()
+
+              make_h_cand_tab(H
+                    ,player_assignments.to_dict()
+                    ,auction_seat
+                    ,n_iterations
+                    ,v
+                    ,cash_remaining_per_team.to_dict()
+                    ,n_drafters * n_picks)
 
         with team_tab:
 
