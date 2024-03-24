@@ -283,7 +283,7 @@ def make_matchup_matrix(_x_scores : pd.DataFrame
       st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
             "Drafting & Teams" page then come back here""")
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_matchup_tab(player_stats
                   , selections
                   , matchup_seat
@@ -491,7 +491,7 @@ def make_trade_score_tab(_scores : pd.DataFrame
                       , height = len(full_frame) * 35 + 38
                                                 )     
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def make_trade_destination_display(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -643,7 +643,7 @@ def make_trade_target_display(_H
 
   return values_to_me
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def get_cross_combos(n : int
                       , m : int
                       , my_players : list[str]
@@ -708,7 +708,7 @@ def get_combos(players_with_weight : list[tuple]
                                       for m in player_combos_with_weight]
   return player_combos_with_total_weight
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_combo_df(all_combos : list
                   , player_stats : pd.DataFrame
                   , my_team : str
@@ -864,7 +864,7 @@ def make_trade_suggestion_display(_H
   else: 
     st.markdown('No promising trades found')
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_trade_h_tab(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -938,7 +938,7 @@ def make_trade_h_tab(_H
 
 ### Rank tabs 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_rank_tab(_scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
@@ -962,7 +962,7 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float

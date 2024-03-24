@@ -529,7 +529,7 @@ class SimpleAgent():
 
         return player
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
                             , n_picks : int
