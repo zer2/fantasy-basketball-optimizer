@@ -698,20 +698,90 @@ with Profiler():
   if st.session_state['mode'] == 'Auction Mode':
     with auction_tab:
   
+      left, right = st.columns([0.4,0.6])
 
-      selections_auctions = pd.DataFrame([[None] * 3] * n_picks * n_drafters
-                                        ,columns = ['Player','Team','Cost'])
+      with left:
+        
+        cash_per_team = st.number_input(r'How much cash does each team have to pick players?'
+                  , min_value = 1
+                  , value = 200)
 
-      selections_auctions.loc[:'Player'] = \
-          selections_auctions.loc[:'Player'].astype(player_category_type)
+        teams = ['Team ' + str(n) for n in range(n_drafters)]
 
-      st.data_editor(selections_auctions
-                    ,column_config = 
-                    {"Player" : st.column_config.SelectboxColumn(options = list(raw_stats_df.index))}
-                    , hide_index = True
-                    )
-      zdgdg
+        selections_auctions = pd.DataFrame([[None] * 3] * n_picks * n_drafters
+                                          ,columns = ['Player','Team','Cost'])
 
+        selections_auctions.loc[:'Player'] = \
+            selections_auctions.loc[:'Player'].astype(player_category_type)
+
+        st.caption("""Enter which players have been selected by which teams, and for how much, below""")
+
+        st.data_editor(selections_auctions
+                      ,column_config = 
+                      {"Player" : st.column_config.SelectboxColumn(options = list(raw_stats_df.index))
+                      ,"Team" : st.column_config.SelectboxColumn(options = teams)}
+                      , hide_index = True
+                      , use_container_width = True
+                      )
+
+        selection_list = selections_auctions['Player'].dropna()
+
+        total_cash = cash_per_team * n_drafters
+
+        st.caption('Total cash available is: ' + str(total_cash))
+
+        amount_spent = selections_auctions['Cost'].dropna().sum()
+
+        remaining_cash = total_cash - amount_spent
+        
+        st.caption('Remaining cash available is: ' + str(remaining_cash))
+
+      with right: 
+        auction_seat = st.selectbox(f'Which team are you?'
+            , teams
+            , index = 0)
+
+        matches_my_team = selections_auctions['Team'] == auction_seat
+        my_players = selections_auctions[matches_my_team].dropna()
+
+        cand_tab, team_tab = st.tabs(["Candidates","Team"])
+              
+        with cand_tab:
+
+          z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
+                    
+          with z_cand_tab:
+            
+            make_cand_tab(z_scores
+                          ,selection_list
+                          , st.session_state.params['z-score-player-multiplier']
+                          ,st.session_state.info_key)
+
+          with g_cand_tab:
+
+            make_cand_tab(g_scores
+                          , selection_list
+                          , st.session_state.params['g-score-player-multiplier']
+                          ,st.session_state.info_key)
+
+          with h_cand_tab:
+
+            st.write('Placeholder!!!')
+
+        with team_tab:
+
+          base_h_score = None
+          base_win_rates = None
+
+          make_full_team_tab(z_scores
+                            ,g_scores
+                            ,my_players
+                            ,n_drafters
+                            ,n_picks
+                            ,base_h_score
+                            ,base_win_rates
+                            ,st.session_state.info_key
+                            )
 
   elif st.session_state['mode'] == 'Season Mode':
 
