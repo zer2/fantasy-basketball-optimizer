@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import listify, make_progress_chart, make_about_tab, stat_styler, styler_a,styler_b, styler_c, get_categories
+from src.helper_functions import listify, make_progress_chart, stat_styler, styler_a,styler_b, styler_c, get_categories
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.run_algorithm import HAgent, analyze_trade
@@ -91,6 +91,19 @@ if st.session_state['mode'] == 'Draft Mode':
   rank_tab = main_tabs[2]
   draft_tab = main_tabs[3]
   about_tab = main_tabs[4]
+
+elif st.session_state['mode'] == 'Auction Mode':
+  main_tabs = st.tabs([":control_knobs: Parameters"
+              ,":bar_chart: Player Info"
+              ,":first_place_medal: Player Scores & Rankings"
+              ,":moneybag: Auction"
+              ,":scroll: About"])
+
+  param_tab = main_tabs[0]
+  info_tab = main_tabs[1]
+  rank_tab = main_tabs[2]
+  auction_tab = main_tabs[3]
+  about_tab = main_tabs[4]
                 
 elif st.session_state['mode'] == 'Season Mode':
   main_tabs = st.tabs([":control_knobs: Parameters"
@@ -123,7 +136,7 @@ with param_tab:
 
       mode = st.selectbox(
         'Which mode do you want to use?',
-        ('Draft Mode', 'Season Mode')
+        ('Draft Mode', 'Auction Mode','Season Mode')
         , index = 0
         , key = 'mode')
 
@@ -294,7 +307,7 @@ with param_tab:
       st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
     with algorithm_param_column:
-      st.header('H-scoring Parameters')
+      st.header('Algorithm Parameters')
 
       left_algo_param_col, right_algo_param_col = st.columns(2)
 
@@ -353,6 +366,28 @@ with param_tab:
                                   , max_value = st.session_state.params['options']['n_iterations']['max'])
         n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
         st.caption(n_iterations_str)
+
+        if mode == 'Auction Mode':
+
+          streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                    , key = 'streaming_noise'
+                                    , value = 1.0
+                                    , min_value = 0.0
+                                    , max_value = None)
+          stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
+                                more long-term performance noise is expected, making low-value 
+                                players more heavily down-weighted due to the possibility that
+                                they drop below  streaming-level value'''
+          st.caption(stream_noise_str)         
+
+          streaming_noise = st.number_input(r'Select an $H_{\sigma}$ value'
+                        , key = 'streaming_noise_h'
+                        , value = 0.02
+                        , min_value = 0.0
+                        , max_value = None)
+
+          stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
+          st.caption(stream_noise_str_h)         
 
         punting = (omega > 0) 
 
@@ -462,6 +497,13 @@ with info_tab:
                               ,n_picks
                               ,st.session_state.player_stats_editable_version)
       st.session_state.info = info #useful for testing
+
+      mov = info['Mov']
+      vom = info['Vom']
+      
+      v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
+
+      v = np.array(v/v.sum()).reshape(1,9)
       
       z_scores = info['Z-scores']
       g_scores = info['G-scores']
@@ -566,23 +608,16 @@ if st.session_state['mode'] == 'Draft Mode':
           make_cand_tab(z_scores
                         ,selection_list
                         , st.session_state.params['z-score-player-multiplier']
-                        ,st.session_state.info_key)
+                        , info_key = st.session_state.info_key)
 
         with g_cand_tab:
 
           make_cand_tab(g_scores
                         , selection_list
                         , st.session_state.params['g-score-player-multiplier']
-                        ,st.session_state.info_key)
+                        , info_key = st.session_state.info_key)
 
         with h_cand_tab:
-
-          mov = info['Mov']
-          vom = info['Vom']
-          
-          v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
-
-          v = np.array(v/v.sum()).reshape(1,9)
 
           if len(my_players) == n_picks:
             st.markdown('Team is complete!')
@@ -597,58 +632,11 @@ if st.session_state['mode'] == 'Draft Mode':
             #record the fact that the run has already been invoked, no need to invoke it again
             stop_run_h_score()
 
-            n_players = n_drafters * n_picks
-        
-            generator = H.get_h_scores(player_assignments, draft_seat)
-      
-            placeholder = st.empty()
-
-            #if n_iterations is 0 we run just once with punting set to False
-            for i in range(max(1,n_iterations)):
-
-              res = next(generator)
-              score = res['Scores']
-              weights = res['Weights']
-              win_rates = res['Rates']
-
-              #normalize weights by what we expect from other drafters
-              weights = pd.DataFrame(weights
-                            , index = score.index
-                            , columns = get_categories())/v
-              
-              win_rates.columns = get_categories()
-              
-              with placeholder.container():
-    
-                rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
-                    
-                score = score.sort_values(ascending = False).round(3)
-                score.name = 'H-score'
-                score = pd.DataFrame(score)
-
-                with rate_tab:
-                  rate_df = win_rates.loc[score.index].dropna()
-                  rate_display = score.merge(rate_df, left_index = True, right_index = True)
-                  rate_display = rate_display.style.format("{:.1%}"
-                                    ,subset = pd.IndexSlice[:,['H-score']]) \
-                            .map(styler_a
-                                  , subset = pd.IndexSlice[:,['H-score']]) \
-                            .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                            .format('{:,.1%}', subset = rate_df.columns)
-                  st.dataframe(rate_display, use_container_width = True)
-                with weight_tab:
-                  weight_df = weights.loc[score.index].dropna()
-                  weight_display = score.merge(weight_df
-                                        , left_index = True
-                                        , right_index = True)
-                  weight_display = weight_display.style.format("{:.0%}"
-                                                              , subset = weight_df.columns)\
-                            .format("{:.1%}"
-                                    ,subset = pd.IndexSlice[:,['H-score']]) \
-                            .map(styler_a
-                                  , subset = pd.IndexSlice[:,['H-score']]) \
-                            .background_gradient(axis = None,subset = weight_df.columns) 
-                  st.dataframe(weight_display, use_container_width = True)
+            make_h_cand_tab(H
+                  ,player_assignments
+                  ,draft_seat
+                  ,n_iterations
+                  ,v)
 
       with team_tab:
 
@@ -682,6 +670,134 @@ if st.session_state['mode'] == 'Draft Mode':
                           ,base_win_rates
                           ,st.session_state.info_key
                           )
+if st.session_state['mode'] == 'Auction Mode':
+  with auction_tab:
+
+    left, right = st.columns([0.4,0.6])
+
+    with left:
+
+      cash_per_team = st.number_input(r'How much cash does each team have to pick players?'
+                , min_value = 1
+                , value = 200)
+
+      teams = ['Team ' + str(n) for n in range(n_drafters)]
+
+      auction_selections_default = pd.DataFrame([[None] * 3] * n_picks * n_drafters
+                                        ,columns = ['Player','Team','Cost'])
+
+      auction_selections_default.loc[:'Player'] = \
+          auction_selections_default.loc[:'Player'].astype(player_category_type)
+
+      st.caption("""Enter which players have been selected by which teams, and for how much, below""")
+
+      auction_selections = st.data_editor(auction_selections_default
+                    ,column_config = 
+                    {"Player" : st.column_config.SelectboxColumn(options = list(raw_stats_df.index))
+                    ,"Team" : st.column_config.SelectboxColumn(options = teams)
+                    ,'Cost' : st.column_config.NumberColumn(min_value = 0
+                                                          , step = 1)}
+                    , hide_index = True
+                    , use_container_width = True
+                    )
+
+      selection_list = auction_selections['Player'].dropna()
+
+      total_cash = cash_per_team * n_drafters
+
+      amount_spent = auction_selections['Cost'].dropna().sum()
+
+      remaining_cash = total_cash - amount_spent
+      
+      st.caption('\$' + str(remaining_cash) + ' remains out of \$' + str(total_cash) + ' originally available' )
+
+    with right: 
+      auction_seat = st.selectbox(f'Which team are you?'
+          , teams
+          , index = 0)
+
+      cash_spent_per_team = auction_selections.dropna().groupby('Team', observed = False)['Cost'].sum()
+      cash_remaining_per_team = cash_per_team - cash_spent_per_team
+      player_assignments = auction_selections.dropna().groupby('Team', observed = False)['Player'].apply(list)
+
+      for team in teams:
+        if not team in cash_remaining_per_team.index:
+          cash_remaining_per_team.loc[team] = cash_per_team
+
+        if not team in player_assignments.index:
+          player_assignments.loc[team] = []
+
+      my_players = player_assignments[auction_seat]
+      n_my_players = len(my_players)
+
+      my_remaining_cash = cash_remaining_per_team[auction_seat]
+
+      st.caption('You have \$' + str(my_remaining_cash) + ' remaining out of \$' + str(cash_per_team) \
+              + ' to select ' + str(n_picks - n_my_players) + ' of ' + str(n_picks) + ' players')
+
+      cand_tab, team_tab = st.tabs(["Candidates","Team"])
+            
+      with cand_tab:
+
+        z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
+                  
+        with z_cand_tab:
+          
+          make_cand_tab(z_scores
+                        ,selection_list
+                        , st.session_state.params['z-score-player-multiplier']
+                        ,remaining_cash
+                        ,n_drafters * n_picks
+                        ,st.session_state.info_key
+)
+
+        with g_cand_tab:
+
+          make_cand_tab(g_scores
+                        , selection_list
+                        , st.session_state.params['g-score-player-multiplier']
+                        ,remaining_cash
+                        , n_drafters * n_picks
+                        ,st.session_state.info_key)
+
+        with h_cand_tab:
+
+          if len(my_players) == n_picks:
+            st.markdown('Team is complete!')
+                    
+          elif not st.session_state.run_h_score:
+            with st.form(key='my_form_to_submit'):
+              h_score_button = st.form_submit_button(label='Run H-score algorithm'
+                                                  , on_click = run_h_score) 
+                      
+          else:
+
+            #record the fact that the run has already been invoked, no need to invoke it again
+            stop_run_h_score()
+
+            make_h_cand_tab(H
+                  ,player_assignments.to_dict()
+                  ,auction_seat
+                  ,n_iterations
+                  ,v
+                  ,cash_remaining_per_team.to_dict()
+                  ,n_drafters * n_picks)
+
+      with team_tab:
+
+        base_h_score = None
+        base_win_rates = None
+
+        make_full_team_tab(z_scores
+                          ,g_scores
+                          ,my_players
+                          ,n_drafters
+                          ,n_picks
+                          ,base_h_score
+                          ,base_win_rates
+                          ,st.session_state.info_key
+                          )
+
 elif st.session_state['mode'] == 'Season Mode':
 
   with rosters_tab:
@@ -1062,6 +1178,7 @@ with about_tab:
                   ,'G-scoring'
                   ,'H-scoring'
                   ,'Turnovers'
+                  ,'Auctions'
                   ,'Waivers & Trading'
                   ,'Data Sources'])
 
@@ -1069,8 +1186,9 @@ with about_tab:
                 ,'static_explanation.md'
                 ,'dynamic_explanation.md'
                 ,'turnovers.md'
-                ,'data_sources.md'
-                ,'trading.md']
+                ,'auctions.md'
+                ,'trading.md'
+                ,'data_sources.md']
 
   for tab, path in zip(tabs, about_paths):
     with tab:

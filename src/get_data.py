@@ -275,7 +275,7 @@ def get_specified_stats(historical_df : pd.DataFrame
   df.index.name = 'Player'
   return df.round(2) 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def get_nba_schedule():
     nba_schedule = requests.get(st.session_state.params['schedule-url']).json()
     game_dates = nba_schedule['leagueSchedule']['gameDates']

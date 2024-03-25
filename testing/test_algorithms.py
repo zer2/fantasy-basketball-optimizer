@@ -1,8 +1,10 @@
-from src.run_algorithm import HAgent
+from src.run_algorithm import HAgent, savor_calculation
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points
 from streamlit.testing.v1 import AppTest
 import numpy as np 
 import pandas as pd
+from scipy.stats import norm
+
 
 def test_h_score_calculation_and_gradient():
     """Make sure the H-score calculations are working"""
@@ -83,3 +85,39 @@ def check_gradient(c, func, del_func, term):
         res = del_theoretical[:,:,:,term].reshape(1,9,9)
 
     assert (abs(del_real - res) < 0.01).all()
+
+
+def test_savor_calculation():
+    raw_values_unselected = pd.Series([1,2,3,4,5]).sort_values(ascending = False)
+    n_remaining_players = 3
+    remaining_cash = 10
+    noise = 1
+
+    savor_result = savor_calculation(raw_values_unselected
+                    , n_remaining_players
+                    , remaining_cash
+                    , noise = 1)
+
+    replacement_level = raw_values_unselected.iloc[n_remaining_players]
+
+    replacement_ev = np.mean(np.clip(np.random.normal(scale = noise
+                                                        , size = 100000)
+                                    ,0,None))
+
+    def estimate_player_value(mean):
+        return np.mean(np.clip(np.random.normal(loc = mean
+                                                        ,scale = noise
+                                                        , size = 100000)
+                            ,0,None))
+
+    player_net_evs = np.clip(np.array([estimate_player_value(x - replacement_level) - replacement_ev \
+                            for x in raw_values_unselected])
+                            ,0,None)
+
+    regularized_player_net_evs = player_net_evs/player_net_evs.sum()
+    regularized_savor = savor_result/savor_result.sum()
+
+    assert all(abs(regularized_player_net_evs - regularized_savor) < .001)
+
+
+

@@ -104,7 +104,7 @@ def calculate_scores_from_coefficients(player_stats : pd.DataFrame
     res.columns = get_categories()
     return res.fillna(0)
 
-@st.cache_data
+@st.cache_data(show_spinner = False)
 def process_player_data(_player_stats : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series

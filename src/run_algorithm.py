@@ -60,10 +60,11 @@ class HAgent():
         self.L = info['L']
         self.punting = punting
         self.scoring_format = scoring_format
-      
+
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
                   , drafter
+                  , cash_remaining_per_team : dict[int] = None
                   , exclusion_list = []
                   ) -> tuple: 
 
@@ -86,6 +87,7 @@ class HAgent():
         diff_means, diff_vars = self.get_diff_distributions(player_assignments
                                         , drafter
                                         , x_scores_available
+                                        , cash_remaining_per_team
         )
         
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
@@ -108,38 +110,69 @@ class HAgent():
     def get_diff_distributions(self
                     , player_assignments : dict[list[str]]
                     , drafter
-                    , x_scores_available : pd.DataFrame) -> pd.Series:
+                    , x_scores_available : pd.DataFrame
+                    , cash_remaining_per_team : dict[int] = None) -> pd.Series:
         """Calculates diff-means based on the dynamic method 
 
         Args:
             players_chosen : list of all players chosen, including my_players
             x_scores_available: DataFrame of x-scores, excluding players chosen by any team
-            my_players : list of players chosen already by this team
-
+            cash_remaining_per_team: amount of cash left for each team. Only relevant for auctions
         Returns:
             Series of form {cat : expected value of opposing teams for the cat}
         """
+
         my_players = [p for p in player_assignments[drafter] if p ==p]
 
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis = 0))
 
         #assume that players for the rest of the round will be chosen from the default ordering 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
-        mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
 
-        other_team_sums = np.vstack(
-            [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
-                                    in player_assignments.items() if team != drafter]
-        ).T
+        if cash_remaining_per_team:
+
+            total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
+
+            remaining_players = self.n_drafters * self.n_picks - len(players_chosen)
+
+            #weight by v to get generic v-weighted value
+            replacement_value = (x_scores_available.iloc[remaining_players] * self.v.T.reshape(9)).sum()
+            remaining_overall_value = ((x_scores_available.iloc[0:remaining_players] * self.v.T).sum(axis = 1) \
+                                        - replacement_value).sum()
+            value_per_dollar = remaining_overall_value/total_cash_remaining
+
+            #when translating back to x-scores, reverse the basis by dividing by v 
+            category_value_per_dollar = value_per_dollar / (self.v * 9) 
+            replacement_value_by_category = replacement_value / (self.v * 9) 
+
+            diff_means = np.vstack(
+                [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
+                                                np.array(self.x_scores.loc[players].sum(axis = 0)).reshape(1,9,1)
+                                            , cash_remaining_per_team[drafter] - cash_remaining_per_team[team]
+                                            , len(my_players) - len(players)
+                                            , category_value_per_dollar
+                                            , replacement_value_by_category) for team, players \
+                                        in player_assignments.items() if team != drafter]
+            ).T
+
+        else: 
+
+            extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
+            mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
+
+            other_team_sums = np.vstack(
+                [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
+                                        in player_assignments.items() if team != drafter]
+            ).T
+
+            diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
+
 
         other_team_vars = np.vstack(
             [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
                                     in player_assignments.items() if team != drafter]
         ).T
         
-        diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
-
         diff_vars = other_team_vars.reshape(1,9,self.n_drafters - 1)
 
         return diff_means, diff_vars
@@ -154,6 +187,21 @@ class HAgent():
 
         return opposing_team_stats 
     
+    def get_diff_means_auction(self
+                                        , score_diff
+                                        , money_diff
+                                        , player_diff
+                                        , category_value_per_dollar
+                                        , replacement_value_by_category):
+        
+        player_diff_total = ((player_diff-1) * replacement_value_by_category).reshape(1,9,1)
+        money_diff_total = (money_diff * category_value_per_dollar).reshape(1,9,1)
+
+        #player diff total is subtracted because the team with more players gets less replacement value
+        total_diff = score_diff - player_diff_total + money_diff_total 
+
+        return total_diff
+
     def get_diff_var(self, n_their_players):
         if self.scoring_format == 'Rotisserie':
             diff_var = self.n_picks * \
@@ -162,39 +210,6 @@ class HAgent():
             diff_var = self.n_picks * \
                 (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
-
-    def get_diff_means_old(self
-                    , player_assignments : dict[list[str]]
-                    , drafter
-                    , x_scores_available : pd.DataFrame) -> pd.Series:
-        """Calculates diff-means based on the dynamic method 
-
-        Args:
-            players_chosen : list of all players chosen, including my_players
-            x_scores_available: DataFrame of x-scores, excluding players chosen by any team
-            my_players : list of players chosen already by this team
-
-        Returns:
-            Series of form {cat : expected value of opposing teams for the cat}
-        """
-        x_self_sum = self.x_scores.loc[my_players].sum(axis = 0)
-
-        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-        sum_so_far = self.x_scores.loc[players_chosen].sum()
-
-        #assume that players for the rest of the round will be chosen from the default ordering 
-        extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen)
-        sum_extra_players = x_scores_available.iloc[0:extra_players_needed].sum()
-
-        average_team_so_far = (sum_so_far + sum_extra_players)/self.n_drafters
-
-        diff_means = np.array(x_self_sum - average_team_so_far).reshape(1,9,1)
-
-        #currently diff_means is one-dimensional 
-        #should switch diff_means to be two-dimension, but not aligned with x-candidates
-        #so it should be of size (1,9,n_opponents)
-
-        return diff_means 
 
     def perform_iterations(self
                            ,weights : pd.DataFrame
@@ -529,7 +544,7 @@ class SimpleAgent():
 
         return player
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
                             , n_picks : int
@@ -677,3 +692,39 @@ def analyze_trade_value(player : str
     res = (res_with_player['Scores'].max() - res_without_player['Scores'].max())
 
     return res
+
+def savor_calculation(raw_values_unselected : pd.Series
+                    , n_remaining_players : int
+                    , remaining_cash : int
+                    , noise = 1) -> pd.Series:
+    """Calculate SAVOR- Streaming-adjusted value over replacement
+
+    SAVOR estimates the probability that a player will be replaced by a streamer, and adjusts 
+    auction value accordingly
+
+    Args:
+      raw_values_unselected: raw value by Z-score, G-score, etc. 
+      n_remaining_players: number of players left to be picked
+      remaining_cash: amount of cash remaining to spend on players, from all teams
+      noise: parameter for the SAVOR function. Controls how noisy we expect player performance to be
+             and therefore how likely it is a player will be replaced by a streamer
+
+    Returns:
+      Series, SAVOR 
+    """
+
+    replacement_value = raw_values_unselected.iloc[n_remaining_players]
+    value_above_replacement = np.clip(raw_values_unselected - replacement_value,0,None)
+
+    probability_of_non_streaming = norm.cdf(value_above_replacement/noise)
+    adjustment_factor = noise/(2 * np.pi)**(0.5) * (1 - np.exp((-value_above_replacement**2)/(2 * noise)))
+    adjusted_value = value_above_replacement * probability_of_non_streaming - adjustment_factor
+
+    remaining_value = adjusted_value.iloc[0:n_remaining_players].sum()
+    dollar_per_value = remaining_cash/remaining_value
+
+    savor = adjusted_value * dollar_per_value
+
+    return savor 
+
+    

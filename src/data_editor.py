@@ -14,7 +14,7 @@ def highlight_changes(val):
     background = f"background-color:#3580BB;" if val else ""
     return f"{color} {background}"
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def show_diff(
     source_df: pd.DataFrame
     , modified_df: pd.DataFrame

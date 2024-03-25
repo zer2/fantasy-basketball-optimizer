@@ -2,11 +2,26 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
-from src.run_algorithm import HAgent, estimate_matchup_result, analyze_trade, analyze_trade_value
+from src.run_algorithm import HAgent, estimate_matchup_result, analyze_trade, analyze_trade_value, savor_calculation
 from src.process_player_data import process_player_data
 import os
 import itertools
+from pathlib import Path
   
+@st.cache_data(show_spinner = False)
+def make_about_tab(md_path : str):
+    """Make one of the tabs on the about page
+
+    Args:
+      md_path : string representing the path to the relevant markdown file for display
+    Returns:
+      None
+    """
+    c2,c2,c3 = st.columns([0.1,0.8,0.1])
+    with c2:
+        intro_md = Path('about/' + md_path).read_text()
+        st.markdown(intro_md, unsafe_allow_html=True)
+
 ### Team tabs 
 
 @st.cache_data(show_spinner = False)
@@ -138,13 +153,17 @@ def make_full_team_tab(z_scores : pd.DataFrame
 def make_cand_tab(_scores : pd.DataFrame
               , selection_list : list[str]
               , player_multiplier : float
-              , info_key : None):
+              , remaining_cash : int = None 
+              , total_players : int = None 
+              , info_key : int = None) :
   """Make a tab showing stats for players that have not yet been drafted
 
   Args:
       scores: Dataframe of floats, rows by player and columns by category
       selection_list: list of players that have already been selected
       player_multiplier: scaling factor to use for color-coded display of player stats
+      remaining_cash: for auction calculation
+      total_players: for auction calculation
       info_key: for detecting changes
 
   Returns:
@@ -155,9 +174,110 @@ def make_cand_tab(_scores : pd.DataFrame
   percentage_statistics = st.session_state.params['percentage-statistics'] 
 
   scores_unselected = _scores[~_scores.index.isin(selection_list)]
+
+  if remaining_cash:
+
+    scores_unselected.loc[:,'$ Value'] = savor_calculation(scores_unselected['Total']
+                                                          , total_players - len(selection_list)
+                                                          , remaining_cash
+                                                          , st.session_state['streaming_noise'])
+  
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 
+def make_h_cand_tab(H
+                    ,player_assignments
+                    ,draft_seat
+                    ,n_iterations
+                    ,v
+                    ,cash_remaining_per_team : dict[int] = None
+                    ,total_players : int = None):
+  """Make a tab showing H-scores for the current draft situation
+
+  Args:
+      H:
+      player_assignments: dict of who has drafted what player
+      draft_seat: seat from which to calculate H-score
+      n_iterations:
+      v:
+      cash_remaining_per_team:
+
+  Returns:
+      DataFrame of stats of unselected players, to use in other tabs
+  """
+          
+  generator = H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+
+  placeholder = st.empty()
+
+  #if n_iterations is 0 we run just once with punting set to False
+  for i in range(max(1,n_iterations)):
+
+    res = next(generator)
+    score = res['Scores']
+    weights = res['Weights']
+    win_rates = res['Rates']
+
+    #normalize weights by what we expect from other drafters
+    weights = pd.DataFrame(weights
+                  , index = score.index
+                  , columns = get_categories())/v
+    
+    win_rates.columns = get_categories()
+    
+    with placeholder.container():
+
+      rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
+          
+      score = score.sort_values(ascending = False)
+      score.name = 'H-score'
+      score = pd.DataFrame(score)
+
+      with rate_tab:
+        rate_df = win_rates.loc[score.index].dropna()
+        rate_display = score.merge(rate_df, left_index = True, right_index = True)
+
+        if cash_remaining_per_team:
+
+          players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+          total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
+
+          rate_display.loc[:,'$ Value'] = savor_calculation(score
+                                                          , total_players - len(players_chosen)
+                                                          , total_cash_remaining
+                                                          , st.session_state['streaming_noise_h'])
+
+          rate_display = rate_display[['$ Value','H-score'] + get_categories()]
+
+          rate_display = rate_display.style.format("{:.1%}"
+                            ,subset = pd.IndexSlice[:,['H-score']]) \
+                          .format("{:.1f}"
+                            ,subset = pd.IndexSlice[:,['$ Value']]) \
+                    .map(styler_a
+                          , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
+                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                    .format('{:,.1%}', subset = rate_df.columns)
+        else:
+          rate_display = rate_display.style.format("{:.1%}"
+                            ,subset = pd.IndexSlice[:,['H-score']]) \
+                    .map(styler_a
+                          , subset = pd.IndexSlice[:,['H-score']]) \
+                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                    .format('{:,.1%}', subset = rate_df.columns)
+        st.dataframe(rate_display, use_container_width = True)
+      with weight_tab:
+        weight_df = weights.loc[score.index].dropna()
+        weight_display = score.merge(weight_df
+                              , left_index = True
+                              , right_index = True)
+        weight_display = weight_display.style.format("{:.0%}"
+                                                    , subset = weight_df.columns)\
+                  .format("{:.1%}"
+                          ,subset = pd.IndexSlice[:,['H-score']]) \
+                  .map(styler_a
+                        , subset = pd.IndexSlice[:,['H-score']]) \
+                  .background_gradient(axis = None,subset = weight_df.columns) 
+        st.dataframe(weight_display, use_container_width = True)
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False)
@@ -283,7 +403,7 @@ def make_matchup_matrix(_x_scores : pd.DataFrame
       st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
             "Drafting & Teams" page then come back here""")
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_matchup_tab(player_stats
                   , selections
                   , matchup_seat
@@ -491,7 +611,7 @@ def make_trade_score_tab(_scores : pd.DataFrame
                       , height = len(full_frame) * 35 + 38
                                                 )     
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def make_trade_destination_display(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -643,7 +763,7 @@ def make_trade_target_display(_H
 
   return values_to_me
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def get_cross_combos(n : int
                       , m : int
                       , my_players : list[str]
@@ -708,7 +828,7 @@ def get_combos(players_with_weight : list[tuple]
                                       for m in player_combos_with_weight]
   return player_combos_with_total_weight
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_combo_df(all_combos : list
                   , player_stats : pd.DataFrame
                   , my_team : str
@@ -864,7 +984,7 @@ def make_trade_suggestion_display(_H
   else: 
     st.markdown('No promising trades found')
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_trade_h_tab(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -938,7 +1058,7 @@ def make_trade_h_tab(_H
 
 ### Rank tabs 
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_rank_tab(_scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
@@ -962,7 +1082,7 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data()
+@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float
