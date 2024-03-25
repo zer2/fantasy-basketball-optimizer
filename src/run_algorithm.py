@@ -135,15 +135,15 @@ class HAgent():
 
             remaining_players = self.n_drafters * self.n_picks - len(players_chosen)
 
-            replacement_value = x_scores_available.iloc[remaining_players].sum()
-
-            #ZR: Note that this is not quite right, because x-scores aren't precisely player values 
-            remaining_overall_value = (x_scores_available.iloc[0:remaining_players].sum(axis = 1) \
+            #weight by v to get generic v-weighted value
+            replacement_value = (x_scores_available.iloc[remaining_players] * self.v.T.reshape(9)).sum()
+            remaining_overall_value = ((x_scores_available.iloc[0:remaining_players] * self.v.T).sum(axis = 1) \
                                         - replacement_value).sum()
             value_per_dollar = remaining_overall_value/total_cash_remaining
 
-            replacement_value_by_category = np.array([replacement_value/9] * 9)
-            category_value_per_dollar = value_per_dollar * self.v
+            #when translating back to x-scores, reverse the basis by dividing by v 
+            category_value_per_dollar = value_per_dollar / (self.v * 9) 
+            replacement_value_by_category = replacement_value / (self.v * 9) 
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
