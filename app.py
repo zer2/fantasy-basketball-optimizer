@@ -307,7 +307,7 @@ with Profiler():
         st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
       with algorithm_param_column:
-        st.header('H-scoring Parameters')
+        st.header('Algorithm Parameters')
 
         left_algo_param_col, right_algo_param_col = st.columns(2)
 
@@ -366,6 +366,28 @@ with Profiler():
                                     , max_value = st.session_state.params['options']['n_iterations']['max'])
           n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
           st.caption(n_iterations_str)
+
+          if mode == 'Auction Mode':
+
+            streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                      , key = 'streaming_noise'
+                                      , value = 1.0
+                                      , min_value = 0.0
+                                      , max_value = None)
+            stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
+                                  more long-term performance noise is expected, making low-value 
+                                  players more heavily down-weighted due to the possibility that
+                                  they drop below  streaming-level value'''
+            st.caption(stream_noise_str)         
+
+            streaming_noise = st.number_input(r'Select an $H_{\sigma}$ value'
+                          , key = 'streaming_noise_h'
+                          , value = 0.2
+                          , min_value = 0.0
+                          , max_value = None)
+
+            stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
+            st.caption(stream_noise_str_h)         
 
           punting = (omega > 0) 
 

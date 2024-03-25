@@ -165,7 +165,7 @@ def make_cand_tab(_scores : pd.DataFrame
     scores_unselected.loc[:,'$ Value'] = savor_calculation(scores_unselected['Total']
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
-                                                          , 1)
+                                                          , st.session_state['streaming_noise'])
   
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
@@ -230,7 +230,7 @@ def make_h_cand_tab(H
           rate_display.loc[:,'$ Value'] = savor_calculation(score
                                                           , total_players - len(players_chosen)
                                                           , total_cash_remaining
-                                                            ,)
+                                                          , st.session_state['streaming_noise_h'])
 
           rate_display = rate_display[['$ Value','H-score'] + get_categories()]
 
