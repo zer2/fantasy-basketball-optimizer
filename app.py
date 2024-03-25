@@ -382,7 +382,7 @@ with Profiler():
 
             streaming_noise = st.number_input(r'Select an $H_{\sigma}$ value'
                           , key = 'streaming_noise_h'
-                          , value = 0.2
+                          , value = 0.02
                           , min_value = 0.0
                           , max_value = None)
 
@@ -1178,6 +1178,7 @@ with Profiler():
                     ,'G-scoring'
                     ,'H-scoring'
                     ,'Turnovers'
+                    ,'Auctions'
                     ,'Waivers & Trading'
                     ,'Data Sources'])
 
@@ -1185,8 +1186,9 @@ with Profiler():
                   ,'static_explanation.md'
                   ,'dynamic_explanation.md'
                   ,'turnovers.md'
-                  ,'data_sources.md'
-                  ,'trading.md']
+                  ,'auctions.md'
+                  ,'trading.md'
+                  ,'data_sources.md']
 
     for tab, path in zip(tabs, about_paths):
       with tab:

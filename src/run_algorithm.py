@@ -715,8 +715,10 @@ def savor_calculation(raw_values_unselected : pd.Series
 
     replacement_value = raw_values_unselected.iloc[n_remaining_players]
     value_above_replacement = np.clip(raw_values_unselected - replacement_value,0,None)
+
     probability_of_non_streaming = norm.cdf(value_above_replacement/noise)
-    adjusted_value = value_above_replacement * probability_of_non_streaming
+    adjustment_factor = noise/(2 * np.pi)**(0.5) * (1 - np.exp((-value_above_replacement**2)/(2 * noise)))
+    adjusted_value = value_above_replacement * probability_of_non_streaming - adjustment_factor
 
     remaining_value = adjusted_value.iloc[0:n_remaining_players].sum()
     dollar_per_value = remaining_cash/remaining_value
