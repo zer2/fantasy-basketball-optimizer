@@ -6,7 +6,22 @@ from src.run_algorithm import HAgent, estimate_matchup_result, analyze_trade, an
 from src.process_player_data import process_player_data
 import os
 import itertools
+from pathlib import Path
   
+@st.cache_data(show_spinner = False)
+def make_about_tab(md_path : str):
+    """Make one of the tabs on the about page
+
+    Args:
+      md_path : string representing the path to the relevant markdown file for display
+    Returns:
+      None
+    """
+    c2,c2,c3 = st.columns([0.1,0.8,0.1])
+    with c2:
+        intro_md = Path('about/' + md_path).read_text()
+        st.markdown(intro_md, unsafe_allow_html=True)
+
 ### Team tabs 
 
 @st.cache_data(show_spinner = False)

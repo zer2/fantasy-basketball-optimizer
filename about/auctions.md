@@ -92,7 +92,7 @@ $$
 E[F] - E[S] = \mu * CDF(\mu) - \int_{-\mu}^{0} \frac{\sigma}{\sqrt{2\pi}} e^{\frac{-y^2}{2\sigma}} d(- \frac{y^2}{2 \sigma})
 $$
 
-This is equivalent to 
+Upon integration, this becomes
 
 $$
 E[F] - E[S] = \mu * CDF(\mu) - \frac{\sigma}{\sqrt{2\pi}} \left( e^{\frac{-y^2}{2\sigma}} |_{-\mu}^{0} \right) 
