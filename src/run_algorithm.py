@@ -143,7 +143,7 @@ class HAgent():
             value_per_dollar = remaining_overall_value/total_cash_remaining
 
             replacement_value_by_category = np.array([replacement_value/9] * 9)
-            category_value_per_dollar = np.array([value_per_dollar/9] * 9)
+            category_value_per_dollar = value_per_dollar * self.v
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
@@ -194,7 +194,7 @@ class HAgent():
                                         , category_value_per_dollar
                                         , replacement_value_by_category):
         
-        player_diff_total = (player_diff * replacement_value_by_category).reshape(1,9,1)
+        player_diff_total = ((player_diff-1) * replacement_value_by_category).reshape(1,9,1)
         money_diff_total = (money_diff * category_value_per_dollar).reshape(1,9,1)
 
         #player diff total is subtracted because the team with more players gets less replacement value
