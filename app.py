@@ -342,6 +342,33 @@ with param_tab:
                     if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
         st.caption(nu_str)
 
+        if scoring_format == 'Rotisserie':
+
+          chi = st.number_input(r'Select a $\chi$ value'
+                  , key = 'chi'
+                  , value = float(st.session_state.params['options']['chi']['default'])
+                  , min_value = float(st.session_state.params['options']['chi']['min'])
+                  , max_value = float(st.session_state.params['options']['chi']['max']))
+          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                        If performance means were known exactly beforehand, chi would be 1/M where M 
+                        is the number weeks in the season. However, in practice, season-long means are 
+                        not known before the season begins, so it is recommended to set chi to be higher 
+                        '''
+          st.caption(chi_str)
+
+          upsilon = st.number_input(r'Select a $\Upsilon$ value'
+                  , key = 'upsilon'
+                  , value = float(st.session_state.params['options']['upsilon']['default'])
+                  , min_value = float(st.session_state.params['options']['upsilon']['min'])
+                  , max_value = float(st.session_state.params['options']['upsilon']['max']))
+          upsilon_str = r'''For Rotisserie, an advantage state of $\Upsilon$ times the expected max 
+                            luck of any drafter is built into H-scores. This is a heuristic way of modeling 
+                            winning the whole season, which requires some amount of luck to be competitive'''
+          st.caption(upsilon_str)
+        else:
+          upsilon = None
+          chi = None
+
       with right_algo_param_col:
         alpha = st.number_input(r'Select a $\alpha$ value'
                           , key = 'alpha'
@@ -560,6 +587,8 @@ with rank_tab:
                     ,n_iterations
                     ,scoring_format
                     ,punting
+                    ,chi
+                    ,upsilon
                     ,st.session_state.info_key)
 
 H = HAgent(info = info
@@ -570,7 +599,9 @@ H = HAgent(info = info
     , n_picks = n_picks
     , n_drafters = n_drafters
     , scoring_format = scoring_format
-    , punting = punting)   
+    , punting = punting
+    , chi = chi
+    , upsilon = upsilon)   
 
 if st.session_state['mode'] == 'Draft Mode':
   with draft_tab:
@@ -650,6 +681,8 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,n_drafters
                                         ,scoring_format
                                         ,punting
+                                        ,chi
+                                        ,upsilon
                                         ,player_assignments
                                         ,draft_seat
                                         ,st.session_state.info_key)
@@ -836,6 +869,8 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,n_drafters
                                         ,scoring_format
                                         ,punting
+                                        ,chi
+                                        ,upsilon
                                         ,player_assignments
                                         ,roster_inspection_seat
                                         ,st.session_state.info_key)
@@ -989,6 +1024,8 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,n_drafters
                             ,scoring_format
                             ,punting
+                            ,chi
+                            ,upsilon
                             ,player_assignments
                             ,waiver_inspection_seat
                             ,st.session_state.info_key)
@@ -1177,6 +1214,7 @@ with about_tab:
   tabs = st.tabs(['Intro'
                   ,'G-scoring'
                   ,'H-scoring'
+                  ,'Rotisserie'
                   ,'Turnovers'
                   ,'Auctions'
                   ,'Waivers & Trading'
@@ -1185,6 +1223,7 @@ with about_tab:
   about_paths = ['intro.md'
                 ,'static_explanation.md'
                 ,'dynamic_explanation.md'
+                ,'rotisserie.md'
                 ,'turnovers.md'
                 ,'auctions.md'
                 ,'trading.md'

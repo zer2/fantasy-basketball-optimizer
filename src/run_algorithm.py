@@ -19,6 +19,8 @@ class HAgent():
                  , n_drafters : int
                  , scoring_format : str
                  , punting : bool
+                 , chi : float
+                 , upsilon : float
                     ):
         """Calculates the rank order based on H-score
 
@@ -32,6 +34,7 @@ class HAgent():
             n_drafters : int, number of drafters
             scoring_format
             punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
+            upsilon: advantage state built into the predictions, for Rotisserie 
         Returns:
             None
 
@@ -42,6 +45,8 @@ class HAgent():
         self.beta = beta
         self.n_picks = n_picks 
         self.n_drafters = n_drafters
+        self.chi = chi
+        self.upsilon = upsilon
 
         mov = info['Mov']
         vom = info['Vom']
@@ -50,9 +55,12 @@ class HAgent():
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
+            max_advantage_state = np.sqrt(self.n_picks*2 * self.chi * 9 * 2 * np.log(self.n_drafters))
+            self.advantage_state = self.upsilon * max_advantage_state/9
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/(mov + vom))
+            self.advantage_state = 0
 
         self.v = np.array(v/v.sum()).reshape(9,1)
 
@@ -167,6 +175,8 @@ class HAgent():
 
             diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
 
+        if self.scoring_format == 'Rotisserie':
+            diff_means = diff_means + self.advantage_state
 
         other_team_vars = np.vstack(
             [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
@@ -205,7 +215,7 @@ class HAgent():
     def get_diff_var(self, n_their_players):
         if self.scoring_format == 'Rotisserie':
             diff_var = self.n_picks * \
-                (2/25 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+                (2 * self.chi +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         else:
             diff_var = self.n_picks * \
                 (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))

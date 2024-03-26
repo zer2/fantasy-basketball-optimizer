@@ -108,7 +108,7 @@ def run_draft(agents
 def run_multiple_seasons(teams : dict[list]
                          , season_df : pd.DataFrame
                          , n_seasons : int = 100 
-                         , n_weeks : int = 25
+                         , n_weeks : int = 20
                          , scoring_format : str = 'Head to Head: Each Category'
                          , return_detailed_results : bool = False ):
     """Simulate multiple seasons with the same drafters 
@@ -397,10 +397,12 @@ def validate() -> None:
     nu = st.session_state.params['options']['nu']['default']
     n_drafters = st.session_state.params['options']['n_drafters']['default']
     n_picks = st.session_state.params['options']['n_picks']['default']
-    #omega = st.session_state.params['options']['omega']['default']
-    #gamma = st.session_state.params['options']['gamma']['default']
+    omega = st.session_state.params['options']['omega']['default']
+    gamma = st.session_state.params['options']['gamma']['default']
     alpha = st.session_state.params['options']['alpha']['default']
     beta = st.session_state.params['options']['beta']['default']
+    upsilon = st.session_state.params['options']['upsilon']['default']
+    chi = 0.05
     n_seasons = 1000
 
     info = process_player_data(player_averages
@@ -434,6 +436,8 @@ def validate() -> None:
             , n_drafters = n_drafters
             , scoring_format = 'Rotisserie'
             , punting = True
+            , chi = chi
+            , upsilon = upsilon
             )
                 
     res_roto =  try_strategy(primary_agent_roto
@@ -455,6 +459,8 @@ def validate() -> None:
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Each Category'
                 , punting = True
+                , chi = None
+                , upsilon = None
                 )
 
     res_ec =  try_strategy(primary_agent_ec
@@ -476,6 +482,8 @@ def validate() -> None:
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Most Categories'
                 , punting = True
+                , chi = None
+                , upsilon = None
                 )
 
     res_wta =  try_strategy(primary_agent_wta
@@ -494,7 +502,7 @@ def validate() -> None:
         t1, t2, t3, t4 = st.tabs(['Overall'
                             ,'Head to Head: Most Categories Details'
                             ,'Head to Head: Each Category Details'
-                            ,'Roto'])
+                            ,'Rotisserie'])
 
         with t1: 
             win_rate_df = pd.DataFrame({'Head to Head: Most Categories' : res_wta[0]

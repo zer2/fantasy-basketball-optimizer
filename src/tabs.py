@@ -462,6 +462,8 @@ def get_base_h_score(_info : dict
                 , n_drafters : int
                 , scoring_format : str
                 , punting : bool
+                , chi : float
+                , upsilon : float
                 , player_assignments : dict[list[str]]
                 , team : str
                 , info_key : int):
@@ -492,7 +494,9 @@ def get_base_h_score(_info : dict
     , n_picks = n_picks
     , n_drafters = n_drafters
     , scoring_format = scoring_format
-    , punting = punting)
+    , punting = punting
+    , chi = chi
+    , upsilon = upsilon)
 
   return next(H.get_h_scores(player_assignments, team))   
 
@@ -1080,7 +1084,7 @@ def make_rank_tab(_scores : pd.DataFrame
   
   scores_styled = static_score_styler(scores_copy,player_multiplier)
       
-  rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
+  rank_display = st.dataframe(scores_styled, use_container_width = True)
 
 @st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
@@ -1093,6 +1097,8 @@ def make_h_rank_tab(_info : dict
                   , n_iterations : int
                   , scoring_format : str
                   , punting : bool
+                  , chi : float
+                  , upsilon : float
                   , info_key : int):
   """Make ranks by H-score
 
@@ -1120,7 +1126,9 @@ def make_h_rank_tab(_info : dict
     , n_picks = n_picks
     , n_drafters = n_drafters
     , scoring_format = scoring_format
-    , punting = punting)
+    , punting = punting
+    , chi = chi
+    , upsilon = upsilon)
 
   generator = H.get_h_scores({n : [] for n in range(n_drafters)}, 0)
   for i in range(max(1,n_iterations)):
