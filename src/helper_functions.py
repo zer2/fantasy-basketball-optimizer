@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import itertools
-from pathlib import Path
 import streamlit as st
 import numexpr as ne
 from datetime import datetime
@@ -18,20 +17,6 @@ def listify(x : pd.DataFrame) -> list:
 
     x = x.values.tolist()
     return [item for row in x for item in row]
-
-#@st.cache_data(spinner = False)
-def make_about_tab(md_path : str):
-    """Make one of the tabs on the about page
-
-    Args:
-      md_path : string representing the path to the relevant markdown file for display
-    Returns:
-      None
-    """
-    c2,c2,c3 = st.columns([0.1,0.8,0.1])
-    with c2:
-        intro_md = Path('about/' + md_path).read_text()
-        st.markdown(intro_md, unsafe_allow_html=True)
 
 def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   """Helper function for styling tables of Z or G scores
