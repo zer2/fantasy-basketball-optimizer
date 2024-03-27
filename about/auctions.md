@@ -33,9 +33,6 @@ The flaw of the simple method is that it does not account for variation througho
 
 Another way of framing this is that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valueable than their alternatives. This is a known concept in the fantasy basketball community- for example it is referenced in this [reddit thread](https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/).
 
-
-To get a sense of how this effects value, we can model the situation mathematically. This thought experiment leads to the SAVOR procedure
-
 ### Building a mathematical model 
 
 Assume that the replacement value remains the same over the course of a season. This is intuitively reasonable; individual players may go up or down but the value of the player at rank e.g. 157 should be relatively consistent. 
@@ -56,9 +53,7 @@ Visually, this looks like a truncated normal distribution
 
 <iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/44674625-7bfd-43e7-bbd8-caa5318a569c"> </iframe>
 
-It is important to remember that without any investment into a particular roster slot, a drafter can always choose a replacement-level player for essentially no cost. 
-
-Players with exactly replacement value before perturbation ($\mu = 0$) have post-perturbation value
+It is important to remember that without any investment into a particular roster slot, a drafter can always choose a replacement-level player for essentially no cost. Players with exactly replacement value before perturbation ($\mu = 0$) have post-perturbation value
 
 $$
 S= 
@@ -72,7 +67,7 @@ Since picking a player removes a spot that could be used for one of these "strea
 
 ### SAVOR: Streaming-adjusted value over replacement
 
-Calculating $E[F-S]$ requires some math. 
+Calculating $E[F]-E[S]$ requires some math. 
 
 Using the definition of the expected value and the probability density of the normal distribution,
 
@@ -135,7 +130,7 @@ SAVOR has one parameter- the noise level $\sigma$. Here's an example of how auct
 
 <iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/499a7593-3399-46af-be27-9c84f80aa8bb"> </iframe>
 
-With $\sigma = 0$, there is no change. As $\sigma$ rises, low-value players lose even more value as predicted. On the flipside, high-value players actually gain value. This happens not because $E[F]$ is somehow higher than their $\mu$ (it is always lower), rather, as low-players lose value the amount of total value in the pot decreases and high-value players become even more valuable on a relative basis. 
+With $\sigma = 0$, there is no change. As $\sigma$ rises, low-value players lose even more value, as predicted. On the flipside, high-value players actually gain value. This happens not because $E[F]$ is somehow higher than their $\mu$ (it is always lower), rather, as low-players lose value the amount of total value in the pot decreases and high-value players become even more valuable on a relative basis. 
 
 I have set that $\sigma = 1$ as a default because that seems reasonable to me and the results look reasonable too, but the parameter could perhaps be refined.
 
@@ -182,7 +177,7 @@ With H-scores proxying general value, the SAVOR algorithm can be applied to them
 
 It should be noted that even if all of this theory is perfect and quantifies player value perfectly, just having this information available does not guarantee a good auction: if a bidder always pays full money for each of their picks, they won't have an above-average team even in theory. 
 
-One way to make a good team is to target players that have high auction values according to H-score versus what others are willing to pay, which could perhaps be inferred from typical auction values or the static Z-score procedure. Even then, there are many additional dimensions to auction drafting: the very best auction drafters know how to use psychology to get good deals on the players they want or bump up the prices of players that they are not interested in. Perfecting auction drafting is difficult, and goes far beyond the mathematics of player value. 
+One way to make a good team is to target players that have high auction values according to H-score versus what others are willing to pay, which could perhaps be inferred from typical auction values or the static Z-score procedure. Even then, there are many additional dimensions to auction drafting: the very best auction drafters know how to use psychology to get good deals on the players they want or bump up the prices of players that they are not interested in. Perfecting auction drafting is difficult, and goes far beyond the mathematics discussed here
 
 
 
