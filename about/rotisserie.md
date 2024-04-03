@@ -26,17 +26,17 @@ Where $S_w$ is a particular scenario in terms of category ordering, for which yo
 
 If computation was not a limiting factor, it would be simple to brute force the probability of winning in Rotisserie, given approximate normal distributions for each teams' performances for each category. Unfortunately, the calculation is too intensive to be practical.
 
-For a given category, there are $T!$ possible orderings, where $T$ is the number of teams. If $T$ is $12$ that translates to more than $479$ million. Further, to get total orderings for each category, that number must be raised to the power of number of categories $C$. With $9$ categories, the result is $1.32 * 10^{78}$. which is roughly equal to the number of atoms in the universe. No cloud service is performing that calculation! 
+For a given category, there are $T!$ ([factorial](https://en.wikipedia.org/wiki/Factorial)) possible orderings, where $T$ is the number of teams. If $T$ is $12$ that translates to more than $479$ million. Further, to get total orderings for each category, that number must be raised to the power of number of categories $C$. With $9$ categories, the result is $1.32 * 10^{78}$. which is roughly equal to the number of atoms in the universe. No cloud service is performing that calculation! 
 
 ### Simulation
 
-When computation is impractical, the next logical course of action is to try simulating the problem. 
+When computation is impractical, the natural next course of action is to try simulating the problem. 
 
 Unfortunately, simulating Rotisserie is still more computationally intensive than we would like. A single simulation for a single player requires drawing $T*C$ random numbers, then performing a number of computations to determine the winner. With ten thousand simulations (often necessary to get a reliable result) across five hundred players thirty times (a typical number of iterations for H-scoring), simulation requires careful analysis of more than sixteen billion random numbers. That is less outrageous, but still stretches the limitations of modern hardware. The best random number generators can generate a random normal in [about two nanoseconds](https://github.com/miloyip/normaldist-benchmark). It would take more than thirty seconds just to generate the sixteen billion random normals. And that is before all of the necessary subsequent calculations, which are not simple. 
 
-### A heuristic 
+### Invoking a heuristic 
 
-When all else fails, the problem must be simplified. 
+When all else fails, the problem must be simplified.
 
 There are many ways to create a heuristic for Rotisserie. The method I have implemented assumes 
 - The overall stats of other teams are (roughly) known 
@@ -47,7 +47,7 @@ There are many ways to create a heuristic for Rotisserie. The method I have impl
 - If a drafter has an $X\%$ chance of winning against team $A$ and a $>X\%$ chance of beating team $B$, if they win against team $A$ then they must also win against team $B$
 - The drafter's number of category points can be approximated by a Normal distribution 
 
-Below is a summary of how the model works 
+Below is a slightly mathy summary of how the model works
 
 #### The drafter's distribution 
 
@@ -57,9 +57,9 @@ Based on the assumptions, a mean and variance can be calculated for the drafter'
 
 Where $P_1$, $P_2$ etc. are the probabilities of winning against each opponent, in ascending order. $N$ is the total number of opponents.
 
-To get the overall distribution for the drafter, these values for all categories can be added together. Call the sum $\mu_D$ and $\sigma_D^2$
+To get the overall distribution for the drafter, these values for all categories can be added together. Call the sums $\mu_D$ and $\sigma_D^2$
 
-#### The objective
+#### The objective function
 
 The difference between two Normal distributions is also a Normal distribution. Therefore, the differential between the drafter's total points and the number of points needed to win the league can be approximated as a Normal distribution. 
 
@@ -67,9 +67,9 @@ $$
 N(\mu_M - \mu_D, \sigma_D^2 + \sigma_M^2)
 $$
 
-The CDF of this distribution is the objective function. It can be optimized via gradient descent to find the optimal player to pick 
+The CDF of this distribution at zero is the probability that the drafter scores at least as many category points as necessary to win, making it an appropriate objective function. It can be optimized via gradient descent to find the optimal player to pick 
 
-#### Results and observations 
+## Results and observations 
 
 In general, $\mu_M$ is larger than $\mu_D$, so the center of the distribution is to the right of $0$ and the value of the CDF is below $50\%$. This implies that increasing the total variance through $\sigma_D^2$ increases the CDF and therefore the objective function. While uncertainty is undesirable in most cases, in this context, it turns out to be a good thing! Intuitively, the reason that this happens is that scoring above every other drafter takes luck, and luck comes more easily with higher volatility. 
 
@@ -79,4 +79,4 @@ The upshot is that the most important categories and matchups to try to win in R
 
 That is not to say that punting is an inherently terrible idea in Rotisserie; rather, the argument for punting is just weaker because of a countervailing effect. In practice, the algorithm tends to advocate for some degree of very soft punting in Rotisserie. In particular it likes the idea of deprioritizing steals slightly, using it to eke out a significant advantage in other categories, and hoping that the volatile nature of steals allows the drafter to pick up some wins in that category despite their slight disadvantage. 
 
-Finally, I would be remiss not to emphasize that these methods for Rotisserie are *extremely* rough. They rely on many assumptions, and are far from a guranteed correct answer! 
+Finally, I would be remiss not to emphasize that the derived method for Rotisserie is *extremely* rough. Even using the explicit solution or simulation method would be an approximation to some degree; the heuristic method adds another layer of simplification on top of that. It is far from a guaranteed correct answer and should be taken with a grain of salt!
