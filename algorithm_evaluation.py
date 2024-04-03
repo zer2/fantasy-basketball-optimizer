@@ -25,4 +25,7 @@ with Profiler():
 
   st.title('Testing algorithms for Fantasy Basketball :basketball:')
 
+  #add a test here for doing a linear regression to find gamma and omega 
+  #we can just use that gamma and that omega in the future 
+
   validate()

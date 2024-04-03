@@ -70,11 +70,11 @@ options :
   min : 1
   max : 
  omega : 
-  default : 1.0
+  default : 0.8
   min : 0.0
   max: 2.0
  gamma :
-  default : 0.1
+  default : 0.05
   min : 0.0
   max : 1.0
  upsilon : 
@@ -107,4 +107,4 @@ punting_defaults :
   Theoretically optimal punting : 
     omega : 1.0
     gamma : 0.1
-punting_default_index : 2
+punting_default_index : 1

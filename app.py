@@ -355,18 +355,7 @@ with param_tab:
                         not known before the season begins, so it is recommended to set chi to be higher 
                         '''
           st.caption(chi_str)
-
-          upsilon = st.number_input(r'Select a $\Upsilon$ value'
-                  , key = 'upsilon'
-                  , value = float(st.session_state.params['options']['upsilon']['default'])
-                  , min_value = float(st.session_state.params['options']['upsilon']['min'])
-                  , max_value = float(st.session_state.params['options']['upsilon']['max']))
-          upsilon_str = r'''For Rotisserie, an advantage state of $\Upsilon$ times the expected max 
-                            luck of any drafter is built into H-scores. This is a heuristic way of modeling 
-                            winning the whole season, which requires some amount of luck to be competitive'''
-          st.caption(upsilon_str)
         else:
-          upsilon = None
           chi = None
 
       with right_algo_param_col:
@@ -588,7 +577,6 @@ with rank_tab:
                     ,scoring_format
                     ,punting
                     ,chi
-                    ,upsilon
                     ,st.session_state.info_key)
 
 H = HAgent(info = info
@@ -600,8 +588,7 @@ H = HAgent(info = info
     , n_drafters = n_drafters
     , scoring_format = scoring_format
     , punting = punting
-    , chi = chi
-    , upsilon = upsilon)   
+    , chi = chi)   
 
 if st.session_state['mode'] == 'Draft Mode':
   with draft_tab:
@@ -682,7 +669,6 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,scoring_format
                                         ,punting
                                         ,chi
-                                        ,upsilon
                                         ,player_assignments
                                         ,draft_seat
                                         ,st.session_state.info_key)
@@ -859,7 +845,6 @@ elif st.session_state['mode'] == 'Season Mode':
 
         if len(inspection_players) == n_picks:
 
-
           base_h_res = get_base_h_score(info
                                         ,omega
                                         ,gamma
@@ -870,7 +855,6 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,scoring_format
                                         ,punting
                                         ,chi
-                                        ,upsilon
                                         ,player_assignments
                                         ,roster_inspection_seat
                                         ,st.session_state.info_key)
@@ -1025,7 +1009,6 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,scoring_format
                             ,punting
                             ,chi
-                            ,upsilon
                             ,player_assignments
                             ,waiver_inspection_seat
                             ,st.session_state.info_key)
