@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
 from src.helper_functions import combinatorial_calculation, calculate_tipping_points, get_categories
@@ -20,7 +20,6 @@ class HAgent():
                  , scoring_format : str
                  , punting : bool
                  , chi : float
-                 , upsilon : float
                     ):
         """Calculates the rank order based on H-score
 
@@ -34,7 +33,6 @@ class HAgent():
             n_drafters : int, number of drafters
             scoring_format
             punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
-            upsilon: advantage state built into the predictions, for Rotisserie 
         Returns:
             None
 
@@ -46,7 +44,12 @@ class HAgent():
         self.n_picks = n_picks 
         self.n_drafters = n_drafters
         self.chi = chi
-        self.upsilon = upsilon
+        
+        self.cross_player_var = info['Var']
+        self.L = info['L']
+        self.punting = punting
+        self.scoring_format = scoring_format
+        self.var_fudge_factor = 2
 
         mov = info['Mov']
         vom = info['Vom']
@@ -55,19 +58,29 @@ class HAgent():
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
-            max_advantage_state = np.sqrt(self.n_picks*2 * self.chi * 9 * 2 * np.log(self.n_drafters))
-            self.advantage_state = self.upsilon * max_advantage_state/9
+
+            n_opponents = n_drafters - 1
+
+            #scale is standard deviation of overall "luck"
+            player_stat_luck_overall = np.sqrt(self.chi * self.n_picks * 9)
+
+            max_luck_expected =  norm.ppf((self.n_drafters - 1 - 0.375)/(self.n_drafters - 1 + 0.25)) * \
+                                    player_stat_luck_overall
+
+            player_stat_luck_per_category = max_luck_expected/9
+            max_cdf = norm.cdf(player_stat_luck_per_category, scale = np.sqrt(self.chi * self.n_picks) )
+
+            ev_max_wins = max_cdf * (self.n_drafters-1) * 9
+
+            self.mu_m = ev_max_wins
+            self.var_m = max_cdf * (1-max_cdf) * self.n_picks * self.n_drafters
+
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/(mov + vom))
-            self.advantage_state = 0
 
         self.v = np.array(v/v.sum()).reshape(9,1)
 
-        self.cross_player_var = info['Var']
-        self.L = info['L']
-        self.punting = punting
-        self.scoring_format = scoring_format
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -101,7 +114,7 @@ class HAgent():
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
         default_weights = self.v.T.reshape(1,9,1)
-        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * 500)) + \
+        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * 1000)) + \
                             default_weights).mean(axis = 2)
         
         scores = []
@@ -175,8 +188,19 @@ class HAgent():
 
             diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
 
+        #make order statistics adjustment for Roto 
         if self.scoring_format == 'Rotisserie':
-            diff_means = diff_means + self.advantage_state
+            total_players = self.n_drafters * self.n_picks 
+            remaining_players = total_players - len(players_chosen)
+            scale = np.sqrt(self.cross_player_var * \
+                            self.n_picks * \
+                            remaining_players/total_players
+                            )
+
+            n_values = rankdata(diff_means, axis = 2, method = 'ordinal')
+            player_variance_adjustment =  norm.ppf((n_values - 0.375)/(self.n_drafters - 1 + 0.25))
+
+            diff_means = diff_means + player_variance_adjustment * scale.values.reshape(1,9,1)
 
         other_team_vars = np.vstack(
             [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
@@ -184,6 +208,8 @@ class HAgent():
         ).T
         
         diff_vars = other_team_vars.reshape(1,9,self.n_drafters - 1)
+
+        #adjust diff_means to be more representative
 
         return diff_means, diff_vars
 
@@ -213,9 +239,10 @@ class HAgent():
         return total_diff
 
     def get_diff_var(self, n_their_players):
+        #diff_var should just include the player-to-player variance. maybe? and 
+
         if self.scoring_format == 'Rotisserie':
-            diff_var = self.n_picks * \
-                (2 * self.chi +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+            diff_var = self.n_picks * 2 * self.chi + 0 * self.cross_player_var
         else:
             diff_var = self.n_picks * \
                 (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
@@ -271,10 +298,20 @@ class HAgent():
                 if self.scoring_format == 'Head to Head: Most Categories':
         
                     tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
+
+                    #ZR: Need to add the sqrt(diff_vars) thing later
         
-                    pdf_weights = (tipping_points*pdf_estimates).mean(axis = 2)
+                    pdf_weights = (tipping_points*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+
+                elif self.scoring_format == 'Rotisserie':
+
+                    gradient_weights = self.get_gradient_weights_rotisserie(np.array(cdf_estimates))   
+        
+                    pdf_weights = (gradient_weights*pdf_estimates).mean(axis = 2)
+
+
                 else:
-                    pdf_weights = pdf_estimates.mean(axis = 2)
+                    pdf_weights = (pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
 
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
@@ -289,6 +326,8 @@ class HAgent():
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
+                elif self.scoring_format == 'Rotisserie':
+                    score = self.objective_function_rotisserie(cdf_estimates)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
@@ -306,6 +345,8 @@ class HAgent():
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
+                elif self.scoring_format == 'Rotisserie':
+                    score = self.objective_function_rotisserie(cdf_estimates)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
@@ -321,7 +362,8 @@ class HAgent():
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
-
+                elif self.scoring_format == 'Rotisserie':
+                    score = self.objective_function_rotisserie(cdf_estimates)
                 else:
 
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
@@ -348,6 +390,8 @@ class HAgent():
                     score = combinatorial_calculation(cdf_estimates
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
+                elif self.scoring_format == 'Rotisserie':
+                    score = self.objective_function_rotisserie(cdf_estimates)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1)
 
@@ -396,6 +440,84 @@ class HAgent():
         cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
 
         return cdf_estimates_reshaped
+
+    def get_gradient_weights_rotisserie(self, cdf_estimates):
+
+        n_opponents = self.n_drafters - 1
+
+        drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1,1,1)
+
+        n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+
+        mu_values = cdf_estimates.sum(axis = 2).reshape(-1
+                                                            , 9
+                                                            , 1) 
+
+        variance_contributions = cdf_estimates * \
+                                    (2 * n_opponents - 2 * n_values - 2 * mu_values + 1 )
+        category_variance = variance_contributions.sum(axis = 2).reshape(-1
+                                                            , 9
+                                                            , 1)
+
+        extra_term = mu_values**2
+
+        category_variance = category_variance + extra_term
+
+        drafter_variance = category_variance.sum(axis = 1).reshape(-1,1,1) * self.var_fudge_factor
+
+        total_variance = drafter_variance + self.var_m
+
+        nabla = total_variance + (self.mu_m - drafter_mean) * self.var_fudge_factor * \
+                                                 (n_opponents - n_values - mu_values + 0.5) 
+
+        outer_pdf = norm.pdf((drafter_mean - self.mu_m)/np.sqrt(total_variance))
+
+        #return 2 * ((n_opponents - n_values - mu_values + 0.5) - x_factor)
+        return nabla * outer_pdf/ (total_variance * np.sqrt(total_variance))
+
+    def objective_function_rotisserie(self, cdf_estimates):
+
+        n_opponents = self.n_drafters - 1
+
+        drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1)
+
+        n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+        mu_values = cdf_estimates.sum(axis = 2).reshape(-1
+                                                            , 9
+                                                            , 1) 
+
+
+        variance_contributions = cdf_estimates * \
+                                    (2 * n_opponents - 2 * n_values - 2 * mu_values + 1 )
+        category_variance = variance_contributions.sum(axis = 2).reshape(-1
+                                                            , 9
+                                                            , 1)
+
+        #print('N values:')
+        #print(n_values)
+
+        #print('Mu Values:')
+        #print(mu_values)
+
+        #print('Var contributions:')
+        #print(variance_contributions)
+
+        extra_term = mu_values**2
+
+        category_variance = category_variance + extra_term
+
+        #print('Category variance:')
+        #print(variance_contributions)
+
+        drafter_variance = category_variance.sum(axis = 1).reshape(-1) * self.var_fudge_factor
+
+        total_variance = drafter_variance + self.var_m
+
+        #return drafter_variance
+
+        objective = norm.cdf(drafter_mean - self.mu_m, scale = np.sqrt(total_variance))
+
+        return objective 
 
     def get_x_mu_long_form(self,c):
         #uses the pre-simplified formula for x_mu from page 19 of the paper

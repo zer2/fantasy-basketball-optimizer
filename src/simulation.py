@@ -401,7 +401,6 @@ def validate() -> None:
     gamma = st.session_state.params['options']['gamma']['default']
     alpha = st.session_state.params['options']['alpha']['default']
     beta = st.session_state.params['options']['beta']['default']
-    upsilon = st.session_state.params['options']['upsilon']['default']
     chi = 0.05
     n_seasons = 1000
 
@@ -437,7 +436,6 @@ def validate() -> None:
             , scoring_format = 'Rotisserie'
             , punting = True
             , chi = chi
-            , upsilon = upsilon
             )
                 
     res_roto =  try_strategy(primary_agent_roto
@@ -445,7 +443,7 @@ def validate() -> None:
             , n_drafters
             , n_picks
             , weekly_df
-            , n_seasons 
+            , n_seasons
             , n_primary = 1
             , scoring_format = 'Rotisserie')
 
@@ -460,7 +458,6 @@ def validate() -> None:
                 , scoring_format = 'Head to Head: Each Category'
                 , punting = True
                 , chi = None
-                , upsilon = None
                 )
 
     res_ec =  try_strategy(primary_agent_ec
@@ -483,7 +480,6 @@ def validate() -> None:
                 , scoring_format = 'Head to Head: Most Categories'
                 , punting = True
                 , chi = None
-                , upsilon = None
                 )
 
     res_wta =  try_strategy(primary_agent_wta
