@@ -1,5 +1,4 @@
-from src.run_algorithm import HAgent, savor_calculation
-from src.helper_functions import combinatorial_calculation, calculate_tipping_points
+from src.run_algorithm import HAgent, savor_calculation, combinatorial_calculation, calculate_tipping_points
 from streamlit.testing.v1 import AppTest
 import numpy as np 
 import pandas as pd
@@ -92,6 +91,22 @@ def test_objective_gradients():
     ]
 
     #check gradients
+
+    def rotisserie_objective(cdf_estimates):
+        res = self.get_objective_and_pdf_weights_rotisserie(
+                        cdf_estimates
+                        , 1
+                        , None
+                        , False) 
+        return res
+
+    def rotisserie_gradient(cdf_estimates):
+        _, res = self.get_objective_and_pdf_weights_rotisserie(
+                        cdf_estimates
+                        , 1
+                        , None
+                        , True) 
+        return res
 
     for c in c_list:
 

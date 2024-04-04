@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
-from src.helper_functions import combinatorial_calculation, calculate_tipping_points, get_categories
+from src.helper_functions import get_categories
 import streamlit as st 
 import numexpr as ne
 
@@ -98,6 +98,7 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
+
         my_players = [p for p in player_assignments[drafter] if p ==p]
         n_players_selected = len(my_players) 
 
@@ -134,10 +135,10 @@ class HAgent():
                     , drafter
                     , x_scores_available : pd.DataFrame
                     , cash_remaining_per_team : dict[int] = None) -> pd.Series:
-        """Calculates diff-means based on the dynamic method 
+        """Calculates base distributions of expected difference to opponents, before next player is added
 
         Args:
-            players_chosen : list of all players chosen, including my_players
+            player_distributions : list of all players chosen, including my_players
             x_scores_available: DataFrame of x-scores, excluding players chosen by any team
             cash_remaining_per_team: amount of cash left for each team. Only relevant for auctions
         Returns:
@@ -183,7 +184,7 @@ class HAgent():
             mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
 
             other_team_sums = np.vstack(
-                [self.get_opposing_team_stats(players, mean_extra_players, len(my_players)) for team, players \
+                [self.get_opposing_team_means(players, mean_extra_players, len(my_players)) for team, players \
                                         in player_assignments.items() if team != drafter]
             ).T
 
@@ -205,18 +206,19 @@ class HAgent():
         else:
             n_values = None
 
-        other_team_vars = np.vstack(
+        diff_vars = np.vstack(
             [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
                                     in player_assignments.items() if team != drafter]
         ).T
         
-        diff_vars = other_team_vars.reshape(1,9,self.n_drafters - 1)
-
-        #adjust diff_means to be more representative
+        diff_vars = diff_vars.reshape(1,9,self.n_drafters - 1)
 
         return diff_means, diff_vars, n_values
 
-    def get_opposing_team_stats(self, players, replacement_value, n_players):
+    def get_opposing_team_means(self
+                            , players
+                            , replacement_value
+                            , n_players):
         players = [p for p in players if p == p]
 
         n_extra_players = n_players + 1 - len(players)
@@ -241,7 +243,8 @@ class HAgent():
 
         return total_diff
 
-    def get_diff_var(self, n_their_players):
+    def get_diff_var(self
+                    , n_their_players):
         #diff_var should just include the player-to-player variance. maybe? and 
 
         if self.scoring_format == 'Rotisserie':
@@ -290,33 +293,19 @@ class HAgent():
                 del_full = self.get_del_full(weights)
         
                 expected_future_diff_single = self.get_x_mu_simplified_form(weights)
-
                 expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
                 pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
-                
                 cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
         
-                if self.scoring_format == 'Head to Head: Most Categories':
-        
-                    tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
-
-                    #ZR: Need to add the sqrt(diff_vars) thing later
-        
-                    pdf_weights = (tipping_points*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
-
-                elif self.scoring_format == 'Rotisserie':
-
-                    gradient_weights = self.get_gradient_weights_rotisserie(np.array(cdf_estimates)
-                                                                            , n_values)   
-        
-                    pdf_weights = (gradient_weights*pdf_estimates).mean(axis = 2)
-
-
-                else:
-                    pdf_weights = (pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+                score, pdf_weights = self.get_objective_and_pdf_weights(
+                                        cdf_estimates
+                                        , pdf_estimates
+                                        , diff_vars
+                                        , n_values
+                                        , calculate_pdf_weights = True)
 
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
@@ -327,33 +316,24 @@ class HAgent():
                 weights[weights < 0] = 0
                 weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
-                if self.scoring_format == 'Head to Head: Most Categories':
-                    score = combinatorial_calculation(cdf_estimates
-                                                              , 1 - cdf_estimates
-                                 ).mean(axis = 1)
-                elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
-                else:
-                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
-
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.punting) & (n_players_selected < (self.n_picks)) ): 
 
                 x_diff_array = diff_means + x_scores_available_array
 
-                cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
+                cdf_estimates = self.get_cdf(x_diff_array
+                                            , diff_vars)
 
                 weights = None
                 expected_future_diff = None
+                pdf_estimates = None
                 
-                if self.scoring_format == 'Head to Head: Most Categories':
-                    score = combinatorial_calculation(cdf_estimates
-                                                              , 1 - cdf_estimates
-                                 ).mean(axis = 1)
-                elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
-                else:
-                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
+                score = self.get_objective_and_pdf_weights(
+                                        cdf_estimates
+                                        , pdf_estimates
+                                        , diff_vars
+                                        , n_values
+                                        , calculate_pdf_weights = False)
 
             #case where no new players need to be chosen
             elif (n_players_selected == self.n_picks): 
@@ -362,16 +342,14 @@ class HAgent():
 
                 weights = None
                 expected_future_diff = None
+                pdf_estimates = None
                 
-                if self.scoring_format == 'Head to Head: Most Categories':
-                    score = combinatorial_calculation(cdf_estimates
-                                                              , 1 - cdf_estimates
-                                 ).mean(axis = 1)
-                elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
-                else:
-
-                    score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
+                score = self.get_objective_and_pdf_weights(
+                                        cdf_estimates
+                                        , pdf_estimates
+                                        , diff_vars
+                                        , n_values
+                                        , calculate_pdf_weights = False)
                 
                 result_index = ['']
 
@@ -390,15 +368,14 @@ class HAgent():
                 diff_means_mod = diff_means - drop_potentials_array
 
                 cdf_estimates = self.get_cdf(diff_means_mod, diff_vars)
+                pdf_estimates = None
                                         
-                if self.scoring_format == 'Head to Head: Most Categories':
-                    score = combinatorial_calculation(cdf_estimates
-                                                              , 1 - cdf_estimates
-                                 ).mean(axis = 1)
-                elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
-                else:
-                    score = cdf_estimates.mean(axis = 2).mean(axis = 1)
+                score = self.get_objective_and_pdf_weights(
+                                        cdf_estimates
+                                        , pdf_estimates
+                                        , diff_vars
+                                        , n_values
+                                        , calculate_pdf_weights = False)
 
                 result_index = drop_potentials.index
 
@@ -420,6 +397,139 @@ class HAgent():
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = get_categories())}
 
     ### below are functions used for the optimization procedure 
+    def get_objective_and_pdf_weights(self
+                                        ,cdf_estimates
+                                        , pdf_estimates
+                                        , diff_vars
+                                        , n_values
+                                        , calculate_pdf_weights = False):
+
+        if self.scoring_format == 'Head to Head: Most Categories':
+
+            return self.get_objective_and_pdf_weights_mc(
+                        cdf_estimates
+                        , pdf_estimates
+                        , diff_vars
+                        , calculate_pdf_weights) 
+
+        elif self.scoring_format == 'Rotisserie':
+
+            return self.get_objective_and_pdf_weights_rotisserie(
+                        cdf_estimates
+                        , pdf_estimates
+                        , n_values
+                        , calculate_pdf_weights) 
+
+        else:
+            return self.get_objective_and_pdf_weights_ec(
+                        cdf_estimates
+                        , pdf_estimates
+                        , diff_vars
+                        , calculate_pdf_weights) 
+
+    def get_objective_and_pdf_weights_mc(self
+                                , cdf_estimates
+                                , pdf_estimates
+                                , diff_vars
+                                , calculate_pdf_weights = False):
+
+        objective = combinatorial_calculation(cdf_estimates
+                                                , 1 - cdf_estimates
+                                                ).mean(axis = 1)
+
+        if calculate_pdf_weights:
+
+            tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
+
+            pdf_weights = (tipping_points*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+
+            return objective, pdf_weights
+
+        else: 
+
+            return objective
+
+
+    def get_objective_and_pdf_weights_ec(self
+                            , cdf_estimates
+                            , pdf_estimates
+                            , diff_vars
+                            , calculate_pdf_weights = False):
+
+        objective = cdf_estimates.mean(axis = 2).mean(axis = 1) 
+
+        if calculate_pdf_weights:
+
+            pdf_weights = (pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+
+            return objective, pdf_weights
+
+        else:
+            return objective
+
+
+    def get_objective_and_pdf_weights_rotisserie(self
+                                , cdf_estimates
+                                , pdf_estimates
+                                , n_values = None
+                                , calculate_pdf_weights = False):
+
+        """Calculates the objective function for Rotisserie, and the gradient if required
+         
+        Args:
+            cdf_estimates : 
+            n_values 
+            calculate_pdf_weights
+        Yields:
+            Either a Series for Objective value 
+            or 
+
+        """
+        n_opponents = self.n_drafters - 1
+
+        drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1,1,1)
+
+        if n_values is None:
+            n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+
+        mu_values = cdf_estimates.sum(axis = 2).reshape(-1
+                                                            , 9
+                                                            , 1) 
+
+        variance_contributions = cdf_estimates * \
+                                    (2 * n_opponents - 2 * n_values - 2 * mu_values + 1 )
+        category_variance = variance_contributions.sum(axis = 2).reshape(-1
+                                                            , 9
+                                                            , 1)
+
+        extra_term = mu_values**2
+
+        category_variance = category_variance + extra_term
+
+        drafter_variance = category_variance.sum(axis = 1).reshape(-1,1,1) * self.var_fudge_factor
+
+        total_variance = drafter_variance + self.var_m
+
+        objective = norm.cdf(drafter_mean - self.mu_m
+                            , scale = np.sqrt(total_variance)).reshape(-1)
+
+        if calculate_pdf_weights:
+
+            nabla = total_variance + (self.mu_m - drafter_mean) * self.var_fudge_factor * \
+                                                    (n_opponents - n_values - mu_values + 0.5) 
+
+            outer_pdf = norm.pdf((drafter_mean - self.mu_m)/np.sqrt(total_variance))
+
+            gradient = nabla * outer_pdf/ (total_variance * np.sqrt(total_variance))
+
+            pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
+
+            return objective, pdf_weights
+
+        else: 
+
+            return objective
+
     def get_pdf(self, x_diff_array, diff_vars):
 
         #need to resize
@@ -687,6 +797,9 @@ class SimpleAgent():
 
         return player
 
+
+### Analysis of H-scoring results 
+
 @st.cache_data(show_spinner = False)
 def estimate_matchup_result(team_1_x_scores : pd.Series
                             , team_2_x_scores : pd.Series
@@ -829,12 +942,15 @@ def analyze_trade_value(player : str
         with_player[team] = with_player[team] + [player]
 
 
-    res_without_player= next(H.get_h_scores(without_player,team, [player]))
+    res_without_player= next(H.get_h_scores(without_player,team, exclusion_list = [player]))
     res_with_player = next(H.get_h_scores(with_player, team))
 
     res = (res_with_player['Scores'].max() - res_without_player['Scores'].max())
 
     return res
+
+
+### Helper functions 
 
 def savor_calculation(raw_values_unselected : pd.Series
                     , n_remaining_players : int
@@ -870,4 +986,94 @@ def savor_calculation(raw_values_unselected : pd.Series
 
     return savor 
 
+def combinatorial_calculation(c : np.array
+                              , c_comp : np.array
+                              , data = 1 #the latest probabilities. Defaults to 1 at start
+                              , level : int = 0 #the number of categories that have been worked into the probability
+                              , n_false : int = 0 #the number of category losses that have been tracked so far
+                             ):
+    """This recursive functions enumerates winning probabilities for the Gaussian optimizer
+
+    The function's recursive structure creates a binary tree, where each split is based on whether the next category is 
+    won or lost. At the high level it looks like 
     
+                                            (start) 
+                                    |                   |
+                                won rebounds      lost rebounds
+                             |          |           |            |
+                          won pts    lost pts   won pts     lost pts
+                          
+    The probabilities of winning scenarios are then added along the tree. This is more efficient than brute force calculation
+    of each possibility, because it doesn't repeat multiplication steps for similar scenarios like (won 9) and (won 8 then 
+    lost the last 1). Ultimately it is about five times faster than the equivalent with list comprehension
+    
+    Args:
+        c: Array of all category winning probabilities. Dimensions are (player, category, opponent)
+        c_comp: 1 - c
+        data: probability of the node's scenario. Defaults to 1 because no categories are required at first
+        level: the number of categories that have been worked into the probability
+        n_false: the number of category losses that have been tracked so far. When it gets high enough 
+                 we write off the node; the remaining scenarios do not contribute to winning chances
+
+    Returns:
+        DataFrame with probability of winning a majority of categories for each player 
+
+        axis 0: player 
+        axis 1: opponent
+
+    """
+    if n_false > (c.shape[1] -1)/2: #scenarios where a majority of categories are losses are overall losses
+        return 0 
+    elif level < c.shape[1] :
+        #find the total winning probability of both branches from this point- if we win or lose the current category 
+        return combinatorial_calculation(c, c_comp, data * c[:,level,:], level + 1, n_false) + \
+                combinatorial_calculation(c, c_comp, data * c_comp[:,level,:], level + 1, n_false + 1)
+    else: #a series where all 9 categories has been processed, and n_false <= the cutoff, can be added to the total %
+        return data
+
+@st.cache_data()
+def get_grid():
+    #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
+
+    which = np.array([list(combinations(range(9), 5))] )
+    grid = np.zeros((126, 9), dtype="bool")     
+    grid[np.arange(126)[None].T, which] = True
+
+    grid = np.expand_dims(grid, axis = 2)
+
+    return grid
+
+def calculate_tipping_points(x : np.array) -> np.array:
+    """Calculate the probability of each category being a tipping point, assuming independence
+
+    Args:
+        x: Array of shape (n,9,m) representing probabilities of winning each of the 9 categories 
+
+    Returns:
+        DataFrame of shape (n,9,m) representing probabilities of each category being a tipping point
+        m is number of opponents
+    """
+
+    grid = get_grid()
+
+    #copy grid for each row in x 
+    grid = np.array([grid] * x.shape[0])
+
+    x = x.reshape(x.shape[0],1,9, x.shape[2])
+
+    #get the probabilities of the scenarios and filter them by which categories they apply to
+    #the categories that are won all become tipping points
+
+    first_part = ne.evaluate('grid * x + (1-grid) * (1-x)') \
+                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    positive_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
+
+    #do the same but for the inverse scenarios, where 5 categories are lost and 4 are won
+    #in this case the lost categories become tipping points 
+    first_part = ne.evaluate('(1 - grid) * x + grid * (1-x)') \
+                                  .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    negative_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
+
+    final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
+
+    return final_probabilities
