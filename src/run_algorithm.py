@@ -105,7 +105,7 @@ class HAgent():
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list)]
         total_players = self.n_picks * self.n_drafters
 
-        diff_means, diff_vars = self.get_diff_distributions(player_assignments
+        diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
                                         , drafter
                                         , x_scores_available
                                         , cash_remaining_per_team
@@ -126,7 +126,8 @@ class HAgent():
                                        , diff_means
                                        , diff_vars
                                        , x_scores_available_array
-                                       , x_scores_available.index)
+                                       , x_scores_available.index
+                                       , n_values)
 
     def get_diff_distributions(self
                     , player_assignments : dict[list[str]]
@@ -201,6 +202,8 @@ class HAgent():
             player_variance_adjustment =  norm.ppf((n_values - 0.375)/(self.n_drafters - 1 + 0.25))
 
             diff_means = diff_means + player_variance_adjustment * scale.values.reshape(1,9,1)
+        else:
+            n_values = None
 
         other_team_vars = np.vstack(
             [self.get_diff_var(len([p for p in players if p ==p])) for team, players \
@@ -211,7 +214,7 @@ class HAgent():
 
         #adjust diff_means to be more representative
 
-        return diff_means, diff_vars
+        return diff_means, diff_vars, n_values
 
     def get_opposing_team_stats(self, players, replacement_value, n_players):
         players = [p for p in players if p == p]
@@ -256,6 +259,7 @@ class HAgent():
                            ,diff_vars : pd.Series
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
+                           ,n_values
                            ) -> tuple:
         """Performs one iteration of H-scoring
          
@@ -305,7 +309,8 @@ class HAgent():
 
                 elif self.scoring_format == 'Rotisserie':
 
-                    gradient_weights = self.get_gradient_weights_rotisserie(np.array(cdf_estimates))   
+                    gradient_weights = self.get_gradient_weights_rotisserie(np.array(cdf_estimates)
+                                                                            , n_values)   
         
                     pdf_weights = (gradient_weights*pdf_estimates).mean(axis = 2)
 
@@ -327,7 +332,7 @@ class HAgent():
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
                 elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates)
+                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
@@ -346,7 +351,7 @@ class HAgent():
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
                 elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates)
+                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
@@ -363,7 +368,7 @@ class HAgent():
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
                 elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates)
+                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
                 else:
 
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1) 
@@ -391,7 +396,7 @@ class HAgent():
                                                               , 1 - cdf_estimates
                                  ).mean(axis = 1)
                 elif self.scoring_format == 'Rotisserie':
-                    score = self.objective_function_rotisserie(cdf_estimates)
+                    score = self.objective_function_rotisserie(cdf_estimates, n_values)
                 else:
                     score = cdf_estimates.mean(axis = 2).mean(axis = 1)
 
@@ -441,13 +446,16 @@ class HAgent():
 
         return cdf_estimates_reshaped
 
-    def get_gradient_weights_rotisserie(self, cdf_estimates):
+    def get_gradient_weights_rotisserie(self
+                                        , cdf_estimates
+                                        , n_values = None):
 
         n_opponents = self.n_drafters - 1
 
         drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1,1,1)
 
-        n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+        if n_values is None:
+            n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
 
         mu_values = cdf_estimates.sum(axis = 2).reshape(-1
                                                             , 9
@@ -475,13 +483,16 @@ class HAgent():
         #return 2 * ((n_opponents - n_values - mu_values + 0.5) - x_factor)
         return nabla * outer_pdf/ (total_variance * np.sqrt(total_variance))
 
-    def objective_function_rotisserie(self, cdf_estimates):
+    def objective_function_rotisserie(self
+                                    , cdf_estimates
+                                    , n_values = None):
 
         n_opponents = self.n_drafters - 1
 
         drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1)
 
-        n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+        if n_values is None:
+            n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
         mu_values = cdf_estimates.sum(axis = 2).reshape(-1
                                                             , 9
                                                             , 1) 
