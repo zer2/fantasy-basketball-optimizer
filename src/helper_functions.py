@@ -29,8 +29,9 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   """
 
   agg_columns = [col for col in ['$ Value','Total'] if col in df.columns]
+  index_columns = ['Player'] if 'Player' in df.columns else []
 
-  df = df[agg_columns + get_categories()]
+  df = df[index_columns + agg_columns + get_categories()]
 
   df_styled = df.style.format("{:.2f}"
                               , subset = pd.IndexSlice[:,agg_columns + get_categories()]) \
