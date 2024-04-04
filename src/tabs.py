@@ -1094,6 +1094,7 @@ def make_h_rank_tab(_info : dict
                   , n_drafters : int
                   , n_iterations : int
                   , scoring_format : str
+                  , mode : str
                   , punting : bool
                   , chi : float
                   , info_key : int):
@@ -1109,12 +1110,14 @@ def make_h_rank_tab(_info : dict
     n_drafters: int, number of drafters
     n_iterations: int, number of gradient descent steps
     scoring_format: 
+    mode: 
     punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
     info_key: key to info data, used to detect changes
 
   Returns:
       None
   """
+
   H = HAgent(info = _info
     , omega = omega
     , gamma = gamma
@@ -1126,10 +1129,17 @@ def make_h_rank_tab(_info : dict
     , punting = punting
     , chi = chi)
 
-  generator = H.get_h_scores({n : [] for n in range(n_drafters)}, 0)
+  if st.session_state['mode'] == 'Auction Mode':
+    cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
+  else:
+    cash_remaining_per_team = None
+
+  generator = H.get_h_scores(player_assignments = {n : [] for n in range(n_drafters)}
+                          , drafter = 0
+                          , cash_remaining_per_team = cash_remaining_per_team)
+
   for i in range(max(1,n_iterations)):
     res = next(generator)
-
 
   h_res = res['Scores']
   c = res['Weights']
