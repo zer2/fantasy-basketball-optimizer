@@ -446,13 +446,16 @@ class HAgent():
 
         return cdf_estimates_reshaped
 
-    def get_gradient_weights_rotisserie(self, cdf_estimates, n_values):
+    def get_gradient_weights_rotisserie(self
+                                        , cdf_estimates
+                                        , n_values = None):
 
         n_opponents = self.n_drafters - 1
 
         drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1,1,1)
 
-        #n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+        if n_values is None:
+            n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
 
         mu_values = cdf_estimates.sum(axis = 2).reshape(-1
                                                             , 9
@@ -480,13 +483,16 @@ class HAgent():
         #return 2 * ((n_opponents - n_values - mu_values + 0.5) - x_factor)
         return nabla * outer_pdf/ (total_variance * np.sqrt(total_variance))
 
-    def objective_function_rotisserie(self, cdf_estimates, n_values):
+    def objective_function_rotisserie(self
+                                    , cdf_estimates
+                                    , n_values = None):
 
         n_opponents = self.n_drafters - 1
 
         drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1)
 
-        #n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+        if n_values is None:
+            n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
         mu_values = cdf_estimates.sum(axis = 2).reshape(-1
                                                             , 9
                                                             , 1) 
