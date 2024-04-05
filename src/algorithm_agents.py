@@ -4,9 +4,8 @@ from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
 from src.helper_functions import get_categories
-from src.algorithm_helpers import combinatorial_calculation, tipping_point_helper
+from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 import streamlit as st 
-import numexpr as ne
 
 class HAgent():
 
@@ -541,7 +540,8 @@ class HAgent():
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
                                 , n_values : np.array = None
-                                , calculate_pdf_weights : bool = False):
+                                , calculate_pdf_weights : bool = False
+                                , test_mode : bool = False):
 
         """
         Calculate the objective function and optionally pdf weights for the gradient, for Roto
@@ -549,7 +549,7 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            n_values: order of matchup means. Useful for Toro
+            n_values: order of matchup means. Useful for Roto
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
@@ -592,9 +592,12 @@ class HAgent():
 
             gradient = nabla * outer_pdf/ (total_variance * np.sqrt(total_variance))
 
-            pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
+            if test_mode:
+                return gradient
+            else:
+                pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
 
-            return objective, pdf_weights
+                return objective, pdf_weights
 
         else: 
 
