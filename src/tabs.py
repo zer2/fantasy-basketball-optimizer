@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
-from src.run_algorithm import HAgent, estimate_matchup_result, analyze_trade, analyze_trade_value, savor_calculation
+from src.algorithm_agents import HAgent
+from src.h_score_analysis estimate_matchup_result, analyze_trade, analyze_trade_value
+from src.algorithm_helpers import savor_calculation
 from src.process_player_data import process_player_data
 import os
 import itertools

@@ -10,7 +10,7 @@ from yfpy.models import League
 from src.helper_functions import listify, make_progress_chart, stat_styler, styler_a,styler_b, styler_c, get_categories
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
-from src.run_algorithm import HAgent, analyze_trade
+from src.algorithm_agents import HAgent
 from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
