@@ -10,7 +10,7 @@ from yfpy.models import League
 from src.helper_functions import listify, make_progress_chart, stat_styler, styler_a,styler_b, styler_c, get_categories
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
-from src.run_algorithm import HAgent, analyze_trade
+from src.algorithm_agents import HAgent
 from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
@@ -559,12 +559,31 @@ with rank_tab:
 
     with h_rank_tab:
       rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-      st.caption("""These rankings are based on estimates of win probability for an arbitrary head to head matchup,
-                given the candidate player is taken with the first overall pick and future picks are adjusted 
-                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated.""")
 
-      st.caption('Note that these scores are unique to the ' + scoring_format + \
-                ' format and all the H-scoring parameters defined on the parameter tab')
+      if st.session_state['mode'] == 'Auction Mode':
+        taken_str = 'for free'
+      else:
+        taken_str = 'with the first overall pick'
+
+      if scoring_format == 'Rotisserie':
+        first_str = """Rankings are based on estimates of win probability against a field of 
+                  eleven opposing teams given the candidate player is taken """ + taken_str + """ and 
+                  future picks are adjusted accordingly. Corresponding category scores, based on the
+                  probability of scoring a point against in arbitrary opponent, are calculated with 
+                  H-scoring adjustments incorporated."""
+      elif scoring_format == 'Head to Head: Most Categories': 
+        first_str = """Rankings are based on estimates of overall win probability for an arbitrary head to head 
+                matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
+                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated."""
+      elif scoring_format == 'Head to Head: Each Category': 
+        first_str = """Rankings are based on estimates of mean category win probability for an arbitrary head to head 
+                matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
+                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated."""
+
+      second_str = 'Note that these scores are unique to the ' + scoring_format + \
+                ' format and all the H-scoring parameters defined on the parameter tab'
+
+      st.caption(first_str + ' ' + second_str)
 
       make_h_rank_tab(info
                     ,omega
@@ -575,6 +594,7 @@ with rank_tab:
                     ,n_drafters
                     ,n_iterations
                     ,scoring_format
+                    ,st.session_state['mode']
                     ,punting
                     ,chi
                     ,st.session_state.info_key)
@@ -591,6 +611,7 @@ H = HAgent(info = info
     , chi = chi)   
 
 if st.session_state['mode'] == 'Draft Mode':
+
   with draft_tab:
     
     left, right = st.columns(2)

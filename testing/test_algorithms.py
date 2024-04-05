@@ -1,9 +1,9 @@
-from src.run_algorithm import HAgent, savor_calculation, combinatorial_calculation, calculate_tipping_points
+from src.algorithm_agents import HAgent
+from src.algorithm_helpers import savor_calculation, combinatorial_calculation, calculate_tipping_points
 from streamlit.testing.v1 import AppTest
 import numpy as np 
 import pandas as pd
 from scipy.stats import norm
-
 
 def test_x_mu_gradients():
     """Make sure the H-score calculations for x_mu are working"""
@@ -93,7 +93,7 @@ def test_objective_gradients():
     #check gradients
 
     def rotisserie_objective(cdf_estimates):
-        res = self.get_objective_and_pdf_weights_rotisserie(
+        res = H.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , 1
                         , None
@@ -101,10 +101,11 @@ def test_objective_gradients():
         return res
 
     def rotisserie_gradient(cdf_estimates):
-        _, res = self.get_objective_and_pdf_weights_rotisserie(
+        res = H.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , 1
                         , None
+                        , True
                         , True) 
         return res
 
@@ -112,7 +113,7 @@ def test_objective_gradients():
 
         print('CHECKING NEXT. C = ')
         print(c)
-        check_all_gradients_2(c, H.objective_function_rotisserie, H.get_gradient_weights_rotisserie)
+        check_all_gradients_2(c, rotisserie_objective, rotisserie_gradient)
 
 
 def test_combinatorial_calculation():

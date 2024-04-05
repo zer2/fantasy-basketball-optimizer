@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-from src.run_algorithm import HAgent, SimpleAgent
+from src.algorithm_agents import HAgent, SimpleAgent
 from src.helper_functions import get_categories, stat_styler, styler_a, rotate
 from src.process_player_data import process_player_data
 from src.get_data import get_player_metadata
