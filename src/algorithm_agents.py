@@ -167,7 +167,7 @@ class HAgent():
 
             #when translating back to x-scores, reverse the basis by dividing by v 
             category_value_per_dollar = value_per_dollar / (self.v * 9) 
-            replacement_value_by_category = replacement_value / (self.v * 9) 
+            replacement_value_by_category = replacement_value / (self.v * 9)
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
@@ -213,6 +213,17 @@ class HAgent():
         ).T
         
         diff_vars = diff_vars.reshape(1,9,self.n_drafters - 1)
+
+        #ZR: this is a super ugly implementation
+        if cash_remaining_per_team:
+            self.value_of_money = self.get_value_of_money_auction(
+                        diff_means
+                        , diff_vars
+                        , n_values
+                        , category_value_per_dollar
+                        , replacement_value_by_category)
+        else:
+            self.value_of_money = None
 
         return diff_means, diff_vars, n_values
 
@@ -264,7 +275,7 @@ class HAgent():
         total_diff = score_diff - player_diff_total + money_diff_total 
 
         return total_diff
-
+    
     def get_diff_var(self
                     , n_their_players : int) -> float:
 
@@ -284,6 +295,31 @@ class HAgent():
             diff_var = self.n_picks * \
                 (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
+    
+    def get_value_of_money_auction(self
+                                   , diff_means
+                                   , diff_vars
+                                   , n_values
+                                   , category_value_per_dollar
+                                   , replacement_value_by_category):
+        x_diff_array = np.concatenate([diff_means + replacement_value_by_category + category_value_per_dollar * x/10 for x in range(1000)])
+
+        cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
+
+        score = self.get_objective_and_pdf_weights(
+                                cdf_estimates
+                                , None
+                                , diff_vars
+                                , n_values
+                                , calculate_pdf_weights = False)
+        
+        money_df = pd.DataFrame({'value' : score}
+                                , index = [x/10 for x in range(1000)])
+                
+        return money_df
+        
+        
+
 
     def perform_iterations(self
                            ,weights : pd.DataFrame
@@ -421,6 +457,10 @@ class HAgent():
                 expected_diff_means = expected_future_diff.mean(axis = 2)
             else:
                 expected_diff_means = None
+
+            if self.value_of_money is not None:
+                
+                score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
             yield {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(weights, index = result_index, columns = get_categories())

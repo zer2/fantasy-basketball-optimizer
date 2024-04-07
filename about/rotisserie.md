@@ -14,13 +14,13 @@ The best way to account for this would be with a measure of pre-season projectio
 
 ## Going for gold
 
-The goal for Rotisserie is not increasing the probability of winning an arbitrary matchup. Instead, it is the probability of getting the most category points overall. The objective function is 
+The other difference is in the objective function. Rather than winning an arbitrary matchup, a Rotisserie drafter wants to win against every opponent simultaneously. One way of writing the objective function is 
 
 $$
 \sum_{s \in S_w} P(s) 
 $$
 
-Where $S_w$ is a particular scenario in terms of category ordering, for which you are the winner, and $P(S)$ is the probability of that scenario happening. This very different objective necessitates approaching the format differently from how we approached head-to-head
+Where $S_w$ is a particular scenario in terms of category ordering, for which the drafter is the winner, and $P(S)$ is the probability of that scenario happening. This very different objective necessitates approaching the format differently from ho head-to-head
 
 ### Explicit solution
 
@@ -71,7 +71,11 @@ The CDF of this distribution at zero is the probability that the drafter scores 
 
 ## Results and observations 
 
-In general, $\mu_M$ is larger than $\mu_D$, so the center of the distribution is to the right of $0$ and the value of the CDF is below $50\%$. This implies that increasing the total variance through $\sigma_D^2$ increases the CDF and therefore the objective function. While uncertainty is undesirable in most cases, in this context, it turns out to be a good thing! Intuitively, the reason that this happens is that scoring above every other drafter takes luck, and luck comes more easily with higher volatility. 
+Interestingly, the derived equation implies that drafters are better off with more volatile results. Explaining that with eome brief math:
+-In general, $\mu_M$ is larger than $\mu_D$. Therefore, center of the distribution is to the right of $0$ and the value of the CDF is below $50\%$. 
+-This implies that increasing the total variance through $\sigma_D^2$ increases the CDF and therefore the objective function
+
+While uncertainty is undesirable in most cases, in this context, it turns out to be a good thing! Intuitively, the reason that this happens is that scoring above every other drafter takes luck, and luck comes more easily with higher volatility. 
 
 The natural follow-up question is how volatility for the drafter's score can be increased. Mathematically the answer is that it can be increased by improving the likelihood of winning low-probability points at the expense of high-probability points. Common sense bears this out; it stands to reason that the sum of two $0/1$ coin flips is more volatile than the sum of one guaranteed $0$ and one guaranteed $1$.
 
