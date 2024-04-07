@@ -540,7 +540,7 @@ def validate() -> None:
 
     with timing_tab:
         
-        wta_tab, ec_tab = st.tabs(['Head to Head: Most Categories','Head to Head: Each Category']) 
+        wta_tab, ec_tab, roto_tab = st.tabs(['Head to Head: Most Categories','Head to Head: Each Category','Rotisserie']) 
 
         with wta_tab:
             time_df = pd.DataFrame(res_wta[3])
@@ -564,6 +564,16 @@ def validate() -> None:
             )
             st.dataframe(timing_df_ec)
 
+        with roto_tab:
+            time_df = pd.DataFrame(res_roto[3])
+            for col in time_df.columns:
+                time_df[col] = time_df[col].dt.total_seconds()
+
+            timing_df_roto = time_df.style.format("{:.2f} s").map(stat_styler
+                                                , middle = 1
+                                                , multiplier = -50
+            )
+            st.dataframe(timing_df_roto)
 #add function here to sim
 #check for actual values of beta, gamma 
 def get_preds_c(v,c,L):    

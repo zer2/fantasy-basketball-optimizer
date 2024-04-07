@@ -169,9 +169,13 @@ This equation can be grouped into four parts
 
 ### Estimating auction value from H-score
 
-The H-score calculation yields a win probability for each candidate player if they could be selected without costing any money. Of course, this is unrealistic. But H-score can be used as a proxy for general value; a player that increases win probability over a replacement level player by twice as much as a different player is probably twice as valuable and worth twice as much money. 
+The raw H-score calculation yields a win probability for each candidate player if they could be selected without costing any money. Of course, this is unrealistic. 
 
-With H-scores proxying general value, the SAVOR algorithm can be applied to them, just like in the static context. 
+One way to equate H-scores to dollars is to subtract money (and corresponding value) from what the drafter has remaining until they break even for taking the player. This is doable and theoretically works well, but is a bit computationally expensive because it requires back-tracking through several calculations several times for each player.  
+
+A simpler method is to start with a replacement player and various values of $X_m$ to see how level of cash affects H-scores. Approximate cash values can then be derived for player by comparing their H-scores to those of just adding cash, and finding the closest cash equivalents. 
+
+I define H-scores for the auction context relative to dollars. So a player equivalent to $ \sim 100\$$ would get an H-score of $100\%$, for example. To get real auction values, the SAVOR algorithm is applied to the resulting H-scores
 
 ## Conclusion: using auction values 
 

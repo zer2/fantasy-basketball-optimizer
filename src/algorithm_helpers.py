@@ -117,15 +117,13 @@ def calculate_tipping_points(x : np.array) -> np.array:
     #get the probabilities of the scenarios and filter them by which categories they apply to
     #the categories that are won all become tipping points
 
-    first_part = ne.evaluate('grid * x + (1-grid) * (1-x)') \
-                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
-    positive_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
+    positive_first_part = np.prod(ne.evaluate('grid * x + (1-grid) * (1-x)'), axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    positive_case_probabilities = np.sum(ne.evaluate('positive_first_part * grid'),axis = 1)
 
     #do the same but for the inverse scenarios, where 5 categories are lost and 4 are won
     #in this case the lost categories become tipping points 
-    first_part = ne.evaluate('(1 - grid) * x + grid * (1-x)') \
-                                  .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
-    negative_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
+    negative_first_part = np.prod(ne.evaluate('(1 - grid) * x + grid * (1-x)'),axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    negative_case_probabilities = np.sum(ne.evaluate('negative_first_part * grid'), axis = 1)
 
     final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
 
