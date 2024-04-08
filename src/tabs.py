@@ -233,7 +233,7 @@ def make_h_cand_tab(H
     with placeholder.container():
 
       if cash_remaining_per_team:
-        rate_tab, weight_tab, target_tab = st.tabs(['Expected Win Rates', 'Weights','Targets'])
+        target_tab, rate_tab, weight_tab,  = st.tabs(['Targets','Expected Win Rates', 'Weights'])
       else:
         rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
           
@@ -1190,5 +1190,6 @@ def make_h_rank_tab(_info : dict
                       , left_on = 'Player'
                       ,right_index = True)
 
-  h_res = h_percentage_styler(h_res)
-  h_score_display = st.dataframe(h_res, hide_index = True, use_container_width = True)
+  h_res_styled = h_percentage_styler(h_res)
+  st.dataframe(h_res_styled, hide_index = True, use_container_width = True)
+  return h_res
