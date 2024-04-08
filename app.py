@@ -783,7 +783,7 @@ if st.session_state['mode'] == 'Auction Mode':
                   
         with z_cand_tab:
           
-          make_cand_tab(z_scores
+          z_scores_unselected = make_cand_tab(z_scores
                         ,selection_list
                         , st.session_state.params['z-score-player-multiplier']
                         ,remaining_cash
@@ -793,7 +793,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
         with g_cand_tab:
 
-          make_cand_tab(g_scores
+          g_scores_unselected = make_cand_tab(g_scores
                         , selection_list
                         , st.session_state.params['g-score-player-multiplier']
                         ,remaining_cash
@@ -821,6 +821,7 @@ if st.session_state['mode'] == 'Auction Mode':
                   ,n_iterations
                   ,v
                   ,cash_remaining_per_team.to_dict()
+                  ,g_scores_unselected['$ Value']
                   ,n_drafters * n_picks)
 
       with team_tab:
