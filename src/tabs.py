@@ -183,9 +183,11 @@ def make_cand_tab(_scores : pd.DataFrame
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
                                                           , st.session_state['streaming_noise'])
-  
+    
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
+
+  return scores_unselected
 
 def make_h_cand_tab(H
                     ,player_assignments
@@ -193,6 +195,7 @@ def make_h_cand_tab(H
                     ,n_iterations
                     ,v
                     ,cash_remaining_per_team : dict[int] = None
+                    ,generic_player_value : pd.Series = None
                     ,total_players : int = None):
   """Make a tab showing H-scores for the current draft situation
 
@@ -229,29 +232,32 @@ def make_h_cand_tab(H
     
     with placeholder.container():
 
-      rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
+      if cash_remaining_per_team:
+        rate_tab, weight_tab, target_tab = st.tabs(['Expected Win Rates', 'Weights','Targets'])
+      else:
+        rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
           
       score = score.sort_values(ascending = False)
       score.name = 'H-score'
-      score = pd.DataFrame(score)
+      score_df = pd.DataFrame(score)
 
       with rate_tab:
-        rate_df = win_rates.loc[score.index].dropna()
-        rate_display = score.merge(rate_df, left_index = True, right_index = True)
+        rate_df = win_rates.loc[score_df.index].dropna()
+        rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
         if cash_remaining_per_team:
 
           players_chosen = [x for v in player_assignments.values() for x in v if x == x]
           total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
-          rate_display.loc[:,'$ Value'] = savor_calculation(score
+          rate_display.loc[:,'$ Value'] = savor_calculation(score_df
                                                           , total_players - len(players_chosen)
                                                           , total_cash_remaining
                                                           , st.session_state['streaming_noise_h'])
 
           rate_display = rate_display[['$ Value','H-score'] + get_categories()]
 
-          rate_display = rate_display.style.format("{:.1%}"
+          rate_display_styled = rate_display.style.format("{:.1%}"
                             ,subset = pd.IndexSlice[:,['H-score']]) \
                           .format("{:.1f}"
                             ,subset = pd.IndexSlice[:,['$ Value']]) \
@@ -260,26 +266,39 @@ def make_h_cand_tab(H
                     .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                     .format('{:,.1%}', subset = rate_df.columns)
         else:
-          rate_display = rate_display.style.format("{:.1%}"
+          rate_display_styled = rate_display.style.format("{:.1%}"
                             ,subset = pd.IndexSlice[:,['H-score']]) \
                     .map(styler_a
                           , subset = pd.IndexSlice[:,['H-score']]) \
                     .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                     .format('{:,.1%}', subset = rate_df.columns)
-        st.dataframe(rate_display, use_container_width = True)
+        st.dataframe(rate_display_styled, use_container_width = True)
       with weight_tab:
-        weight_df = weights.loc[score.index].dropna()
-        weight_display = score.merge(weight_df
+        weight_df = weights.loc[score_df.index].dropna()
+        weight_display = score_df.merge(weight_df
                               , left_index = True
                               , right_index = True)
-        weight_display = weight_display.style.format("{:.0%}"
+        weight_display_styled = weight_display.style.format("{:.0%}"
                                                     , subset = weight_df.columns)\
                   .format("{:.1%}"
                           ,subset = pd.IndexSlice[:,['H-score']]) \
                   .map(styler_a
                         , subset = pd.IndexSlice[:,['H-score']]) \
                   .background_gradient(axis = None,subset = weight_df.columns) 
-        st.dataframe(weight_display, use_container_width = True)
+        st.dataframe(weight_display_styled, use_container_width = True)
+
+      if cash_remaining_per_team:
+                  
+         comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
+                                       , 'Generic $ Value' : generic_player_value.loc[rate_display.index]})
+         comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['Generic $ Value']
+
+         comparison_df_styled = comparison_df.style.format("{:.1f}") \
+                  .map(styler_a, subset = ['Your $ Value', 'Generic $ Value']) \
+                  .background_gradient(axis = None
+                                       ,cmap = 'PiYG'
+                                       ,subset = ['Difference'])
+         st.write(comparison_df_styled)
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False)
