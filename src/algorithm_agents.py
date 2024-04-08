@@ -81,6 +81,10 @@ class HAgent():
 
         self.v = np.array(v/v.sum()).reshape(9,1)
 
+        turnover_inverted_v = self.v.copy()
+        turnover_inverted_v[-1] = -turnover_inverted_v[-1]
+        self.turnover_inverted_v = turnover_inverted_v/turnover_inverted_v.sum()
+
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -166,8 +170,10 @@ class HAgent():
             value_per_dollar = remaining_overall_value/total_cash_remaining
 
             #when translating back to x-scores, reverse the basis by dividing by v 
-            category_value_per_dollar = value_per_dollar / (self.v * 9) 
-            replacement_value_by_category = replacement_value / (self.v * 9)
+
+
+            category_value_per_dollar = value_per_dollar / (self.turnover_inverted_v * 9) 
+            replacement_value_by_category = replacement_value / (self.turnover_inverted_v * 9)
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \

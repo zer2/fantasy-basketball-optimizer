@@ -288,17 +288,28 @@ def make_h_cand_tab(H
         st.dataframe(weight_display_styled, use_container_width = True)
 
       if cash_remaining_per_team:
+         
+         with target_tab:
                   
-         comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
-                                       , 'Generic $ Value' : generic_player_value.loc[rate_display.index]})
-         comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['Generic $ Value']
+          comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
+                                        , '$ Value' : generic_player_value.loc[rate_display.index]})
+          comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
-         comparison_df_styled = comparison_df.style.format("{:.1f}") \
-                  .map(styler_a, subset = ['Your $ Value', 'Generic $ Value']) \
-                  .background_gradient(axis = None
-                                       ,cmap = 'PiYG'
-                                       ,subset = ['Difference'])
-         st.write(comparison_df_styled)
+          comparison_df = comparison_df.join(rate_df)
+
+          comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
+
+          comparison_df_styled = comparison_df.style.format("{:.1f}"
+                                                            , subset = ['Your $ Value', '$ Value','Difference']) \
+                    .map(styler_a
+                        , subset = ['Your $ Value', '$ Value']) \
+                    .background_gradient(axis = None
+                                        ,cmap = 'PiYG'
+                                        ,subset = ['Difference']) \
+                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                    .format('{:,.1%}', subset = rate_df.columns)
+          
+          st.dataframe(comparison_df_styled)
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False)
