@@ -1114,7 +1114,7 @@ def make_rank_tab(_scores : pd.DataFrame
   
   scores_styled = static_score_styler(scores_copy,player_multiplier)
       
-  rank_display = st.dataframe(scores_styled, use_container_width = True)
+  rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
 #@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
