@@ -164,6 +164,7 @@ This equation can be grouped into four parts
     - I define a replacement-level player as having overall replacement-level value spread out equally across categories
 - $X_m - X_{o_m}$: the differential effect of team $A$ having more money remaining than team $B$.
     - The overall monetary differential can be estimated as the sum of available above-replacement value (weighted by the $v$ vector for generic value) over the sum of remaining money in the pool, multiplied by the difference in money between team $A$ and team $B$. To get per-category values, spread the overall value by per-category generic weight (as in, divide out the $v$ vector)
+    - One issue with the above procedure is that it assumes spending more money on a player leads to them having a better score for turnovers, when that is usually the opposite of the case. To control for that in a simple way, I reverse it and assume that the "value" gained for turnovers is negative
 - $X_{\delta}$: differential from punting strategy
     - This value can be calculated in the same way as it was for the drafting context 
 

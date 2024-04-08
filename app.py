@@ -585,7 +585,7 @@ with rank_tab:
 
       st.caption(first_str + ' ' + second_str)
 
-      make_h_rank_tab(info
+      h_ranks = make_h_rank_tab(info
                     ,omega
                     ,gamma
                     ,alpha
@@ -608,7 +608,7 @@ H = HAgent(info = info
     , n_drafters = n_drafters
     , scoring_format = scoring_format
     , punting = punting
-    , chi = chi)   
+    , chi = chi)  
 
 if st.session_state['mode'] == 'Draft Mode':
 
@@ -755,7 +755,7 @@ if st.session_state['mode'] == 'Auction Mode':
       auction_seat = st.selectbox(f'Which team are you?'
           , teams
           , index = 0)
-
+      
       cash_spent_per_team = auction_selections.dropna().groupby('Team', observed = False)['Cost'].sum()
       cash_remaining_per_team = cash_per_team - cash_spent_per_team
       player_assignments = auction_selections.dropna().groupby('Team', observed = False)['Player'].apply(list)
@@ -815,13 +815,21 @@ if st.session_state['mode'] == 'Auction Mode':
             #record the fact that the run has already been invoked, no need to invoke it again
             stop_run_h_score()
 
+            h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
+            h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+                                                          , n_picks * n_drafters - len(selection_list)
+                                                          , remaining_cash
+                                                          , st.session_state['streaming_noise_h'])
+            
+            h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
+
             make_h_cand_tab(H
                   ,player_assignments.to_dict()
                   ,auction_seat
                   ,n_iterations
                   ,v
                   ,cash_remaining_per_team.to_dict()
-                  ,g_scores_unselected['$ Value']
+                  ,h_defaults_savor
                   ,n_drafters * n_picks)
 
       with team_tab:
