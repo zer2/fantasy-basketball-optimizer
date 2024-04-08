@@ -185,7 +185,7 @@ def make_cand_tab(_scores : pd.DataFrame
                                                           , st.session_state['streaming_noise'])
     
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
-  scores_display = st.dataframe(scores_unselected_styled, hide_index = True, use_container_width = True)
+  scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 
   return scores_unselected
 
@@ -1114,7 +1114,7 @@ def make_rank_tab(_scores : pd.DataFrame
   
   scores_styled = static_score_styler(scores_copy,player_multiplier)
       
-  rank_display = st.dataframe(scores_styled, use_container_width = True)
+  rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
 #@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
