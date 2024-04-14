@@ -119,7 +119,13 @@ class HAgent():
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
         default_weights = self.v.T.reshape(1,9,1)
-        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * 1000)) + \
+
+        if self.scoring_format == 'Rotisserie':
+            category_momentum_factor = 10000
+        else:
+            category_momentum_factor = 1000
+
+        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                             default_weights).mean(axis = 2)
         
         scores = []
@@ -295,11 +301,10 @@ class HAgent():
         """
         #diff_var should just include the player-to-player variance. maybe? and 
 
-        if self.scoring_format == 'Rotisserie':
-            diff_var = self.n_picks * 2 * self.chi + 0 * self.cross_player_var
-        else:
-            diff_var = self.n_picks * \
-                (2 +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+        chi = self.chi if self.scoring_format == 'Rotisserie' else 1
+
+        diff_var = self.n_picks * \
+            (2 * chi +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
     
     def get_value_of_money_auction(self
@@ -507,6 +512,7 @@ class HAgent():
             return self.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , pdf_estimates
+                        , diff_vars
                         , n_values
                         , calculate_pdf_weights) 
 
@@ -585,6 +591,7 @@ class HAgent():
     def get_objective_and_pdf_weights_rotisserie(self
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
+                                , diff_vars : np.array
                                 , n_values : np.array = None
                                 , calculate_pdf_weights : bool = False
                                 , test_mode : bool = False):
@@ -628,7 +635,7 @@ class HAgent():
 
         objective = norm.cdf(drafter_mean - self.mu_m
                             , scale = np.sqrt(total_variance)).reshape(-1)
-
+        
         if calculate_pdf_weights:
 
             nabla = total_variance + (self.mu_m - drafter_mean) * self.var_fudge_factor * \
@@ -641,7 +648,7 @@ class HAgent():
             if test_mode:
                 return gradient
             else:
-                pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
+                pdf_weights = (gradient*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
 
                 return objective, pdf_weights
 

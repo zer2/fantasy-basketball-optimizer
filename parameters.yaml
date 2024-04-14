@@ -107,4 +107,7 @@ punting_defaults :
   Theoretically optimal punting : 
     omega : 1.0
     gamma : 0.1
-punting_default_index : 1
+punting_default_index : 
+  "Head to Head: Most Categories" : 1
+  "Head to Head: Each Category" : 1
+  "Rotisserie": 0

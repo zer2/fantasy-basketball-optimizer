@@ -257,10 +257,13 @@ with param_tab:
 
       punting_levels = st.session_state.params['punting_defaults']
 
+
+      default_punting = st.session_state.params['punting_default_index'][scoring_format]
+
       punting_level = st.selectbox(
         'What level of punting do you want H-scores to apply when modeling your future draft picks?'
         ,list(punting_levels.keys())
-        ,index = st.session_state.params['punting_default_index']
+        ,index = default_punting
       )
 
       st.caption('''This option sets the default parameters for H-scoring. 
