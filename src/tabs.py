@@ -1116,7 +1116,7 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float

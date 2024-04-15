@@ -14,7 +14,7 @@ The statement of fact is probably true. However, concluding from it that investi
 
 To see how this fallacy can manifest itself in real data, consider the following simplified results table 
 
-| | Drafter A | Drafter B | Drafter C | Drafter D| 
+| | Team A | Team B | Team C | Team D| 
 |:-------|:-------|:-------|:-------|:-------|
 |Turnover weight | $100\%$ | $0\%$ | $100\%$ | $0\%$ |
 |Player m/g | $40$ | $40$ | $20$ | $20$ |
@@ -43,17 +43,17 @@ In the Most Categories context, winning turnovers to go 1-8 instead of 0-9 is un
 
 This argument seems plausible on face but is framed incorrectly. Perhaps auto-loss scenarios are not worth considering, but if so, then neither are auto-win scenarios. __The proper way to evaluate category importance is determining how helpful each of them is under the condition that the match-up is close. Winning a consolation category isn't helpful, and neither is running up the score.__
 
-Given that a match-up is close, neither drafter could be dominating the counting statistics. In that circumstance, there is no reason to expect either drafter to have such a significant advantage in turnovers that investing in it would be futile for the other. So intuitively, I would guess that turnovers are just as likely to be the deciding factor as any other category 
+Given that a match-up is close, neither team could be dominating the counting statistics. In that circumstance, there is no reason to expect either team to have such a significant advantage in turnovers that investing in it would be futile for the other. So intuitively, I would guess that turnovers are just as likely to be the deciding factor as any other category 
 
 <iframe width = "672" height = "378" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/b0373be6-ce75-4c55-89fc-8ad29939ce24"> </iframe>
 
 #### Relying on a consistent advantage 
 
-In many contexts, drafters need to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins the league. Presumably the top drafter would have to come into each matchup with an advantage because they chose better players. 
+In many contexts, managers need their teams to have some advantage to have any shot at winning. For example, say a league has no playoffs at all, and the top team after the regular season wins the league. Presumably the top team would have to come into each matchup with an advantage because they chose better players. 
 
-It would be correct to say that given an across the board advantage, a drafter is more likely to lose turnovers than other categories. However, as already established, correlation does not imply causation. What matters is whether they can improve their overall performances through turnovers as much as through other categories. 
+It would be correct to say that given an across the board advantage, a team is more likely to lose turnovers than other categories. However, as already established, correlation does not imply causation. What matters is whether they can improve their overall performances through turnovers as much as through other categories. 
 
-Let's say a drafter has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. One would expect that investing in turnovers would become less likely to translate to more category wins, since the investment would only matter if an opponent had an anomolously bad week for turnovers. However, the other counting statistics would also become less rewarding to invest in, since those investments would only matter if an opponent had an anomolously good week for that category. Ultimately, all of the counting statistics would be less rewarding to invest in. So why single out turnovers? 
+Let's say a team has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. One would expect that investing in turnovers would become less likely to translate to more category wins, since the investment would only matter if an opponent had an anomolously bad week for turnovers. However, the other counting statistics would also become less rewarding to invest in, since those investments would only matter if an opponent had an anomolously good week for that category. Ultimately, all of the counting statistics would be less rewarding to invest in. So why single out turnovers? 
 
 ### 2B. Modeling the problem mathematically
 
@@ -69,7 +69,7 @@ The intuition here is that the two conditions together specify a situation under
 
 For Each Category and Rotisserrie, the analysis is even simpler. The partial derivative is just the probability density of each category around zero.
 
-The most reliable way for a drafter to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives them some advantage in all of the counting statistics. So we can set up the distribution such that one drafter has a constant advantage across all of the counting statistics (disadvantage for turnovers). 
+The most reliable way for a manager to obtain a consistent advantage is by choosing players who get more playing time than expected. This gives their team some advantage in all of the counting statistics. So we can set up the distribution such that one team has a constant advantage across all of the counting statistics (disadvantage for turnovers). 
 
 #### Modeling performance across partial derivatives
 
@@ -123,11 +123,11 @@ Analyzing for this case is easier, since the partial derivative is just the dens
 
 As expected, turnovers decline in importance at a similar rate as the other counting statistics. 
 
-It is interesting to note that the percentage statistics have outsize importance in situations where one drafter has a playing time advantage. With the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
+It is interesting to note that the percentage statistics have outsize importance in situations where one team has a playing time advantage. With the counting statistics largely shored up, the percentage statistics, which are unbiased by playing time, are still just as difficult to win and become relatively more important. 
 
 ## 3. Punting
 
-One may note that the analysis of the previous section assumed that when a drafter had a counting statistic advantage, that advantage was uniform across the counting statistics. But what if a drafter was particularly bad at turnovers- in other words, if they had already punted the category? It stands to reason that in that case, turnovers would be less important on the margins than other categories. 
+One may note that the analysis of the previous section assumed that when a team had a counting statistic advantage, that advantage was uniform across the counting statistics. But what if a team was particularly bad at turnovers- in other words, if their manager had already punted the category? It stands to reason that in that case, turnovers would be less important on the margins than other categories. 
 
 Of course, this argument applies equally well to all categories. Once you have decided to punt a category, that category becomes less important to invest in. And punting a specific category cannot be a universally good idea, because that would defeat the idea of punting in the first place. But perhaps there is an argument that against a field of opponents who are not punting anything, punting turnovers is a uniquely good strategy. 
 
@@ -161,7 +161,7 @@ G-scores deal with this by incorporating week-to-week variance. They do downweig
 
 To some degree, the hypothesis that down-weighting turnovers is uniquely beneficial can be tested. I ran a test with the following setup
 - For each category
-  - Divide all drafters into two groups of six
+  - Divide twelve teams into two groups of six
   - One group downweights the category by a certain factor. The other does not
   - For each sequential arrangement of seats (6 down-weighters/6 normals, or 1 normal/6 down-weighters/5 normals, etc. )
     - One thousand seasons are simulated by sampling from the actual season of data
@@ -198,7 +198,7 @@ And for rebounds
 
 Punting or soft-punting turnovers is about as beneficial as punting other categories. With this evidence, there is no reason to treat it differently. 
 
-It should be noted that this test does not cover argument the circumstance under which one drafter has an overall advantage, because all player statistics are known beforehand, making it imposssible for any drafter to have a surprisingly good team. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned drafters will have a significant advantage in general. If the heuristic of section 2B is wrong or misleading, perhaps turnovers become significantly less important in that case
+It should be noted that this test does not cover argument the circumstance under which one team has an overall advantage, because all player statistics are known beforehand, making it imposssible for any team to have a surprisingly good team. There remains the possibility that in a real league, with some uncertainty about how players are going to perform, the best-positioned team will have a significant advantage in general. If the heuristic of section 2B is wrong or misleading, perhaps turnovers become significantly less important in that case
 
 ## 6. Conclusion
 
@@ -206,4 +206,4 @@ I have not seen a convincing argument that turnovers should be down-weighted to 
 
 Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page.
 
-Also, keep in mind that many other drafters ignore turnovers. Winning them reliably may take only a small investment while grabbing every player whose strength is turnovers would be overkill. So in practice you might want to downweight turnovers a bit, perhaps to $50\%$
+Also, keep in mind that many other managers ignore turnovers. Winning them reliably may take only a small investment while grabbing every player whose strength is turnovers would be overkill. So in practice you might want to downweight turnovers a bit, perhaps to $50\%$
