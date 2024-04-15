@@ -677,7 +677,7 @@ if st.session_state['mode'] == 'Draft Mode':
             make_h_cand_tab(H
                   ,player_assignments
                   ,draft_seat
-                  ,n_iterations
+                  ,n_iterations if punting else 1
                   ,v)
 
       with team_tab:
