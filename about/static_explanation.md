@@ -1,6 +1,6 @@
 # Static rankings from Z-score to G-score 
 
-Ranking players is a popular pasttime for fantasy basketball enthusiasts. Rankings curated by experts are useful because they allow newer drafters, or those who simply don't have the time to craft their own sophisticated strategies, to make reasonable drafting decisions. 
+Ranking players is a popular pasttime for fantasy basketball enthusiasts. Rankings curated by experts are useful because they allow newer managers, or those who simply don't have the time to craft their own sophisticated strategies, to make reasonable drafting decisions. 
 
 Ideally, player rankings should have some mathematical backbone, which requires a metric quantifying player value. The established metric for category leagues is called 'Z-scoring', and it drives the vast majority of ranking lists that I have seen. However, when I looked for a mathematical argument explaining why Z-scores are a good choice for fantasy basketball rankings, I could not find one.
 
@@ -50,7 +50,7 @@ Consider this problem: **Team one has $N-1$ players randomly selected from a poo
 This problem statement makes a few implicit simplifications about Rotisserie drafts 
 - The goal is to maximize the expected value of the number of categories won against an arbitrary opponent in a single week, where all players perform at their season-long means. Using weekly means instead of season-long totals is just a convenience, to align with the definition of Z-scores. And optimizing for victory against an arbitrary opponent is equivalent to optimizing for total score at the end of a season, since each category victory over any opponent is worth one point 
 - Besides the player being drafted, all others are assumed to be chosen randomly from a pool of top players. This assumption is obviously not exactly true. However, it is somewhat necessary because we are trying to make a ranking system which does not depend on which other players have been drafted. It is also not as radical as it may seem, since real teams have a mix of strong and some weak players chosen from a variety of positions, making them random-ish in aggregate
-- Position requirements, waiver wires, injury slots, etc. are ignored. Drafters use their drafted players the whole season
+- Position requirements, waiver wires, injury slots, etc. are ignored. Managers use their drafted players the whole season
 
 The simplified problem can be approached by calculating the probability for team one to win each category, then optimizing for their sum
 
@@ -128,7 +128,7 @@ $$
 
 I call these G-scores, and it turns out that these are quite different from Z-scores. For example, steals have a very high week-to-week standard deviation, and carry less weight in G-scores than Z-scores as a result.
 
-Intuitively, why does this happen? The way I think about it is that investing heavily into a volatile category will lead to only a flimsy advantage, and so is likely less worthwhile than investing into a robust category. Many drafters have this intuition already, de-prioritizing unpredictable categories like steals relative to what Z-scores would suggest. The G-score idea just converts that intuition into mathematical rigor
+Intuitively, why does this happen? The way I think about it is that investing heavily into a volatile category will lead to only a flimsy advantage, and so is likely less worthwhile than investing into a robust category. Many managers have this intuition already, de-prioritizing unpredictable categories like steals relative to what Z-scores would suggest. The G-score idea just converts that intuition into mathematical rigor
   
 ## 5.	Head-to-head simulation results
 
@@ -153,7 +153,7 @@ The expected win rate if all strategies are equally good is $\frac{1}{12} = 8.33
 
 When interpreting these results, it is important to remember that they are for an idealized version of fantasy basketball. Still, the dominance displayed by G-scores in the simulations suggests that the G-score modification really is appropriate.
 
-To confirm the intuition about why the G-score works, take a look at its win rates by category against $11$ Z-score drafters in 9-Cat
+To confirm the intuition about why the G-score works, take a look at its win rates by category against $11$ managers using Z-score in 9-Cat
 
 |     | G-score win rate | 
 | -------- | ------- |
@@ -168,8 +168,8 @@ To confirm the intuition about why the G-score works, take a look at its win rat
 | Free throw %    | $40.6\%$    | 
 | Overall   | $52.2\%$    | 
 
-The G-score drafter performs well in stable/high-volume categories like assists and poorly in volatile categories like turnovers, netting to an average win rate of slightly above $50\%$. As expected, the marginal investment in stable categories is worth more than the corresponding underinvestment in volatile categories, since investment in stable categories leads to reliable wins and the volatile categories can be won despite underinvestment with sheer luck. 
+The G-score manager performs well in stable/high-volume categories like assists and poorly in volatile categories like turnovers, netting to an average win rate of slightly above $50\%$. As expected, the marginal investment in stable categories is worth more than the corresponding underinvestment in volatile categories, since investment in stable categories leads to reliable wins and the volatile categories can be won despite underinvestment with sheer luck. 
 
-Simulations also suggest that G-scores work better than Z-scores in the *Head-to-Head: Most Categories* format. I chose not to include the results here because it is a very strategic format, and expecting other drafters to go straight off ranking lists is probably unrealistic for it.
+Simulations also suggest that G-scores work better than Z-scores in the *Head-to-Head: Most Categories* format. I chose not to include the results here because it is a very strategic format, and expecting other managers to go straight off ranking lists is probably unrealistic for it.
 
 Another possible use-case is auctions. There is a well-known procedure for translating player value to auction value, outlined e.g. [in this article](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). If the auction is for a head-to-head format, it is reasonable to use G-scores to quantify value rather than Z-scores 

@@ -1,6 +1,6 @@
 # Auctions
 
-Auctions are more complicated and strategically interesting than snake drafts. While snake drafts only allow drafters to pick players that are available on their turns, auctions offer them the opportunity to bid on any player at any time. So if a drafter believes e.g. Nikola Jokic is undervalued, they will always be allowed to outbid their opponents and test their hypothesis, without being at the whim of an arbitrary snake draft order. For this reason, auctions are often considered the most skill-intensive form of fantasy basketball, and most rewarding to those with robust knowledge and strategies. 
+Auctions are more complicated and strategically interesting than snake drafts. While snake drafts only allow managers to pick players that are available on their turns, auctions offer them the opportunity to bid on any player at any time. So if a manager believes e.g. Nikola Jokic is undervalued, they will always be allowed to outbid their opponents and test their hypothesis, without being at the whim of an arbitrary snake draft order. For this reason, auctions are often considered the most skill-intensive form of fantasy basketball, and most rewarding to those with robust knowledge and strategies. 
 
 One place where a mathematical perspective can be helpful is evaluating the dollar value of available players. This provides a guide to auction bidders, giving them benchmarks of how much they should be willing to pay for particular players. 
 
@@ -29,9 +29,9 @@ This strategy is entirely logical if Z-score truly represents value. Players who
 
 ### Value deterioration
 
-The flaw of the simple method is that it does not account for variation throughout a season. Ineveitably player values do not stay completely constant over the course of a season; some go up and some go down. Top-level players are unlikely to ever go below replacement level value, but some of the low-level players at the bottom of the fantasy barrel have a high chance of sliding into irrelevance. In that not so unlikely case, they would be providing no value at all- a possibility that should be accounted for. 
+The flaw of the simple method is that it does not account for how player values change throughout a season. Ineveitably they will not stay constant; some will go up and some go down. Top-level players are unlikely to ever go below replacement level value, but many players at the bottom of the fantasy barrel are likely to slide into irrelevance. In that not so unlikely case, they would be providing no value at all. 
 
-Another way of framing this is that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valueable than their alternatives. This is a known concept in the fantasy basketball community- for example it is referenced in this [reddit thread](https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/).
+Another way of framing this is that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valuable than their alternatives. This is a known concept in the fantasy basketball community- for example it is referenced in this [reddit thread](https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/).
 
 ### Building a mathematical model 
 
@@ -49,11 +49,7 @@ F=
 \end{cases}
 $$
 
-Visually, this looks like a truncated normal distribution 
-
-<iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/44674625-7bfd-43e7-bbd8-caa5318a569c"> </iframe>
-
-It is important to remember that without any investment into a particular roster slot, a drafter can always choose a replacement-level player for essentially no cost. Players with exactly replacement value before perturbation ($\mu = 0$) have post-perturbation value
+It is important to remember that without any investment into a particular roster slot, a manager can always choose a replacement-level player for essentially no cost. Players with exactly replacement value before perturbation ($\mu = 0$) have post-perturbation value
 
 $$
 S= 
@@ -67,50 +63,10 @@ Since picking a player removes a spot that could be used for one of these "strea
 
 ### SAVOR: Streaming-adjusted value over replacement
 
-Calculating $E[F]-E[S]$ requires some math. 
-
-Using the definition of the expected value and the probability density of the normal distribution,
+Calculating $E[F]-E[S]$ requires some math, the details of which are in the paper. The result is 
 
 $$
-E[F] = \frac{1}{\sqrt{2\pi}} \int_0^{\infty} x e^{\frac{-\left( x - \mu \right)^2}{2\sigma}} dx
-$$
-
-$$
-E[S] = \int_0^{\infty} \frac{x}{\sqrt{2\pi}} e^{\frac{-x^2}{2\sigma}} dx
-$$
-
-
-Changing the variable in the expression for $E[F]$ from $x$ to $y + \mu$ yields 
-
-$$
-E[F] = \frac{1}{\sqrt{2\pi}} \int_{-\mu}^{\infty} (y + \mu) e^{\frac{-y^2}{2\sigma}} dy
-= \frac{1}{\sqrt{2\pi}} \left(  \int_{-\mu}^{\infty} y e^{\frac{-y^2}{2\sigma}} dy + \int_{-\mu}^{\infty} \mu e^{\frac{-y^2}{2\sigma}} dy \right)
-= \frac{1}{\sqrt{2\pi}} \left( \int_{-\mu}^{\infty} y e^{\frac{-y^2}{2\sigma}} dy + \mu \int_{-\mu}^{\infty}  e^{\frac{-y^2}{2\sigma}} dy \right)
-$$
-
-Therefore
-
-$$
-E[F] - E[S] = \frac{1}{\sqrt{2\pi}} \left( \int_{-\mu}^{\infty} y e^{\frac{-y^2}{2\sigma}} dy + \mu \int_{-\mu}^{\infty}  e^{\frac{-y^2}{2\sigma}} dy - \int_0^{\infty} x e^{\frac{-x^2}{2\sigma}} dx \right)
-= \frac{1}{\sqrt{2\pi}} \left( \int_{-\mu}^{0} y e^{\frac{-y^2}{2\sigma}} dy + \mu \int_{-\mu}^{\infty} e^{\frac{-y^2}{2\sigma}} dy \right)
-$$
-
-The second part of the expression can be identified as $\mu * CDF(\mu)$. This simplifies to 
-
-$$
-E[F] - E[S] =\mu * CDF(\mu) + \int_{-\mu}^{0} \frac{y}{\sqrt{2\pi}} e^{\frac{-y^2}{2\sigma}} dy
-$$
-
-Substituting $- \sigma * d(- \frac{y^2}{2 \sigma })$ for $ydy$ yields 
-$$
-E[F] - E[S] = \mu * CDF(\mu) - \int_{-\mu}^{0} \frac{\sigma}{\sqrt{2\pi}} e^{\frac{-y^2}{2\sigma}} d(- \frac{y^2}{2 \sigma})
-$$
-
-Upon integration, this becomes
-
-$$
-E[F] - E[S] = \mu * CDF(\mu) - \frac{\sigma}{\sqrt{2\pi}} \left( e^{\frac{-y^2}{2\sigma}} |_{-\mu}^{0} \right) 
-= \mu * CDF(\mu) - \frac{\sigma}{\sqrt{2\pi}} \left( 1 - e^{\frac{- \mu^2}{2\sigma}} \right)
+E[F] - E[S] = \mu * CDF(\mu) - \frac{\sigma}{\sqrt{2\pi}} \left( 1 - e^{\frac{- \mu^2}{2\sigma}} \right)
 $$
 
 It is easy enough to test this equation by simulating post-perturbation value a large number of times. I've done that and made sure that it works, given the assumptions of the problem setup. 
@@ -172,7 +128,7 @@ This equation can be grouped into four parts
 
 The raw H-score calculation yields a win probability for each candidate player if they could be selected without costing any money. Of course, this is unrealistic. 
 
-One way to equate H-scores to dollars is to subtract money (and corresponding value) from what the drafter has remaining until they break even for taking the player. This is doable and theoretically works well, but is a bit computationally expensive because it requires back-tracking through several calculations several times for each player.  
+One way to equate H-scores to dollars is to subtract money (and corresponding value) from what the manager has remaining until they break even for taking the player. This is doable and theoretically works well, but is a bit computationally expensive because it requires back-tracking through several calculations several times for each player.  
 
 A simpler method is to start with a replacement player and various values of $X_m$ to see how level of cash affects H-scores. Approximate cash values can then be derived for player by comparing their H-scores to those of just adding cash, and finding the closest cash equivalents. 
 
@@ -182,7 +138,7 @@ I define H-scores for the auction context relative to dollars. So a player equiv
 
 It should be noted that even if all of this theory is perfect and quantifies player value perfectly, just having this information available does not guarantee a good auction: if a bidder always pays full money for each of their picks, they won't have an above-average team even in theory. 
 
-One way to make a good team is to target players that have high auction values according to H-score versus what others are willing to pay, which could perhaps be inferred from typical auction values or the static Z-score procedure. Even then, there are many additional dimensions to auction drafting: the very best auction drafters know how to use psychology to get good deals on the players they want or bump up the prices of players that they are not interested in. Perfecting auction drafting is difficult, and goes far beyond the mathematics discussed here
+One way to make a good team is to target players that have high auction values according to H-score versus what others are willing to pay, which could perhaps be inferred from typical auction values or the static Z-score procedure. Even then, there are many additional dimensions to auction drafting: the very best auction managers know how to use psychology to get good deals on the players they want or bump up the prices of players that they are not interested in. Perfecting auction drafting is difficult, and goes far beyond the mathematics discussed here
 
 
 
