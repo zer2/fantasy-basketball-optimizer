@@ -257,7 +257,6 @@ with param_tab:
 
       punting_levels = st.session_state.params['punting_defaults']
 
-
       default_punting = st.session_state.params['punting_default_index'][scoring_format]
 
       punting_level = st.selectbox(
@@ -325,25 +324,31 @@ with param_tab:
                         it quantifies how much better the optimal player choice will be compared to the player that would be 
                         chosen with baseline weights'''
         st.caption(omega_str)
+
+        if omega > 0:
       
-        gamma = st.number_input(r'Select a $\gamma$ value'
-                              , key = 'gamma'
-                              , value = punting_levels[punting_level]['gamma']
-                              , min_value = float(st.session_state.params['options']['gamma']['min'])
-                              , max_value = float(st.session_state.params['options']['gamma']['max']))
-        gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
-                tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-                players that  work best for its strategy'''
-        st.caption(gamma_str)
-    
-        nu = st.number_input(r'Select a $\nu$ value'
-                          , key = 'nu'
-                          , value = float(st.session_state.params['options']['nu']['default'])
-                          , min_value = float(st.session_state.params['options']['nu']['min'])
-                          , max_value = float(st.session_state.params['options']['nu']['max']))
-        nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
-                    if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
-        st.caption(nu_str)
+          gamma = st.number_input(r'Select a $\gamma$ value'
+                                , key = 'gamma'
+                                , value = punting_levels[punting_level]['gamma']
+                                , min_value = float(st.session_state.params['options']['gamma']['min'])
+                                , max_value = float(st.session_state.params['options']['gamma']['max']))
+          gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+                  tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
+                  players that  work best for its strategy'''
+          st.caption(gamma_str)
+      
+          nu = st.number_input(r'Select a $\nu$ value'
+                            , key = 'nu'
+                            , value = float(st.session_state.params['options']['nu']['default'])
+                            , min_value = float(st.session_state.params['options']['nu']['min'])
+                            , max_value = float(st.session_state.params['options']['nu']['max']))
+          nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
+                      if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
+          st.caption(nu_str)
+
+        else: 
+          gamma = None
+          nu = None
 
         if scoring_format == 'Rotisserie':
 
@@ -362,29 +367,36 @@ with param_tab:
           chi = None
 
       with right_algo_param_col:
-        alpha = st.number_input(r'Select a $\alpha$ value'
-                          , key = 'alpha'
-                          , value = float(st.session_state.params['options']['alpha']['default'])
-                          , min_value = float(st.session_state.params['options']['alpha']['min'])
-                          , max_value = float(st.session_state.params['options']['alpha']['max']))
-        alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
-        st.caption(alpha_str)
+
+        if omega > 0:
+
+          alpha = st.number_input(r'Select a $\alpha$ value'
+                            , key = 'alpha'
+                            , value = float(st.session_state.params['options']['alpha']['default'])
+                            , min_value = float(st.session_state.params['options']['alpha']['min'])
+                            , max_value = float(st.session_state.params['options']['alpha']['max']))
+          alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
+          st.caption(alpha_str)
+      
+          beta = st.number_input(r'Select a $\beta$ value'
+                                , key = 'beta'
+                                , value = float(st.session_state.params['options']['beta']['default'])
+                                , min_value = float(st.session_state.params['options']['beta']['min'])
+                                , max_value = float(st.session_state.params['options']['beta']['max']))
+          beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
+          st.caption(beta_str)
     
-        beta = st.number_input(r'Select a $\beta$ value'
-                              , key = 'beta'
-                              , value = float(st.session_state.params['options']['beta']['default'])
-                              , min_value = float(st.session_state.params['options']['beta']['min'])
-                              , max_value = float(st.session_state.params['options']['beta']['max']))
-        beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
-        st.caption(beta_str)
-    
-        n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
-                                  , key = 'n_iterations'
-                                  , value = st.session_state.params['options']['n_iterations']['default']
-                                  , min_value = st.session_state.params['options']['n_iterations']['min']
-                                  , max_value = st.session_state.params['options']['n_iterations']['max'])
-        n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
-        st.caption(n_iterations_str)
+          n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
+                                    , key = 'n_iterations'
+                                    , value = st.session_state.params['options']['n_iterations']['default']
+                                    , min_value = st.session_state.params['options']['n_iterations']['min']
+                                    , max_value = st.session_state.params['options']['n_iterations']['max'])
+          n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
+          st.caption(n_iterations_str)
+        else:
+          n_iterations = 0 
+          alpha = None
+          beta = None
 
         if mode == 'Auction Mode':
 
@@ -407,8 +419,6 @@ with param_tab:
 
           stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
           st.caption(stream_noise_str_h)         
-
-        punting = (omega > 0) 
 
     with trade_param_column:
         st.header('Trading Parameters')
@@ -598,7 +608,6 @@ with rank_tab:
                     ,n_iterations
                     ,scoring_format
                     ,st.session_state['mode']
-                    ,punting
                     ,chi
                     ,st.session_state.info_key)
 
@@ -609,8 +618,8 @@ H = HAgent(info = info
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
+    , dynamic = n_iterations > 0
     , scoring_format = scoring_format
-    , punting = punting
     , chi = chi)  
 
 if st.session_state['mode'] == 'Draft Mode':
@@ -677,7 +686,7 @@ if st.session_state['mode'] == 'Draft Mode':
             make_h_cand_tab(H
                   ,player_assignments
                   ,draft_seat
-                  ,n_iterations if punting else 1
+                  ,n_iterations
                   ,v)
 
       with team_tab:
@@ -691,7 +700,6 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,n_picks
                                         ,n_drafters
                                         ,scoring_format
-                                        ,punting
                                         ,chi
                                         ,player_assignments
                                         ,draft_seat
@@ -886,7 +894,6 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,n_picks
                                         ,n_drafters
                                         ,scoring_format
-                                        ,punting
                                         ,chi
                                         ,player_assignments
                                         ,roster_inspection_seat
@@ -1040,7 +1047,6 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,n_picks
                             ,n_drafters
                             ,scoring_format
-                            ,punting
                             ,chi
                             ,player_assignments
                             ,waiver_inspection_seat
