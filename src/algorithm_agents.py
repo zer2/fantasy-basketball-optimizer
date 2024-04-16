@@ -17,7 +17,6 @@ class HAgent():
                  , beta : float
                  , n_picks : int
                  , n_drafters : int
-                 , punt_limiter : float
                  , dynamic : bool
                  , scoring_format : str
                  , chi : float
@@ -81,8 +80,6 @@ class HAgent():
             v = np.sqrt(mov/(mov + vom))
 
         self.v = np.array(v/v.sum()).reshape(9,1)
-
-        self.punt_limiter = punt_limiter
 
         turnover_inverted_v = self.v.copy()
         turnover_inverted_v[-1] = -turnover_inverted_v[-1]
@@ -397,17 +394,7 @@ class HAgent():
 
                 weights[weights < 0] = 0
 
-                if self.punt_limiter > 0:
-
-                    weak_categories = cdf_estimates.mean(axis = 2) < self.punt_limiter
-                    weights = np.clip(weights, a_min = self.v.T * weak_categories, a_max = None)
-                    weights = (weights * ~weak_categories) * \
-                                (1 - (weights * weak_categories).sum(axis = 1).reshape(-1,1))/ \
-                                (weights * ~weak_categories).sum(axis = 1).reshape(-1,1) \
-                                        + weights * weak_categories
-
-                else:
-                    weights = weights/weights.sum(axis = 1).reshape(-1,1)
+                weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 

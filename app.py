@@ -389,14 +389,6 @@ with param_tab:
         else:
           n_iterations = 0 
 
-        punt_limiter = st.number_input(r'Select a punt limiter'
-                                  , key = 'punt_limiter'
-                                  , value = punting_levels[punting_level]['punt_limiter']
-                                  , min_value = st.session_state.params['options']['punt_limiter']['min']
-                                  , max_value = st.session_state.params['options']['punt_limiter']['max'])
-        punt_limiter_str = r'''Categories with expected win % below the punt limiter require 100% or greater weight'''
-        st.caption(punt_limiter_str)
-
         if mode == 'Auction Mode':
 
           streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
@@ -604,7 +596,6 @@ with rank_tab:
                     ,beta
                     ,n_picks
                     ,n_drafters
-                    ,punt_limiter
                     ,n_iterations
                     ,scoring_format
                     ,st.session_state['mode']
@@ -618,7 +609,6 @@ H = HAgent(info = info
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
-    , punt_limiter = punt_limiter
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
     , chi = chi)  
@@ -700,7 +690,6 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,beta
                                         ,n_picks
                                         ,n_drafters
-                                        ,punt_limiter
                                         ,scoring_format
                                         ,chi
                                         ,player_assignments
@@ -895,7 +884,6 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,beta
                                         ,n_picks
                                         ,n_drafters
-                                        ,punt_limiter
                                         ,scoring_format
                                         ,chi
                                         ,player_assignments
@@ -1049,7 +1037,6 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,beta
                             ,n_picks
                             ,n_drafters
-                            ,punt_limiter
                             ,scoring_format
                             ,chi
                             ,player_assignments

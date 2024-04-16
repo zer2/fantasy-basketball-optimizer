@@ -492,7 +492,6 @@ def get_base_h_score(_info : dict
                 , beta : float
                 , n_picks : int
                 , n_drafters : int
-                , punt_limiter : float
                 , scoring_format : str
                 , chi : float
                 , player_assignments : dict[list[str]]
@@ -508,7 +507,6 @@ def get_base_h_score(_info : dict
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
-    punt_limiter: float, minimum category weight for future picks
     scoring_format: 
     player_assignments : player assignment dictionary
     team: name of team to evaluate
@@ -524,7 +522,6 @@ def get_base_h_score(_info : dict
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
-    , punt_limiter = punt_limiter
     , dynamic = False
     , scoring_format = scoring_format
     , chi = chi)
@@ -1125,7 +1122,6 @@ def make_h_rank_tab(_info : dict
                   , beta : float
                   , n_picks : int
                   , n_drafters : int
-                  , punt_limiter : float
                   , n_iterations : int
                   , scoring_format : str
                   , mode : str
@@ -1141,7 +1137,6 @@ def make_h_rank_tab(_info : dict
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
-    punt_limiter: float, minimum category weight for future picks
     n_iterations: int, number of gradient descent steps
     scoring_format: 
     mode: 
@@ -1158,7 +1153,6 @@ def make_h_rank_tab(_info : dict
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
-    , punt_limiter = punt_limiter
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
     , chi = chi)

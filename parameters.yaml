@@ -105,16 +105,13 @@ punting_defaults :
   No dynamic optimization :
     omega : 0.0 
     gamma : 0.0
-    punt_limiter : 0.0
-  No punting : 
+  Moderate punting : 
     omega : 0.8
     gamma : 0.05
-    punt_limiter : 0.4
-  Punting : 
-    omega : 0.8
-    gamma : 0.05
-    punt_limiter : 0.0 
+  Aggressive punting : 
+    omega : 1.0
+    gamma : 0.1
 punting_default_index : 
-  "Head to Head: Most Categories" : 2
-  "Head to Head: Each Category" : 2
+  "Head to Head: Most Categories" : 1
+  "Head to Head: Each Category" : 1
   "Rotisserie": 1
