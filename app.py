@@ -324,25 +324,31 @@ with param_tab:
                         it quantifies how much better the optimal player choice will be compared to the player that would be 
                         chosen with baseline weights'''
         st.caption(omega_str)
+
+        if omega > 0:
       
-        gamma = st.number_input(r'Select a $\gamma$ value'
-                              , key = 'gamma'
-                              , value = punting_levels[punting_level]['gamma']
-                              , min_value = float(st.session_state.params['options']['gamma']['min'])
-                              , max_value = float(st.session_state.params['options']['gamma']['max']))
-        gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
-                tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-                players that  work best for its strategy'''
-        st.caption(gamma_str)
-    
-        nu = st.number_input(r'Select a $\nu$ value'
-                          , key = 'nu'
-                          , value = float(st.session_state.params['options']['nu']['default'])
-                          , min_value = float(st.session_state.params['options']['nu']['min'])
-                          , max_value = float(st.session_state.params['options']['nu']['max']))
-        nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
-                    if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
-        st.caption(nu_str)
+          gamma = st.number_input(r'Select a $\gamma$ value'
+                                , key = 'gamma'
+                                , value = punting_levels[punting_level]['gamma']
+                                , min_value = float(st.session_state.params['options']['gamma']['min'])
+                                , max_value = float(st.session_state.params['options']['gamma']['max']))
+          gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+                  tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
+                  players that  work best for its strategy'''
+          st.caption(gamma_str)
+      
+          nu = st.number_input(r'Select a $\nu$ value'
+                            , key = 'nu'
+                            , value = float(st.session_state.params['options']['nu']['default'])
+                            , min_value = float(st.session_state.params['options']['nu']['min'])
+                            , max_value = float(st.session_state.params['options']['nu']['max']))
+          nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
+                      if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
+          st.caption(nu_str)
+
+        else: 
+          gamma = None
+          nu = None
 
         if scoring_format == 'Rotisserie':
 
@@ -361,23 +367,24 @@ with param_tab:
           chi = None
 
       with right_algo_param_col:
-        alpha = st.number_input(r'Select a $\alpha$ value'
-                          , key = 'alpha'
-                          , value = float(st.session_state.params['options']['alpha']['default'])
-                          , min_value = float(st.session_state.params['options']['alpha']['min'])
-                          , max_value = float(st.session_state.params['options']['alpha']['max']))
-        alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
-        st.caption(alpha_str)
-    
-        beta = st.number_input(r'Select a $\beta$ value'
-                              , key = 'beta'
-                              , value = float(st.session_state.params['options']['beta']['default'])
-                              , min_value = float(st.session_state.params['options']['beta']['min'])
-                              , max_value = float(st.session_state.params['options']['beta']['max']))
-        beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
-        st.caption(beta_str)
 
         if omega > 0:
+
+          alpha = st.number_input(r'Select a $\alpha$ value'
+                            , key = 'alpha'
+                            , value = float(st.session_state.params['options']['alpha']['default'])
+                            , min_value = float(st.session_state.params['options']['alpha']['min'])
+                            , max_value = float(st.session_state.params['options']['alpha']['max']))
+          alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
+          st.caption(alpha_str)
+      
+          beta = st.number_input(r'Select a $\beta$ value'
+                                , key = 'beta'
+                                , value = float(st.session_state.params['options']['beta']['default'])
+                                , min_value = float(st.session_state.params['options']['beta']['min'])
+                                , max_value = float(st.session_state.params['options']['beta']['max']))
+          beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
+          st.caption(beta_str)
     
           n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
                                     , key = 'n_iterations'
@@ -388,6 +395,8 @@ with param_tab:
           st.caption(n_iterations_str)
         else:
           n_iterations = 0 
+          alpha = None
+          beta = None
 
         if mode == 'Auction Mode':
 
