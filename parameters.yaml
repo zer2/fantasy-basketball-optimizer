@@ -97,17 +97,24 @@ options :
   default : 30
   min : 10
   max: 10000
+ punt_limiter:
+  default : 0.0
+  min : 0.0
+  max : 1.0
 punting_defaults :
-  No punting :
+  No dynamic optimization :
     omega : 0.0 
     gamma : 0.0
-  Moderate punting :
+    punt_limiter : 0.0
+  No punting : 
     omega : 0.8
     gamma : 0.05
-  Theoretically optimal punting : 
-    omega : 1.0
-    gamma : 0.1
+    punt_limiter : 0.4
+  Punting : 
+    omega : 0.8
+    gamma : 0.05
+    punt_limiter : 0.0 
 punting_default_index : 
-  "Head to Head: Most Categories" : 1
-  "Head to Head: Each Category" : 1
-  "Rotisserie": 0
+  "Head to Head: Most Categories" : 2
+  "Head to Head: Each Category" : 2
+  "Rotisserie": 1

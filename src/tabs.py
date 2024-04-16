@@ -215,7 +215,7 @@ def make_h_cand_tab(H
 
   placeholder = st.empty()
 
-  #if n_iterations is 0 we run just once with punting set to False
+  #if n_iterations is 0 we run just once
   for i in range(max(1,n_iterations)):
 
     res = next(generator)
@@ -492,8 +492,8 @@ def get_base_h_score(_info : dict
                 , beta : float
                 , n_picks : int
                 , n_drafters : int
+                , punt_limiter : float
                 , scoring_format : str
-                , punting : bool
                 , chi : float
                 , player_assignments : dict[list[str]]
                 , team : str
@@ -508,8 +508,8 @@ def get_base_h_score(_info : dict
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
+    punt_limiter: float, minimum category weight for future picks
     scoring_format: 
-    punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
     player_assignments : player assignment dictionary
     team: name of team to evaluate
 
@@ -524,8 +524,9 @@ def get_base_h_score(_info : dict
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
+    , punt_limiter = punt_limiter
+    , dynamic = False
     , scoring_format = scoring_format
-    , punting = punting
     , chi = chi)
 
   return next(H.get_h_scores(player_assignments, team))   
@@ -1116,7 +1117,7 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float
@@ -1124,10 +1125,10 @@ def make_h_rank_tab(_info : dict
                   , beta : float
                   , n_picks : int
                   , n_drafters : int
+                  , punt_limiter : float
                   , n_iterations : int
                   , scoring_format : str
                   , mode : str
-                  , punting : bool
                   , chi : float
                   , info_key : int):
   """Make ranks by H-score
@@ -1140,10 +1141,10 @@ def make_h_rank_tab(_info : dict
     beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
+    punt_limiter: float, minimum category weight for future picks
     n_iterations: int, number of gradient descent steps
     scoring_format: 
     mode: 
-    punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
     info_key: key to info data, used to detect changes
 
   Returns:
@@ -1157,8 +1158,9 @@ def make_h_rank_tab(_info : dict
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
+    , punt_limiter = punt_limiter
+    , dynamic = n_iterations > 0
     , scoring_format = scoring_format
-    , punting = punting
     , chi = chi)
 
   if st.session_state['mode'] == 'Auction Mode':

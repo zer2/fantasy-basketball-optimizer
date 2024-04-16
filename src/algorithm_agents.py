@@ -17,8 +17,9 @@ class HAgent():
                  , beta : float
                  , n_picks : int
                  , n_drafters : int
+                 , punt_limiter : float
+                 , dynamic : bool
                  , scoring_format : str
-                 , punting : bool
                  , chi : float
                     ):
         """Calculates the rank order based on H-score
@@ -31,8 +32,8 @@ class HAgent():
             beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
             n_drafters : int, number of drafters
+            punting_floor: minimum allowed weight
             scoring_format
-            punting: boolean for whether to adjust expectation of future picks by formulating a punting strategy
         Returns:
             None
 
@@ -43,11 +44,11 @@ class HAgent():
         self.beta = beta
         self.n_picks = n_picks 
         self.n_drafters = n_drafters
+        self.dynamic = dynamic
         self.chi = chi
         
         self.cross_player_var = info['Var']
         self.L = info['L']
-        self.punting = punting
         self.scoring_format = scoring_format
         self.var_fudge_factor = 2
 
@@ -80,6 +81,8 @@ class HAgent():
             v = np.sqrt(mov/(mov + vom))
 
         self.v = np.array(v/v.sum()).reshape(9,1)
+
+        self.punt_limiter = punt_limiter
 
         turnover_inverted_v = self.v.copy()
         turnover_inverted_v[-1] = -turnover_inverted_v[-1]
@@ -366,7 +369,7 @@ class HAgent():
         while True:
 
             #case where many players need to be chosen
-            if (n_players_selected < self.n_picks - 1) & (self.punting):
+            if (n_players_selected < self.n_picks - 1) & (self.dynamic):
 
                 del_full = self.get_del_full(weights)
         
@@ -391,11 +394,23 @@ class HAgent():
                 change_weights = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
         
                 weights = weights + change_weights
+
                 weights[weights < 0] = 0
-                weights = weights/weights.sum(axis = 1).reshape(-1,1)
+
+                if self.punt_limiter > 0:
+
+                    weak_categories = cdf_estimates.mean(axis = 2) < self.punt_limiter
+                    weights = np.clip(weights, a_min = self.v.T * weak_categories, a_max = None)
+                    weights = (weights * ~weak_categories) * \
+                                (1 - (weights * weak_categories).sum(axis = 1).reshape(-1,1))/ \
+                                (weights * ~weak_categories).sum(axis = 1).reshape(-1,1) \
+                                        + weights * weak_categories
+
+                else:
+                    weights = weights/weights.sum(axis = 1).reshape(-1,1)
 
             #case where one more player needs to be chosen
-            elif (n_players_selected == (self.n_picks - 1)) | ((not self.punting) & (n_players_selected < (self.n_picks)) ): 
+            elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
 
                 x_diff_array = diff_means + x_scores_available_array
 

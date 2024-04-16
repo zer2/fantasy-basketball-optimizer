@@ -257,7 +257,6 @@ with param_tab:
 
       punting_levels = st.session_state.params['punting_defaults']
 
-
       default_punting = st.session_state.params['punting_default_index'][scoring_format]
 
       punting_level = st.selectbox(
@@ -377,14 +376,26 @@ with param_tab:
                               , max_value = float(st.session_state.params['options']['beta']['max']))
         beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
         st.caption(beta_str)
+
+        if omega > 0:
     
-        n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
-                                  , key = 'n_iterations'
-                                  , value = st.session_state.params['options']['n_iterations']['default']
-                                  , min_value = st.session_state.params['options']['n_iterations']['min']
-                                  , max_value = st.session_state.params['options']['n_iterations']['max'])
-        n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
-        st.caption(n_iterations_str)
+          n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
+                                    , key = 'n_iterations'
+                                    , value = st.session_state.params['options']['n_iterations']['default']
+                                    , min_value = st.session_state.params['options']['n_iterations']['min']
+                                    , max_value = st.session_state.params['options']['n_iterations']['max'])
+          n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
+          st.caption(n_iterations_str)
+        else:
+          n_iterations = 0 
+
+        punt_limiter = st.number_input(r'Select a punt limiter'
+                                  , key = 'punt_limiter'
+                                  , value = punting_levels[punting_level]['punt_limiter']
+                                  , min_value = st.session_state.params['options']['punt_limiter']['min']
+                                  , max_value = st.session_state.params['options']['punt_limiter']['max'])
+        punt_limiter_str = r'''Categories with expected win % below the punt limiter require 100% or greater weight'''
+        st.caption(punt_limiter_str)
 
         if mode == 'Auction Mode':
 
@@ -407,8 +418,6 @@ with param_tab:
 
           stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
           st.caption(stream_noise_str_h)         
-
-        punting = (omega > 0) 
 
     with trade_param_column:
         st.header('Trading Parameters')
@@ -595,10 +604,10 @@ with rank_tab:
                     ,beta
                     ,n_picks
                     ,n_drafters
+                    ,punt_limiter
                     ,n_iterations
                     ,scoring_format
                     ,st.session_state['mode']
-                    ,punting
                     ,chi
                     ,st.session_state.info_key)
 
@@ -609,8 +618,9 @@ H = HAgent(info = info
     , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
+    , punt_limiter = punt_limiter
+    , dynamic = n_iterations > 0
     , scoring_format = scoring_format
-    , punting = punting
     , chi = chi)  
 
 if st.session_state['mode'] == 'Draft Mode':
@@ -677,7 +687,7 @@ if st.session_state['mode'] == 'Draft Mode':
             make_h_cand_tab(H
                   ,player_assignments
                   ,draft_seat
-                  ,n_iterations if punting else 1
+                  ,n_iterations
                   ,v)
 
       with team_tab:
@@ -690,8 +700,8 @@ if st.session_state['mode'] == 'Draft Mode':
                                         ,beta
                                         ,n_picks
                                         ,n_drafters
+                                        ,punt_limiter
                                         ,scoring_format
-                                        ,punting
                                         ,chi
                                         ,player_assignments
                                         ,draft_seat
@@ -885,8 +895,8 @@ elif st.session_state['mode'] == 'Season Mode':
                                         ,beta
                                         ,n_picks
                                         ,n_drafters
+                                        ,punt_limiter
                                         ,scoring_format
-                                        ,punting
                                         ,chi
                                         ,player_assignments
                                         ,roster_inspection_seat
@@ -1039,8 +1049,8 @@ elif st.session_state['mode'] == 'Season Mode':
                             ,beta
                             ,n_picks
                             ,n_drafters
+                            ,punt_limiter
                             ,scoring_format
-                            ,punting
                             ,chi
                             ,player_assignments
                             ,waiver_inspection_seat
