@@ -49,6 +49,7 @@ def round_robin_opponent(t : int
     Returns:
         The opposing team number for team t during week w
     """
+
     if t == 0: #position 0 remains fixed, and the other teams rotate around their (n - 1) spots
         return ((n - 2 - w) % (n - 1) ) + 1
     elif ((t + w) % (n-1) ==0): # in spot (n-1) of the non-zero spots, the opponent is 0 
@@ -129,7 +130,6 @@ def run_multiple_seasons(teams : dict[list]
         Series of winning percentages with the structure
          team_number : winning_fraction  
     """
-
     #reverse the mapping
     t = pd.Series(teams).explode()
     team_dict = dict(zip(t,t.index))
@@ -160,7 +160,7 @@ def run_multiple_seasons(teams : dict[list]
         team_performances = team_performances[get_categories()] #only want category columns
     
         #we need to map each team to its opponent for the week. We do that with a formula for round robin pairing
-        opposing_team_schedule = [(s,round_robin_opponent(t,w),w) for s, t, w in team_performances.index]
+        opposing_team_schedule = [(s,round_robin_opponent(t,w, len(teams)),w) for s, t, w in team_performances.index]
         opposing_team_performances = team_performances.loc[opposing_team_schedule]
 
         cat_wins = np.greater(team_performances.values,opposing_team_performances.values)
@@ -273,6 +273,7 @@ def try_strategy(_primary_agent
     detailed_res = pd.DataFrame()
     team_dict = {}
     all_times = {}
+    agents_dict = {}
      
     for i in range(n_drafters): 
 
@@ -285,7 +286,7 @@ def try_strategy(_primary_agent
         agents = rotate(agents, i)
         primary = rotate(primary, i)
         
-        teams, team_details, times = run_draft(agents,n_picks)
+        teams, agents_post, times = run_draft(agents,n_picks)
         res, details = run_multiple_seasons(teams = teams
                                    , season_df = season_df
                                    , n_seasons = n_seasons
@@ -294,286 +295,202 @@ def try_strategy(_primary_agent
         detailed_res = pd.concat([detailed_res, details.loc[i,:]])
         
         victory_res[i] = np.mean([(res.get(n)) if (res.get(n)) is not None else 0 for n in range(n_drafters) if primary[n]])
+
         team_dict[i] = teams[i]
+        agents_dict[i] = agents_post[i]
         all_times[i] = times[i]
-        
-    return victory_res, detailed_res, team_dict, all_times
 
-def make_detailed_results_tab(res, overall_win_rate, info, n_drafters, roto = False):
+    
+    #the return value here should be a dictionary    
+    return {'Victory rates' : victory_res
+            ,'Category win rates' : detailed_res
+            , 'Team compositions' : team_dict
+            , 'Agents' : agents_dict
+            , 'Times' : all_times}
 
-    c1, c2 = st.columns([0.5,0.5])
+def make_detailed_results_tab(res
+                              , overall_win_rate
+                              , info
+                              , n_drafters
+                              , n_picks
+                              , roto = False):
 
-    with c1: 
+    win_rates_tab, histogram_tab, weight_tab, progression_tab = st.tabs(['Win Rates'
+                                                                         ,'Category Win Rates'
+                                                                         ,'Weights'
+                                                                         ,'Progressions'])
 
-        if roto:
-            detailed_rates_collapsed = res[1]
-            detailed_rates_collapsed.columns = get_categories()
+    with win_rates_tab:
+        c1, c2 = st.columns([0.5,0.5])
 
-        else: 
-            detailed_rates_collapsed = res[1].loc['Win'].reset_index(drop = True) + \
-                                        res[1].loc['Tie'].reset_index(drop = True)/2
-        overall_win_rate.columns = ['Overall Win %']
+        with c1: 
 
-        detailed_rates_collapsed.index = ['Seat ' + str(x) for x in range(n_drafters)]
+            if roto:
+                detailed_rates_collapsed = res['Category win rates']
+                detailed_rates_collapsed.columns = get_categories()
 
-        detailed_rates_collapsed = overall_win_rate.merge(detailed_rates_collapsed
-                                                                            , left_index = True
-                                                                            , right_index = True)
+            else: 
+                detailed_rates_collapsed = res['Category win rates'].loc['Win'].reset_index(drop = True) + \
+                                            res['Category win rates'].loc['Tie'].reset_index(drop = True)/2
+            overall_win_rate.columns = ['Overall Win %']
 
-        if roto:
-            detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}", subset = ['Overall Win %']) \
-                                        .format("{:.3}"
-                                                , subset = get_categories()) \
-                                        .map(stat_styler
-                                            , middle = 6.5
-                                            , multiplier = 40
-                                            , subset = get_categories()) \
-                                        .map(styler_a
-                                            , subset = ['Overall Win %'])             
-        else: 
-            detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}") \
-                                        .map(stat_styler
-                                            , middle = 0.5
-                                            , multiplier = 150
-                                            , subset = get_categories()) \
-                                        .map(styler_a
-                                            , subset = ['Overall Win %']) 
+            detailed_rates_collapsed.index = ['Seat ' + str(x) for x in range(n_drafters)]
 
-        st.dataframe(detailed_rate_df
-                , use_container_width = True
-                , height = len(detailed_rates_collapsed) * 35 + 38)
-    with c2:
-        seats = ['Seat ' + str(x) for x in range(n_drafters)]
-        team_tabs = st.tabs(seats)
+            detailed_rates_collapsed = overall_win_rate.merge(detailed_rates_collapsed
+                                                                                , left_index = True
+                                                                                , right_index = True)
 
-        for team_tab, seat in zip(team_tabs, range(n_drafters)):
-            with team_tab:
-                make_team_tab(info['G-scores'] 
-                            , res[2][seat]
-                            , n_drafters 
-                            , st.session_state.params['g-score-player-multiplier']
-                            , st.session_state.params['g-score-team-multiplier']
-                            , None
-                            ) 
-
-
-def validate() -> None:
-
-    season_df = pd.read_csv('data/2022-23_complete.csv')
-
-    weekly_df = make_weekly_df(season_df)
-
-    input_tab, analysis_tab, results_tab, timing_tab = st.tabs(['Inputs'
-                                                ,'Analysis'
-                                                ,'Results'
-                                                ,'Timing'])
-
-    with input_tab:
-        weekly_tab, averages_tab = st.tabs(['Weekly Data','Averages'])
-
-        with weekly_tab:
-            st.dataframe(weekly_df)
-
-        with averages_tab:
-
-            player_averages = weekly_df.groupby('Player')[cols].mean()
-
-            player_averages.loc[:,'Free Throw %'] = player_averages['Free Throws']/player_averages['Free Throw Attempts']
-            player_averages.loc[:,'Field Goal %'] = player_averages['Field Goals']/player_averages['Field Goal Attempts']
-
-            metadata = get_player_metadata()
-
-            player_averages = player_averages.merge(metadata, left_index = True, right_index = True)
-            conversion_factors = pd.read_csv('./coefficients.csv', index_col = 0)
-
-            st.markdown('Weekly player averages ')
-            st.dataframe(player_averages)
-
-    multipliers = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
-                            , index = conversion_factors.index)
-
-    #these should all be part of the params file
-    psi = st.session_state.params['options']['psi']['default']
-    nu = st.session_state.params['options']['nu']['default']
-    n_drafters = st.session_state.params['options']['n_drafters']['default']
-    n_picks = st.session_state.params['options']['n_picks']['default']
-    omega = st.session_state.params['options']['omega']['default']
-    gamma = st.session_state.params['options']['gamma']['default']
-    alpha = st.session_state.params['options']['alpha']['default']
-    beta = st.session_state.params['options']['beta']['default']
-    chi = 0.05
-    n_seasons = 1000
-
-    info = process_player_data(player_averages
-                        , conversion_factors
-                        , multipliers 
-                        , psi
-                        , nu 
-                        , n_drafters
-                        , n_picks
-                        , None
-                        )
-
-    g_scores = info['G-scores']
-    g_scores = g_scores.sort_values('Total', ascending = False)
-    default_agent_hth = SimpleAgent(order = list(g_scores.index))
-
-    z_scores = info['Z-scores']
-    z_scores = z_scores.sort_values('Total', ascending = False)
-    default_agent_roto = SimpleAgent(order = list(z_scores.index))
-
-    with analysis_tab: 
-        omega, gamma = get_estimate_of_omega_gamma(info)
-
-    primary_agent_roto = HAgent(
-            info = info
-            , omega = omega
-            , gamma = gamma
-            , alpha = alpha
-            , beta = beta
-            , n_picks = n_picks
-            , n_drafters = n_drafters
-            , scoring_format = 'Rotisserie'
-            , punting = True
-            , chi = chi
-            )
-                
-    res_roto =  try_strategy(primary_agent_roto
-            , default_agent_roto
-            , n_drafters
-            , n_picks
-            , weekly_df
-            , n_seasons
-            , n_primary = 1
-            , scoring_format = 'Rotisserie')
-
-    primary_agent_ec = HAgent(
-                info = info
-                , omega = omega
-                , gamma = gamma
-                , alpha = alpha
-                , beta = beta
-                , n_picks = n_picks
-                , n_drafters = n_drafters
-                , scoring_format = 'Head to Head: Each Category'
-                , punting = True
-                , chi = None
-                )
-
-    res_ec =  try_strategy(primary_agent_ec
-            , default_agent_hth
-            , n_drafters
-            , n_picks
-            , weekly_df
-            , n_seasons
-            , n_primary = 1
-            , scoring_format = 'Head to Head: Each Category')
-
-    primary_agent_wta = HAgent(
-                info = info
-                , omega = omega
-                , gamma = gamma
-                , alpha = alpha
-                , beta = beta
-                , n_picks = n_picks
-                , n_drafters = n_drafters
-                , scoring_format = 'Head to Head: Most Categories'
-                , punting = True
-                , chi = None
-                )
-
-    res_wta =  try_strategy(primary_agent_wta
-            , default_agent_hth
-            , n_drafters
-            , n_picks
-            , weekly_df
-            , n_seasons
-            , n_primary = 1
-            , scoring_format = 'Head to Head: Most Categories')
-
-
-
-    with results_tab:
-
-        t1, t2, t3, t4 = st.tabs(['Overall'
-                            ,'Head to Head: Most Categories Details'
-                            ,'Head to Head: Each Category Details'
-                            ,'Rotisserie'])
-
-        with t1: 
-            win_rate_df = pd.DataFrame({'Head to Head: Most Categories' : res_wta[0]
-                                        ,'Head to Head: Each Category' : res_ec[0] 
-                                        ,'Rotisserie' : res_roto[0]}
-                                        , index = ['Seat ' + str(x) for x in range(n_drafters)])
-
-            averages_df = pd.DataFrame({'Head to Head: Most Categories' : \
-                                                    [win_rate_df['Head to Head: Most Categories'].mean()]
-                                                ,'Head to Head: Each Category' : \
-                                                    [win_rate_df['Head to Head: Each Category'].mean()] 
-                                                ,'Rotisserie' : \
-                                                    [win_rate_df['Rotisserie'].mean()]}
-                                                        , index = ['Aggregate'])
-            win_rate_df = pd.concat([averages_df, win_rate_df])
-
-            win_rate_df_styled = win_rate_df.style.format("{:.1%}") \
+            if roto:
+                detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}", subset = ['Overall Win %']) \
+                                            .format("{:.3}"
+                                                    , subset = get_categories()) \
                                             .map(stat_styler
-                                            ,middle = 0.08333, multiplier = 300) \
-                                            .map(styler_a, subset = pd.IndexSlice['Aggregate',:])
+                                                , middle = 6.5
+                                                , multiplier = 40
+                                                , subset = get_categories()) \
+                                            .map(styler_a
+                                                , subset = ['Overall Win %'])             
+            else: 
+                detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}") \
+                                            .map(stat_styler
+                                                , middle = 0.5
+                                                , multiplier = 150
+                                                , subset = get_categories()) \
+                                            .map(styler_a
+                                                , subset = ['Overall Win %']) 
 
-            st.subheader('Ultimate win rates')
-            st.dataframe(win_rate_df_styled
-                    , height = len(win_rate_df) * 35 + 38)
+            st.dataframe(detailed_rate_df
+                    , use_container_width = True
+                    , height = len(detailed_rates_collapsed) * 35 + 38)
+        with c2:
+            seats = ['Seat ' + str(x) for x in range(n_drafters)]
+            team_tabs = st.tabs(seats)
 
-        with t2: 
-            overall_win_rate = win_rate_df[['Head to Head: Most Categories']]
+            for team_tab, seat in zip(team_tabs, range(n_drafters)):
+                with team_tab:
+                    make_team_tab(info['Z-scores'] if roto else info['G-scores'] 
+                                , res['Team compositions'][seat]
+                                , n_drafters 
+                                , st.session_state.params['g-score-player-multiplier']
+                                , st.session_state.params['g-score-team-multiplier']
+                                , None
+                                ) 
 
-            make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters)
-            
-        with t3: 
-            overall_win_rate = win_rate_df[['Head to Head: Each Category']]
+    with histogram_tab:
+        make_histogram([res], roto)
+    with weight_tab:
+        make_weight_chart([res], n_picks)
+    with progression_tab:
+        columns = st.columns(n_drafters)
+        for col, team_num in zip(columns,range(n_drafters)):
+            with col:
+                st.header('Seat ' + str(team_num))
 
-            make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters)
+                for pick_num in range(n_picks):
+                    see_progression(res, team_num, pick_num)
 
-        with t4:
-            overall_win_rate = win_rate_df[['Rotisserie']]
-            make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, True)
 
-    with timing_tab:
+def get_win_rates(detail):
+
+    win_rates = detail[detail.index.get_level_values('Result') == 'Win'].reset_index(drop = True) + \
+                detail[detail.index.get_level_values('Result') == 'Tie'].reset_index(drop = True)/2
         
-        wta_tab, ec_tab, roto_tab = st.tabs(['Head to Head: Most Categories','Head to Head: Each Category','Rotisserie']) 
+    return detail
+        
+def make_histogram(res_list, roto):
 
-        with wta_tab:
-            time_df = pd.DataFrame(res_wta[3])
-            for col in time_df.columns:
-                time_df[col] = time_df[col].dt.total_seconds()
+    if roto:
+        details = [res['Category win rates'] for res in res_list]
+        x_name = 'Category points'
+    else:
+        details = [get_win_rates(res['Category win rates'])*100 for res in res_list]
+        x_name = 'Category win rate (%)'
+    
+    df = pd.concat(details).melt()
+    df.columns = ['cat',x_name]
 
-            timing_df_wta = time_df.style.format("{:.2f} s").map(stat_styler
-                                                , middle = 1
-                                                , multiplier = -50
-            )
-            st.dataframe(timing_df_wta)
+    fig = px.histogram(df, x = x_name
+                 , histnorm='probability density'
+                 , barmode = 'overlay')
+    
+    st.plotly_chart(fig)
+    
+def see_progression(res, team_num, pick_num):
+    model = res['Agents'][team_num]
+    scores = [x['Scores'] for x in model.all_res_list[pick_num]]
+    
+    data = pd.concat([pd.DataFrame({'Imputed win percent' : [s.loc[player]* 100 for s in scores]
+                                    , 'Player' : player
+                                   , 'Iteration' : list(range(len(scores)))})
+            for player in scores[-1].sort_values(ascending = False).index[0:15]])
+    
+    title_str = \
+        'Pick ' + str(pick_num + 1) + ': ' + model.players[pick_num]
+    
+    fig = px.line(data
+                  , x = "Iteration"
+                  , y = "Imputed win percent"
+                  , color = "Player"
+                 , title = title_str)
+    
+    fig.update_layout(legend=dict(
+        y=0.5,
+        x=1.1,
+                )
+        ,height =600
+        ,width = 400)
+    st.plotly_chart(fig)
 
-        with ec_tab:
-            time_df = pd.DataFrame(res_ec[3])
-            for col in time_df.columns:
-                time_df[col] = time_df[col].dt.total_seconds()
 
-            timing_df_ec = time_df.style.format("{:.2f} s").map(stat_styler
-                                                , middle = 1
-                                                , multiplier = -50
-            )
-            st.dataframe(timing_df_ec)
+def get_pick_weights(res, pick_num, team_num):
 
-        with roto_tab:
-            time_df = pd.DataFrame(res_roto[3])
-            for col in time_df.columns:
-                time_df[col] = time_df[col].dt.total_seconds()
+    info = res['Agents'][team_num].all_res_list[pick_num][-1]
+    weights = info['Weights']
 
-            timing_df_roto = time_df.style.format("{:.2f} s").map(stat_styler
-                                                , middle = 1
-                                                , multiplier = -50
-            )
-            st.dataframe(timing_df_roto)
+    player_chosen = res['Agents'][team_num].players[pick_num]
+    weights = weights.loc[player_chosen]
+    
+    v = res['Agents'][team_num].v.T
+
+    weights = weights/v.reshape(9,)
+    
+    weights = weights.sort_values(ascending = False).reset_index(drop = True)
+
+    return weights
+
+def get_res_weights(res, pick_num):
+    res_weights = pd.concat([get_pick_weights(res, pick_num, team_num) for team_num in range(len(res['Agents']))]
+                              ,axis = 1) 
+
+    return res_weights
+
+def get_round_weights(res_list, pick_num):
+    round_weights = pd.concat([get_res_weights(res, pick_num) for res in res_list], axis = 1).mean(axis = 1)
+    return round_weights
+
+def make_weight_chart(res_list, n_picks):
+                       
+    data = pd.concat([pd.DataFrame({'Weight' : get_round_weights(res_list,pick_num)
+                                    ,'Round' : pick_num
+                                ,'Importance' : list(range(9))
+                                                        }) for pick_num in range(n_picks -1)])
+
+    colors = px.colors.sample_colorscale("plotly3", [n/(n_picks - 2) for n in range(n_picks - 1)])
+
+    fig = px.bar(data, x = 'Importance'
+                , y = 'Weight'
+                , color = 'Round'
+                , barmode= 'overlay'
+                , color_discrete_sequence = colors
+                , opacity = 0.2)
+
+    fig.update_layout(
+        yaxis_title="Weight"
+        ,title = 'Each Category'
+    )
+    st.plotly_chart(fig)
+            
+
 #add function here to sim
 #check for actual values of beta, gamma 
 def get_preds_c(v,c,L):    
@@ -658,3 +575,275 @@ def get_estimate_of_omega_gamma(info):
     st.plotly_chart(fig2)
     
     return omega, gamma
+
+def run_mini_season(season_df
+                        ,n_drafters : int
+                        ,n_picks : int
+                        ,omega : float
+                        ,gamma : float
+                        ,alpha : float
+                        ,beta : float
+                        ,chi : float
+                        ,n_seasons : int = 1000) -> dict:
+
+    weekly_df = make_weekly_df(season_df)
+
+    input_tab, results_tab, analysis_tab, timing_tab = st.tabs(['Inputs'
+                                                ,'Results'
+                                                ,'Analysis'
+                                                ,'Timing'])
+
+    with input_tab:
+        weekly_tab, averages_tab = st.tabs(['Weekly Data','Averages'])
+
+        with weekly_tab:
+            st.dataframe(weekly_df)
+
+        with averages_tab:
+
+            player_averages = weekly_df.groupby('Player')[cols].mean()
+
+            player_averages.loc[:,'Free Throw %'] = player_averages['Free Throws']/player_averages['Free Throw Attempts']
+            player_averages.loc[:,'Field Goal %'] = player_averages['Field Goals']/player_averages['Field Goal Attempts']
+
+            metadata = get_player_metadata()
+
+            player_averages = player_averages.merge(metadata, left_index = True, right_index = True)
+            conversion_factors = pd.read_csv('./coefficients.csv', index_col = 0)
+
+            st.markdown('Weekly player averages ')
+            st.dataframe(player_averages)
+
+    multipliers = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
+                            , index = conversion_factors.index)
+
+    info = process_player_data(player_averages
+                        , conversion_factors
+                        , multipliers 
+                        , 0
+                        , 0 
+                        , n_drafters
+                        , n_picks
+                        , None
+                        )
+
+    g_scores = info['G-scores']
+    g_scores = g_scores.sort_values('Total', ascending = False)
+    default_agent_hth = SimpleAgent(order = list(g_scores.index))
+
+    z_scores = info['Z-scores']
+    z_scores = z_scores.sort_values('Total', ascending = False)
+    default_agent_roto = SimpleAgent(order = list(z_scores.index))
+
+    primary_agent_roto = HAgent(
+            info = info
+            , omega = omega
+            , gamma = gamma
+            , alpha = alpha
+            , beta = beta
+            , n_picks = n_picks
+            , n_drafters = n_drafters
+            , scoring_format = 'Rotisserie'
+            , dynamic = True
+            , chi = chi
+            )
+                
+    res_roto =  try_strategy(primary_agent_roto
+            , default_agent_roto
+            , n_drafters
+            , n_picks
+            , weekly_df
+            , n_seasons
+            , n_primary = 1
+            , scoring_format = 'Rotisserie')
+
+    primary_agent_ec = HAgent(
+                info = info
+                , omega = omega
+                , gamma = gamma
+                , alpha = alpha
+                , beta = beta
+                , n_picks = n_picks
+                , n_drafters = n_drafters
+                , scoring_format = 'Head to Head: Each Category'
+                , dynamic = True
+                , chi = None
+                )
+
+    res_ec =  try_strategy(primary_agent_ec
+            , default_agent_hth
+            , n_drafters
+            , n_picks
+            , weekly_df
+            , n_seasons
+            , n_primary = 1
+            , scoring_format = 'Head to Head: Each Category')
+
+    primary_agent_wta = HAgent(
+                info = info
+                , omega = omega
+                , gamma = gamma
+                , alpha = alpha
+                , beta = beta
+                , n_picks = n_picks
+                , n_drafters = n_drafters
+                , scoring_format = 'Head to Head: Most Categories'
+                , dynamic = True
+                , chi = None
+                )
+
+    res_wta =  try_strategy(primary_agent_wta
+            , default_agent_hth
+            , n_drafters
+            , n_picks
+            , weekly_df
+            , n_seasons
+            , n_primary = 1
+            , scoring_format = 'Head to Head: Most Categories')
+
+    with results_tab:
+
+        t1, t2, t3, t4 = st.tabs(['Overall'
+                            ,'Head to Head: Most Categories Details'
+                            ,'Head to Head: Each Category Details'
+                            ,'Rotisserie Details'])
+
+        with t1: 
+            win_rate_df = pd.DataFrame({'Head to Head: Most Categories' : res_wta['Victory rates']
+                                        ,'Head to Head: Each Category' : res_ec['Victory rates'] 
+                                        ,'Rotisserie' : res_roto['Victory rates']}
+                                        , index = ['Seat ' + str(x) for x in range(n_drafters)])
+
+            averages_df = pd.DataFrame({'Head to Head: Most Categories' : \
+                                                    [win_rate_df['Head to Head: Most Categories'].mean()]
+                                                ,'Head to Head: Each Category' : \
+                                                    [win_rate_df['Head to Head: Each Category'].mean()] 
+                                                ,'Rotisserie' : \
+                                                    [win_rate_df['Rotisserie'].mean()]}
+                                                        , index = ['Aggregate'])
+            win_rate_df = pd.concat([averages_df, win_rate_df])
+
+            win_rate_df_styled = win_rate_df.style.format("{:.1%}") \
+                                            .map(stat_styler
+                                            ,middle = 0.08333, multiplier = 300) \
+                                            .map(styler_a, subset = pd.IndexSlice['Aggregate',:])
+
+            st.subheader('Ultimate win rates')
+            st.dataframe(win_rate_df_styled
+                    , height = len(win_rate_df) * 35 + 38)
+
+        with t2: 
+            overall_win_rate = win_rate_df[['Head to Head: Most Categories']]
+
+            make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks)
+            
+        with t3: 
+            overall_win_rate = win_rate_df[['Head to Head: Each Category']]
+
+            make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks)
+
+        with t4:
+            overall_win_rate = win_rate_df[['Rotisserie']]
+            make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks, True)
+
+    with timing_tab:
+        
+        wta_tab, ec_tab, roto_tab = st.tabs(['Head to Head: Most Categories','Head to Head: Each Category','Rotisserie']) 
+
+        with wta_tab:
+            time_df = pd.DataFrame(res_wta['Times'])
+            for col in time_df.columns:
+                time_df[col] = time_df[col].dt.total_seconds()
+
+            timing_df_wta = time_df.style.format("{:.2f} s").map(stat_styler
+                                                , middle = 1
+                                                , multiplier = -50
+            )
+            st.dataframe(timing_df_wta)
+
+        with ec_tab:
+            time_df = pd.DataFrame(res_ec['Times'])
+            for col in time_df.columns:
+                time_df[col] = time_df[col].dt.total_seconds()
+
+            timing_df_ec = time_df.style.format("{:.2f} s").map(stat_styler
+                                                , middle = 1
+                                                , multiplier = -50
+            )
+            st.dataframe(timing_df_ec)
+
+        with roto_tab:
+            time_df = pd.DataFrame(res_roto['Times'])
+            for col in time_df.columns:
+                time_df[col] = time_df[col].dt.total_seconds()
+
+            timing_df_roto = time_df.style.format("{:.2f} s").map(stat_styler
+                                                , middle = 1
+                                                , multiplier = -50
+            )
+            st.dataframe(timing_df_roto)
+
+    return {'wta' : res_wta
+            ,'ec' : res_ec
+            ,'roto' : res_roto
+    }
+
+def validate():
+
+    season_df = pd.read_csv('data/2022-23_complete.csv')
+
+    mini_seasons = [season_df, season_df]
+
+    tabs = st.tabs(['Exp ' + str(exp) for exp in range(len(mini_seasons))] + ['Overall'])
+
+    all_res = []
+
+    n_drafters = 12
+    n_picks = 13
+    omega = st.session_state.params['options']['omega']['default']
+    gamma = st.session_state.params['options']['gamma']['default']
+    alpha = st.session_state.params['options']['alpha']['default']
+    beta = st.session_state.params['options']['beta']['default']
+    chi = 0.05
+    n_seasons = 1000
+
+    for mini_season, tab in zip(mini_seasons, tabs):
+        with tab: 
+            all_res = all_res + [run_mini_season(mini_season
+                                                 ,n_drafters
+                                                 ,n_picks
+                                                 ,omega
+                                                 ,gamma
+                                                 ,alpha
+                                                 ,beta
+                                                 ,chi
+                                                 ,n_seasons)]
+            
+    with tabs[-1]:
+        wta_tab, ec_tab, roto_tab = st.tabs(['Head to Head: Most Categories'
+                                             ,'Head to Head: Each Category'
+                                             ,'Rotisserie'])
+        with wta_tab:
+            all_res_wta = [res['wta'] for res in all_res]
+            histogram_tab, weight_tab = st.tabs(['Histogram','Weight'])
+
+            with histogram_tab:
+                make_histogram(all_res_wta, False)
+            with weight_tab:
+                make_weight_chart(all_res_wta, n_picks)
+        with ec_tab:
+            all_res_ec = [res['ec'] for res in all_res]
+            histogram_tab, weight_tab = st.tabs(['Histogram','Weight'])
+
+            with histogram_tab:
+                make_histogram(all_res_ec, False)
+            with weight_tab:
+                make_weight_chart(all_res_ec, n_picks)
+        with roto_tab:
+            all_res_roto = [res['roto'] for res in all_res]
+            histogram_tab, weight_tab = st.tabs(['Histogram','Weight'])
+
+            with histogram_tab:
+                make_histogram(all_res_roto, True)
+            with weight_tab:
+                make_weight_chart(all_res_roto, n_picks)

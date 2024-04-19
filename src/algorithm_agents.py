@@ -85,6 +85,8 @@ class HAgent():
         turnover_inverted_v[-1] = -turnover_inverted_v[-1]
         self.turnover_inverted_v = turnover_inverted_v/turnover_inverted_v.sum()
 
+        self.all_res_list = [] #for tracking decisions made during testing
+        self.players = []
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -371,7 +373,7 @@ class HAgent():
                 del_full = self.get_del_full(weights)
         
                 expected_future_diff_single = self.get_x_mu_simplified_form(weights)
-                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
+                expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
@@ -839,12 +841,18 @@ class HAgent():
                   ): 
 
         generator = self.get_h_scores(player_assignments, j)
+
+        res_list = []
         for i in range(30):
-            res  = next(generator)
+            res = next(generator)
+            res_list = res_list + [res] 
 
         scores = res['Scores']
 
         best_player = scores.idxmax()
+
+        self.all_res_list = self.all_res_list + [res_list]
+        self.players = self.players + [best_player]
 
         return best_player
 
