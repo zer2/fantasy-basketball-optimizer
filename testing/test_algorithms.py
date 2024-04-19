@@ -19,7 +19,7 @@ def test_x_mu_gradients():
         , n_picks = at.number_input('n_picks').value
         , n_drafters = at.number_input('n_drafters').value
         , scoring_format = 'Head to Head: Most Categories'
-        , punting = True
+        , dynamic = True
         , chi = None)
 
     c_list = [np.array([1/8] * 8 + [0]).reshape(1,9)
@@ -64,7 +64,7 @@ def test_objective_gradients():
         , n_picks = at.number_input('n_picks').value
         , n_drafters = at.number_input('n_drafters').value
         , scoring_format = 'Rotisserie'
-        , punting = True
+        , dynamic = True
         , chi = 0.6)
 
     #we're ok failing the c
@@ -96,6 +96,7 @@ def test_objective_gradients():
         res = H.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , 1
+                        , 1
                         , None
                         , False) 
         return res
@@ -103,6 +104,7 @@ def test_objective_gradients():
     def rotisserie_gradient(cdf_estimates):
         res = H.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
+                        , 1
                         , 1
                         , None
                         , True

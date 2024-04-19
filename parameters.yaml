@@ -74,7 +74,7 @@ options :
   min : 0.0
   max: 2.0
  gamma :
-  default : 0.05
+  default : 0.1
   min : 0.0
   max : 1.0
  upsilon : 
@@ -97,17 +97,13 @@ options :
   default : 30
   min : 10
   max: 10000
- punt_limiter:
-  default : 0.0
-  min : 0.0
-  max : 1.0
 punting_defaults :
   No dynamic optimization :
     omega : 0.0 
     gamma : 0.0
   Moderate punting : 
     omega : 0.8
-    gamma : 0.05
+    gamma : 0.1
   Aggressive punting : 
     omega : 1.0
     gamma : 0.1

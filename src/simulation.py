@@ -381,11 +381,9 @@ def make_detailed_results_tab(res
     with weight_tab:
         make_weight_chart([res], n_picks)
     with progression_tab:
-        columns = st.columns(n_drafters)
-        for col, team_num in zip(columns,range(n_drafters)):
-            with col:
-                st.header('Seat ' + str(team_num))
-
+        tabs = st.tabs(['Seat ' + str(team_num) for team_num in range(n_drafters)])
+        for tab, team_num in zip(tabs,range(n_drafters)):
+            with tab:
                 for pick_num in range(n_picks):
                     see_progression(res, team_num, pick_num)
 
@@ -395,7 +393,7 @@ def get_win_rates(detail):
     win_rates = detail[detail.index.get_level_values('Result') == 'Win'].reset_index(drop = True) + \
                 detail[detail.index.get_level_values('Result') == 'Tie'].reset_index(drop = True)/2
         
-    return detail
+    return win_rates
         
 def make_histogram(res_list, roto):
 
@@ -410,8 +408,7 @@ def make_histogram(res_list, roto):
     df.columns = ['cat',x_name]
 
     fig = px.histogram(df, x = x_name
-                 , histnorm='probability density'
-                 , barmode = 'overlay')
+                 , histnorm='probability density')
     
     st.plotly_chart(fig)
     
@@ -438,7 +435,7 @@ def see_progression(res, team_num, pick_num):
         x=1.1,
                 )
         ,height =600
-        ,width = 400)
+        ,width = 1000)
     st.plotly_chart(fig)
 
 
