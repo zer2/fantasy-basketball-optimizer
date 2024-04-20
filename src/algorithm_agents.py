@@ -383,7 +383,6 @@ class HAgent():
                 score, pdf_weights = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = True)
 
@@ -413,7 +412,6 @@ class HAgent():
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = False)
 
@@ -429,7 +427,6 @@ class HAgent():
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = False)
                 
@@ -455,7 +452,6 @@ class HAgent():
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = False)
 
@@ -486,7 +482,6 @@ class HAgent():
     def get_objective_and_pdf_weights(self
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
-                                        , diff_vars : np.array
                                         , n_values : np.array = None
                                         , calculate_pdf_weights : bool = False):
         """
@@ -495,7 +490,6 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            diff_vars: variance of differentials against opponents
             n_values: order of matchup means. Useful for Toro
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
@@ -508,7 +502,6 @@ class HAgent():
             return self.get_objective_and_pdf_weights_mc(
                         cdf_estimates
                         , pdf_estimates
-                        , diff_vars
                         , calculate_pdf_weights) 
 
         elif self.scoring_format == 'Rotisserie':
@@ -516,7 +509,6 @@ class HAgent():
             return self.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , pdf_estimates
-                        , diff_vars
                         , n_values
                         , calculate_pdf_weights) 
 
@@ -524,13 +516,11 @@ class HAgent():
             return self.get_objective_and_pdf_weights_ec(
                         cdf_estimates
                         , pdf_estimates
-                        , diff_vars
                         , calculate_pdf_weights) 
 
     def get_objective_and_pdf_weights_mc(self
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
-                                , diff_vars : np.array
                                 , calculate_pdf_weights : bool = False):
         """
         Calculate the objective function and optionally pdf weights for the gradient, for Most Categories
@@ -538,7 +528,6 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            diff_vars: variance of differentials against opponents
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
@@ -553,7 +542,7 @@ class HAgent():
 
             tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
 
-            pdf_weights = (tipping_points*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+            pdf_weights = (tipping_points*pdf_estimates).mean(axis = 2)
 
             return objective, pdf_weights
 
@@ -565,7 +554,6 @@ class HAgent():
     def get_objective_and_pdf_weights_ec(self
                             , cdf_estimates : np.array
                             , pdf_estimates : np.array
-                            , diff_vars : np.array
                             , calculate_pdf_weights : bool = False):
 
         """
@@ -574,7 +562,6 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            diff_vars: variance of differentials against opponents
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
@@ -584,7 +571,7 @@ class HAgent():
 
         if calculate_pdf_weights:
 
-            pdf_weights = (pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+            pdf_weights = (pdf_estimates).mean(axis = 2)
 
             return objective, pdf_weights
 
@@ -595,7 +582,6 @@ class HAgent():
     def get_objective_and_pdf_weights_rotisserie(self
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
-                                , diff_vars : np.array
                                 , n_values : np.array = None
                                 , calculate_pdf_weights : bool = False
                                 , test_mode : bool = False):
@@ -652,7 +638,7 @@ class HAgent():
             if test_mode:
                 return gradient
             else:
-                pdf_weights = (gradient*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+                pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
 
                 return objective, pdf_weights
 

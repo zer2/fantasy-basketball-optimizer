@@ -689,14 +689,16 @@ def run_mini_season(season_df
                 , chi = None
                 )
 
-    res_wta =  try_strategy(primary_agent_wta
-            , default_agent_hth
-            , n_drafters
-            , n_picks
-            , weekly_df
-            , n_seasons
-            , n_primary = 1
-            , scoring_format = 'Head to Head: Most Categories')
+    #res_wta =  try_strategy(primary_agent_wta
+    #        , default_agent_hth
+    #        , n_drafters
+    #        , n_picks
+    #        , weekly_df
+    #        , n_seasons
+    #        , n_primary = 1
+    #        , scoring_format = 'Head to Head: Most Categories')
+
+    res_wta = res_ec #hack
 
     with results_tab:
 

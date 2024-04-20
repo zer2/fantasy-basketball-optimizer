@@ -96,15 +96,14 @@ def test_objective_gradients():
         res = H.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , 1
-                        , 1
                         , None
                         , False) 
         return res
 
     def rotisserie_gradient(cdf_estimates):
+        
         res = H.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
-                        , 1
                         , 1
                         , None
                         , True
@@ -190,9 +189,6 @@ def check_gradient_2(c, func, del_func):
 
     all_del_real_normalized = np.array(all_del_real).reshape(9,1)/sum(all_del_real)
     all_res_normalized = np.array(all_res).reshape(9,1)/sum(all_del_real)
-
-    print(all_del_real_normalized)
-    print(all_res_normalized)
 
     assert (abs(all_del_real_normalized - all_res_normalized) < 0.001).all()
 
