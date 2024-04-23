@@ -216,4 +216,4 @@ I have not seen a convincing argument that turnovers should be down-weighted to 
 
 Still, absence of evidence is not evidence of absence, and there might be some more nuanced reason that turnovers should be downweighted not captured here. If you want to use this website and want to downweight turnovers, feel free to manually set the turnover multiplier on the parameters page.
 
-Also, keep in mind that many other managers ignore turnovers. Winning them reliably may take only a small investment while grabbing every player whose strength is turnovers would be overkill. So in practice you might want to downweight turnovers a bit, perhaps to $50\%$
+Also, keep in mind that many other managers ignore turnovers. The algorithm will adjust as other managers choose high-turnover players, but before then it may be worth keeping in mind that winning turnovers requires a relatively small investment and investing heavily into the category may be overkill. 
