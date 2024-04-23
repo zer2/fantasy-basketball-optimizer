@@ -1,14 +1,22 @@
 # The curious case of turnovers 
 
-Conventional wisdom dictates that turnovers should be valued less than other categories when evaluating players. As such, many analysts recommend down-weighting the category by $75\%$ or more by default. There is a seemingly good reason for this, and I understand why it has been the orthodoxy for so long. However, I believe that as well-entrenched this idea is, it is also wrong. 
+Turnovers is a unique category in the sense that it rewards players for sitting on the bench, while every other category rewards players for playing. This is counterintuitive and feels wrong to many. 
 
-It is natural to look at results and conclude that turnovers are not important to invest in. Succesful teams often lose turnovers, and poorly performing teams often win them. Of course, seeing that, anyone would naturally start to believe that investing in turnovers is not very helpful. But that is not exactly logical. What matters is the causal relationship between investing in turnovers and doing well: on the margins, does investing in turnovers yield a similar return to investing in other categories? My analysis suggests that it does, which is why this website's default is to treat turnovers like every other category (multiplied by -1 of course). 
+As such, it is conventional wisdom to disregard turnovers or at least down-weight them by a large factor. Hashtag Basketball, for instance, down-weights turnovers to $0.25$ because "[people who barely play any minutes, and therefore will have hardly any turnovers get a huge boost in value when it is set to 1. So setting the turnover category to 1 really inflates some guys who do not actually do much besides not turn over the ball](https://www.reddit.com/r/fantasybball/comments/djcynb/hashtag_rankings_turnover_multiplier/)" 
 
-My thinking on this topic is not entirely rigorous, which is why I am not including it in the paper or incorporating it into H-scoring. Still, I realize that if I am going to disregard conventional wisdom, I should at least explain my thought my process. I will do that here
+There are logical-sounding arguments backing up Hashtag's intuition
+1. The best teams tend to do poorly in turnovers, and the worst teams tend to do well in them. A reasonable observer may conclude that investing in turnovers therefore makes a team worse 
+2. It is easiest to win turnovers when a team has already lost all chance of winning the season. There is no benefit to this, so turnovers should not be prioritized
+3. Turnovers is a great category to punt, because ignoring turnovers allows a team to take players that are great in the other categories. This means that they should just punt it by default 
+4. Turnovers are volatile and unpredictable, making them pointless to consider while drafting
+
+These arguments have often come up in conversations I have had with others in the fantasy basketball community. They are intuitively reasonable on face, so I understand why the down-weighting approach has been the orthodoxy for so long. However, as well-entrenched as the down-weighting approach is, and as many logical-sounding arguments there are behind it, I am convinced that it is wrong-headed. None of the arguments persuade me, and I believe that the approach has stayed popular because of inertia and a lack of analytical rigor. For that reason, the default on this site is to treat turnovers like every other counting statistic (except multiplied by -1 of course)
+
+I realize that I am going against the grain of the fantasy community with this opinion. I am suggesting that the way things have been done for years and years is incorrect. So I will lay out my thought process here, going through the four arguments above and explaining why none of them are persuasive. I will also show the result of a test I ran, which showed no convincing evidence that punting turnovers was uniquely advantageous 
 
 ## 1. Correlation does not imply causation
 
-It is often noted that teams which perform poorly in turnovers tend to do better overall and vice versa. 
+The first argument relies on the emprical fact that teams which perform poorly in turnovers tend to do well overall and vice versa. 
 
 The statement of fact is probably true. However, concluding from it that investing in turnovers does not increase overall win probability is a fallacy because [correlation does not imply causation](https://en.wikipedia.org/wiki/Correlation_does_not_imply_causation). __It may be true that doing well in turnovers is associated with losing overall. However, that does not necessarily mean anything about the causal relationship between the two. Investing in turnovers could still increase the probability of winning as much as investing in any of the other categories does or more.__ 
 
@@ -25,13 +33,13 @@ Teams that invested more in turnovers made fewer turnovers. Also, teams which ma
 
 <iframe width = "672" height = "378" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/b167980e-3947-4abe-a4a8-72ae22cff6d1"> </iframe>
 
-This happened because there was a third cause, minutes per game, which both made teams succesful and increased the number of turnovers. It was not making many turnovers which helped teams do well- it was the conditions required for doing well that caused more turnovers. 
+This happened because there was a third cause, minutes per game, which both made teams succesful and increased the number of turnovers. It was not making many turnovers which helped teams do well- it was the conditions required for doing well that caused more turnovers. After controlling for that fact, it is apparent that investing in turnovers allowed Team $A$ to take the gold over team $B$ and for team $C$ to snatch third place over team $D$. 
 
 This example is not necessarily illustrative of actual fantasy basketball. The point is just that it could be, so we cannot draw conclusions directly from correlations
 
 ## 2. Return on investment  
 
-What actually matters is the causal effect of investing in turnovers on overall performance. Let's analyze this, first with intuition and then with some degree of rigor 
+The second argument postulated that turnovers only matter in situations when a season is already lost. But is that logical? 
 
 ### 2A. The intuitive approach
 
@@ -56,6 +64,8 @@ It would be correct to say that given an across the board advantage, a team is m
 Let's say a team has a significant advantage across all categories except turnovers, for which they have a significant disadvantage. One would expect that investing in turnovers would become less likely to translate to more category wins, since the investment would only matter if an opponent had an anomolously bad week for turnovers. However, the other counting statistics would also become less rewarding to invest in, since those investments would only matter if an opponent had an anomolously good week for that category. Ultimately, all of the counting statistics would be less rewarding to invest in. So why single out turnovers? 
 
 ### 2B. Modeling the problem mathematically
+
+The intuition built in the previous section can be expounded on with mathematical analysis
 
 #### Defining optimal weights 
 
@@ -129,7 +139,7 @@ It is interesting to note that the percentage statistics have outsize importance
 
 One may note that the analysis of the previous section assumed that when a team had a counting statistic advantage, that advantage was uniform across the counting statistics. But what if a team was particularly bad at turnovers- in other words, if their manager had already punted the category? It stands to reason that in that case, turnovers would be less important on the margins than other categories. 
 
-Of course, this argument applies equally well to all categories. Once you have decided to punt a category, that category becomes less important to invest in. And punting a specific category cannot be a universally good idea, because that would defeat the idea of punting in the first place. But perhaps there is an argument that against a field of opponents who are not punting anything, punting turnovers is a uniquely good strategy. 
+Of course, this argument applies equally well to all categories. Once you have decided to punt a category, that category becomes less important to invest in. And punting a specific category cannot be a universally good idea, because that would defeat the idea of punting in the first place. But as argument three proposed, perhaps there is a reason to believe that against a field of opponents who are not punting anything, punting turnovers is a uniquely good strategy. 
 
 There is one potential mechanism for this- punting turnovers improving your performance in the other eight categories more than punting other categories would improve their respective other eights. 
 
@@ -149,9 +159,9 @@ One must note that this is a very heuristic approach, because it does not accoun
 
 Turnovers are high, but not the highest. Punting free throws and threes both appear to be more valuable, at least in isolation.
 
-## 4. One other argument: turnovers are volatile
+## 4. Turnover volatility
 
-One final argument is that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in for head-to-head formats.
+The final argument was that turnovers are hard to predict on a week-to-week basis, and therefore are not worth investing in for head-to-head formats.
 
 It is true that turnovers are relatively volatile from week to week. However, this is not unique; all categories have some level of week to week volatility. Turnovers are not even most volatile category. Steals are, by a wide margin. 
 
