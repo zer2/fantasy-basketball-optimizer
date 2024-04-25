@@ -14,8 +14,7 @@ if 'params' not in st.session_state:
       try:
         st.session_state.params = yaml.safe_load(stream)
       except yaml.YAMLError as exc:
-          print(exc) 
-
+          st.write(exc) 
 
 st.set_page_config(page_title='Fantasy BBall Optimization- Testing Page'
           , page_icon=':basketball:'

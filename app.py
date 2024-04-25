@@ -517,7 +517,8 @@ with info_tab:
                               , on_change = increment_player_stats_version)
 
       player_stats = player_stats.drop(injured_players)
-      info = process_player_data(player_stats
+      info = process_player_data(None
+                              ,player_stats
                               ,conversion_factors
                               ,multipliers
                               ,psi

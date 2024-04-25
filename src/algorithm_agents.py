@@ -20,6 +20,7 @@ class HAgent():
                  , dynamic : bool
                  , scoring_format : str
                  , chi : float
+                 , collect_info : bool = False
                     ):
         """Calculates the rank order based on H-score
 
@@ -45,6 +46,7 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
+        self.collect_info = collect_info
         
         self.cross_player_var = info['Var']
         self.L = info['L']
@@ -58,8 +60,6 @@ class HAgent():
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
-
-            n_opponents = n_drafters - 1
 
             #scale is standard deviation of overall "luck"
             player_stat_luck_overall = np.sqrt(self.chi * self.n_picks * 9)
@@ -837,8 +837,10 @@ class HAgent():
 
         best_player = scores.idxmax()
 
-        self.all_res_list = self.all_res_list + [res_list]
-        self.players = self.players + [best_player]
+        if self.collect_info:
+
+            self.all_res_list = self.all_res_list + [res_list]
+            self.players = self.players + [best_player]
 
         return best_player
 

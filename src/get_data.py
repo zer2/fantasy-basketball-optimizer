@@ -31,7 +31,7 @@ def get_current_season_data(season : int = 2024) -> tuple:
   )
 
                             
-  renamer = st.session_state.params['api-renamer']
+  renamer = st.session_state.params['current-season-api-renamer']
   pgl_df = pgl_df.rename(columns = renamer)
 
   expected_minutes_long_term = process_minutes(pgl_df)
@@ -97,6 +97,9 @@ def get_historical_data():
   #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
   
   full_df = pd.read_csv('./data/stat_df.csv')
+
+  renamer = st.session_state.params['stat-df-renamer']
+  full_df = full_df.rename(columns = renamer)
 
   full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
   

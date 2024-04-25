@@ -16,7 +16,7 @@ volume-statistics:
 other-columns:
   - Position
   - Games Played %
-api-renamer: 
+current-season-api-renamer: 
  PLAYER_NAME : Player
  PTS : Points
  REB : Rebounds
@@ -30,7 +30,35 @@ api-renamer:
  FGA : Field Goal Attempts
  FGM : Field Goals Made
  GAME_DATE : Game Date
-darko-column-renamer:
+historical-renamer: 
+ PLAYER_NAME : Player
+ PTS : Points
+ REB : Rebounds
+ AST : Assists
+ STL: Steals
+ BLK : Blocks
+ FG3M : Threes
+ TO : Turnovers
+ FTA : Free Throw Attempts
+ FTM : Free Throws Made
+ FGA : Field Goal Attempts
+ FGM : Field Goals Made
+ date : Date
+stat-df-renamer:
+ season : Season
+ player : Player
+ pts : Points
+ trb : Rebounds
+ ast : Assists
+ stl : Steals
+ blk : Blocks
+ fg3 : Threes
+ tov : Turnovers
+ ft : Free Throw Attempts
+ fta : Free Throws Made
+ fg : Field Goal Attempts
+ fga : Field Goals Made
+darko-renamer:
  PTS : Points
  REB : Rebounds
  AST : Assists
