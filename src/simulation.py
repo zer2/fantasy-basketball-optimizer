@@ -749,7 +749,7 @@ def run_season(season_df
                 , n_picks
                 , weekly_df
                 , n_seasons
-                , n_primary = 1
+                , n_primary = n_primary
                 , scoring_format = 'Rotisserie')
 
             res_wta =  try_strategy(primary_agent_wta
@@ -760,7 +760,7 @@ def run_season(season_df
                     , n_picks
                     , weekly_df
                     , n_seasons
-                    , n_primary = 1
+                    , n_primary = n_primary
                     , scoring_format = 'Head to Head: Most Categories')
             
             res_dict[matchup] = {'wta' : res_wta
