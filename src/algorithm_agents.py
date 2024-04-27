@@ -5,6 +5,7 @@ import os
 from itertools import combinations
 from src.helper_functions import get_categories
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
+from src.process_player_data import get_category_level_rv
 import streamlit as st 
 
 class HAgent():
@@ -77,6 +78,7 @@ class HAgent():
 
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
+
             v = np.sqrt(mov/(mov + vom))
 
         self.v = np.array(v/v.sum()).reshape(9,1)
@@ -181,7 +183,14 @@ class HAgent():
 
 
             category_value_per_dollar = value_per_dollar / (self.turnover_inverted_v * 9) 
-            replacement_value_by_category = replacement_value / (self.turnover_inverted_v * 9)
+
+            replacement_value_by_category = get_category_level_rv(replacement_value
+                                                                  , pd.Series(self.v.reshape(-1)
+                                                                            , index = st.session_state.params['percentage-statistics'] + \
+                                                                                        st.session_state.params['counting-statistics'])
+                                                    )
+            replacement_value_by_category = np.array(replacement_value_by_category).reshape(9,1)
+
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
@@ -314,20 +323,36 @@ class HAgent():
                                    , diff_vars
                                    , n_values
                                    , category_value_per_dollar
-                                   , replacement_value_by_category):
-        x_diff_array = np.concatenate([diff_means + replacement_value_by_category + category_value_per_dollar * x/10 for x in range(1000)])
+                                   , replacement_value_by_category
+                                   , max_money = 200
+                                   , step_size = 0.1):
+        
+        """Estimates a monetary equivalent of the value of a particular player. Assumes money is spent indiscriminately
+
+        Args:
+            diff_means : 
+            diff_vars: 
+            n_values:
+            category_value_per_dollar:
+            replacement_value_by_category:
+            max_money: maximum amount of money to check 
+            step_size: increment by which to check 
+        Returns:
+            1x9 array, expected difference in scores by category
+        """
+        x_diff_array = np.concatenate([diff_means + replacement_value_by_category + category_value_per_dollar * x * step_size \
+                                       for x in range(int(max_money/step_size))])
 
         cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
 
         score = self.get_objective_and_pdf_weights(
                                 cdf_estimates
                                 , None
-                                , diff_vars
                                 , n_values
                                 , calculate_pdf_weights = False)
         
         money_df = pd.DataFrame({'value' : score}
-                                , index = [x/10 for x in range(1000)])
+                                , index = [x * step_size for x in range(int(max_money/step_size))])
                 
         return money_df
         

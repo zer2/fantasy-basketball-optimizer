@@ -54,10 +54,11 @@ stat-df-renamer:
  blk : Blocks
  fg3 : Threes
  tov : Turnovers
- ft : Free Throw Attempts
- fta : Free Throws Made
- fg : Field Goal Attempts
- fga : Field Goals Made
+ ft : Free Throws Made
+ fta : Free Throw Attempts
+ fg : Field Goals Made
+ fga : Field Goal Attempts
+ pos : Position
 darko-renamer:
  PTS : Points
  REB : Rebounds
@@ -81,10 +82,14 @@ z-score-team-multiplier : 20
 g-score-player-multiplier : 60
 g-score-team-multiplier : 24
 options : 
+ upsilon : 
+  default : 1.0
+  min : 0.0
+  max: 1.0
  psi : 
-  default : 0
-  min : 0
-  max: 1
+  default : 0.8
+  min : 0.0
+  max: 1.0
  nu : 
   default : 0.77
   min : 0
@@ -105,10 +110,6 @@ options :
   default : 0.1
   min : 0.0
   max : 1.0
- upsilon : 
-  default : 0.7
-  min : 0.0
-  max: 2.0
  chi : 
   default : 0.4
   min : 0.0

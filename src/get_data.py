@@ -102,14 +102,17 @@ def get_historical_data():
   full_df = full_df.rename(columns = renamer)
 
   full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
-  
+
+  full_df.loc[:,'Free Throw %'] = full_df.loc[:,'Free Throws Made']/full_df.loc[:,'Free Throw Attempts']
+  full_df.loc[:,'Field Goal %'] = full_df.loc[:,'Field Goals Made']/full_df.loc[:,'Field Goal Attempts']
+
+  full_df['Position'] = full_df['Position'].fillna('NP')
+
   full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
 
   #adjust for the fact that historical data is week-based on game-based
   all_counting_stats = st.session_state.params['counting-statistics'] + st.session_state.params['volume-statistics']
   full_df[all_counting_stats] = full_df[all_counting_stats]/3
-
-  full_df.loc[:,'Games Played %'] = 1
 
   return full_df
 
@@ -170,7 +173,7 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
   all_darko.loc[:,'REB'] = dreb + oreb 
 
-  renamer = st.session_state.params['darko-column-renamer']
+  renamer = st.session_state.params['darko-renamer']
   all_darko = all_darko.rename(columns = renamer)
 
   player_metadata = get_player_metadata()

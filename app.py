@@ -281,13 +281,24 @@ with param_tab:
     with player_param_column:
       st.header('Player Statistics')
 
+      upsilon = st.number_input(r'Select a $\upsilon$ value'
+                        , key = 'upsilon'
+                        , min_value = float(st.session_state.params['options']['upsilon']['min'])
+                        , value = float(st.session_state.params['options']['upsilon']['default'])
+                      , max_value = float(st.session_state.params['options']['upsilon']['max']))
+      upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
+                    miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
+                    $15\%$ of games instead'''
+      st.caption(upsilon_str)
+
+
       psi = st.number_input(r'Select a $\psi$ value'
                         , key = 'psi'
                         , min_value = float(st.session_state.params['options']['psi']['min'])
                         , value = float(st.session_state.params['options']['psi']['default'])
                       , max_value = float(st.session_state.params['options']['psi']['max']))
-      psi_str = r'''$\psi$ controls how injury rates are dealt with. For example is if $\psi$ is $50\%$ and a 
-                    player is expected to miss $20\%$ of games, their counting statistics will be multiplied by $(1-0.5*0.2) =  90\%$'''
+      psi_str = r'''It it assumed that of the games a player will miss, 
+                    they are replaced by a replacement-level player for $\psi \%$ of them'''
     
       st.caption(psi_str)
 
@@ -501,9 +512,11 @@ with info_tab:
     player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
     player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
 
-    effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
+    #make the upsilon adjustment
+    player_stats['Games Played %'] = 100 - ( 100 - player_stats['Games Played %']) * upsilon 
+
     for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col] * effective_games_played_percent * 3
+      player_stats[col] = player_stats_editable[col] * player_stats['Games Played %']/100 * 3
 
   with injury_tab:
       st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
@@ -521,6 +534,7 @@ with info_tab:
                               ,player_stats
                               ,conversion_factors
                               ,multipliers
+                              ,upsilon
                               ,psi
                               ,nu
                               ,n_drafters
@@ -609,6 +623,8 @@ with rank_tab:
                     ,n_iterations
                     ,scoring_format
                     ,st.session_state['mode']
+                    ,psi
+                    ,upsilon
                     ,chi
                     ,st.session_state.info_key)
 
@@ -1239,6 +1255,7 @@ with about_tab:
                   ,'H-scoring'
                   ,'Rotisserie'
                   ,'Turnovers'
+                  ,'Injuries'
                   ,'Auctions'
                   ,'Waivers & Trading'
                   ,'Data Sources'])
@@ -1248,6 +1265,7 @@ with about_tab:
                 ,'dynamic_explanation.md'
                 ,'rotisserie.md'
                 ,'turnovers.md'
+                ,'injury.md'
                 ,'auctions.md'
                 ,'trading.md'
                 ,'data_sources.md']

@@ -1114,7 +1114,7 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def make_h_rank_tab(_info : dict
                   , omega : float
                   , gamma : float
@@ -1125,6 +1125,8 @@ def make_h_rank_tab(_info : dict
                   , n_iterations : int
                   , scoring_format : str
                   , mode : str
+                  , psi : float
+                  , upsilon : float
                   , chi : float
                   , info_key : int):
   """Make ranks by H-score
@@ -1156,7 +1158,7 @@ def make_h_rank_tab(_info : dict
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
     , chi = chi)
-
+  
   if st.session_state['mode'] == 'Auction Mode':
     cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
   else:

@@ -163,11 +163,51 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     res.columns = get_categories()
     return res.fillna(0)
 
+def games_played_adjustment(scores : pd.DataFrame
+                      , replacement_games_rate : pd.Series
+                      , n_players : int
+                      , v : pd.Series = None) -> pd.DataFrame :
+    """Adjust scores based on effective games played. Requires scores to be in same order as replacement_player_value
+
+    Args:
+        scores: Dataframe of category-level scores. One row per player, one column per statistic 
+        replacement_player_value: Series of rates between 0 and 1. That rate of games are assumed to be filled in by a replacement-level player
+        n_players: Number of players that will be relevant to fantasy
+        v: series of weights per category. Only applicable if scores don't translate precisely to overall value 
+
+    Returns:
+        Dataframe with same dimensions as scores 
+    """
+
+    all_stats = st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+    if v is None:
+       v = pd.Series({stat : 1/9 for stat in all_stats})
+
+    totals = scores.dot(v)
+
+    rv = totals.sort_values(ascending = False).iloc[n_players]
+    category_level_rv = get_category_level_rv(rv, v)
+
+    replacement_player_value = np.array(category_level_rv.T).reshape(1,-1) * \
+                                np.array(replacement_games_rate).reshape(-1,1)
+    adjusted_scores =  scores + replacement_player_value
+
+    return adjusted_scores 
+
+def get_category_level_rv(rv : float, v : pd.Series):
+   all_stats = st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+   rv_multiple = rv/(len(all_stats) -2) if  'Turnovers' in all_stats else rv/len(all_stats)
+   value_by_category = pd.Series({stat : - rv_multiple/v[stat] if stat == 'Turnovers' 
+                                  else rv_multiple/v[stat] for stat in all_stats})
+   
+   return value_by_category
+
 @st.cache_data(show_spinner = False)
 def process_player_data(  _weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series
+                        , upsilon : float
                         , psi : float
                         , nu : float
                         , n_drafters : int
@@ -218,10 +258,21 @@ def process_player_data(  _weekly_df : pd.DataFrame
     coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
-                         
+    
+
+  mov = coefficients.loc[get_categories() , 'Mean of Variances']
+  vom = coefficients.loc[get_categories() , 'Variance of Means']
+  v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
+  v = v/v.sum()
+
   g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,1)
   z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
+
+  replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
+  g_scores = games_played_adjustment(g_scores, replacement_games_rate,n_players)
+  z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players)
+  x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, v = v)
 
   g_scores = g_scores * multipliers.T.values[0]
   z_scores = z_scores * multipliers.T.values[0]
@@ -255,8 +306,7 @@ def process_player_data(  _weekly_df : pd.DataFrame
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   
-  mov = coefficients.loc[get_categories() , 'Mean of Variances']
-  vom = coefficients.loc[get_categories() , 'Variance of Means']
+
 
   L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
 

@@ -131,6 +131,7 @@ def run_multiple_seasons(teams : dict[list]
         Series of winning percentages with the structure
          team_number : winning_fraction  
     """
+
     #reverse the mapping
     t = pd.Series(teams).explode()
     team_dict = dict(zip(t,t.index))
@@ -634,6 +635,9 @@ def run_season(season_df
             
             player_averages['Position'] = player_averages['Position'].fillna('NP')
 
+            #we're not accounting for injury rate here
+            player_averages.loc[:,'Games Played %'] = 1
+
             st.markdown('Weekly player averages ')
             st.dataframe(player_averages)
 
@@ -646,6 +650,7 @@ def run_season(season_df
                         , None
                         , multipliers 
                         , 0
+                        , 0 
                         , 0 
                         , n_drafters
                         , n_picks
@@ -837,7 +842,7 @@ def validate():
 
     tabs = st.tabs(season_names + ['Overall'])
 
-    matchups = [('G','Z'),('Z','G'),('H','G')]
+    matchups = [('G','Z')]
 
     for season_name, season_df, tab in zip(season_names, season_dfs, tabs):
 
@@ -876,11 +881,14 @@ def validate():
                 
                 with summary_tab:
                     win_rate_df = pd.DataFrame({
-                            'Head to Head: Most Categories' : pd.concat(res_wta['Victory rates'] for res_wta in all_res_wta).mean(axis = 1)
-                            ,'Head to Head: Each Category' : pd.concat(res_ec['Victory rates'] for res_ec in all_res_ec).mean(axis = 1)
-                            ,'Rotisserie' : pd.concat(res_roto['Victory rates'] for res_roto in all_res_roto).mean(axis = 1)}
+                            'Head to Head: Most Categories' : pd.concat([pd.Series(res_wta['Victory rates']) for res_wta in all_res_wta]
+                                                                        , axis =1).mean(axis = 1).values
+                            ,'Head to Head: Each Category' : pd.concat([pd.Series(res_ec['Victory rates']) for res_ec in all_res_ec]
+                                                                       ,axis = 1).mean(axis = 1).values
+                            ,'Rotisserie' : pd.concat([pd.Series(res_roto['Victory rates']) for res_roto in all_res_roto]
+                                                                        ,axis = 1).mean(axis = 1).values}
                             , index = ['Seat ' + str(x) for x in range(n_drafters)])
-
+                    
                     averages_df = pd.DataFrame({'Head to Head: Most Categories' : \
                                                             [win_rate_df['Head to Head: Most Categories'].mean()]
                                                         ,'Head to Head: Each Category' : \
