@@ -237,6 +237,7 @@ def run_multiple_seasons(teams : dict[list]
 
         return wins_by_teams, results_agg
 
+@st.cache_resource()
 def try_strategy(_primary_agent
                  , _default_agent
                  , primary_agent_type
@@ -822,7 +823,7 @@ def run_season(season_df
 
 def validate():
 
-    file_list = os.listdir('../data_for_testing/')[0:2]
+    file_list = os.listdir('../data_for_testing/')
 
     season_names = [file[0:7] for file in file_list]
 
@@ -842,7 +843,7 @@ def validate():
 
     tabs = st.tabs(season_names + ['Overall'])
 
-    matchups = [('G','Z')]
+    matchups = [('G','Z'),('H','G')]
 
     for season_name, season_df, tab in zip(season_names, season_dfs, tabs):
 
