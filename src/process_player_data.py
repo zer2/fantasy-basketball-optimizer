@@ -306,8 +306,6 @@ def process_player_data(  _weekly_df : pd.DataFrame
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   
-
-
   L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
 
   info = {'G-scores' : g_scores

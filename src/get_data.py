@@ -75,21 +75,26 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
       Dataframe of player-level statistics needed for fantasy
   """
   #convert a game level dataframe to a week-level dataframe
+
+  try: 
            
-  agg_df = df.groupby('Player').mean().astype(float)
-  agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
-                                          , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
-                                          ,0)
-  agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
-                                          , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
-                                          ,0) 
+    agg_df = df.groupby('Player').mean().astype(float)
+    agg_df.loc[:,'Free Throw %'] = np.where(agg_df['Free Throw Attempts'] > 0
+                                            , agg_df['Free Throws Made']/agg_df['Free Throw Attempts']
+                                            ,0)
+    agg_df.loc[:,'Field Goal %'] = np.where(agg_df['Field Goal Attempts'] > 0
+                                            , agg_df['Field Goals Made']/agg_df['Field Goal Attempts']
+                                            ,0) 
 
-  agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
+    agg_df = agg_df.fillna(0).merge(metadata, left_index = True, right_index = True)
 
-  game_counts = df.groupby('Player').count()
-  agg_df.loc[:,'Games Played %'] = 1
+    game_counts = df.groupby('Player').count()
+    agg_df.loc[:,'Games Played %'] = 1
+    
+    return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
   
-  return agg_df.drop(columns = ['Free Throws Made','Field Goals Made'])
+  except:
+     return pd.DataFrame()
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource

@@ -10,9 +10,11 @@ import copy
 import datetime
 import streamlit as st
 import os
+pd.options.mode.chained_assignment = None
 
 import statsmodels.api as sm
 import plotly.express as px
+import pickle
 
 #ZR: this can be cleaned up probably
 cols = ['Free Throws Made','Free Throw Attempts','Field Goals Made','Field Goal Attempts'
@@ -237,7 +239,6 @@ def run_multiple_seasons(teams : dict[list]
 
         return wins_by_teams, results_agg
 
-@st.cache_resource()
 def try_strategy(_primary_agent
                  , _default_agent
                  , primary_agent_type
@@ -281,6 +282,8 @@ def try_strategy(_primary_agent
      
     for i in range(n_drafters): 
 
+        print('Working on seat' + str(i))
+
         #we need to deepcopy the agents so that they don't share references with each other
         agents =  [copy.deepcopy(_primary_agent) for x in range(n_primary)] + \
                     [copy.deepcopy(_default_agent) for x in range(n_drafters-n_primary)]
@@ -301,7 +304,15 @@ def try_strategy(_primary_agent
         victory_res[i] = np.mean([(res.get(n)) if (res.get(n)) is not None else 0 for n in range(n_drafters) if primary[n]])
 
         team_dict[i] = teams[i]
-        agents_dict[i] = agents_post[i]
+
+        #this is all we need from agents, and it allows us to pickle them 
+        if primary_agent_type == 'H':
+            agents_dict[i] = {'all_res_list' : agents_post[i].all_res_list
+                            ,'players' : agents_post[i].players
+                            ,'v' : agents_post[i].v}
+        else:
+            agents_dict[i] = None
+
         all_times[i] = times[i]
 
     
@@ -318,8 +329,9 @@ def make_detailed_results_tab(res
                               , n_drafters
                               , n_picks
                               , is_h_agent = False
-                              , roto = False
-                              , extra_tabs = False):
+                              , scoring_format = 'Rotisserie'):
+
+    roto = scoring_format == 'Rotisserie'
 
     win_rates_tab, histogram_tab, weight_tab, progression_tab, timing_tab = st.tabs(['Win Rates'
                                                                          ,'Category Win Rates'
@@ -386,22 +398,22 @@ def make_detailed_results_tab(res
     with histogram_tab:
         make_histogram([res], roto)
 
-    if extra_tabs:
-
-        with weight_tab:
-            if is_h_agent:
-                make_weight_chart([res], n_picks)
-            else:
-                st.markdown('No weights')
-        with progression_tab:
-            if is_h_agent:
-                tabs = st.tabs(['Seat ' + str(team_num) for team_num in range(n_drafters)])
-                for tab, team_num in zip(tabs,range(n_drafters)):
-                    with tab:
-                        for pick_num in range(n_picks):
-                            see_progression(res, team_num, pick_num)
-            else:
-                st.markdown('No progressions')
+    with weight_tab:
+        if is_h_agent:
+            make_weight_chart([res], n_picks)
+        else:
+            st.markdown('No weights')
+    with progression_tab:
+        if is_h_agent:
+            progression_team_num = st.selectbox('Which team do you want to see progressions for?'
+                                ,list(range(n_drafters))
+                                ,key = 'progression ' + scoring_format
+                                , format_func = lambda x: "Seat " + str(x))
+            
+            for pick_num in range(n_picks):
+                see_progression(res, progression_team_num, pick_num)
+        else:
+            st.markdown('No progressions')
 
     with timing_tab:
         time_df = pd.DataFrame(res['Times'])
@@ -440,16 +452,18 @@ def make_histogram(res_list, roto):
     st.plotly_chart(fig)
     
 def see_progression(res, team_num, pick_num):
-    model = res['Agents'][team_num]
-    scores = [x['Scores'] for x in model.all_res_list[pick_num]]
+    agent = res['Agents'][team_num]
+    scores = [x['Scores'] for x in agent['all_res_list'][pick_num]]
+
+    top_players = scores[-1].sort_values(ascending = False).index[0:15]
     
     data = pd.concat([pd.DataFrame({'Imputed win percent' : [s.loc[player]* 100 for s in scores]
                                     , 'Player' : player
                                    , 'Iteration' : list(range(len(scores)))})
-            for player in scores[-1].sort_values(ascending = False).index[0:15]])
+            for player in top_players])
     
     title_str = \
-        'Pick ' + str(pick_num + 1) + ': ' + model.players[pick_num]
+        'Pick ' + str(pick_num + 1) + ': ' + agent['players'][pick_num]
     
     fig = px.line(data
                   , x = "Iteration"
@@ -465,16 +479,24 @@ def see_progression(res, team_num, pick_num):
         ,width = 1000)
     st.plotly_chart(fig)
 
+    expected_win_rates = pd.DataFrame(agent['all_res_list'][pick_num][-1]['Rates'].loc[top_players])
+    expected_win_rates_styled = expected_win_rates.style.format("{:.1%}") \
+                                                .map(stat_styler
+                                                ,middle = 0.5, multiplier = 150)
+    
+    st.caption('Expected category win rates, by the end of H-score processing')
+    st.dataframe(expected_win_rates_styled)
+
 
 def get_pick_weights(res, pick_num, team_num):
 
-    info = res['Agents'][team_num].all_res_list[pick_num][-1]
+    info = res['Agents'][team_num]['all_res_list'][pick_num][-1]
     weights = info['Weights']
 
-    player_chosen = res['Agents'][team_num].players[pick_num]
+    player_chosen = res['Agents'][team_num]['players'][pick_num]
     weights = weights.loc[player_chosen]
     
-    v = res['Agents'][team_num].v.T
+    v = res['Agents'][team_num]['v'].T
 
     weights = weights/v.reshape(9,)
     
@@ -609,9 +631,23 @@ def run_season(season_df
                         ,alpha : float
                         ,beta : float
                         ,chi : float
+                        ,season_name : str 
                         ,n_seasons : int = 1000
-                        ,detail : bool = False
                         ) -> dict:
+    
+    print('Working on season ' + season_name)
+    #this is manual caching
+    pickle_file_location = '../results/' + season_name + '.pickle'
+
+    if os.path.isfile(pickle_file_location):
+        file = open(pickle_file_location,'rb')
+        res_dict = pickle.load(file)
+        use_stored_res = True
+    else: 
+        res_dict = {}
+        use_stored_res = False
+
+    res_dict_limited = {}
 
     weekly_df = make_weekly_df(season_df)
 
@@ -677,7 +713,7 @@ def run_season(season_df
             , scoring_format = 'Rotisserie'
             , dynamic = True
             , chi = chi
-            , collect_info = detail
+            , collect_info = True
             )
                     
 
@@ -692,7 +728,7 @@ def run_season(season_df
                 , scoring_format = 'Head to Head: Each Category'
                 , dynamic = True
                 , chi = None
-                , collect_info = detail
+                , collect_info = True
                 )
 
     h_agent_wta = HAgent(
@@ -706,12 +742,13 @@ def run_season(season_df
                 , scoring_format = 'Head to Head: Most Categories'
                 , dynamic = True
                 , chi = None
+                , collect_info = True 
                 )
     
-    res_dict = {}
-
     for matchup, matchup_tab in zip(matchups, matchup_tabs[1:]):
         with matchup_tab:
+
+            print('Matchup: ' + str(matchup))
             if matchup[0] == 'H':
                 primary_agent_ec = h_agent_ec
                 primary_agent_wta = h_agent_wta
@@ -735,30 +772,14 @@ def run_season(season_df
             elif matchup[1] == 'G':
                 default_agent = g_score_agent
 
-            res_ec =  try_strategy(primary_agent_ec
-                , default_agent
-                , matchup[0]
-                , matchup[1]
-                , n_drafters
-                , n_picks
-                , weekly_df
-                , n_seasons
-                , n_primary = n_primary
-                , scoring_format = 'Head to Head: Each Category')
-            
+            if use_stored_res: 
+                res_ec = res_dict[matchup]['ec']
+                res_roto = res_dict[matchup]['roto']
+                res_wta = res_dict[matchup]['wta']
 
-            res_roto =  try_strategy(primary_agent_roto
-                , default_agent
-                , matchup[0]
-                , matchup[1]
-                , n_drafters
-                , n_picks
-                , weekly_df
-                , n_seasons
-                , n_primary = n_primary
-                , scoring_format = 'Rotisserie')
-
-            res_wta =  try_strategy(primary_agent_wta
+            else:
+                print('Format: EC')
+                res_ec =  try_strategy(primary_agent_ec
                     , default_agent
                     , matchup[0]
                     , matchup[1]
@@ -767,12 +788,43 @@ def run_season(season_df
                     , weekly_df
                     , n_seasons
                     , n_primary = n_primary
-                    , scoring_format = 'Head to Head: Most Categories')
+                    , scoring_format = 'Head to Head: Each Category')
+                
+                print('Format: roto')
+
+                res_roto =  try_strategy(primary_agent_roto
+                    , default_agent
+                    , matchup[0]
+                    , matchup[1]
+                    , n_drafters
+                    , n_picks
+                    , weekly_df
+                    , n_seasons
+                    , n_primary = n_primary
+                    , scoring_format = 'Rotisserie')
+
+                print('Format: wta')
+
+                res_wta =  try_strategy(primary_agent_wta
+                        , default_agent
+                        , matchup[0]
+                        , matchup[1]
+                        , n_drafters
+                        , n_picks
+                        , weekly_df
+                        , n_seasons
+                        , n_primary = n_primary
+                        , scoring_format = 'Head to Head: Most Categories')
+                
+            #get rid of the most memory-intensive part of the results: we don't need them
+            res_ec_limited = res_ec.copy()
+            res_ec_limited['Agents'] = None
             
-            res_dict[matchup] = {'wta' : res_wta
-                                        ,'ec' : res_ec
-                                        ,'roto' : res_roto
-                                }
+            res_wta_limited = res_wta.copy()
+            res_wta_limited['Agents'] = None
+
+            res_roto_limited = res_roto.copy()
+            res_roto_limited['Agents'] = None
             
             t1, t2, t3, t4 = st.tabs(['Summary'
                                 ,'Head to Head: Most Categories Details'
@@ -808,30 +860,49 @@ def run_season(season_df
             with t2: 
                 overall_win_rate = win_rate_df[['Head to Head: Most Categories']]
 
-                make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks,is_h_agent, False, detail)
+                make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks,is_h_agent, 'MC')
                 
             with t3: 
                 overall_win_rate = win_rate_df[['Head to Head: Each Category']]
 
-                make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks,is_h_agent, False, detail)
+                make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks,is_h_agent, 'EC')
 
             with t4:
                 overall_win_rate = win_rate_df[['Rotisserie']]
-                make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks, is_h_agent,True, detail)
+                make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks, is_h_agent,'Rotisserie')
 
-    return res_dict
+            #we don't need the agents to persist across seasons, so we can get rid of them to save memory 
+            #res_wta['Agents'] =  None
+            #res_ec['Agents'] = None
+            #res_roto['Agents'] = None
+
+            res_dict[matchup] = {'wta' : res_wta
+                            ,'ec' : res_ec
+                            ,'roto' : res_roto
+                    }
+            
+            res_dict_limited[matchup] = {'wta' : res_wta_limited
+                            ,'ec' : res_ec_limited
+                            ,'roto' : res_roto_limited
+                    }
+            
+            
+    if not use_stored_res:
+        with open(pickle_file_location, 'wb') as handle:
+            pickle.dump(res_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return res_dict_limited
 
 def validate():
 
-    file_list = os.listdir('../data_for_testing/')
+    file_list = os.listdir('../data_for_testing/')[0:6]
 
-    season_names = [file[0:7] for file in file_list]
 
     all_res = []
 
     n_drafters = 12
     n_picks = 13
-    omega = st.session_state.params['options']['omega']['default']
+    omega = 0.5 #st.session_state.params['options']['omega']['default']
     gamma = st.session_state.params['options']['gamma']['default']
     alpha = st.session_state.params['options']['alpha']['default']
     beta = st.session_state.params['options']['beta']['default']
@@ -839,29 +910,32 @@ def validate():
     n_seasons = 1000
 
     renamer = st.session_state.params['historical-renamer']
-    season_dfs = [pd.read_csv('../data_for_testing/' + file).rename(columns = renamer) for file in file_list]
 
-    tabs = st.tabs(season_names + ['Overall'])
+    season_dfs = {file[0:7] : pd.read_csv('../data_for_testing/' + file).rename(columns = renamer) for file in file_list}
 
-    matchups = [('G','Z'),('H','G')]
+    matchups = [('H','G'), ('G','Z')]
 
-    for season_name, season_df, tab in zip(season_names, season_dfs, tabs):
+    season_name = st.selectbox('What season do you want to view results for?'
+                                 ,[None] + list(season_dfs.keys()))
 
-        detail = season_name == '2023-24'
+    if season_name:
 
-        with tab: 
-            all_res = all_res + [run_season(season_df
-                                                 ,matchups
-                                                 ,n_drafters
-                                                 ,n_picks
-                                                 ,omega
-                                                 ,gamma
-                                                 ,alpha
-                                                 ,beta
-                                                 ,chi
-                                                 ,n_seasons
-                                                 ,detail)]
-            
+        print('Working on ' + season_name)
+
+        all_res = all_res + [run_season(season_dfs[season_name]
+                                                ,matchups
+                                                ,n_drafters
+                                                ,n_picks
+                                                ,omega
+                                                ,gamma
+                                                ,alpha
+                                                ,beta
+                                                ,chi
+                                                ,season_name
+                                                ,n_seasons
+                                                )]
+
+    """    
     with tabs[-1]:
 
         matchup_tabs = st.tabs([x[0] + ' vs ' + x[1] for x in matchups])
@@ -933,3 +1007,4 @@ def validate():
                     if is_h_agent:
                         with weight_tab:
                             make_weight_chart(all_res_roto, n_picks)
+    """

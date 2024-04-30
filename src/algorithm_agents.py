@@ -204,7 +204,7 @@ class HAgent():
 
         else: 
 
-            extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
+            extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) 
             mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
 
             other_team_sums = np.vstack(
@@ -537,7 +537,7 @@ class HAgent():
                         , n_values
                         , calculate_pdf_weights) 
 
-        else:
+        elif self.scoring_format == 'Head to Head: Each Category':
             return self.get_objective_and_pdf_weights_ec(
                         cdf_estimates
                         , pdf_estimates

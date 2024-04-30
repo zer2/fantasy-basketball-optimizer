@@ -1,10 +1,7 @@
 from src.simulation import *
-#from streamlit_profiler import Profiler
 
 import yaml
 import streamlit as st
-
-#with Profiler():
 
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
