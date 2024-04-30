@@ -5,6 +5,7 @@ import os
 from itertools import combinations
 from src.helper_functions import get_categories
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
+from src.process_player_data import get_category_level_rv
 import streamlit as st 
 
 class HAgent():
@@ -20,6 +21,7 @@ class HAgent():
                  , dynamic : bool
                  , scoring_format : str
                  , chi : float
+                 , collect_info : bool = False
                     ):
         """Calculates the rank order based on H-score
 
@@ -45,6 +47,7 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
+        self.collect_info = collect_info
         
         self.cross_player_var = info['Var']
         self.L = info['L']
@@ -58,8 +61,6 @@ class HAgent():
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
-
-            n_opponents = n_drafters - 1
 
             #scale is standard deviation of overall "luck"
             player_stat_luck_overall = np.sqrt(self.chi * self.n_picks * 9)
@@ -77,6 +78,7 @@ class HAgent():
 
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
+
             v = np.sqrt(mov/(mov + vom))
 
         self.v = np.array(v/v.sum()).reshape(9,1)
@@ -85,6 +87,8 @@ class HAgent():
         turnover_inverted_v[-1] = -turnover_inverted_v[-1]
         self.turnover_inverted_v = turnover_inverted_v/turnover_inverted_v.sum()
 
+        self.all_res_list = [] #for tracking decisions made during testing
+        self.players = []
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -179,7 +183,14 @@ class HAgent():
 
 
             category_value_per_dollar = value_per_dollar / (self.turnover_inverted_v * 9) 
-            replacement_value_by_category = replacement_value / (self.turnover_inverted_v * 9)
+
+            replacement_value_by_category = get_category_level_rv(replacement_value
+                                                                  , pd.Series(self.v.reshape(-1)
+                                                                            , index = st.session_state.params['percentage-statistics'] + \
+                                                                                        st.session_state.params['counting-statistics'])
+                                                    )
+            replacement_value_by_category = np.array(replacement_value_by_category).reshape(9,1)
+
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
@@ -193,7 +204,7 @@ class HAgent():
 
         else: 
 
-            extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) - 1
+            extra_players_needed = (len(my_players)+1) * self.n_drafters - len(players_chosen) 
             mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
 
             other_team_sums = np.vstack(
@@ -312,20 +323,36 @@ class HAgent():
                                    , diff_vars
                                    , n_values
                                    , category_value_per_dollar
-                                   , replacement_value_by_category):
-        x_diff_array = np.concatenate([diff_means + replacement_value_by_category + category_value_per_dollar * x/10 for x in range(1000)])
+                                   , replacement_value_by_category
+                                   , max_money = 200
+                                   , step_size = 0.1):
+        
+        """Estimates a monetary equivalent of the value of a particular player. Assumes money is spent indiscriminately
+
+        Args:
+            diff_means : 
+            diff_vars: 
+            n_values:
+            category_value_per_dollar:
+            replacement_value_by_category:
+            max_money: maximum amount of money to check 
+            step_size: increment by which to check 
+        Returns:
+            1x9 array, expected difference in scores by category
+        """
+        x_diff_array = np.concatenate([diff_means + replacement_value_by_category + category_value_per_dollar * x * step_size \
+                                       for x in range(int(max_money/step_size))])
 
         cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
 
         score = self.get_objective_and_pdf_weights(
                                 cdf_estimates
                                 , None
-                                , diff_vars
                                 , n_values
                                 , calculate_pdf_weights = False)
         
         money_df = pd.DataFrame({'value' : score}
-                                , index = [x/10 for x in range(1000)])
+                                , index = [x * step_size for x in range(int(max_money/step_size))])
                 
         return money_df
         
@@ -371,7 +398,7 @@ class HAgent():
                 del_full = self.get_del_full(weights)
         
                 expected_future_diff_single = self.get_x_mu_simplified_form(weights)
-                expected_future_diff = ((12-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
+                expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
@@ -381,7 +408,6 @@ class HAgent():
                 score, pdf_weights = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = True)
 
@@ -411,7 +437,6 @@ class HAgent():
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = False)
 
@@ -427,7 +452,6 @@ class HAgent():
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = False)
                 
@@ -453,7 +477,6 @@ class HAgent():
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
-                                        , diff_vars
                                         , n_values
                                         , calculate_pdf_weights = False)
 
@@ -484,7 +507,6 @@ class HAgent():
     def get_objective_and_pdf_weights(self
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
-                                        , diff_vars : np.array
                                         , n_values : np.array = None
                                         , calculate_pdf_weights : bool = False):
         """
@@ -493,7 +515,6 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            diff_vars: variance of differentials against opponents
             n_values: order of matchup means. Useful for Toro
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
@@ -506,7 +527,6 @@ class HAgent():
             return self.get_objective_and_pdf_weights_mc(
                         cdf_estimates
                         , pdf_estimates
-                        , diff_vars
                         , calculate_pdf_weights) 
 
         elif self.scoring_format == 'Rotisserie':
@@ -514,21 +534,18 @@ class HAgent():
             return self.get_objective_and_pdf_weights_rotisserie(
                         cdf_estimates
                         , pdf_estimates
-                        , diff_vars
                         , n_values
                         , calculate_pdf_weights) 
 
-        else:
+        elif self.scoring_format == 'Head to Head: Each Category':
             return self.get_objective_and_pdf_weights_ec(
                         cdf_estimates
                         , pdf_estimates
-                        , diff_vars
                         , calculate_pdf_weights) 
 
     def get_objective_and_pdf_weights_mc(self
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
-                                , diff_vars : np.array
                                 , calculate_pdf_weights : bool = False):
         """
         Calculate the objective function and optionally pdf weights for the gradient, for Most Categories
@@ -536,7 +553,6 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            diff_vars: variance of differentials against opponents
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
@@ -551,7 +567,7 @@ class HAgent():
 
             tipping_points = calculate_tipping_points(np.array(cdf_estimates))   
 
-            pdf_weights = (tipping_points*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+            pdf_weights = (tipping_points*pdf_estimates).mean(axis = 2)
 
             return objective, pdf_weights
 
@@ -563,7 +579,6 @@ class HAgent():
     def get_objective_and_pdf_weights_ec(self
                             , cdf_estimates : np.array
                             , pdf_estimates : np.array
-                            , diff_vars : np.array
                             , calculate_pdf_weights : bool = False):
 
         """
@@ -572,7 +587,6 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            diff_vars: variance of differentials against opponents
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
@@ -582,7 +596,7 @@ class HAgent():
 
         if calculate_pdf_weights:
 
-            pdf_weights = (pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+            pdf_weights = (pdf_estimates).mean(axis = 2)
 
             return objective, pdf_weights
 
@@ -593,7 +607,6 @@ class HAgent():
     def get_objective_and_pdf_weights_rotisserie(self
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
-                                , diff_vars : np.array
                                 , n_values : np.array = None
                                 , calculate_pdf_weights : bool = False
                                 , test_mode : bool = False):
@@ -650,7 +663,7 @@ class HAgent():
             if test_mode:
                 return gradient
             else:
-                pdf_weights = (gradient*pdf_estimates/np.sqrt(diff_vars)).mean(axis = 2)
+                pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
 
                 return objective, pdf_weights
 
@@ -839,12 +852,20 @@ class HAgent():
                   ): 
 
         generator = self.get_h_scores(player_assignments, j)
+
+        res_list = []
         for i in range(30):
-            res  = next(generator)
+            res = next(generator)
+            res_list = res_list + [res] 
 
         scores = res['Scores']
 
         best_player = scores.idxmax()
+
+        if self.collect_info:
+
+            self.all_res_list = self.all_res_list + [res_list]
+            self.players = self.players + [best_player]
 
         return best_player
 

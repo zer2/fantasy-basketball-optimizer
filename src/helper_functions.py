@@ -29,7 +29,7 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   """
 
   agg_columns = [col for col in ['$ Value','Total'] if col in df.columns]
-  index_columns = ['Player'] if 'Player' in df.columns else []
+  index_columns = [col for col in ['Rank','Player'] if col in df.columns]
 
   df = df[index_columns + agg_columns + get_categories()]
 

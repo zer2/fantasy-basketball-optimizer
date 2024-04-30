@@ -16,7 +16,7 @@ volume-statistics:
 other-columns:
   - Position
   - Games Played %
-api-renamer: 
+current-season-api-renamer: 
  PLAYER_NAME : Player
  PTS : Points
  REB : Rebounds
@@ -30,7 +30,36 @@ api-renamer:
  FGA : Field Goal Attempts
  FGM : Field Goals Made
  GAME_DATE : Game Date
-darko-column-renamer:
+historical-renamer: 
+ PLAYER_NAME : Player
+ PTS : Points
+ REB : Rebounds
+ AST : Assists
+ STL: Steals
+ BLK : Blocks
+ FG3M : Threes
+ TO : Turnovers
+ FTA : Free Throw Attempts
+ FTM : Free Throws Made
+ FGA : Field Goal Attempts
+ FGM : Field Goals Made
+ date : Date
+stat-df-renamer:
+ season : Season
+ player : Player
+ pts : Points
+ trb : Rebounds
+ ast : Assists
+ stl : Steals
+ blk : Blocks
+ fg3 : Threes
+ tov : Turnovers
+ ft : Free Throws Made
+ fta : Free Throw Attempts
+ fg : Field Goals Made
+ fga : Field Goal Attempts
+ pos : Position
+darko-renamer:
  PTS : Points
  REB : Rebounds
  AST : Assists
@@ -53,10 +82,14 @@ z-score-team-multiplier : 20
 g-score-player-multiplier : 60
 g-score-team-multiplier : 24
 options : 
+ upsilon : 
+  default : 1.0
+  min : 0.0
+  max: 1.0
  psi : 
-  default : 0
-  min : 0
-  max: 1
+  default : 0.8
+  min : 0.0
+  max: 1.0
  nu : 
   default : 0.77
   min : 0
@@ -74,13 +107,9 @@ options :
   min : 0.0
   max: 2.0
  gamma :
-  default : 0.05
+  default : 0.1
   min : 0.0
   max : 1.0
- upsilon : 
-  default : 0.7
-  min : 0.0
-  max: 2.0
  chi : 
   default : 0.4
   min : 0.0
@@ -97,17 +126,13 @@ options :
   default : 30
   min : 10
   max: 10000
- punt_limiter:
-  default : 0.0
-  min : 0.0
-  max : 1.0
 punting_defaults :
   No dynamic optimization :
     omega : 0.0 
     gamma : 0.0
   Moderate punting : 
     omega : 0.8
-    gamma : 0.05
+    gamma : 0.1
   Aggressive punting : 
     omega : 1.0
     gamma : 0.1
