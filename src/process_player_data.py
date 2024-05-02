@@ -258,7 +258,6 @@ def process_player_data(  _weekly_df : pd.DataFrame
     coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
-    
 
   mov = coefficients.loc[get_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_categories() , 'Variance of Means']

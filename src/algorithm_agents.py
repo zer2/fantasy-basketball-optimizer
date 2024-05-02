@@ -248,6 +248,7 @@ class HAgent():
         else:
             self.value_of_money = None
 
+
         return diff_means, diff_vars, n_values
 
     def get_opposing_team_means(self

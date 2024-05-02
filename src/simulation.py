@@ -33,6 +33,9 @@ def make_weekly_df(season_df : pd.DataFrame):
                                                  ,names = ['Player','Week'])
     weekly_df = season_df.groupby(['Player','Week'])[cols].sum()
     season_df = pd.DataFrame(weekly_df, index = weekly_df_index ).fillna(0)
+
+    #experimental!!!
+    season_df = season_df[season_df.sum(axis = 1) > 0]
     
     return season_df
 
@@ -180,7 +183,7 @@ def run_multiple_seasons(teams : dict[list]
             team_performances.loc[:,'Tie'] = tot_cat_ties
             team_performances.loc[:,'Win'] = tot_cat_wins
             
-        team_results = team_performances.groupby(['Team','Season']).agg({'Win' : sum, 'Tie' : sum})
+        team_results = team_performances.groupby(['Team','Season']).agg({'Win' : 'sum', 'Tie' : 'sum'})
 
         #a team cannot win the season if it has fewer wins than any other team 
         most_wins = team_results.groupby('Season')['Win'].transform('max')
@@ -447,7 +450,8 @@ def make_histogram(res_list, roto):
     df.columns = ['cat',x_name]
 
     fig = px.histogram(df, x = x_name
-                 , histnorm='probability density')
+                 , histnorm='probability density'
+                 ,nbins = 20)
     
     st.plotly_chart(fig)
     
@@ -759,13 +763,13 @@ def run_season(season_df
                 primary_agent_ec = z_score_agent
                 primary_agent_wta = z_score_agent
                 primary_agent_roto = z_score_agent
-                n_primary = int(n_drafters/2)
+                n_primary = 1 #int(n_drafters/2)
 
             elif matchup[0] == 'G':
                 primary_agent_ec = g_score_agent
                 primary_agent_wta = g_score_agent
                 primary_agent_roto = g_score_agent
-                n_primary = int(n_drafters/2)
+                n_primary = 1 #int(n_drafters/2)
 
             if matchup[1] == 'Z':
                 default_agent = z_score_agent
@@ -895,14 +899,13 @@ def run_season(season_df
 
 def validate():
 
-    file_list = os.listdir('../data_for_testing/')[0:6]
-
+    file_list = os.listdir('../data_for_testing/')
 
     all_res = []
 
     n_drafters = 12
     n_picks = 13
-    omega = 0.5 #st.session_state.params['options']['omega']['default']
+    omega = st.session_state.params['options']['omega']['default']
     gamma = st.session_state.params['options']['gamma']['default']
     alpha = st.session_state.params['options']['alpha']['default']
     beta = st.session_state.params['options']['beta']['default']
@@ -913,7 +916,7 @@ def validate():
 
     season_dfs = {file[0:7] : pd.read_csv('../data_for_testing/' + file).rename(columns = renamer) for file in file_list}
 
-    matchups = [('H','G'), ('G','Z')]
+    matchups = [('H','G'),('G','G'),('G','Z'),('Z','G')]
 
     season_name = st.selectbox('What season do you want to view results for?'
                                  ,[None] + list(season_dfs.keys()))

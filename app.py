@@ -73,6 +73,7 @@ historical_df = get_historical_data()
 current_data, expected_minutes = get_current_season_data()
 darko_data = get_darko_data(expected_minutes)
 
+#These are based on 2023-2024 excluding injury
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 st.title('Optimization for Fantasy Basketball :basketball:')

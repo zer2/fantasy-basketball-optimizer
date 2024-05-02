@@ -117,7 +117,6 @@ def get_historical_data():
 
   #adjust for the fact that historical data is week-based on game-based
   all_counting_stats = st.session_state.params['counting-statistics'] + st.session_state.params['volume-statistics']
-  full_df[all_counting_stats] = full_df[all_counting_stats]/3
 
   return full_df
 
