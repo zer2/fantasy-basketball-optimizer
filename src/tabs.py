@@ -1094,7 +1094,7 @@ def make_trade_h_tab(_H
 def make_rank_tab(_scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
-  """Show rankings my general value
+  """Show rankings by general value
 
   Args:
       scores: Dataframe of floats, rows by player and columns by category
