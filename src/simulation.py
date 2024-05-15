@@ -782,18 +782,6 @@ def run_season(season_df
                 res_wta = res_dict[matchup]['wta']
 
             else:
-                print('Format: EC')
-                res_ec =  try_strategy(primary_agent_ec
-                    , default_agent
-                    , matchup[0]
-                    , matchup[1]
-                    , n_drafters
-                    , n_picks
-                    , weekly_df
-                    , n_seasons
-                    , n_primary = n_primary
-                    , scoring_format = 'Head to Head: Each Category')
-                
                 print('Format: roto')
 
                 res_roto =  try_strategy(primary_agent_roto
@@ -806,7 +794,19 @@ def run_season(season_df
                     , n_seasons
                     , n_primary = n_primary
                     , scoring_format = 'Rotisserie')
-
+                
+                print('Format: EC')
+                res_ec =  try_strategy(primary_agent_ec
+                    , default_agent
+                    , matchup[0]
+                    , matchup[1]
+                    , n_drafters
+                    , n_picks
+                    , weekly_df
+                    , n_seasons
+                    , n_primary = n_primary
+                    , scoring_format = 'Head to Head: Each Category')
+                
                 print('Format: wta')
 
                 res_wta =  try_strategy(primary_agent_wta

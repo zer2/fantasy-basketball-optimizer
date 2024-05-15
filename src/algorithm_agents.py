@@ -63,18 +63,20 @@ class HAgent():
             v = np.sqrt(mov/vom)  
 
             #scale is standard deviation of overall "luck"
-            player_stat_luck_overall = np.sqrt(self.chi * self.n_picks * 9)
+            player_stat_luck_overall = np.sqrt(9)
 
             max_luck_expected =  norm.ppf((self.n_drafters - 1 - 0.375)/(self.n_drafters - 1 + 0.25)) * \
                                     player_stat_luck_overall
+            
+            fudge_factor = 0.6 # account for luck not being evenly distributed, making it effectively lower 
+            player_stat_luck_per_category = max_luck_expected * fudge_factor /9
 
-            player_stat_luck_per_category = max_luck_expected/9
-            max_cdf = norm.cdf(player_stat_luck_per_category, scale = np.sqrt(self.chi * self.n_picks) )
+            max_cdf = norm.cdf(player_stat_luck_per_category)
 
             ev_max_wins = max_cdf * (self.n_drafters-1) * 9
 
             self.mu_m = ev_max_wins
-            self.var_m = max_cdf * (1-max_cdf) * self.n_picks * self.n_drafters
+            self.var_m = max_cdf * (1-max_cdf) * (self.n_drafters-1) * 9
 
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
