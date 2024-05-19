@@ -392,7 +392,7 @@ with param_tab:
       
           beta = st.number_input(r'Select a $\beta$ value'
                                 , key = 'beta'
-                                , value = float(st.session_state.params['options']['beta']['default'])
+                                , value = float(st.session_state.params['options']['beta']['default'][scoring_format])
                                 , min_value = float(st.session_state.params['options']['beta']['min'])
                                 , max_value = float(st.session_state.params['options']['beta']['max']))
           beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''

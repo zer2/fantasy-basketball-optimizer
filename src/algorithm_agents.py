@@ -21,6 +21,7 @@ class HAgent():
                  , dynamic : bool
                  , scoring_format : str
                  , chi : float
+                 , fudge_factor : float = 1
                  , collect_info : bool = False
                     ):
         """Calculates the rank order based on H-score
@@ -52,7 +53,8 @@ class HAgent():
         self.cross_player_var = info['Var']
         self.L = info['L']
         self.scoring_format = scoring_format
-        self.var_fudge_factor = 2
+
+        self.fudge_factor = fudge_factor
 
         mov = info['Mov']
         vom = info['Vom']
@@ -68,8 +70,7 @@ class HAgent():
             max_luck_expected =  norm.ppf((self.n_drafters - 1 - 0.375)/(self.n_drafters - 1 + 0.25)) * \
                                     player_stat_luck_overall
             
-            fudge_factor = 0.6 # account for luck not being evenly distributed, making it effectively lower 
-            player_stat_luck_per_category = max_luck_expected * fudge_factor /9
+            player_stat_luck_per_category = max_luck_expected * self.fudge_factor /9
 
             max_cdf = norm.cdf(player_stat_luck_per_category)
 
@@ -220,6 +221,7 @@ class HAgent():
         if self.scoring_format == 'Rotisserie':
             total_players = self.n_drafters * self.n_picks 
             remaining_players = total_players - len(players_chosen)
+
             scale = np.sqrt(self.cross_player_var * \
                             self.n_picks * \
                             remaining_players/total_players
@@ -228,7 +230,9 @@ class HAgent():
             n_values = rankdata(diff_means, axis = 2, method = 'ordinal')
             player_variance_adjustment =  norm.ppf((n_values - 0.375)/(self.n_drafters - 1 + 0.25))
 
-            diff_means = diff_means + player_variance_adjustment * scale.values.reshape(1,9,1)
+            #let's try without this 
+            #diff_means = diff_means + player_variance_adjustment * scale.values.reshape(1,9,1)
+
         else:
             n_values = None
 
@@ -647,7 +651,7 @@ class HAgent():
 
         category_variance = category_variance + extra_term
 
-        drafter_variance = category_variance.sum(axis = 1).reshape(-1,1,1) * self.var_fudge_factor
+        drafter_variance = category_variance.sum(axis = 1).reshape(-1,1,1)
 
         total_variance = drafter_variance + self.var_m
 
@@ -656,8 +660,7 @@ class HAgent():
         
         if calculate_pdf_weights:
 
-            nabla = total_variance + (self.mu_m - drafter_mean) * self.var_fudge_factor * \
-                                                    (n_opponents - n_values - mu_values + 0.5) 
+            nabla = total_variance + (self.mu_m - drafter_mean) * (n_opponents - n_values - mu_values + 0.5) 
 
             outer_pdf = norm.pdf((drafter_mean - self.mu_m)/np.sqrt(total_variance))
 
