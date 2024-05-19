@@ -334,7 +334,7 @@ def make_detailed_results_tab(res
                               , is_h_agent = False
                               , scoring_format = 'Rotisserie'):
 
-    roto = scoring_format == 'Rotisserie'
+    roto = 'Rotisserie' in scoring_format 
 
     win_rates_tab, histogram_tab, weight_tab, progression_tab, timing_tab = st.tabs(['Win Rates'
                                                                          ,'Category Win Rates'
@@ -633,7 +633,6 @@ def run_season(season_df
                         ,omega : float
                         ,gamma : float
                         ,alpha : float
-                        ,beta : float
                         ,chi : float
                         ,season_name : str 
                         ,n_seasons : int = 1000
@@ -711,12 +710,13 @@ def run_season(season_df
             , omega = omega
             , gamma = gamma
             , alpha = alpha
-            , beta = beta
+            , beta = st.session_state.params['options']['beta']['default']['Rotisserie']
             , n_picks = n_picks
             , n_drafters = n_drafters
             , scoring_format = 'Rotisserie'
             , dynamic = True
             , chi = chi
+            , fudge_factor = 0.2
             , collect_info = True
             )
                     
@@ -726,7 +726,7 @@ def run_season(season_df
                 , omega = omega
                 , gamma = gamma
                 , alpha = alpha
-                , beta = beta
+                , beta =  st.session_state.params['options']['beta']['default']['Head to Head: Each Category']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Each Category'
@@ -740,7 +740,7 @@ def run_season(season_df
                 , omega = omega
                 , gamma = gamma
                 , alpha = alpha
-                , beta = beta
+                , beta = st.session_state.params['options']['beta']['default']['Head to Head: Most Categories']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Most Categories'
@@ -782,18 +782,6 @@ def run_season(season_df
                 res_wta = res_dict[matchup]['wta']
 
             else:
-                print('Format: EC')
-                res_ec =  try_strategy(primary_agent_ec
-                    , default_agent
-                    , matchup[0]
-                    , matchup[1]
-                    , n_drafters
-                    , n_picks
-                    , weekly_df
-                    , n_seasons
-                    , n_primary = n_primary
-                    , scoring_format = 'Head to Head: Each Category')
-                
                 print('Format: roto')
 
                 res_roto =  try_strategy(primary_agent_roto
@@ -806,7 +794,19 @@ def run_season(season_df
                     , n_seasons
                     , n_primary = n_primary
                     , scoring_format = 'Rotisserie')
-
+                
+                print('Format: EC')
+                res_ec =  try_strategy(primary_agent_ec
+                    , default_agent
+                    , matchup[0]
+                    , matchup[1]
+                    , n_drafters
+                    , n_picks
+                    , weekly_df
+                    , n_seasons
+                    , n_primary = n_primary
+                    , scoring_format = 'Head to Head: Each Category')
+                
                 print('Format: wta')
 
                 res_wta =  try_strategy(primary_agent_wta
@@ -864,16 +864,16 @@ def run_season(season_df
             with t2: 
                 overall_win_rate = win_rate_df[['Head to Head: Most Categories']]
 
-                make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks,is_h_agent, 'MC')
+                make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks,is_h_agent, 'Rotisserie') #ZR: Hack
                 
             with t3: 
                 overall_win_rate = win_rate_df[['Head to Head: Each Category']]
 
-                make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks,is_h_agent, 'EC')
+                make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks,is_h_agent, 'Rotisserie 1') #ZR: Hack
 
             with t4:
                 overall_win_rate = win_rate_df[['Rotisserie']]
-                make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks, is_h_agent,'Rotisserie')
+                make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks, is_h_agent,'Rotisserie 2')
 
             #we don't need the agents to persist across seasons, so we can get rid of them to save memory 
             #res_wta['Agents'] =  None
@@ -908,7 +908,6 @@ def validate():
     omega = st.session_state.params['options']['omega']['default']
     gamma = st.session_state.params['options']['gamma']['default']
     alpha = st.session_state.params['options']['alpha']['default']
-    beta = st.session_state.params['options']['beta']['default']
     chi = 0.05
     n_seasons = 1000
 
@@ -932,7 +931,6 @@ def validate():
                                                 ,omega
                                                 ,gamma
                                                 ,alpha
-                                                ,beta
                                                 ,chi
                                                 ,season_name
                                                 ,n_seasons

@@ -1090,7 +1090,7 @@ def make_trade_h_tab(_H
 
 ### Rank tabs 
 
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def make_rank_tab(_scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
