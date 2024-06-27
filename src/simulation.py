@@ -35,7 +35,7 @@ def make_weekly_df(season_df : pd.DataFrame):
     season_df = pd.DataFrame(weekly_df, index = weekly_df_index ).fillna(0)
 
     #experimental!!!
-    season_df = season_df[season_df.sum(axis = 1) > 0]
+    #season_df = season_df[season_df.sum(axis = 1) > 0]
     
     return season_df
 
@@ -117,6 +117,7 @@ def run_multiple_seasons(teams : dict[list]
                          , n_seasons : int = 100 
                          , n_weeks : int = 20
                          , scoring_format : str = 'Head to Head: Each Category'
+                         , params : dict = None
                          , return_detailed_results : bool = False ):
     """Simulate multiple seasons with the same drafters 
     
@@ -164,7 +165,7 @@ def run_multiple_seasons(teams : dict[list]
         #for all categories except turnovers, higher numbers are better. So we invert turnovers 
         team_performances['Turnovers'] = - team_performances['Turnovers'] 
         
-        team_performances = team_performances[get_categories()] #only want category columns
+        team_performances = team_performances[get_categories(params)] #only want category columns
     
         #we need to map each team to its opponent for the week. We do that with a formula for round robin pairing
         opposing_team_schedule = [(s,round_robin_opponent(t,w, len(teams)),w) for s, t, w in team_performances.index]
@@ -177,8 +178,8 @@ def run_multiple_seasons(teams : dict[list]
         tot_cat_ties = cat_ties.sum(axis = 1)
         
         if scoring_format == 'Head to Head: Most Categories':
-            team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_categories())/2
-            team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_categories())/2
+            team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_categories(params))/2
+            team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_categories(params))/2
         elif scoring_format == 'Head to Head: Each Category':
             team_performances.loc[:,'Tie'] = tot_cat_ties
             team_performances.loc[:,'Win'] = tot_cat_wins
@@ -203,7 +204,7 @@ def run_multiple_seasons(teams : dict[list]
         
         #for all categories except turnovers, higher numbers are better. So we invert turnovers 
         team_performances['Turnovers'] = - team_performances['Turnovers'] 
-        season_points_by_category = team_performances.groupby('Season')[get_categories()].rank()
+        season_points_by_category = team_performances.groupby('Season')[get_categories(params)].rank()
 
         season_points = season_points_by_category.sum(axis = 1)
         winners_after_ties = season_points[season_points == season_points.groupby('Season').transform('max')]
@@ -222,8 +223,8 @@ def run_multiple_seasons(teams : dict[list]
     else:
         if scoring_format in ('Head to Head: Most Categories','Head to Head: Each Category'):
 
-            cat_win_df = pd.DataFrame(cat_wins, columns = get_categories(), index = team_performances.index)
-            cat_tie_df = pd.DataFrame(cat_ties, columns = get_categories(), index = team_performances.index)
+            cat_win_df = pd.DataFrame(cat_wins, columns = get_categories(params), index = team_performances.index)
+            cat_tie_df = pd.DataFrame(cat_ties, columns = get_categories(params), index = team_performances.index)
             
             cat_wins_agg = cat_win_df.groupby('Team').mean()
             cat_wins_agg = pd.concat({'Win' : cat_wins_agg}, names = ['Result'])
@@ -252,6 +253,7 @@ def try_strategy(_primary_agent
                  , n_seasons : int
                  , n_primary : int
                  , scoring_format : str
+                 , params : dict
                  ) -> tuple:
     """Try a particular strategy (enacted by the primary agent) against a field of default agents
     
@@ -274,7 +276,6 @@ def try_strategy(_primary_agent
         detailed_res: Dataframe of win/tie rates by category and draft seat (from the primary agent perspective)
         team_dict: dict of form {seat -> list of players chosen by the drafter in that seat}
     """
-
     #should really record all of the drafted teams too 
 
     victory_res = [[] for i in range(n_drafters)]
@@ -301,6 +302,7 @@ def try_strategy(_primary_agent
                                    , season_df = season_df
                                    , n_seasons = n_seasons
                                    , scoring_format = scoring_format
+                                   , params = params
                                    , return_detailed_results = True)
         detailed_res = pd.concat([detailed_res, details.loc[i,:]])
         
@@ -331,6 +333,7 @@ def make_detailed_results_tab(res
                               , info
                               , n_drafters
                               , n_picks
+                              , params
                               , is_h_agent = False
                               , scoring_format = 'Rotisserie'):
 
@@ -349,7 +352,7 @@ def make_detailed_results_tab(res
 
             if roto:
                 detailed_rates_collapsed = res['Category win rates']
-                detailed_rates_collapsed.columns = get_categories()
+                detailed_rates_collapsed.columns = get_categories(params)
 
             else: 
                 detailed_rates_collapsed = res['Category win rates'].loc['Win'].reset_index(drop = True) + \
@@ -365,11 +368,11 @@ def make_detailed_results_tab(res
             if roto:
                 detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}", subset = ['Overall Win %']) \
                                             .format("{:.3}"
-                                                    , subset = get_categories()) \
+                                                    , subset = get_categories(params)) \
                                             .map(stat_styler
                                                 , middle = 6.5
                                                 , multiplier = 40
-                                                , subset = get_categories()) \
+                                                , subset = get_categories(params)) \
                                             .map(styler_a
                                                 , subset = ['Overall Win %'])             
             else: 
@@ -377,7 +380,7 @@ def make_detailed_results_tab(res
                                             .map(stat_styler
                                                 , middle = 0.5
                                                 , multiplier = 150
-                                                , subset = get_categories()) \
+                                                , subset = get_categories(params)) \
                                             .map(styler_a
                                                 , subset = ['Overall Win %']) 
 
@@ -572,7 +575,7 @@ def estimate_values(c, v, x_scores, g_scores):
     k_avg = np.mean([x[1].values for x in observations])
     return m_avg, k_avg
 
-def get_estimate_of_omega_gamma(info):
+def get_estimate_of_omega_gamma(info, params):
 
     x_scores = info['X-scores']
     g_scores = info['G-scores']
@@ -597,7 +600,7 @@ def get_estimate_of_omega_gamma(info):
     y_m = [v[1][0] for v in res]   
     y_k = [v[1][1] for v in res]  
 
-    s = pd.DataFrame(cs/v.T, columns = get_categories())
+    s = pd.DataFrame(cs/v.T, columns = get_categories(params))
 
     s.loc[:,'sigma'] = x_k
     s.loc[:,'Actual_k'] = y_k
@@ -635,6 +638,7 @@ def run_season(season_df
                         ,alpha : float
                         ,chi : float
                         ,season_name : str 
+                        ,params : dict
                         ,n_seasons : int = 1000
                         ) -> dict:
     
@@ -657,7 +661,7 @@ def run_season(season_df
     matchup_tabs = st.tabs(['Inputs'] + [x[0] + ' vs ' + x[1] for x in matchups])
 
     with matchup_tabs[0]:
-        weekly_tab, averages_tab = st.tabs(['Weekly Data','Averages'])
+        weekly_tab, averages_tab, omega_gamma_tab = st.tabs(['Weekly Data','Averages','Omega and Gamma'])
 
         with weekly_tab:
             st.dataframe(weekly_df)
@@ -681,22 +685,29 @@ def run_season(season_df
             st.markdown('Weekly player averages ')
             st.dataframe(player_averages)
 
-    conversion_factors = pd.read_csv('./coefficients.csv', index_col = 0)
-    multipliers = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
-                            , index = conversion_factors.index)
+            conversion_factors = pd.read_csv('./coefficients.csv', index_col = 0)
+            multipliers = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
+                                    , index = conversion_factors.index)
+            
+        with omega_gamma_tab:
 
-    info = process_player_data(weekly_df
-                        , player_averages
-                        , None
-                        , multipliers 
-                        , 0
-                        , 0 
-                        , 0 
-                        , n_drafters
-                        , n_picks
-                        , player_averages #just to ensure its not caching
-                        )
+            info = process_player_data(weekly_df
+                                , player_averages
+                                , None
+                                , multipliers 
+                                , 0
+                                , 0 
+                                , 0 
+                                , n_drafters
+                                , n_picks
+                                , params
+                                , player_averages #just to ensure its not caching
+                                )
+            
+            st.dataframe(info['G-scores'])
     
+            get_estimate_of_omega_gamma(info, params)
+
     g_scores = info['G-scores']
     g_scores = g_scores.sort_values('Total', ascending = False)
     g_score_agent = SimpleAgent(order = list(g_scores.index))
@@ -705,12 +716,13 @@ def run_season(season_df
     z_scores = z_scores.sort_values('Total', ascending = False)
     z_score_agent = SimpleAgent(order = list(z_scores.index))
 
+
     h_agent_roto = HAgent(
             info = info
             , omega = omega
             , gamma = gamma
             , alpha = alpha
-            , beta = st.session_state.params['options']['beta']['default']['Rotisserie']
+            , beta = params['options']['beta']['default']['Rotisserie']
             , n_picks = n_picks
             , n_drafters = n_drafters
             , scoring_format = 'Rotisserie'
@@ -719,14 +731,13 @@ def run_season(season_df
             , fudge_factor = 0.2
             , collect_info = True
             )
-                    
 
     h_agent_ec = HAgent(
                 info = info
                 , omega = omega
                 , gamma = gamma
                 , alpha = alpha
-                , beta =  st.session_state.params['options']['beta']['default']['Head to Head: Each Category']
+                , beta =  params['options']['beta']['default']['Head to Head: Each Category']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Each Category'
@@ -740,7 +751,7 @@ def run_season(season_df
                 , omega = omega
                 , gamma = gamma
                 , alpha = alpha
-                , beta = st.session_state.params['options']['beta']['default']['Head to Head: Most Categories']
+                , beta = params['options']['beta']['default']['Head to Head: Most Categories']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Most Categories'
@@ -782,6 +793,21 @@ def run_season(season_df
                 res_wta = res_dict[matchup]['wta']
 
             else:
+
+                print('Format: EC')
+                res_ec =  try_strategy(primary_agent_ec
+                    , default_agent
+                    , matchup[0]
+                    , matchup[1]
+                    , n_drafters
+                    , n_picks
+                    , weekly_df
+                    , n_seasons
+                    , n_primary = n_primary
+                    , scoring_format = 'Head to Head: Each Category'
+                    , params = params)
+            
+
                 print('Format: roto')
 
                 res_roto =  try_strategy(primary_agent_roto
@@ -793,19 +819,8 @@ def run_season(season_df
                     , weekly_df
                     , n_seasons
                     , n_primary = n_primary
-                    , scoring_format = 'Rotisserie')
-                
-                print('Format: EC')
-                res_ec =  try_strategy(primary_agent_ec
-                    , default_agent
-                    , matchup[0]
-                    , matchup[1]
-                    , n_drafters
-                    , n_picks
-                    , weekly_df
-                    , n_seasons
-                    , n_primary = n_primary
-                    , scoring_format = 'Head to Head: Each Category')
+                    , scoring_format = 'Rotisserie'
+                    , params = params)
                 
                 print('Format: wta')
 
@@ -818,7 +833,8 @@ def run_season(season_df
                         , weekly_df
                         , n_seasons
                         , n_primary = n_primary
-                        , scoring_format = 'Head to Head: Most Categories')
+                        , scoring_format = 'Head to Head: Most Categories'
+                        , params = params)
                 
             #get rid of the most memory-intensive part of the results: we don't need them
             res_ec_limited = res_ec.copy()
@@ -864,16 +880,16 @@ def run_season(season_df
             with t2: 
                 overall_win_rate = win_rate_df[['Head to Head: Most Categories']]
 
-                make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks,is_h_agent, 'Rotisserie') #ZR: Hack
+                make_detailed_results_tab(res_wta, overall_win_rate, info, n_drafters,n_picks,params,is_h_agent, 'Head to Head: Most Categories')
                 
             with t3: 
                 overall_win_rate = win_rate_df[['Head to Head: Each Category']]
 
-                make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks,is_h_agent, 'Rotisserie 1') #ZR: Hack
+                make_detailed_results_tab(res_ec, overall_win_rate, info, n_drafters, n_picks,params,is_h_agent, 'Head to Head: Each Category')
 
             with t4:
                 overall_win_rate = win_rate_df[['Rotisserie']]
-                make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks, is_h_agent,'Rotisserie 2')
+                make_detailed_results_tab(res_roto, overall_win_rate, info, n_drafters, n_picks,params, is_h_agent,'Rotisserie')
 
             #we don't need the agents to persist across seasons, so we can get rid of them to save memory 
             #res_wta['Agents'] =  None
@@ -919,6 +935,8 @@ def validate():
 
     season_name = st.selectbox('What season do you want to view results for?'
                                  ,[None] + list(season_dfs.keys()))
+    
+    params = st.session_state.params
 
     if season_name:
 
@@ -933,6 +951,7 @@ def validate():
                                                 ,alpha
                                                 ,chi
                                                 ,season_name
+                                                ,params
                                                 ,n_seasons
                                                 )]
 

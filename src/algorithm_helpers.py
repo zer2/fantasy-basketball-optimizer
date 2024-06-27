@@ -29,7 +29,7 @@ def savor_calculation(raw_values_unselected : pd.Series
     value_above_replacement = np.clip(raw_values_unselected - replacement_value,0,None)
 
     probability_of_non_streaming = norm.cdf(value_above_replacement/noise)
-    adjustment_factor = noise/(2 * np.pi)**(0.5) * (1 - np.exp((-value_above_replacement**2)/(2 * noise)))
+    adjustment_factor = (noise)/(2 * np.pi)**(0.5) * (1 - np.exp((-value_above_replacement**2)/(2 * noise**2)))
     adjusted_value = value_above_replacement * probability_of_non_streaming - adjustment_factor
 
     remaining_value = adjusted_value.iloc[0:n_remaining_players].sum()

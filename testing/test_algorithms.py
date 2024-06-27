@@ -196,7 +196,7 @@ def test_savor_calculation():
     raw_values_unselected = pd.Series([1,2,3,4,5]).sort_values(ascending = False)
     n_remaining_players = 3
     remaining_cash = 10
-    noise = 1
+    noise = 2
 
     savor_result = savor_calculation(raw_values_unselected
                     , n_remaining_players

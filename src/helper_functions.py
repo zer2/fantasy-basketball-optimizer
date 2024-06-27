@@ -7,9 +7,12 @@ import streamlit as st
 import numexpr as ne
 from datetime import datetime
 
-def get_categories():
+def get_categories(params = None):
     #convenience function to get the list of categories used for fantasy basketball
-    return st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+    if params: 
+      return params['percentage-statistics'] + params['counting-statistics']
+    else: 
+      return st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
 
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
