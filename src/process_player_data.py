@@ -64,6 +64,7 @@ def calculate_coefficients(player_means : pd.DataFrame
 
 def calculate_coefficients_historical(weekly_df : pd.DataFrame
                      , representative_player_set : list
+                     , params : dict
                      ) -> dict:
     """calculate the coefficients from a real weekly dataset by week
 
@@ -74,8 +75,6 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
         Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
 
     """
-    params = st.session_state.params
-
     player_stats = weekly_df.groupby(level = 'Player').agg(['mean','var'])
 
     #counting stats
@@ -138,8 +137,6 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     Returns:
         Dataframe of scores, by player/category
     """
-    params = st.session_state.params
-
     counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
     counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
     counting_cat_mean_of_vars = coefficients.loc[params['counting-statistics'],'Mean of Variances']
@@ -160,14 +157,16 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     fgp_score = fgp_numerator.divide(fgp_denominator)
     
     res = pd.concat([fgp_score, ftp_score, main_scores],axis = 1)  
-    res.columns = get_categories()
+    res.columns = get_categories(params)
     return res.fillna(0)
 
 def games_played_adjustment(scores : pd.DataFrame
                       , replacement_games_rate : pd.Series
                       , n_players : int
+                      , params : dict
                       , v : pd.Series = None) -> pd.DataFrame :
-    """Adjust scores based on effective games played. Requires scores to be in same order as replacement_player_value
+    """Applies injury adjustment formula based on effective games played. 
+    Requires scores to be in same order as replacement_player_value
 
     Args:
         scores: Dataframe of category-level scores. One row per player, one column per statistic 
@@ -179,14 +178,14 @@ def games_played_adjustment(scores : pd.DataFrame
         Dataframe with same dimensions as scores 
     """
 
-    all_stats = st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+    all_stats = params['percentage-statistics'] + params['counting-statistics']
     if v is None:
        v = pd.Series({stat : 1/9 for stat in all_stats})
 
     totals = scores.dot(v)
 
     rv = totals.sort_values(ascending = False).iloc[n_players]
-    category_level_rv = get_category_level_rv(rv, v)
+    category_level_rv = get_category_level_rv(rv, v, params)
 
     replacement_player_value = np.array(category_level_rv.T).reshape(1,-1) * \
                                 np.array(replacement_games_rate).reshape(-1,1)
@@ -194,8 +193,8 @@ def games_played_adjustment(scores : pd.DataFrame
 
     return adjusted_scores 
 
-def get_category_level_rv(rv : float, v : pd.Series):
-   all_stats = st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+def get_category_level_rv(rv : float, v : pd.Series, params : dict):
+   all_stats = params['percentage-statistics'] + params['counting-statistics']
    rv_multiple = rv/(len(all_stats) -2) if  'Turnovers' in all_stats else rv/len(all_stats)
    value_by_category = pd.Series({stat : - rv_multiple/v[stat] if stat == 'Turnovers' 
                                   else rv_multiple/v[stat] for stat in all_stats})
@@ -212,6 +211,7 @@ def process_player_data(  _weekly_df : pd.DataFrame
                         , nu : float
                         , n_drafters : int
                         , n_picks : int
+                        , params : dict
                         , player_stats_key
                         ) -> dict:
   """Based on player stats and parameters, do all calculations to set up for running algorithms
@@ -229,13 +229,12 @@ def process_player_data(  _weekly_df : pd.DataFrame
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
-  params = st.session_state.params
-
   n_players = n_drafters * n_picks
 
   if _weekly_df is not None:
     coefficients_first_order = calculate_coefficients_historical(_weekly_df
-                                                , pd.unique(_weekly_df.index.get_level_values('Player')))
+                                                , pd.unique(_weekly_df.index.get_level_values('Player'))
+                                                , params)
   else:
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
@@ -253,14 +252,18 @@ def process_player_data(  _weekly_df : pd.DataFrame
 
   if _weekly_df is not None:
     coefficients = calculate_coefficients_historical(_weekly_df
-                                                , representative_player_set)
+                                                , representative_player_set
+                                                , params)
   else:
     coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
+    
 
-  mov = coefficients.loc[get_categories() , 'Mean of Variances']
-  vom = coefficients.loc[get_categories() , 'Variance of Means']
+  #st.write(coefficients)
+
+  mov = coefficients.loc[get_categories(params) , 'Mean of Variances']
+  vom = coefficients.loc[get_categories(params) , 'Variance of Means']
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
@@ -269,9 +272,9 @@ def process_player_data(  _weekly_df : pd.DataFrame
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
 
   replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
-  g_scores = games_played_adjustment(g_scores, replacement_games_rate,n_players)
-  z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players)
-  x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, v = v)
+  g_scores = games_played_adjustment(g_scores, replacement_games_rate,n_players, params)
+  z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players, params)
+  x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, params, v = v)
 
   g_scores = g_scores * multipliers.T.values[0]
   z_scores = z_scores * multipliers.T.values[0]
@@ -317,6 +320,7 @@ def process_player_data(  _weekly_df : pd.DataFrame
           , 'Vom' : vom
           , 'L' : L}
 
-  st.session_state.info_key += 1 
+  if st.session_state: #if we are running outside of streamlit this will be empty, and will evaluate to False
+    st.session_state.info_key += 1 
   
   return info

@@ -184,13 +184,11 @@ class HAgent():
 
             #when translating back to x-scores, reverse the basis by dividing by v 
 
-
             category_value_per_dollar = value_per_dollar / (self.turnover_inverted_v * 9) 
 
             replacement_value_by_category = get_category_level_rv(replacement_value
                                                                   , pd.Series(self.v.reshape(-1)
-                                                                            , index = st.session_state.params['percentage-statistics'] + \
-                                                                                        st.session_state.params['counting-statistics'])
+                                                                            , index = self.x_scores.columns) #used for category names
                                                     )
             replacement_value_by_category = np.array(replacement_value_by_category).reshape(9,1)
 
@@ -375,7 +373,7 @@ class HAgent():
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
                            ,n_values
-                           ) -> tuple:
+                           ) -> dict:
         """Performs one iteration of H-scoring
          
          Case (1): If n_players_selected < n_picks -1, the Gaussian multivariate assumption is used for future picks and weight is chosen by gradient descent
@@ -506,9 +504,9 @@ class HAgent():
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
             yield {'Scores' : pd.Series(score, index = result_index)
-                    ,'Weights' : pd.DataFrame(weights, index = result_index, columns = get_categories())
-                    ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = get_categories())
-                    ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = get_categories())}
+                    ,'Weights' : pd.DataFrame(weights, index = result_index, columns = self.x_scores.columns)
+                    ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
+                    ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)}
 
     ### below are functions used for the optimization procedure 
     def get_objective_and_pdf_weights(self

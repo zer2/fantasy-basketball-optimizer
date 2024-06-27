@@ -540,6 +540,7 @@ with info_tab:
                               ,nu
                               ,n_drafters
                               ,n_picks
+                              ,st.session_state.params
                               ,st.session_state.player_stats_editable_version)
       st.session_state.info = info #useful for testing
 
