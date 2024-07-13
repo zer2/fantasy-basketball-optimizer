@@ -12,3 +12,5 @@ requests
 pyyaml
 numexpr
 statsmodels
+cvxpy
+snowflake-connector-python

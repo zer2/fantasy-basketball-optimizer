@@ -3,10 +3,11 @@ import pandas as pd
 from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
-from src.helper_functions import get_categories
+from src.helper_functions import check_team_eligibility
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
+from src.helper_functions import get_eligibility_row_simplified
 
 class HAgent():
 
@@ -22,9 +23,10 @@ class HAgent():
                  , scoring_format : str
                  , chi : float
                  , fudge_factor : float = 1
+                 , positions : pd.Series = None
                  , collect_info : bool = False
                     ):
-        """Calculates the rank order based on H-score
+        """Initializes an H-score agent, which can calculate H-scores based on given info 
 
         Args:
             info: dictionary with info related to player statistics etc. 
@@ -34,8 +36,9 @@ class HAgent():
             beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
             n_drafters : int, number of drafters
-            punting_floor: minimum allowed weight
             scoring_format
+
+            positions: Series of format {'LeBron James' -> ['PF', 'C']}
         Returns:
             None
 
@@ -48,11 +51,17 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
+        self.positions = positions
+
+        self.positions_boolean = pd.DataFrame(np.concatenate([get_eligibility_row_simplified(pos) for pos in positions])
+                                             , index = positions.index)
         self.collect_info = collect_info
         
         self.cross_player_var = info['Var']
         self.L = info['L']
         self.scoring_format = scoring_format
+        self.position_means = np.array(info['Position-Means']).T.reshape(1,9,-1)
+        self.L_by_position = info['L-by-Position']
 
         self.fudge_factor = fudge_factor
 
@@ -111,10 +120,12 @@ class HAgent():
         """
 
         my_players = [p for p in player_assignments[drafter] if p ==p]
+
         n_players_selected = len(my_players) 
 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list)]
+        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list) & \
+                                                self.x_scores.index.isin(self.positions.index)]
         total_players = self.n_picks * self.n_drafters
 
         diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
@@ -134,9 +145,6 @@ class HAgent():
 
         initial_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                             default_weights).mean(axis = 2)
-        
-        scores = []
-        weights = []
 
         return self.perform_iterations(initial_weights
                                        ,my_players
@@ -400,6 +408,15 @@ class HAgent():
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.dynamic):
 
+                position_priorities = self.get_position_priorities_from_weights(weights)
+                default_position_matrix = self.get_default_position_matrix(position_priorities)
+                future_position_matrix = self.get_future_position_matrix(result_index, default_position_matrix)
+                print(future_position_matrix)
+
+                #I'm not sure exactly how this multiplication should work 
+                L = future_position_matrix * self.L_by_position
+
+
                 del_full = self.get_del_full(weights)
         
                 expected_future_diff_single = self.get_x_mu_simplified_form(weights)
@@ -509,6 +526,48 @@ class HAgent():
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)}
 
     ### below are functions used for the optimization procedure 
+    def get_position_priorities_from_weights(self, weights):
+
+        return (weights/self.v.T).dot(self.position_means)
+    
+    def get_future_position_matrix(self, available_players, default_position_matrix):
+        
+        #this should be converted to a matrix form somehow
+        team_comps = [pd.concat([self.positions_boolean.loc[self.players], self.positions_boolean.loc[[player]]])
+                       for player in available_players]
+
+        future_position_matrix = default_position_matrix - team_comps
+
+        return future_position_matrix
+    
+    def get_default_position_matrix(self, position_priorities):
+
+        top_position_score = position_priorities.max(axis =2)
+
+        top_guard_score = position_priorities[:,:,(1,2)].max(axis =2)
+        top_forward_score = position_priorities[:,:,(3,4)].max(axis =2)
+
+        #print((2 * (position_priorities[:,:,1] == top_guard_score)).astype(int))
+
+        nc = 2 + (3 * (position_priorities[:,:,0] == top_position_score).astype(int))
+        npg = 1 + (2 * (position_priorities[:,:,1] == top_guard_score).astype(int)) + \
+                                3 * (position_priorities[:,:,1] == top_position_score).astype(int)
+        nsg = 1 + (2 * (position_priorities[:,:,2] == top_guard_score).astype(int)) + \
+                                3 * (position_priorities[:,:,2] == top_position_score).astype(int)
+        npf = 1 + (2 * (position_priorities[:,:,3] == top_forward_score).astype(int)) + \
+                                3 * (position_priorities[:,:,3] == top_position_score).astype(int)
+        nsf = 1 + (2 * (position_priorities[:,:,4] == top_forward_score).astype(int)) + \
+                                3 * (position_priorities[:,:,4] == top_position_score).astype(int)
+        
+        default_position_matrix = np.concatenate([nc,npg,nsg,npf,nsf], axis = 1)
+
+        print(position_priorities)
+        print(default_position_matrix)
+        sgfsd
+
+        return default_position_matrix
+
+
     def get_objective_and_pdf_weights(self
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
@@ -864,20 +923,27 @@ class HAgent():
 
         scores = res['Scores']
 
-        best_player = scores.idxmax()
+        available_players_sorted = scores.sort_values(ascending = False)    
+
+        if self.positions is not None:
+            player = choose_eligible_player(self.players, available_players_sorted.index, self.positions)     
+        else: 
+            player = available_players_sorted.index[0]
 
         if self.collect_info:
 
             self.all_res_list = self.all_res_list + [res_list]
-            self.players = self.players + [best_player]
+            self.players = self.players + [player]
 
-        return best_player
+        return player
 
 class SimpleAgent():
     #Comment
 
-    def __init__(self, order):
+    def __init__(self, order, positions = None):
         self.order = order
+        self.players = []
+        self.positions = positions
 
     def make_pick(self, player_assignments : dict[list], j : int) -> str:
 
@@ -885,9 +951,23 @@ class SimpleAgent():
 
         #ZR: Can this be done more efficiently?
         available_players = [p for p in self.order if not p in players_chosen]
-        player = available_players[0]
 
+        if self.positions is not None:
+
+            player = choose_eligible_player(self.players, available_players, self.positions)
+                    
+        else: 
+            player = available_players[0]
+
+        self.players = self.players + [player]
         return player
 
+
+
+def choose_eligible_player(team, available_players, positions):
+    for player in available_players:
+        new_team = team+ [player]
+        if check_team_eligibility(positions.loc[new_team]):
+            return player
 
 

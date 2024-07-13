@@ -6,6 +6,23 @@ from nba_api.stats import endpoints as nba_endpoints
 import numpy as np
 import requests
 import os
+import snowflake.connector
+
+@st.cache_resource()
+def get_data_from_snowflake(table_name):
+   
+   con = snowflake.connector.connect(
+        user=st.secrets['SNOWFLAKE-USER']
+        ,password=st.secrets['SNOWFLAKE-PASSWORD']
+        ,account='aib52055.us-east-1'
+        ,database = 'FANTASYOPTIMIZER'
+        ,schema = 'FANTASYBASKETBALLOPTIMIZER'
+    )
+   
+   df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
+
+   return df
+
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 

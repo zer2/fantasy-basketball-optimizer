@@ -297,11 +297,16 @@ def process_player_data(  _weekly_df : pd.DataFrame
   players_and_positions = pd.merge(x_scores
                            , positions
                            , left_index = True
-                           , right_index = True)
+                           , right_index = True).explode('Position')
 
   #get position averages, to make sure the covariance matrix measures differences relative to position
   position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
-  position_means = position_means - position_means.mean(axis = 0)
+
+  #For later: standardize in the G-score basis 
+  position_means_g = position_means/v
+  position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
+  position_means = position_means_g * v
+
   #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
   joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
 
@@ -309,6 +314,8 @@ def process_player_data(  _weekly_df : pd.DataFrame
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   
   L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
+
+  L_by_position = players_and_positions[0:n_players].explode('Position').groupby('Position').cov()
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
@@ -318,7 +325,9 @@ def process_player_data(  _weekly_df : pd.DataFrame
           , 'Positions' : positions
           , 'Mov' : mov
           , 'Vom' : vom
-          , 'L' : L}
+          , 'L' : L
+          , 'Position-Means' : position_means
+          , 'L-by-Position' : L_by_position}
 
   if st.session_state: #if we are running outside of streamlit this will be empty, and will evaluate to False
     st.session_state.info_key += 1 

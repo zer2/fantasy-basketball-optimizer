@@ -6,6 +6,7 @@ import itertools
 import streamlit as st
 import numexpr as ne
 from datetime import datetime
+import cvxpy
 
 def get_categories(params = None):
     #convenience function to get the list of categories used for fantasy basketball
@@ -244,3 +245,72 @@ def make_progress_chart(res : list[pd.DataFrame]):
                      )
 
     return fig
+
+def check_team_eligibility(players):    
+    """Checks if a team is eligible or not, based on the players' possible positions
+
+    The function works by setting up an optimization problem for assigning players to team positions
+    If the optimization problem is infeasible, the team is not eligible
+    
+    Args:
+        players:Lists of players, which are themselves lists of eligible positions. E.g. 
+                [['SF','PF'],['C'],['SF']]
+
+    Returns:
+        True or False, depending on if the team is found to be eligible or not
+
+    """
+    n_players = len(players)
+    
+    #we need 8 columns for the 8 positions. We are defining them as 
+    #C, PG, SG, G, SF, PF, F, U 
+    X = cvxpy.Variable(shape = (n_players,8)) #we could set boolean = True, but it takes much longer
+
+    eligibility = np.concatenate([get_eligibility_row(player) for player in players])
+
+    #each player gets 1 position
+    one_position_constraint = cvxpy.sum(X,axis = 1) == 1
+    
+    #total number of players in each category cannot exceed the maximum for the category
+    available_positions_constraint = cvxpy.sum(X,axis = 0) <= [2,1,1,2,1,1,2,3]    
+    
+    #players can only play at positions they are eligible for 
+    eligibility_constraint = X <= eligibility 
+    
+    positivity_constraint = X >= 0
+    
+    constraints = [one_position_constraint, available_positions_constraint, eligibility_constraint, positivity_constraint]
+    problem = cvxpy.Problem(cvxpy.Minimize(0), constraints)
+    problem.solve(solver=cvxpy.ECOS)
+            
+    return not problem.status == "infeasible"
+
+def get_eligibility_row(pos):
+    """Converts a list of player positions into a binary vector of length 8, for the 8 team positions"""
+    eligibility = {7}
+    if 'C' in pos:
+        eligibility.add(0)
+    if 'PG' in pos: 
+        eligibility.update((1,3))
+    if 'SG' in pos: 
+        eligibility.update((2,3))
+    if 'SF' in pos: 
+        eligibility.update((4,6))
+    if 'PF' in pos: 
+        eligibility.update((5,6))
+    return np.array([[i in eligibility for i in range(8)]])
+
+def get_eligibility_row_simplified(pos):
+    """Converts a list of player positions into a binary vector of length 5, for the 5 base positions"""
+    eligibility = set()
+    if 'C' in pos:
+        eligibility.add(0)
+    if 'PG' in pos: 
+        eligibility.add(1)
+    if 'SG' in pos: 
+        eligibility.add((2))
+    if 'SF' in pos: 
+        eligibility.add((3))
+    if 'PF' in pos: 
+        eligibility.add((4))
+    return np.array([[i in eligibility for i in range(8)]])
