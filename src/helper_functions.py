@@ -313,4 +313,4 @@ def get_eligibility_row_simplified(pos):
         eligibility.add((3))
     if 'PF' in pos: 
         eligibility.add((4))
-    return np.array([[i in eligibility for i in range(8)]])
+    return np.array([[i in eligibility for i in range(5)]])

@@ -301,6 +301,7 @@ def process_player_data(  _weekly_df : pd.DataFrame
 
   #get position averages, to make sure the covariance matrix measures differences relative to position
   position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
+  position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
 
   #For later: standardize in the G-score basis 
   position_means_g = position_means/v

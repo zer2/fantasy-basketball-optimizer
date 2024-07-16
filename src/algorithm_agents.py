@@ -8,6 +8,7 @@ from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_p
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
 from src.helper_functions import get_eligibility_row_simplified
+import datetime
 
 class HAgent():
 
@@ -53,15 +54,20 @@ class HAgent():
         self.chi = chi
         self.positions = positions
 
-        self.positions_boolean = pd.DataFrame(np.concatenate([get_eligibility_row_simplified(pos) for pos in positions])
-                                             , index = positions.index)
+        #try changing this later for cvxpy
+        positions_float = pd.DataFrame(np.concatenate([get_eligibility_row_simplified(pos) for pos in positions])
+                                             , index = positions.index).astype(float)
+        self.positions_float = positions_float.div(positions_float.sum(axis = 1), axis = 0)
+
         self.collect_info = collect_info
         
         self.cross_player_var = info['Var']
         self.L = info['L']
         self.scoring_format = scoring_format
-        self.position_means = np.array(info['Position-Means']).T.reshape(1,9,-1)
+        self.position_means = np.array(info['Position-Means']).reshape(1,-1,9)
+
         self.L_by_position = info['L-by-Position']
+        self.L_by_position = np.array(self.L_by_position).reshape(1,-1,9,9)
 
         self.fudge_factor = fudge_factor
 
@@ -402,24 +408,30 @@ class HAgent():
 
         """
         i = 0
+
+        starting_team_comp = self.positions_float.loc[self.players].sum(axis = 0)
+
+        team_comps = np.concatenate([starting_team_comp + self.positions_float.loc[[player]] for player in result_index]
+                                    , axis = 0)
+        
         
         while True:
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.dynamic):
 
+                start = datetime.datetime.now()
+
                 position_priorities = self.get_position_priorities_from_weights(weights)
                 default_position_matrix = self.get_default_position_matrix(position_priorities)
-                future_position_matrix = self.get_future_position_matrix(result_index, default_position_matrix)
-                print(future_position_matrix)
+                future_position_matrix = self.get_future_position_matrix(team_comps, default_position_matrix)
 
-                #I'm not sure exactly how this multiplication should work 
-                L = future_position_matrix * self.L_by_position
+                L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_matrix)
+                position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_matrix).reshape(-1,9,1)
 
+                del_full = self.get_del_full(weights, L)
 
-                del_full = self.get_del_full(weights)
-        
-                expected_future_diff_single = self.get_x_mu_simplified_form(weights)
+                expected_future_diff_single = self.get_x_mu_simplified_form(weights, L) + position_mu
                 expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
@@ -520,6 +532,12 @@ class HAgent():
                 
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
+
+            if i == 25:
+                print(n_players_selected)
+                print(future_position_matrix)
+                print(position_mu)
+
             yield {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(weights, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
@@ -528,17 +546,7 @@ class HAgent():
     ### below are functions used for the optimization procedure 
     def get_position_priorities_from_weights(self, weights):
 
-        return (weights/self.v.T).dot(self.position_means)
-    
-    def get_future_position_matrix(self, available_players, default_position_matrix):
-        
-        #this should be converted to a matrix form somehow
-        team_comps = [pd.concat([self.positions_boolean.loc[self.players], self.positions_boolean.loc[[player]]])
-                       for player in available_players]
-
-        future_position_matrix = default_position_matrix - team_comps
-
-        return future_position_matrix
+        return (weights/self.v.T).dot(self.position_means.reshape(1,9,-1))
     
     def get_default_position_matrix(self, position_priorities):
 
@@ -546,8 +554,6 @@ class HAgent():
 
         top_guard_score = position_priorities[:,:,(1,2)].max(axis =2)
         top_forward_score = position_priorities[:,:,(3,4)].max(axis =2)
-
-        #print((2 * (position_priorities[:,:,1] == top_guard_score)).astype(int))
 
         nc = 2 + (3 * (position_priorities[:,:,0] == top_position_score).astype(int))
         npg = 1 + (2 * (position_priorities[:,:,1] == top_guard_score).astype(int)) + \
@@ -561,13 +567,19 @@ class HAgent():
         
         default_position_matrix = np.concatenate([nc,npg,nsg,npf,nsf], axis = 1)
 
-        print(position_priorities)
-        print(default_position_matrix)
-        sgfsd
-
         return default_position_matrix
 
+    def get_future_position_matrix(self, team_comps, default_position_matrix):
 
+        #should try replacing this with a cvxpy optimization version later 
+        
+        future_position_matrix = default_position_matrix - team_comps
+
+        future_position_matrix = future_position_matrix/(self.n_picks - len(self.players) - 1)
+
+        return future_position_matrix
+
+    
     def get_objective_and_pdf_weights(self
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
@@ -806,9 +818,9 @@ class HAgent():
 
         return x_mu
 
-    def get_x_mu_simplified_form(self,c):
-        last_four_terms = self.get_last_four_terms(c)
-        x_mu = np.einsum('ij, ajk -> aik',self.L, last_four_terms)
+    def get_x_mu_simplified_form(self,c, L):
+        last_four_terms = self.get_last_four_terms(c,L)
+        x_mu = np.einsum('aij, ajk -> aik',L, last_four_terms)
         return x_mu
 
 
@@ -842,72 +854,122 @@ class HAgent():
 
         return (c * self.gamma).reshape(-1,9,1) + (self.v * self.omega).reshape(1,9,1)
 
-    def get_term_five(self,c):
-        return self.get_term_five_a(c)/self.get_term_five_b(c)
+    def get_term_five(self,c,L):
+        return self.get_term_five_a(c,L)/self.get_term_five_b(c,L)
 
-    def get_term_five_a(self,c):
-        factor =  (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
+    def get_term_five_a(self,c, L):
+
+
+        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)
+        factor_top = np.einsum('pad, dp -> ap', v_dot_v_T_dot_L, c.T)
+
+        v_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_dot_L_dot_v = np.einsum('pad, dc -> ap', v_dot_L, self.v)
+
+        factor =  (factor_top/v_dot_L_dot_v).T
+        
         c_mod = c - factor
-        return np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1).reshape(-1,1,1))
+        c_mod_dot_L = np.einsum('pc, pcd -> pd', c_mod, L)
+        c_mod_dot_L_c_mod = np.einsum('pd, pd -> p', c_mod_dot_L, c_mod)
 
-    def get_term_five_b(self,c):
-        return ((c.dot(self.L) * c).sum(axis = 1) * self.v.T.dot(self.L).dot(self.v) - self.v.T.dot(self.L.dot(c.T))**2).reshape(-1,1,1)
+        res = np.sqrt(c_mod_dot_L_c_mod.reshape(-1,1,1))
 
-    def get_terms_four_five(self,c):
+        return res
+
+    def get_term_five_b(self,c,L):
+
+        c_dot_L = np.einsum('pc, pcd -> pd', c, L)
+        c_dot_L_c = np.einsum('pd, pd -> p', c_dot_L, c)
+
+        v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_T_dot_L_dot_v = np.einsum('pad, dc -> ap', v_T_dot_L, self.v)
+
+        L_dot_c_T = np.einsum('pcd, dp -> cp', L, c.T)
+        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', self.v.T, L_dot_c_T)
+
+        res = (c_dot_L_c * v_T_dot_L_dot_v - v_T_dot_L_dot_c**2).reshape(-1,1,1)
+
+        return res
+
+    def get_terms_four_five(self,c,L):
         #is this the right shape
-        return self.get_term_four(c) * self.get_term_five(c)
+        return self.get_term_four(c) * self.get_term_five(c,L)
 
     def get_del_term_four(self,c):
         return (np.identity(9) * self.gamma).reshape(1,9,9)
 
-    def get_del_term_five_a(self,c):
-        factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
+    def get_del_term_five_a(self,c,L):
+
+        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)
+        factor_top = np.einsum('pad, dp -> ap', v_dot_v_T_dot_L, c.T)
+
+        v_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_dot_L_dot_v = np.einsum('pad, dj -> jp', v_dot_L, self.v)
+
+        factor =  (factor_top/v_dot_L_dot_v).T
 
         c_mod = c - factor
-        top = c_mod.dot(self.L).reshape(-1,1,9)
-        bottom = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1).reshape(-1,1,1))
-        side = np.identity(9) - self.v.dot(self.v.T).dot(self.L)/self.v.T.dot(self.L).dot(self.v)
-        res = (top/bottom).dot(side)
+
+        top_og = np.einsum('pc, pcd -> pd', c_mod, L)
+
+        top = top_og.reshape(-1,1,9)
+        bottom = np.sqrt((np.einsum('pd, pd -> p',top_og,c_mod)).reshape(-1,1,1))
+
+        side= np.identity(9) - np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)/v_dot_L_dot_v.reshape(-1,1,1)
+        res = np.einsum('pia, pad -> pid', top/bottom, side)
+
         return res.reshape(-1,1,9)
 
-    def get_del_term_five_b(self,c):
-        term_one = (2 * c.dot(self.L) * self.v.T.dot(self.L).dot(self.v)).reshape(-1,1,9)
-        term_two = (2 * self.v.T.dot(self.L.dot(c.T)).T).reshape(-1,1,1)
-        term_three = (self.v.T.dot(self.L)).reshape(1,1,9)
-        return term_one.reshape(-1,1,9) - (term_two * term_three).reshape(-1,1,9)
+    def get_del_term_five_b(self,c,L):
 
-    def get_del_term_five(self,c):
-        a = self.get_term_five_a(c)
-        del_a = self.get_del_term_five_a(c)
-        b = self.get_term_five_b(c)
-        del_b = self.get_del_term_five_b(c)
+        c_dot_L = np.einsum('pc, pcd -> pd', c, L)
+
+        v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_T_dot_L_dot_v = np.einsum('pad, dj -> paj', v_T_dot_L, self.v)
+
+        L_dot_c_T = np.einsum('pcd, dp -> cp', L, c.T)
+        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', self.v.T, L_dot_c_T)
+
+        term_one = (2 * c_dot_L * v_T_dot_L_dot_v.reshape(-1,1)).reshape(-1,1,9)
+        term_two = (2 * v_T_dot_L_dot_c.T).reshape(-1,1,1)
+        term_three = v_T_dot_L.reshape(-1,1,9)
+
+        res = term_one.reshape(-1,1,9) - (term_two * term_three).reshape(-1,1,9)
+
+        return res
+
+    def get_del_term_five(self,c,L):
+        a = self.get_term_five_a(c,L)
+        del_a = self.get_del_term_five_a(c,L)
+        b = self.get_term_five_b(c,L)
+        del_b = self.get_del_term_five_b(c,L)
 
         return (del_a * b - a * del_b) / b**2
 
-    def get_del_terms_four_five(self,c):
-        return self.get_term_four(c) * self.get_del_term_five(c) + \
-                    self.get_del_term_four(c) * self.get_term_five(c)
+    def get_del_terms_four_five(self,c,L):
+        return self.get_term_four(c) * self.get_del_term_five(c,L) + \
+                    self.get_del_term_four(c) * self.get_term_five(c,L)
 
-    def get_last_three_terms(self,c):
-        return np.einsum('ij, ajk -> aik',self.L,self.get_terms_four_five(c))
+    def get_last_three_terms(self,c,L):
+        return np.einsum('aij, ajk -> aik',L,self.get_terms_four_five(c,L))
 
-    def get_del_last_three_terms(self,c):
-        return np.einsum('ij, ajk -> aik',self.L,self.get_del_terms_four_five(c))
+    def get_del_last_three_terms(self,c,L):
+        return np.einsum('aij, ajk -> aik',L,self.get_del_terms_four_five(c,L))
 
-    def get_last_four_terms(self,c):
+    def get_last_four_terms(self,c,L):
         term_two = self.get_term_two(c)
-        last_three = self.get_last_three_terms(c)
+        last_three = self.get_last_three_terms(c,L)
         return np.einsum('aij, ajk -> aik', term_two, last_three)
 
-    def get_del_last_four_terms(self,c):
+    def get_del_last_four_terms(self,c,L):
         comp_i = self.get_del_term_two(c)
-        comp_ii = self.get_last_three_terms(c)
+        comp_ii = self.get_last_three_terms(c,L)
         term_a = np.einsum('aijk, aj -> aik', comp_i, comp_ii.reshape(-1,9))
-        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c))
+        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c,L))
         return term_a + term_b
 
-    def get_del_full(self,c):
-        return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
+    def get_del_full(self,c, L):
+        return np.einsum('aij, ajk -> aik',L,self.get_del_last_four_terms(c,L))
 
     def make_pick(self
                   , player_assignments : dict[list]
