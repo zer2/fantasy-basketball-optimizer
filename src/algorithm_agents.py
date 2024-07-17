@@ -8,6 +8,7 @@ from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_p
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
 from src.helper_functions import get_eligibility_row_simplified
+from src.position_optimization import optimize_positions_all_players
 import datetime
 
 class HAgent():
@@ -65,7 +66,6 @@ class HAgent():
         self.L = info['L']
         self.scoring_format = scoring_format
         self.position_means = np.array(info['Position-Means']).reshape(1,-1,9)
-
         self.L_by_position = info['L-by-Position']
         self.L_by_position = np.array(self.L_by_position).reshape(1,-1,9,9)
 
@@ -422,12 +422,15 @@ class HAgent():
 
                 start = datetime.datetime.now()
 
-                position_priorities = self.get_position_priorities_from_weights(weights)
-                default_position_matrix = self.get_default_position_matrix(position_priorities)
-                future_position_matrix = self.get_future_position_matrix(team_comps, default_position_matrix)
+                position_rewards = self.get_position_priorities_from_weights(weights)
 
-                L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_matrix)
-                position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_matrix).reshape(-1,9,1)
+                future_position_array = optimize_positions_all_players(self.positions.loc[result_index]
+                                                                       ,position_rewards
+                                                                       ,self.positions.loc[self.players])
+
+                L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
+                position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
+                position_mu = np.expand_dims(position_mu, axis = 2)
 
                 del_full = self.get_del_full(weights, L)
 
@@ -533,10 +536,12 @@ class HAgent():
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
 
-            if i == 25:
-                print(n_players_selected)
-                print(future_position_matrix)
-                print(position_mu)
+            #if i == 25:
+            #    print(n_players_selected)
+            #    try:
+            #        print(future_position_array)
+            #    except:
+            #        pass
 
             yield {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(weights, index = result_index, columns = self.x_scores.columns)
@@ -546,8 +551,10 @@ class HAgent():
     ### below are functions used for the optimization procedure 
     def get_position_priorities_from_weights(self, weights):
 
-        return (weights/self.v.T).dot(self.position_means.reshape(1,9,-1))
+        res = np.einsum('ij, akj -> ik', weights/self.v.T, self.position_means)
+        return res
     
+    '''
     def get_default_position_matrix(self, position_priorities):
 
         top_position_score = position_priorities.max(axis =2)
@@ -578,6 +585,7 @@ class HAgent():
         future_position_matrix = future_position_matrix/(self.n_picks - len(self.players) - 1)
 
         return future_position_matrix
+    '''
 
     
     def get_objective_and_pdf_weights(self

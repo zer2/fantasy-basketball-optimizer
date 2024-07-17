@@ -297,10 +297,15 @@ def process_player_data(  _weekly_df : pd.DataFrame
   players_and_positions = pd.merge(x_scores
                            , positions
                            , left_index = True
-                           , right_index = True).explode('Position')
-
+                           , right_index = True)
+  
   #get position averages, to make sure the covariance matrix measures differences relative to position
-  position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
+  #we need to weight averages to avoid over-counting the players that can take multiple positions 
+  positions_exploded = players_and_positions[0:n_players].explode('Position').reset_index().set_index(['Player','Position'])
+  position_mean_weights = 1/positions_exploded.groupby('Player').transform('count')
+  position_means_weighted = positions_exploded.mul(position_mean_weights)
+
+  position_means = position_means_weighted.groupby('Position').sum()/position_mean_weights.groupby('Position').sum()
   position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
 
   #For later: standardize in the G-score basis 
