@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helper_functions import get_categories
+from src.helper_functions import get_categories, weighted_cov_matrix
 import os
 import streamlit as st
 
@@ -314,14 +314,21 @@ def process_player_data(  _weekly_df : pd.DataFrame
   position_means = position_means_g * v
 
   #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
-  joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
+  joined = pd.merge(players_and_positions.explode('Position')
+                    , position_means
+                    , right_index = True
+                    , left_on = 'Position'
+                    , suffixes = ['_x',''])
 
   x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
   x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
   
   L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
-
-  L_by_position = players_and_positions[0:n_players].explode('Position').groupby('Position').cov()
+  
+  L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
+                                                              , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
+                                                              for position in ['C','PG','SG','PF','SF']}
+                              )
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores

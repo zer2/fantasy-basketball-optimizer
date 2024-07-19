@@ -149,10 +149,29 @@ class HAgent():
         else:
             category_momentum_factor = 1000
 
-        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
+        initial_category_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                             default_weights).mean(axis = 2)
+        
+        initial_utility_shares = pd.DataFrame({'C' : [1/5] * len(x_scores_available_array)
+                                                ,'PG' : [1/5] * len(x_scores_available_array)
+                                                ,'SG' : [1/5] * len(x_scores_available_array)
+                                                ,'PF' : [1/5] * len(x_scores_available_array)
+                                                ,'SF' : [1/5] * len(x_scores_available_array)
+                                                })
+        
+        initial_guard_shares = pd.DataFrame({'PG' : [1/5] * len(x_scores_available_array)
+                                                ,'SG' : [1/5] * len(x_scores_available_array)
+                                                })
+        
+        initial_forward_shares = pd.DataFrame({'PF' : [1/5] * len(x_scores_available_array)
+                                                ,'SF' : [1/5] * len(x_scores_available_array)
+                                                })
+                
 
-        return self.perform_iterations(initial_weights
+        return self.perform_iterations(initial_category_weights
+                                       ,initial_utility_shares
+                                       ,initial_guard_shares
+                                       ,initial_forward_shares
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
@@ -379,7 +398,10 @@ class HAgent():
 
 
     def perform_iterations(self
-                           ,weights : pd.DataFrame
+                           ,category_weights : pd.DataFrame
+                           ,utility_shares : pd.DataFrame
+                           ,guard_shares : pd.DataFrame
+                           ,forward_shares : pd.DataFrame
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
@@ -414,27 +436,31 @@ class HAgent():
         team_comps = np.concatenate([starting_team_comp + self.positions_float.loc[[player]] for player in result_index]
                                     , axis = 0)
         
-        
         while True:
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.dynamic):
 
-                start = datetime.datetime.now()
-
-                position_rewards = self.get_position_priorities_from_weights(weights)
+                #calculate scores and category-level gradients
+                ######
+                position_rewards = self.get_position_priorities_from_category_weights(category_weights)
 
                 future_position_array = optimize_positions_all_players(self.positions.loc[result_index]
                                                                        ,position_rewards
-                                                                       ,self.positions.loc[self.players])
+                                                                       ,self.positions.loc[self.players]
+                                                                       , utility_shares
+                                                                       , guard_shares
+                                                                       , forward_shares)
 
                 L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
+
+
                 position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
                 position_mu = np.expand_dims(position_mu, axis = 2)
 
-                del_full = self.get_del_full(weights, L)
+                del_full = self.get_del_full(category_weights, L)
 
-                expected_future_diff_single = self.get_x_mu_simplified_form(weights, L) + position_mu
+                expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L) + position_mu
                 expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
                 x_diff_array = diff_means + x_scores_available_array + expected_future_diff
@@ -450,14 +476,33 @@ class HAgent():
 
                 gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
         
+                #update category weights
+                ######
                 step_size = self.alpha * (i + 1)**(-self.beta) 
                 change_weights = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
         
-                weights = weights + change_weights
+                category_weights = category_weights + change_weights
 
-                weights[weights < 0] = 0
+                category_weights[category_weights < 0] = 0
 
-                weights = weights/weights.sum(axis = 1).reshape(-1,1)
+                category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
+
+                #update position shares 
+                ######
+                position_gradient = np.einsum('ak,aik -> ai',gradient,self.position_means)
+
+                #update flex shares and ensure that they stay compliant with their definitions 
+                utility_shares += 10 * step_size * position_gradient/np.linalg.norm(position_gradient,axis = 1).reshape(-1,1)
+                utility_shares = np.clip(utility_shares, 0, 1)
+                utility_shares = utility_shares.div(utility_shares.sum(axis = 1), axis = 0)
+
+                guard_shares += step_size * position_gradient[:,(1,2)] /np.linalg.norm(position_gradient[:,(1,2)] ,axis = 1).reshape(-1,1)
+                guard_shares = np.clip(guard_shares, 0, 1)
+                guard_shares = guard_shares.div(guard_shares.sum(axis = 1), axis = 0)
+
+                forward_shares += step_size * position_gradient[:,(3,4)] /np.linalg.norm(position_gradient[:,(3,4)] ,axis = 1).reshape(-1,1)
+                forward_shares = np.clip(forward_shares, 0, 1)
+                forward_shares = forward_shares.div(forward_shares.sum(axis = 1), axis = 0)
 
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
@@ -467,7 +512,7 @@ class HAgent():
                 cdf_estimates = self.get_cdf(x_diff_array
                                             , diff_vars)
 
-                weights = None
+                category_weights = None
                 expected_future_diff = None
                 pdf_estimates = None
                 
@@ -482,7 +527,7 @@ class HAgent():
 
                 cdf_estimates = self.get_cdf(diff_means, diff_vars)
 
-                weights = None
+                category_weights = None
                 expected_future_diff = None
                 pdf_estimates = None
                 
@@ -519,7 +564,7 @@ class HAgent():
 
                 result_index = drop_potentials.index
 
-                weights = None
+                category_weights = None
                 expected_future_diff = None
 
             i = i + 1
@@ -544,12 +589,12 @@ class HAgent():
             #        pass
 
             yield {'Scores' : pd.Series(score, index = result_index)
-                    ,'Weights' : pd.DataFrame(weights, index = result_index, columns = self.x_scores.columns)
+                    ,'Weights' : pd.DataFrame(category_weights, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)}
 
     ### below are functions used for the optimization procedure 
-    def get_position_priorities_from_weights(self, weights):
+    def get_position_priorities_from_category_weights(self, weights):
 
         res = np.einsum('ij, akj -> ik', weights/self.v.T, self.position_means)
         return res
@@ -987,7 +1032,7 @@ class HAgent():
         generator = self.get_h_scores(player_assignments, j)
 
         res_list = []
-        for i in range(30):
+        for i in range(100):
             res = next(generator)
             res_list = res_list + [res] 
 

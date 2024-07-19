@@ -1,15 +1,16 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+import pandas as pd 
 
 def get_future_player_rows(position_rewards):
     """Takes an array of rewards by simplified position (5 columns) and translates them to rewards per slot (13) by player"""
 
-    util_rewards = np.array([np.max(position_rewards, axis = 1)] * 3)
+    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.001] * 3)
     center_rewards = np.array([position_rewards[:,0]] * 2)
-    guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1)] * 2)
+    guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1) + 0.001] * 2)
     pg_reward = np.array([position_rewards[:,1]]) 
     sg_reward = np.array([position_rewards[:,2]]) 
-    forward_rewards = np.array([np.max(position_rewards[:,3:5], axis = 1)] * 2)
+    forward_rewards = np.array([np.max(position_rewards[:,3:5], axis = 1)+ 0.001] * 2)
     pf_reward = np.array([position_rewards[:,3]]) 
     sf_reward =  np.array([position_rewards[:,4]]) 
 
@@ -98,7 +99,9 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
         return np.array([0] * 13)
 
 def get_position_array_from_res(res :np.array
-                                 , position_rewards : np.array
+                                 , utility_shares : pd.DataFrame
+                                 , forward_shares : pd.DataFrame
+                                 , guard_shares : pd.DataFrame
                                  , n_remaining_players : int):
     """Takes the result of the assignment problem from integers to the associated positions
     
@@ -114,39 +117,38 @@ def get_position_array_from_res(res :np.array
     """
 
     future_positions = res[:,-n_remaining_players:]
-    utils = (future_positions <= 2).sum(axis = 1)
-    centers = ((future_positions > 2) & (future_positions <=4)).sum(axis = 1)
-    guards = ((future_positions > 4) & (future_positions <=6)).sum(axis = 1)
-    pg = (future_positions ==7).sum(axis =1)
-    sg = (future_positions ==8).sum(axis = 1)
+    utils = (future_positions <= 2).sum(axis = 1).astype(float)
+    centers = ((future_positions > 2) & (future_positions <=4)).sum(axis = 1).astype(float)
+    guards = ((future_positions > 4) & (future_positions <=6)).sum(axis = 1).astype(float)
+    pg = (future_positions ==7).sum(axis =1).astype(float)
+    sg = (future_positions ==8).sum(axis = 1).astype(float)
     
-    forwards = ((future_positions > 8) & (future_positions <=10)).sum(axis = 1)
-    pf = (future_positions ==11).sum(axis = 1)
-    sf = (future_positions ==12).sum(axis = 1)
-    
-    max_reward = np.argmax(position_rewards, axis = 1)
-    
-    centers += (max_reward == 0) * utils
-    pg += (max_reward == 1) * utils
-    sg += (max_reward == 2) * utils
-    pf += (max_reward == 3) * utils
-    sf += (max_reward == 4) * utils
+    forwards = ((future_positions > 8) & (future_positions <=10)).sum(axis = 1).astype(float)
+    pf = (future_positions ==11).sum(axis = 1).astype(float)
+    sf = (future_positions ==12).sum(axis = 1).astype(float)
 
-    pg_better = (position_rewards[:,1] > position_rewards[:,2])
+    #add flex spots based on computed shares 
+    utils_split = utility_shares.mul(utils.reshape(-1,1))
+    guards_split = guard_shares.mul(guards.reshape(-1,1))
+    forwards_split = forward_shares.mul(forwards.reshape(-1,1))
 
-    pg += pg_better * guards
-    sg += ~pg_better * guards
-   
-    pf_better = (position_rewards[:,3] > position_rewards[:,4])
-    
-    pf += pf_better * forwards 
-    sf += ~pf_better * forwards
+    centers += utils_split.loc[:,'C']
+    pg += utils_split.loc[:,'PG'] + guards_split.loc[:,'PG']
+    sg += utils_split.loc[:,'SG'] + guards_split.loc[:,'SG']
+    pf += utils_split.loc[:,'PF'] + forwards_split.loc[:,'PF']
+    sf += utils_split.loc[:,'SF'] + forwards_split.loc[:,'SF']
 
-    return np.concatenate([[centers],[pg],[sg],[pf],[sf]], axis = 0).T
+    res = np.concatenate([[centers],[pg],[sg],[pf],[sf]], axis = 0).T
+    print(res)
+
+    return res
 
 def optimize_positions_all_players(candidate_players : list[list[str]]
                                    , position_rewards : np.array
                                    , team_so_far : list[list[str]]
+                                   , utility_shares : pd.DataFrame
+                                   , forward_shares : pd.DataFrame
+                                   , guard_shares : pd.DataFrame
                                    , scale_down : bool = True):
     """Optimizes positions of future draft picks for all candidate players and associated position rewards 
 
@@ -175,7 +177,11 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
                                 for player, reward_vector in zip(candidate_player_array,reward_array)]
                                 ]
                                 , axis = 0)
-    final_positions = get_position_array_from_res(all_res, position_rewards, n_remaining_players)
+    final_positions = get_position_array_from_res(all_res
+                                                  ,utility_shares
+                                                  ,guard_shares
+                                                  ,forward_shares
+                                                  , n_remaining_players)
 
     if scale_down:
         return final_positions/n_remaining_players

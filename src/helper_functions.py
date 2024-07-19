@@ -314,3 +314,9 @@ def get_eligibility_row_simplified(pos):
     if 'PF' in pos: 
         eligibility.add((4))
     return np.array([[i in eligibility for i in range(5)]])
+
+def weighted_cov_matrix(df, weights):
+    weighted_means = np.average(df, axis=0, weights=weights)
+    deviations = df - weighted_means
+    weighted_cov = np.dot(weights * deviations.T, deviations) / weights.sum()
+    return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
