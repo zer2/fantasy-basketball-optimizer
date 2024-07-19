@@ -91,7 +91,7 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
     """
 
     future_player_rows = np.array([reward_vector] * n_remaining_players)
-    full_array = np.concatenate([team_so_far_array, future_player_rows, [candidate_player_row]], axis = 0)    
+    full_array = np.concatenate([team_so_far_array, [candidate_player_row], future_player_rows], axis = 0)    
     try:
         res = linear_sum_assignment(full_array, maximize = True)
         return res[1] 
@@ -139,7 +139,6 @@ def get_position_array_from_res(res :np.array
     sf += utils_split.loc[:,'SF'] + forwards_split.loc[:,'SF']
 
     res = np.concatenate([[centers],[pg],[sg],[pf],[sf]], axis = 0).T
-    print(res)
 
     return res
 
