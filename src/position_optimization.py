@@ -100,8 +100,8 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
 
 def get_position_array_from_res(res :np.array
                                  , utility_shares : pd.DataFrame
-                                 , forward_shares : pd.DataFrame
                                  , guard_shares : pd.DataFrame
+                                 , forward_shares : pd.DataFrame
                                  , n_remaining_players : int):
     """Takes the result of the assignment problem from integers to the associated positions
     
@@ -146,8 +146,8 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
                                    , position_rewards : np.array
                                    , team_so_far : list[list[str]]
                                    , utility_shares : pd.DataFrame
-                                   , forward_shares : pd.DataFrame
                                    , guard_shares : pd.DataFrame
+                                   , forward_shares : pd.DataFrame
                                    , scale_down : bool = True):
     """Optimizes positions of future draft picks for all candidate players and associated position rewards 
 
@@ -176,12 +176,15 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
                                 for player, reward_vector in zip(candidate_player_array,reward_array)]
                                 ]
                                 , axis = 0)
+    
     final_positions = get_position_array_from_res(all_res
                                                   ,utility_shares
                                                   ,guard_shares
                                                   ,forward_shares
                                                   , n_remaining_players)
+    
 
+    
     if scale_down:
         return final_positions/n_remaining_players
     else: 

@@ -300,17 +300,25 @@ def process_player_data(  _weekly_df : pd.DataFrame
                            , right_index = True)
   
   #get position averages, to make sure the covariance matrix measures differences relative to position
-  #we need to weight averages to avoid over-counting the players that can take multiple positions 
-  positions_exploded = players_and_positions[0:n_players].explode('Position').reset_index().set_index(['Player','Position'])
+  #we need to weight averages to avoid over-counting the players that can take multiple positions
+  # 
+   
+  players_and_positions_limited = players_and_positions[0:n_players]
+  categories = get_categories(params)
+  players_and_positions_limited[categories] = players_and_positions_limited[categories] \
+                                                .sub(players_and_positions_limited[categories].mean(axis = 0))
+  positions_exploded = players_and_positions_limited.explode('Position').reset_index().set_index(['Player','Position'])
   position_mean_weights = 1/positions_exploded.groupby('Player').transform('count')
   position_means_weighted = positions_exploded.mul(position_mean_weights)
 
   position_means = position_means_weighted.groupby('Position').sum()/position_mean_weights.groupby('Position').sum()
+  positions_exploded = positions_exploded.sub(positions_exploded.mean(axis = 0)) #normalize by mean of the category 
+
   position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
 
-  #For later: standardize in the G-score basis 
   position_means_g = position_means/v
   position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
+  position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
   position_means = position_means_g * v
 
   #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
@@ -329,7 +337,7 @@ def process_player_data(  _weekly_df : pd.DataFrame
                                                               , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
                                                               for position in ['C','PG','SG','PF','SF']}
                               )
-
+    
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores

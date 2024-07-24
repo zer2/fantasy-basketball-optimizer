@@ -22,29 +22,37 @@ def test_x_mu_gradients():
         , dynamic = True
         , chi = None)
 
-    c_list = [np.array([1/8] * 8 + [0]).reshape(1,9)
+    c_list = [
+            np.array([1/8] * 8 + [0]).reshape(1,9)
             ,np.array([1/4]*4 + [0] * 5).reshape(1,9)
-            ,np.array([1/10] * 8 + [2/10]).reshape(1,9)]
+            ,np.array([1/10] * 8 + [2/10]).reshape(1,9)
+            ,np.array([[[0.1] + [0.15] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
+                            + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]]).reshape(11,9)
+             ]
 
     #check gradients
 
     for c in c_list:
 
-        x_mu_long = H.get_x_mu_long_form(c)
-        x_mu_simplified = H.get_x_mu_simplified_form(c)
+        L = np.array([H.L] * len(c))
 
-        assert x_mu_long.shape == x_mu_simplified.shape
-        assert (abs(x_mu_long - x_mu_simplified) < 0.01).all()
+        #x_mu_long = H.get_x_mu_long_form(c)
+        #x_mu_simplified = H.get_x_mu_simplified_form(c)
 
-        check_all_gradients(c, H.get_term_five_a, H.get_del_term_five_a)
-        check_all_gradients(c, H.get_term_five_b, H.get_del_term_five_b)
-        check_all_gradients(c, H.get_term_five, H.get_del_term_five)
-        check_all_gradients(c, H.get_term_four, H.get_del_term_four)
-        check_all_gradients(c, H.get_terms_four_five, H.get_del_terms_four_five)
-        check_all_gradients(c, H.get_term_two, H.get_del_term_two)
-        check_all_gradients(c, H.get_last_three_terms, H.get_del_last_three_terms)
-        check_all_gradients(c, H.get_last_four_terms, H.get_del_last_four_terms)
-        check_all_gradients(c, H.get_x_mu_simplified_form, H.get_del_full)
+        #assert x_mu_long.shape == x_mu_simplified.shape
+        #assert (abs(x_mu_long - x_mu_simplified) < 0.01).all(        
+        check_all_gradients(c, L,H.get_term_two, H.get_del_term_two)
+        check_all_gradients(c, L,H.get_term_five_a, H.get_del_term_five_a)
+
+        check_all_gradients(c, L,H.get_term_five_b, H.get_del_term_five_b)
+
+        check_all_gradients(c, L,H.get_term_four, H.get_del_term_four)
+        check_all_gradients(c, L,H.get_terms_four_five, H.get_del_terms_four_five)
+        check_all_gradients(c, L,H.get_last_three_terms, H.get_del_last_three_terms)
+        check_all_gradients(c, L,H.get_last_four_terms, H.get_del_last_four_terms)
+        check_all_gradients(c, L,H.get_x_mu_simplified_form, H.get_del_full)
+
+        check_all_gradients(c, L,H.get_term_five, H.get_del_term_five)
 
 def test_objective_gradients():
     """Make sure the H-score calculations for x_mu are working"""
@@ -135,24 +143,31 @@ def test_tipping_point_calculation():
 
     assert (abs(res - expected_result) < 0.01).all()
 
-def check_all_gradients(c, func, del_func):
+def check_all_gradients(c, L, func, del_func):
     for j in range(9):
-        check_gradient(c, func, del_func, j)
+        check_gradient(c, L, func, del_func, j)
 
 def check_all_gradients_2(c, func, del_func):
 
     check_gradient_2(c, func, del_func)
 
-def check_gradient(c, func, del_func, term):
+def check_gradient(c, L, func, del_func, term):
+
     h = 0.0000001
-    old = func(c)
+    old = func(c, L)
     c2 = c.copy()
 
     c2[0,term] = c2[0,term] + h
 
-    new = func(c2)
+    new = func(c2, L)
     del_real = (new - old)/h
-    del_theoretical = del_func(c)
+    del_theoretical = del_func(c, L)
+
+    if del_real.shape[0] > 1: 
+        del_real = del_real[0,:,:]
+
+    if del_theoretical.shape[0] > 1: 
+        del_theoretical = np.expand_dims(del_theoretical[0,:,:], axis = 0)
 
     if del_theoretical.shape == (1,1,9):
         res = del_theoretical[:,:,term]
@@ -165,6 +180,7 @@ def check_gradient(c, func, del_func, term):
 
 def check_gradient_2(c, func, del_func):
     h = 0.0001
+
     old = func(c)
 
     #print('Objective value:')

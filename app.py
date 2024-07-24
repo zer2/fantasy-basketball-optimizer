@@ -252,7 +252,7 @@ with param_tab:
       dataset_name = st.selectbox(
         'Which dataset do you want to default to?'
         ,all_datasets
-        ,index = 0
+        ,index = 6
         ,on_change = increment_player_stats_version
       )
 
