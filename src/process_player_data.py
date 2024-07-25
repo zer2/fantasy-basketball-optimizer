@@ -316,10 +316,10 @@ def process_player_data(  _weekly_df : pd.DataFrame
 
   position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
 
-  position_means_g = position_means/v
+  position_means_g = position_means * v
   position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
   position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
-  position_means = position_means_g * v
+  position_means = position_means_g / v
 
   #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
   joined = pd.merge(players_and_positions.explode('Position')

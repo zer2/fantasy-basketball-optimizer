@@ -138,9 +138,11 @@ def get_position_array_from_res(res :np.array
     pf += utils_split.loc[:,'PF'] + forwards_split.loc[:,'PF']
     sf += utils_split.loc[:,'SF'] + forwards_split.loc[:,'SF']
 
-    res = np.concatenate([[centers],[pg],[sg],[pf],[sf]], axis = 0).T
+    res_main = np.concatenate([[centers],[pg],[sg],[pf],[sf]], axis = 0).T
 
-    return res
+    flex_shares = np.concatenate([[utils],[guards],[forwards]], axis = 0).T
+
+    return res_main, flex_shares
 
 def optimize_positions_all_players(candidate_players : list[list[str]]
                                    , position_rewards : np.array
@@ -177,7 +179,7 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
                                 ]
                                 , axis = 0)
     
-    final_positions = get_position_array_from_res(all_res
+    final_positions, flex_shares = get_position_array_from_res(all_res
                                                   ,utility_shares
                                                   ,guard_shares
                                                   ,forward_shares
@@ -186,7 +188,7 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
 
     
     if scale_down:
-        return final_positions/n_remaining_players
+        return final_positions/n_remaining_players, flex_shares
     else: 
-        return final_positions
+        return final_positions, flex_shares
 
