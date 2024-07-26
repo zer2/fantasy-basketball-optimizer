@@ -262,9 +262,6 @@ def check_team_eligibility(players):
 
     """
 
-    #hack for now 
-    return True
-
     n_players = len(players)
     
     #we need 8 columns for the 8 positions. We are defining them as 
