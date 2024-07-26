@@ -53,19 +53,24 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
-        self.positions = positions
-        self.old = False
+
+        #ZR: we really need to fix this later lol. The thing is that the positions table 
+        #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
+        if positions is None:
+            self.positions = info['Positions']
+        else:
+            self.positions = positions
 
         self.collect_info = collect_info
         
         self.cross_player_var = info['Var']
-        self.L = info['L']
         self.scoring_format = scoring_format
 
         self.position_means = np.array(info['Position-Means']).reshape(1,-1,9)
 
-        self.L_by_position = info['L-by-Position']
-        self.L_by_position = np.array(self.L_by_position).reshape(1,-1,9,9)
+        L_by_position = info['L-by-Position']
+        L_by_position = np.array(L_by_position).reshape(1,-1,9,9)
+        self.L = L_by_position.mean(axis = 1)
 
         self.fudge_factor = fudge_factor
 
@@ -380,6 +385,8 @@ class HAgent():
 
         chi = self.chi if self.scoring_format == 'Rotisserie' else 1
 
+        #is cross_player_var just the diagonal entries of L? 
+
         diff_var = self.n_picks * \
             (2 * chi +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
@@ -444,7 +451,10 @@ class HAgent():
          Case (4): If n_players_selected > n_picks, all subsets of possible players are evaluated for the best subset
 
         Args:
-            weights: Starting choice of weights. Relevant for case (1)
+            category_weights: Starting choice of weights. Relevant for case (1)
+            utility_shares: starting fraction of future utility spots expected to be used for each position
+            guard_shares: starting fraction of future guard spots expected to be used for each position
+            forward_shares: starting fraction of future forward spots expected to be used for each position
             my_players: list of players selected by the current drafter
             n_players_selected: integer, number of players already selected by the current drafter 
                                 This is a param in addition to my_players because n_players_selected is already calculated in the parent function
@@ -508,14 +518,6 @@ class HAgent():
                         k : optimizers[k].minimize(grad) for k, grad in gradients_centered.items()
                     }
                 
-                #full_gradient = np.concatenate( list(gradients_centered.values()), axis = 1)
-                #norm = np.linalg.norm(full_gradient,axis = 1).reshape(-1,1)
-
-                #update category weights
-                ######
-                #step_size = self.alpha * (i + 1)**(-self.beta) 
-
-                #change_weights = step_size * gradients_centered['Categories']/norm
                 category_weights = category_weights + updates['Categories']
                 category_weights[category_weights < 0] = 0
                 category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
@@ -631,9 +633,12 @@ class HAgent():
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
-                    ,'Utility-Shares' : pd.DataFrame(utility_shares_current.values, index = result_index, columns = ['C','PG','SG','PF','SF']) 
-                    ,'Guard-Shares' : pd.DataFrame(forward_shares_current.values, index = result_index, columns = ['PG','SG']) 
-                    ,'Forward-Shares' : pd.DataFrame(guard_shares_current.values, index = result_index, columns = ['PF','SF']) 
+                    ,'Utility-Shares' : pd.DataFrame(utility_shares_current.values, index = result_index
+                                                     , columns = ['C','PG','SG','PF','SF']) 
+                    ,'Guard-Shares' : pd.DataFrame(forward_shares_current.values, index = result_index
+                                                   , columns = ['PG','SG']) 
+                    ,'Forward-Shares' : pd.DataFrame(guard_shares_current.values, index = result_index
+                                                     , columns = ['PF','SF']) 
                     
                     
                     }
@@ -643,39 +648,6 @@ class HAgent():
 
         res = np.einsum('ij, akj -> ik', weights/self.v.T, self.position_means)
         return res
-    
-    '''
-    def get_default_position_matrix(self, position_priorities):
-
-        top_position_score = position_priorities.max(axis =2)
-
-        top_guard_score = position_priorities[:,:,(1,2)].max(axis =2)
-        top_forward_score = position_priorities[:,:,(3,4)].max(axis =2)
-
-        nc = 2 + (3 * (position_priorities[:,:,0] == top_position_score).astype(int))
-        npg = 1 + (2 * (position_priorities[:,:,1] == top_guard_score).astype(int)) + \
-                                3 * (position_priorities[:,:,1] == top_position_score).astype(int)
-        nsg = 1 + (2 * (position_priorities[:,:,2] == top_guard_score).astype(int)) + \
-                                3 * (position_priorities[:,:,2] == top_position_score).astype(int)
-        npf = 1 + (2 * (position_priorities[:,:,3] == top_forward_score).astype(int)) + \
-                                3 * (position_priorities[:,:,3] == top_position_score).astype(int)
-        nsf = 1 + (2 * (position_priorities[:,:,4] == top_forward_score).astype(int)) + \
-                                3 * (position_priorities[:,:,4] == top_position_score).astype(int)
-        
-        default_position_matrix = np.concatenate([nc,npg,nsg,npf,nsf], axis = 1)
-
-        return default_position_matrix
-
-    def get_future_position_matrix(self, team_comps, default_position_matrix):
-
-        #should try replacing this with a cvxpy optimization version later 
-        
-        future_position_matrix = default_position_matrix - team_comps
-
-        future_position_matrix = future_position_matrix/(self.n_picks - len(self.players) - 1)
-
-        return future_position_matrix
-    '''
 
     def get_objective_and_gradient(self
                                     ,category_weights
@@ -702,14 +674,13 @@ class HAgent():
                                                                     , forward_shares)
             
 
-            if self.old:
-                L = np.array([self.L])
-                position_mu = 0
-            else:
-                #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
-                position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
-                position_mu = np.expand_dims(position_mu, axis = 2)
-                L = self.L_by_position.mean(axis = 1)
+
+            position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
+            position_mu = np.expand_dims(position_mu, axis = 2)
+
+            #this causes an issue with gradients. It doesn't change much so we can just keep L constant
+            #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
+            L = self.L
 
             del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L)
 
@@ -840,7 +811,7 @@ class HAgent():
         Returns:
             Objective or Objective, Gradient 
         """
-        objective = cdf_estimates.mean(axis = 2).sum(axis = 1) 
+        objective = cdf_estimates.mean(axis = 2).mean(axis = 1) 
 
         if calculate_pdf_weights:
 

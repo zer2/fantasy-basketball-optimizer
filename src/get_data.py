@@ -12,8 +12,8 @@ import snowflake.connector
 def get_data_from_snowflake(table_name):
    
    con = snowflake.connector.connect(
-        user=st.secrets['SNOWFLAKE-USER']
-        ,password=st.secrets['SNOWFLAKE-PASSWORD']
+        user=st.secrets['SNOWFLAKE_USER']
+        ,password=st.secrets['SNOWFLAKE_PASSWORD']
         ,account='aib52055.us-east-1'
         ,database = 'FANTASYOPTIMIZER'
         ,schema = 'FANTASYBASKETBALLOPTIMIZER'
@@ -115,15 +115,15 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource
-def get_historical_data():
-  #get the one-time load of historical data stored as a CSV. In the future, it would perhaps be better to get this from snowflake
-  
-  full_df = pd.read_csv('./data/stat_df.csv')
+def get_historical_data():  
+  full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW')
 
   renamer = st.session_state.params['stat-df-renamer']
   full_df = full_df.rename(columns = renamer)
 
-  full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
+  full_df = full_df.apply(pd.to_numeric, errors='ignore')
+
+  #full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
 
   full_df.loc[:,'Free Throw %'] = full_df.loc[:,'Free Throws Made']/full_df.loc[:,'Free Throw Attempts']
   full_df.loc[:,'Field Goal %'] = full_df.loc[:,'Field Goals Made']/full_df.loc[:,'Field Goal Attempts']
@@ -131,9 +131,6 @@ def get_historical_data():
   full_df['Position'] = full_df['Position'].fillna('NP')
 
   full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
-
-  #adjust for the fact that historical data is week-based on game-based
-  all_counting_stats = st.session_state.params['counting-statistics'] + st.session_state.params['volume-statistics']
 
   return full_df
 

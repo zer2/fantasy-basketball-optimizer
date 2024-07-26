@@ -246,6 +246,7 @@ def make_progress_chart(res : list[pd.DataFrame]):
 
     return fig
 
+#this function should use scipy.special.linear_sum_assignment
 def check_team_eligibility(players):    
     """Checks if a team is eligible or not, based on the players' possible positions
 
@@ -260,6 +261,10 @@ def check_team_eligibility(players):
         True or False, depending on if the team is found to be eligible or not
 
     """
+
+    #hack for now 
+    return True
+
     n_players = len(players)
     
     #we need 8 columns for the 8 positions. We are defining them as 

@@ -45,20 +45,21 @@ historical-renamer:
  FGM : Field Goals Made
  date : Date
 stat-df-renamer:
- season : Season
- player : Player
- pts : Points
- trb : Rebounds
- ast : Assists
- stl : Steals
- blk : Blocks
- fg3 : Threes
- tov : Turnovers
- ft : Free Throws Made
- fta : Free Throw Attempts
- fg : Field Goals Made
- fga : Field Goal Attempts
- pos : Position
+ SEASON : Season
+ NBA_PLAYER_NAME : Player
+ POINTS : Points
+ REBOUNDS : Rebounds
+ ASSISTS : Assists
+ STEALS : Steals
+ BLOCKS : Blocks
+ THREES : Threes
+ TURNOVERS : Turnovers
+ FREE_THROWS_MADE : Free Throws Made
+ FREE_THROW_ATTEMPTS : Free Throw Attempts
+ FIELD_GOALS_MADE : Field Goals Made
+ FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+ POSITION_LIST : Position
+ GAMES_PLAYED_PERCENT : Games Played %
 darko-renamer:
  PTS : Points
  REB : Rebounds

@@ -274,7 +274,6 @@ with param_tab:
       player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
       selections = selections.astype(player_category_type)
       
-
   with advanced_params:
 
     player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
@@ -639,7 +638,7 @@ H = HAgent(info = info
     , n_drafters = n_drafters
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
-    , chi = chi)  
+    , chi = chi )
 
 if st.session_state['mode'] == 'Draft Mode':
 

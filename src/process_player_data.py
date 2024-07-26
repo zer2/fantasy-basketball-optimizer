@@ -290,7 +290,7 @@ def process_player_data(  _weekly_df : pd.DataFrame
   #need to fix this later for Roto
   x_scores = x_scores.loc[g_scores.index]
 
-  positions = _player_means[['Position']]
+  positions = _player_means['Position'].str.split(',')
 
   cross_player_var =  x_scores[0:n_players].var()
                           
@@ -320,18 +320,6 @@ def process_player_data(  _weekly_df : pd.DataFrame
   position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
   position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
   position_means = position_means_g / v
-
-  #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
-  joined = pd.merge(players_and_positions.explode('Position')
-                    , position_means
-                    , right_index = True
-                    , left_on = 'Position'
-                    , suffixes = ['_x',''])
-
-  x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
-  x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
-  
-  L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
   
   L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
                                                               , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
@@ -341,14 +329,13 @@ def process_player_data(  _weekly_df : pd.DataFrame
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
-          ,'X-scores-as-diff' : x_scores_as_diff
           , 'Var' : cross_player_var
           , 'Positions' : positions
           , 'Mov' : mov
           , 'Vom' : vom
-          , 'L' : L
           , 'Position-Means' : position_means
-          , 'L-by-Position' : L_by_position}
+          , 'L-by-Position' : L_by_position
+          , 'Positions' : positions}
 
   if st.session_state: #if we are running outside of streamlit this will be empty, and will evaluate to False
     st.session_state.info_key += 1 
