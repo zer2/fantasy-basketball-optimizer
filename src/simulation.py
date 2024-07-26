@@ -312,9 +312,11 @@ def try_strategy(_primary_agent
 
         #this is all we need from agents, and it allows us to pickle them 
         if primary_agent_type == 'H':
-            agents_dict[i] = {'all_res_list' : agents_post[i].all_res_list
-                            ,'players' : agents_post[i].players
-                            ,'v' : agents_post[i].v}
+            agents_dict[i] = agents_post[i] #{'all_res_list' : agents_post[i].all_res_list
+                            #,'players' : agents_post[i].players
+                            #,'x_scores' : agents_post[i].x_scores
+                            #,'v' : agents_post[i].v
+                            #,'L' : agents_post[i].L}
         else:
             agents_dict[i] = None
 

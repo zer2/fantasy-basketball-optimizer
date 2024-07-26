@@ -202,7 +202,7 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict):
    return value_by_category
 
 @st.cache_data(show_spinner = False)
-def process_player_data(  _weekly_df : pd.DataFrame
+def process_player_data(  weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series
@@ -231,27 +231,27 @@ def process_player_data(  _weekly_df : pd.DataFrame
   """
   n_players = n_drafters * n_picks
 
-  if _weekly_df is not None:
-    coefficients_first_order = calculate_coefficients_historical(_weekly_df
-                                                , pd.unique(_weekly_df.index.get_level_values('Player'))
+  if weekly_df is not None:
+    coefficients_first_order = calculate_coefficients_historical(weekly_df
+                                                , pd.unique(weekly_df.index.get_level_values('Player'))
                                                 , params)
   else:
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors['Conversion Factor'])
         
-  z_scores_first_order =  calculate_scores_from_coefficients(_player_means
+  g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
-                                                          ,0)
-  z_scores_first_order = z_scores_first_order * multipliers.T.values[0]
+                                                          ,1)
+  g_scores_first_order = g_scores_first_order * multipliers.T.values[0]
 
-  first_order_score = z_scores_first_order.sum(axis = 1)
+  first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  if _weekly_df is not None:
-    coefficients = calculate_coefficients_historical(_weekly_df
+  if weekly_df is not None:
+    coefficients = calculate_coefficients_historical(weekly_df
                                                 , representative_player_set
                                                 , params)
   else:
@@ -259,8 +259,6 @@ def process_player_data(  _weekly_df : pd.DataFrame
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
     
-
-  #st.write(coefficients)
 
   mov = coefficients.loc[get_categories(params) , 'Mean of Variances']
   vom = coefficients.loc[get_categories(params) , 'Variance of Means']
@@ -314,6 +312,8 @@ def process_player_data(  _weekly_df : pd.DataFrame
   position_means = position_means_weighted.groupby('Position').sum()/position_mean_weights.groupby('Position').sum()
   positions_exploded = positions_exploded.sub(positions_exploded.mean(axis = 0)) #normalize by mean of the category 
 
+  #we should have some logic for position not being available
+  #also all of the position rules should be modularized 
   position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
 
   position_means_g = position_means * v

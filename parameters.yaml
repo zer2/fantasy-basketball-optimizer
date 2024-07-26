@@ -61,22 +61,20 @@ stat-df-renamer:
  POSITION_LIST : Position
  GAMES_PLAYED_PERCENT : Games Played %
 darko-renamer:
- PTS : Points
- REB : Rebounds
- AST : Assists
- STL: Steals
- BLK : Blocks
- FG3M : Threes
- TOV : Turnovers
- FTA : Free Throw Attempts
- FGA : Field Goal Attempts
- FT% : Free Throw %
- FG% : Field Goal %
-darko-player-renamer : 
-  Xavier Tillman : Xavier Tillman Sr.
-  P.J. Washington : P.J. Washington Jr.
-  GG Jackson : GG Jackson II
-  Nicolas Claxton : Nic Claxton
+ NBA_PLAYER_NAME : Player
+ POINTS : Points
+ REBOUNDS : Rebounds
+ ASSISTS : Assists
+ STEALS : Steals
+ BLOCKS : Blocks
+ THREES : Threes
+ TURNOVERS : Turnovers
+ FREE_THROW_ATTEMPTS : Free Throw Attempts
+ FREE_THROW_PERCENT : Free Throw %
+ FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+ FIELD_GOAL_PERCENT : Field Goal %
+ POSITION_LIST : Position
+ MINUTES_PLAYED : Forecasted Minutes
 schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
 z-score-player-multiplier : 50
 z-score-team-multiplier : 20

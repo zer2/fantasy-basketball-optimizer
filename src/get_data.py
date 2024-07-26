@@ -169,40 +169,20 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   Returns:
       Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
   """
-  skill_projections = pd.read_csv('data/DARKO_player_talent_2024-03-13.csv')
-  per_game_projections = pd.read_csv('data/DARKO_daily_projections_2024-03-13.csv')
-  all_darko = skill_projections.merge(per_game_projections)
-
-  player_renamer = st.session_state.params['darko-player-renamer']
-  all_darko['Player'] = all_darko['Player'].replace(player_renamer)
-  
-  all_darko = all_darko.set_index('Player') 
-
-  #get fg% from skill projections: fg2% * (1-FG3ARate%) + fg3% * Fg3ARate%
-  fg3_pct = all_darko['FG3%']
-  fg2_pct = all_darko['FG2%']
-  fg3a_pct = all_darko['FG3ARate%']	
-  fg3a = all_darko['FG3A']
-
-  oreb = all_darko['OREB'] 
-  dreb = all_darko['DREB'] 
-
-  all_darko.loc[:,'FG%'] = fg2_pct * (1- fg3a_pct) + fg3_pct * fg3a_pct
-  all_darko.loc[:,'FG3M'] = fg3_pct * fg3a
-  all_darko.loc[:,'REB'] = dreb + oreb 
-
+  darko_df = get_data_from_snowflake('DARKO_VIEW')
   renamer = st.session_state.params['darko-renamer']
-  all_darko = all_darko.rename(columns = renamer)
+  darko_df = darko_df.rename(columns = renamer)
+  darko_df = darko_df.apply(pd.to_numeric, errors='ignore')
 
-  player_metadata = get_player_metadata()
-  all_darko = all_darko.merge(player_metadata, left_index = True, right_index = True)
+  darko_df['Position'] = darko_df['Position'].fillna('NP')
+  darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
     
   required_columns = st.session_state.params['counting-statistics'] + \
                     st.session_state.params['percentage-statistics'] + \
                     st.session_state.params['volume-statistics'] + \
                     st.session_state.params['other-columns']
-  darko_short_term = get_darko_short_term(all_darko)[required_columns]
-  darko_long_term = get_darko_long_term(all_darko, expected_minutes)[required_columns]
+  darko_short_term = get_darko_short_term(darko_df)[required_columns]
+  darko_long_term = get_darko_long_term(darko_df, expected_minutes)[required_columns]
 
   return {'DARKO-S' : darko_short_term
            ,'DARKO-L' : darko_long_term}
@@ -232,33 +212,19 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
     Returns:
         Dataframe of predictions
     """
-    all_darko = all_darko.drop(columns = ['Minutes'])
     darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
-  
-    possesions = darko_long_term['Minutes']/48 * darko_long_term['Pace']/100
-  
-    free_throw_attempts = possesions * darko_long_term.loc[:,'FTA/100'] 
-    free_throws_made = free_throw_attempts * darko_long_term.loc[:,'Free Throw %']
 
-    three_attempts = possesions * darko_long_term.loc[:,'FG3A/100']
-    threes_made = three_attempts * darko_long_term['FG3%']
-
-    two_attempts = possesions * (darko_long_term.loc[:,'FGA/100'] - darko_long_term.loc[:,'FG3A/100'] ) 
-    twos_made = two_attempts * darko_long_term['FG2%']
+    minutes_adjustment_factor = darko_long_term['Minutes']/darko_long_term['Forecasted Minutes']
  
-    darko_long_term.loc[:,'Points'] = 3*threes_made + 2*twos_made + free_throws_made
-    darko_long_term.loc[:,'Rebounds'] = possesions * darko_long_term.loc[:,'REB/100'] 
-    darko_long_term.loc[:,'Assists'] = possesions * darko_long_term.loc[:,'AST/100'] 
-    darko_long_term.loc[:,'Steals'] = possesions * darko_long_term.loc[:,'STL/100'] 
-    darko_long_term.loc[:,'Blocks'] = possesions * darko_long_term.loc[:,'BLK/100'] 
-    darko_long_term.loc[:,'Threes'] =  threes_made
-    darko_long_term.loc[:,'Turnovers'] = possesions * darko_long_term.loc[:,'TOV/100'] 
-    darko_long_term.loc[:,'Free Throw Attempts'] = free_throw_attempts
-    darko_long_term.loc[:,'Field Goal Attempts'] = two_attempts + three_attempts
-
-    darko_long_term.loc[:,'Field Goal %'] = (twos_made + threes_made)/(two_attempts + three_attempts)
-    darko_long_term.loc[:,'Free Throw %'] = darko_long_term.loc[:,'Free Throw %']
-
+    darko_long_term.loc[:,'Points'] = darko_long_term.loc[:,'Points'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Rebounds'] = darko_long_term.loc[:,'Rebounds'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Assists'] = darko_long_term.loc[:,'Assists'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Steals'] = darko_long_term.loc[:,'Steals'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Blocks'] = darko_long_term.loc[:,'Blocks'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Threes'] =  darko_long_term.loc[:,'Threes'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Turnovers'] = darko_long_term.loc[:,'Turnovers'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Free Throw Attempts'] = darko_long_term.loc[:,'Free Throw Attempts'] * minutes_adjustment_factor
+    darko_long_term.loc[:,'Field Goal Attempts'] = darko_long_term.loc[:,'Field Goal Attempts'] * minutes_adjustment_factor
     darko_long_term.loc[:,'Games Played %'] = 1
 
     return darko_long_term

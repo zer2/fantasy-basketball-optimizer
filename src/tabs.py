@@ -1090,8 +1090,8 @@ def make_trade_h_tab(_H
 
 ### Rank tabs 
 
-#@st.cache_data(show_spinner = False)
-def make_rank_tab(_scores : pd.DataFrame
+@st.cache_data(show_spinner = False)
+def make_rank_tab(scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
   """Show rankings by general value
@@ -1104,7 +1104,7 @@ def make_rank_tab(_scores : pd.DataFrame
   Returns:
       None
   """
-  scores_copy = _scores.copy()
+  scores_copy = scores.copy()
 
   scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
   scores_copy.loc[:,'Player'] = scores_copy.index
@@ -1114,8 +1114,8 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-#@st.cache_data(show_spinner = False)
-def make_h_rank_tab(_info : dict
+@st.cache_data(show_spinner = False)
+def make_h_rank_tab(info : dict
                   , omega : float
                   , gamma : float
                   , alpha : float
@@ -1148,7 +1148,7 @@ def make_h_rank_tab(_info : dict
       None
   """
 
-  H = HAgent(info = _info
+  H = HAgent(info = info
     , omega = omega
     , gamma = gamma
     , alpha = alpha
