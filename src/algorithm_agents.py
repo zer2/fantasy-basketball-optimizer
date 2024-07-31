@@ -143,7 +143,7 @@ class HAgent():
                                                 self.x_scores.index.isin(self.positions.index)]
         total_players = self.n_picks * self.n_drafters
 
-        diff_means, sum_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
+        diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
                                         , drafter
                                         , x_scores_available
                                         , cash_remaining_per_team
@@ -209,7 +209,6 @@ class HAgent():
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
-                                       , sum_means
                                        , diff_vars
                                        , x_scores_available_array
                                        , x_scores_available.index
@@ -282,7 +281,6 @@ class HAgent():
             ).T
 
             diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
-            sum_means = x_self_sum.reshape(1,9,1) + other_team_sums.reshape(1,9,self.n_drafters - 1)
 
         #make order statistics adjustment for Roto 
         if self.scoring_format == 'Rotisserie':
@@ -322,7 +320,7 @@ class HAgent():
             self.value_of_money = None
 
 
-        return diff_means, sum_means, diff_vars, n_values
+        return diff_means, diff_vars, n_values
 
     def get_opposing_team_means(self
                             , players : list[str]
@@ -441,7 +439,6 @@ class HAgent():
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
-                           ,sum_means
                            ,diff_vars : pd.Series
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
@@ -509,7 +506,6 @@ class HAgent():
                                                     ,guard_shares
                                                     ,forward_shares
                                                     ,diff_means
-                                                    ,sum_means
                                                     ,diff_vars
                                                     ,x_scores_available_array
                                                     ,result_index
@@ -650,10 +646,8 @@ class HAgent():
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
 
                 x_diff_array = diff_means + x_scores_available_array
-                x_sum_array = sum_means + x_scores_available_array
 
                 cdf_estimates = self.get_cdf(x_diff_array
-                                             , x_sum_array
                                             , diff_vars)
 
                 category_weights = None
@@ -750,7 +744,6 @@ class HAgent():
                                     ,guard_shares
                                     ,forward_shares
                                     ,diff_means
-                                    ,sum_means
                                     ,diff_vars
                                     ,x_scores_available_array
                                     ,result_index
@@ -784,10 +777,9 @@ class HAgent():
             expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
             x_diff_array = diff_means + x_scores_available_array + expected_future_diff
-            x_sum_array = sum_means + x_scores_available_array + expected_future_diff
 
-            pdf_estimates = self.get_pdf(x_diff_array, x_sum_array, diff_vars)
-            cdf_estimates = self.get_cdf(x_diff_array, x_sum_array, diff_vars)
+            pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
+            cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
     
             score, pdf_weights = self.get_objective_and_pdf_weights(
                                     cdf_estimates
@@ -988,7 +980,6 @@ class HAgent():
 
     def get_pdf(self
                 , x_diff_array : np.array
-                , x_sum_array : np.array 
                 , diff_vars : np.array) -> np.array:
         """
         Calculate the PDF via arrays of means and variance
@@ -1000,20 +991,13 @@ class HAgent():
         Returns:
             Array of PDFs
         """
-        #percent stats arent Poisson so they dont get adjusted 
-        new_x_sum_array = x_sum_array.copy()
-        new_x_sum_array[:,0,:] = 0 
-        new_x_sum_array[:,1,:] = 0 
         #need to resize
-
-        sum_array_reshaped = new_x_sum_array.reshape(new_x_sum_array.shape[0]
-                                            , new_x_sum_array.shape[1] * new_x_sum_array.shape[2])
         diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]
                                                     , x_diff_array.shape[1] * x_diff_array.shape[2])
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
         #the addition of diff_array_reshaped is the experimental Poisson adjustment 
-        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + sum_array_reshaped))
+        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + diff_array_reshaped))
 
         pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
 
@@ -1021,7 +1005,6 @@ class HAgent():
     
     def get_cdf(self
             , x_diff_array : np.array
-            , x_sum_array
             , diff_vars : np.array) -> np.array:
         """
         Calculate the CDF via arrays of means and variance
@@ -1033,19 +1016,13 @@ class HAgent():
         Returns:
             Array of CDFs
         """
-        #percent stats arent Poisson so they dont get adjusted 
-        new_x_sum_array = x_sum_array.copy()
-        new_x_sum_array[:,0,:] = 0 
-        new_x_sum_array[:,1,:] = 0 
 
         #need to resize
-        sum_array_reshaped = new_x_sum_array.reshape(new_x_sum_array.shape[0]
-                                    , new_x_sum_array.shape[1] * new_x_sum_array.shape[2])
         diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]
                                                     , x_diff_array.shape[1] * x_diff_array.shape[2])
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
-        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + sum_array_reshaped))
+        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + diff_array_reshaped))
 
         cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
 
