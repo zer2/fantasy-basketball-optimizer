@@ -10,6 +10,7 @@ import streamlit as st
 from src.helper_functions import get_eligibility_row_simplified
 from src.position_optimization import optimize_positions_all_players
 import datetime
+import scipy
 
 class HAgent():
 
@@ -142,7 +143,7 @@ class HAgent():
                                                 self.x_scores.index.isin(self.positions.index)]
         total_players = self.n_picks * self.n_drafters
 
-        diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
+        diff_means, sum_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
                                         , drafter
                                         , x_scores_available
                                         , cash_remaining_per_team
@@ -208,6 +209,7 @@ class HAgent():
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
+                                       , sum_means
                                        , diff_vars
                                        , x_scores_available_array
                                        , x_scores_available.index
@@ -280,6 +282,7 @@ class HAgent():
             ).T
 
             diff_means = x_self_sum.reshape(1,9,1) - other_team_sums.reshape(1,9,self.n_drafters - 1)
+            sum_means = x_self_sum.reshape(1,9,1) + other_team_sums.reshape(1,9,self.n_drafters - 1)
 
         #make order statistics adjustment for Roto 
         if self.scoring_format == 'Rotisserie':
@@ -319,7 +322,7 @@ class HAgent():
             self.value_of_money = None
 
 
-        return diff_means, diff_vars, n_values
+        return diff_means, sum_means, diff_vars, n_values
 
     def get_opposing_team_means(self
                             , players : list[str]
@@ -438,6 +441,7 @@ class HAgent():
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
+                           ,sum_means
                            ,diff_vars : pd.Series
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
@@ -467,20 +471,27 @@ class HAgent():
         """
         i = 0
 
+        optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.001)
+            ,'Utilities' : AdamOptimizer(learning_rate = 0.01)
+            ,'Guards' : AdamOptimizer(learning_rate = 0.01)
+            ,'Forwards' : AdamOptimizer(learning_rate = 0.01)}
+            
+
+        '''
         if len(self.players) == 0:
 
-            optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.01)
-                        ,'Utilities' : AdamOptimizer(learning_rate = 0.1)
-                        ,'Guards' : AdamOptimizer(learning_rate = 0.1)
-                        ,'Forwards' : AdamOptimizer(learning_rate = 0.1)}
+            optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.001)
+                        ,'Utilities' : AdamOptimizer(learning_rate = 0.01)
+                        ,'Guards' : AdamOptimizer(learning_rate = 0.01)
+                        ,'Forwards' : AdamOptimizer(learning_rate = 0.01)}
             
         else:
 
-            optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.005)
-                        ,'Utilities' : AdamOptimizer(learning_rate = 0.05)
-                        ,'Guards' : AdamOptimizer(learning_rate = 0.05)
-                        ,'Forwards' : AdamOptimizer(learning_rate = 0.05)}  
-
+            optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.0005)
+                        ,'Utilities' : AdamOptimizer(learning_rate = 0.005)
+                        ,'Guards' : AdamOptimizer(learning_rate = 0.005)
+                        ,'Forwards' : AdamOptimizer(learning_rate = 0.005)}  
+        '''
 
         while True:
 
@@ -498,6 +509,7 @@ class HAgent():
                                                     ,guard_shares
                                                     ,forward_shares
                                                     ,diff_means
+                                                    ,sum_means
                                                     ,diff_vars
                                                     ,x_scores_available_array
                                                     ,result_index
@@ -506,17 +518,53 @@ class HAgent():
                 score = res['Score']
                 gradients = res['Gradients']
                 cdf_estimates = res['CDF-Estimates']
-                expected_future_diff = res['Future-Diffs']     
+                expected_future_diff = res['Future-Diffs']   
+
+
+                #category_weights[:,0] = category_weights[:,0] + 0.0000001  
+
+                #utility_shares['C'] = utility_shares['C'] + 0.0000001  
+                #
+                #res2 = self.get_objective_and_gradient(category_weights
+                #                    ,utility_shares
+                #                    ,guard_shares
+                #                    ,forward_shares
+                #                    ,diff_means
+                #                    ,diff_vars
+                #                    ,x_scores_available_array
+                #                    ,result_index
+                #                    ,n_players_selected
+                #                    ,n_values)
+                
+                #imputed_grad = (res2['Score'] - score)/0.0000001
+                #calculated_grad = res['Gradients']['Categories'][:,0]
+                #calculated_grad = res['Gradients']['Utilities'][:,0]
+
+                #print('Number of players')
+                #print(len(self.players))
+                #print('Iteration')
+                #print(i)
+
+                #print('grads uncentered')
+                #print(gradients['Categories'][0])
 
                 gradients_centered = \
                         {
                             k : grad - grad.mean(axis = 1).reshape(-1,1) for k, grad in gradients.items()
                         }
                 
+                #print('grads centered')
+                #print(gradients_centered['Categories'][0])
+                #print('norm of grads')
+                #print(scipy.linalg.norm(gradients_centered['Categories'][0]))
+                
                 updates = \
                     {
                         k : optimizers[k].minimize(grad) for k, grad in gradients_centered.items()
                     }
+                
+                #print('Updates')
+                #print(updates['Categories'][0])
                 
                 category_weights = category_weights + updates['Categories']
                 category_weights[category_weights < 0] = 0
@@ -546,19 +594,66 @@ class HAgent():
                 forward_shares = np.clip(forward_shares, 0, 1)
                 forward_shares = forward_shares.div(forward_shares.sum(axis = 1), axis = 0)
 
+                #print(i)
+                #print(len(self.players))
+                #print(guard_shares.iloc[0])
+
                 best_player = score.argmax()
 
                 self.initial_category_weights = category_weights[best_player]/2 + self.v.reshape(9)/2
-                self.initial_utility_shares = utility_shares.iloc[best_player]/5 + 1/10
+                self.initial_utility_shares = utility_shares.iloc[best_player]/2 + 1/10
                 self.initial_guard_shares = guard_shares.iloc[best_player]/2 + 1/4
                 self.initial_forward_shares = forward_shares.iloc[best_player]/2 + 1/4
 
+                '''
+                if ((i == 29) & (len(self.players) ==2)):
+                    print(category_weights[0]/self.v.T)
+                    print(updates['Categories'][0])
+                    dasf
+
+                    #category_weights[0,:] = [0.1,0.1,0.08,0.12,0.12,0.08,0.14,0.13,0.13]
+                    #category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
+
+
+                    print(score[0:3])
+
+                    res = self.get_objective_and_gradient(category_weights
+                                                    ,utility_shares
+                                                    ,guard_shares
+                                                    ,forward_shares
+                                                    ,diff_means
+                                                    ,diff_vars
+                                                    ,x_scores_available_array
+                                                    ,result_index
+                                                    ,n_players_selected
+                                                    ,n_values)['Score']
+                    
+                    print(res[0])
+                    category_weights[:,2] = category_weights[:,2] - 0.002
+
+                    res = self.get_objective_and_gradient(category_weights
+                                                    ,utility_shares
+                                                    ,guard_shares
+                                                    ,forward_shares
+                                                    ,diff_means
+                                                    ,diff_vars
+                                                    ,x_scores_available_array
+                                                    ,result_index
+                                                    ,n_players_selected
+                                                    ,n_values)['Score']
+                    
+                    
+                    print(res[0])
+                '''
+                
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
 
                 x_diff_array = diff_means + x_scores_available_array
+                x_sum_array = sum_means + x_scores_available_array
 
                 cdf_estimates = self.get_cdf(x_diff_array
+                                             , x_sum_array
                                             , diff_vars)
 
                 category_weights = None
@@ -655,6 +750,7 @@ class HAgent():
                                     ,guard_shares
                                     ,forward_shares
                                     ,diff_means
+                                    ,sum_means
                                     ,diff_vars
                                     ,x_scores_available_array
                                     ,result_index
@@ -688,9 +784,10 @@ class HAgent():
             expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
 
             x_diff_array = diff_means + x_scores_available_array + expected_future_diff
+            x_sum_array = sum_means + x_scores_available_array + expected_future_diff
 
-            pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
-            cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
+            pdf_estimates = self.get_pdf(x_diff_array, x_sum_array, diff_vars)
+            cdf_estimates = self.get_cdf(x_diff_array, x_sum_array, diff_vars)
     
             score, pdf_weights = self.get_objective_and_pdf_weights(
                                     cdf_estimates
@@ -891,6 +988,7 @@ class HAgent():
 
     def get_pdf(self
                 , x_diff_array : np.array
+                , x_sum_array : np.array 
                 , diff_vars : np.array) -> np.array:
         """
         Calculate the PDF via arrays of means and variance
@@ -902,12 +1000,20 @@ class HAgent():
         Returns:
             Array of PDFs
         """
+        #percent stats arent Poisson so they dont get adjusted 
+        new_x_sum_array = x_sum_array.copy()
+        new_x_sum_array[:,0,:] = 0 
+        new_x_sum_array[:,1,:] = 0 
         #need to resize
+
+        sum_array_reshaped = new_x_sum_array.reshape(new_x_sum_array.shape[0]
+                                            , new_x_sum_array.shape[1] * new_x_sum_array.shape[2])
         diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]
                                                     , x_diff_array.shape[1] * x_diff_array.shape[2])
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
-        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
+        #the addition of diff_array_reshaped is the experimental Poisson adjustment 
+        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + sum_array_reshaped))
 
         pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
 
@@ -915,6 +1021,7 @@ class HAgent():
     
     def get_cdf(self
             , x_diff_array : np.array
+            , x_sum_array
             , diff_vars : np.array) -> np.array:
         """
         Calculate the CDF via arrays of means and variance
@@ -926,13 +1033,19 @@ class HAgent():
         Returns:
             Array of CDFs
         """
+        #percent stats arent Poisson so they dont get adjusted 
+        new_x_sum_array = x_sum_array.copy()
+        new_x_sum_array[:,0,:] = 0 
+        new_x_sum_array[:,1,:] = 0 
 
         #need to resize
+        sum_array_reshaped = new_x_sum_array.reshape(new_x_sum_array.shape[0]
+                                    , new_x_sum_array.shape[1] * new_x_sum_array.shape[2])
         diff_array_reshaped = x_diff_array.reshape(x_diff_array.shape[0]
                                                     , x_diff_array.shape[1] * x_diff_array.shape[2])
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
-        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
+        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + sum_array_reshaped))
 
         cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
 

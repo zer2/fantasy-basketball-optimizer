@@ -5,7 +5,7 @@ import pandas as pd
 def get_future_player_rows(position_rewards):
     """Takes an array of rewards by simplified position (5 columns) and translates them to rewards per slot (13) by player"""
 
-    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.001] * 3)
+    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.002] * 3)
     center_rewards = np.array([position_rewards[:,0]] * 2)
     guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1) + 0.001] * 2)
     pg_reward = np.array([position_rewards[:,1]]) 

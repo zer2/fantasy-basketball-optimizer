@@ -286,7 +286,7 @@ def try_strategy(_primary_agent
      
     for i in range(n_drafters): 
 
-        #print('Working on seat' + str(i))
+        print('Working on seat' + str(i))
 
         #we need to deepcopy the agents so that they don't share references with each other
         agents =  [copy.deepcopy(_primary_agent) for x in range(n_primary)] + \
