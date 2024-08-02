@@ -252,7 +252,6 @@ def get_specified_stats(historical_df : pd.DataFrame
       df = current_data[dataset_name].copy()
   elif 'DARKO' in dataset_name:
       df = darko_data[dataset_name].copy()
-      os.write(1,bytes(str(df),'utf-8'))
   else:
       df = historical_df.loc[dataset_name].copy()
   
