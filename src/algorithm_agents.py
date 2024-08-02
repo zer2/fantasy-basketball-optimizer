@@ -3,10 +3,14 @@ import pandas as pd
 from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
-from src.helper_functions import get_categories
+from src.helper_functions import check_team_eligibility
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
+from src.helper_functions import get_eligibility_row_simplified
+from src.position_optimization import optimize_positions_all_players
+import datetime
+import scipy
 
 class HAgent():
 
@@ -14,45 +18,57 @@ class HAgent():
                  , info : dict
                  , omega : float
                  , gamma : float
-                 , alpha : float
-                 , beta : float
                  , n_picks : int
                  , n_drafters : int
                  , dynamic : bool
                  , scoring_format : str
                  , chi : float
                  , fudge_factor : float = 1
+                 , positions : pd.Series = None
                  , collect_info : bool = False
                     ):
-        """Calculates the rank order based on H-score
+        """Initializes an H-score agent, which can calculate H-scores based on given info 
 
         Args:
             info: dictionary with info related to player statistics etc. 
             omega: float, parameter as described in the paper
             gamma: float, parameter as described in the paper
-            alpha: float, step size parameter for gradient descent 
-            beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
             n_drafters : int, number of drafters
-            punting_floor: minimum allowed weight
             scoring_format
+
+            positions: Series of format {'LeBron James' -> ['PF', 'C']}
         Returns:
             None
 
         """
         self.omega = omega
         self.gamma = gamma
-        self.alpha = alpha
-        self.beta = beta
         self.n_picks = n_picks 
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
+
+        #ZR: we really need to fix this later lol. The thing is that the positions table 
+        #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
+        if positions is None:
+            self.positions = info['Positions']
+        else:
+            self.positions = positions
+
         self.collect_info = collect_info
         
         self.cross_player_var = info['Var']
-        self.L = info['L']
         self.scoring_format = scoring_format
+
+        if info['Position-Means'] is not None:
+            self.position_means = np.array(info['Position-Means']).reshape(1,-1,9)
+        else:
+            self.position_means = None
+
+        L_by_position = info['L-by-Position']
+        L_by_position = np.array(L_by_position).reshape(1,-1,9,9)
+        self.L = L_by_position.mean(axis = 1)
 
         self.fudge_factor = fudge_factor
 
@@ -90,6 +106,11 @@ class HAgent():
         turnover_inverted_v[-1] = -turnover_inverted_v[-1]
         self.turnover_inverted_v = turnover_inverted_v/turnover_inverted_v.sum()
 
+        self.category_weights = None
+        self.utility_shares = None
+        self.forward_shares = None
+        self.guard_shares = None
+
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
@@ -111,10 +132,13 @@ class HAgent():
         """
 
         my_players = [p for p in player_assignments[drafter] if p ==p]
+
         n_players_selected = len(my_players) 
 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list)]
+        x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list) & \
+                                                self.x_scores.index.isin(self.positions.index)]
+        
         total_players = self.n_picks * self.n_drafters
 
         diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
@@ -122,7 +146,6 @@ class HAgent():
                                         , x_scores_available
                                         , cash_remaining_per_team
         )
-        
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
         default_weights = self.v.T.reshape(1,9,1)
@@ -132,13 +155,54 @@ class HAgent():
         else:
             category_momentum_factor = 1000
 
-        initial_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
-                            default_weights).mean(axis = 2)
-        
-        scores = []
-        weights = []
+        if len(self.players) == 0:
 
-        return self.perform_iterations(initial_weights
+            initial_category_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
+                    default_weights).mean(axis = 2)
+            initial_category_weights = initial_category_weights/(initial_category_weights.sum(axis = 1).reshape(-1,1))
+
+                    
+            initial_utility_shares = pd.DataFrame({'C' : [1/5] * len(x_scores_available_array)
+                                                    ,'PG' : [1/5] * len(x_scores_available_array)
+                                                    ,'SG' : [1/5] * len(x_scores_available_array)
+                                                    ,'PF' : [1/5] * len(x_scores_available_array)
+                                                    ,'SF' : [1/5] * len(x_scores_available_array)
+                                                    })
+            
+            initial_guard_shares = pd.DataFrame({'PG' : [1/2] * len(x_scores_available_array)
+                                                    ,'SG' : [1/2] * len(x_scores_available_array)
+                                                    })
+            
+            initial_forward_shares = pd.DataFrame({'PF' : [1/2] * len(x_scores_available_array)
+                                                    ,'SF' : [1/2] * len(x_scores_available_array)
+                                                    })
+        else: 
+
+            initial_category_weights = np.array([self.initial_category_weights] * len(x_scores_available))
+            initial_utility_shares = pd.DataFrame({'C' : [self.initial_utility_shares['C']] * len(x_scores_available_array)
+                                                    ,'PG' : [self.initial_utility_shares['PG']]  * len(x_scores_available_array)
+                                                    ,'SG' : [self.initial_utility_shares['SG']]  * len(x_scores_available_array)
+                                                    ,'PF' : [self.initial_utility_shares['PF']]  * len(x_scores_available_array)
+                                                    ,'SF' : [self.initial_utility_shares['SF']]  * len(x_scores_available_array)
+                                                    }
+                                                    ,index = x_scores_available.index)
+            
+            initial_guard_shares = pd.DataFrame({'PG' : [self.initial_guard_shares['PG']]  * len(x_scores_available_array)
+                                                    ,'SG' : [self.initial_guard_shares['SG']]  * len(x_scores_available_array)
+                                                    }
+                                                    ,index = x_scores_available.index)
+            
+            initial_forward_shares = pd.DataFrame({'PF' : [self.initial_forward_shares['PF']]  * len(x_scores_available_array)
+                                                    ,'SF' : [self.initial_forward_shares['SF']]  * len(x_scores_available_array)
+                                                    }
+                                                    ,index = x_scores_available.index)
+
+                
+
+        return self.perform_iterations(initial_category_weights
+                                       ,initial_utility_shares
+                                       ,initial_guard_shares
+                                       ,initial_forward_shares
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
@@ -319,6 +383,8 @@ class HAgent():
 
         chi = self.chi if self.scoring_format == 'Rotisserie' else 1
 
+        #is cross_player_var just the diagonal entries of L? 
+
         diff_var = self.n_picks * \
             (2 * chi +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
@@ -360,12 +426,13 @@ class HAgent():
                                 , index = [x * step_size for x in range(int(max_money/step_size))])
                 
         return money_df
-        
-        
 
 
     def perform_iterations(self
-                           ,weights : pd.DataFrame
+                           ,category_weights : pd.DataFrame
+                           ,utility_shares : pd.DataFrame
+                           ,guard_shares : pd.DataFrame
+                           ,forward_shares : pd.DataFrame
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
@@ -382,7 +449,10 @@ class HAgent():
          Case (4): If n_players_selected > n_picks, all subsets of possible players are evaluated for the best subset
 
         Args:
-            weights: Starting choice of weights. Relevant for case (1)
+            category_weights: Starting choice of weights. Relevant for case (1)
+            utility_shares: starting fraction of future utility spots expected to be used for each position
+            guard_shares: starting fraction of future guard spots expected to be used for each position
+            forward_shares: starting fraction of future forward spots expected to be used for each position
             my_players: list of players selected by the current drafter
             n_players_selected: integer, number of players already selected by the current drafter 
                                 This is a param in addition to my_players because n_players_selected is already calculated in the parent function
@@ -394,39 +464,125 @@ class HAgent():
 
         """
         i = 0
-        
+
+        optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.001)
+            ,'Utilities' : AdamOptimizer(learning_rate = 0.01)
+            ,'Guards' : AdamOptimizer(learning_rate = 0.01)
+            ,'Forwards' : AdamOptimizer(learning_rate = 0.01)}
+
         while True:
+
+                            
+            category_weights_current = category_weights
+            utility_shares_current = utility_shares
+            guard_shares_current = guard_shares
+            forward_shares_current = forward_shares
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.dynamic):
 
-                del_full = self.get_del_full(weights)
-        
-                expected_future_diff_single = self.get_x_mu_simplified_form(weights)
-                expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
+                res = self.get_objective_and_gradient(category_weights
+                                                    ,utility_shares
+                                                    ,guard_shares
+                                                    ,forward_shares
+                                                    ,diff_means
+                                                    ,diff_vars
+                                                    ,x_scores_available_array
+                                                    ,result_index
+                                                    ,n_players_selected
+                                                    ,n_values)
+                score = res['Score']
+                gradients = res['Gradients']
+                cdf_estimates = res['CDF-Estimates']
+                expected_future_diff = res['Future-Diffs']   
 
-                x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
-                pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
-                cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
-        
-                score, pdf_weights = self.get_objective_and_pdf_weights(
-                                        cdf_estimates
-                                        , pdf_estimates
-                                        , n_values
-                                        , calculate_pdf_weights = True)
+                #category_weights[:,0] = category_weights[:,0] + 0.0000001  
 
-                gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
-        
-                step_size = self.alpha * (i + 1)**(-self.beta) 
-                change_weights = step_size * gradient/np.linalg.norm(gradient,axis = 1).reshape(-1,1)
-        
-                weights = weights + change_weights
+                #utility_shares['C'] = utility_shares['C'] + 0.0000001  
+                #
+                #res2 = self.get_objective_and_gradient(category_weights
+                #                    ,utility_shares
+                #                    ,guard_shares
+                #                    ,forward_shares
+                #                    ,diff_means
+                #                    ,diff_vars
+                #                    ,x_scores_available_array
+                #                    ,result_index
+                #                    ,n_players_selected
+                #                    ,n_values)
+                
+                #imputed_grad = (res2['Score'] - score)/0.0000001
+                #calculated_grad = res['Gradients']['Categories'][:,0]
+                #calculated_grad = res['Gradients']['Utilities'][:,0]
 
-                weights[weights < 0] = 0
+                #print('Number of players')
+                #print(len(self.players))
+                #print('Iteration')
+                #print(i)
 
-                weights = weights/weights.sum(axis = 1).reshape(-1,1)
+                #print('grads uncentered')
+                #print(gradients['Categories'][0])
 
+                gradients_centered = \
+                        {
+                            k : grad - grad.mean(axis = 1).reshape(-1,1) for k, grad in gradients.items()
+                        }
+                
+                #print('grads centered')
+                #print(gradients_centered['Categories'][0])
+                #print('norm of grads')
+                #print(scipy.linalg.norm(gradients_centered['Categories'][0]))
+                
+                updates = \
+                    {
+                        k : optimizers[k].minimize(grad) for k, grad in gradients_centered.items()
+                    }
+                
+                #print('Updates')
+                #print(updates['Categories'][0])
+                
+                category_weights = category_weights + updates['Categories']
+                category_weights[category_weights < 0] = 0
+                category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
+
+                assert np.all(np.abs(category_weights.sum(axis=1).reshape(-1, 1) - 1) < 1e-8)
+
+                weights_df = pd.DataFrame(category_weights, index = result_index, columns = self.x_scores.columns)
+                assert np.all(np.abs(weights_df.sum(axis=1) - 1) < 1e-8)
+
+                #update position shares 
+                ######
+                if self.position_means is not None:
+
+                    #update flex shares and ensure that they stay compliant with their definitions    
+                    #position_change_weights = 9/5  * step_size * position_gradients_centered['Utilities']
+                    utility_shares = utility_shares + updates['Utilities']
+                    utility_shares = np.clip(utility_shares, 0, 1)
+                    utility_shares = utility_shares.div(utility_shares.sum(axis = 1), axis = 0)
+
+                    #guard_change_weights = 9/2 * step_size * position_gradients_centered['Guards']
+                    guard_shares = guard_shares + updates['Guards']
+                    guard_shares = np.clip(guard_shares, 0, 1)
+                    guard_shares = guard_shares.div(guard_shares.sum(axis = 1), axis = 0)
+
+                    #forward_change_weights = #9/2 * step_size * position_gradients_centered['Forwards']
+                    forward_shares = forward_shares + updates['Forwards']
+                    forward_shares = np.clip(forward_shares, 0, 1)
+                    forward_shares = forward_shares.div(forward_shares.sum(axis = 1), axis = 0)
+
+                    #print(i)
+                    #print(len(self.players))
+                    #print(guard_shares.iloc[0])
+
+                    best_player = score.argmax()
+
+                    self.initial_category_weights = category_weights[best_player]/2 + self.v.reshape(9)/2
+                    self.initial_utility_shares = utility_shares.iloc[best_player]/2 + 1/10
+                    self.initial_guard_shares = guard_shares.iloc[best_player]/2 + 1/4
+                    self.initial_forward_shares = forward_shares.iloc[best_player]/2 + 1/4
+
+               
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
 
@@ -435,7 +591,7 @@ class HAgent():
                 cdf_estimates = self.get_cdf(x_diff_array
                                             , diff_vars)
 
-                weights = None
+                category_weights = None
                 expected_future_diff = None
                 pdf_estimates = None
                 
@@ -450,7 +606,7 @@ class HAgent():
 
                 cdf_estimates = self.get_cdf(diff_means, diff_vars)
 
-                weights = None
+                category_weights = None
                 expected_future_diff = None
                 pdf_estimates = None
                 
@@ -487,7 +643,7 @@ class HAgent():
 
                 result_index = drop_potentials.index
 
-                weights = None
+                category_weights = None
                 expected_future_diff = None
 
             i = i + 1
@@ -504,11 +660,116 @@ class HAgent():
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
             yield {'Scores' : pd.Series(score, index = result_index)
-                    ,'Weights' : pd.DataFrame(weights, index = result_index, columns = self.x_scores.columns)
+                    ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
-                    ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)}
+                    ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
+                    ,'Utility-Shares' : pd.DataFrame(utility_shares_current.values, index = result_index
+                                                     , columns = ['C','PG','SG','PF','SF']) 
+                    ,'Guard-Shares' : pd.DataFrame(forward_shares_current.values, index = result_index
+                                                   , columns = ['PG','SG']) 
+                    ,'Forward-Shares' : pd.DataFrame(guard_shares_current.values, index = result_index
+                                                     , columns = ['PF','SF']) 
+                    
+                    
+                    }
 
     ### below are functions used for the optimization procedure 
+    def get_position_priorities_from_category_weights(self, weights):
+
+        res = np.einsum('ij, akj -> ik', weights/self.v.T, self.position_means)
+        return res
+
+    def get_objective_and_gradient(self
+                                    ,category_weights
+                                    ,utility_shares
+                                    ,guard_shares
+                                    ,forward_shares
+                                    ,diff_means
+                                    ,diff_vars
+                                    ,x_scores_available_array
+                                    ,result_index
+                                    ,n_players_selected
+                                    ,n_values
+                                    ,):
+        
+            #calculate scores and category-level gradients
+            ######
+
+            if self.position_means is not None:
+
+                position_rewards = self.get_position_priorities_from_category_weights(category_weights)
+
+                future_position_array, flex_shares = optimize_positions_all_players(self.positions.loc[result_index]
+                                                                        ,position_rewards
+                                                                        ,self.positions.loc[self.players]
+                                                                        , utility_shares
+                                                                        , guard_shares
+                                                                        , forward_shares)
+                
+
+
+                position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
+                position_mu = np.expand_dims(position_mu, axis = 2)
+            else:
+                position_mu = 0
+
+            #this causes an issue with gradients. It doesn't change much so we can just keep L constant
+            #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
+            L = self.L
+
+            del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L)
+
+            expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L) + position_mu
+            expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
+
+
+            x_diff_array = diff_means + x_scores_available_array + expected_future_diff
+
+            pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
+            cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
+    
+            score, pdf_weights = self.get_objective_and_pdf_weights(
+                                    cdf_estimates
+                                    , pdf_estimates
+                                    , n_values
+                                    , calculate_pdf_weights = True)
+
+            category_gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
+
+
+            if self.position_means is not None:
+                position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
+
+                utility_gradient = position_gradient * flex_shares[:,0].reshape(-1,1)
+                guard_gradient =position_gradient[:,(1,2)] * flex_shares[:,1].reshape(-1,1)
+                forward_gradient =position_gradient[:,(3,4)] * flex_shares[:,2].reshape(-1,1)
+
+                gradients =                     {
+                        'Categories' : category_gradient
+                        ,'Utilities' : utility_gradient
+                        ,'Guards' : guard_gradient
+                        ,'Forwards' : forward_gradient
+                    }
+
+            else:
+                gradients =  {
+                        'Categories' : category_gradient
+                    }
+
+                flex_shares = None
+
+            res = {'Score' : score
+                ,'Gradients' : gradients
+                ,'CDF-Estimates' : cdf_estimates
+                ,'Flex-Shares' : flex_shares
+                , 'Future-Diffs' : expected_future_diff
+            }
+
+
+
+            return res 
+
+    
     def get_objective_and_pdf_weights(self
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
@@ -693,6 +954,7 @@ class HAgent():
                                                     , x_diff_array.shape[1] * x_diff_array.shape[2])
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
+        #the addition of diff_array_reshaped is the experimental Poisson adjustment 
         pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
 
         pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
@@ -747,9 +1009,9 @@ class HAgent():
 
         return x_mu
 
-    def get_x_mu_simplified_form(self,c):
-        last_four_terms = self.get_last_four_terms(c)
-        x_mu = np.einsum('ij, ajk -> aik',self.L, last_four_terms)
+    def get_x_mu_simplified_form(self,c, L):
+        last_four_terms = self.get_last_four_terms(c,L)
+        x_mu = np.einsum('aij, ajk -> aik',L, last_four_terms)
         return x_mu
 
 
@@ -760,12 +1022,12 @@ class HAgent():
     #term 4: -gamma * j - omega * v
     #term 5: sigma / (j^T L j v^T L V - (v^T L j)^2) 
 
-    def get_term_two(self,c):
+    def get_term_two(self,c, L = None):
         #v = self.v.reshape(9,1)
 
         return - self.v.reshape(-1,9,1) * c.reshape(-1,1,9) + c.reshape(-1,9,1) * self.v.reshape(-1,1,9)
 
-    def get_del_term_two(self,c):
+    def get_del_term_two(self,c, L = None):
         arr_a = np.zeros((9,9,9))
         for i in range(9):
             arr_a[i,:,i] = self.v.reshape(9,)
@@ -778,77 +1040,127 @@ class HAgent():
 
         return arr_full.reshape(1,9,9,9)
 
-    def get_term_four(self,c):
+    def get_term_four(self,c, L = None):
         #v = np.array([1/9] * 9).reshape(9,1)
 
         return (c * self.gamma).reshape(-1,9,1) + (self.v * self.omega).reshape(1,9,1)
 
-    def get_term_five(self,c):
-        return self.get_term_five_a(c)/self.get_term_five_b(c)
+    def get_term_five(self,c,L):
+        return self.get_term_five_a(c,L)/self.get_term_five_b(c,L)
 
-    def get_term_five_a(self,c):
-        factor =  (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
+    def get_term_five_a(self,c, L):
+
+
+        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)
+        factor_top = np.einsum('pad, dp -> ap', v_dot_v_T_dot_L, c.T)
+
+        v_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_dot_L_dot_v = np.einsum('pad, dc -> ap', v_dot_L, self.v)
+
+        factor =  (factor_top/v_dot_L_dot_v).T
+        
         c_mod = c - factor
-        return np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1).reshape(-1,1,1))
+        c_mod_dot_L = np.einsum('pc, pcd -> pd', c_mod, L)
+        c_mod_dot_L_c_mod = np.einsum('pd, pd -> p', c_mod_dot_L, c_mod)
 
-    def get_term_five_b(self,c):
-        return ((c.dot(self.L) * c).sum(axis = 1) * self.v.T.dot(self.L).dot(self.v) - self.v.T.dot(self.L.dot(c.T))**2).reshape(-1,1,1)
+        res = np.sqrt(c_mod_dot_L_c_mod.reshape(-1,1,1))
 
-    def get_terms_four_five(self,c):
+        return res
+
+    def get_term_five_b(self,c,L):
+
+        c_dot_L = np.einsum('pc, pcd -> pd', c, L)
+        c_dot_L_c = np.einsum('pd, pd -> p', c_dot_L, c)
+
+        v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_T_dot_L_dot_v = np.einsum('pad, dc -> ap', v_T_dot_L, self.v)
+
+        L_dot_c_T = np.einsum('pcd, dp -> cp', L, c.T)
+        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', self.v.T, L_dot_c_T)
+
+        res = (c_dot_L_c * v_T_dot_L_dot_v - v_T_dot_L_dot_c**2).reshape(-1,1,1)
+
+        return res
+
+    def get_terms_four_five(self,c,L):
         #is this the right shape
-        return self.get_term_four(c) * self.get_term_five(c)
+        return self.get_term_four(c) * self.get_term_five(c,L)
 
-    def get_del_term_four(self,c):
+    def get_del_term_four(self,c, L = None):
         return (np.identity(9) * self.gamma).reshape(1,9,9)
 
-    def get_del_term_five_a(self,c):
-        factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
+    def get_del_term_five_a(self,c,L):
+
+        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)
+        factor_top = np.einsum('pad, dp -> ap', v_dot_v_T_dot_L, c.T)
+
+        v_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_dot_L_dot_v = np.einsum('pad, dj -> jp', v_dot_L, self.v)
+
+        factor =  (factor_top/v_dot_L_dot_v).T
 
         c_mod = c - factor
-        top = c_mod.dot(self.L).reshape(-1,1,9)
-        bottom = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1).reshape(-1,1,1))
-        side = np.identity(9) - self.v.dot(self.v.T).dot(self.L)/self.v.T.dot(self.L).dot(self.v)
-        res = (top/bottom).dot(side)
+
+        top_og = np.einsum('pc, pcd -> pd', c_mod, L)
+
+        top = top_og.reshape(-1,1,9)
+        bottom = np.sqrt((np.einsum('pd, pd -> p',top_og,c_mod)).reshape(-1,1,1))
+
+        side= np.identity(9) - np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)/v_dot_L_dot_v.reshape(-1,1,1)
+        res = np.einsum('pia, pad -> pid', top/bottom, side)
+
         return res.reshape(-1,1,9)
 
-    def get_del_term_five_b(self,c):
-        term_one = (2 * c.dot(self.L) * self.v.T.dot(self.L).dot(self.v)).reshape(-1,1,9)
-        term_two = (2 * self.v.T.dot(self.L.dot(c.T)).T).reshape(-1,1,1)
-        term_three = (self.v.T.dot(self.L)).reshape(1,1,9)
-        return term_one.reshape(-1,1,9) - (term_two * term_three).reshape(-1,1,9)
+    def get_del_term_five_b(self,c,L):
 
-    def get_del_term_five(self,c):
-        a = self.get_term_five_a(c)
-        del_a = self.get_del_term_five_a(c)
-        b = self.get_term_five_b(c)
-        del_b = self.get_del_term_five_b(c)
+        c_dot_L = np.einsum('pc, pcd -> pd', c, L)
+
+        v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
+        v_T_dot_L_dot_v = np.einsum('pad, dj -> paj', v_T_dot_L, self.v)
+
+        L_dot_c_T = np.einsum('pcd, dp -> cp', L, c.T)
+        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', self.v.T, L_dot_c_T)
+
+        term_one = (2 * c_dot_L * v_T_dot_L_dot_v.reshape(-1,1)).reshape(-1,1,9)
+        term_two = (2 * v_T_dot_L_dot_c.T).reshape(-1,1,1)
+        term_three = v_T_dot_L.reshape(-1,1,9)
+
+        res = term_one.reshape(-1,1,9) - (term_two * term_three).reshape(-1,1,9)
+
+        return res
+
+    def get_del_term_five(self,c,L):
+        a = self.get_term_five_a(c,L)
+        del_a = self.get_del_term_five_a(c,L)
+        b = self.get_term_five_b(c,L)
+        del_b = self.get_del_term_five_b(c,L)
 
         return (del_a * b - a * del_b) / b**2
 
-    def get_del_terms_four_five(self,c):
-        return self.get_term_four(c) * self.get_del_term_five(c) + \
-                    self.get_del_term_four(c) * self.get_term_five(c)
+    def get_del_terms_four_five(self,c,L):
+        return self.get_term_four(c) * self.get_del_term_five(c,L) + \
+                    self.get_del_term_four(c) * self.get_term_five(c,L)
 
-    def get_last_three_terms(self,c):
-        return np.einsum('ij, ajk -> aik',self.L,self.get_terms_four_five(c))
+    def get_last_three_terms(self,c,L):
+        return np.einsum('aij, ajk -> aik',L,self.get_terms_four_five(c,L))
 
-    def get_del_last_three_terms(self,c):
-        return np.einsum('ij, ajk -> aik',self.L,self.get_del_terms_four_five(c))
+    def get_del_last_three_terms(self,c,L):
+        return np.einsum('aij, ajk -> aik',L,self.get_del_terms_four_five(c,L))
 
-    def get_last_four_terms(self,c):
+    def get_last_four_terms(self,c,L):
         term_two = self.get_term_two(c)
-        last_three = self.get_last_three_terms(c)
+        last_three = self.get_last_three_terms(c,L)
         return np.einsum('aij, ajk -> aik', term_two, last_three)
 
-    def get_del_last_four_terms(self,c):
+    def get_del_last_four_terms(self,c,L):
         comp_i = self.get_del_term_two(c)
-        comp_ii = self.get_last_three_terms(c)
+        comp_ii = self.get_last_three_terms(c,L)
         term_a = np.einsum('aijk, aj -> aik', comp_i, comp_ii.reshape(-1,9))
-        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c))
+        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c,L))
         return term_a + term_b
 
-    def get_del_full(self,c):
-        return np.einsum('ij, ajk -> aik',self.L,self.get_del_last_four_terms(c))
+    def get_del_full(self,c, L):
+        return np.einsum('aij, ajk -> aik',L,self.get_del_last_four_terms(c,L))
 
     def make_pick(self
                   , player_assignments : dict[list]
@@ -860,24 +1172,31 @@ class HAgent():
         res_list = []
         for i in range(30):
             res = next(generator)
-            res_list = res_list + [res] 
+            res_list.append(res)
 
         scores = res['Scores']
 
-        best_player = scores.idxmax()
+        available_players_sorted = scores.sort_values(ascending = False)    
+
+        if self.positions is not None:
+            player = choose_eligible_player(self.players, available_players_sorted.index, self.positions)     
+        else: 
+            player = available_players_sorted.index[0]
 
         if self.collect_info:
 
             self.all_res_list = self.all_res_list + [res_list]
-            self.players = self.players + [best_player]
+            self.players = self.players + [player]
 
-        return best_player
+        return player
 
 class SimpleAgent():
     #Comment
 
-    def __init__(self, order):
+    def __init__(self, order, positions = None):
         self.order = order
+        self.players = []
+        self.positions = positions
 
     def make_pick(self, player_assignments : dict[list], j : int) -> str:
 
@@ -885,9 +1204,48 @@ class SimpleAgent():
 
         #ZR: Can this be done more efficiently?
         available_players = [p for p in self.order if not p in players_chosen]
-        player = available_players[0]
 
+        if self.positions is not None:
+
+            player = choose_eligible_player(self.players, available_players, self.positions)
+                    
+        else: 
+            player = available_players[0]
+
+        self.players = self.players + [player]
         return player
 
 
 
+def choose_eligible_player(team, available_players, positions):
+    for player in available_players:
+        new_team = team+ [player]
+        if check_team_eligibility(positions.loc[new_team]):
+            return player
+
+
+class AdamOptimizer:
+    def __init__(self, learning_rate=0.1, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        self.learning_rate = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.m = None
+        self.v = None
+        self.t = 0
+
+    def minimize(self, gradient):
+        if self.m is None:
+            self.m = 0
+            self.v = 0
+
+        self.t += 1
+        self.m = self.beta1 * self.m + (1 - self.beta1) * gradient
+        self.v = self.beta2 * self.v + (1 - self.beta2) * (gradient ** 2)
+        
+        m_hat = self.m / (1 - self.beta1 ** self.t)
+        v_hat = self.v / (1 - self.beta2 ** self.t)
+
+        update = self.learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
+
+        return update 

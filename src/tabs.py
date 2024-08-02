@@ -488,8 +488,6 @@ def make_matchup_tab(player_stats
 def get_base_h_score(_info : dict
                 , omega : float
                 , gamma : float
-                , alpha : float
-                , beta : float
                 , n_picks : int
                 , n_drafters : int
                 , scoring_format : str
@@ -503,8 +501,6 @@ def get_base_h_score(_info : dict
     info: dictionary with info related to player statistics etc. 
     omega: float, parameter as described in the paper
     gamma: float, parameter as described in the paper
-    alpha: float, step size parameter for gradient descent 
-    beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
     scoring_format: 
@@ -518,8 +514,6 @@ def get_base_h_score(_info : dict
   H = HAgent(info = _info
     , omega = omega
     , gamma = gamma
-    , alpha = alpha
-    , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
     , dynamic = False
@@ -1090,8 +1084,8 @@ def make_trade_h_tab(_H
 
 ### Rank tabs 
 
-#@st.cache_data(show_spinner = False)
-def make_rank_tab(_scores : pd.DataFrame
+@st.cache_data(show_spinner = False)
+def make_rank_tab(scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
   """Show rankings by general value
@@ -1104,7 +1098,7 @@ def make_rank_tab(_scores : pd.DataFrame
   Returns:
       None
   """
-  scores_copy = _scores.copy()
+  scores_copy = scores.copy()
 
   scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
   scores_copy.loc[:,'Player'] = scores_copy.index
@@ -1114,12 +1108,10 @@ def make_rank_tab(_scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-#@st.cache_data(show_spinner = False)
-def make_h_rank_tab(_info : dict
+@st.cache_data(show_spinner = False)
+def make_h_rank_tab(info : dict
                   , omega : float
                   , gamma : float
-                  , alpha : float
-                  , beta : float
                   , n_picks : int
                   , n_drafters : int
                   , n_iterations : int
@@ -1135,8 +1127,6 @@ def make_h_rank_tab(_info : dict
     _info: dictionary with info related to player statistics etc. 
     omega: float, parameter as described in the paper
     gamma: float, parameter as described in the paper
-    alpha: float, step size parameter for gradient descent 
-    beta: float, decay parameter for gradient descent 
     n_picks: int, number of picks each drafter gets 
     n_drafters: int, number of drafters
     n_iterations: int, number of gradient descent steps
@@ -1148,11 +1138,9 @@ def make_h_rank_tab(_info : dict
       None
   """
 
-  H = HAgent(info = _info
+  H = HAgent(info = info
     , omega = omega
     , gamma = gamma
-    , alpha = alpha
-    , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
     , dynamic = n_iterations > 0

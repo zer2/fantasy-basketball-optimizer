@@ -284,7 +284,7 @@ def try_strategy(_primary_agent
     all_times = {}
     agents_dict = {}
      
-    for i in range(n_drafters): 
+    for i in range(n_drafters):
 
         print('Working on seat' + str(i))
 
@@ -312,9 +312,11 @@ def try_strategy(_primary_agent
 
         #this is all we need from agents, and it allows us to pickle them 
         if primary_agent_type == 'H':
-            agents_dict[i] = {'all_res_list' : agents_post[i].all_res_list
-                            ,'players' : agents_post[i].players
-                            ,'v' : agents_post[i].v}
+            agents_dict[i] = agents_post[i] #{'all_res_list' : agents_post[i].all_res_list
+                            #,'players' : agents_post[i].players
+                            #,'x_scores' : agents_post[i].x_scores
+                            #,'v' : agents_post[i].v
+                            #,'L' : agents_post[i].L}
         else:
             agents_dict[i] = None
 
@@ -635,14 +637,13 @@ def run_season(season_df
                         ,n_picks : int
                         ,omega : float
                         ,gamma : float
-                        ,alpha : float
                         ,chi : float
                         ,season_name : str 
                         ,params : dict
                         ,n_seasons : int = 1000
                         ) -> dict:
     
-    print('Working on season ' + season_name)
+    #print('Working on season ' + season_name)
     #this is manual caching
     pickle_file_location = '../results/' + season_name + '.pickle'
 
@@ -721,8 +722,6 @@ def run_season(season_df
             info = info
             , omega = omega
             , gamma = gamma
-            , alpha = alpha
-            , beta = params['options']['beta']['default']['Rotisserie']
             , n_picks = n_picks
             , n_drafters = n_drafters
             , scoring_format = 'Rotisserie'
@@ -736,8 +735,6 @@ def run_season(season_df
                 info = info
                 , omega = omega
                 , gamma = gamma
-                , alpha = alpha
-                , beta =  params['options']['beta']['default']['Head to Head: Each Category']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Each Category'
@@ -750,8 +747,6 @@ def run_season(season_df
                 info = info
                 , omega = omega
                 , gamma = gamma
-                , alpha = alpha
-                , beta = params['options']['beta']['default']['Head to Head: Most Categories']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Most Categories'
@@ -923,11 +918,12 @@ def validate():
     n_picks = 13
     omega = st.session_state.params['options']['omega']['default']
     gamma = st.session_state.params['options']['gamma']['default']
-    alpha = st.session_state.params['options']['alpha']['default']
     chi = 0.05
     n_seasons = 1000
 
     renamer = st.session_state.params['historical-renamer']
+
+
 
     season_dfs = {file[0:7] : pd.read_csv('../data_for_testing/' + file).rename(columns = renamer) for file in file_list}
 
@@ -948,7 +944,6 @@ def validate():
                                                 ,n_picks
                                                 ,omega
                                                 ,gamma
-                                                ,alpha
                                                 ,chi
                                                 ,season_name
                                                 ,params

@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helper_functions import get_categories
+from src.helper_functions import get_categories, weighted_cov_matrix
 import os
 import streamlit as st
 
@@ -193,8 +193,8 @@ def games_played_adjustment(scores : pd.DataFrame
 
     return adjusted_scores 
 
-def get_category_level_rv(rv : float, v : pd.Series, params : dict):
-   all_stats = params['percentage-statistics'] + params['counting-statistics']
+def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
+   all_stats = get_categories(params)
    rv_multiple = rv/(len(all_stats) -2) if  'Turnovers' in all_stats else rv/len(all_stats)
    value_by_category = pd.Series({stat : - rv_multiple/v[stat] if stat == 'Turnovers' 
                                   else rv_multiple/v[stat] for stat in all_stats})
@@ -202,13 +202,12 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict):
    return value_by_category
 
 @st.cache_data(show_spinner = False)
-def process_player_data(  _weekly_df : pd.DataFrame
+def process_player_data(weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series
                         , upsilon : float
                         , psi : float
-                        , nu : float
                         , n_drafters : int
                         , n_picks : int
                         , params : dict
@@ -231,27 +230,27 @@ def process_player_data(  _weekly_df : pd.DataFrame
   """
   n_players = n_drafters * n_picks
 
-  if _weekly_df is not None:
-    coefficients_first_order = calculate_coefficients_historical(_weekly_df
-                                                , pd.unique(_weekly_df.index.get_level_values('Player'))
+  if weekly_df is not None:
+    coefficients_first_order = calculate_coefficients_historical(weekly_df
+                                                , pd.unique(weekly_df.index.get_level_values('Player'))
                                                 , params)
   else:
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors['Conversion Factor'])
         
-  z_scores_first_order =  calculate_scores_from_coefficients(_player_means
+  g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
-                                                          ,0)
-  z_scores_first_order = z_scores_first_order * multipliers.T.values[0]
+                                                          ,1)
+  g_scores_first_order = g_scores_first_order * multipliers.T.values[0]
 
-  first_order_score = z_scores_first_order.sum(axis = 1)
+  first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
-  if _weekly_df is not None:
-    coefficients = calculate_coefficients_historical(_weekly_df
+  if weekly_df is not None:
+    coefficients = calculate_coefficients_historical(weekly_df
                                                 , representative_player_set
                                                 , params)
   else:
@@ -259,8 +258,6 @@ def process_player_data(  _weekly_df : pd.DataFrame
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
     
-
-  #st.write(coefficients)
 
   mov = coefficients.loc[get_categories(params) , 'Mean of Variances']
   vom = coefficients.loc[get_categories(params) , 'Variance of Means']
@@ -290,35 +287,58 @@ def process_player_data(  _weekly_df : pd.DataFrame
   #need to fix this later for Roto
   x_scores = x_scores.loc[g_scores.index]
 
-  positions = _player_means[['Position']]
+  positions = _player_means['Position'].str.split(',')
 
   cross_player_var =  x_scores[0:n_players].var()
                           
-  players_and_positions = pd.merge(x_scores
-                           , positions
-                           , left_index = True
-                           , right_index = True)
-
   #get position averages, to make sure the covariance matrix measures differences relative to position
-  position_means = players_and_positions[0:n_players].explode('Position').groupby('Position').mean()
-  position_means = position_means - position_means.mean(axis = 0)
-  #players_and_positions.loc[:,'Position'] = [x[0] for x in players_and_positions.loc[:,'Position']]
-  joined = pd.merge(players_and_positions, position_means, right_index = True, left_on = 'Position', suffixes = ['_x',''])
-
-  x_category_scores = joined.groupby('Player')[x_scores.columns].mean()
-  x_scores_as_diff = (x_scores - nu * x_category_scores)[x_scores.columns]
+  #we need to weight averages to avoid over-counting the players that can take multiple positions
+  # 
+   
+  try: 
+    players_and_positions = pd.merge(x_scores
+                        , positions
+                        , left_index = True
+                        , right_index = True)
   
-  L = np.array(x_scores_as_diff.loc[x_scores.index[0:n_players]].cov()) 
+    players_and_positions_limited = players_and_positions[0:n_players]
+    categories = get_categories(params)
+    players_and_positions_limited[categories] = players_and_positions_limited[categories] \
+                                                    .sub(players_and_positions_limited[categories].mean(axis = 0))
+    positions_exploded = players_and_positions_limited.explode('Position').reset_index().set_index(['Player','Position'])
+    position_mean_weights = 1/positions_exploded.groupby('Player').transform('count')
+    position_means_weighted = positions_exploded.mul(position_mean_weights)
 
+    position_means = position_means_weighted.groupby('Position').sum()/position_mean_weights.groupby('Position').sum()
+    positions_exploded = positions_exploded.sub(positions_exploded.mean(axis = 0)) #normalize by mean of the category 
+
+    #we should have some logic for position not being available
+    #also all of the position rules should be modularized 
+    position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
+
+    position_means_g = position_means * v
+    position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
+    position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
+    position_means = position_means_g / v
+    
+    L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
+                                                                , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
+                                                                for position in ['C','PG','SG','PF','SF']}
+                                )
+  except:
+    position_means = None        
+    L_by_position = np.array([x_scores.cov()])
+    
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
-          ,'X-scores-as-diff' : x_scores_as_diff
           , 'Var' : cross_player_var
           , 'Positions' : positions
           , 'Mov' : mov
           , 'Vom' : vom
-          , 'L' : L}
+          , 'Position-Means' : position_means
+          , 'L-by-Position' : L_by_position
+          , 'Positions' : positions}
 
   if st.session_state: #if we are running outside of streamlit this will be empty, and will evaluate to False
     st.session_state.info_key += 1 

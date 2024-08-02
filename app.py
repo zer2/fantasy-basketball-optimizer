@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import listify, make_progress_chart, stat_styler, styler_a,styler_b, styler_c, get_categories
+from src.helper_functions import listify, increment_player_stats_version
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -35,6 +35,9 @@ if 'player_stats_editable_version' not in st.session_state:
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
 
+if 'parameters_key' not in st.session_state:
+    st.session_state.info_key = 100000
+
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
@@ -56,9 +59,6 @@ def run_h_score():
 def stop_run_h_score():
     st.session_state.run_h_score = False
 
-def increment_player_stats_version():
-  st.session_state.player_stats_editable_version += 1
-
 if 'params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
       try:
@@ -74,6 +74,7 @@ current_data, expected_minutes = get_current_season_data()
 darko_data = get_darko_data(expected_minutes)
 
 #These are based on 2023-2024 excluding injury
+#might need to modify these at some point? 
 coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
 st.title('Optimization for Fantasy Basketball :basketball:')
@@ -274,7 +275,6 @@ with param_tab:
       player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
       selections = selections.astype(player_category_type)
       
-
   with advanced_params:
 
     player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
@@ -348,55 +348,11 @@ with param_tab:
                   tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
                   players that  work best for its strategy'''
           st.caption(gamma_str)
-      
-          nu = st.number_input(r'Select a $\nu$ value'
-                            , key = 'nu'
-                            , value = float(st.session_state.params['options']['nu']['default'])
-                            , min_value = float(st.session_state.params['options']['nu']['min'])
-                            , max_value = float(st.session_state.params['options']['nu']['max']))
-          nu_str = r'''Covariance matrix is calculated with position averages multiplied by $\nu$ subtracted out. $\nu=0$ is appropriate 
-                      if there are no position requirements, $\nu=1$ is appropriate if position requirements are fully strict '''
-          st.caption(nu_str)
 
         else: 
           gamma = None
-          nu = None
-
-        if scoring_format == 'Rotisserie':
-
-          chi = st.number_input(r'Select a $\chi$ value'
-                  , key = 'chi'
-                  , value = float(st.session_state.params['options']['chi']['default'])
-                  , min_value = float(st.session_state.params['options']['chi']['min'])
-                  , max_value = float(st.session_state.params['options']['chi']['max']))
-          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                        If performance means were known exactly beforehand, chi would be 1/M where M 
-                        is the number weeks in the season. However, in practice, season-long means are 
-                        not known before the season begins, so it is recommended to set chi to be higher 
-                        '''
-          st.caption(chi_str)
-        else:
-          chi = None
-
-      with right_algo_param_col:
 
         if omega > 0:
-
-          alpha = st.number_input(r'Select a $\alpha$ value'
-                            , key = 'alpha'
-                            , value = float(st.session_state.params['options']['alpha']['default'])
-                            , min_value = float(st.session_state.params['options']['alpha']['min'])
-                            , max_value = float(st.session_state.params['options']['alpha']['max']))
-          alpha_str = r'''$\alpha$ is the initial step size for gradient descent. Tuning $\alpha$ is not recommended'''
-          st.caption(alpha_str)
-      
-          beta = st.number_input(r'Select a $\beta$ value'
-                                , key = 'beta'
-                                , value = float(st.session_state.params['options']['beta']['default'][scoring_format])
-                                , min_value = float(st.session_state.params['options']['beta']['min'])
-                                , max_value = float(st.session_state.params['options']['beta']['max']))
-          beta_str = r'''$\beta$ is the degree of step size decay. Tuning $\beta$ is not recommended'''
-          st.caption(beta_str)
     
           n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
                                     , key = 'n_iterations'
@@ -407,30 +363,40 @@ with param_tab:
           st.caption(n_iterations_str)
         else:
           n_iterations = 0 
-          alpha = None
-          beta = None
 
-        if mode == 'Auction Mode':
+      with right_algo_param_col:
 
-          streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
-                                    , key = 'streaming_noise'
-                                    , value = 1.0
-                                    , min_value = 0.0
-                                    , max_value = None)
-          stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
-                                more long-term performance noise is expected, making low-value 
-                                players more heavily down-weighted due to the possibility that
-                                they drop below  streaming-level value'''
-          st.caption(stream_noise_str)         
+        chi = st.number_input(r'Select a $\chi$ value'
+                , key = 'chi'
+                , value = float(st.session_state.params['options']['chi']['default'])
+                , min_value = float(st.session_state.params['options']['chi']['min'])
+                , max_value = float(st.session_state.params['options']['chi']['max']))
+        chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                      If performance means were known exactly beforehand, chi would be 1/M where M 
+                      is the number weeks in the season. However, in practice, season-long means are 
+                      not known before the season begins, so it is recommended to set chi to be higher 
+                      '''
+        st.caption(chi_str)
 
-          streaming_noise = st.number_input(r'Select an $H_{\sigma}$ value'
-                        , key = 'streaming_noise_h'
-                        , value = 0.02
-                        , min_value = 0.0
-                        , max_value = None)
+        streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                  , key = 'streaming_noise'
+                                  , value = 1.0
+                                  , min_value = 0.0
+                                  , max_value = None)
+        stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
+                              more long-term performance noise is expected, making low-value 
+                              players more heavily down-weighted due to the possibility that
+                              they drop below  streaming-level value'''
+        st.caption(stream_noise_str)         
 
-          stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
-          st.caption(stream_noise_str_h)         
+        streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
+                      , key = 'streaming_noise_h'
+                      , value = 0.02
+                      , min_value = 0.0
+                      , max_value = None)
+
+        stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
+        st.caption(stream_noise_str_h)         
 
     with trade_param_column:
         st.header('Trading Parameters')
@@ -537,7 +503,6 @@ with info_tab:
                               ,multipliers
                               ,upsilon
                               ,psi
-                              ,nu
                               ,n_drafters
                               ,n_picks
                               ,st.session_state.params
@@ -618,8 +583,6 @@ with rank_tab:
       h_ranks = make_h_rank_tab(info
                     ,omega
                     ,gamma
-                    ,alpha
-                    ,beta
                     ,n_picks
                     ,n_drafters
                     ,n_iterations
@@ -633,13 +596,11 @@ with rank_tab:
 H = HAgent(info = info
     , omega = omega
     , gamma = gamma
-    , alpha = alpha
-    , beta = beta
     , n_picks = n_picks
     , n_drafters = n_drafters
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
-    , chi = chi)  
+    , chi = chi )
 
 if st.session_state['mode'] == 'Draft Mode':
 
@@ -714,8 +675,6 @@ if st.session_state['mode'] == 'Draft Mode':
           base_h_res = get_base_h_score(info
                                         ,omega
                                         ,gamma
-                                        ,alpha
-                                        ,beta
                                         ,n_picks
                                         ,n_drafters
                                         ,scoring_format
@@ -908,8 +867,6 @@ elif st.session_state['mode'] == 'Season Mode':
           base_h_res = get_base_h_score(info
                                         ,omega
                                         ,gamma
-                                        ,alpha
-                                        ,beta
                                         ,n_picks
                                         ,n_drafters
                                         ,scoring_format
@@ -1061,8 +1018,6 @@ elif st.session_state['mode'] == 'Season Mode':
             base_h_res = get_base_h_score(info
                             ,omega
                             ,gamma
-                            ,alpha
-                            ,beta
                             ,n_picks
                             ,n_drafters
                             ,scoring_format
