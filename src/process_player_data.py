@@ -193,8 +193,8 @@ def games_played_adjustment(scores : pd.DataFrame
 
     return adjusted_scores 
 
-def get_category_level_rv(rv : float, v : pd.Series, params : dict):
-   all_stats = params['percentage-statistics'] + params['counting-statistics']
+def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
+   all_stats = get_categories(params)
    rv_multiple = rv/(len(all_stats) -2) if  'Turnovers' in all_stats else rv/len(all_stats)
    value_by_category = pd.Series({stat : - rv_multiple/v[stat] if stat == 'Turnovers' 
                                   else rv_multiple/v[stat] for stat in all_stats})
@@ -202,13 +202,12 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict):
    return value_by_category
 
 @st.cache_data(show_spinner = False)
-def process_player_data(  weekly_df : pd.DataFrame
-                        , player_means : pd.DataFrame
+def process_player_data(weekly_df : pd.DataFrame
+                        , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series
                         , upsilon : float
                         , psi : float
-                        , nu : float
                         , n_drafters : int
                         , n_picks : int
                         , params : dict
@@ -236,11 +235,11 @@ def process_player_data(  weekly_df : pd.DataFrame
                                                 , pd.unique(weekly_df.index.get_level_values('Player'))
                                                 , params)
   else:
-    coefficients_first_order = calculate_coefficients(player_means
-                                                  , player_means.index
+    coefficients_first_order = calculate_coefficients(_player_means
+                                                  , _player_means.index
                                                   , conversion_factors['Conversion Factor'])
         
-  g_scores_first_order =  calculate_scores_from_coefficients(player_means
+  g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
@@ -255,7 +254,7 @@ def process_player_data(  weekly_df : pd.DataFrame
                                                 , representative_player_set
                                                 , params)
   else:
-    coefficients = calculate_coefficients(player_means
+    coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
     
@@ -265,11 +264,11 @@ def process_player_data(  weekly_df : pd.DataFrame
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
-  g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1,1)
-  z_scores =  calculate_scores_from_coefficients(player_means, coefficients, params,  1,0)
-  x_scores =  calculate_scores_from_coefficients(player_means, coefficients, params, 0,1)
+  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,1)
+  z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
+  x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
 
-  replacement_games_rate = (1- player_means['Games Played %']/100) * psi
+  replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,n_players, params)
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, params, v = v)
@@ -288,7 +287,7 @@ def process_player_data(  weekly_df : pd.DataFrame
   #need to fix this later for Roto
   x_scores = x_scores.loc[g_scores.index]
 
-  positions = player_means['Position'].str.split(',')
+  positions = _player_means['Position'].str.split(',')
 
   cross_player_var =  x_scores[0:n_players].var()
                           

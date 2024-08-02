@@ -18,8 +18,6 @@ class HAgent():
                  , info : dict
                  , omega : float
                  , gamma : float
-                 , alpha : float
-                 , beta : float
                  , n_picks : int
                  , n_drafters : int
                  , dynamic : bool
@@ -35,8 +33,6 @@ class HAgent():
             info: dictionary with info related to player statistics etc. 
             omega: float, parameter as described in the paper
             gamma: float, parameter as described in the paper
-            alpha: float, step size parameter for gradient descent 
-            beta: float, decay parameter for gradient descent 
             n_picks: int, number of picks each drafter gets 
             n_drafters : int, number of drafters
             scoring_format
@@ -48,8 +44,6 @@ class HAgent():
         """
         self.omega = omega
         self.gamma = gamma
-        self.alpha = alpha
-        self.beta = beta
         self.n_picks = n_picks 
         self.n_drafters = n_drafters
         self.dynamic = dynamic

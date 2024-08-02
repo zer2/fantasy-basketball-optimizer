@@ -637,7 +637,6 @@ def run_season(season_df
                         ,n_picks : int
                         ,omega : float
                         ,gamma : float
-                        ,alpha : float
                         ,chi : float
                         ,season_name : str 
                         ,params : dict
@@ -723,8 +722,6 @@ def run_season(season_df
             info = info
             , omega = omega
             , gamma = gamma
-            , alpha = alpha
-            , beta = params['options']['beta']['default']['Rotisserie']
             , n_picks = n_picks
             , n_drafters = n_drafters
             , scoring_format = 'Rotisserie'
@@ -738,8 +735,6 @@ def run_season(season_df
                 info = info
                 , omega = omega
                 , gamma = gamma
-                , alpha = alpha
-                , beta =  params['options']['beta']['default']['Head to Head: Each Category']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Each Category'
@@ -752,8 +747,6 @@ def run_season(season_df
                 info = info
                 , omega = omega
                 , gamma = gamma
-                , alpha = alpha
-                , beta = params['options']['beta']['default']['Head to Head: Most Categories']
                 , n_picks = n_picks
                 , n_drafters = n_drafters
                 , scoring_format = 'Head to Head: Most Categories'
@@ -925,7 +918,6 @@ def validate():
     n_picks = 13
     omega = st.session_state.params['options']['omega']['default']
     gamma = st.session_state.params['options']['gamma']['default']
-    alpha = st.session_state.params['options']['alpha']['default']
     chi = 0.05
     n_seasons = 1000
 
@@ -952,7 +944,6 @@ def validate():
                                                 ,n_picks
                                                 ,omega
                                                 ,gamma
-                                                ,alpha
                                                 ,chi
                                                 ,season_name
                                                 ,params

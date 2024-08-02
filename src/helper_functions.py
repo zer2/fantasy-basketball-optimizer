@@ -322,3 +322,11 @@ def weighted_cov_matrix(df, weights):
     deviations = df - weighted_means
     weighted_cov = np.dot(weights * deviations.T, deviations) / weights.sum()
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
+
+def increment_player_stats_version():
+  if st.session_state:
+    st.session_state.player_stats_editable_version += 1
+
+def increment_paramater_key():
+  if st.session_state:
+    st.session_state.player_stats_editable_version += 1
