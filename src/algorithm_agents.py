@@ -67,7 +67,10 @@ class HAgent():
         self.cross_player_var = info['Var']
         self.scoring_format = scoring_format
 
-        self.position_means = np.array(info['Position-Means']).reshape(1,-1,9)
+        if info['Position-Means'] is not None:
+            self.position_means = np.array(info['Position-Means']).reshape(1,-1,9)
+        else:
+            self.position_means = None
 
         L_by_position = info['L-by-Position']
         L_by_position = np.array(L_by_position).reshape(1,-1,9,9)
@@ -141,6 +144,7 @@ class HAgent():
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list) & \
                                                 self.x_scores.index.isin(self.positions.index)]
+        
         total_players = self.n_picks * self.n_drafters
 
         diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
@@ -148,7 +152,6 @@ class HAgent():
                                         , x_scores_available
                                         , cash_remaining_per_team
         )
-        
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
         default_weights = self.v.T.reshape(1,9,1)
@@ -472,23 +475,6 @@ class HAgent():
             ,'Utilities' : AdamOptimizer(learning_rate = 0.01)
             ,'Guards' : AdamOptimizer(learning_rate = 0.01)
             ,'Forwards' : AdamOptimizer(learning_rate = 0.01)}
-            
-
-        '''
-        if len(self.players) == 0:
-
-            optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.001)
-                        ,'Utilities' : AdamOptimizer(learning_rate = 0.01)
-                        ,'Guards' : AdamOptimizer(learning_rate = 0.01)
-                        ,'Forwards' : AdamOptimizer(learning_rate = 0.01)}
-            
-        else:
-
-            optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.0005)
-                        ,'Utilities' : AdamOptimizer(learning_rate = 0.005)
-                        ,'Guards' : AdamOptimizer(learning_rate = 0.005)
-                        ,'Forwards' : AdamOptimizer(learning_rate = 0.005)}  
-        '''
 
         while True:
 
@@ -565,6 +551,7 @@ class HAgent():
                 category_weights = category_weights + updates['Categories']
                 category_weights[category_weights < 0] = 0
                 category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
+
                 assert np.all(np.abs(category_weights.sum(axis=1).reshape(-1, 1) - 1) < 1e-8)
 
                 weights_df = pd.DataFrame(category_weights, index = result_index, columns = self.x_scores.columns)
@@ -572,76 +559,36 @@ class HAgent():
 
                 #update position shares 
                 ######
-                #position_change_weights = np.einsum('ak,aik -> ai',change_weights,self.position_means)
+                if self.position_means is not None:
 
-                #update flex shares and ensure that they stay compliant with their definitions    
-                #position_change_weights = 9/5  * step_size * position_gradients_centered['Utilities']
-                utility_shares = utility_shares + updates['Utilities']
-                utility_shares = np.clip(utility_shares, 0, 1)
-                utility_shares = utility_shares.div(utility_shares.sum(axis = 1), axis = 0)
+                    #update flex shares and ensure that they stay compliant with their definitions    
+                    #position_change_weights = 9/5  * step_size * position_gradients_centered['Utilities']
+                    utility_shares = utility_shares + updates['Utilities']
+                    utility_shares = np.clip(utility_shares, 0, 1)
+                    utility_shares = utility_shares.div(utility_shares.sum(axis = 1), axis = 0)
 
-                #guard_change_weights = 9/2 * step_size * position_gradients_centered['Guards']
-                guard_shares = guard_shares + updates['Guards']
-                guard_shares = np.clip(guard_shares, 0, 1)
-                guard_shares = guard_shares.div(guard_shares.sum(axis = 1), axis = 0)
+                    #guard_change_weights = 9/2 * step_size * position_gradients_centered['Guards']
+                    guard_shares = guard_shares + updates['Guards']
+                    guard_shares = np.clip(guard_shares, 0, 1)
+                    guard_shares = guard_shares.div(guard_shares.sum(axis = 1), axis = 0)
 
-                #forward_change_weights = #9/2 * step_size * position_gradients_centered['Forwards']
-                forward_shares = forward_shares + updates['Forwards']
-                forward_shares = np.clip(forward_shares, 0, 1)
-                forward_shares = forward_shares.div(forward_shares.sum(axis = 1), axis = 0)
+                    #forward_change_weights = #9/2 * step_size * position_gradients_centered['Forwards']
+                    forward_shares = forward_shares + updates['Forwards']
+                    forward_shares = np.clip(forward_shares, 0, 1)
+                    forward_shares = forward_shares.div(forward_shares.sum(axis = 1), axis = 0)
 
-                #print(i)
-                #print(len(self.players))
-                #print(guard_shares.iloc[0])
+                    #print(i)
+                    #print(len(self.players))
+                    #print(guard_shares.iloc[0])
 
-                best_player = score.argmax()
+                    best_player = score.argmax()
 
-                self.initial_category_weights = category_weights[best_player]/2 + self.v.reshape(9)/2
-                self.initial_utility_shares = utility_shares.iloc[best_player]/2 + 1/10
-                self.initial_guard_shares = guard_shares.iloc[best_player]/2 + 1/4
-                self.initial_forward_shares = forward_shares.iloc[best_player]/2 + 1/4
+                    self.initial_category_weights = category_weights[best_player]/2 + self.v.reshape(9)/2
+                    self.initial_utility_shares = utility_shares.iloc[best_player]/2 + 1/10
+                    self.initial_guard_shares = guard_shares.iloc[best_player]/2 + 1/4
+                    self.initial_forward_shares = forward_shares.iloc[best_player]/2 + 1/4
 
-                '''
-                if ((i == 29) & (len(self.players) ==2)):
-                    print(category_weights[0]/self.v.T)
-                    print(updates['Categories'][0])
-                    dasf
-
-                    #category_weights[0,:] = [0.1,0.1,0.08,0.12,0.12,0.08,0.14,0.13,0.13]
-                    #category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
-
-
-                    print(score[0:3])
-
-                    res = self.get_objective_and_gradient(category_weights
-                                                    ,utility_shares
-                                                    ,guard_shares
-                                                    ,forward_shares
-                                                    ,diff_means
-                                                    ,diff_vars
-                                                    ,x_scores_available_array
-                                                    ,result_index
-                                                    ,n_players_selected
-                                                    ,n_values)['Score']
-                    
-                    print(res[0])
-                    category_weights[:,2] = category_weights[:,2] - 0.002
-
-                    res = self.get_objective_and_gradient(category_weights
-                                                    ,utility_shares
-                                                    ,guard_shares
-                                                    ,forward_shares
-                                                    ,diff_means
-                                                    ,diff_vars
-                                                    ,x_scores_available_array
-                                                    ,result_index
-                                                    ,n_players_selected
-                                                    ,n_values)['Score']
-                    
-                    
-                    print(res[0])
-                '''
-                
+               
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
 
@@ -753,19 +700,24 @@ class HAgent():
         
             #calculate scores and category-level gradients
             ######
-            position_rewards = self.get_position_priorities_from_category_weights(category_weights)
 
-            future_position_array, flex_shares = optimize_positions_all_players(self.positions.loc[result_index]
-                                                                    ,position_rewards
-                                                                    ,self.positions.loc[self.players]
-                                                                    , utility_shares
-                                                                    , guard_shares
-                                                                    , forward_shares)
-            
+            if self.position_means is not None:
+
+                position_rewards = self.get_position_priorities_from_category_weights(category_weights)
+
+                future_position_array, flex_shares = optimize_positions_all_players(self.positions.loc[result_index]
+                                                                        ,position_rewards
+                                                                        ,self.positions.loc[self.players]
+                                                                        , utility_shares
+                                                                        , guard_shares
+                                                                        , forward_shares)
+                
 
 
-            position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
-            position_mu = np.expand_dims(position_mu, axis = 2)
+                position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
+                position_mu = np.expand_dims(position_mu, axis = 2)
+            else:
+                position_mu = 0
 
             #this causes an issue with gradients. It doesn't change much so we can just keep L constant
             #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
@@ -775,6 +727,7 @@ class HAgent():
 
             expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L) + position_mu
             expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,9,1)
+
 
             x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
@@ -788,20 +741,31 @@ class HAgent():
                                     , calculate_pdf_weights = True)
 
             category_gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
-            position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
 
-            utility_gradient = position_gradient * flex_shares[:,0].reshape(-1,1)
-            guard_gradient =position_gradient[:,(1,2)] * flex_shares[:,1].reshape(-1,1)
-            forward_gradient =position_gradient[:,(3,4)] * flex_shares[:,2].reshape(-1,1)
 
-            res = {'Score' : score
-                ,'Gradients' : 
-                    {
+            if self.position_means is not None:
+                position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
+
+                utility_gradient = position_gradient * flex_shares[:,0].reshape(-1,1)
+                guard_gradient =position_gradient[:,(1,2)] * flex_shares[:,1].reshape(-1,1)
+                forward_gradient =position_gradient[:,(3,4)] * flex_shares[:,2].reshape(-1,1)
+
+                gradients =                     {
                         'Categories' : category_gradient
                         ,'Utilities' : utility_gradient
                         ,'Guards' : guard_gradient
                         ,'Forwards' : forward_gradient
                     }
+
+            else:
+                gradients =  {
+                        'Categories' : category_gradient
+                    }
+
+                flex_shares = None
+
+            res = {'Score' : score
+                ,'Gradients' : gradients
                 ,'CDF-Estimates' : cdf_estimates
                 ,'Flex-Shares' : flex_shares
                 , 'Future-Diffs' : expected_future_diff
@@ -997,7 +961,7 @@ class HAgent():
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
         #the addition of diff_array_reshaped is the experimental Poisson adjustment 
-        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + diff_array_reshaped))
+        pdf_estimates = norm.pdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
 
         pdf_estimates_reshaped = pdf_estimates.reshape(x_diff_array.shape)
 
@@ -1022,7 +986,7 @@ class HAgent():
                                                     , x_diff_array.shape[1] * x_diff_array.shape[2])
         diff_vars_reshaped = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
 
-        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped + diff_array_reshaped))
+        cdf_estimates = norm.cdf(diff_array_reshaped, scale = np.sqrt(diff_vars_reshaped))
 
         cdf_estimates_reshaped = cdf_estimates.reshape(x_diff_array.shape)
 

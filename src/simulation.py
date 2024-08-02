@@ -284,7 +284,7 @@ def try_strategy(_primary_agent
     all_times = {}
     agents_dict = {}
      
-    for i in range(n_drafters): 
+    for i in range(n_drafters):
 
         print('Working on seat' + str(i))
 

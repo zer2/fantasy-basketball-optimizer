@@ -203,7 +203,7 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict):
 
 @st.cache_data(show_spinner = False)
 def process_player_data(  weekly_df : pd.DataFrame
-                        , _player_means : pd.DataFrame
+                        , player_means : pd.DataFrame
                         , conversion_factors :pd.Series
                         , multipliers : pd.Series
                         , upsilon : float
@@ -236,11 +236,11 @@ def process_player_data(  weekly_df : pd.DataFrame
                                                 , pd.unique(weekly_df.index.get_level_values('Player'))
                                                 , params)
   else:
-    coefficients_first_order = calculate_coefficients(_player_means
-                                                  , _player_means.index
+    coefficients_first_order = calculate_coefficients(player_means
+                                                  , player_means.index
                                                   , conversion_factors['Conversion Factor'])
         
-  g_scores_first_order =  calculate_scores_from_coefficients(_player_means
+  g_scores_first_order =  calculate_scores_from_coefficients(player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
@@ -255,7 +255,7 @@ def process_player_data(  weekly_df : pd.DataFrame
                                                 , representative_player_set
                                                 , params)
   else:
-    coefficients = calculate_coefficients(_player_means
+    coefficients = calculate_coefficients(player_means
                                                   , representative_player_set
                                                   , conversion_factors['Conversion Factor'])
     
@@ -265,11 +265,11 @@ def process_player_data(  weekly_df : pd.DataFrame
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
-  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,1)
-  z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
-  x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
+  g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1,1)
+  z_scores =  calculate_scores_from_coefficients(player_means, coefficients, params,  1,0)
+  x_scores =  calculate_scores_from_coefficients(player_means, coefficients, params, 0,1)
 
-  replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
+  replacement_games_rate = (1- player_means['Games Played %']/100) * psi
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,n_players, params)
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, params, v = v)
@@ -288,43 +288,47 @@ def process_player_data(  weekly_df : pd.DataFrame
   #need to fix this later for Roto
   x_scores = x_scores.loc[g_scores.index]
 
-  positions = _player_means['Position'].str.split(',')
+  positions = player_means['Position'].str.split(',')
 
   cross_player_var =  x_scores[0:n_players].var()
                           
-  players_and_positions = pd.merge(x_scores
-                           , positions
-                           , left_index = True
-                           , right_index = True)
-  
   #get position averages, to make sure the covariance matrix measures differences relative to position
   #we need to weight averages to avoid over-counting the players that can take multiple positions
   # 
    
-  players_and_positions_limited = players_and_positions[0:n_players]
-  categories = get_categories(params)
-  players_and_positions_limited[categories] = players_and_positions_limited[categories] \
-                                                .sub(players_and_positions_limited[categories].mean(axis = 0))
-  positions_exploded = players_and_positions_limited.explode('Position').reset_index().set_index(['Player','Position'])
-  position_mean_weights = 1/positions_exploded.groupby('Player').transform('count')
-  position_means_weighted = positions_exploded.mul(position_mean_weights)
-
-  position_means = position_means_weighted.groupby('Position').sum()/position_mean_weights.groupby('Position').sum()
-  positions_exploded = positions_exploded.sub(positions_exploded.mean(axis = 0)) #normalize by mean of the category 
-
-  #we should have some logic for position not being available
-  #also all of the position rules should be modularized 
-  position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
-
-  position_means_g = position_means * v
-  position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
-  position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
-  position_means = position_means_g / v
+  try: 
+    players_and_positions = pd.merge(x_scores
+                        , positions
+                        , left_index = True
+                        , right_index = True)
   
-  L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
-                                                              , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
-                                                              for position in ['C','PG','SG','PF','SF']}
-                              )
+    players_and_positions_limited = players_and_positions[0:n_players]
+    categories = get_categories(params)
+    players_and_positions_limited[categories] = players_and_positions_limited[categories] \
+                                                    .sub(players_and_positions_limited[categories].mean(axis = 0))
+    positions_exploded = players_and_positions_limited.explode('Position').reset_index().set_index(['Player','Position'])
+    position_mean_weights = 1/positions_exploded.groupby('Player').transform('count')
+    position_means_weighted = positions_exploded.mul(position_mean_weights)
+
+    position_means = position_means_weighted.groupby('Position').sum()/position_mean_weights.groupby('Position').sum()
+    positions_exploded = positions_exploded.sub(positions_exploded.mean(axis = 0)) #normalize by mean of the category 
+
+    #we should have some logic for position not being available
+    #also all of the position rules should be modularized 
+    position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
+
+    position_means_g = position_means * v
+    position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
+    position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
+    position_means = position_means_g / v
+    
+    L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
+                                                                , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
+                                                                for position in ['C','PG','SG','PF','SF']}
+                                )
+  except:
+    position_means = None        
+    L_by_position = np.array([x_scores.cov()])
     
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores

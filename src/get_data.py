@@ -116,7 +116,7 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_resource
 def get_historical_data():  
-  full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW')
+  full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
   renamer = st.session_state.params['stat-df-renamer']
   full_df = full_df.rename(columns = renamer)
