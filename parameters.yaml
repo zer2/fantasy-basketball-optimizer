@@ -113,6 +113,16 @@ options :
   default : 30
   min : 10
   max: 10000
+ positions: 
+  default:
+   Util : 3
+   C : 2
+   G : 2
+   PG : 1
+   SG : 1
+   F : 2
+   PF : 1
+   SF : 1
 punting_defaults :
   No dynamic optimization :
     omega : 0.0 

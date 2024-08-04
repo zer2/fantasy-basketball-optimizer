@@ -35,9 +35,6 @@ if 'player_stats_editable_version' not in st.session_state:
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
 
-if 'parameters_key' not in st.session_state:
-    st.session_state.info_key = 100000
-
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
@@ -277,10 +274,10 @@ with param_tab:
       
   with advanced_params:
 
-    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
+    player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
 
     with player_param_column:
-      st.header('Player Statistics')
+      st.subheader('Player Statistics')
 
       upsilon = st.number_input(r'Select a $\upsilon$ value'
                         , key = 'upsilon'
@@ -320,12 +317,73 @@ with param_tab:
 
       st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
+    with position_param_column: 
+
+      st.subheader('Position Requirements')
+
+      st.caption('The H-scoring algorithm will choose players assuming that its team ultimately need to fit this structure')
+
+      left_position_col, right_position_col = st.columns(2)
+
+      with left_position_col:
+
+        st.subheader('Strict positions')
+
+        n_centers = st.number_input(r'Centers'
+                          , key = 'n_centers'
+                          , value = st.session_state.params['options']['positions']['default']['C']
+                          , min_value = 0)
+        
+        n_point_guards = st.number_input(r'Point Guards'
+                    , key = 'n_point_guards'
+                    , value = st.session_state.params['options']['positions']['default']['PG']
+                    , min_value = 0)
+        
+        n_shooting_guards = st.number_input(r'Shooting Guards'
+                      , key = 'n_shooting_guards'
+                      , value = st.session_state.params['options']['positions']['default']['SG']
+                      , min_value = 0)
+        
+        n_power_forwards = st.number_input(r'Power Forwards'
+                      , key = 'n_power_forwards'
+                      , value = st.session_state.params['options']['positions']['default']['PF']
+                      , min_value = 0)
+                      
+        n_small_forwards = st.number_input(r'Small Forwards'
+                , key = 'n_small_forwards'
+                , value = st.session_state.params['options']['positions']['default']['SF']
+                , min_value = 0)
+        
+      with right_position_col:
+
+        st.subheader('Flex positions')
+
+        n_utilities = st.number_input(r'Utilities'
+                    , key = 'n_utilities'
+                    , value = st.session_state.params['options']['positions']['default']['Util']
+                    , min_value = 0)
+        
+        n_guards = st.number_input(r'Guards'
+                            , key = 'n_guards'
+                            , value = st.session_state.params['options']['positions']['default']['G']
+                            , min_value = 0)
+        
+        n_forwards = st.number_input(r'Forwards'
+                            , key = 'n_forwards'
+                            , value = st.session_state.params['options']['positions']['default']['F']
+                            , min_value = 0)
+        
+      implied_n_picks = n_utilities + n_centers + n_guards + n_point_guards + n_shooting_guards + \
+                                      n_forwards + n_power_forwards + n_small_forwards
+      
+      if implied_n_picks > n_picks:
+        st.write('There are more position slots than picks in your league. Change your configuration before proceeding')
+        st.stop()
+        
+
     with algorithm_param_column:
-      st.header('Algorithm Parameters')
-
-      left_algo_param_col, right_algo_param_col = st.columns(2)
-
-      with left_algo_param_col:
+        
+        st.subheader('Algorithm Parameters')
 
         omega = st.number_input(r'Select a $\omega$ value'
                               , key = 'omega'
@@ -364,42 +422,47 @@ with param_tab:
         else:
           n_iterations = 0 
 
-      with right_algo_param_col:
+        if scoring_format == 'Rotisserie':
 
-        chi = st.number_input(r'Select a $\chi$ value'
-                , key = 'chi'
-                , value = float(st.session_state.params['options']['chi']['default'])
-                , min_value = float(st.session_state.params['options']['chi']['min'])
-                , max_value = float(st.session_state.params['options']['chi']['max']))
-        chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                      If performance means were known exactly beforehand, chi would be 1/M where M 
-                      is the number weeks in the season. However, in practice, season-long means are 
-                      not known before the season begins, so it is recommended to set chi to be higher 
-                      '''
-        st.caption(chi_str)
+          chi = st.number_input(r'Select a $\chi$ value'
+                  , key = 'chi'
+                  , value = float(st.session_state.params['options']['chi']['default'])
+                  , min_value = float(st.session_state.params['options']['chi']['min'])
+                  , max_value = float(st.session_state.params['options']['chi']['max']))
+          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                        If performance means were known exactly beforehand, chi would be 1/M where M 
+                        is the number weeks in the season. However, in practice, season-long means are 
+                        not known before the season begins, so it is recommended to set chi to be higher 
+                        '''
+          st.caption(chi_str)
+        
+        else: 
+          chi = None
 
-        streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
-                                  , key = 'streaming_noise'
-                                  , value = 1.0
-                                  , min_value = 0.0
-                                  , max_value = None)
-        stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
-                              more long-term performance noise is expected, making low-value 
-                              players more heavily down-weighted due to the possibility that
-                              they drop below  streaming-level value'''
-        st.caption(stream_noise_str)         
+        if st.session_state['mode'] == 'Auction Mode':
 
-        streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
-                      , key = 'streaming_noise_h'
-                      , value = 0.02
-                      , min_value = 0.0
-                      , max_value = None)
+          streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                    , key = 'streaming_noise'
+                                    , value = 1.0
+                                    , min_value = 0.0
+                                    , max_value = None)
+          stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
+                                more long-term performance noise is expected, making low-value 
+                                players more heavily down-weighted due to the possibility that
+                                they drop below  streaming-level value'''
+          st.caption(stream_noise_str)         
 
-        stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
-        st.caption(stream_noise_str_h)         
+          streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
+                        , key = 'streaming_noise_h'
+                        , value = 0.02
+                        , min_value = 0.0
+                        , max_value = None)
+
+          stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
+          st.caption(stream_noise_str_h)         
 
     with trade_param_column:
-        st.header('Trading Parameters')
+        st.subheader('Trading Parameters')
 
         your_differential_threshold = st.number_input(
               r'Your differential threshold for the automatic trade suggester'

@@ -1,18 +1,21 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from src.helper_functions import get_position_numbers, get_position_ends
 import pandas as pd 
 
 def get_future_player_rows(position_rewards):
     """Takes an array of rewards by simplified position (5 columns) and translates them to rewards per slot (13) by player"""
 
-    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.002] * 3)
-    center_rewards = np.array([position_rewards[:,0]] * 2)
-    guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1) + 0.001] * 2)
-    pg_reward = np.array([position_rewards[:,1]]) 
-    sg_reward = np.array([position_rewards[:,2]]) 
-    forward_rewards = np.array([np.max(position_rewards[:,3:5], axis = 1)+ 0.001] * 2)
-    pf_reward = np.array([position_rewards[:,3]]) 
-    sf_reward =  np.array([position_rewards[:,4]]) 
+    position_numbers = get_position_numbers()
+
+    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.002] * position_numbers['Util'])
+    center_rewards = np.array([position_rewards[:,0]] * position_numbers['C'])
+    guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1) + 0.001] * position_numbers['G'])
+    pg_reward = np.array([position_rewards[:,1]] * position_numbers['PG'] ) 
+    sg_reward = np.array([position_rewards[:,2]] * position_numbers['SG'] ) 
+    forward_rewards = np.array([np.max(position_rewards[:,3:5], axis = 1)+ 0.001]  * position_numbers['F'] )
+    pf_reward = np.array([position_rewards[:,3]]  * position_numbers['PF'] ) 
+    sf_reward =  np.array([position_rewards[:,4]]  * position_numbers['SF'] ) 
 
     row = np.concatenate([util_rewards, center_rewards, guard_rewards, pg_reward, sg_reward, forward_rewards, pf_reward, sf_reward]
                         , axis = 0).T
@@ -21,15 +24,9 @@ def get_future_player_rows(position_rewards):
 
 def get_player_rows(players):
     """Turns a list of player eligibilities into a array of rows that can be input to the matching problem"""
-
-    two_zeros = [[0,0]] * len(players)
-    two_infs =  [[-np.inf, -np.inf] ]* len(players)
-
-    one_zero = [[0]]  * len(players)
-    one_inf =  [[-np.inf] ]* len(players)
-
     n_players = len(players)
-    util_slots = np.array([[0,0,0]] * n_players)
+
+    position_numbers = get_position_numbers()
 
     is_center = np.array([['C' in x] for x in players])
     is_pg = np.array([['PG' in x] for x in players])
@@ -37,33 +34,36 @@ def get_player_rows(players):
     is_pf = np.array([['PF' in x] for x in players])
     is_sf = np.array([['SF' in x] for x in players])
 
+    util_slots = np.array([[0] * position_numbers['Util']] * n_players)
+
+
     center_slots = np.where(is_center
-                            , two_zeros
-                            , two_infs)
+                            , [[0] * position_numbers['C']] * n_players
+                            , [[-np.inf] * position_numbers['C']] * n_players)
 
     guard_slots = np.where(is_pg | is_sg
-                            , two_zeros
-                            , two_infs)
+                            , [[0] * position_numbers['G']] * n_players
+                            , [[-np.inf] * position_numbers['G']] * n_players)
     
     pg_slot = np.where(is_pg
-                            , one_zero
-                            , one_inf)
+                            , [[0] * position_numbers['PG']] * n_players
+                            , [[-np.inf] * position_numbers['PG']] * n_players)
     
     sg_slot = np.where(is_sg
-                            , one_zero
-                            , one_inf)
+                            , [[0] * position_numbers['SG']] * n_players
+                            , [[-np.inf] * position_numbers['SG']] * n_players)
     
     forward_slots = np.where(is_pf | is_sf
-                            , two_zeros
-                            , two_infs)
+                            , [[0] * position_numbers['F']] * n_players
+                            , [[-np.inf] * position_numbers['F']] * n_players)
     
     pf_slot = np.where(is_pf
-                            , one_zero
-                            , one_inf)
+                            , [[0] * position_numbers['PF']] * n_players
+                            , [[-np.inf] * position_numbers['PF']] * n_players)
     
     sf_slot = np.where(is_sf
-                            , one_zero
-                            , one_inf)  
+                            , [[0] * position_numbers['SF']] * n_players
+                            , [[-np.inf] * position_numbers['SF']] * n_players)
 
     res = np.concatenate([util_slots, center_slots, guard_slots, pg_slot, sg_slot, forward_slots, pf_slot, sf_slot], axis = 1)
 
@@ -116,16 +116,18 @@ def get_position_array_from_res(res :np.array
 
     """
 
+    position_ends = get_position_ends()
+
     future_positions = res[:,-n_remaining_players:]
-    utils = (future_positions <= 2).sum(axis = 1).astype(float)
-    centers = ((future_positions > 2) & (future_positions <=4)).sum(axis = 1).astype(float)
-    guards = ((future_positions > 4) & (future_positions <=6)).sum(axis = 1).astype(float)
-    pg = (future_positions ==7).sum(axis =1).astype(float)
-    sg = (future_positions ==8).sum(axis = 1).astype(float)
+    utils = (future_positions <= position_ends['Util']).sum(axis = 1).astype(float)
+    centers = ((future_positions > position_ends['Util']) & (future_positions <=position_ends['C'])).sum(axis = 1).astype(float)
+    guards = ((future_positions > position_ends['C']) & (future_positions <= position_ends['G'])).sum(axis = 1).astype(float)
+    pg = ((future_positions > position_ends['G']) & (future_positions <= position_ends['PG'])).sum(axis = 1).astype(float)
+    sg = ((future_positions > position_ends['PG']) & (future_positions <= position_ends['SG'])).sum(axis = 1).astype(float)
     
-    forwards = ((future_positions > 8) & (future_positions <=10)).sum(axis = 1).astype(float)
-    pf = (future_positions ==11).sum(axis = 1).astype(float)
-    sf = (future_positions ==12).sum(axis = 1).astype(float)
+    forwards = ((future_positions > position_ends['SG']) & (future_positions <= position_ends['F'])).sum(axis = 1).astype(float)
+    pf = ((future_positions > position_ends['F']) & (future_positions <= position_ends['PF'])).sum(axis = 1).astype(float)
+    sf = ((future_positions > position_ends['PF']) & (future_positions <= position_ends['SF'])).sum(axis = 1).astype(float)
 
     #add flex spots based on computed shares 
     utils_split = utility_shares.mul(utils.reshape(-1,1))

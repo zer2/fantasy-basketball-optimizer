@@ -15,6 +15,72 @@ def get_categories(params = None):
     else: 
       return st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
 
+def get_position_numbers():
+
+    if st.session_state:
+        n_utilities = st.session_state.n_utilities 
+        n_centers = st.session_state.n_centers
+        n_guards = st.session_state.n_guards
+        n_point_guards =  st.session_state.n_point_guards
+        n_shooting_guards =  st.session_state.n_shooting_guards
+        n_forwards = st.session_state.n_forwards
+        n_power_forwards =  st.session_state.n_power_forwards
+        n_small_forwards =  st.session_state.n_small_forwards     
+    else:
+       
+       #default to the standard position requirements
+       n_utilities = 3
+       n_centers = 2
+       n_guards = 2
+       n_point_guards = 1
+       n_shooting_guards = 1
+       n_forwards = 2
+       n_power_forwards = 1
+       n_small_forwards = 1
+
+    return {'Util' :n_utilities
+            ,'C' : n_centers
+            ,'G' : n_guards
+            ,'PG' : n_point_guards
+            ,'SG' : n_shooting_guards
+            ,'F' : n_forwards
+            ,'PF' : n_power_forwards
+            ,'SF' : n_small_forwards
+            }
+
+def get_position_ends():
+
+    if st.session_state:
+        utility_end = st.session_state.n_utilities - 1 
+        center_end = utility_end + st.session_state.n_centers
+        guard_end = center_end + st.session_state.n_guards
+        point_guard_end = guard_end +  st.session_state.n_point_guards
+        shooting_guard_end = point_guard_end + st.session_state.n_shooting_guards
+        forward_end = shooting_guard_end + st.session_state.n_forwards
+        power_forward_end = forward_end +  st.session_state.n_power_forwards
+        shooting_forward_end = power_forward_end + st.session_state.n_small_forwards     
+    else:
+       
+       #default to the standard position requirements
+       utility_end = 2
+       center_end = 4
+       guard_end = 6
+       point_guard_end = 7
+       shooting_guard_end = 8
+       forward_end = 10
+       power_forward_end = 11
+       shooting_forward_end = 12
+
+    return {'Util' :utility_end
+            ,'C' : center_end
+            ,'G' : guard_end
+            ,'PG' : point_guard_end
+            ,'SG' : shooting_guard_end
+            ,'F' : forward_end
+            ,'PF' : power_forward_end
+            ,'SF' : shooting_forward_end
+            }
+
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
     #Goes row by row- very important! 
@@ -324,9 +390,5 @@ def weighted_cov_matrix(df, weights):
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
 
 def increment_player_stats_version():
-  if st.session_state:
-    st.session_state.player_stats_editable_version += 1
-
-def increment_paramater_key():
   if st.session_state:
     st.session_state.player_stats_editable_version += 1
