@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from src.helper_functions import get_position_numbers, get_position_ends
+import streamlit as st
 import pandas as pd 
 
 def get_future_player_rows(position_rewards):
@@ -8,14 +9,23 @@ def get_future_player_rows(position_rewards):
 
     position_numbers = get_position_numbers()
 
-    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.002] * position_numbers['Util'])
-    center_rewards = np.array([position_rewards[:,0]] * position_numbers['C'])
-    guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1) + 0.001] * position_numbers['G'])
-    pg_reward = np.array([position_rewards[:,1]] * position_numbers['PG'] ) 
-    sg_reward = np.array([position_rewards[:,2]] * position_numbers['SG'] ) 
-    forward_rewards = np.array([np.max(position_rewards[:,3:5], axis = 1)+ 0.001]  * position_numbers['F'] )
-    pf_reward = np.array([position_rewards[:,3]]  * position_numbers['PF'] ) 
-    sf_reward =  np.array([position_rewards[:,4]]  * position_numbers['SF'] ) 
+    #The reshaping is necessary to handle the case when a position number is zero
+    util_rewards = np.array([np.max(position_rewards, axis = 1) + 0.002] * position_numbers['Util']) \
+                                                            .reshape(position_numbers['Util'] , len(position_rewards))
+    center_rewards = np.array([position_rewards[:,0]] * position_numbers['C']) \
+                                                            .reshape(position_numbers['C'] , len(position_rewards))
+    guard_rewards = np.array([np.max(position_rewards[:,1:3],axis = 1) + 0.001] * position_numbers['G']) \
+                                                            .reshape(position_numbers['G'] , len(position_rewards))
+    pg_reward = np.array([position_rewards[:,1]] * position_numbers['PG'] ) \
+                                                            .reshape(position_numbers['PG'] , len(position_rewards)) 
+    sg_reward = np.array([position_rewards[:,2]] * position_numbers['SG'] ) \
+                                                            .reshape(position_numbers['SG'] , len(position_rewards)) 
+    forward_rewards = np.array([np.max(position_rewards[:,3:5], axis = 1)+ 0.001]  * position_numbers['F'] ) \
+                                                            .reshape(position_numbers['F'] , len(position_rewards))
+    pf_reward = np.array([position_rewards[:,3]]  * position_numbers['PF'] ) \
+                                                            .reshape(position_numbers['PF'] , len(position_rewards)) 
+    sf_reward =  np.array([position_rewards[:,4]]  * position_numbers['SF'] ) \
+                                                            .reshape(position_numbers['SF'] , len(position_rewards)) 
 
     row = np.concatenate([util_rewards, center_rewards, guard_rewards, pg_reward, sg_reward, forward_rewards, pf_reward, sf_reward]
                         , axis = 0).T

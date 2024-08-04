@@ -387,7 +387,10 @@ with param_tab:
       if implied_n_picks > n_picks:
         st.write('There are more position slots than picks in your league. Change your configuration before proceeding')
         st.stop()
-        
+
+      elif implied_n_picks < n_picks:
+        st.write('There are fewer position slots than picks in your league. Change your configuration before proceeding')
+        st.stop()
 
     with algorithm_param_column:
         
