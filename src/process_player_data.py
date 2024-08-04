@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helper_functions import get_categories, weighted_cov_matrix
+from src.helper_functions import get_categories, weighted_cov_matrix, increment_info_key
 import os
 import streamlit as st
 
@@ -340,7 +340,6 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'L-by-Position' : L_by_position
           , 'Positions' : positions}
 
-  if st.session_state: #if we are running outside of streamlit this will be empty, and will evaluate to False
-    st.session_state.info_key += 1 
+  increment_info_key()
   
   return info

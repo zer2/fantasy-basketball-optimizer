@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import listify, increment_player_stats_version
+from src.helper_functions import listify, increment_player_stats_version, increment_info_key
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -332,27 +332,32 @@ with param_tab:
         n_centers = st.number_input(r'Centers'
                           , key = 'n_centers'
                           , value = st.session_state.params['options']['positions']['default']['C']
-                          , min_value = 0)
+                          , min_value = 0
+                          , on_change = increment_info_key)
         
         n_point_guards = st.number_input(r'Point Guards'
                     , key = 'n_point_guards'
                     , value = st.session_state.params['options']['positions']['default']['PG']
-                    , min_value = 0)
+                    , min_value = 0
+                    , on_change = increment_info_key)
         
         n_shooting_guards = st.number_input(r'Shooting Guards'
                       , key = 'n_shooting_guards'
                       , value = st.session_state.params['options']['positions']['default']['SG']
-                      , min_value = 0)
+                      , min_value = 0
+                      , on_change = increment_info_key)
         
         n_power_forwards = st.number_input(r'Power Forwards'
                       , key = 'n_power_forwards'
                       , value = st.session_state.params['options']['positions']['default']['PF']
-                      , min_value = 0)
+                      , min_value = 0
+                      , on_change = increment_info_key)
                       
         n_small_forwards = st.number_input(r'Small Forwards'
                 , key = 'n_small_forwards'
                 , value = st.session_state.params['options']['positions']['default']['SF']
-                , min_value = 0)
+                , min_value = 0
+                , on_change = increment_info_key)
         
       with right_position_col:
 
@@ -361,17 +366,20 @@ with param_tab:
         n_utilities = st.number_input(r'Utilities'
                     , key = 'n_utilities'
                     , value = st.session_state.params['options']['positions']['default']['Util']
-                    , min_value = 0)
+                    , min_value = 0
+                    , on_change = increment_info_key)
         
         n_guards = st.number_input(r'Guards'
                             , key = 'n_guards'
                             , value = st.session_state.params['options']['positions']['default']['G']
-                            , min_value = 0)
+                            , min_value = 0
+                            , on_change = increment_info_key)
         
         n_forwards = st.number_input(r'Forwards'
                             , key = 'n_forwards'
                             , value = st.session_state.params['options']['positions']['default']['F']
-                            , min_value = 0)
+                            , min_value = 0
+                            , on_change = increment_info_key)
         
       implied_n_picks = n_utilities + n_centers + n_guards + n_point_guards + n_shooting_guards + \
                                       n_forwards + n_power_forwards + n_small_forwards

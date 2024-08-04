@@ -392,3 +392,7 @@ def weighted_cov_matrix(df, weights):
 def increment_player_stats_version():
   if st.session_state:
     st.session_state.player_stats_editable_version += 1
+
+def increment_info_key():
+  if st.session_state:
+    st.session_state.info_key += 1
