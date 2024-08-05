@@ -607,13 +607,11 @@ class HAgent():
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
-                    ,'Utility-Shares' : pd.DataFrame(position_shares_current['Util'].values, index = result_index
-                                                     , columns = ['C','PG','SG','PF','SF']) 
-                    ,'Guard-Shares' : pd.DataFrame(position_shares_current['F'].values, index = result_index
-                                                   , columns = ['PG','SG']) 
-                    ,'Forward-Shares' : pd.DataFrame(position_shares_current['G'].values, index = result_index
-                                                     , columns = ['PF','SF']) 
-                    
+                    ,'Position-Shares' : {position_code : 
+                                                    pd.DataFrame(position_shares_current[position_code].values, index = result_index
+                                                     , columns = position_info['bases']) 
+                                                     for position_code, position_info in self.position_structure['flex'].items()
+                                            }
                     
                     }
 
@@ -680,17 +678,15 @@ class HAgent():
             if self.position_means is not None:
                 position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
 
-                utility_gradient = position_gradient[:,self.position_indices['Util']]  * flex_shares[:,0].reshape(-1,1)
-                guard_gradient =position_gradient[:,self.position_indices['G']] * flex_shares[:,1].reshape(-1,1)
-                forward_gradient =position_gradient[:,self.position_indices['F']] * flex_shares[:,2].reshape(-1,1)
+                share_gradients =  {position_code : 
+                                        position_gradient[:,self.position_indices[position_code]]  * flex_share.reshape(-1,1)
+                                        for position_code, flex_share in flex_shares.items()
+                                    }
 
-                gradients =                     {
-                        'Categories' : category_gradient
-                        ,'Shares' : 
-                                    {'Util' : utility_gradient
-                                    ,'G' : guard_gradient
-                                    ,'F' : forward_gradient}
-                    }
+                gradients =   {
+                                'Categories' : category_gradient
+                                ,'Shares' : share_gradients
+                                }
 
             else:
                 gradients =  {

@@ -124,8 +124,6 @@ def get_position_array_from_res(res :np.array
 
     """
 
-    
-
     position_ends = get_position_ends()
 
     future_positions = res[:,-n_remaining_players:]
@@ -152,7 +150,9 @@ def get_position_array_from_res(res :np.array
 
     res_main = np.concatenate([[centers],[pg],[sg],[pf],[sf]], axis = 0).T
 
-    flex_shares = np.concatenate([[utils],[guards],[forwards]], axis = 0).T
+    flex_shares = {'Util' : utils
+                   ,'G' : guards
+                   ,'F' : forwards}
 
     return res_main, flex_shares
 
