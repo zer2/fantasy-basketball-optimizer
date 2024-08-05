@@ -64,7 +64,7 @@ if 'params' not in st.session_state:
           print(exc) 
 
 counting_statistics = st.session_state.params['counting-statistics'] 
-volume_statistics = st.session_state.params['volume-statistics'] 
+volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
 
 historical_df = get_historical_data()
 current_data, expected_minutes = get_current_season_data()

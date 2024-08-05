@@ -178,8 +178,8 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
     
   required_columns = st.session_state.params['counting-statistics'] + \
-                    st.session_state.params['percentage-statistics'] + \
-                    st.session_state.params['volume-statistics'] + \
+                    list(st.session_state.params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
                     st.session_state.params['other-columns']
   darko_short_term = get_darko_short_term(darko_df)[required_columns]
   darko_long_term = get_darko_long_term(darko_df, expected_minutes)[required_columns]

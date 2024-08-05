@@ -7,7 +7,7 @@ from src.helper_functions import check_team_eligibility
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_eligibility_row_simplified, get_position_structure
+from src.helper_functions import get_eligibility_row_simplified, get_position_structure, get_position_indices
 from src.position_optimization import optimize_positions_all_players
 import datetime
 import scipy
@@ -112,12 +112,7 @@ class HAgent():
         self.guard_shares = None
 
         self.position_structure = get_position_structure()
-        flex_info =  self.position_structure['flex']
-        base_position_list = self.position_structure['base_list']
-        self.position_indices = {position_code : 
-                        [i for i, val in enumerate(base_position_list) if val in position_info['bases']]
-                                for position_code, position_info in flex_info.items()
-        }
+        self.position_indices = get_position_indices(self.position_structure)
 
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []

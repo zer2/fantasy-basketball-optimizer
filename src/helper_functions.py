@@ -11,18 +11,18 @@ import cvxpy
 def get_categories(params = None):
     #convenience function to get the list of categories used for fantasy basketball
     if params: 
-      return params['percentage-statistics'] + params['counting-statistics']
+      return list(params['ratio-statistics'].keys()) + params['counting-statistics']
     else: 
-      return st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+      return list(st.session_state.params['ratio-statistics'].keys()) + st.session_state.params['counting-statistics']
 
 def get_position_numbers():
 
     if st.session_state:
         res = {}
-        for position_code in st.session_state.params['options']['positions']['base'].keys():  
+        for position_code in st.session_state.params['position_structure']['base_list']:  
            res[position_code] = st.session_state['n_' + position_code]
 
-        for position_code in st.session_state.params['options']['positions']['flex'].keys():  
+        for position_code in st.session_state.params['position_structure']['flex_list']:  
            res[position_code] = st.session_state['n_' + position_code]
 
         return res
@@ -49,6 +49,7 @@ def get_position_structure():
                          ,'SG' : {'full_str' : 'Shooting Guards'}
                          ,'PF' : {'full_str' : 'Power Forwards'}
                          ,'SF' : {'full_str' : 'Small Forwards'}}
+               ,'flex_list' : ['Util','G','F']
                ,'flex' : {'Util' : 
                           {'bases' : ['C','PG','SG','PF','SF']
                            ,'full_str' : 'Utilities'
@@ -64,37 +65,57 @@ def get_position_structure():
 
 
 
-def get_position_ends():
+def get_position_ranges():
 
     if st.session_state:
-        utility_end = st.session_state.n_Util - 1 
-        center_end = utility_end + st.session_state.n_C
-        guard_end = center_end + st.session_state.n_G
-        point_guard_end = guard_end +  st.session_state.n_PG
-        shooting_guard_end = point_guard_end + st.session_state.n_SG
-        forward_end = shooting_guard_end + st.session_state.n_F
-        power_forward_end = forward_end +  st.session_state.n_PF
-        shooting_forward_end = power_forward_end + st.session_state.n_SF     
+
+        start = 0
+        end = 0
+        res = {}
+
+        position_structure = st.session_state.params['position_structure']
+        
+        all_positions = position_structure['base_list'] + position_structure['flex_list']
+
+        for position_code in all_positions:
+           end += st.session_state['n_' + position_code]
+           res[position_code] = {'start' : start, 'end': end}
+           start = end
+
+        return res 
+
     else:
        
        #default to the standard position requirements
-       utility_end = 2
-       center_end = 4
-       guard_end = 6
-       point_guard_end = 7
-       shooting_guard_end = 8
-       forward_end = 10
-       power_forward_end = 11
-       shooting_forward_end = 12
+       center = {'start' : 0, 'end' : 2}
+       point_guard = {'start' : 2, 'end' : 3}
+       shooting_guard = {'start' : 3, 'end' : 4}
+       power_forward = {'start' : 4, 'end' : 5}
+       shooting_forward = {'start' : 5, 'end' : 6}
+       utility = {'start' : 6, 'end' : 9}
+       guard =  {'start' : 9, 'end' : 11}
+       forward = {'start' : 11, 'end' : 13}
 
-    return {'Util' :utility_end
-            ,'C' : center_end
-            ,'G' : guard_end
-            ,'PG' : point_guard_end
-            ,'SG' : shooting_guard_end
-            ,'F' : forward_end
-            ,'PF' : power_forward_end
-            ,'SF' : shooting_forward_end
+       return {
+                'C' : center
+                ,'PG' : point_guard
+                ,'SG' : shooting_guard
+                ,'PF' : power_forward
+                ,'SF' : shooting_forward
+                ,'Util' :utility
+                ,'G' : guard
+                ,'F' : forward
+
+                }
+    
+def get_position_indices(position_structure):
+   
+    flex_info =  position_structure['flex']
+    base_position_list = position_structure['base_list']
+
+    return {position_code : 
+                            [i for i, val in enumerate(base_position_list) if val in position_info['bases']]
+                                    for position_code, position_info in flex_info.items()
             }
 
 def listify(x : pd.DataFrame) -> list:
