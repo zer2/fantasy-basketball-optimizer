@@ -114,15 +114,53 @@ options :
   min : 10
   max: 10000
  positions: 
-  default:
-   Util : 3
+  base:
    C : 2
-   G : 2
    PG : 1
    SG : 1
-   F : 2
    PF : 1
    SF : 1
+  flex: 
+   Util : 3
+   G :  2
+   F :  2
+position_structure :
+  base_list :
+    - C
+    - PG
+    - SG
+    - PF
+    - SF
+  base:
+    C : 
+      full_str: Centers
+    PG : 
+      full_str: Point Guards
+    SG : 
+      full_str: Shooting Guards
+    PF : 
+      full_str: Power Forwards
+    SF : 
+      full_str: Small Forwards
+  flex: 
+    Util : 
+      bases: 
+       - C
+       - PG
+       - SG
+       - PF
+       - SF
+      full_str: Utilities
+    G : 
+      bases: 
+      - PG
+      - SG
+      full_str: Guards
+    F: 
+      bases: 
+      - PF
+      - SF
+      full_str: Forwards
 punting_defaults :
   No dynamic optimization :
     omega : 0.0 

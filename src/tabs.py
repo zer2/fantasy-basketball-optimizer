@@ -151,7 +151,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
       st.markdown('Team H-score not defined until team is full') 
 ### Candidate tabs 
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = True)
 def make_cand_tab(_scores : pd.DataFrame
               , selection_list : list[str]
               , player_multiplier : float
@@ -171,9 +171,6 @@ def make_cand_tab(_scores : pd.DataFrame
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
-              
-  counting_statistics = st.session_state.params['counting-statistics'] 
-  percentage_statistics = st.session_state.params['percentage-statistics'] 
 
   scores_unselected = _scores[~_scores.index.isin(selection_list)]
 
@@ -185,6 +182,7 @@ def make_cand_tab(_scores : pd.DataFrame
                                                           , st.session_state['streaming_noise'])
     
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
+
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 
   return scores_unselected

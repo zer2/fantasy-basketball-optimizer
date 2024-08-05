@@ -18,47 +18,63 @@ def get_categories(params = None):
 def get_position_numbers():
 
     if st.session_state:
-        n_utilities = st.session_state.n_utilities 
-        n_centers = st.session_state.n_centers
-        n_guards = st.session_state.n_guards
-        n_point_guards =  st.session_state.n_point_guards
-        n_shooting_guards =  st.session_state.n_shooting_guards
-        n_forwards = st.session_state.n_forwards
-        n_power_forwards =  st.session_state.n_power_forwards
-        n_small_forwards =  st.session_state.n_small_forwards     
+        res = {}
+        for position_code in st.session_state.params['options']['positions']['base'].keys():  
+           res[position_code] = st.session_state['n_' + position_code]
+
+        for position_code in st.session_state.params['options']['positions']['flex'].keys():  
+           res[position_code] = st.session_state['n_' + position_code]
+
+        return res
     else:
        
-       #default to the standard position requirements
-       n_utilities = 3
-       n_centers = 2
-       n_guards = 2
-       n_point_guards = 1
-       n_shooting_guards = 1
-       n_forwards = 2
-       n_power_forwards = 1
-       n_small_forwards = 1
+        return {'Util' :3
+                ,'C' : 2
+                ,'G' : 2
+                ,'PG' : 1
+                ,'SG' : 1
+                ,'F' : 2
+                ,'PF' : 1
+                ,'SF' : 1
+                }
+    
+def get_position_structure():
+    if st.session_state:
+       return st.session_state.params['position_structure']
+    else:
+       return { 'base_list' :
+                        ['C','PG','SG','PF','SF']
+               ,'base' : {'C' : {'full_str' : 'Centers'}
+                         ,'PG' :{'full_str' : 'Point Guards'}
+                         ,'SG' : {'full_str' : 'Shooting Guards'}
+                         ,'PF' : {'full_str' : 'Power Forwards'}
+                         ,'SF' : {'full_str' : 'Small Forwards'}}
+               ,'flex' : {'Util' : 
+                          {'bases' : ['C','PG','SG','PF','SF']
+                           ,'full_str' : 'Utilities'
+                          }
+                        ,'G' : {'bases' : ['PG','SG']
+                           ,'full_str' : 'Guards'
+                          }
+                        ,'F' : {'bases' : ['PF','SF']
+                           ,'full_str' : 'Forwards'
+                          }
+                            }
+                 }
 
-    return {'Util' :n_utilities
-            ,'C' : n_centers
-            ,'G' : n_guards
-            ,'PG' : n_point_guards
-            ,'SG' : n_shooting_guards
-            ,'F' : n_forwards
-            ,'PF' : n_power_forwards
-            ,'SF' : n_small_forwards
-            }
+
 
 def get_position_ends():
 
     if st.session_state:
-        utility_end = st.session_state.n_utilities - 1 
-        center_end = utility_end + st.session_state.n_centers
-        guard_end = center_end + st.session_state.n_guards
-        point_guard_end = guard_end +  st.session_state.n_point_guards
-        shooting_guard_end = point_guard_end + st.session_state.n_shooting_guards
-        forward_end = shooting_guard_end + st.session_state.n_forwards
-        power_forward_end = forward_end +  st.session_state.n_power_forwards
-        shooting_forward_end = power_forward_end + st.session_state.n_small_forwards     
+        utility_end = st.session_state.n_Util - 1 
+        center_end = utility_end + st.session_state.n_C
+        guard_end = center_end + st.session_state.n_G
+        point_guard_end = guard_end +  st.session_state.n_PG
+        shooting_guard_end = point_guard_end + st.session_state.n_SG
+        forward_end = shooting_guard_end + st.session_state.n_F
+        power_forward_end = forward_end +  st.session_state.n_PF
+        shooting_forward_end = power_forward_end + st.session_state.n_SF     
     else:
        
        #default to the standard position requirements

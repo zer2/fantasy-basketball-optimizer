@@ -109,9 +109,7 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
         return np.array([0] * 13)
 
 def get_position_array_from_res(res :np.array
-                                 , utility_shares : pd.DataFrame
-                                 , guard_shares : pd.DataFrame
-                                 , forward_shares : pd.DataFrame
+                                 , position_shares : dict[pd.DataFrame]
                                  , n_remaining_players : int):
     """Takes the result of the assignment problem from integers to the associated positions
     
@@ -125,6 +123,8 @@ def get_position_array_from_res(res :np.array
         List of ints, representing which slots the future players will take
 
     """
+
+    
 
     position_ends = get_position_ends()
 
@@ -140,9 +140,9 @@ def get_position_array_from_res(res :np.array
     sf = ((future_positions > position_ends['PF']) & (future_positions <= position_ends['SF'])).sum(axis = 1).astype(float)
 
     #add flex spots based on computed shares 
-    utils_split = utility_shares.mul(utils.reshape(-1,1))
-    guards_split = guard_shares.mul(guards.reshape(-1,1))
-    forwards_split = forward_shares.mul(forwards.reshape(-1,1))
+    utils_split = position_shares['Util'].mul(utils.reshape(-1,1))
+    guards_split = position_shares['G'].mul(guards.reshape(-1,1))
+    forwards_split = position_shares['F'].mul(forwards.reshape(-1,1))
 
     centers += utils_split.loc[:,'C']
     pg += utils_split.loc[:,'PG'] + guards_split.loc[:,'PG']
@@ -159,9 +159,7 @@ def get_position_array_from_res(res :np.array
 def optimize_positions_all_players(candidate_players : list[list[str]]
                                    , position_rewards : np.array
                                    , team_so_far : list[list[str]]
-                                   , utility_shares : pd.DataFrame
-                                   , guard_shares : pd.DataFrame
-                                   , forward_shares : pd.DataFrame
+                                   , position_shares : dict[pd.DataFrame]
                                    , scale_down : bool = True):
     """Optimizes positions of future draft picks for all candidate players and associated position rewards 
 
@@ -192,9 +190,7 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
                                 , axis = 0)
     
     final_positions, flex_shares = get_position_array_from_res(all_res
-                                                  ,utility_shares
-                                                  ,guard_shares
-                                                  ,forward_shares
+                                                  ,position_shares
                                                   , n_remaining_players)
     
 

@@ -7,7 +7,7 @@ from src.helper_functions import check_team_eligibility
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_eligibility_row_simplified
+from src.helper_functions import get_eligibility_row_simplified, get_position_structure
 from src.position_optimization import optimize_positions_all_players
 import datetime
 import scipy
@@ -111,6 +111,14 @@ class HAgent():
         self.forward_shares = None
         self.guard_shares = None
 
+        self.position_structure = get_position_structure()
+        flex_info =  self.position_structure['flex']
+        base_position_list = self.position_structure['base_list']
+        self.position_indices = {position_code : 
+                        [i for i, val in enumerate(base_position_list) if val in position_info['bases']]
+                                for position_code, position_info in flex_info.items()
+        }
+
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
@@ -162,47 +170,32 @@ class HAgent():
             initial_category_weights = initial_category_weights/(initial_category_weights.sum(axis = 1).reshape(-1,1))
 
                     
-            initial_utility_shares = pd.DataFrame({'C' : [1/5] * len(x_scores_available_array)
-                                                    ,'PG' : [1/5] * len(x_scores_available_array)
-                                                    ,'SG' : [1/5] * len(x_scores_available_array)
-                                                    ,'PF' : [1/5] * len(x_scores_available_array)
-                                                    ,'SF' : [1/5] * len(x_scores_available_array)
-                                                    })
-            
-            initial_guard_shares = pd.DataFrame({'PG' : [1/2] * len(x_scores_available_array)
-                                                    ,'SG' : [1/2] * len(x_scores_available_array)
-                                                    })
-            
-            initial_forward_shares = pd.DataFrame({'PF' : [1/2] * len(x_scores_available_array)
-                                                    ,'SF' : [1/2] * len(x_scores_available_array)
-                                                    })
+            initial_position_shares = {
+                        position_code : 
+                                    pd.DataFrame(
+                                        {base_position_code : [1/len(position_info['bases'])] * len(x_scores_available_array)
+                                        for base_position_code in position_info['bases']}
+                                                ) 
+                        for position_code, position_info in self.position_structure['flex'].items()  
+                                        }
+                        
         else: 
 
             initial_category_weights = np.array([self.initial_category_weights] * len(x_scores_available))
-            initial_utility_shares = pd.DataFrame({'C' : [self.initial_utility_shares['C']] * len(x_scores_available_array)
-                                                    ,'PG' : [self.initial_utility_shares['PG']]  * len(x_scores_available_array)
-                                                    ,'SG' : [self.initial_utility_shares['SG']]  * len(x_scores_available_array)
-                                                    ,'PF' : [self.initial_utility_shares['PF']]  * len(x_scores_available_array)
-                                                    ,'SF' : [self.initial_utility_shares['SF']]  * len(x_scores_available_array)
-                                                    }
-                                                    ,index = x_scores_available.index)
             
-            initial_guard_shares = pd.DataFrame({'PG' : [self.initial_guard_shares['PG']]  * len(x_scores_available_array)
-                                                    ,'SG' : [self.initial_guard_shares['SG']]  * len(x_scores_available_array)
-                                                    }
-                                                    ,index = x_scores_available.index)
-            
-            initial_forward_shares = pd.DataFrame({'PF' : [self.initial_forward_shares['PF']]  * len(x_scores_available_array)
-                                                    ,'SF' : [self.initial_forward_shares['SF']]  * len(x_scores_available_array)
-                                                    }
-                                                    ,index = x_scores_available.index)
-
+            initial_position_shares = {
+                        position_code : 
+                                    pd.DataFrame(
+                                        {base_position_code : [self.initial_shares[position_code][base_position_code]] * \
+                                                                            len(x_scores_available_array)
+                                        for base_position_code in position_info['bases']}
+                                                ) 
+                        for position_code, position_info in self.position_structure['flex'].items()  
+                                        }
                 
 
         return self.perform_iterations(initial_category_weights
-                                       ,initial_utility_shares
-                                       ,initial_guard_shares
-                                       ,initial_forward_shares
+                                       ,initial_position_shares
                                        ,my_players
                                        , n_players_selected
                                        , diff_means
@@ -255,7 +248,6 @@ class HAgent():
                                                                             , index = self.x_scores.columns) #used for category names
                                                     )
             replacement_value_by_category = np.array(replacement_value_by_category).reshape(9,1)
-
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,9,1) - \
@@ -430,9 +422,7 @@ class HAgent():
 
     def perform_iterations(self
                            ,category_weights : pd.DataFrame
-                           ,utility_shares : pd.DataFrame
-                           ,guard_shares : pd.DataFrame
-                           ,forward_shares : pd.DataFrame
+                           ,position_shares : dict[pd.DataFrame]
                            ,my_players : list[str]
                            ,n_players_selected : int
                            ,diff_means : pd.Series
@@ -466,25 +456,21 @@ class HAgent():
         i = 0
 
         optimizers = {'Categories' : AdamOptimizer(learning_rate = 0.001)
-            ,'Utilities' : AdamOptimizer(learning_rate = 0.01)
-            ,'Guards' : AdamOptimizer(learning_rate = 0.01)
-            ,'Forwards' : AdamOptimizer(learning_rate = 0.01)}
+                      ,'Shares' : {position_code : AdamOptimizer(learning_rate = 0.01)
+                                      for position_code in self.position_structure['flex'].keys()}
+        }
 
         while True:
 
                             
             category_weights_current = category_weights
-            utility_shares_current = utility_shares
-            guard_shares_current = guard_shares
-            forward_shares_current = forward_shares
+            position_shares_current = position_shares
 
             #case where many players need to be chosen
             if (n_players_selected < self.n_picks - 1) & (self.dynamic):
 
                 res = self.get_objective_and_gradient(category_weights
-                                                    ,utility_shares
-                                                    ,guard_shares
-                                                    ,forward_shares
+                                                    ,position_shares
                                                     ,diff_means
                                                     ,diff_vars
                                                     ,x_scores_available_array
@@ -496,53 +482,23 @@ class HAgent():
                 cdf_estimates = res['CDF-Estimates']
                 expected_future_diff = res['Future-Diffs']   
 
-
-                #category_weights[:,0] = category_weights[:,0] + 0.0000001  
-
-                #utility_shares['C'] = utility_shares['C'] + 0.0000001  
-                #
-                #res2 = self.get_objective_and_gradient(category_weights
-                #                    ,utility_shares
-                #                    ,guard_shares
-                #                    ,forward_shares
-                #                    ,diff_means
-                #                    ,diff_vars
-                #                    ,x_scores_available_array
-                #                    ,result_index
-                #                    ,n_players_selected
-                #                    ,n_values)
-                
-                #imputed_grad = (res2['Score'] - score)/0.0000001
-                #calculated_grad = res['Gradients']['Categories'][:,0]
-                #calculated_grad = res['Gradients']['Utilities'][:,0]
-
-                #print('Number of players')
-                #print(len(self.players))
-                #print('Iteration')
-                #print(i)
-
-                #print('grads uncentered')
-                #print(gradients['Categories'][0])
-
-                gradients_centered = \
+                category_gradients_centered = gradients['Categories'] - gradients['Categories'].mean(axis = 1).reshape(-1,1) 
+                share_gradients_centered = \
                         {
-                            k : grad - grad.mean(axis = 1).reshape(-1,1) for k, grad in gradients.items()
+                            k : grad - grad.mean(axis = 1).reshape(-1,1) for k, grad in gradients['Shares'].items()
                         }
                 
-                #print('grads centered')
-                #print(gradients_centered['Categories'][0])
-                #print('norm of grads')
-                #print(scipy.linalg.norm(gradients_centered['Categories'][0]))
                 
-                updates = \
+                category_updates = optimizers['Categories'].minimize(category_gradients_centered)
+                share_updates = \
                     {
-                        k : optimizers[k].minimize(grad) for k, grad in gradients_centered.items()
+                        k : optimizers['Shares'][k].minimize(grad) for k, grad in share_gradients_centered.items()
                     }
                 
                 #print('Updates')
                 #print(updates['Categories'][0])
                 
-                category_weights = category_weights + updates['Categories']
+                category_weights = category_weights + category_updates
                 category_weights[category_weights < 0] = 0
                 category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
 
@@ -557,32 +513,20 @@ class HAgent():
 
                     #update flex shares and ensure that they stay compliant with their definitions    
                     #position_change_weights = 9/5  * step_size * position_gradients_centered['Utilities']
-                    utility_shares = utility_shares + updates['Utilities']
-                    utility_shares = np.clip(utility_shares, 0, 1)
-                    utility_shares = utility_shares.div(utility_shares.sum(axis = 1), axis = 0)
 
-                    #guard_change_weights = 9/2 * step_size * position_gradients_centered['Guards']
-                    guard_shares = guard_shares + updates['Guards']
-                    guard_shares = np.clip(guard_shares, 0, 1)
-                    guard_shares = guard_shares.div(guard_shares.sum(axis = 1), axis = 0)
+                    for position_code in self.position_structure['flex'].keys():
 
-                    #forward_change_weights = #9/2 * step_size * position_gradients_centered['Forwards']
-                    forward_shares = forward_shares + updates['Forwards']
-                    forward_shares = np.clip(forward_shares, 0, 1)
-                    forward_shares = forward_shares.div(forward_shares.sum(axis = 1), axis = 0)
-
-                    #print(i)
-                    #print(len(self.players))
-                    #print(guard_shares.iloc[0])
+                        position_shares[position_code] = position_shares[position_code] + share_updates[position_code]
+                        position_shares[position_code] = np.clip(position_shares[position_code], 0, 1)
+                        position_shares[position_code] = position_shares[position_code].div(position_shares[position_code].sum(axis = 1), axis = 0)
 
                     best_player = score.argmax()
 
                     self.initial_category_weights = category_weights[best_player]/2 + self.v.reshape(9)/2
-                    self.initial_utility_shares = utility_shares.iloc[best_player]/2 + 1/10
-                    self.initial_guard_shares = guard_shares.iloc[best_player]/2 + 1/4
-                    self.initial_forward_shares = forward_shares.iloc[best_player]/2 + 1/4
-
-               
+                    self.initial_shares = {position_code : shares.iloc[best_player]/2 + 1/(2 *shares.shape[1])
+                                             for position_code, shares in position_shares.items()
+                                            }
+                                           
             #case where one more player needs to be chosen
             elif (n_players_selected == (self.n_picks - 1)) | ((not self.dynamic) & (n_players_selected < (self.n_picks)) ): 
 
@@ -663,11 +607,11 @@ class HAgent():
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
-                    ,'Utility-Shares' : pd.DataFrame(utility_shares_current.values, index = result_index
+                    ,'Utility-Shares' : pd.DataFrame(position_shares_current['Util'].values, index = result_index
                                                      , columns = ['C','PG','SG','PF','SF']) 
-                    ,'Guard-Shares' : pd.DataFrame(forward_shares_current.values, index = result_index
+                    ,'Guard-Shares' : pd.DataFrame(position_shares_current['F'].values, index = result_index
                                                    , columns = ['PG','SG']) 
-                    ,'Forward-Shares' : pd.DataFrame(guard_shares_current.values, index = result_index
+                    ,'Forward-Shares' : pd.DataFrame(position_shares_current['G'].values, index = result_index
                                                      , columns = ['PF','SF']) 
                     
                     
@@ -681,9 +625,7 @@ class HAgent():
 
     def get_objective_and_gradient(self
                                     ,category_weights
-                                    ,utility_shares
-                                    ,guard_shares
-                                    ,forward_shares
+                                    ,position_shares
                                     ,diff_means
                                     ,diff_vars
                                     ,x_scores_available_array
@@ -702,9 +644,7 @@ class HAgent():
                 future_position_array, flex_shares = optimize_positions_all_players(self.positions.loc[result_index]
                                                                         ,position_rewards
                                                                         ,self.positions.loc[self.players]
-                                                                        , utility_shares
-                                                                        , guard_shares
-                                                                        , forward_shares)
+                                                                        , position_shares)
                 
 
 
@@ -740,15 +680,16 @@ class HAgent():
             if self.position_means is not None:
                 position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
 
-                utility_gradient = position_gradient * flex_shares[:,0].reshape(-1,1)
-                guard_gradient =position_gradient[:,(1,2)] * flex_shares[:,1].reshape(-1,1)
-                forward_gradient =position_gradient[:,(3,4)] * flex_shares[:,2].reshape(-1,1)
+                utility_gradient = position_gradient[:,self.position_indices['Util']]  * flex_shares[:,0].reshape(-1,1)
+                guard_gradient =position_gradient[:,self.position_indices['G']] * flex_shares[:,1].reshape(-1,1)
+                forward_gradient =position_gradient[:,self.position_indices['F']] * flex_shares[:,2].reshape(-1,1)
 
                 gradients =                     {
                         'Categories' : category_gradient
-                        ,'Utilities' : utility_gradient
-                        ,'Guards' : guard_gradient
-                        ,'Forwards' : forward_gradient
+                        ,'Shares' : 
+                                    {'Util' : utility_gradient
+                                    ,'G' : guard_gradient
+                                    ,'F' : forward_gradient}
                     }
 
             else:

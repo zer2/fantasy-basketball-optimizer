@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import listify, increment_player_stats_version, increment_info_key
+from src.helper_functions import get_position_numbers, listify, increment_player_stats_version, increment_info_key
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -327,62 +327,30 @@ with param_tab:
 
       with left_position_col:
 
-        st.subheader('Strict positions')
+        st.write('Base positions')
 
-        n_centers = st.number_input(r'Centers'
-                          , key = 'n_centers'
-                          , value = st.session_state.params['options']['positions']['default']['C']
-                          , min_value = 0
-                          , on_change = increment_info_key)
-        
-        n_point_guards = st.number_input(r'Point Guards'
-                    , key = 'n_point_guards'
-                    , value = st.session_state.params['options']['positions']['default']['PG']
+        position_defaults = st.session_state.params['options']['positions']
+        for position_code, position_info in st.session_state.params['position_structure']['base'].items():
+
+          st.number_input(position_info['full_str']
+                    , key = 'n_' + position_code
+                    , value = position_defaults['base'][position_code]
                     , min_value = 0
-                    , on_change = increment_info_key)
-        
-        n_shooting_guards = st.number_input(r'Shooting Guards'
-                      , key = 'n_shooting_guards'
-                      , value = st.session_state.params['options']['positions']['default']['SG']
-                      , min_value = 0
-                      , on_change = increment_info_key)
-        
-        n_power_forwards = st.number_input(r'Power Forwards'
-                      , key = 'n_power_forwards'
-                      , value = st.session_state.params['options']['positions']['default']['PF']
-                      , min_value = 0
-                      , on_change = increment_info_key)
-                      
-        n_small_forwards = st.number_input(r'Small Forwards'
-                , key = 'n_small_forwards'
-                , value = st.session_state.params['options']['positions']['default']['SF']
-                , min_value = 0
-                , on_change = increment_info_key)
+                        )
         
       with right_position_col:
 
-        st.subheader('Flex positions')
+        st.write('Flex positions')
 
-        n_utilities = st.number_input(r'Utilities'
-                    , key = 'n_utilities'
-                    , value = st.session_state.params['options']['positions']['default']['Util']
+        for position_code, position_info in st.session_state.params['position_structure']['flex'].items():
+
+          st.number_input(position_info['full_str']
+                    , key = 'n_' + position_code
+                    , value = position_defaults['flex'][position_code]
                     , min_value = 0
-                    , on_change = increment_info_key)
-        
-        n_guards = st.number_input(r'Guards'
-                            , key = 'n_guards'
-                            , value = st.session_state.params['options']['positions']['default']['G']
-                            , min_value = 0
-                            , on_change = increment_info_key)
-        
-        n_forwards = st.number_input(r'Forwards'
-                            , key = 'n_forwards'
-                            , value = st.session_state.params['options']['positions']['default']['F']
-                            , min_value = 0
-                            , on_change = increment_info_key)
-        
-      implied_n_picks = n_utilities + n_centers + n_guards + n_point_guards + n_shooting_guards + \
-                                      n_forwards + n_power_forwards + n_small_forwards
+                        )
+          
+      implied_n_picks = sum(n for n in get_position_numbers().values())
       
       if implied_n_picks > n_picks:
         st.write('There are more position slots than picks in your league. Change your configuration before proceeding')
