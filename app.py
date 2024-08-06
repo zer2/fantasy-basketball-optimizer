@@ -556,7 +556,7 @@ with info_tab:
       
       v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
 
-      v = np.array(v/v.sum()).reshape(1,9)
+      v = np.array(v/v.sum()).reshape(1,len(v))
       
       z_scores = info['Z-scores']
       g_scores = info['G-scores']

@@ -14,6 +14,8 @@ ratio-statistics:
   Free Throw % : 
     made-statistic : Free Throws Made
     volume-statistic : Free Throw Attempts 
+negative-statistics: 
+  - Turnovers
 other-columns:
   - Position
   - Games Played %

@@ -75,27 +75,44 @@ def combinatorial_calculation(c : np.array
         axis 1: opponent
 
     """
-    if n_false > (c.shape[1] -1)/2: #scenarios where a majority of categories are losses are overall losses
+    if (n_false > c.shape[1]/2): #scenarios where a majority of categories are losses are overall losses
         return 0 
     elif level < c.shape[1] :
         #find the total winning probability of both branches from this point- if we win or lose the current category 
         return combinatorial_calculation(c, c_comp, data * c[:,level,:], level + 1, n_false) + \
                 combinatorial_calculation(c, c_comp, data * c_comp[:,level,:], level + 1, n_false + 1)
-    else: #a series where all 9 categories has been processed, and n_false <= the cutoff, can be added to the total %
+    elif (n_false == c.shape[1]/2): #in case of a tie, EV is 1/2 
+        return data/2
+    else:
         return data
 
 @st.cache_data()
-def get_grid():
+def get_win_grid(n_categories):
     #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
 
-    which = np.array([list(combinations(range(9), 5))] )
-    grid = np.zeros((126, 9), dtype="bool")     
-    grid[np.arange(126)[None].T, which] = True
+    which = np.array([list(combinations(range(n_categories), int(n_categories/2) + 1))] )
+
+    grid = np.zeros((which.shape[1], n_categories), dtype="bool")     
+    grid[np.arange(which.shape[1])[None].T, which] = True
 
     grid = np.expand_dims(grid, axis = 2)
 
     return grid
 
+@st.cache_data()
+def get_tie_grid(n_categories):
+    #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
+
+    which = np.array([list(combinations(range(n_categories), int(n_categories/2)))] )
+
+    grid = np.zeros((which.shape[1], n_categories), dtype="bool")     
+    grid[np.arange(which.shape[1])[None].T, which] = True
+
+    grid = np.expand_dims(grid, axis = 2)
+
+    return grid
+
+#ZR: This needs to be modified to account for a possible even number of categories 
 def calculate_tipping_points(x : np.array) -> np.array:
     """Calculate the probability of each category being a tipping point, assuming independence
 
@@ -106,25 +123,40 @@ def calculate_tipping_points(x : np.array) -> np.array:
         DataFrame of shape (n,9,m) representing probabilities of each category being a tipping point
         m is number of opponents
     """
+    n_categories = x.shape[1] 
 
-    grid = get_grid()
+    grid = get_win_grid(9)
 
     #copy grid for each row in x 
     grid = np.array([grid] * x.shape[0])
 
-    x = x.reshape(x.shape[0],1,9, x.shape[2])
+    x = x.reshape(x.shape[0],1,n_categories, x.shape[2])
 
     #get the probabilities of the scenarios and filter them by which categories they apply to
     #the categories that are won all become tipping points
 
-    positive_first_part = np.prod(ne.evaluate('grid * x + (1-grid) * (1-x)'), axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    positive_first_part = np.prod(ne.evaluate('grid * x + (1-grid) * (1-x)'), axis = 2).reshape(x.shape[0],grid.shape[1],1,x.shape[3])
     positive_case_probabilities = np.sum(ne.evaluate('positive_first_part * grid'),axis = 1)
 
     #do the same but for the inverse scenarios, where 5 categories are lost and 4 are won
     #in this case the lost categories become tipping points 
-    negative_first_part = np.prod(ne.evaluate('(1 - grid) * x + grid * (1-x)'),axis = 2).reshape(x.shape[0],126,1,x.shape[3])
+    negative_first_part = np.prod(ne.evaluate('(1 - grid) * x + grid * (1-x)'),axis = 2).reshape(x.shape[0],grid.shape[1],1,x.shape[3])
     negative_case_probabilities = np.sum(ne.evaluate('negative_first_part * grid'), axis = 1)
 
     final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
 
-    return final_probabilities
+    if (n_categories % 2 == 1):
+
+        return final_probabilities
+    
+    else: 
+
+        tie_grid = get_tie_grid(n_categories)
+
+        tie_probabilities = np.prod(ne.evaluate('tie_grid * x + (1-tie_grid) * (1-x)'), axis = 2) \
+                                .reshape(x.shape[0],tie_grid.shape[1],1,x.shape[3]) \
+                                .sum(axis = 1)
+        
+        #when there are an even number of categories, tipping points flip results between win/loss and tie, 
+        #rather than between win and loss. Therefore they have half as much impact individually 
+        final_probabilities = final_probabilities/2 + tie_probabilities/2

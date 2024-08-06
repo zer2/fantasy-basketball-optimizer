@@ -126,9 +126,10 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     counting_cat_denominator = (counting_cat_var_of_means.values*alpha_weight + counting_cat_mean_of_vars.values*beta_weight ) ** 0.5
     numerator = player_means.loc[:,params['counting-statistics']] - counting_cat_mean_of_means
     main_scores = numerator.divide(counting_cat_denominator)
-    main_scores['Turnovers'] = - main_scores['Turnovers']
 
-    #free throws 
+    for negative_stat in params['negative-statistics']:
+        main_scores[negative_stat] = - main_scores[negative_stat]
+
     ratio_scores = {}
     for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
         volume_statistic = ratio_stat_info['volume-statistic']
