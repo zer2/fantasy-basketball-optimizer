@@ -65,7 +65,6 @@ class HAgent():
 
         self.n_categories = x_scores.shape[1]
 
-
         if info['Position-Means'] is not None:
             self.position_means = np.array(info['Position-Means']).reshape(1,-1,self.n_categories)
         else:
@@ -74,7 +73,6 @@ class HAgent():
         L_by_position = info['L-by-Position']
         L_by_position = np.array(L_by_position).reshape(1,-1,self.n_categories,self.n_categories)
         self.L = L_by_position.mean(axis = 1)
-
 
         self.fudge_factor = fudge_factor
 

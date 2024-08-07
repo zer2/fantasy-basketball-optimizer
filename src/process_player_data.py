@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helper_functions import get_categories, get_position_structure, weighted_cov_matrix, increment_info_key
+from src.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
+                                ,get_position_structure, weighted_cov_matrix, increment_info_key
 import os
 import streamlit as st
 
@@ -20,28 +21,34 @@ def calculate_coefficients(player_means : pd.DataFrame
 
     """
 
-    params = st.session_state.params
+    counting_statistics = get_selected_counting_statistics()
+    ratio_statistics = get_selected_ratio_statistics()
+
+    #ZR: We should really have a 'get_position_structure' equivalent function for this 
+    params = st.session_state['params']
 
     #counting stats
-    var_of_means = player_means.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
-    mean_of_means = player_means.loc[representative_player_set,params['counting-statistics']].mean(axis = 0)
+    var_of_means = player_means.loc[representative_player_set,counting_statistics].var(axis = 0)
+    mean_of_means = player_means.loc[representative_player_set,counting_statistics].mean(axis = 0)
 
     for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
-        volume_statistic = ratio_stat_info['volume-statistic']
 
-        volume_mean_of_means = player_means.loc[representative_player_set, volume_statistic].mean()
-        mean_of_means.loc[volume_statistic] = volume_mean_of_means
-                        
-        agg_average = (player_means.loc[representative_player_set, ratio_stat] * \
-                            player_means.loc[representative_player_set, volume_statistic]).mean()/volume_mean_of_means
-        mean_of_means.loc[ratio_stat] = agg_average
-                        
-        numerator = player_means.loc[representative_player_set, volume_statistic]/volume_mean_of_means * \
-                                    (player_means.loc[representative_player_set, ratio_stat] - agg_average)
-        ratio_var_of_means = numerator.var()
-        var_of_means.loc[ratio_stat] = ratio_var_of_means
+        if ratio_stat in ratio_statistics:
+            volume_statistic = ratio_stat_info['volume-statistic']
 
-        translation_factors[volume_statistic] = 0
+            volume_mean_of_means = player_means.loc[representative_player_set, volume_statistic].mean()
+            mean_of_means.loc[volume_statistic] = volume_mean_of_means
+                            
+            agg_average = (player_means.loc[representative_player_set, ratio_stat] * \
+                                player_means.loc[representative_player_set, volume_statistic]).mean()/volume_mean_of_means
+            mean_of_means.loc[ratio_stat] = agg_average
+                            
+            numerator = player_means.loc[representative_player_set, volume_statistic]/volume_mean_of_means * \
+                                        (player_means.loc[representative_player_set, ratio_stat] - agg_average)
+            ratio_var_of_means = numerator.var()
+            var_of_means.loc[ratio_stat] = ratio_var_of_means
+
+            translation_factors[volume_statistic] = 0
 
     #get mean of vars
     mean_of_vars = var_of_means * translation_factors
@@ -66,34 +73,40 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
         Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
 
     """
+
+    counting_statistics = get_selected_counting_statistics()
+    ratio_statistics = get_selected_ratio_statistics()
     player_stats = weekly_df.groupby(level = 'Player').agg(['mean','var'])
 
     #counting stats
-    mean_of_vars = player_stats.loc[representative_player_set,(params['counting-statistics'],'var')].mean(axis = 0)
-    var_of_means = player_stats.loc[representative_player_set,(params['counting-statistics'],'mean')].var(axis = 0)
-    mean_of_means = player_stats.loc[representative_player_set,(params['counting-statistics'],'mean')].mean(axis = 0)
+    mean_of_vars = player_stats.loc[representative_player_set,(counting_statistics,'var')].mean(axis = 0)
+    var_of_means = player_stats.loc[representative_player_set,(counting_statistics,'mean')].var(axis = 0)
+    mean_of_means = player_stats.loc[representative_player_set,(counting_statistics,'mean')].mean(axis = 0)
 
+    #there should be a better way to do this loop- maybe with something akin to get_position_structure
     for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
-        volume_statistic = ratio_stat_info['volume-statistic']
-        made_statistic = ratio_stat_info['made-statistic']
+        if ratio_stat in ratio_statistics:
 
-        made_mean_of_means = player_stats.loc[representative_player_set, (made_statistic,'mean')].mean()
-        volume_mean_of_means = player_stats.loc[representative_player_set, (volume_statistic,'mean')].mean()
+            volume_statistic = ratio_stat_info['volume-statistic']
+            made_statistic = ratio_stat_info['made-statistic']
 
-        mean_of_means.loc[volume_statistic] = volume_mean_of_means
-        ratio_agg_average = made_mean_of_means / volume_mean_of_means
+            made_mean_of_means = player_stats.loc[representative_player_set, (made_statistic,'mean')].mean()
+            volume_mean_of_means = player_stats.loc[representative_player_set, (volume_statistic,'mean')].mean()
 
-        mean_of_means.loc[ratio_stat] = ratio_agg_average
+            mean_of_means.loc[volume_statistic] = volume_mean_of_means
+            ratio_agg_average = made_mean_of_means / volume_mean_of_means
 
-        ratio = player_stats.loc[:, (made_statistic,'mean')]/player_stats.loc[:, (volume_statistic,'mean')]
-        ratio_numerator = player_stats.loc[:, (volume_statistic,'mean')]/volume_mean_of_means * (ratio - ratio_agg_average)
-        ratio_var_of_means = ratio_numerator.loc[representative_player_set].var()
-        var_of_means.loc[ratio_stat] = ratio_var_of_means
+            mean_of_means.loc[ratio_stat] = ratio_agg_average
 
-        weekly_df.loc[:,'volume_adjusted_' + ratio_stat] = (weekly_df[made_statistic] - weekly_df[volume_statistic]*ratio_agg_average)/ \
-                                            volume_mean_of_means
-        ratio_mean_of_vars = weekly_df['volume_adjusted_' + ratio_stat].loc[representative_player_set].groupby('Player').var().mean()    
-        mean_of_vars.loc[ratio_stat] = ratio_mean_of_vars
+            ratio = player_stats.loc[:, (made_statistic,'mean')]/player_stats.loc[:, (volume_statistic,'mean')]
+            ratio_numerator = player_stats.loc[:, (volume_statistic,'mean')]/volume_mean_of_means * (ratio - ratio_agg_average)
+            ratio_var_of_means = ratio_numerator.loc[representative_player_set].var()
+            var_of_means.loc[ratio_stat] = ratio_var_of_means
+
+            weekly_df.loc[:,'volume_adjusted_' + ratio_stat] = (weekly_df[made_statistic] - weekly_df[volume_statistic]*ratio_agg_average)/ \
+                                                volume_mean_of_means
+            ratio_mean_of_vars = weekly_df['volume_adjusted_' + ratio_stat].loc[representative_player_set].groupby('Player').var().mean()    
+            mean_of_vars.loc[ratio_stat] = ratio_mean_of_vars
 
     coefficients = pd.DataFrame({'Mean of Means' : mean_of_means.droplevel(level = 1)
                             ,'Variance of Means' : var_of_means.droplevel(level = 1)
@@ -119,28 +132,34 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     Returns:
         Dataframe of scores, by player/category
     """
-    counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
-    counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
-    counting_cat_mean_of_vars = coefficients.loc[params['counting-statistics'],'Mean of Variances']
+    counting_statistics = get_selected_counting_statistics()
+    ratio_statistics = get_selected_ratio_statistics()
+
+    counting_cat_mean_of_means = coefficients.loc[counting_statistics,'Mean of Means']
+    counting_cat_var_of_means = coefficients.loc[counting_statistics,'Variance of Means']
+    counting_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
 
     counting_cat_denominator = (counting_cat_var_of_means.values*alpha_weight + counting_cat_mean_of_vars.values*beta_weight ) ** 0.5
-    numerator = player_means.loc[:,params['counting-statistics']] - counting_cat_mean_of_means
+    numerator = player_means.loc[:,counting_statistics] - counting_cat_mean_of_means
     main_scores = numerator.divide(counting_cat_denominator)
 
     for negative_stat in params['negative-statistics']:
-        main_scores[negative_stat] = - main_scores[negative_stat]
+        if negative_stat in main_scores.columns:
+            main_scores[negative_stat] = - main_scores[negative_stat]
 
     ratio_scores = {}
     for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
-        volume_statistic = ratio_stat_info['volume-statistic']
+        if ratio_stat in ratio_statistics:
 
-        denominator = (coefficients.loc[ratio_stat,'Variance of Means']*alpha_weight + coefficients.loc[ratio_stat,'Mean of Variances']*beta_weight)**0.5
-        numerator = player_means.loc[:, volume_statistic]/coefficients.loc[volume_statistic,'Mean of Means'] * \
-                                     (player_means[ratio_stat] - coefficients.loc[ratio_stat,'Mean of Means'])
-        ratio_scores[ratio_stat] = numerator.divide(denominator)
+            volume_statistic = ratio_stat_info['volume-statistic']
+
+            denominator = (coefficients.loc[ratio_stat,'Variance of Means']*alpha_weight + coefficients.loc[ratio_stat,'Mean of Variances']*beta_weight)**0.5
+            numerator = player_means.loc[:, volume_statistic]/coefficients.loc[volume_statistic,'Mean of Means'] * \
+                                        (player_means[ratio_stat] - coefficients.loc[ratio_stat,'Mean of Means'])
+            ratio_scores[ratio_stat] = numerator.divide(denominator)
     
-    res = pd.concat([ratio_scores[ratio_stat] for ratio_stat in params['ratio-statistics'].keys() ] + [main_scores],axis = 1)  
-    res.columns = get_categories(params)
+    res = pd.concat([ratio_scores[ratio_stat] for ratio_stat in ratio_scores.keys() ] + [main_scores],axis = 1)  
+    res.columns = get_selected_categories()
     return res.fillna(0)
 
 def games_played_adjustment(scores : pd.DataFrame
@@ -161,7 +180,8 @@ def games_played_adjustment(scores : pd.DataFrame
         Dataframe with same dimensions as scores 
     """
 
-    all_stats = list(params['ratio-statistics'].keys()) + params['counting-statistics']
+    all_stats = get_selected_categories()
+
     if v is None:
        v = pd.Series({stat : 1/9 for stat in all_stats})
 
@@ -177,7 +197,7 @@ def games_played_adjustment(scores : pd.DataFrame
     return adjusted_scores 
 
 def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
-   all_stats = get_categories(params)
+   all_stats = get_selected_categories()
    rv_multiple = rv/(len(all_stats) -2) if  'Turnovers' in all_stats else rv/len(all_stats)
    value_by_category = pd.Series({stat : - rv_multiple/v[stat] if stat == 'Turnovers' 
                                   else rv_multiple/v[stat] for stat in all_stats})
@@ -227,7 +247,7 @@ def process_player_data(weekly_df : pd.DataFrame
                                                           , params
                                                           , 1
                                                           ,1)
-  g_scores_first_order = g_scores_first_order * multipliers.T.values[0]
+  g_scores_first_order = g_scores_first_order * multipliers.loc[get_selected_categories(),:].T.values[0]
 
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
@@ -242,8 +262,8 @@ def process_player_data(weekly_df : pd.DataFrame
                                                   , conversion_factors['Conversion Factor'])
     
 
-  mov = coefficients.loc[get_categories(params) , 'Mean of Variances']
-  vom = coefficients.loc[get_categories(params) , 'Variance of Means']
+  mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
+  vom = coefficients.loc[get_selected_categories() , 'Variance of Means']
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
@@ -256,9 +276,9 @@ def process_player_data(weekly_df : pd.DataFrame
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, params, v = v)
 
-  g_scores = g_scores * multipliers.T.values[0]
-  z_scores = z_scores * multipliers.T.values[0]
-  x_scores = x_scores * multipliers.T.values[0]
+  g_scores = g_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
+  z_scores = z_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
+  x_scores = x_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
 
   z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
 
@@ -285,7 +305,7 @@ def process_player_data(weekly_df : pd.DataFrame
                         , right_index = True)
   
     players_and_positions_limited = players_and_positions[0:n_players]
-    categories = get_categories(params)
+    categories = get_selected_categories()
     players_and_positions_limited[categories] = players_and_positions_limited[categories] \
                                                     .sub(players_and_positions_limited[categories].mean(axis = 0))
     positions_exploded = players_and_positions_limited.explode('Position').reset_index().set_index(['Player','Position'])

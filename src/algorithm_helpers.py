@@ -3,6 +3,7 @@ from scipy.stats import norm
 import numpy as np
 import streamlit as st
 from itertools import combinations
+from src.helper_functions import get_selected_categories
 import numexpr as ne
 
 def savor_calculation(raw_values_unselected : pd.Series
@@ -125,7 +126,7 @@ def calculate_tipping_points(x : np.array) -> np.array:
     """
     n_categories = x.shape[1] 
 
-    grid = get_win_grid(9)
+    grid = get_win_grid(n_categories)
 
     #copy grid for each row in x 
     grid = np.array([grid] * x.shape[0])
@@ -145,18 +146,18 @@ def calculate_tipping_points(x : np.array) -> np.array:
 
     final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
 
-    if (n_categories % 2 == 1):
-
-        return final_probabilities
-    
-    else: 
+    if (n_categories % 2 == 0):
 
         tie_grid = get_tie_grid(n_categories)
+        tie_grid = np.array([tie_grid] * x.shape[0])
 
-        tie_probabilities = np.prod(ne.evaluate('tie_grid * x + (1-tie_grid) * (1-x)'), axis = 2) \
-                                .reshape(x.shape[0],tie_grid.shape[1],1,x.shape[3]) \
+        tie_probabilities = np.prod(ne.evaluate('tie_grid * x + (1-tie_grid) * (1-x)'), axis = 2)
+
+        tie_probabilities = tie_probabilities.reshape(x.shape[0],tie_grid.shape[1],1,x.shape[3]) \
                                 .sum(axis = 1)
-        
+                
         #when there are an even number of categories, tipping points flip results between win/loss and tie, 
         #rather than between win and loss. Therefore they have half as much impact individually 
         final_probabilities = final_probabilities/2 + tie_probabilities/2
+
+    return final_probabilities

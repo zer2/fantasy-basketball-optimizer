@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from src.algorithm_agents import HAgent, SimpleAgent
-from src.helper_functions import get_categories, stat_styler, styler_a, rotate
+from src.helper_functions import get_selected_categories, stat_styler, styler_a, rotate
 from src.process_player_data import process_player_data
 from src.get_data import get_player_metadata
 from src.tabs import make_team_tab
@@ -165,7 +165,7 @@ def run_multiple_seasons(teams : dict[list]
         #for all categories except turnovers, higher numbers are better. So we invert turnovers 
         team_performances['Turnovers'] = - team_performances['Turnovers'] 
         
-        team_performances = team_performances[get_categories(params)] #only want category columns
+        team_performances = team_performances[get_selected_categories()] #only want category columns
     
         #we need to map each team to its opponent for the week. We do that with a formula for round robin pairing
         opposing_team_schedule = [(s,round_robin_opponent(t,w, len(teams)),w) for s, t, w in team_performances.index]
@@ -178,8 +178,8 @@ def run_multiple_seasons(teams : dict[list]
         tot_cat_ties = cat_ties.sum(axis = 1)
         
         if scoring_format == 'Head to Head: Most Categories':
-            team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_categories(params))/2
-            team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_categories(params))/2
+            team_performances.loc[:,'Tie'] = tot_cat_wins + tot_cat_ties/2 == len(get_selected_categories())/2
+            team_performances.loc[:,'Win'] = tot_cat_wins + tot_cat_ties/2 > len(get_selected_categories())/2
         elif scoring_format == 'Head to Head: Each Category':
             team_performances.loc[:,'Tie'] = tot_cat_ties
             team_performances.loc[:,'Win'] = tot_cat_wins
@@ -204,7 +204,7 @@ def run_multiple_seasons(teams : dict[list]
         
         #for all categories except turnovers, higher numbers are better. So we invert turnovers 
         team_performances['Turnovers'] = - team_performances['Turnovers'] 
-        season_points_by_category = team_performances.groupby('Season')[get_categories(params)].rank()
+        season_points_by_category = team_performances.groupby('Season')[get_selected_categories()].rank()
 
         season_points = season_points_by_category.sum(axis = 1)
         winners_after_ties = season_points[season_points == season_points.groupby('Season').transform('max')]
@@ -223,8 +223,8 @@ def run_multiple_seasons(teams : dict[list]
     else:
         if scoring_format in ('Head to Head: Most Categories','Head to Head: Each Category'):
 
-            cat_win_df = pd.DataFrame(cat_wins, columns = get_categories(params), index = team_performances.index)
-            cat_tie_df = pd.DataFrame(cat_ties, columns = get_categories(params), index = team_performances.index)
+            cat_win_df = pd.DataFrame(cat_wins, columns = get_selected_categories(), index = team_performances.index)
+            cat_tie_df = pd.DataFrame(cat_ties, columns = get_selected_categories(), index = team_performances.index)
             
             cat_wins_agg = cat_win_df.groupby('Team').mean()
             cat_wins_agg = pd.concat({'Win' : cat_wins_agg}, names = ['Result'])
@@ -354,7 +354,7 @@ def make_detailed_results_tab(res
 
             if roto:
                 detailed_rates_collapsed = res['Category win rates']
-                detailed_rates_collapsed.columns = get_categories(params)
+                detailed_rates_collapsed.columns = get_selected_categories()
 
             else: 
                 detailed_rates_collapsed = res['Category win rates'].loc['Win'].reset_index(drop = True) + \
@@ -370,11 +370,11 @@ def make_detailed_results_tab(res
             if roto:
                 detailed_rate_df = detailed_rates_collapsed.style.format("{:.1%}", subset = ['Overall Win %']) \
                                             .format("{:.3}"
-                                                    , subset = get_categories(params)) \
+                                                    , subset = get_selected_categories()) \
                                             .map(stat_styler
                                                 , middle = 6.5
                                                 , multiplier = 40
-                                                , subset = get_categories(params)) \
+                                                , subset = get_selected_categories()) \
                                             .map(styler_a
                                                 , subset = ['Overall Win %'])             
             else: 
@@ -382,7 +382,7 @@ def make_detailed_results_tab(res
                                             .map(stat_styler
                                                 , middle = 0.5
                                                 , multiplier = 150
-                                                , subset = get_categories(params)) \
+                                                , subset = get_selected_categories()) \
                                             .map(styler_a
                                                 , subset = ['Overall Win %']) 
 
@@ -602,7 +602,7 @@ def get_estimate_of_omega_gamma(info, params):
     y_m = [v[1][0] for v in res]   
     y_k = [v[1][1] for v in res]  
 
-    s = pd.DataFrame(cs/v.T, columns = get_categories(params))
+    s = pd.DataFrame(cs/v.T, columns = get_selected_categories())
 
     s.loc[:,'sigma'] = x_k
     s.loc[:,'Actual_k'] = y_k

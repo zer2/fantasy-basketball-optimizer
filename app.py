@@ -238,6 +238,15 @@ with param_tab:
       else:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
+      categories = st.multiselect('Which categories does you league use?'
+                          , key = 'selected_categories'
+                          , options = st.session_state.params['counting-statistics'] + \
+                                    list(st.session_state.params['ratio-statistics'].keys())
+                          , default = st.session_state.params['counting-statistics'] + \
+                                    list(st.session_state.params['ratio-statistics'].keys())
+                          , on_change = increment_player_stats_version
+                                )
+
       rotisserie = scoring_format == 'Rotisserie'
 
       unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
