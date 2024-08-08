@@ -66,7 +66,7 @@ Since picking a player removes a spot that could be used for one of these "strea
 Calculating $E[F]-E[S]$ requires some math, the details of which are in the paper. The result is 
 
 $$
-E[F] - E[S] = \mu * CDF(\mu) - \frac{\sigma}{\sqrt{2\pi}} \left( 1 - e^{\frac{- \mu^2}{2\sigma}} \right)
+E[F] - E[S] = \mu * CDF(\mu) - \frac{\sigma}{\sqrt{2\pi}} \left( 1 - e^{\frac{- \mu^2}{2\sigma^2}} \right)
 $$
 
 It is easy enough to test this equation by simulating post-perturbation value a large number of times. I've done that and made sure that it works, given the assumptions of the problem setup. 
@@ -84,7 +84,15 @@ This step can be inserted into the previously outlined procedure. With the SAVOR
 
 SAVOR has one parameter- the noise level $\sigma$. Here's an example of how auction values change as it changes
 
-<iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/499a7593-3399-46af-be27-9c84f80aa8bb"> </iframe>
+Pre-Savor | | Post-Savor | | | | |
+| -------- | ------- | ------- | ------- | ------- |  ------- | ------- | 
+$\mu$ | | $\sigma=0$ | | $\sigma=0.1$ | | $\sigma=1$ |
+Value | Percent | Value | Percent | Value | Percent | Value | Percent 
+0 | 0% | 0 | 0% | 0 | 0% | 0 | 0%
+1 | 10% | 1 | 10% | 0.96 | 9.76% | 0.68 | 8.05%
+2 | 20% | 2 | 20% | 1.96 | 19.92% | 1.61 | 18.94% 
+3 | 30% | 3 | 30% | 2.96 | 30.08% | 2.60 | 40.24% 
+4 | 40% | 4 | 40% | 3.96 | 40.24% | 3.60 | 42.38% 
 
 With $\sigma = 0$, there is no change. As $\sigma$ rises, low-value players lose even more value, as predicted. On the flipside, high-value players actually gain value. This happens not because $E[F]$ is somehow higher than their $\mu$ (it is always lower), rather, as low-players lose value the amount of total value in the pot decreases and high-value players become even more valuable on a relative basis. 
 

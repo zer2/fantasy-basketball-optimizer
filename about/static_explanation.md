@@ -131,10 +131,11 @@ $$
 I call these G-scores, and it turns out that these are quite different from Z-scores. With 2022-23 data, they are as follows
 
 Category | G-score as fraction of Z-score
+| -------- | ------- | 
 Assists | 75\% 
 Blocks | 68\% 
-Field | Goal 56\% 
-Free Throw | 58\% 
+Field Goal % |  56\% 
+Free Throw % | 58\% 
 Points |  65\% 
 Rebounds | 69\% 
 Steals | 44\% 

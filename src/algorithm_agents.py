@@ -6,7 +6,7 @@ from itertools import combinations
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_position_structure, get_position_indices, check_team_eligibility
+from src.helper_functions import get_position_structure, get_position_indices
 from src.position_optimization import optimize_positions_all_players, check_eligibility_alternate
 import datetime
 import scipy
