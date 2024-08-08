@@ -125,7 +125,7 @@ $$
 \nabla V \sim \frac{\sum_{n,c} \frac{dp_{n,c}}{dX} \sqrt{ \sigma_D^2 + \sigma^2_M} - \left( \sum_{n,c} p_{n,c} - \mu_M   \right) \frac{1}{2} \left(\sigma_D^2 + \sigma^2_M \right)^{-0.5}   \frac{d \sigma_D^2}{dX}  }{ \sigma_D^2 + \sigma^2_M}
 $$
 
-Thanks to similarity this becomes 
+Removing the irrelevant denominator and multiplying by $\sqrt{ \sigma_D^2 + \sigma^2_M}$, this becomes
 
 $$
 \nabla V \sim \sum_{n,c} \frac{dp_{n,c}}{dX} \left( \sigma_D^2 + \sigma^2_M \right) + \left( \sum_{n,c} p_{n,c} - \mu_M   \right) \frac{1}{2}  \frac{d \sigma_D^2}{dX}  
@@ -179,7 +179,7 @@ Interestingly, the derived equation implies that teams are better off with more 
 
 While uncertainty is undesirable in most cases, in this context, it turns out to be a good thing! Intuitively, the reason that this happens is that scoring above every other team takes luck, and luck comes more easily with higher volatility. 
 
-The natural follow-up question is how volatility for the team's score can be increased. Mathematically the answer is that it can be increased by improving the likelihood of winning low-probability points at the expense of high-probability points. Common sense bears this out; it stands to reason that the sum of two $0/1$ coin flips is more volatile than the sum of one guaranteed $0$ and one guaranteed $1$. Similarly, being decent at two categories leads to more volatility than being amazing at one and terrible at another. 
+The natural follow-up question is how volatility for the team's score can be increased. Mathematically the answer is that it can be increased by improving the likelihood of winning low-probability points at the expense of high-probability points. Common sense bears this out; it stands to reason that the sum of two $0/1$ coin flips is more volatile than the sum of one guaranteed $0$ and one guaranteed $1$. Similarly, being decent at two categories leads to more volatility than being amazing at one and terrible at another. Another way of increasing volatility, not included here, it taking high-upside players who may be available at a discount.  
 
 The upshot is that the most important categories and matchups to try to win in Rotisserie are those for which the team is at a disadvantage. So if it seems like a manager's team is falling behind in a category, they likely would benefit by shoring it up with their future picks. This aligns with the conventional wisdom that balanced teams are generally stronger for Rotisserie than they are for head-to-head. 
 

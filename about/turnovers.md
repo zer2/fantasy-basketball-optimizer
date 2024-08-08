@@ -1,10 +1,8 @@
 # The curious case of turnovers 
 
-Turnovers is a unique category in the sense that it rewards players for sitting on the bench, while every other category rewards players for playing. This is counterintuitive and feels wrong to many. 
+Turnovers is a unique category in the sense that it rewards players for sitting on the bench, while every other category rewards players for playing. This is counterintuitive and feels wrong to many. As such, it is conventional wisdom to disregard turnovers or at least down-weight them by a large factor. Hashtag Basketball, for instance, down-weights turnovers to $0.25$.
 
-As such, it is conventional wisdom to disregard turnovers or at least down-weight them by a large factor. Hashtag Basketball, for instance, down-weights turnovers to $0.25$ because "[people who barely play any minutes, and therefore will have hardly any turnovers get a huge boost in value when it is set to 1. So setting the turnover category to 1 really inflates some guys who do not actually do much besides not turn over the ball](https://www.reddit.com/r/fantasybball/comments/djcynb/hashtag_rankings_turnover_multiplier/)" 
-
-This exact argument is not convincing because benchwarmers will never be worth drafting however turnovers are handled. Still, there are other arguments against treating turnovers like other categories that seem logical on face. 
+There are several arguments for this approach, which seem sensible on face 
 1. The best teams tend to do poorly in turnovers, and the worst teams tend to do well in them. A reasonable observer may conclude that investing in turnovers therefore makes a team worse 
 2. It is easiest to win turnovers when a team has already lost all chance of winning the season. There is no benefit to this, so turnovers should not be prioritized
 3. Turnovers is a great category to punt, because ignoring turnovers allows a team to take players that are great in the other categories. This means that they should just punt it by default 

@@ -12,9 +12,11 @@ def get_future_player_rows(position_rewards):
     #The reshaping is necessary to handle the case when a position number is zero
     position_structure = get_position_structure()
 
-    base_rewards = {position_code : np.array([position_rewards[:,0]] * position_numbers[position_code]) \
+    base_list = position_structure['base_list']
+
+    base_rewards = {position_code : np.array([position_rewards[:,i]] * position_numbers[position_code]) \
                                                             .reshape(position_numbers[position_code] , len(position_rewards))
-                                    for position_code in position_structure['base_list']
+                                    for i, position_code in zip(range(len(base_list)), base_list)
                                                             }
     
     position_indices = get_position_indices(position_structure)
@@ -85,7 +87,7 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
 
     """
 
-    future_player_rows = np.array([reward_vector] * n_remaining_players)
+    future_player_rows = np.array([reward_vector] * n_remaining_players).reshape(n_remaining_players, reward_vector.shape[0])
     full_array = np.concatenate([team_so_far_array, [candidate_player_row], future_player_rows], axis = 0)    
     try:
         res = linear_sum_assignment(full_array, maximize = True)
@@ -186,11 +188,13 @@ def check_eligibility_alternate(player, team_so_far):
    
     position_numbers = get_position_numbers()
     n_total_picks = sum([v for k, v in position_numbers.items()])
+    n_base_positions = len(get_position_structure()['base_list'])
 
-    position_rewards = np.array([[0] * n_total_picks])
+    position_rewards = np.array([[0] * n_base_positions])
     n_remaining_players = n_total_picks -1 - len(team_so_far)
     reward_vector = get_future_player_rows(position_rewards)[0]
     team_so_far_array = get_player_rows(team_so_far) if len(team_so_far) > 0 else np.empty((0,n_total_picks))
+
     candidate_player_vector = get_player_rows([player])[0]
 
     all_res = optimize_positions_for_prospective_player(candidate_player_vector

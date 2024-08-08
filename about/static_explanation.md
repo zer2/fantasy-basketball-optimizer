@@ -1,16 +1,14 @@
 # Static rankings from Z-score to G-score 
 
-Ranking players is a popular pasttime for fantasy basketball enthusiasts. Rankings curated by experts are useful because they allow newer managers, or those who simply don't have the time to craft their own sophisticated strategies, to make reasonable drafting decisions. 
+Ideally, player rankings should have some mathematical backbone, which requires a metric quantifying player value. The established metric for category leagues is called 'Z-scoring', and it drives most numerical ranking lists. However, when I looked for a mathematical argument explaining why Z-scores are a good choice for fantasy basketball rankings, I could not find one.
 
-Ideally, player rankings should have some mathematical backbone, which requires a metric quantifying player value. The established metric for category leagues is called 'Z-scoring', and it drives the vast majority of ranking lists that I have seen. However, when I looked for a mathematical argument explaining why Z-scores are a good choice for fantasy basketball rankings, I could not find one.
+This lack of justification inspired me to lay out a mathematical argument for Z-scores myself, which I put forward in the [paper](https://arxiv.org/abs/2307.02188). One surprising wrinkle is that the justification only works given that player performances are known exactly; otherwise, Z-scores are missing a crucial component. To 'fix' it I formulated a new version called G-score. 
 
-This lack of justification inspired me to lay out a mathematical argument for Z-scores myself, which I put forward in the [paper](https://arxiv.org/abs/2307.02188). One surprising wrinkle is that the justification only works given that player performances are known exactly; otherwise, Z-scores are missing a crucial component. 
-
-I realize that the paper's explanation is incomprehensible to anyone without a background in math. To that end, I am providing a simplified version of the argument here, which hopefully will be easier to follow
+I realize that the paper's explanation is a little dense, so I will also provide a simplified version here
 
 ## 1.	What are Z-scores?
 
-You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how "spread out" the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
+In the field of statistics, Z-scores are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how "spread out" the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$
 
 For use in fantasy basketball, a few modifications are made to basic Z-scores 
 -	The percentage categories are adjusted by volume. This is necessary because players who shoot more matter more; if a team has one player who goes $9$ for $9$ ($100\%$) and another who goes $0$ for $1$ ($0\%$) their aggregate average is $90\%$ rather than $50\%$. The fix is to multiply scores by the player's volume, relative to average volume
@@ -39,18 +37,11 @@ See below for an animation of weekly blocking numbers going through the Z-score 
 
 Adding up the results for all categories yields an aggregate Z-score
 
-## 2. Justifying Z-scores for Rotisserie
-
-It is impractical to calculate a truly optimal solution for Rotisserie or any other format, since they are so complex. However, if we simplify the Rotisserie format, we can at least demonstrate that Z-scores are a reasonable heuristic for it
+## 2. Justifying Z-scores 
 
 ### A. Assumptions and setup
 
 Consider this problem: **Team one has $N-1$ players randomly selected from a pool of players, and team two has $N$ players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform exactly as expected?**
-
-This problem statement makes a few implicit simplifications about Rotisserie drafts 
-- The goal is to maximize the expected value of the number of categories won against an arbitrary opponent, assuming all player performances are known beforehand
-- Besides the player being drafted, all others are assumed to be chosen randomly from a pool of top players. This assumption is obviously not exactly true. However, it is somewhat necessary because we are trying to make a ranking system which does not depend on which other players have been drafted. It is also not as radical as it may seem, since real teams have a mix of strong and some weak players chosen from a variety of positions, making them random-ish in aggregate
-- Position requirements, waiver wires, injury slots, etc. are ignored. Managers use their drafted players the whole season
 
 The simplified problem can be approached by calculating the probability for team one to win each category, then optimizing for their sum
 
@@ -60,13 +51,17 @@ The difference in category score between two teams tells us which team is winnin
 
 <iframe  width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/73c3acaa-20c9-4a61-907a-ee0de2ff7e3b"> </iframe>
 
-You may notice that the result looks a lot like a Bell curve even though the raw block numbers look nothing like a Bell curve. This happens because of the surprising "Central Limit Theorem", which says that when adding a bunch of random numbers together, their sum always ends up looking a lot like a Bell curve. This applies to all the other categories as well
+You may notice that the result looks a lot like a Bell curve even though the raw block numbers look nothing like a Bell curve. This happens because of the surprising "Central Limit Theorem", which essentially says that when you add up a bunch of random numbers, the result looks like a Bell curve even if the original random numbers did not. Bell curves are also called Normal or Gaussian distributions. If you're interested in learning more about the CLT, I recommend 3Blue1Brown's video about it, embedded below
+
+<iframe width = "800" height = "450" padding = "none" scrolling="no" src="https://www.youtube.com/embed/zeJD6dqJ5lo
+"> </iframe>
+
 
 ### C.	Properties of the category difference
 
 The mean and standard deviation of the Bell curves for category differences can be calculated via probability theory. Including the unchosen player with category average $m_p$
 - The mean is $m_\mu - m_p$
-- The standard deviation is $\sqrt{2N-1} * m_\sigma$ (The square root in the formula comes from the fact that $STD(X + Y) = \sqrt{STD(X)^2 + STD(Y)^2}$ where $STD(X)$ is the standard deviation of $X$)
+- The standard deviation is $\sqrt{2N-1} * m_\sigma$ 
 
 ### D.	Calculating probability of victory
 
@@ -74,7 +69,7 @@ When the category difference is below zero, team one will win the category
 
 The probability of this happening can be calculated using something called a cumulative distribution function. $CDF(x) =$ the probability that a particular distribution will be less than $x$. We can use $CDF(0)$, then, to calculate the probability that the category difference is below zero and team one wins. 
 
-The $CDF$ of the Bell curve is well known. The details of how to apply it to this case are somewhat complicated, but we can cut to the chase and give an approximate formula 
+The $CDF$ of the Bell curve is well known. Approximately, it can be said that
 
 $$
 CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{\pi}}* \frac{- \mu }{ \sigma} \right]
@@ -102,13 +97,11 @@ $$
 
 It is clear that the expected number of category victories is directly proportional to the sum of the unchosen player's Z-scores. This tells us that under the aforementioned assumptions, the higher a player's total Z-score is, the better they are.
 
-One common misconception is that Z-scores are only applicable to Normally distributed data. This is not the case; the justification for Z-scores laid out here does not require the underlying data to be Normally distributed. The misconception that Normality is required is probably rooted in the concept of the [standard Z-table](https://en.wikipedia.org/wiki/Standard_normal_table), which does require Normally distributed data. But we aren't using a Z-table anywhere so it doesn't matter in this case
+One common misconception is that Z-scores are only applicable to Normally distributed data, so using Z-scores for categories that are not distributed Normally across players is inappropriate. This is not the case; the justification for Z-scores laid out here does not require the underlying data to be Normally distributed. The misconception that Normality is required is probably rooted in the concept of the [standard Z-table](https://en.wikipedia.org/wiki/Standard_normal_table), which does require Normally distributed data. But we aren't using a Z-table anywhere so it doesn't matter in this case
 
-## 3. Modifying assumptions for Head-to-Head
+## 3. Accounting for uncertainty
 
-"Head-to-Head: Each Category" is deceptively similar to Rotisserie, in the sense that winning one category against one opponent is worth one point. Yes, head-to-head matchups are one at a time rather than simultaneous, but that doesn't matter when the goal is just to do as well as possible against an arbitrary opponent. The main substantive difference between the two formats is that head-to-head matchups occur over a single week, rather than over an entire season. This is important because it means that players don't necessarily perform at their season-long averages for any given matchup. Instead, their performances are somewhat random, depending on how they happen to perform during the week of the matchup. 
-
-For Rotisserie, we handled uncertainty about which other players would be chosen by assuming they were chosen randomly. To extend this for head-to-head, we can assume that their performances are randomly chosen as well. Effectively, the revamped assumption is that we are randomly choosing player/weekly performance combos from a set of top players and their performances for a season, rather than just choosing a player and taking their average. Below, see how metrics for blocks change when we look at every weekly performance of the top $156$ players, instead of just their averages 
+In reality, player performances are not known exactly beforehand. To account for that we can imagine randomly choosing a weekly performance for each player, instead of assuming they will perform at a pre-determined level. Essentially this means sampling from player/week pairs instead of sampling just from players. Below, see how metrics for blocks change when we look at every weekly performance of the top $156$ players, instead of just their averages 
 
 <iframe  width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab41db2a-99f2-45b1-8c05-d755c014b30f"> </iframe>
 
@@ -116,7 +109,7 @@ Although the mean remains the same, the standard deviation gets larger. This mak
 
 ## 4.	Formulating G-scores 
 
-Most of the logic from section 2 can also be applied to Head-to-Head: Each Category. The only difference is that we need to use metrics from the pool of players and performances, as laid out in section 3, rather than just players as we did in section 2. The mean is still $m_\mu$ as shown in the example of blocks above. Therefore all we need to do is replace $m_\sigma$ with $\sqrt{m_\sigma^2 + m_\tau^2}$, which yields
+Most of the logic from section 2 can also be applied to the new model. The only difference is that we need to use metrics from the pool of players and performances, as laid out in section 3, rather than just players as we did in section 2. The mean is still $m_\mu$ as shown in the example of blocks above. Therefore all we need to do is replace $m_\sigma$ with $\sqrt{m_\sigma^2 + m_\tau^2}$, which yields
 
 $$
 \frac{m_p - m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
@@ -142,7 +135,7 @@ Steals | 44\%
 Threes | 72\% 
 Turnovers | 62\% 
 
-Volatile categories like steals are heavily down-weighted.
+G-scores are different from Z-scores because different categories have different levels of week-to-week volatility relative to player-to-player volatility. Steals for example are relatively volatile on a week to week basis, and adding the $m_\tau^2$ term makes their denominator quite large, decreasing their overall weight. 
 
 Intuitively, why does this happen? The way I think about it is that investing heavily into a volatile category will lead to only a flimsy advantage, and so is likely less worthwhile than investing into a robust category. Many managers have this intuition already, de-prioritizing unpredictable categories like steals relative to what Z-scores would suggest. The G-score idea just converts that intuition into mathematical rigor
   

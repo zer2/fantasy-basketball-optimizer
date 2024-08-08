@@ -628,8 +628,15 @@ with rank_tab:
 
       second_str = 'Note that these scores are unique to the ' + scoring_format + \
                 ' format and all the H-scoring parameters defined on the parameter tab'
+      
+      if st.session_state['mode'] == 'Auction Mode':
+        third_str = r'. $ values assume 200 per drafter'
+      else: 
+        third_str = ''
 
-      st.caption(first_str + ' ' + second_str)
+      st.caption(first_str + ' ' + second_str + third_str)
+
+
 
       h_ranks = make_h_rank_tab(info
                     ,omega
@@ -758,6 +765,7 @@ if st.session_state['mode'] == 'Auction Mode':
     with left:
 
       cash_per_team = st.number_input(r'How much cash does each team have to pick players?'
+                , key = 'cash_per_team'
                 , min_value = 1
                 , value = 200)
 
@@ -789,7 +797,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
       remaining_cash = total_cash - amount_spent
       
-      st.caption('\$' + str(remaining_cash) + ' remains out of \$' + str(total_cash) + ' originally available' )
+      st.caption(r'\$' + str(remaining_cash) + r' remains out of \$' + str(total_cash) + ' originally available' )
 
     with right: 
       auction_seat = st.selectbox(f'Which team are you?'
@@ -812,7 +820,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
       my_remaining_cash = cash_remaining_per_team[auction_seat]
 
-      st.caption('You have \$' + str(my_remaining_cash) + ' remaining out of \$' + str(cash_per_team) \
+      st.caption(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(cash_per_team) \
               + ' to select ' + str(n_picks - n_my_players) + ' of ' + str(n_picks) + ' players')
 
       cand_tab, team_tab = st.tabs(["Candidates","Team"])

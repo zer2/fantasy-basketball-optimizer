@@ -10,7 +10,7 @@ import os
 import itertools
 from pathlib import Path
   
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def make_about_tab(md_path : str):
     """Make one of the tabs on the about page
 
@@ -1106,7 +1106,7 @@ def make_rank_tab(scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def make_h_rank_tab(info : dict
                   , omega : float
                   , gamma : float
@@ -1165,6 +1165,7 @@ def make_h_rank_tab(info : dict
   rate_df = cdf_estimates.loc[h_res.index].dropna()
 
   h_res = h_res.sort_values(ascending = False)
+
   h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                         ,'Player' : h_res.index
                         ,'H-score' : h_res.values
@@ -1173,7 +1174,27 @@ def make_h_rank_tab(info : dict
   h_res = h_res.merge(rate_df
                       , left_on = 'Player'
                       ,right_index = True)
+  
+  if st.session_state['mode'] == 'Auction Mode':
 
-  h_res_styled = h_percentage_styler(h_res)
+    h_res.loc[:,'$ Value'] = savor_calculation(h_res['H-score']
+                                                    , n_picks * n_drafters
+                                                    , 200*n_drafters
+                                                    , st.session_state['streaming_noise_h'])
+
+    h_res = h_res[['Player','$ Value','H-score'] + get_selected_categories()]
+
+    h_res_styled = h_res.style.format("{:.1%}"
+                      ,subset = pd.IndexSlice[:,['H-score']]) \
+                    .format("{:.1f}"
+                      ,subset = pd.IndexSlice[:,['$ Value']]) \
+              .map(styler_a
+                    , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
+              .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+              .format('{:,.1%}', subset = rate_df.columns)
+    
+  else:
+    h_res_styled = h_percentage_styler(h_res)
+
   st.dataframe(h_res_styled, hide_index = True, use_container_width = True)
   return h_res
