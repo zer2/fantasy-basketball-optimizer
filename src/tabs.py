@@ -10,7 +10,7 @@ import os
 import itertools
 from pathlib import Path
   
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def make_about_tab(md_path : str):
     """Make one of the tabs on the about page
 
@@ -1106,7 +1106,7 @@ def make_rank_tab(scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def make_h_rank_tab(info : dict
                   , omega : float
                   , gamma : float
