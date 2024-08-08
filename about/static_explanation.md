@@ -4,7 +4,7 @@ Ranking players is a popular pasttime for fantasy basketball enthusiasts. Rankin
 
 Ideally, player rankings should have some mathematical backbone, which requires a metric quantifying player value. The established metric for category leagues is called 'Z-scoring', and it drives the vast majority of ranking lists that I have seen. However, when I looked for a mathematical argument explaining why Z-scores are a good choice for fantasy basketball rankings, I could not find one.
 
-This lack of justification inspired me to lay out a mathematical argument for Z-scores myself, which I put forward in the [paper](https://arxiv.org/abs/2307.02188). One surprising wrinkle is that the justification is only appropriate for the "Rotisserie" format. When the math is modified for head-to-head formats, a different metric that I call "G-score" pops out as the optimal way to rank players instead. 
+This lack of justification inspired me to lay out a mathematical argument for Z-scores myself, which I put forward in the [paper](https://arxiv.org/abs/2307.02188). One surprising wrinkle is that the justification only works given that player performances are known exactly; otherwise, Z-scores are missing a crucial component. 
 
 I realize that the paper's explanation is incomprehensible to anyone without a background in math. To that end, I am providing a simplified version of the argument here, which hopefully will be easier to follow
 
@@ -45,10 +45,10 @@ It is impractical to calculate a truly optimal solution for Rotisserie or any ot
 
 ### A. Assumptions and setup
 
-Consider this problem: **Team one has $N-1$ players randomly selected from a pool of players, and team two has $N$ players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform at exactly their long term mean for a week?**
+Consider this problem: **Team one has $N-1$ players randomly selected from a pool of players, and team two has $N$ players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform exactly as expected?**
 
 This problem statement makes a few implicit simplifications about Rotisserie drafts 
-- The goal is to maximize the expected value of the number of categories won against an arbitrary opponent in a single week, where all players perform at their season-long means. Using weekly means instead of season-long totals is just a convenience, to align with the definition of Z-scores. And optimizing for victory against an arbitrary opponent is equivalent to optimizing for total score at the end of a season, since each category victory over any opponent is worth one point 
+- The goal is to maximize the expected value of the number of categories won against an arbitrary opponent, assuming all player performances are known beforehand
 - Besides the player being drafted, all others are assumed to be chosen randomly from a pool of top players. This assumption is obviously not exactly true. However, it is somewhat necessary because we are trying to make a ranking system which does not depend on which other players have been drafted. It is also not as radical as it may seem, since real teams have a mix of strong and some weak players chosen from a variety of positions, making them random-ish in aggregate
 - Position requirements, waiver wires, injury slots, etc. are ignored. Managers use their drafted players the whole season
 
@@ -100,7 +100,9 @@ $$
 \frac{1}{2}\left[9 + \frac{2}{\sqrt{(2N-1) \pi}} * \sum_c Z_{p,c} \right]
 $$
 
-It is clear that the expected number of category victories is directly proportional to the sum of the unchosen player's Z-scores. This tells us that under the aforementioned assumptions, the higher a player's total Z-score is, the better they are for Rotisserie
+It is clear that the expected number of category victories is directly proportional to the sum of the unchosen player's Z-scores. This tells us that under the aforementioned assumptions, the higher a player's total Z-score is, the better they are.
+
+One common misconception is that Z-scores are only applicable to Normally distributed data. This is not the case; the justification for Z-scores laid out here does not require the underlying data to be Normally distributed. The misconception that Normality is required is probably rooted in the concept of the [standard Z-table](https://en.wikipedia.org/wiki/Standard_normal_table), which does require Normally distributed data. But we aren't using a Z-table anywhere so it doesn't matter in this case
 
 ## 3. Modifying assumptions for Head-to-Head
 
@@ -126,15 +128,26 @@ $$
 \frac{\frac{a_p}{a_\mu} \left( r_p - r_\mu \right) }{\sqrt{r_\sigma^2 + r_\tau^2}} 
 $$
 
-I call these G-scores, and it turns out that these are quite different from Z-scores. For example, steals have a very high week-to-week standard deviation, and carry less weight in G-scores than Z-scores as a result.
+I call these G-scores, and it turns out that these are quite different from Z-scores. With 2022-23 data, they are as follows
+
+Category | G-score as fraction of Z-score
+Assists | 75\% 
+Blocks | 68\% 
+Field | Goal 56\% 
+Free Throw | 58\% 
+Points |  65\% 
+Rebounds | 69\% 
+Steals | 44\% 
+Threes | 72\% 
+Turnovers | 62\% 
+
+Volatile categories like steals are heavily down-weighted.
 
 Intuitively, why does this happen? The way I think about it is that investing heavily into a volatile category will lead to only a flimsy advantage, and so is likely less worthwhile than investing into a robust category. Many managers have this intuition already, de-prioritizing unpredictable categories like steals relative to what Z-scores would suggest. The G-score idea just converts that intuition into mathematical rigor
   
 ## 5.	Head-to-head simulation results
 
 Our logic relies on many assumptions, so we can't be sure that G-scores work in practice. What we can do is simulate actual head-to-head drafts and see how G-score does against Z-score. 
-
-The code in this repository simulates a simplistic version of head-to-head fantasy basketball, via a $12$ team snake draft. It doesn't include advanced strategies like using the waiver wire or punting categories, but for the most part it should be similar to real fantasy. For more detail, check out the paper. 
 
 The expected win rate if all strategies are equally good is $\frac{1}{12} = 8.33\%$. Empirical win rates are shown below for *Head-to-Head: Each Category* 9-Cat, which includes all categories, and 8-Cat, a variant which excludes turnovers 
 
@@ -170,6 +183,4 @@ To confirm the intuition about why the G-score works, take a look at its win rat
 
 The G-score manager performs well in stable/high-volume categories like assists and poorly in volatile categories like turnovers, netting to an average win rate of slightly above $50\%$. As expected, the marginal investment in stable categories is worth more than the corresponding underinvestment in volatile categories, since investment in stable categories leads to reliable wins and the volatile categories can be won despite underinvestment with sheer luck. 
 
-Simulations also suggest that G-scores work better than Z-scores in the *Head-to-Head: Most Categories* format. I chose not to include the results here because it is a very strategic format, and expecting other managers to go straight off ranking lists is probably unrealistic for it.
-
-Another possible use-case is auctions. There is a well-known procedure for translating player value to auction value, outlined e.g. [in this article](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). If the auction is for a head-to-head format, it is reasonable to use G-scores to quantify value rather than Z-scores 
+Simulations also suggest that G-scores work better than Z-scores in the *Head-to-Head: Most Categories* format. I chose not to include the results here because it is a very strategic format, and expecting other managers to go straight off ranking lists is probably unrealistic for it

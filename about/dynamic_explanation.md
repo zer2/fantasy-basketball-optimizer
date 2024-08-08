@@ -6,7 +6,7 @@ In general, the way that the best managers adapt is more of an art than a scienc
 
 In the [paper](https://arxiv.org/abs/2307.02188), I derive an algorithm called H-scoring to translate this intuition into a rigorous procedure. By framing draft strategy as an optimization problem, it implicitly understands how to rebalance teams for optimal performance, sacrificing some categories and shoring up others. While imperfect, I believe that the logic is sound, and evidence suggests that it works, at least in a simplified context. 
 
-Below is a summary of how the algorithm is designed
+For details of how the algorithm works, see the paper. For a much simplified version, with less math, see below 
 
 ## 1. The H-scoring approach
 
@@ -14,7 +14,7 @@ Dynamic drafting is a fundamentally more difficult proposition than static draft
 
 The most challenging aspect of the problem is accounting for future draft picks. They are neither completely under the manager's control (since the manager does not know which players will be available later) nor completely random (since the manager will decide which players to take of those available). Instead, future draft picks fall somewhere between the two extremes. 
 
-H-scores' solution to this dilemma is conceiving of future picks as being controlled by a weight vector, by which aggregate statistics of future picks can be approximated. For example, the  algorithm might give seven categories $14\%$ weight each and two categories $1\%$ each, for a total of $100\%$. The algorithm would then assume that the manager would use the custom weighing to value future picks. That would lead the algorithm to approximate statistics for future picks with a slight upwards bias in the seven up-weighted categories and a large downwards bias in the two down-weighted categories. By this mechanism, the manager has some measure of control over future picks. 
+H-scores' solution to this dilemma is conceiving of future picks as being controlled by a weight vector, by which aggregate statistics of future picks can be approximated. For example, the algorithm might give seven categories $14\%$ weight each and two categories $1\%$ each, for a total of $100\%$. The algorithm would then assume that the manager would use the custom weighing to value future picks. That would lead the algorithm to approximate statistics for future picks with a slight upwards bias in the seven up-weighted categories and a large downwards bias in the two down-weighted categories. By this mechanism, the manager has some measure of control over future picks. 
 
 Of course, being able to map a weight vector $j$ to approximate statistics for future picks is not enough for optimal draft strategy. The manager needs to operate the other way around, and pick both a player $p$ from the available candidate pool and a weight vector $j$ for future picks such that the probability of winning (H-score) is optimized. 
 
@@ -90,12 +90,6 @@ A natural choice for modeling the statistics of draft picks is the [multivariate
 - It can incorporate correlations between different categories. This is essential because it allows the algorithm to understand that some combinations of categories are easier to jointly optimize than others, e.g. prioriting both rebounds and blocks is easier than prioritizing assists and turnovers
 - It is relatively easy to work with. A more complicated function, while perhaps more suited to real data, would make the math much more complicated
 
-It is simple to derive a parameterization for $X_\delta$ when it ignores player position and draft circumstances. One could simply compute the mean, variance, and correlations of real player data. However, player position and draft circumstances both present complications
-- If raw player statistics were used to calculate correlations, the model would believe that it could choose a team full of e.g. all point guards to punt Field Goal % to an extreme degree. In reality teams need to choose players from a mix of positions. Player position can be accounted for by subtracting out position means. E.g. if Centers get $+0.5$ rebounds on average, a center's rebound number could be adjusted by $-0.5$. Or, since there are some flex spots making position requirements not entirely rigid, the adjustment number could be scaled by some constant which is $\leq 1$, which we call $\nu$. So if $\nu$ is $0.8$, the previous example would instead lead to $0.4$ rebounds being subtracted out from centers' numbers
-- Draft circumstances can be accounted for with two conditions, one dealing with the pool of available players and the other dealing with how players in $X_\delta$ are chosen
-  - All players above a certain threshold of general value have been picked, as an approximation of the fact that more valuable players will be taken earlier. We can approximate this threshold to be $0$, since $X_\delta$ is defined relative to what is expected, and should have $0$ value when $j = v$ 
-  - The chosen player is the highest-scoring of those remaining based on the aforementioned weight vector $j$. This reflects that the manager will choose the best players according to their own weight vector in the future
-
 This scenario provides a launching point for calculating the expected value of future draft picks, $X_\delta(j)$. The calculation involves many steps of linear algebra, the details of which are in the paper. The result is as follows
 
 Defining 
@@ -121,6 +115,14 @@ For intuition, see an animated version of how the algorithm works for two catego
 <iframe width = "896" height = "504" src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/7ca9674a-8780-4839-9bbb-02025bf33f6f"> </iframe>
 
 In this example $j$ weighs $C_1$ above $C_2$, so the algorithm's contour lines are askew from the line of general value. The algorithm can sacrifice a small amount of general value by moving to the left in order to find a player that fits $j$ better, with a high value for $C_1$ and a low value for $C_2$
+
+### 2f. Adjusting for position
+
+It would be a mistake to ignore position, since otherwise the H-scoring algorithm would believe that it could make a team full of only point guards. To get around this, H-scoring adjusts $X_\delta$ with a three-step process
+
+1. Based on current weights, figure out how best to allocate previously chosen players. For example if a build based on $j$ prioritizes point guards heavily, then the algorithm will want to consider its previously chosen PG/SGs as SGs 
+2. Decide how to allocate remaining flex spots. E.g. divvying up two utility spots with one point guard and one small forward 
+3. Based on the computed future positions, add a bonus based on position means. E.g. if the algorithm has decided that its two remaining slots will go to point guards, it adds two times the average point guards' stats (normalized to 0) to its total 
 
 ## 3. Optimizing for $p$ and $j$
 

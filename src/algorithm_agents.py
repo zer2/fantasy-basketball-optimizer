@@ -3,12 +3,11 @@ import pandas as pd
 from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
-from src.helper_functions import check_team_eligibility
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_eligibility_row_simplified, get_position_structure, get_position_indices
-from src.position_optimization import optimize_positions_all_players
+from src.helper_functions import get_position_structure, get_position_indices, check_team_eligibility
+from src.position_optimization import optimize_positions_all_players, check_eligibility_alternate
 import datetime
 import scipy
 
@@ -136,7 +135,6 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
-
         my_players = [p for p in player_assignments[drafter] if p ==p]
 
         n_players_selected = len(my_players) 
@@ -480,9 +478,6 @@ class HAgent():
                 gradients = res['Gradients']
                 cdf_estimates = res['CDF-Estimates']
                 expected_future_diff = res['Future-Diffs']   
-
-                h = 0.00000001
-                category_weights[:,0] += h
 
                 category_gradients_centered = gradients['Categories'] - gradients['Categories'].mean(axis = 1).reshape(-1,1) 
                 share_gradients_centered = \
@@ -1150,9 +1145,10 @@ class SimpleAgent():
 
 
 def choose_eligible_player(team, available_players, positions):
-    for player in available_players:
-        new_team = team+ [player]
-        if check_team_eligibility(positions.loc[new_team]):
+
+    team_positions = positions.loc[team]
+    for player in available_players:        
+        if check_eligibility_alternate(positions.loc[player], team_positions):
             return player
 
 

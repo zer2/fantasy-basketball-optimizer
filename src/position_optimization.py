@@ -91,7 +91,7 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
         res = linear_sum_assignment(full_array, maximize = True)
         return res[1] 
     except: 
-        return np.array([0] * len(reward_vector))
+        return np.array([-1] * len(reward_vector))
 
 def get_position_array_from_res(res :np.array
                                  , position_shares : dict[pd.DataFrame]
@@ -182,3 +182,23 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
     else: 
         return final_positions, flex_shares
 
+def check_eligibility_alternate(player, team_so_far):
+   
+    position_numbers = get_position_numbers()
+    n_total_picks = sum([v for k, v in position_numbers.items()])
+
+    position_rewards = np.array([[0] * n_total_picks])
+    n_remaining_players = n_total_picks -1 - len(team_so_far)
+    reward_vector = get_future_player_rows(position_rewards)[0]
+    team_so_far_array = get_player_rows(team_so_far) if len(team_so_far) > 0 else np.empty((0,n_total_picks))
+    candidate_player_vector = get_player_rows([player])[0]
+
+    all_res = optimize_positions_for_prospective_player(candidate_player_vector
+                                                        , reward_vector
+                                                        , team_so_far_array
+                                                        , n_remaining_players)
+    
+    if all(all_res >= 0):
+        return True
+    else: 
+       return False

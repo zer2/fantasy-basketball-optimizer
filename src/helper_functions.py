@@ -6,7 +6,6 @@ import itertools
 import streamlit as st
 import numexpr as ne
 from datetime import datetime
-import cvxpy
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
@@ -283,6 +282,8 @@ def make_progress_chart(res : list[pd.DataFrame]):
 
     return fig
 
+#deprecated below 
+'''
 #this function should use scipy.special.linear_sum_assignment
 def check_team_eligibility(players):    
     """Checks if a team is eligible or not, based on the players' possible positions
@@ -353,6 +354,7 @@ def get_eligibility_row_simplified(pos):
     if 'PF' in pos: 
         eligibility.add((4))
     return np.array([[i in eligibility for i in range(5)]])
+'''
 
 def weighted_cov_matrix(df, weights):
     weighted_means = np.average(df, axis=0, weights=weights)

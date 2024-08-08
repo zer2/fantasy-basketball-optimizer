@@ -1,8 +1,8 @@
 # Adapting to Rotisserie
 
-The Rotisserie format has considerably different dynamics from its head-to-head counterparts. For one, scores are aggregated across an entire season rather than across individual weeks. Additionally, winning in Rotisserie requires winning against every single opponent at the same time, rather than individual opponents across multiple matchups. These two distinctions pose unique problems when trying to game-plan for Rotisserie, and warrant significant adjustments. 
+I did not include Rotisserie in the H-scoring paper because its objective function is hard to calculate. Still, I wanted to have some sort of implementation for this site, so I designed a duck-tape-and-glue way of handling Rotisserie. 
 
-I've done my best to adjust appropriately. My solutions are a bit duck-tape-and-glue, but I think they broadly make sense. 
+The Rotisserie format has considerably different dynamics from its head-to-head counterparts. For one, scores are aggregated across an entire season rather than across individual weeks. Additionally, winning in Rotisserie requires winning against every single opponent at the same time, rather than individual opponents across multiple matchups. These two distinctions pose unique problems when trying to game-plan for Rotisserie, and warrant significant adjustments. 
 
 ## Season-long aggregation
 
@@ -47,37 +47,139 @@ There are many ways to create a heuristic for Rotisserie. The method I have impl
 - If a team has an $X\%$ chance of winning against opposing team $A$ and a $>X\%$ chance of beating opposing team $B$, if they win against team $A$ then they must also win against team $B$
 - The team's number of category points can be approximated by a Normal distribution 
 
-Below is a slightly mathy summary of how the model works
+Since this wasn't in the paper, I will include a mathy explanation of what follows from these assumptions 
 
-#### The team's distribution 
+#### Math
 
-Based on the assumptions, a mean and variance can be calculated for the team's total number of points earned in a category. A detailed derivation is in the paper, the result of which is
-- $\mu = \sum_n P_n$
-- $\sigma^2 =  \mu^2 + \sum_n P_n (2N - 2n - 2 \mu + 1)$
+Consider a simple example of three opponents for a specific category: $t_0$, $t_1$, and $t_2$. The team has $10\%$, $50\%$, and $60\%$ chances to defeat them respectively. The team's average outcome is defeating $\sum p = 1.2$ of the other teams, earning $1.2$ points. 
 
-Where $P_1$, $P_2$ etc. are the probabilities of winning against each opponent, in ascending order. $N$ is the total number of opponents.
+Based on how the team scores, there are four possible outcomes 
+- With probability $10\%$, the team scores better than all three other teams. The variance of this outcome from expected is $(+1.8)^2 = 3.24$
+- With probability $40\%$, the team scores better than both $t_1$ and $t_2$ but not $t_3$. The variance of this outcome from expected is $(+0.8)^2 = 0.64$
+- With probability $10\%$, the team scores better than $t_1$ and worse than the other two. The variance of this outcome from expected is $(-0.2)^2 = 0.04$
+- With probability $40\%$, the team scores worse than all three other teams. The variance of this outcome from expected is $(-1.2)^2 = 1.44$
+\end{itemize}
 
-To get the overall distribution for the team, these values for all categories can be added together. Call the sums $\mu_D$ and $\sigma_D^2$
-
-#### The objective function
-
-The difference between two Normal distributions is also a Normal distribution. Therefore, the differential between the team's total points and the number of points needed to win the league can be approximated as a Normal distribution. 
+The total variance is 
 
 $$
-N(\mu_M - \mu_D, \sigma_D^2 + \sigma_M^2)
+0.1 * 3.24 + 0.4 * 0.64 + 0.1 * 0.04 + 0.4 * 1.44 = 1.16
 $$
 
-The CDF of this distribution at zero is the probability that the team scores at least as many category points as necessary to win, making it an appropriate objective function. It can be optimized via gradient descent to find the optimal player to pick 
+More generally, this can be framed as 
+
+$$
+p_1 \left( N  - \mu_c \right)^2  + \sum_{n=2}^{N} \left[ \left( p_n - p_{n-1} \right) \left(N - n + 1 - \mu_c \right)^2 \right]+ \left( 1 - p_{n} \right) \mu^2
+$$
+
+Where $p_1$, $p_2$ et cetera are the probabilities of beating the other teams in in ascending order and $\mu_c$ is their sum. This can be rewritten to 
+
+$$
+\mu_c^2 + \sum_{n=1}^{N} \left[ p_{n,c} \left( (N - n + 1 - \mu_c)^2 - (N - n -\mu_c)^2 \right) \right]
+$$
+
+$$
+=\mu_c^2 + \sum_{n=1}^{N} \left[ p_{n,c} \left( 2N - 2n - 2\mu_c + 1 \right) \right]
+$$
+
+For a sanity check, it is easy to verify that this equation works with the example. 
+
+The total variance is 
+
+$$
+\sigma_D^2 = \sum_c \left[ \mu_c^2 + \sum_{n=1}^{N} \left[ p_{n,c} \left( 2N - 2n - 2\mu_c + 1 \right) \right] \right]
+$$
+
+The difference between the necessary number of points to win and the team's score is then
+$$
+N\left( \mu_M - \sum_{n,c} p_{n,c} , \sigma_D^2 + \sigma^2_M \right)
+$$
+
+The objective function is the cdf of that Normal distribution at zero. 
+
+$$
+V = CDF \left( N\left( \mu_M - \sum_{n,c} p_{n,c}, \sigma_D^2 + \sigma^2_M \right), 0 \right) 
+$$
+
+The gradient is somewhat complicated to calculate.The objective function has already been determined to be
+
+$$
+V = CDF \left( N\left( \mu_M - \sum_{n,c} p_{n,c}, \sigma_D^2 + \sigma^2_M \right), 0 \right) 
+$$
+
+First, the Normal distribution can be converted into the basis of a standard normal
+
+$$
+V = \phi  \left( \frac{ \sum_{n,c} p_{n,c} - \mu_M }{\sqrt{ \sigma_D^2 + \sigma^2_M}} \right)
+$$
+
+By chain rule, the gradient is the PDF multiplied by the gradient of the inside. Since the PDF is essentially a constant (it is the same for all categories) and only the direction of the gradient is needed, the pdf term can be dropped. All that is required is the gradient of the inside. 
+
+$$
+\nabla V \sim \nabla \left( \frac{ \sum_{n,c} p_{n,c} - \mu_M  }{\sqrt{ \sigma_D^2 + \sigma^2_M}} \right)
+$$
+
+Invoking the quotient rule yields 
+
+$$
+\nabla V \sim \frac{\sum_{n,c} \frac{dp_{n,c}}{dX} \sqrt{ \sigma_D^2 + \sigma^2_M} - \left( \sum_{n,c} p_{n,c} - \mu_M   \right) \frac{1}{2} \left(\sigma_D^2 + \sigma^2_M \right)^{-0.5}   \frac{d \sigma_D^2}{dX}  }{ \sigma_D^2 + \sigma^2_M}
+$$
+
+Thanks to similarity this becomes 
+
+$$
+\nabla V \sim \sum_{n,c} \frac{dp_{n,c}}{dX} \left( \sigma_D^2 + \sigma^2_M \right) + \left( \sum_{n,c} p_{n,c} - \mu_M   \right) \frac{1}{2}  \frac{d \sigma_D^2}{dX}  
+$$
+
+Now we need to use that 
+
+$$
+\frac{d \sigma_D^2}{dX}  = \sum_{n,c} \frac{dp_{n,c}}{dX} \left( 2N - 2n + 1 - 2\mu_c \right)
+$$
+
+To see this, consider that 
+
+$$
+\frac{d \sigma_D^2}{dX}  = \frac{d}{dX} \sum_c \left[ \mu_c^2 + \sum_{n=1}^{N} \left[ p_{n,c} \left( 2N - 2n - 2\mu_c + 1 \right) \right] \right]
+$$
+
+$$
+= \sum_{c} \frac{d\mu_c^2}{dX} + \sum_{n.c} \frac{dp_{n,c}}{dX} \left[ 2N - 2n + 1 \right] - \sum_{n.c} \left[ \frac{d2\mu_c}{dX} \right]
+$$
+
+$$
+= \sum_{n,c} \left[ \frac{dp_{n,c}}{dX} 2 \mu_c \right] + \sum_{n,c} \left[ \frac{dp_{n,c}}{dX} \left( 2N - 2n + 1 \right) \right] - \sum_{n.c} \left[ \frac{d2 \sum_{n} p_{n,c}}{dX} \right]
+$$
+
+$$
+= \sum_{n,c} \left[ \frac{dp_{n,c}}{dX} 2 \mu_c \right] + \sum_{n,c} \left[ \frac{dp_{n,c}}{dX} \left( 2N - 2n + 1 \right) \right] - \sum_{n.c} \left[ \frac{dp_{n,c}}{dX} 4 \mu_c \right]
+$$
+
+And factoring out $\sum_{n,c} \frac{dp_{n,c}}{dX}$, results in 
+
+$$
+\nabla V \sim \sum_{n,c} \frac{dp_{n,c}}{dX} \left[ \left( \sigma_D^2 + \sigma^2_M \right) - \frac{ \sum_{n,c} p_{n,c} - \mu_M  }{2} \left( 2N - 2n + 1 - 2\mu_c \right) \right]
+$$
+
+Or 
+
+$$
+\nabla V \sim \sum_{o,c} PDF(X_o(j)) * \nabla X_o(j)\left[ \left( \sigma_D^2 + \sigma^2_M \right) + \left( \mu_M - \sum_{c} \mu_c \right) \left( N - n - \mu_c + \frac{1}{2}\right) \right]
+$$
+
+Where $X_o$ is the mean differential against a specific opponent
+
+It is apparent from the gradient that when $\mu_M > \sum_{n,c} p_{n,c}$ as it generally will be, the matchups with low $n$ and low $\mu_c$ yield the greatest returns on investment. This aligns with the intuition that Rotisserie managers want to increase the variance and therefore upside of their own strategies, since increasing the probabilities of winning low-probability categories increases variance
 
 ## Results and observations 
 
-Interestingly, the derived equation implies that teams are better off with more volatile results. Explaining that with eome brief math:
--In general, $\mu_M$ is larger than $\mu_D$. Therefore, center of the distribution is to the right of $0$ and the value of the CDF is below $50\%$. 
--This implies that increasing the total variance through $\sigma_D^2$ increases the CDF and therefore the objective function
+Interestingly, the derived equation implies that teams are better off with more volatile results. Explaining that with some brief math:
+-In general, the expected top score $\mu_M$ is larger than the manager's own expected score $\mu_D$. Therefore, center of the distribution is to the right of $0$ and the value of the CDF is below $50\%$. 
+-This implies that increasing the total variance through $\sigma_D^2$ and spreading out the distribution of $D$ increases the likelihood that it will go above $\mu_M$
 
 While uncertainty is undesirable in most cases, in this context, it turns out to be a good thing! Intuitively, the reason that this happens is that scoring above every other team takes luck, and luck comes more easily with higher volatility. 
 
-The natural follow-up question is how volatility for the team's score can be increased. Mathematically the answer is that it can be increased by improving the likelihood of winning low-probability points at the expense of high-probability points. Common sense bears this out; it stands to reason that the sum of two $0/1$ coin flips is more volatile than the sum of one guaranteed $0$ and one guaranteed $1$.
+The natural follow-up question is how volatility for the team's score can be increased. Mathematically the answer is that it can be increased by improving the likelihood of winning low-probability points at the expense of high-probability points. Common sense bears this out; it stands to reason that the sum of two $0/1$ coin flips is more volatile than the sum of one guaranteed $0$ and one guaranteed $1$. Similarly, being decent at two categories leads to more volatility than being amazing at one and terrible at another. 
 
 The upshot is that the most important categories and matchups to try to win in Rotisserie are those for which the team is at a disadvantage. So if it seems like a manager's team is falling behind in a category, they likely would benefit by shoring it up with their future picks. This aligns with the conventional wisdom that balanced teams are generally stronger for Rotisserie than they are for head-to-head. 
 
