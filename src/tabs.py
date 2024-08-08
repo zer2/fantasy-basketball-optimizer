@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helper_functions import  static_score_styler, h_percentage_styler, get_categories, styler_a, styler_b, styler_c, stat_styler
+from src.helper_functions import  static_score_styler, h_percentage_styler, get_selected_categories, styler_a, styler_b, styler_c, stat_styler
 from src.algorithm_agents import HAgent
 from src.h_score_analysis import estimate_matchup_result, analyze_trade, analyze_trade_value
 from src.algorithm_helpers import savor_calculation
@@ -57,10 +57,10 @@ def make_team_tab(_scores : pd.DataFrame
   if n_players_on_team > 0:
 
       team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
-                                                  .map(styler_c, subset = pd.IndexSlice[['Total'], get_categories()]) \
+                                                  .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
                                                   .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
-                                                  .map(stat_styler, subset = pd.IndexSlice[my_players, get_categories()], multiplier = player_multiplier) \
-                                                  .applymap(stat_styler, subset = pd.IndexSlice['Total', get_categories()], multiplier = team_multiplier)
+                                                  .map(stat_styler, subset = pd.IndexSlice[my_players, get_selected_categories()], multiplier = player_multiplier) \
+                                                  .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()], multiplier = team_multiplier)
       display = st.dataframe(team_stats_styled
                           , use_container_width = True
                           , height = len(team_stats) * 35 + 38
@@ -151,7 +151,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
       st.markdown('Team H-score not defined until team is full') 
 ### Candidate tabs 
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = True)
 def make_cand_tab(_scores : pd.DataFrame
               , selection_list : list[str]
               , player_multiplier : float
@@ -171,9 +171,6 @@ def make_cand_tab(_scores : pd.DataFrame
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
-              
-  counting_statistics = st.session_state.params['counting-statistics'] 
-  percentage_statistics = st.session_state.params['percentage-statistics'] 
 
   scores_unselected = _scores[~_scores.index.isin(selection_list)]
 
@@ -185,6 +182,7 @@ def make_cand_tab(_scores : pd.DataFrame
                                                           , st.session_state['streaming_noise'])
     
   scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
+
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 
   return scores_unselected
@@ -226,9 +224,9 @@ def make_h_cand_tab(H
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
                   , index = score.index
-                  , columns = get_categories())/v
+                  , columns = get_selected_categories())/v
     
-    win_rates.columns = get_categories()
+    win_rates.columns = get_selected_categories()
     
     with placeholder.container():
 
@@ -255,7 +253,7 @@ def make_h_cand_tab(H
                                                           , total_cash_remaining
                                                           , st.session_state['streaming_noise_h'])
 
-          rate_display = rate_display[['$ Value','H-score'] + get_categories()]
+          rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
 
           rate_display_styled = rate_display.style.format("{:.1%}"
                             ,subset = pd.IndexSlice[:,['H-score']]) \
@@ -480,7 +478,7 @@ def make_matchup_tab(player_stats
                         , scoring_format)
 
   win_probabilities.loc[:,'Overall'] = result
-  win_probabilities = win_probabilities[['Overall'] + get_categories()]
+  win_probabilities = win_probabilities[['Overall'] + get_selected_categories()]
   win_probabilities_styled = h_percentage_styler(win_probabilities)
   st.dataframe(win_probabilities_styled, hide_index = True)
 
@@ -558,7 +556,7 @@ def make_h_waiver_df(_H
   res = res.sort_values(ascending = False)
   win_rates = win_rates.loc[res.index]
 
-  win_rates.columns = get_categories()
+  win_rates.columns = get_selected_categories()
   res.name = 'H-score'
 
   base_h_score_copy = base_h_score.copy()
@@ -625,12 +623,12 @@ def make_trade_score_tab(_scores : pd.DataFrame
                                               .map(styler_b, subset = pd.IndexSlice[players_sent + players_received
                                                                                     , ['Total']]) \
                                               .map(styler_c, subset = pd.IndexSlice[['Total Sent','Total Received']
-                                                                                , ['Total'] + get_categories()]) \
+                                                                                , ['Total'] + get_selected_categories()]) \
                                               .map(stat_styler, subset = pd.IndexSlice[players_sent + players_received
-                                                                                  , get_categories()]
+                                                                                  , get_selected_categories()]
                                                                                   , multiplier = player_multiplier) \
                                               .map(stat_styler, subset = pd.IndexSlice[['Total Difference']
-                                                                                  , get_categories()]
+                                                                                  , get_selected_categories()]
                                                                                   , multiplier = player_multiplier)  
   display = st.dataframe(full_frame_styled
                       , use_container_width = True
@@ -1102,7 +1100,7 @@ def make_rank_tab(scores : pd.DataFrame
 
   scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
   scores_copy.loc[:,'Player'] = scores_copy.index
-  scores_copy = scores_copy[['Rank','Player','Total'] + get_categories()]
+  scores_copy = scores_copy[['Rank','Player','Total'] + get_selected_categories()]
   
   scores_styled = static_score_styler(scores_copy,player_multiplier)
       
@@ -1163,10 +1161,11 @@ def make_h_rank_tab(info : dict
   c = res['Weights']
   cdf_estimates = res['Rates']
     
-  cdf_estimates.columns = get_categories()
+  cdf_estimates.columns = get_selected_categories()
   rate_df = cdf_estimates.loc[h_res.index].dropna()
 
   h_res = h_res.sort_values(ascending = False)
+
   h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
                         ,'Player' : h_res.index
                         ,'H-score' : h_res.values
@@ -1175,7 +1174,27 @@ def make_h_rank_tab(info : dict
   h_res = h_res.merge(rate_df
                       , left_on = 'Player'
                       ,right_index = True)
+  
+  if st.session_state['mode'] == 'Auction Mode':
 
-  h_res_styled = h_percentage_styler(h_res)
+    h_res.loc[:,'$ Value'] = savor_calculation(h_res['H-score']
+                                                    , n_picks * n_drafters
+                                                    , 200*n_drafters
+                                                    , st.session_state['streaming_noise_h'])
+
+    h_res = h_res[['Player','$ Value','H-score'] + get_selected_categories()]
+
+    h_res_styled = h_res.style.format("{:.1%}"
+                      ,subset = pd.IndexSlice[:,['H-score']]) \
+                    .format("{:.1f}"
+                      ,subset = pd.IndexSlice[:,['$ Value']]) \
+              .map(styler_a
+                    , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
+              .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+              .format('{:,.1%}', subset = rate_df.columns)
+    
+  else:
+    h_res_styled = h_percentage_styler(h_res)
+
   st.dataframe(h_res_styled, hide_index = True, use_container_width = True)
   return h_res

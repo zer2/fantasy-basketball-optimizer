@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import listify, increment_player_stats_version
+from src.helper_functions import get_position_numbers, listify, increment_player_stats_version, increment_info_key
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -33,9 +33,6 @@ if 'player_stats_editable_version' not in st.session_state:
     st.session_state.player_stats_editable_version = 0
 
 if 'info_key' not in st.session_state:
-    st.session_state.info_key = 100000
-
-if 'parameters_key' not in st.session_state:
     st.session_state.info_key = 100000
 
 if 'run_h_score' not in st.session_state:
@@ -67,7 +64,7 @@ if 'params' not in st.session_state:
           print(exc) 
 
 counting_statistics = st.session_state.params['counting-statistics'] 
-volume_statistics = st.session_state.params['volume-statistics'] 
+volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
 
 historical_df = get_historical_data()
 current_data, expected_minutes = get_current_season_data()
@@ -241,6 +238,15 @@ with param_tab:
       else:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
+      categories = st.multiselect('Which categories does you league use?'
+                          , key = 'selected_categories'
+                          , options = st.session_state.params['counting-statistics'] + \
+                                    list(st.session_state.params['ratio-statistics'].keys())
+                          , default = st.session_state.params['counting-statistics'] + \
+                                    list(st.session_state.params['ratio-statistics'].keys())
+                          , on_change = increment_player_stats_version
+                                )
+
       rotisserie = scoring_format == 'Rotisserie'
 
       unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
@@ -277,10 +283,10 @@ with param_tab:
       
   with advanced_params:
 
-    player_param_column, algorithm_param_column, trade_param_column = st.columns([0.25,0.5,0.25])
+    player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
 
     with player_param_column:
-      st.header('Player Statistics')
+      st.subheader('Player Statistics')
 
       upsilon = st.number_input(r'Select a $\upsilon$ value'
                         , key = 'upsilon'
@@ -320,12 +326,52 @@ with param_tab:
 
       st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
+    with position_param_column: 
+
+      st.subheader('Position Requirements')
+
+      st.caption('The H-scoring algorithm will choose players assuming that its team ultimately need to fit this structure')
+
+      left_position_col, right_position_col = st.columns(2)
+
+      with left_position_col:
+
+        st.write('Base positions')
+
+        position_defaults = st.session_state.params['options']['positions']
+        for position_code, position_info in st.session_state.params['position_structure']['base'].items():
+
+          st.number_input(position_info['full_str']
+                    , key = 'n_' + position_code
+                    , value = position_defaults['base'][position_code]
+                    , min_value = 0
+                        )
+        
+      with right_position_col:
+
+        st.write('Flex positions')
+
+        for position_code, position_info in st.session_state.params['position_structure']['flex'].items():
+
+          st.number_input(position_info['full_str']
+                    , key = 'n_' + position_code
+                    , value = position_defaults['flex'][position_code]
+                    , min_value = 0
+                        )
+          
+      implied_n_picks = sum(n for n in get_position_numbers().values())
+      
+      if implied_n_picks > n_picks:
+        st.write('There are more position slots than picks in your league. Change your configuration before proceeding')
+        st.stop()
+
+      elif implied_n_picks < n_picks:
+        st.write('There are fewer position slots than picks in your league. Change your configuration before proceeding')
+        st.stop()
+
     with algorithm_param_column:
-      st.header('Algorithm Parameters')
-
-      left_algo_param_col, right_algo_param_col = st.columns(2)
-
-      with left_algo_param_col:
+        
+        st.subheader('Algorithm Parameters')
 
         omega = st.number_input(r'Select a $\omega$ value'
                               , key = 'omega'
@@ -364,42 +410,47 @@ with param_tab:
         else:
           n_iterations = 0 
 
-      with right_algo_param_col:
+        if scoring_format == 'Rotisserie':
 
-        chi = st.number_input(r'Select a $\chi$ value'
-                , key = 'chi'
-                , value = float(st.session_state.params['options']['chi']['default'])
-                , min_value = float(st.session_state.params['options']['chi']['min'])
-                , max_value = float(st.session_state.params['options']['chi']['max']))
-        chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                      If performance means were known exactly beforehand, chi would be 1/M where M 
-                      is the number weeks in the season. However, in practice, season-long means are 
-                      not known before the season begins, so it is recommended to set chi to be higher 
-                      '''
-        st.caption(chi_str)
+          chi = st.number_input(r'Select a $\chi$ value'
+                  , key = 'chi'
+                  , value = float(st.session_state.params['options']['chi']['default'])
+                  , min_value = float(st.session_state.params['options']['chi']['min'])
+                  , max_value = float(st.session_state.params['options']['chi']['max']))
+          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                        If performance means were known exactly beforehand, chi would be 1/M where M 
+                        is the number weeks in the season. However, in practice, season-long means are 
+                        not known before the season begins, so it is recommended to set chi to be higher 
+                        '''
+          st.caption(chi_str)
+        
+        else: 
+          chi = None
 
-        streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
-                                  , key = 'streaming_noise'
-                                  , value = 1.0
-                                  , min_value = 0.0
-                                  , max_value = None)
-        stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
-                              more long-term performance noise is expected, making low-value 
-                              players more heavily down-weighted due to the possibility that
-                              they drop below  streaming-level value'''
-        st.caption(stream_noise_str)         
+        if st.session_state['mode'] == 'Auction Mode':
 
-        streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
-                      , key = 'streaming_noise_h'
-                      , value = 0.02
-                      , min_value = 0.0
-                      , max_value = None)
+          streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                    , key = 'streaming_noise'
+                                    , value = 1.0
+                                    , min_value = 0.0
+                                    , max_value = None)
+          stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
+                                more long-term performance noise is expected, making low-value 
+                                players more heavily down-weighted due to the possibility that
+                                they drop below  streaming-level value'''
+          st.caption(stream_noise_str)         
 
-        stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
-        st.caption(stream_noise_str_h)         
+          streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
+                        , key = 'streaming_noise_h'
+                        , value = 0.02
+                        , min_value = 0.0
+                        , max_value = None)
+
+          stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
+          st.caption(stream_noise_str_h)         
 
     with trade_param_column:
-        st.header('Trading Parameters')
+        st.subheader('Trading Parameters')
 
         your_differential_threshold = st.number_input(
               r'Your differential threshold for the automatic trade suggester'
@@ -514,7 +565,7 @@ with info_tab:
       
       v = np.sqrt(mov/vom)  if scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
 
-      v = np.array(v/v.sum()).reshape(1,9)
+      v = np.array(v/v.sum()).reshape(1,len(v))
       
       z_scores = info['Z-scores']
       g_scores = info['G-scores']
@@ -577,8 +628,15 @@ with rank_tab:
 
       second_str = 'Note that these scores are unique to the ' + scoring_format + \
                 ' format and all the H-scoring parameters defined on the parameter tab'
+      
+      if st.session_state['mode'] == 'Auction Mode':
+        third_str = r'. $ values assume 200 per drafter'
+      else: 
+        third_str = ''
 
-      st.caption(first_str + ' ' + second_str)
+      st.caption(first_str + ' ' + second_str + third_str)
+
+
 
       h_ranks = make_h_rank_tab(info
                     ,omega
@@ -707,6 +765,7 @@ if st.session_state['mode'] == 'Auction Mode':
     with left:
 
       cash_per_team = st.number_input(r'How much cash does each team have to pick players?'
+                , key = 'cash_per_team'
                 , min_value = 1
                 , value = 200)
 
@@ -738,7 +797,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
       remaining_cash = total_cash - amount_spent
       
-      st.caption('\$' + str(remaining_cash) + ' remains out of \$' + str(total_cash) + ' originally available' )
+      st.caption(r'\$' + str(remaining_cash) + r' remains out of \$' + str(total_cash) + ' originally available' )
 
     with right: 
       auction_seat = st.selectbox(f'Which team are you?'
@@ -761,7 +820,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
       my_remaining_cash = cash_remaining_per_team[auction_seat]
 
-      st.caption('You have \$' + str(my_remaining_cash) + ' remaining out of \$' + str(cash_per_team) \
+      st.caption(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(cash_per_team) \
               + ' to select ' + str(n_picks - n_my_players) + ' of ' + str(n_picks) + ' players')
 
       cand_tab, team_tab = st.tabs(["Candidates","Team"])

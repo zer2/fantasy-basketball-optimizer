@@ -4,7 +4,9 @@ Fantasy basketball does not end at the draft stage. During a season, managers ca
 
 ## The waiver wire
 
-Players that are not on any team are considered "on the waiver wire", and can be picked up as free agents. If there is a player on your team who is not contributing much or does not fit your strategy well, it might be worth exchanging them for a player on the waiver wire. Evaluating whether or not this is a good decision is accomplished simply by analyzing the change in H-score for the team when the substitution is made. If the H-score improves after the change is made, then the exchange is promising. It is worth keeping in mind that the calculation does not explicitly consider position. A waiver move might be risky if it improves your team's H-score slightly but also makes your team less positionally balanced, and might be worth it even if it decreases H-score if it greatly improves team balance. 
+Players that are not on any team can be picked up from the waiver wire, or as a free agent. If there is a player on your team who is not contributing much or does not fit your strategy well, it might be worth exchanging them for a different available player. 
+
+The website evaluates potential swaps simply by analyzing the change in H-score for the team when the substitution is made. If the H-score improves after the change is made, then the exchange is promising. It is worth keeping in mind that the calculation does not explicitly consider position. A waiver move might be risky if it improves your team's H-score slightly but also makes your team less positionally balanced, and might be worth it even if it decreases H-score if it greatly improves team balance. 
 
 ## Trading
 
@@ -30,7 +32,7 @@ It should be noted that a single incorrectly listed waiver wire player can rende
 
 When a team trades up, e.g. trades one players for two, they need to drop a player from their resulting team. 
 
-The complexity of this kind of trade also increases drastically with the number of players needed to drop, but not to the same degree as the trade-down case. The number of combinations available if e.g. four players are added is just seventeen choose four, which is slightly over two thousand. That is trivial for a computer. Trading down more than six players does run into memory issues, so that is disabled, but a trade that lopsided is not common
+The complexity of this kind of trade also increases drastically with the number of players needed to drop, but not to the same degree as the trade-down case. The number of combinations available if e.g. four players are added is just seventeen choose four, which is slightly over two thousand. That is trivial for a computer. Trading up more than six players does run into memory issues, so that is disabled, but a trade that lopsided is not common
 
 ## Heuristic trade guide
 

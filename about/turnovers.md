@@ -1,16 +1,14 @@
 # The curious case of turnovers 
 
-Turnovers is a unique category in the sense that it rewards players for sitting on the bench, while every other category rewards players for playing. This is counterintuitive and feels wrong to many. 
+Turnovers is a unique category in the sense that it rewards players for sitting on the bench, while every other category rewards players for playing. This is counterintuitive and feels wrong to many. As such, it is conventional wisdom to disregard turnovers or at least down-weight them by a large factor. Hashtag Basketball, for instance, down-weights turnovers to $0.25$.
 
-As such, it is conventional wisdom to disregard turnovers or at least down-weight them by a large factor. Hashtag Basketball, for instance, down-weights turnovers to $0.25$ because "[people who barely play any minutes, and therefore will have hardly any turnovers get a huge boost in value when it is set to 1. So setting the turnover category to 1 really inflates some guys who do not actually do much besides not turn over the ball](https://www.reddit.com/r/fantasybball/comments/djcynb/hashtag_rankings_turnover_multiplier/)" 
-
-There are logical-sounding arguments backing up Hashtag's intuition
+There are several arguments for this approach, which seem sensible on face 
 1. The best teams tend to do poorly in turnovers, and the worst teams tend to do well in them. A reasonable observer may conclude that investing in turnovers therefore makes a team worse 
 2. It is easiest to win turnovers when a team has already lost all chance of winning the season. There is no benefit to this, so turnovers should not be prioritized
 3. Turnovers is a great category to punt, because ignoring turnovers allows a team to take players that are great in the other categories. This means that they should just punt it by default 
 4. Turnovers are volatile and unpredictable, making them pointless to consider while drafting
 
-These arguments have often come up in conversations I have had with others in the fantasy basketball community. They are intuitively reasonable on face, so I understand why the down-weighting approach has been the orthodoxy for so long. However, as well-entrenched as the down-weighting approach is, and as many logical-sounding arguments there are behind it, I am convinced that it is wrong-headed. None of the arguments persuade me, and I believe that the approach has stayed popular because of inertia and a lack of analytical rigor. For that reason, the default on this site is to treat turnovers like every other counting statistic (except multiplied by -1 of course)
+These arguments have often come up in conversations I have had with others in the fantasy basketball community. They are intuitively reasonable, so I understand why the down-weighting approach has been the orthodoxy for so long. However, as well-entrenched as the down-weighting approach is, and as many logical-sounding arguments there are behind it, I am convinced that it is wrong. None of the arguments persuade me, and I believe that the approach has stayed popular because of inertia and a lack of analytical rigor. For that reason, the default on this site is to treat turnovers like every other counting statistic (except multiplied by -1 of course)
 
 I realize that I am going against the grain of the fantasy community with this opinion. I am suggesting that the way things have been done for years and years is incorrect. So I will lay out my thought process here, going through the four arguments above and explaining why none of them are persuasive. I will also show the result of a test I ran, which showed no convincing evidence that punting turnovers was uniquely advantageous 
 
@@ -177,7 +175,7 @@ To some degree, the hypothesis that down-weighting turnovers is uniquely benefic
     - One thousand seasons are simulated by sampling from the actual season of data
     - The team with the highest regular season record wins
 
-Down-weighting a single category can be a good strategy in general- it is essentially punting. If down-weighting turnovers is a uniquely important measure to take, then the benefit of down-weighting turnovers would be greater than the benefits of down-weighting other categories
+Down-weighting a single category can be a good strategy in general- it is essentially punting. If down-weighting turnovers is a uniquely important measure to take, then the benefit of down-weighting turnovers should be greater than the benefits of down-weighting other categories
 
 The results are as follows for the turnover down-weighter's win rate:
 

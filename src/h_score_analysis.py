@@ -34,7 +34,7 @@ def estimate_matchup_result(team_1_x_scores : pd.Series
     else:
         score = cdf_array.mean() 
 
-    cdf_estimates.columns = get_categories()
+    cdf_estimates.columns = get_selected_categories()
     return float(score), cdf_estimates
 
 

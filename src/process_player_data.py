@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helper_functions import get_categories, weighted_cov_matrix
+from src.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
+                                ,get_position_structure, weighted_cov_matrix, increment_info_key
 import os
 import streamlit as st
 
@@ -20,39 +21,36 @@ def calculate_coefficients(player_means : pd.DataFrame
 
     """
 
-    params = st.session_state.params
+    counting_statistics = get_selected_counting_statistics()
+    ratio_statistics = get_selected_ratio_statistics()
+
+    #ZR: We should really have a 'get_position_structure' equivalent function for this 
+    params = st.session_state['params']
 
     #counting stats
-    var_of_means = player_means.loc[representative_player_set,params['counting-statistics']].var(axis = 0)
-    mean_of_means = player_means.loc[representative_player_set,params['counting-statistics']].mean(axis = 0)
+    var_of_means = player_means.loc[representative_player_set,counting_statistics].var(axis = 0)
+    mean_of_means = player_means.loc[representative_player_set,counting_statistics].mean(axis = 0)
 
-    #free throw percent
-    fta_mean_of_means = player_means.loc[representative_player_set, 'Free Throw Attempts'].mean()
-    mean_of_means.loc['Free Throw Attempts'] = fta_mean_of_means
-                       
-    ftp_agg_average = (player_means.loc[representative_player_set, 'Free Throw %'] * player_means.loc[representative_player_set, 'Free Throw Attempts']).mean()/fta_mean_of_means
-    mean_of_means.loc['Free Throw %'] = ftp_agg_average
-                       
-    ftp_numerator = player_means.loc[representative_player_set, 'Free Throw Attempts']/fta_mean_of_means * (player_means.loc[representative_player_set, 'Free Throw %'] - ftp_agg_average)
-    ftp_var_of_means = ftp_numerator.var()
-    var_of_means.loc['Free Throw %'] = ftp_var_of_means
-    
-    #field goal %
-    fga_mean_of_means = player_means.loc[representative_player_set, 'Field Goal Attempts'].mean()
-    mean_of_means.loc['Field Goal Attempts'] = fga_mean_of_means
-                       
-    fgp_agg_average = (player_means.loc[representative_player_set, 'Field Goal %'] * player_means.loc[representative_player_set, 'Field Goal Attempts']).mean()/fga_mean_of_means
-    mean_of_means.loc['Field Goal %'] = fgp_agg_average
-                       
-    fgp_numerator = player_means.loc[representative_player_set, 'Field Goal Attempts']/fga_mean_of_means * (player_means.loc[representative_player_set, 'Field Goal %'] - fgp_agg_average)
-    fgp_var_of_means = fgp_numerator.var()
-    var_of_means.loc['Field Goal %'] = fgp_var_of_means
+    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+
+        if ratio_stat in ratio_statistics:
+            volume_statistic = ratio_stat_info['volume-statistic']
+
+            volume_mean_of_means = player_means.loc[representative_player_set, volume_statistic].mean()
+            mean_of_means.loc[volume_statistic] = volume_mean_of_means
+                            
+            agg_average = (player_means.loc[representative_player_set, ratio_stat] * \
+                                player_means.loc[representative_player_set, volume_statistic]).mean()/volume_mean_of_means
+            mean_of_means.loc[ratio_stat] = agg_average
+                            
+            numerator = player_means.loc[representative_player_set, volume_statistic]/volume_mean_of_means * \
+                                        (player_means.loc[representative_player_set, ratio_stat] - agg_average)
+            ratio_var_of_means = numerator.var()
+            var_of_means.loc[ratio_stat] = ratio_var_of_means
+
+            translation_factors[volume_statistic] = 0
 
     #get mean of vars
-
-    translation_factors['Free Throw Attempts'] = 0
-    translation_factors['Field Goal Attempts'] = 0
-
     mean_of_vars = var_of_means * translation_factors
 
     coefficients = pd.DataFrame({'Mean of Means' : mean_of_means
@@ -75,43 +73,40 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
         Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
 
     """
+
+    counting_statistics = get_selected_counting_statistics()
+    ratio_statistics = get_selected_ratio_statistics()
     player_stats = weekly_df.groupby(level = 'Player').agg(['mean','var'])
 
     #counting stats
-    mean_of_vars = player_stats.loc[representative_player_set,(params['counting-statistics'],'var')].mean(axis = 0)
-    var_of_means = player_stats.loc[representative_player_set,(params['counting-statistics'],'mean')].var(axis = 0)
-    mean_of_means = player_stats.loc[representative_player_set,(params['counting-statistics'],'mean')].mean(axis = 0)
+    mean_of_vars = player_stats.loc[representative_player_set,(counting_statistics,'var')].mean(axis = 0)
+    var_of_means = player_stats.loc[representative_player_set,(counting_statistics,'mean')].var(axis = 0)
+    mean_of_means = player_stats.loc[representative_player_set,(counting_statistics,'mean')].mean(axis = 0)
 
-    #free throw percent
-    ft_mean_of_means = player_stats.loc[representative_player_set, ('Free Throws Made','mean')].mean()
-    fta_mean_of_means = player_stats.loc[representative_player_set, ('Free Throw Attempts','mean')].mean()
-    mean_of_means.loc['Free Throw Attempts'] = fta_mean_of_means
-    ftp = player_stats.loc[:, ('Free Throws Made','mean')]/player_stats.loc[:, ('Free Throw Attempts','mean')]
-    ftp_agg_average = ft_mean_of_means / fta_mean_of_means
-    mean_of_means.loc['Free Throw %'] = ftp_agg_average
-    ftp_numerator = player_stats.loc[:, ('Free Throw Attempts','mean')]/fta_mean_of_means * (ftp - ftp_agg_average)
-    ftp_var_of_means = ftp_numerator.loc[representative_player_set].var()
-    var_of_means.loc['Free Throw %'] = ftp_var_of_means
-    
-    weekly_df.loc[:,'volume_adjusted_ftp'] = (weekly_df['Free Throws Made'] - weekly_df['Free Throw Attempts']*ftp_agg_average)/ \
-                                            fta_mean_of_means
-    ftp_mean_of_vars = weekly_df['volume_adjusted_ftp'].loc[representative_player_set].groupby('Player').var().mean()
-    mean_of_vars.loc['Free Throw %'] = ftp_mean_of_vars
+    #there should be a better way to do this loop- maybe with something akin to get_position_structure
+    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+        if ratio_stat in ratio_statistics:
 
-    #field goal percent
-    fg_mean_of_means = player_stats.loc[representative_player_set, ('Field Goals Made','mean')].mean()
-    fga_mean_of_means = player_stats.loc[representative_player_set, ('Field Goal Attempts','mean')].mean()
-    mean_of_means.loc['Field Goal Attempts'] = fga_mean_of_means
-    fgp_agg_average = fg_mean_of_means / fga_mean_of_means
-    mean_of_means.loc['Field Goal %'] = fgp_agg_average
-    fgp = player_stats.loc[:, ('Field Goals Made','mean')]/player_stats.loc[:, ('Field Goal Attempts','mean')]
-    fgp_numerator = player_stats.loc[:, ('Field Goal Attempts','mean')]/fga_mean_of_means * (fgp - fgp_agg_average)
-    fgp_var_of_means = fgp_numerator.loc[representative_player_set].var()
-    var_of_means.loc['Field Goal %'] = fgp_var_of_means
-    weekly_df.loc[:,'volume_adjusted_fgp'] = (weekly_df['Field Goals Made'] - weekly_df['Field Goal Attempts']*fgp_agg_average)/ \
-                                        fga_mean_of_means
-    fgp_mean_of_vars = weekly_df['volume_adjusted_fgp'].loc[representative_player_set].groupby('Player').var().mean()    
-    mean_of_vars.loc['Field Goal %'] = fgp_mean_of_vars
+            volume_statistic = ratio_stat_info['volume-statistic']
+            made_statistic = ratio_stat_info['made-statistic']
+
+            made_mean_of_means = player_stats.loc[representative_player_set, (made_statistic,'mean')].mean()
+            volume_mean_of_means = player_stats.loc[representative_player_set, (volume_statistic,'mean')].mean()
+
+            mean_of_means.loc[volume_statistic] = volume_mean_of_means
+            ratio_agg_average = made_mean_of_means / volume_mean_of_means
+
+            mean_of_means.loc[ratio_stat] = ratio_agg_average
+
+            ratio = player_stats.loc[:, (made_statistic,'mean')]/player_stats.loc[:, (volume_statistic,'mean')]
+            ratio_numerator = player_stats.loc[:, (volume_statistic,'mean')]/volume_mean_of_means * (ratio - ratio_agg_average)
+            ratio_var_of_means = ratio_numerator.loc[representative_player_set].var()
+            var_of_means.loc[ratio_stat] = ratio_var_of_means
+
+            weekly_df.loc[:,'volume_adjusted_' + ratio_stat] = (weekly_df[made_statistic] - weekly_df[volume_statistic]*ratio_agg_average)/ \
+                                                volume_mean_of_means
+            ratio_mean_of_vars = weekly_df['volume_adjusted_' + ratio_stat].loc[representative_player_set].groupby('Player').var().mean()    
+            mean_of_vars.loc[ratio_stat] = ratio_mean_of_vars
 
     coefficients = pd.DataFrame({'Mean of Means' : mean_of_means.droplevel(level = 1)
                             ,'Variance of Means' : var_of_means.droplevel(level = 1)
@@ -137,27 +132,34 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     Returns:
         Dataframe of scores, by player/category
     """
-    counting_cat_mean_of_means = coefficients.loc[params['counting-statistics'],'Mean of Means']
-    counting_cat_var_of_means = coefficients.loc[params['counting-statistics'],'Variance of Means']
-    counting_cat_mean_of_vars = coefficients.loc[params['counting-statistics'],'Mean of Variances']
+    counting_statistics = get_selected_counting_statistics()
+    ratio_statistics = get_selected_ratio_statistics()
+
+    counting_cat_mean_of_means = coefficients.loc[counting_statistics,'Mean of Means']
+    counting_cat_var_of_means = coefficients.loc[counting_statistics,'Variance of Means']
+    counting_cat_mean_of_vars = coefficients.loc[counting_statistics,'Mean of Variances']
 
     counting_cat_denominator = (counting_cat_var_of_means.values*alpha_weight + counting_cat_mean_of_vars.values*beta_weight ) ** 0.5
-    numerator = player_means.loc[:,params['counting-statistics']] - counting_cat_mean_of_means
+    numerator = player_means.loc[:,counting_statistics] - counting_cat_mean_of_means
     main_scores = numerator.divide(counting_cat_denominator)
-    main_scores['Turnovers'] = - main_scores['Turnovers']
 
-    #free throws 
-    ftp_denominator = (coefficients.loc['Free Throw %','Variance of Means']*alpha_weight + coefficients.loc['Free Throw %','Mean of Variances']*beta_weight)**0.5
-    ftp_numerator = player_means.loc[:, 'Free Throw Attempts']/coefficients.loc['Free Throw Attempts','Mean of Means'] * (player_means['Free Throw %'] - coefficients.loc['Free Throw %','Mean of Means'])
-    ftp_score = ftp_numerator.divide(ftp_denominator)
+    for negative_stat in params['negative-statistics']:
+        if negative_stat in main_scores.columns:
+            main_scores[negative_stat] = - main_scores[negative_stat]
 
-    #field goals
-    fgp_denominator = (coefficients.loc['Field Goal %','Variance of Means']*alpha_weight + coefficients.loc['Field Goal %','Mean of Variances']*beta_weight)**0.5
-    fgp_numerator = player_means.loc[:, 'Field Goal Attempts']/coefficients.loc['Field Goal Attempts','Mean of Means'] * (player_means['Field Goal %']  - coefficients.loc['Field Goal %','Mean of Means'])
-    fgp_score = fgp_numerator.divide(fgp_denominator)
+    ratio_scores = {}
+    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+        if ratio_stat in ratio_statistics:
+
+            volume_statistic = ratio_stat_info['volume-statistic']
+
+            denominator = (coefficients.loc[ratio_stat,'Variance of Means']*alpha_weight + coefficients.loc[ratio_stat,'Mean of Variances']*beta_weight)**0.5
+            numerator = player_means.loc[:, volume_statistic]/coefficients.loc[volume_statistic,'Mean of Means'] * \
+                                        (player_means[ratio_stat] - coefficients.loc[ratio_stat,'Mean of Means'])
+            ratio_scores[ratio_stat] = numerator.divide(denominator)
     
-    res = pd.concat([fgp_score, ftp_score, main_scores],axis = 1)  
-    res.columns = get_categories(params)
+    res = pd.concat([ratio_scores[ratio_stat] for ratio_stat in ratio_scores.keys() ] + [main_scores],axis = 1)  
+    res.columns = get_selected_categories()
     return res.fillna(0)
 
 def games_played_adjustment(scores : pd.DataFrame
@@ -178,7 +180,8 @@ def games_played_adjustment(scores : pd.DataFrame
         Dataframe with same dimensions as scores 
     """
 
-    all_stats = params['percentage-statistics'] + params['counting-statistics']
+    all_stats = get_selected_categories()
+
     if v is None:
        v = pd.Series({stat : 1/9 for stat in all_stats})
 
@@ -194,7 +197,7 @@ def games_played_adjustment(scores : pd.DataFrame
     return adjusted_scores 
 
 def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
-   all_stats = get_categories(params)
+   all_stats = get_selected_categories()
    rv_multiple = rv/(len(all_stats) -2) if  'Turnovers' in all_stats else rv/len(all_stats)
    value_by_category = pd.Series({stat : - rv_multiple/v[stat] if stat == 'Turnovers' 
                                   else rv_multiple/v[stat] for stat in all_stats})
@@ -244,7 +247,7 @@ def process_player_data(weekly_df : pd.DataFrame
                                                           , params
                                                           , 1
                                                           ,1)
-  g_scores_first_order = g_scores_first_order * multipliers.T.values[0]
+  g_scores_first_order = g_scores_first_order * multipliers.loc[get_selected_categories(),:].T.values[0]
 
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
@@ -259,8 +262,8 @@ def process_player_data(weekly_df : pd.DataFrame
                                                   , conversion_factors['Conversion Factor'])
     
 
-  mov = coefficients.loc[get_categories(params) , 'Mean of Variances']
-  vom = coefficients.loc[get_categories(params) , 'Variance of Means']
+  mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
+  vom = coefficients.loc[get_selected_categories() , 'Variance of Means']
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
@@ -273,9 +276,9 @@ def process_player_data(weekly_df : pd.DataFrame
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, params, v = v)
 
-  g_scores = g_scores * multipliers.T.values[0]
-  z_scores = z_scores * multipliers.T.values[0]
-  x_scores = x_scores * multipliers.T.values[0]
+  g_scores = g_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
+  z_scores = z_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
+  x_scores = x_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
 
   z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
 
@@ -302,7 +305,7 @@ def process_player_data(weekly_df : pd.DataFrame
                         , right_index = True)
   
     players_and_positions_limited = players_and_positions[0:n_players]
-    categories = get_categories(params)
+    categories = get_selected_categories()
     players_and_positions_limited[categories] = players_and_positions_limited[categories] \
                                                     .sub(players_and_positions_limited[categories].mean(axis = 0))
     positions_exploded = players_and_positions_limited.explode('Position').reset_index().set_index(['Player','Position'])
@@ -314,7 +317,8 @@ def process_player_data(weekly_df : pd.DataFrame
 
     #we should have some logic for position not being available
     #also all of the position rules should be modularized 
-    position_means = position_means.loc[['C','PG','SG','PF','SF'], :] #this is the order we always use for positions
+    base_position_list = get_position_structure()['base_list']
+    position_means = position_means.loc[base_position_list, :] #this is the order we always use for positions
 
     position_means_g = position_means * v
     position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
@@ -323,7 +327,7 @@ def process_player_data(weekly_df : pd.DataFrame
     
     L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
                                                                 , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
-                                                                for position in ['C','PG','SG','PF','SF']}
+                                                                for position in base_position_list}
                                 )
   except:
     position_means = None        
@@ -340,7 +344,6 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'L-by-Position' : L_by_position
           , 'Positions' : positions}
 
-  if st.session_state: #if we are running outside of streamlit this will be empty, and will evaluate to False
-    st.session_state.info_key += 1 
+  increment_info_key()
   
   return info

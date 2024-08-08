@@ -6,14 +6,142 @@ import itertools
 import streamlit as st
 import numexpr as ne
 from datetime import datetime
-import cvxpy
 
-def get_categories(params = None):
+def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
-    if params: 
-      return params['percentage-statistics'] + params['counting-statistics']
+    return get_ratio_statistics() + get_counting_statistics()
+    
+def get_counting_statistics():
+    #convenience function to get the list of categories used for fantasy basketball
+    if st.session_state:
+      return st.session_state['params']['counting-statistics']
     else: 
-      return st.session_state.params['percentage-statistics'] + st.session_state.params['counting-statistics']
+      return ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
+    
+def get_ratio_statistics():
+    #convenience function to get the list of categories used for fantasy basketball
+    if st.session_state:
+      return list(st.session_state['params']['ratio-statistics'].keys()) 
+    else: 
+      return ['Field Goal %','Free Throw %']
+    
+def get_selected_categories():
+    return get_selected_ratio_statistics() + get_selected_counting_statistics()
+    
+def get_selected_counting_statistics():
+   if st.session_state:
+      return [category for category in st.session_state['selected_categories'] if category in get_counting_statistics()]
+   else:
+      return get_counting_statistics()
+   
+def get_selected_ratio_statistics():
+   if st.session_state:
+      return [category for category in st.session_state['selected_categories'] if category in get_ratio_statistics()]
+   else:
+      return get_ratio_statistics()
+
+def get_position_numbers():
+
+    if st.session_state:
+        res = {}
+        for position_code in st.session_state.params['position_structure']['base_list']:  
+           res[position_code] = st.session_state['n_' + position_code]
+
+        for position_code in st.session_state.params['position_structure']['flex_list']:  
+           res[position_code] = st.session_state['n_' + position_code]
+
+        return res
+    else:
+       
+        return {'Util' :3
+                ,'C' : 2
+                ,'G' : 2
+                ,'PG' : 1
+                ,'SG' : 1
+                ,'F' : 2
+                ,'PF' : 1
+                ,'SF' : 1
+                }
+    
+def get_position_structure():
+    if st.session_state:
+       return st.session_state.params['position_structure']
+    else:
+       return { 'base_list' :
+                        ['C','PG','SG','PF','SF']
+               ,'base' : {'C' : {'full_str' : 'Centers'}
+                         ,'PG' :{'full_str' : 'Point Guards'}
+                         ,'SG' : {'full_str' : 'Shooting Guards'}
+                         ,'PF' : {'full_str' : 'Power Forwards'}
+                         ,'SF' : {'full_str' : 'Small Forwards'}}
+               ,'flex_list' : ['Util','G','F']
+               ,'flex' : {'Util' : 
+                          {'bases' : ['C','PG','SG','PF','SF']
+                           ,'full_str' : 'Utilities'
+                          }
+                        ,'G' : {'bases' : ['PG','SG']
+                           ,'full_str' : 'Guards'
+                          }
+                        ,'F' : {'bases' : ['PF','SF']
+                           ,'full_str' : 'Forwards'
+                          }
+                            }
+                 }
+
+
+
+def get_position_ranges():
+
+    if st.session_state:
+
+        start = 0
+        end = 0
+        res = {}
+
+        position_structure = st.session_state.params['position_structure']
+        
+        all_positions = position_structure['base_list'] + position_structure['flex_list']
+
+        for position_code in all_positions:
+           end += st.session_state['n_' + position_code]
+           res[position_code] = {'start' : start, 'end': end}
+           start = end
+
+        return res 
+
+    else:
+       
+       #default to the standard position requirements
+       center = {'start' : 0, 'end' : 2}
+       point_guard = {'start' : 2, 'end' : 3}
+       shooting_guard = {'start' : 3, 'end' : 4}
+       power_forward = {'start' : 4, 'end' : 5}
+       shooting_forward = {'start' : 5, 'end' : 6}
+       utility = {'start' : 6, 'end' : 9}
+       guard =  {'start' : 9, 'end' : 11}
+       forward = {'start' : 11, 'end' : 13}
+
+       return {
+                'C' : center
+                ,'PG' : point_guard
+                ,'SG' : shooting_guard
+                ,'PF' : power_forward
+                ,'SF' : shooting_forward
+                ,'Util' :utility
+                ,'G' : guard
+                ,'F' : forward
+
+                }
+    
+def get_position_indices(position_structure):
+   
+    flex_info =  position_structure['flex']
+    base_position_list = position_structure['base_list']
+
+    return {position_code : 
+                            [i for i, val in enumerate(base_position_list) if val in position_info['bases']]
+                                    for position_code, position_info in flex_info.items()
+            }
 
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
@@ -35,14 +163,14 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   agg_columns = [col for col in ['$ Value','Total'] if col in df.columns]
   index_columns = [col for col in ['Rank','Player'] if col in df.columns]
 
-  df = df[index_columns + agg_columns + get_categories()]
+  df = df[index_columns + agg_columns + get_selected_categories()]
 
   df_styled = df.style.format("{:.2f}"
-                              , subset = pd.IndexSlice[:,agg_columns + get_categories()]) \
+                              , subset = pd.IndexSlice[:,agg_columns + get_selected_categories()]) \
                             .map(styler_a
                                 ,subset = pd.IndexSlice[:,agg_columns]) \
                             .map(stat_styler
-                              , subset = pd.IndexSlice[:,get_categories()]
+                              , subset = pd.IndexSlice[:,get_selected_categories()]
                               , multiplier = multiplier)
   return df_styled
 
@@ -62,13 +190,13 @@ def h_percentage_styler(df : pd.DataFrame
   df_styled = df.style.format("{:.2%}"
                                 , subset = pd.IndexSlice[:,[perc_column]] ) \
                           .format("{:.1%}"
-                                , subset = pd.IndexSlice[:,get_categories()]) \
+                                , subset = pd.IndexSlice[:,get_selected_categories()]) \
                           .map(styler_a
                                 , subset = pd.IndexSlice[:,[perc_column]]) \
                           .map(stat_styler
                               , middle = middle
                               , multiplier = multiplier
-                              , subset = get_categories())
+                              , subset = get_selected_categories())
   return df_styled
 
 def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> str:
@@ -114,98 +242,6 @@ def rotate(l, n):
   #rotate list l by n positions 
   return l[-n:] + l[:-n]
 
-def combinatorial_calculation(c : np.array
-                              , c_comp : np.array
-                              , data = 1 #the latest probabilities. Defaults to 1 at start
-                              , level : int = 0 #the number of categories that have been worked into the probability
-                              , n_false : int = 0 #the number of category losses that have been tracked so far
-                             ):
-    """This recursive functions enumerates winning probabilities for the Gaussian optimizer
-
-    The function's recursive structure creates a binary tree, where each split is based on whether the next category is 
-    won or lost. At the high level it looks like 
-    
-                                            (start) 
-                                    |                   |
-                                won rebounds      lost rebounds
-                             |          |           |            |
-                          won pts    lost pts   won pts     lost pts
-                          
-    The probabilities of winning scenarios are then added along the tree. This is more efficient than brute force calculation
-    of each possibility, because it doesn't repeat multiplication steps for similar scenarios like (won 9) and (won 8 then 
-    lost the last 1). Ultimately it is about five times faster than the equivalent with list comprehension
-    
-    Args:
-        c: Array of all category winning probabilities. Dimensions are (player, category, opponent)
-        c_comp: 1 - c
-        data: probability of the node's scenario. Defaults to 1 because no categories are required at first
-        level: the number of categories that have been worked into the probability
-        n_false: the number of category losses that have been tracked so far. When it gets high enough 
-                 we write off the node; the remaining scenarios do not contribute to winning chances
-
-    Returns:
-        DataFrame with probability of winning a majority of categories for each player 
-
-        axis 0: player 
-        axis 1: opponent
-
-    """
-    if n_false > (c.shape[1] -1)/2: #scenarios where a majority of categories are losses are overall losses
-        return 0 
-    elif level < c.shape[1] :
-        #find the total winning probability of both branches from this point- if we win or lose the current category 
-        return combinatorial_calculation(c, c_comp, data * c[:,level,:], level + 1, n_false) + \
-                combinatorial_calculation(c, c_comp, data * c_comp[:,level,:], level + 1, n_false + 1)
-    else: #a series where all 9 categories has been processed, and n_false <= the cutoff, can be added to the total %
-        return data
-
-@st.cache_data()
-def get_grid():
-    #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
-
-    which = np.array([list(itertools.combinations(range(9), 5))] )
-    grid = np.zeros((126, 9), dtype="bool")     
-    grid[np.arange(126)[None].T, which] = True
-
-    grid = np.expand_dims(grid, axis = 2)
-
-    return grid
-
-def calculate_tipping_points(x : np.array) -> np.array:
-    """Calculate the probability of each category being a tipping point, assuming independence
-
-    Args:
-        x: Array of shape (n,9,m) representing probabilities of winning each of the 9 categories 
-
-    Returns:
-        DataFrame of shape (n,9,m) representing probabilities of each category being a tipping point
-        m is number of opponents
-    """
-
-    grid = get_grid()
-
-    #copy grid for each row in x 
-    grid = np.array([grid] * x.shape[0])
-
-    x = x.reshape(x.shape[0],1,9, x.shape[2])
-
-    #get the probabilities of the scenarios and filter them by which categories they apply to
-    #the categories that are won all become tipping points
-
-    first_part = ne.evaluate('grid * x + (1-grid) * (1-x)') \
-                                   .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
-    positive_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
-
-    #do the same but for the inverse scenarios, where 5 categories are lost and 4 are won
-    #in this case the lost categories become tipping points 
-    first_part = ne.evaluate('(1 - grid) * x + grid * (1-x)') \
-                                  .prod(axis = 2).reshape(x.shape[0],126,1,x.shape[3])
-    negative_case_probabilities = ne.evaluate('first_part * grid').sum(axis = 1)
-
-    final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
-
-    return final_probabilities
-
 def make_progress_chart(res : list[pd.DataFrame]):
     """Chart the progress of gradient descent in action, for the top 10 players 
 
@@ -246,6 +282,8 @@ def make_progress_chart(res : list[pd.DataFrame]):
 
     return fig
 
+#deprecated below 
+'''
 #this function should use scipy.special.linear_sum_assignment
 def check_team_eligibility(players):    
     """Checks if a team is eligible or not, based on the players' possible positions
@@ -316,6 +354,7 @@ def get_eligibility_row_simplified(pos):
     if 'PF' in pos: 
         eligibility.add((4))
     return np.array([[i in eligibility for i in range(5)]])
+'''
 
 def weighted_cov_matrix(df, weights):
     weighted_means = np.average(df, axis=0, weights=weights)
@@ -327,6 +366,6 @@ def increment_player_stats_version():
   if st.session_state:
     st.session_state.player_stats_editable_version += 1
 
-def increment_paramater_key():
+def increment_info_key():
   if st.session_state:
-    st.session_state.player_stats_editable_version += 1
+    st.session_state.info_key += 1
