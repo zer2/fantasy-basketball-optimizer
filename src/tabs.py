@@ -220,6 +220,7 @@ def make_h_cand_tab(H
     score = res['Scores']
     weights = res['Weights']
     win_rates = res['Rates']
+    position_shares = res['Position-Shares']
 
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
@@ -230,11 +231,22 @@ def make_h_cand_tab(H
     
     with placeholder.container():
 
+      position_shares_list = [(k, v) for k, v in position_shares.items()]
+      position_shares_tab_names = ['Flex- ' + x[0] for x in position_shares_list]
+      position_shares_res = [x[1] for x in position_shares_list]
+
       if cash_remaining_per_team:
-        target_tab, rate_tab, weight_tab,  = st.tabs(['Targets','Expected Win Rates', 'Weights'])
+        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights'] + position_shares_tab_names )
+        target_tab = all_tabs[0]
+        rate_tab = all_tabs[1]
+        weight_tab = all_tabs[2]
+        position_tabs = all_tabs[3:]
       else:
-        rate_tab, weight_tab = st.tabs(['Expected Win Rates', 'Weights'])
-          
+        all_tabs = st.tabs(['Expected Win Rates', 'Weights'] + position_shares_tab_names)
+        rate_tab = all_tabs[0]
+        weight_tab = all_tabs[1]          
+        position_tabs = all_tabs[2:]
+
       score = score.sort_values(ascending = False)
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
@@ -284,6 +296,22 @@ def make_h_cand_tab(H
                         , subset = pd.IndexSlice[:,['H-score']]) \
                   .background_gradient(axis = None,subset = weight_df.columns) 
         st.dataframe(weight_display_styled, use_container_width = True)
+
+
+        for tab, position_shares_df in zip(position_tabs, position_shares_res):
+          with tab: 
+                              
+              share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
+                                    , left_index = True
+                                    , right_index = True)
+              share_display_styled = share_display.style.format("{:.0%}"
+                                                          , subset = position_shares_df.columns)\
+                        .format("{:.1%}"
+                                ,subset = pd.IndexSlice[:,['H-score']]) \
+                        .map(styler_a
+                              , subset = pd.IndexSlice[:,['H-score']]) \
+                        .background_gradient(axis = None,subset = position_shares_df.columns) 
+              st.dataframe(share_display_styled, use_container_width = True)
 
       if cash_remaining_per_team:
          

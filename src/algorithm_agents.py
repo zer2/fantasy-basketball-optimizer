@@ -542,7 +542,7 @@ class HAgent():
                 cdf_estimates = self.get_cdf(diff_means, diff_vars)
 
                 category_weights_current = None
-                position_shares_current = {position_code : None for position_code in self.position_structure['flex'].keys() }
+                position_shares_current = None
                 expected_future_diff = None
                 pdf_estimates = None
                 
@@ -582,7 +582,7 @@ class HAgent():
                 result_index = drop_potentials.index
 
                 category_weights_current = None
-                position_shares_current = {position_code : None for position_code in self.position_structure['flex'].keys() }
+                position_shares_current = None
                 expected_future_diff = None
 
             i = i + 1
@@ -598,17 +598,21 @@ class HAgent():
                 
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
-            yield {'Scores' : pd.Series(score, index = result_index)
+            res = {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
                     ,'Position-Shares' : {position_code : 
-                                                    pd.DataFrame(position_shares_current[position_code], index = result_index
+                                                    pd.DataFrame(position_shares_current[position_code].values
+                                                                 , index = result_index
                                                      , columns = position_info['bases']) 
                                                      for position_code, position_info in self.position_structure['flex'].items()
-                                            }
+                                            } if position_shares_current is not None else \
+                                                {position_code : None for position_code in self.position_structure['flex'].keys() }
                     
                     }
+
+            yield res
 
     ### below are functions used for the optimization procedure 
     def get_position_priorities_from_category_weights(self, weights):
