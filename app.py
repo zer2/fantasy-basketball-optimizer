@@ -1119,14 +1119,19 @@ elif st.session_state['mode'] == 'Season Mode':
         counterparty_players_dict = { team : players for team, players in selections_editable.items() 
                                 if ((team != trade_party_seat) & (not  any(p!=p for p in players)))
                                   }
-
-        trade_counterparty_seat = st.selectbox(
-            f'Which team do you want to trade with?',
-            [s for s in counterparty_players_dict.keys()],
-            index = 0
-          )
         
-        trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
+        if len(counterparty_players_dict) >=1:
+
+          trade_counterparty_seat = st.selectbox(
+              f'Which team do you want to trade with?',
+              [s for s in counterparty_players_dict.keys()],
+              index = 0
+            )
+          
+          trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
+
+        else: 
+          trade_counterparty_players = []
 
     if len(trade_party_players) == n_picks:
 

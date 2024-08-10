@@ -541,7 +541,8 @@ class HAgent():
 
                 cdf_estimates = self.get_cdf(diff_means, diff_vars)
 
-                category_weights = None
+                category_weights_current = None
+                position_shares_current = {position_code : None for position_code in self.position_structure['flex'].keys() }
                 expected_future_diff = None
                 pdf_estimates = None
                 
@@ -550,6 +551,8 @@ class HAgent():
                                         , pdf_estimates
                                         , n_values
                                         , calculate_pdf_weights = False)
+                
+
                 
                 result_index = ['']
 
@@ -578,7 +581,8 @@ class HAgent():
 
                 result_index = drop_potentials.index
 
-                category_weights = None
+                category_weights_current = None
+                position_shares_current = {position_code : None for position_code in self.position_structure['flex'].keys() }
                 expected_future_diff = None
 
             i = i + 1
@@ -599,7 +603,7 @@ class HAgent():
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
                     ,'Position-Shares' : {position_code : 
-                                                    pd.DataFrame(position_shares_current[position_code].values, index = result_index
+                                                    pd.DataFrame(position_shares_current[position_code], index = result_index
                                                      , columns = position_info['bases']) 
                                                      for position_code, position_info in self.position_structure['flex'].items()
                                             }
