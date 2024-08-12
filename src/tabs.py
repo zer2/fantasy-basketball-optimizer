@@ -254,9 +254,11 @@ def make_h_cand_tab(H
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
+      display = ((i-1) % 5 == 0) or (i == n_iterations - 1)
+
       with rate_tab:
 
-        if (i-1) % 5 == 0:
+        if display:
 
           rate_df = win_rates.loc[score_df.index].dropna()
           rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
@@ -291,7 +293,7 @@ def make_h_cand_tab(H
           st.dataframe(rate_display_styled, use_container_width = True)
       with weight_tab:
 
-        if (i-1) % 5 == 0:
+        if display:
 
           weight_df = weights.loc[score_df.index].dropna()
           weight_display = score_df.merge(weight_df
@@ -308,7 +310,7 @@ def make_h_cand_tab(H
 
       with roster_tab:
 
-          if (i-1) % 5 == 0:
+          if display:
 
             my_players = [x for x in player_assignments[draft_seat] if x ==x]
             n_players = len(my_players)
@@ -335,7 +337,7 @@ def make_h_cand_tab(H
       for tab, position_shares_df in zip(position_tabs, position_shares_res):
           with tab: 
               
-              if (i-1) % 5 == 0:
+              if display:
            
                 share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
                                       , left_index = True
@@ -353,7 +355,7 @@ def make_h_cand_tab(H
          
          with target_tab:
 
-          if (i-1) % 5 == 0:
+          if display:
  
             comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
                                           , '$ Value' : generic_player_value.loc[rate_display.index]})
