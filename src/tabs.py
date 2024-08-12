@@ -237,18 +237,18 @@ def make_h_cand_tab(H
       position_shares_res = [x[1] for x in position_shares_list]
 
       if cash_remaining_per_team:
-        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names )
+        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights'] + position_shares_tab_names + ['Rosters'])
         target_tab = all_tabs[0]
         rate_tab = all_tabs[1]
         weight_tab = all_tabs[2]
-        roster_tab = all_tabs[3]
-        position_tabs = all_tabs[4:]
+        roster_tab = all_tabs[-1]
+        position_tabs = all_tabs[3:-1]
       else:
-        all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names)
+        all_tabs = st.tabs(['Expected Win Rates', 'Weights'] + position_shares_tab_names + ['Rosters'])
         rate_tab = all_tabs[0]
         weight_tab = all_tabs[1]       
-        roster_tab = all_tabs[2]
-        position_tabs = all_tabs[3:]
+        roster_tab = all_tabs[-1]
+        position_tabs = all_tabs[2:-1]
 
       score = score.sort_values(ascending = False)
       score.name = 'H-score'
@@ -331,7 +331,13 @@ def make_h_cand_tab(H
             for col in rosters_inverted:
                rosters_inverted[col] = rosters_inverted[col].fillna(filler)
 
-            st.dataframe(rosters_inverted)
+            st.table(rosters_inverted.style.set_properties(**{
+                                  'font-size': '8pt',
+                                  'background-color' : 'white',
+                                  'color' : 'darkblue'
+                              })
+                              
+                              )
 
 
       for tab, position_shares_df in zip(position_tabs, position_shares_res):
