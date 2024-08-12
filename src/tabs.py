@@ -317,7 +317,10 @@ def make_h_cand_tab(H
             player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)
 
             def get_player(n,k):
-              return player_list[n]
+              if n == -1:
+                 return None
+              else:
+                return player_list[n]
           
             filler = {x : x for x in rosters.index}
 

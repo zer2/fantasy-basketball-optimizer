@@ -116,6 +116,8 @@ class HAgent():
         self.position_structure = get_position_structure()
         self.position_indices = get_position_indices(self.position_structure)
 
+        self.initial_category_weights = None
+
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
@@ -136,6 +138,7 @@ class HAgent():
             String indicating chosen player
         """
         my_players = [p for p in player_assignments[drafter] if p ==p]
+        self.players = my_players #this is a bit of a hack
 
         n_players_selected = len(my_players) 
 
@@ -159,7 +162,7 @@ class HAgent():
         else:
             category_momentum_factor = 1000
 
-        if len(self.players) == 0:
+        if self.initial_category_weights is None:
 
             initial_category_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                     default_weights).mean(axis = 2)

@@ -89,6 +89,7 @@ def optimize_positions_for_prospective_player(candidate_player_row : np.array
 
     future_player_rows = np.array([reward_vector] * n_remaining_players).reshape(n_remaining_players, reward_vector.shape[0])
     full_array = np.concatenate([team_so_far_array, [candidate_player_row], future_player_rows], axis = 0)    
+
     try:
         res = linear_sum_assignment(full_array, maximize = True)
         return res[1] 
