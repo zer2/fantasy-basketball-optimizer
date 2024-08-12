@@ -334,7 +334,7 @@ def make_h_cand_tab(H
             st.table(rosters_inverted.style.set_properties(**{
                                   'font-size': '8pt',
                                   'background-color' : 'white',
-                                  'color' : 'darkblue'
+                                  'color' : 'red'
                               })
                               
                               )
