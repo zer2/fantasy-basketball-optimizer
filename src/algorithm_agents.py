@@ -116,6 +116,8 @@ class HAgent():
         self.position_structure = get_position_structure()
         self.position_indices = get_position_indices(self.position_structure)
 
+        self.initial_category_weights = None
+
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
@@ -136,6 +138,7 @@ class HAgent():
             String indicating chosen player
         """
         my_players = [p for p in player_assignments[drafter] if p ==p]
+        self.players = my_players #this is a bit of a hack
 
         n_players_selected = len(my_players) 
 
@@ -159,7 +162,7 @@ class HAgent():
         else:
             category_momentum_factor = 1000
 
-        if len(self.players) == 0:
+        if self.initial_category_weights is None:
 
             initial_category_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                     default_weights).mean(axis = 2)
@@ -478,6 +481,7 @@ class HAgent():
                 gradients = res['Gradients']
                 cdf_estimates = res['CDF-Estimates']
                 expected_future_diff = res['Future-Diffs']   
+                rosters = res['Rosters']
 
                 category_gradients_centered = gradients['Categories'] - gradients['Categories'].mean(axis = 1).reshape(-1,1) 
                 share_gradients_centered = \
@@ -529,6 +533,7 @@ class HAgent():
                 category_weights = None
                 expected_future_diff = None
                 pdf_estimates = None
+                rosters = None
                 
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
@@ -545,6 +550,7 @@ class HAgent():
                 position_shares_current = None
                 expected_future_diff = None
                 pdf_estimates = None
+                rosters = None
                 
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
@@ -584,6 +590,7 @@ class HAgent():
                 category_weights_current = None
                 position_shares_current = None
                 expected_future_diff = None
+                rosters = None
 
             i = i + 1
 
@@ -602,6 +609,7 @@ class HAgent():
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
+                    ,'Rosters' : pd.DataFrame(rosters, index = result_index)
                     ,'Position-Shares' : {position_code : 
                                                     pd.DataFrame(position_shares_current[position_code].values
                                                                  , index = result_index
@@ -638,7 +646,7 @@ class HAgent():
 
                 position_rewards = self.get_position_priorities_from_category_weights(category_weights)
 
-                future_position_array, flex_shares = optimize_positions_all_players(self.positions.loc[result_index]
+                rosters, future_position_array, flex_shares = optimize_positions_all_players(self.positions.loc[result_index]
                                                                         ,position_rewards
                                                                         ,self.positions.loc[self.players]
                                                                         , position_shares)
@@ -699,6 +707,7 @@ class HAgent():
                 ,'CDF-Estimates' : cdf_estimates
                 ,'Flex-Shares' : flex_shares
                 , 'Future-Diffs' : expected_future_diff
+                , 'Rosters' : rosters
             }
 
 

@@ -6,6 +6,7 @@ import itertools
 import streamlit as st
 import numexpr as ne
 from datetime import datetime
+from functools import reduce 
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
@@ -62,6 +63,13 @@ def get_position_numbers():
                 ,'PF' : 1
                 ,'SF' : 1
                 }
+    
+def get_position_numbers_unwound():
+   position_numbers = get_position_numbers()
+   return reduce(lambda x, y: x + y ,
+                  [[position_code + str(i+1) for i in range(position_number)] 
+                   for position_code, position_number in position_numbers.items()]
+                 )
     
 def get_position_structure():
     if st.session_state:

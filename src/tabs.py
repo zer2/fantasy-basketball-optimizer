@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helper_functions import  static_score_styler, h_percentage_styler, get_selected_categories, styler_a, styler_b, styler_c, stat_styler
+from src.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, styler_a, styler_b, styler_c, stat_styler
 from src.algorithm_agents import HAgent
 from src.h_score_analysis import estimate_matchup_result, analyze_trade, analyze_trade_value
 from src.algorithm_helpers import savor_calculation
@@ -221,6 +221,7 @@ def make_h_cand_tab(H
     weights = res['Weights']
     win_rates = res['Rates']
     position_shares = res['Position-Shares']
+    rosters = res['Rosters']
 
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
@@ -236,106 +237,154 @@ def make_h_cand_tab(H
       position_shares_res = [x[1] for x in position_shares_list]
 
       if cash_remaining_per_team:
-        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights'] + position_shares_tab_names )
+        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights'] + position_shares_tab_names + ['Rosters'])
         target_tab = all_tabs[0]
         rate_tab = all_tabs[1]
         weight_tab = all_tabs[2]
-        position_tabs = all_tabs[3:]
+        roster_tab = all_tabs[-1]
+        position_tabs = all_tabs[3:-1]
       else:
-        all_tabs = st.tabs(['Expected Win Rates', 'Weights'] + position_shares_tab_names)
+        all_tabs = st.tabs(['Expected Win Rates', 'Weights'] + position_shares_tab_names + ['Rosters'])
         rate_tab = all_tabs[0]
-        weight_tab = all_tabs[1]          
-        position_tabs = all_tabs[2:]
+        weight_tab = all_tabs[1]       
+        roster_tab = all_tabs[-1]
+        position_tabs = all_tabs[2:-1]
 
       score = score.sort_values(ascending = False)
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
+      display = ((i-1) % 5 == 0) or (i == n_iterations - 1)
+
       with rate_tab:
-        rate_df = win_rates.loc[score_df.index].dropna()
-        rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
-        if cash_remaining_per_team:
+        if display:
 
-          players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-          total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
+          rate_df = win_rates.loc[score_df.index].dropna()
+          rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
-          rate_display.loc[:,'$ Value'] = savor_calculation(score_df
-                                                          , total_players - len(players_chosen)
-                                                          , total_cash_remaining
-                                                          , st.session_state['streaming_noise_h'])
+          if cash_remaining_per_team:
 
-          rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
+            players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+            total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
-          rate_display_styled = rate_display.style.format("{:.1%}"
-                            ,subset = pd.IndexSlice[:,['H-score']]) \
-                          .format("{:.1f}"
-                            ,subset = pd.IndexSlice[:,['$ Value']]) \
-                    .map(styler_a
-                          , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
-                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                    .format('{:,.1%}', subset = rate_df.columns)
-        else:
-          rate_display_styled = rate_display.style.format("{:.1%}"
+            rate_display.loc[:,'$ Value'] = savor_calculation(score_df
+                                                            , total_players - len(players_chosen)
+                                                            , total_cash_remaining
+                                                            , st.session_state['streaming_noise_h'])
+
+            rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
+
+            rate_display_styled = rate_display.style.format("{:.1%}"
+                              ,subset = pd.IndexSlice[:,['H-score']]) \
+                            .format("{:.1f}"
+                              ,subset = pd.IndexSlice[:,['$ Value']]) \
+                      .map(styler_a
+                            , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
+                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                      .format('{:,.1%}', subset = rate_df.columns)
+          else:
+            rate_display_styled = rate_display.style.format("{:.1%}"
+                              ,subset = pd.IndexSlice[:,['H-score']]) \
+                      .map(styler_a
+                            , subset = pd.IndexSlice[:,['H-score']]) \
+                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                      .format('{:,.1%}', subset = rate_df.columns)
+          st.dataframe(rate_display_styled, use_container_width = True)
+      with weight_tab:
+
+        if display:
+
+          weight_df = weights.loc[score_df.index].dropna()
+          weight_display = score_df.merge(weight_df
+                                , left_index = True
+                                , right_index = True)
+          weight_display_styled = weight_display.style.format("{:.0%}"
+                                                      , subset = weight_df.columns)\
+                    .format("{:.1%}"
                             ,subset = pd.IndexSlice[:,['H-score']]) \
                     .map(styler_a
                           , subset = pd.IndexSlice[:,['H-score']]) \
-                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                    .format('{:,.1%}', subset = rate_df.columns)
-        st.dataframe(rate_display_styled, use_container_width = True)
-      with weight_tab:
-        weight_df = weights.loc[score_df.index].dropna()
-        weight_display = score_df.merge(weight_df
-                              , left_index = True
-                              , right_index = True)
-        weight_display_styled = weight_display.style.format("{:.0%}"
-                                                    , subset = weight_df.columns)\
-                  .format("{:.1%}"
-                          ,subset = pd.IndexSlice[:,['H-score']]) \
-                  .map(styler_a
-                        , subset = pd.IndexSlice[:,['H-score']]) \
-                  .background_gradient(axis = None,subset = weight_df.columns) 
-        st.dataframe(weight_display_styled, use_container_width = True)
+                    .background_gradient(axis = None,subset = weight_df.columns) 
+          st.dataframe(weight_display_styled, use_container_width = True)
 
+      with roster_tab:
 
-        for tab, position_shares_df in zip(position_tabs, position_shares_res):
-          with tab: 
+          if display:
+
+            my_players = [x for x in player_assignments[draft_seat] if x ==x]
+            n_players = len(my_players)
+            player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)
+
+            def get_player(n,k):
+              if n == -1:
+                 return None
+              else:
+                return player_list[n]
+          
+            filler = {x : x for x in rosters.index}
+
+            rosters = rosters.loc[score.index]
+
+            rosters_inverted = [[get_player(list(row).index(i), k) for i in range(len(row))] for k,row in rosters.iterrows()]
+            rosters_inverted = pd.DataFrame(rosters_inverted 
+                                                    ,index = rosters.index
+                                                    ,columns = get_position_numbers_unwound()
+                                            )
+            for col in rosters_inverted:
+               rosters_inverted[col] = rosters_inverted[col].fillna(filler)
+
+            st.table(rosters_inverted.style.set_properties(**{
+                                  'font-size': '8pt',
+                                  'background-color' : 'white',
+                                  'color' : 'red'
+                              })
                               
-              share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
-                                    , left_index = True
-                                    , right_index = True)
-              share_display_styled = share_display.style.format("{:.0%}"
-                                                          , subset = position_shares_df.columns)\
-                        .format("{:.1%}"
-                                ,subset = pd.IndexSlice[:,['H-score']]) \
-                        .map(styler_a
-                              , subset = pd.IndexSlice[:,['H-score']]) \
-                        .background_gradient(axis = None,subset = position_shares_df.columns) 
-              st.dataframe(share_display_styled, use_container_width = True)
+                              )
+
+
+      for tab, position_shares_df in zip(position_tabs, position_shares_res):
+          with tab: 
+              
+              if display:
+           
+                share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
+                                      , left_index = True
+                                      , right_index = True)
+                share_display_styled = share_display.style.format("{:.0%}"
+                                                            , subset = position_shares_df.columns)\
+                          .format("{:.1%}"
+                                  ,subset = pd.IndexSlice[:,['H-score']]) \
+                          .map(styler_a
+                                , subset = pd.IndexSlice[:,['H-score']]) \
+                          .background_gradient(axis = None,subset = position_shares_df.columns) 
+                st.dataframe(share_display_styled, use_container_width = True)
 
       if cash_remaining_per_team:
          
          with target_tab:
-                  
-          comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
-                                        , '$ Value' : generic_player_value.loc[rate_display.index]})
-          comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
-          comparison_df = comparison_df.join(rate_df)
+          if display:
+ 
+            comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
+                                          , '$ Value' : generic_player_value.loc[rate_display.index]})
+            comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
-          comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
+            comparison_df = comparison_df.join(rate_df)
 
-          comparison_df_styled = comparison_df.style.format("{:.1f}"
-                                                            , subset = ['Your $ Value', '$ Value','Difference']) \
-                    .map(styler_a
-                        , subset = ['Your $ Value', '$ Value']) \
-                    .background_gradient(axis = None
-                                        ,cmap = 'PiYG'
-                                        ,subset = ['Difference']) \
-                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                    .format('{:,.1%}', subset = rate_df.columns)
-          
-          st.dataframe(comparison_df_styled)
+            comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
+
+            comparison_df_styled = comparison_df.style.format("{:.1f}"
+                                                              , subset = ['Your $ Value', '$ Value','Difference']) \
+                      .map(styler_a
+                          , subset = ['Your $ Value', '$ Value']) \
+                      .background_gradient(axis = None
+                                          ,cmap = 'PiYG'
+                                          ,subset = ['Difference']) \
+                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                      .format('{:,.1%}', subset = rate_df.columns)
+            
+            st.dataframe(comparison_df_styled)
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False)
