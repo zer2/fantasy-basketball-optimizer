@@ -312,8 +312,9 @@ def make_h_cand_tab(H
 
           if display:
 
-            my_players = [x for x in player_assignments[draft_seat] if x ==x]
+            my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x ==x]
             n_players = len(my_players)
+
             player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)
 
             def get_player(n,k):
@@ -322,7 +323,7 @@ def make_h_cand_tab(H
               else:
                 return player_list[n]
           
-            filler = {x : x for x in rosters.index}
+            filler = {x : x.split(' ')[1] for x in rosters.index}
 
             rosters = rosters.loc[score.index]
 
@@ -334,13 +335,20 @@ def make_h_cand_tab(H
             for col in rosters_inverted:
                rosters_inverted[col] = rosters_inverted[col].fillna(filler)
 
-            st.table(rosters_inverted.style.set_properties(**{
-                                  'font-size': '8pt',
-                                  'background-color' : 'white',
-                                  'color' : 'red'
-                              })
-                              
-                              )
+
+            def style_rosters(x):
+               if len(x) ==0:
+                  return 'background-color:white'
+               elif x in my_players:
+                  return 'background-color: lightgrey; color:black;'
+               else:
+                  return 'background-color: lightblue; color:black;'
+
+            rosters_styled = rosters_inverted.style.map(style_rosters)
+
+            st.dataframe(rosters_styled
+                         , column_config = {col : st.column_config.TextColumn(width = 'small') for col in rosters_styled.columns}
+                           )
 
 
       for tab, position_shares_df in zip(position_tabs, position_shares_res):
