@@ -168,21 +168,21 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
     team_so_far_array = get_player_rows(team_so_far) if len(team_so_far) > 0 else np.empty((0,n_total_picks))
     candidate_player_array = get_player_rows(candidate_players)
 
-    all_res = np.concatenate([[optimize_positions_for_prospective_player(player, reward_vector, team_so_far_array, n_remaining_players)
+    rosters = np.concatenate([[optimize_positions_for_prospective_player(player, reward_vector, team_so_far_array, n_remaining_players)
                                 for player, reward_vector in zip(candidate_player_array,reward_array)]
                                 ]
                                 , axis = 0)
     
-    final_positions, flex_shares = get_position_array_from_res(all_res
+    final_positions, flex_shares = get_position_array_from_res(rosters
                                                   ,position_shares
                                                   , n_remaining_players)
     
 
     
     if scale_down:
-        return final_positions/n_remaining_players, flex_shares
-    else: 
-        return final_positions, flex_shares
+        final_positions = final_positions/n_remaining_players
+    
+    return rosters, final_positions, flex_shares
 
 def check_eligibility_alternate(player, team_so_far):
    
