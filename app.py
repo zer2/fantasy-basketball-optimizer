@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import get_position_numbers, listify, increment_player_stats_version, increment_info_key
+from src.helper_functions import get_position_numbers, listify, increment_player_stats_version, increment_info_key, autodraft
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -590,6 +590,9 @@ with info_tab:
                     
       st.dataframe(game_stats)
 
+if 'selections_df' not in st.session_state:
+  st.session_state.selections_df = selections
+
 with rank_tab:
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
       
@@ -668,15 +671,30 @@ if st.session_state['mode'] == 'Draft Mode':
 
     with left:
 
+      autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?
+                                  '''
+                                  ,options = selections.columns
+                                  ,key = 'autodrafters'
+                                  ,default = None)
+
       st.caption("""Enter which players have been drafted by which teams below""")
-      selections_editable = st.data_editor(selections
+
+      selections_editable = st.data_editor(st.session_state.selections_df
+                                          , key = 'selections_editable'
                                           , hide_index = True
-                                          , height = n_picks * 35 + 50)  
+                                          , height = n_picks * 35 + 50)
+      
+
       selection_list = listify(selections_editable)
+      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+              
+      if not selections_editable.equals(st.session_state.selections_df):
+        autodraft(selections_editable, g_scores_unselected)
+        st.rerun()
 
       player_assignments = selections_editable.to_dict('list')
 
-      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+
 
     with right:
 

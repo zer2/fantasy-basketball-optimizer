@@ -377,3 +377,33 @@ def increment_player_stats_version():
 def increment_info_key():
   if st.session_state:
     st.session_state.info_key += 1
+
+
+
+def autodraft(autodraft_df, g_scores):
+   
+  row = 0
+  drafter = 0
+
+  while not ((autodraft_df.columns[drafter] not in st.session_state.autodrafters) and \
+                (autodraft_df.iloc[row,drafter] != autodraft_df.iloc[row,drafter])):
+    top_player = g_scores.index[0]
+
+
+    if (autodraft_df.iloc[row,drafter] != autodraft_df.iloc[row,drafter]):
+      autodraft_df.iloc[row, drafter] = top_player
+      g_scores = g_scores[1:]
+
+    if row % 2 == 1:
+      if drafter == 0:
+        row = row + 1
+      else:
+        drafter = drafter - 1
+    else:
+      if (drafter == autodraft_df.shape[1] - 1):
+        row = row + 1
+      else:
+        drafter = drafter + 1
+
+  st.session_state.selections_df = autodraft_df
+      
