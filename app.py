@@ -674,13 +674,13 @@ if st.session_state['mode'] == 'Draft Mode':
       selection_list = listify(st.session_state.selections_df)
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
 
-      selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
-                                st.session_state.selections_df.columns[st.session_state.drafter]
-        ,options = g_scores_unselected.index)
-
       if 'row' not in st.session_state:
         st.session_state.row = 0
         st.session_state.drafter = 0
+
+      selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
+                                st.session_state.selections_df.columns[st.session_state.drafter]
+        ,options = g_scores_unselected.index)
 
       def run_autodraft():
         while (selections.columns[st.session_state.drafter] in autodrafters) and (st.session_state.row < n_picks):
