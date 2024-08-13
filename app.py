@@ -57,7 +57,7 @@ def stop_run_h_score():
     st.session_state.run_h_score = False
 
 def run_autodraft():
-  while (selections.columns[st.session_state.drafter] in autodrafters) and (st.session_state.row < n_picks):
+  while (selections.columns[st.session_state.drafter] in st.session_state.autodrafters) and (st.session_state.row < n_picks):
     selection_list = listify(st.session_state.selections_df)
     g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
     select_player_from_draft_board(g_scores_unselected.index[0])
