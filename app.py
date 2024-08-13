@@ -226,6 +226,13 @@ with param_tab:
         if selections is None:
           selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
+      if st.session_state['mode'] == 'Draft Mode':
+          autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
+                ,options = selections.columns
+                ,key = 'autodrafters'
+                ,default = None)
+
+
     with c2: 
     
       scoring_format = st.selectbox(
@@ -733,18 +740,9 @@ if st.session_state['mode'] == 'Draft Mode':
                                     , hide_index = True
                                     , height = n_picks * 35 + 50)
       
-      autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?
-                      '''
-                      ,options = selections.columns
-                      ,key = 'autodrafters'
-                      ,default = None
-                      , on_change = run_autodraft)
-
-
-
     with right:
 
-      draft_seat = st.selectbox(f'Which team are you?'
+      draft_seat = st.selectbox(f'Which drafter are you?'
           , selections.columns
           , index = 0)
 
