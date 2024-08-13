@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import get_position_numbers, listify, increment_player_stats_version, increment_info_key, autodraft
+from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify, increment_player_stats_version, increment_info_key, autodraft
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -47,8 +47,8 @@ if 'schedule' not in st.session_state:
 if 'mode' not in st.session_state:
     st.session_state['mode'] = 'Draft Mode'
 
-if 'selections_editable_original' not in st.session_state:
-    st.session_state['selections_editable_original'] = pd.DataFrame()
+if 'selections_df_original' not in st.session_state:
+    st.session_state['selections_df_original'] = pd.DataFrame()
 
 def run_h_score():
     st.session_state.run_h_score = True
@@ -671,28 +671,74 @@ if st.session_state['mode'] == 'Draft Mode':
 
     with left:
 
-      autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?
-                                  '''
-                                  ,options = selections.columns
-                                  ,key = 'autodrafters'
-                                  ,default = None)
-
-      st.caption("""Enter which players have been drafted by which teams below""")
-
-      selections_editable = st.data_editor(st.session_state.selections_df
-                                          , key = 'selections_editable'
-                                          , hide_index = True
-                                          , height = n_picks * 35 + 50)
-      
-
-      selection_list = listify(selections_editable)
+      selection_list = listify(st.session_state.selections_df)
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
-              
-      if not selections_editable.equals(st.session_state.selections_df):
-        autodraft(selections_editable, g_scores_unselected)
-        st.rerun()
 
-      player_assignments = selections_editable.to_dict('list')
+      selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
+                                st.session_state.selections_df.columns[st.session_state.drafter]
+        ,options = g_scores_unselected.index)
+
+      if 'row' not in st.session_state:
+        st.session_state.row = 0
+        st.session_state.drafter = 0
+
+      def run_autodraft():
+        while (selections.columns[st.session_state.drafter] in autodrafters) and (st.session_state.row < n_picks):
+          selection_list = listify(st.session_state.selections_df)
+          g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+          select_player_from_draft_board(g_scores_unselected.index[0])
+
+      def select_player_from_draft_board(p = None):
+        if not p:
+          p = selected_player
+        st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
+
+        st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
+                                                                               ,st.session_state.drafter
+                                                                               ,st.session_state.selections_df.shape[1])
+        
+        run_autodraft()
+
+      def undo_selection():
+        st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
+                                          , st.session_state.drafter
+                                          , st.session_state.selections_df.shape[1])
+        st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = None
+
+        run_autodraft()
+
+      def clear_board():
+        st.session_state.selections_df = selections
+        st.session_state.drafter = 0
+        st.session_state.row = 0
+
+      button_col1, button_col2, button_col3 = st.columns(3)
+      with button_col1:
+        draft_button = st.button("Lock in selection"
+                                 , on_click = select_player_from_draft_board
+                                 , use_container_width = True)
+      with button_col2:
+        undo_button = st.button("Redo last selection"
+                                , on_click = undo_selection
+                                , use_container_width = True)
+      with button_col3:
+        clear_board_button = st.button("Clear draft board"
+                                , on_click = clear_board
+                                , use_container_width = True)
+        
+      player_assignments = st.session_state.selections_df.to_dict('list')
+
+      selections_df = st.dataframe(st.session_state.selections_df
+                                   ,key = 'selections_df'
+                                    , hide_index = True
+                                    , height = n_picks * 35 + 50)
+      
+      autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?
+                      '''
+                      ,options = selections.columns
+                      ,key = 'autodrafters'
+                      ,default = None
+                      , on_change = run_autodraft)
 
 
 
@@ -702,7 +748,7 @@ if st.session_state['mode'] == 'Draft Mode':
           , selections.columns
           , index = 0)
 
-      my_players = selections_editable[draft_seat].dropna()
+      my_players = st.session_state.selections_df[draft_seat].dropna()
 
       cand_tab, team_tab = st.tabs(["Candidates","Team"])
             
@@ -922,11 +968,11 @@ elif st.session_state['mode'] == 'Season Mode':
     with left:
 
       st.caption("""Enter which player is on which team below""")
-      selections_editable = st.data_editor(selections
+      selections_df = st.data_editor(selections
                                         , hide_index = True
                                         , height = n_picks * 35 + 50)  
-      selection_list = listify(selections_editable)
-      player_assignments = selections_editable.to_dict('list')
+      selection_list = listify(selections_df)
+      player_assignments = selections_df.to_dict('list')
 
       z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
@@ -937,7 +983,7 @@ elif st.session_state['mode'] == 'Season Mode':
         , selections.columns
         , index = 0)
 
-        inspection_players = selections_editable[roster_inspection_seat].dropna()
+        inspection_players = selections_df[roster_inspection_seat].dropna()
 
         if len(inspection_players) == n_picks:
 
@@ -977,7 +1023,7 @@ elif st.session_state['mode'] == 'Season Mode':
         st.write('No matchups for Rotisserie')
       else:
         make_matchup_matrix(info['X-scores']
-                        ,selections_editable
+                        ,selections_df
                         ,scoring_format
                         ,st.session_state.info_key
                         )
@@ -1038,7 +1084,7 @@ elif st.session_state['mode'] == 'Season Mode':
             , index = 0)
 
       with c2: 
-          waiver_players = selections_editable[waiver_inspection_seat].dropna()
+          waiver_players = selections_df[waiver_inspection_seat].dropna()
 
           if len(waiver_players) < n_picks:
               st.markdown("""This team is not full yet!""")
@@ -1126,7 +1172,7 @@ elif st.session_state['mode'] == 'Season Mode':
           , index = 0)
 
     with c2: 
-      trade_party_players = selections_editable[trade_party_seat].dropna()
+      trade_party_players = selections_df[trade_party_seat].dropna()
 
       if len(trade_party_players) < n_picks:
           st.markdown("""This team is not full yet! Fill it and other teams out on the 
@@ -1134,7 +1180,7 @@ elif st.session_state['mode'] == 'Season Mode':
 
       else:
         
-        counterparty_players_dict = { team : players for team, players in selections_editable.items() 
+        counterparty_players_dict = { team : players for team, players in selections_df.items() 
                                 if ((team != trade_party_seat) & (not  any(p!=p for p in players)))
                                   }
         

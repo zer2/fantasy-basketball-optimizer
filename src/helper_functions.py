@@ -381,6 +381,8 @@ def increment_info_key():
 
 
 def autodraft(autodraft_df, g_scores):
+
+  #print("AUTODRAFTING")
    
   row = 0
   drafter = 0
@@ -389,21 +391,40 @@ def autodraft(autodraft_df, g_scores):
                 (autodraft_df.iloc[row,drafter] != autodraft_df.iloc[row,drafter])):
     top_player = g_scores.index[0]
 
+    row, drafter = move_forward_one_pick(row, drafter, autodraft_df.shape[1])
 
     if (autodraft_df.iloc[row,drafter] != autodraft_df.iloc[row,drafter]):
       autodraft_df.iloc[row, drafter] = top_player
       g_scores = g_scores[1:]
 
+  st.session_state.selections_df = autodraft_df
+
+  return row, drafter
+      
+def move_forward_one_pick(row, drafter, n):
     if row % 2 == 1:
       if drafter == 0:
         row = row + 1
       else:
         drafter = drafter - 1
     else:
-      if (drafter == autodraft_df.shape[1] - 1):
+      if (drafter == n - 1):
         row = row + 1
       else:
         drafter = drafter + 1
 
-  st.session_state.selections_df = autodraft_df
-      
+    return row, drafter 
+
+def move_back_one_pick(row, drafter, n):
+    if row % 2 == 1:
+      if drafter == 0:
+        row = row - 1
+      else:
+        drafter = drafter + 1
+    else:
+      if (drafter == n - 1):
+        row = row - 1
+      else:
+        drafter = drafter - 1
+
+    return row, drafter 
