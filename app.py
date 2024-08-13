@@ -7,7 +7,7 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify, increment_player_stats_version, increment_info_key, autodraft
+from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify, increment_player_stats_version, increment_info_key
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -55,6 +55,37 @@ def run_h_score():
 
 def stop_run_h_score():
     st.session_state.run_h_score = False
+
+def run_autodraft():
+  while (selections.columns[st.session_state.drafter] in autodrafters) and (st.session_state.row < n_picks):
+    selection_list = listify(st.session_state.selections_df)
+    g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+    select_player_from_draft_board(g_scores_unselected.index[0])
+
+def select_player_from_draft_board(p = None):
+  if not p:
+    p = selected_player
+  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
+
+  st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
+                                                                          ,st.session_state.drafter
+                                                                          ,st.session_state.selections_df.shape[1])
+  
+  run_autodraft()
+
+def undo_selection():
+  st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
+                                    , st.session_state.drafter
+                                    , st.session_state.selections_df.shape[1])
+  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = None
+
+  run_autodraft()
+
+def clear_board():
+  st.session_state.selections_df = selections
+  st.session_state.drafter = 0
+  st.session_state.row = 0
+
 
 if 'params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
@@ -230,7 +261,8 @@ with param_tab:
           autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
                 ,options = selections.columns
                 ,key = 'autodrafters'
-                ,default = None)
+                ,default = None
+                ,on_change = run_autodraft)
 
 
     with c2: 
@@ -688,36 +720,6 @@ if st.session_state['mode'] == 'Draft Mode':
       selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
                                 st.session_state.selections_df.columns[st.session_state.drafter]
         ,options = g_scores_unselected.index)
-
-      def run_autodraft():
-        while (selections.columns[st.session_state.drafter] in autodrafters) and (st.session_state.row < n_picks):
-          selection_list = listify(st.session_state.selections_df)
-          g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
-          select_player_from_draft_board(g_scores_unselected.index[0])
-
-      def select_player_from_draft_board(p = None):
-        if not p:
-          p = selected_player
-        st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
-
-        st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
-                                                                               ,st.session_state.drafter
-                                                                               ,st.session_state.selections_df.shape[1])
-        
-        run_autodraft()
-
-      def undo_selection():
-        st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
-                                          , st.session_state.drafter
-                                          , st.session_state.selections_df.shape[1])
-        st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = None
-
-        run_autodraft()
-
-      def clear_board():
-        st.session_state.selections_df = selections
-        st.session_state.drafter = 0
-        st.session_state.row = 0
 
       button_col1, button_col2, button_col3 = st.columns(3)
       with button_col1:
