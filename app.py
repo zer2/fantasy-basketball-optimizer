@@ -63,8 +63,10 @@ def run_autodraft():
     select_player_from_draft_board(g_scores_unselected.index[0])
 
 def select_player_from_draft_board(p = None):
+
   if not p:
-    p = selected_player
+    p = st.session_state.selected_player
+
   st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
 
   st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
@@ -160,7 +162,7 @@ with param_tab:
 
   with general_params:
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
 
     with c1: 
 
@@ -169,7 +171,7 @@ with param_tab:
         ('Draft Mode', 'Auction Mode','Season Mode')
         , index = 0
         , key = 'mode')
-
+      
       # Setting default values
       n_drafters = st.session_state.params['options']['n_drafters']['default']
       n_picks = st.session_state.params['options']['n_picks']['default']
@@ -257,16 +259,6 @@ with param_tab:
         if selections is None:
           selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
-      if st.session_state['mode'] == 'Draft Mode':
-          autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
-                ,options = selections.columns
-                ,key = 'autodrafters'
-                ,default = None
-                ,on_change = run_autodraft)
-
-
-    with c2: 
-    
       scoring_format = st.selectbox(
         'Which format are you playing?',
         ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
@@ -277,30 +269,9 @@ with param_tab:
       else:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
-      categories = st.multiselect('Which categories does you league use?'
-                          , key = 'selected_categories'
-                          , options = st.session_state.params['counting-statistics'] + \
-                                    list(st.session_state.params['ratio-statistics'].keys())
-                          , default = st.session_state.params['counting-statistics'] + \
-                                    list(st.session_state.params['ratio-statistics'].keys())
-                          , on_change = increment_player_stats_version
-                                )
-
       rotisserie = scoring_format == 'Rotisserie'
 
-      unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
-      unique_datasets_current = list(current_data.keys())
-      unique_datasets_darko = list(darko_data.keys())
-
-      all_datasets = unique_datasets_historical + unique_datasets_current + unique_datasets_darko
-      all_datasets.reverse()
-        
-      dataset_name = st.selectbox(
-        'Which dataset do you want to default to?'
-        ,all_datasets
-        ,index = 0
-        ,on_change = increment_player_stats_version
-      )
+    with c2: 
 
       punting_levels = st.session_state.params['punting_defaults']
 
@@ -313,12 +284,61 @@ with param_tab:
       )
 
       st.caption('''This option sets the default parameters for H-scoring. 
-                    For more granular control, use the Advanced tab which is next to this one''')
+            For more granular control, use the Advanced tab which is next to this one''')
 
-      raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
+      unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
+      unique_datasets_current = list(current_data.keys())
+      unique_datasets_darko = list(darko_data.keys())
 
-      player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-      selections = selections.astype(player_category_type)
+      all_datasets = unique_datasets_historical + unique_datasets_current + ['RotoWire (req. upload)'] + unique_datasets_darko
+      all_datasets.reverse()
+        
+      dataset_name = st.selectbox(
+        'Which dataset do you want to default to?'
+        ,all_datasets
+        ,index = 0
+        ,on_change = increment_player_stats_version
+      )
+
+      if 'Roto' in dataset_name:
+        uploaded_file = st.file_uploader("Upload RotoWire data, as a csv", type=['csv'])
+        if uploaded_file is not None:
+          # To read file as bytes:
+          st.session_state.rotowire_data = pd.read_csv(uploaded_file, skiprows = 1)
+        else:
+          st.warning('Upload a dataset from RotoWire or change the default dataset before proceeding')
+      else:
+        uploaded_file = None
+
+      with c3: 
+
+        def run_autodraft_and_increment():
+          increment_player_stats_version()
+          run_autodraft()
+
+        with st.form("more options"):
+
+          categories = st.multiselect('Which categories does you league use?'
+                      , key = 'selected_categories'
+                      , options = st.session_state.params['counting-statistics'] + \
+                                list(st.session_state.params['ratio-statistics'].keys())
+                      , default = st.session_state.params['counting-statistics'] + \
+                                list(st.session_state.params['ratio-statistics'].keys())
+                            )
+        
+
+          if st.session_state['mode'] == 'Draft Mode':
+              autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
+                    ,options = selections.columns
+                    ,key = 'autodrafters'
+                    ,default = None)
+          
+          submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
+
+  raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
+
+  player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+  selections = selections.astype(player_category_type)
       
   with advanced_params:
 
@@ -545,6 +565,9 @@ with param_tab:
 
 with info_tab:
 
+  if ('Roto' in dataset_name) & (uploaded_file is None):
+    st.stop()
+
   if st.session_state['schedule']: 
     stat_tab, injury_tab, games_played_tab = st.tabs([
                 "Player Stats"
@@ -568,7 +591,7 @@ with info_tab:
     #re-adjust from user inputs
     player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
     player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-
+    player_stats['Games Played %'] = player_stats['Games Played %']/100
     #make the upsilon adjustment
     player_stats['Games Played %'] = 100 - ( 100 - player_stats['Games Played %']) * upsilon 
 
@@ -704,6 +727,12 @@ H = HAgent(info = info
 
 if st.session_state['mode'] == 'Draft Mode':
 
+  if 'row' not in st.session_state:
+    st.session_state.row = 0
+
+  if 'drafter' not in st.session_state:
+    st.session_state.drafter = 0
+
   with draft_tab:
     
     left, right = st.columns(2)
@@ -713,27 +742,27 @@ if st.session_state['mode'] == 'Draft Mode':
       selection_list = listify(st.session_state.selections_df)
       g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
 
-      if 'row' not in st.session_state:
-        st.session_state.row = 0
-        st.session_state.drafter = 0
+      with st.form("pick form", border = False):
+        selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
+                                  st.session_state.selections_df.columns[st.session_state.drafter]
+          ,key = 'selected_player'
+          ,options = g_scores_unselected.index)
 
-      selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
-                                st.session_state.selections_df.columns[st.session_state.drafter]
-        ,options = g_scores_unselected.index)
+        button_col1, button_col2, button_col3 = st.columns(3)
 
-      button_col1, button_col2, button_col3 = st.columns(3)
-      with button_col1:
-        draft_button = st.button("Lock in selection"
-                                 , on_click = select_player_from_draft_board
-                                 , use_container_width = True)
-      with button_col2:
-        undo_button = st.button("Redo last selection"
-                                , on_click = undo_selection
-                                , use_container_width = True)
-      with button_col3:
-        clear_board_button = st.button("Clear draft board"
-                                , on_click = clear_board
-                                , use_container_width = True)
+        with button_col1:
+          draft_button = st.form_submit_button("Lock in selection"
+                                  , on_click = select_player_from_draft_board
+                                  , use_container_width = True)
+          
+        with button_col2:
+          undo_button = st.form_submit_button("Redo last selection"
+                                  , on_click = undo_selection
+                                  , use_container_width = True)
+        with button_col3:
+          clear_board_button = st.form_submit_button("Clear draft board"
+                                  , on_click = clear_board
+                                  , use_container_width = True)
         
       player_assignments = st.session_state.selections_df.to_dict('list')
 

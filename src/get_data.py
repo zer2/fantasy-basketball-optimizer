@@ -252,6 +252,9 @@ def get_specified_stats(historical_df : pd.DataFrame
       df = current_data[dataset_name].copy()
   elif 'DARKO' in dataset_name:
       df = darko_data[dataset_name].copy()
+  elif 'RotoWire' in dataset_name:
+      raw_df = st.session_state.rotowire_data
+      df = process_rotowire_data(raw_df)
   else:
       df = historical_df.loc[dataset_name].copy()
   
@@ -263,6 +266,26 @@ def get_specified_stats(historical_df : pd.DataFrame
   df.index = df.index + ' (' + df['Position'] + ')'
   df.index.name = 'Player'
   return df.round(2) 
+   
+def process_rotowire_data(raw_df):
+   
+   raw_df.loc[:,'Games Played %'] = raw_df['G']/82
+   raw_df['FG%'] = raw_df['FG%']/100
+   raw_df['FT%'] = raw_df['FT%']/100
+   raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
+
+   raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
+
+   raw_df = raw_df.set_index('Player')
+
+   required_columns = st.session_state.params['counting-statistics'] + \
+                    list(st.session_state.params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
+                    st.session_state.params['other-columns']
+   
+   raw_df = raw_df[required_columns]
+
+   return raw_df
 
 @st.cache_data(show_spinner = False)
 def get_nba_schedule():

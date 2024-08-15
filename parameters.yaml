@@ -47,6 +47,26 @@ historical-renamer:
  FGA : Field Goal Attempts
  FGM : Field Goals Made
  date : Date
+rotowire-renamer: 
+ NAME : Player
+ PTS : Points
+ REB : Rebounds
+ AST : Assists
+ STL: Steals
+ BLK : Blocks
+ 3PM : Threes
+ TO : Turnovers
+ FTA : Free Throw Attempts
+ FTM : Free Throws Made
+ FT% : Free Throw %
+ FGA : Field Goal Attempts
+ FGM : Field Goals Made
+ FG% : Field Goal %
+ Pos : Position
+rotowire-position-adjuster:
+ C : C
+ G : PG,SG
+ F : PF,SF
 stat-df-renamer:
  SEASON : Season
  NBA_PLAYER_NAME : Player
