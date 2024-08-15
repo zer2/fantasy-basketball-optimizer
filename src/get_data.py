@@ -253,8 +253,11 @@ def get_specified_stats(historical_df : pd.DataFrame
   elif 'DARKO' in dataset_name:
       df = darko_data[dataset_name].copy()
   elif 'RotoWire' in dataset_name:
-      raw_df = st.session_state.rotowire_data
-      df = process_rotowire_data(raw_df)
+      if 'rotowire_data' in st.session_state:
+        raw_df = st.session_state.rotowire_data
+        df = process_rotowire_data(raw_df)
+      else:
+        df = darko_data['DARKO-L'].copy() #this is a bit of a hack
   else:
       df = historical_df.loc[dataset_name].copy()
   
