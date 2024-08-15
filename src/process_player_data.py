@@ -164,7 +164,7 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
 
 def games_played_adjustment(scores : pd.DataFrame
                       , replacement_games_rate : pd.Series
-                      , n_players : int
+                      , representative_player_set : list[str]
                       , params : dict
                       , v : pd.Series = None) -> pd.DataFrame :
     """Applies injury adjustment formula based on effective games played. 
@@ -173,7 +173,7 @@ def games_played_adjustment(scores : pd.DataFrame
     Args:
         scores: Dataframe of category-level scores. One row per player, one column per statistic 
         replacement_player_value: Series of rates between 0 and 1. That rate of games are assumed to be filled in by a replacement-level player
-        n_players: Number of players that will be relevant to fantasy
+        representative_player_set: 
         v: series of weights per category. Only applicable if scores don't translate precisely to overall value 
 
     Returns:
@@ -187,12 +187,16 @@ def games_played_adjustment(scores : pd.DataFrame
 
     totals = scores.dot(v)
 
+    n_players = len(representative_player_set)
     rv = totals.sort_values(ascending = False).iloc[n_players]
     category_level_rv = get_category_level_rv(rv, v, params)
 
     replacement_player_value = np.array(category_level_rv.T).reshape(1,-1) * \
                                 np.array(replacement_games_rate).reshape(-1,1)
     adjusted_scores =  scores + replacement_player_value
+
+    #we need to re-normalize because we didn't account for other players being able to bring in replacements before
+    adjusted_scores = adjusted_scores - adjusted_scores.loc[representative_player_set].mean() 
 
     return adjusted_scores 
 
@@ -272,9 +276,9 @@ def process_player_data(weekly_df : pd.DataFrame
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
 
   replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
-  g_scores = games_played_adjustment(g_scores, replacement_games_rate,n_players, params)
-  z_scores = games_played_adjustment(z_scores, replacement_games_rate,n_players, params)
-  x_scores = games_played_adjustment(x_scores, replacement_games_rate,n_players, params, v = v)
+  g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)
+  z_scores = games_played_adjustment(z_scores, replacement_games_rate,representative_player_set, params)
+  x_scores = games_played_adjustment(x_scores, replacement_games_rate,representative_player_set, params, v = v)
 
   g_scores = g_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
   z_scores = z_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
