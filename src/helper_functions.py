@@ -151,6 +151,15 @@ def get_position_indices(position_structure):
                                     for position_code, position_info in flex_info.items()
             }
 
+def get_n_games():
+   if st.session_state:
+      return st.session_state.params['n_games']
+      
+def get_games_per_week():
+   if st.session_state:
+      return st.session_state.params['n_games_per_week']
+
+
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
     #Goes row by row- very important! 
@@ -378,6 +387,9 @@ def increment_info_key():
   if st.session_state:
     st.session_state.info_key += 1
 
+def increment_default_key():
+  if st.session_state:
+    st.session_state.player_stats_default_key += 1
 
 
 def autodraft(autodraft_df, g_scores):

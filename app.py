@@ -7,7 +7,9 @@ from typing import Callable
 import yaml
 from yfpy.models import League
 
-from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify, increment_player_stats_version, increment_info_key
+from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify \
+                                  ,increment_player_stats_version, increment_info_key, increment_default_key \
+                                  ,get_games_per_week
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -31,6 +33,9 @@ if 'player_stats_editable' not in st.session_state:
 
 if 'player_stats_editable_version' not in st.session_state:
     st.session_state.player_stats_editable_version = 0
+
+if 'player_stats_default_key' not in st.session_state:
+    st.session_state.player_stats_default_key = 0
 
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
@@ -88,24 +93,11 @@ def clear_board():
   st.session_state.drafter = 0
   st.session_state.row = 0
 
-
-if 'params' not in st.session_state:
+@st.cache_data()
+def load_params(key, default_key):
+  increment_default_key()
   with open("parameters.yaml", "r") as stream:
-      try:
-        st.session_state.params = yaml.safe_load(stream)
-      except yaml.YAMLError as exc:
-          print(exc) 
-
-counting_statistics = st.session_state.params['counting-statistics'] 
-volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
-
-historical_df = get_historical_data()
-current_data, expected_minutes = get_current_season_data()
-darko_data = get_darko_data(expected_minutes)
-
-#These are based on 2023-2024 excluding injury
-#might need to modify these at some point? 
-coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
+    st.session_state.params = yaml.safe_load(stream)[key]
 
 st.title('Optimization for Fantasy Basketball :basketball:')
 
@@ -166,6 +158,16 @@ with param_tab:
 
     with c1: 
 
+      league = st.selectbox(
+        'Which fantasy sport are you playing?',
+        ('NBA', 'WNBA')
+        , index = 0
+        , key = 'league'
+        , on_change = increment_default_key
+        )
+      
+      load_params(st.session_state.league, st.session_state.player_stats_default_key)
+
       mode = st.selectbox(
         'Which mode do you want to use?',
         ('Draft Mode', 'Auction Mode','Season Mode')
@@ -175,6 +177,14 @@ with param_tab:
       # Setting default values
       n_drafters = st.session_state.params['options']['n_drafters']['default']
       n_picks = st.session_state.params['options']['n_picks']['default']
+
+      historical_df = get_historical_data()
+      current_data, expected_minutes = get_current_season_data()
+      darko_data = get_darko_data(expected_minutes)
+
+      #These are based on 2023-2024 excluding injury
+      #might need to modify these at some point? 
+      coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
 
       if st.session_state['mode'] == 'Season Mode':
 
@@ -285,23 +295,31 @@ with param_tab:
 
       st.caption('''This option sets the default parameters for H-scoring. 
             For more granular control, use the Advanced tab which is next to this one''')
+      
+      if st.session_state.league == 'NBA':
 
-      unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
-      unique_datasets_current = list(current_data.keys())
-      unique_datasets_darko = list(darko_data.keys())
 
-      all_datasets = unique_datasets_historical + unique_datasets_current + ['RotoWire (req. upload)'] + unique_datasets_darko
-      all_datasets.reverse()
+        unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
+        unique_datasets_current = list(current_data.keys())
+        unique_datasets_darko = list(darko_data.keys())
+
+        all_datasets = unique_datasets_historical + unique_datasets_current + ['RotoWire (req. upload)'] + unique_datasets_darko
+        all_datasets.reverse()
+
+      else:
+        all_datasets = ['RotoWire (req. upload)'] 
         
       dataset_name = st.selectbox(
         'Which dataset do you want to default to?'
         ,all_datasets
         ,index = 0
-        ,on_change = increment_player_stats_version
+        ,on_change = increment_default_key
       )
 
       if 'Roto' in dataset_name:
-        uploaded_file = st.file_uploader("Upload RotoWire data, as a csv", type=['csv'])
+        uploaded_file = st.file_uploader("Upload RotoWire data, as a csv"
+                                         , type=['csv']
+                                         , on_change = increment_default_key)
         if uploaded_file is not None:
           # To read file as bytes:
           st.session_state.rotowire_data = pd.read_csv(uploaded_file, skiprows = 1)
@@ -335,11 +353,6 @@ with param_tab:
           
           submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
 
-  raw_stats_df = get_specified_stats(historical_df, current_data, darko_data, dataset_name)
-
-  player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-  selections = selections.astype(player_category_type)
-      
   with advanced_params:
 
     player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
@@ -567,6 +580,16 @@ with info_tab:
 
   if ('Roto' in dataset_name) & (uploaded_file is None):
     st.stop()
+  else:
+    raw_stats_df = get_specified_stats(historical_df
+                                    , current_data
+                                    , darko_data
+                                    , dataset_name
+                                    , st.session_state.player_stats_default_key)
+
+    player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+    selections = selections.astype(player_category_type)
+    
 
   if st.session_state['schedule']: 
     stat_tab, injury_tab, games_played_tab = st.tabs([
@@ -595,8 +618,10 @@ with info_tab:
     #make the upsilon adjustment
     player_stats['Games Played %'] = 100 - ( 100 - player_stats['Games Played %']) * upsilon 
 
+    counting_statistics = st.session_state.params['counting-statistics'] 
+    volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
     for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col] * player_stats['Games Played %']/100 * 3
+      player_stats[col] = player_stats_editable[col] * player_stats['Games Played %']/100 * get_games_per_week()
 
   with injury_tab:
       st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
@@ -619,7 +644,7 @@ with info_tab:
                               ,n_drafters
                               ,n_picks
                               ,st.session_state.params
-                              ,st.session_state.player_stats_editable_version)
+                              ,st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
       st.session_state.info = info #useful for testing
 
       mov = info['Mov']

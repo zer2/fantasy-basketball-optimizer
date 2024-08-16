@@ -7,6 +7,7 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
+from src.helper_functions import get_n_games
 
 @st.cache_resource()
 def get_data_from_snowflake(table_name):
@@ -235,13 +236,16 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
 def get_specified_stats(historical_df : pd.DataFrame
                      , current_data : dict
                      , darko_data : dict
-                     , dataset_name : str) -> pd.DataFrame:
+                     , dataset_name : str
+                     , default_key : int) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
   Args:
     historical_df: Dataframe of raw historical fantasy metrics by player/season
     current_data: dictionary mapping to datasets based on the current season
     darko_data: dictionary mapping to datasets based on DARKO
     dataset_name: the name of the dataset to fetch
+    default_key: used for caching. Increments whenever the default dataset is changed, so that this function
+                 gets rerun for sure whenever the default dataset changes
 
   Returns:
     Dataframe of fantasy statistics 
@@ -272,7 +276,7 @@ def get_specified_stats(historical_df : pd.DataFrame
    
 def process_rotowire_data(raw_df):
    
-   raw_df.loc[:,'Games Played %'] = raw_df['G']/82
+   raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
    raw_df['FG%'] = raw_df['FG%']/100
    raw_df['FT%'] = raw_df['FT%']/100
    raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
