@@ -96,8 +96,6 @@ def get_position_structure():
                             }
                  }
 
-
-
 def get_position_ranges():
 
     if st.session_state:
@@ -150,6 +148,25 @@ def get_position_indices(position_structure):
                             [i for i, val in enumerate(base_position_list) if val in position_info['bases']]
                                     for position_code, position_info in flex_info.items()
             }
+
+def get_L_weights() -> pd.Series:
+   #calculate a default weighting for L
+   #this assumes that all flex positions are weighted evenly among their bases 
+   position_structure = get_position_structure()
+   position_numbers = get_position_numbers()
+   flex_positions = position_structure['flex_list']
+   base_positions = position_structure['base_list']
+   n_slots = sum([v for v in position_numbers.values()])
+
+   shares = pd.Series({position_code : position_numbers[position_code]/n_slots for position_code in base_positions})
+
+   for position_code in flex_positions:
+      bases = position_structure['flex'][position_code]['bases']
+
+      for base in bases:
+         shares[base] += position_numbers[position_code]/(n_slots * len(bases)) 
+
+   return shares 
 
 def get_n_games():
    if st.session_state:

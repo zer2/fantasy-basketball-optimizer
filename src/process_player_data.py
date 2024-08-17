@@ -143,10 +143,6 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
     numerator = player_means.loc[:,counting_statistics] - counting_cat_mean_of_means
     main_scores = numerator.divide(counting_cat_denominator)
 
-    for negative_stat in params['negative-statistics']:
-        if negative_stat in main_scores.columns:
-            main_scores[negative_stat] = - main_scores[negative_stat]
-
     ratio_scores = {}
     for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
         if ratio_stat in ratio_statistics:
@@ -157,9 +153,14 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
             numerator = player_means.loc[:, volume_statistic]/coefficients.loc[volume_statistic,'Mean of Means'] * \
                                         (player_means[ratio_stat] - coefficients.loc[ratio_stat,'Mean of Means'])
             ratio_scores[ratio_stat] = numerator.divide(denominator)
-    
+        
     res = pd.concat([ratio_scores[ratio_stat] for ratio_stat in ratio_scores.keys() ] + [main_scores],axis = 1)  
+
     res.columns = get_selected_categories()
+
+    for negative_stat in params['negative-statistics']:
+        if negative_stat in res.columns:
+            res[negative_stat] = - res[negative_stat]
     return res.fillna(0)
 
 def games_played_adjustment(scores : pd.DataFrame
@@ -208,7 +209,7 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
    
    return value_by_category
 
-@st.cache_data(show_spinner = False)
+#@st.cache_data(show_spinner = False)
 def process_player_data(weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
@@ -307,7 +308,7 @@ def process_player_data(weekly_df : pd.DataFrame
                         , positions
                         , left_index = True
                         , right_index = True)
-  
+
     players_and_positions_limited = players_and_positions[0:n_players]
     categories = get_selected_categories()
     players_and_positions_limited[categories] = players_and_positions_limited[categories] \
@@ -323,14 +324,15 @@ def process_player_data(weekly_df : pd.DataFrame
     #also all of the position rules should be modularized 
     base_position_list = get_position_structure()['base_list']
     position_means = position_means.loc[base_position_list, :] #this is the order we always use for positions
-
+    
     position_means_g = position_means * v
     position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
     position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
     position_means = position_means_g / v
-    
+
     L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
-                                                                , position_mean_weights.loc[pd.IndexSlice[:,position],'Points']) 
+                                                                , position_mean_weights.loc[pd.IndexSlice[:,position]
+                                                                                            ,position_mean_weights.columns[0]]) 
                                                                 for position in base_position_list}
                                 )
   except:

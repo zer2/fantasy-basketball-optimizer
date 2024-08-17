@@ -9,7 +9,7 @@ from yfpy.models import League
 
 from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
-                                  ,get_games_per_week
+                                  ,get_games_per_week, get_categories, get_ratio_statistics
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -160,7 +160,7 @@ with param_tab:
 
       league = st.selectbox(
         'Which fantasy sport are you playing?',
-        ('NBA', 'WNBA')
+        ('NBA', 'WNBA', 'MLB')
         , index = 0
         , key = 'league'
         , on_change = increment_default_key
@@ -178,13 +178,14 @@ with param_tab:
       n_drafters = st.session_state.params['options']['n_drafters']['default']
       n_picks = st.session_state.params['options']['n_picks']['default']
 
-      historical_df = get_historical_data()
-      current_data, expected_minutes = get_current_season_data()
-      darko_data = get_darko_data(expected_minutes)
-
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
-      coefficient_df = pd.read_csv('./coefficients.csv', index_col = 0)
+
+      #ZR: This needs to be parameterized 
+      if st.session_state.league in ('NBA','WNBA'):
+        coefficient_df = pd.read_csv('./basketball_coefficients.csv', index_col = 0)
+      elif st.session_state.league == 'MLB':
+        coefficient_df = pd.read_csv('./baseball_coefficients.csv', index_col = 0)
 
       if st.session_state['mode'] == 'Season Mode':
 
@@ -298,6 +299,9 @@ with param_tab:
       
       if st.session_state.league == 'NBA':
 
+        historical_df = get_historical_data()
+        current_data, expected_minutes = get_current_season_data()
+        darko_data = get_darko_data(expected_minutes)
 
         unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
         unique_datasets_current = list(current_data.keys())
@@ -321,8 +325,8 @@ with param_tab:
                                          , type=['csv']
                                          , on_change = increment_default_key)
         if uploaded_file is not None:
-          # To read file as bytes:
-          st.session_state.rotowire_data = pd.read_csv(uploaded_file, skiprows = 1)
+          # Adding a 
+          st.session_state.rotowire_data  = pd.read_csv(uploaded_file, skiprows = 1)
         else:
           st.warning('Upload a dataset from RotoWire or change the default dataset before proceeding')
       else:
@@ -385,7 +389,7 @@ with param_tab:
     
       st.subheader(f"Multipliers")
 
-      multiplier_df = pd.DataFrame({'Multiplier' : [1,1,1,1,1,1,1,1,1]}
+      multiplier_df = pd.DataFrame({'Multiplier' : [1] * len(get_categories())}
                                   , index = coefficient_df.index).T
       multipliers = st.data_editor(multiplier_df, hide_index = True)
       multipliers = multipliers.T
@@ -581,10 +585,7 @@ with info_tab:
   if ('Roto' in dataset_name) & (uploaded_file is None):
     st.stop()
   else:
-    raw_stats_df = get_specified_stats(historical_df
-                                    , current_data
-                                    , darko_data
-                                    , dataset_name
+    raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
 
     player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
@@ -612,14 +613,14 @@ with info_tab:
     player_stats = player_stats_editable.copy()
 
     #re-adjust from user inputs
-    player_stats[r'Free Throw %'] = player_stats[r'Free Throw %']/100
-    player_stats[r'Field Goal %'] = player_stats[r'Field Goal %']/100
-    player_stats['Games Played %'] = player_stats['Games Played %']/100
+    counting_statistics = st.session_state.params['counting-statistics'] 
+    volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
+    ratio_statistics = get_ratio_statistics()
+
+    player_stats[ratio_statistics + ['Games Played %']] = player_stats[ratio_statistics + ['Games Played %']]/100
     #make the upsilon adjustment
     player_stats['Games Played %'] = 100 - ( 100 - player_stats['Games Played %']) * upsilon 
 
-    counting_statistics = st.session_state.params['counting-statistics'] 
-    volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
     for col in counting_statistics + volume_statistics:
       player_stats[col] = player_stats_editable[col] * player_stats['Games Played %']/100 * get_games_per_week()
 

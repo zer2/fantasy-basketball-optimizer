@@ -319,7 +319,7 @@ WNBA:
       min : 0.0
       max: 1.0
     n_drafters : 
-      default : 9
+      default : 6
       min : 2
       max: 
     n_picks : 
@@ -420,43 +420,68 @@ MLB:
     - Saves
     - Strikeouts 
   ratio-statistics:
-    - Batting Average:
+    Batting Average:
       made-statistic: Hits
       volume-statistic: At Bats 
-    - ERA:
+    ERA:
       made-statistic: Earned Runs
       volume-statistic: Innings Pitched
-    - WHIP:
+    WHIP:
       made-statistic: Walks and Hits
       volume-statistic: Innings Pitched
   negative-statistics:
-    -ERA
-    -WHIP
+    - ERA
+    - WHIP
   other-columns:
   - Position
   - Games Played %
+  batter_stats: 
+    - Runs
+    - Home Runs
+    - RBI
+    - Stolen Bases
+    - Batting Average
+  pitcher_stats:
+    - Wins
+    - Saves
+    - Strikeouts
+    - ERA
+    - WHIP
   rotowire-renamer:
-    - R : Runs
-    - HR : Home Runs
-    - RBI : RBI
-    - SB : Stolen Bases
-    - H : Hits
-    - AB: At Bats
-    - W: Wins
-    - SV: Saves
-    - K: Strikeouts
-    - ER: Earned Runs
-    - IP: Innings Pitched
+    R : Runs
+    HR : Home Runs
+    RBI : RBI
+    SB : Stolen Bases
+    H : Hits
+    AB: At Bats
+    AVG: Batting Average
+    W: Wins
+    SV: Saves
+    K.1 : Strikeouts
+    ER: Earned Runs
+    IP: Innings Pitched
+    Name: Player
+    Pos: Position
+  rotowire-position-adjuster:
+    P : SP,RP 
+    C : C
+    1B : 1B
+    2B : 2B
+    SS : SS
+    3B : 3B
+    OF : OF
+    DH : DH
   position_structure :
     base_list :
-      -C
-      -1B
-      -2B
-      -3B
-      -SS
-      -OF
-      -SP
-      -RP
+      - C
+      - 1B
+      - 2B
+      - 3B
+      - SS
+      - OF
+      - DH
+      - SP
+      - RP
     base:
       C : 
         full_str: Catchers
@@ -474,6 +499,8 @@ MLB:
         full_str: Starting Pitcher
       RP: 
         full_str: Relief Pitcher 
+      DH:
+        full_str: Designated Hitter
     flex_list :
     - CI
     - MI
@@ -498,12 +525,13 @@ MLB:
         - 3B
         - SS
         - OF 
+        - DH
         full_str: Utilities
       P : 
         bases: 
         - SP
         - RP
-        full_str: Pitches
+        full_str: Pitchers
   options : 
     upsilon : 
       default : 0.5
@@ -545,6 +573,7 @@ MLB:
         3B : 1
         SS : 1
         OF: 5
+        DH : 0
         SP: 4
         RP: 4
       flex: 
@@ -552,3 +581,23 @@ MLB:
         MI: 1
         Util: 2
         P: 2
+  punting_defaults :
+    No dynamic optimization :
+      omega : 0.0 
+      gamma : 0.0
+    Moderate punting : 
+      omega : 0.7
+      gamma : 0.25
+    Aggressive punting : 
+      omega : 1.0
+      gamma : 0.4
+  punting_default_index : 
+    "Head to Head: Most Categories" : 1
+    "Head to Head: Each Category" : 1
+    "Rotisserie": 1
+  z-score-player-multiplier : 50
+  z-score-team-multiplier : 20
+  g-score-player-multiplier : 60
+  g-score-team-multiplier : 24
+  n_games : 162
+  n_games_per_week : 0.143 #this is weekly 
