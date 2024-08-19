@@ -209,7 +209,7 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
    
    return value_by_category
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def process_player_data(weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series

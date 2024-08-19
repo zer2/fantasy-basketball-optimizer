@@ -115,7 +115,7 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
      return pd.DataFrame()
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
-@st.cache_resource
+@st.cache_resource(ttl = '1d') 
 def get_historical_data():  
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
@@ -232,7 +232,7 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def get_specified_stats(dataset_name : str
                      , default_key : int) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
