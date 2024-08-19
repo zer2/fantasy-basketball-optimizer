@@ -6,7 +6,7 @@ from itertools import combinations
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_position_structure, get_position_indices
+from src.helper_functions import get_position_structure, get_position_indices, get_L_weights
 from src.position_optimization import optimize_positions_all_players, check_eligibility_alternate
 import datetime
 import scipy
@@ -71,7 +71,9 @@ class HAgent():
 
         L_by_position = info['L-by-Position']
         L_by_position = np.array(L_by_position).reshape(1,-1,self.n_categories,self.n_categories)
-        self.L = L_by_position.mean(axis = 1)
+
+        L_weights = get_L_weights().values.reshape(1,-1,1,1)
+        self.L = (L_by_position * L_weights).sum(axis = 1) #ZR: This should weight by base position options 
 
         self.fudge_factor = fudge_factor
 
@@ -484,16 +486,8 @@ class HAgent():
                 rosters = res['Rosters']
 
                 category_gradients_centered = gradients['Categories'] - gradients['Categories'].mean(axis = 1).reshape(-1,1) 
-                share_gradients_centered = \
-                        {
-                            k : grad - grad.mean(axis = 1).reshape(-1,1) for k, grad in gradients['Shares'].items()
-                        }
                 
                 category_updates = optimizers['Categories'].minimize(category_gradients_centered)
-                share_updates = \
-                    {
-                        k : optimizers['Shares'][k].minimize(grad) for k, grad in share_gradients_centered.items()
-                    }
 
                 category_weights = category_weights + category_updates
                 category_weights[category_weights < 0] = 0
@@ -507,6 +501,16 @@ class HAgent():
                 #update position shares 
                 ######
                 if self.position_means is not None:
+
+                    share_gradients_centered = \
+                            {
+                                k : grad - grad.mean(axis = 1).reshape(-1,1) for k, grad in gradients['Shares'].items()
+                            }
+                    share_updates = \
+                        {
+                            k : optimizers['Shares'][k].minimize(grad) for k, grad in share_gradients_centered.items()
+                        }
+
 
                     #update flex shares and ensure that they stay compliant with their definitions    
                     for position_code in self.position_structure['flex'].keys():
@@ -657,6 +661,8 @@ class HAgent():
                 position_mu = np.expand_dims(position_mu, axis = 2)
             else:
                 position_mu = 0
+                rosters = None
+                flex_shares = None
 
             #this causes an issue with gradients. It doesn't change much so we can just keep L constant
             #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)

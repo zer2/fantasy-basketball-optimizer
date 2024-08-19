@@ -1,204 +1,603 @@
----
-counting-statistics:
-  - Threes
-  - Points
-  - Rebounds
-  - Assists
-  - Steals 
-  - Blocks
-  - Turnovers
-ratio-statistics: 
-  Field Goal % : 
-    made-statistic : Field Goals Made
-    volume-statistic : Field Goal Attempts
-  Free Throw % : 
-    made-statistic : Free Throws Made
-    volume-statistic : Free Throw Attempts 
-negative-statistics: 
-  - Turnovers
-other-columns:
-  - Position
-  - Games Played %
-current-season-api-renamer: 
- PLAYER_NAME : Player
- PTS : Points
- REB : Rebounds
- AST : Assists
- STL: Steals
- BLK : Blocks
- FG3M : Threes
- TOV : Turnovers
- FTA : Free Throw Attempts
- FTM : Free Throws Made
- FGA : Field Goal Attempts
- FGM : Field Goals Made
- GAME_DATE : Game Date
-historical-renamer: 
- PLAYER_NAME : Player
- PTS : Points
- REB : Rebounds
- AST : Assists
- STL: Steals
- BLK : Blocks
- FG3M : Threes
- TO : Turnovers
- FTA : Free Throw Attempts
- FTM : Free Throws Made
- FGA : Field Goal Attempts
- FGM : Field Goals Made
- date : Date
-rotowire-renamer: 
- NAME : Player
- PTS : Points
- REB : Rebounds
- AST : Assists
- STL: Steals
- BLK : Blocks
- 3PM : Threes
- TO : Turnovers
- FTA : Free Throw Attempts
- FTM : Free Throws Made
- FT% : Free Throw %
- FGA : Field Goal Attempts
- FGM : Field Goals Made
- FG% : Field Goal %
- Pos : Position
-rotowire-position-adjuster:
- C : C
- G : PG,SG
- F : PF,SF
-stat-df-renamer:
- SEASON : Season
- NBA_PLAYER_NAME : Player
- POINTS : Points
- REBOUNDS : Rebounds
- ASSISTS : Assists
- STEALS : Steals
- BLOCKS : Blocks
- THREES : Threes
- TURNOVERS : Turnovers
- FREE_THROWS_MADE : Free Throws Made
- FREE_THROW_ATTEMPTS : Free Throw Attempts
- FIELD_GOALS_MADE : Field Goals Made
- FIELD_GOAL_ATTEMPTS : Field Goal Attempts
- POSITION_LIST : Position
- GAMES_PLAYED_PERCENT : Games Played %
-darko-renamer:
- NBA_PLAYER_NAME : Player
- POINTS : Points
- REBOUNDS : Rebounds
- ASSISTS : Assists
- STEALS : Steals
- BLOCKS : Blocks
- THREES : Threes
- TURNOVERS : Turnovers
- FREE_THROW_ATTEMPTS : Free Throw Attempts
- FREE_THROW_PERCENT : Free Throw %
- FIELD_GOAL_ATTEMPTS : Field Goal Attempts
- FIELD_GOAL_PERCENT : Field Goal %
- POSITION_LIST : Position
- MINUTES_PLAYED : Forecasted Minutes
-schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
-z-score-player-multiplier : 50
-z-score-team-multiplier : 20
-g-score-player-multiplier : 60
-g-score-team-multiplier : 24
-options : 
- upsilon : 
-  default : 0.5
-  min : 0.0
-  max: 1.0
- psi : 
-  default : 0.8
-  min : 0.0
-  max: 1.0
- n_drafters : 
-  default : 12
-  min : 2
-  max: 
- n_picks : 
-  default : 13
-  min : 1
-  max : 
- omega : 
-  default : 1.2
-  min : 0.0
-  max: 2.0
- gamma :
-  default : 0.1
-  min : 0.0
-  max : 1.0
- chi : 
-  default : 0.6
-  min : 0.0
-  max: 1
- n_iterations : 
-  default : 30
-  min : 10
-  max: 10000
- positions: 
-  base:
-   C : 2
-   PG : 1
-   SG : 1
-   PF : 1
-   SF : 1
-  flex: 
-   Util : 3
-   G :  2
-   F :  2
-position_structure :
-  base_list :
-    - C
-    - PG
-    - SG
-    - PF
-    - SF
-  base:
-    C : 
-      full_str: Centers
-    PG : 
-      full_str: Point Guards
-    SG : 
-      full_str: Shooting Guards
-    PF : 
-      full_str: Power Forwards
-    SF : 
-      full_str: Small Forwards
-  flex_list :
-   - Util 
-   - G
-   - F
-  flex: 
-    Util : 
-      bases: 
-       - C
-       - PG
-       - SG
-       - PF
-       - SF
-      full_str: Utilities
-    G : 
-      bases: 
+NBA:
+  counting-statistics:
+    - Threes
+    - Points
+    - Rebounds
+    - Assists
+    - Steals 
+    - Blocks
+    - Turnovers
+  ratio-statistics: 
+    Field Goal % : 
+      made-statistic : Field Goals Made
+      volume-statistic : Field Goal Attempts
+    Free Throw % : 
+      made-statistic : Free Throws Made
+      volume-statistic : Free Throw Attempts 
+  negative-statistics: 
+    - Turnovers
+  other-columns:
+    - Position
+    - Games Played %
+  current-season-api-renamer: 
+    PLAYER_NAME : Player
+    PTS : Points
+    REB : Rebounds
+    AST : Assists
+    STL: Steals
+    BLK : Blocks
+    FG3M : Threes
+    TOV : Turnovers
+    FTA : Free Throw Attempts
+    FTM : Free Throws Made
+    FGA : Field Goal Attempts
+    FGM : Field Goals Made
+    GAME_DATE : Game Date
+  historical-renamer: 
+    PLAYER_NAME : Player
+    PTS : Points
+    REB : Rebounds
+    AST : Assists
+    STL: Steals
+    BLK : Blocks
+    FG3M : Threes
+    TO : Turnovers
+    FTA : Free Throw Attempts
+    FTM : Free Throws Made
+    FGA : Field Goal Attempts
+    FGM : Field Goals Made
+    date : Date
+  rotowire-renamer: 
+    NAME : Player
+    PTS : Points
+    REB : Rebounds
+    AST : Assists
+    STL: Steals
+    BLK : Blocks
+    3PM : Threes
+    TO : Turnovers
+    FTA : Free Throw Attempts
+    FTM : Free Throws Made
+    FT% : Free Throw %
+    FGA : Field Goal Attempts
+    FGM : Field Goals Made
+    FG% : Field Goal %
+    Pos : Position
+  rotowire-position-adjuster:
+    C : C
+    G : PG,SG
+    F : PF,SF
+  stat-df-renamer:
+    SEASON : Season
+    NBA_PLAYER_NAME : Player
+    POINTS : Points
+    REBOUNDS : Rebounds
+    ASSISTS : Assists
+    STEALS : Steals
+    BLOCKS : Blocks
+    THREES : Threes
+    TURNOVERS : Turnovers
+    FREE_THROWS_MADE : Free Throws Made
+    FREE_THROW_ATTEMPTS : Free Throw Attempts
+    FIELD_GOALS_MADE : Field Goals Made
+    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+    POSITION_LIST : Position
+    GAMES_PLAYED_PERCENT : Games Played %
+  darko-renamer:
+    NBA_PLAYER_NAME : Player
+    POINTS : Points
+    REBOUNDS : Rebounds
+    ASSISTS : Assists
+    STEALS : Steals
+    BLOCKS : Blocks
+    THREES : Threes
+    TURNOVERS : Turnovers
+    FREE_THROW_ATTEMPTS : Free Throw Attempts
+    FREE_THROW_PERCENT : Free Throw %
+    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+    FIELD_GOAL_PERCENT : Field Goal %
+    POSITION_LIST : Position
+    MINUTES_PLAYED : Forecasted Minutes
+  schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
+  z-score-player-multiplier : 50
+  z-score-team-multiplier : 20
+  g-score-player-multiplier : 60
+  g-score-team-multiplier : 24
+  options : 
+    upsilon : 
+      default : 0.5
+      min : 0.0
+      max: 1.0
+    psi : 
+      default : 0.8
+      min : 0.0
+      max: 1.0
+    n_drafters : 
+      default : 12
+      min : 2
+      max: 
+    n_picks : 
+      default : 13
+      min : 1
+      max : 
+    omega : 
+      default : 1.2
+      min : 0.0
+      max: 2.0
+    gamma :
+      default : 0.1
+      min : 0.0
+      max : 1.0
+    chi : 
+      default : 0.6
+      min : 0.0
+      max: 1
+    n_iterations : 
+      default : 30
+      min : 10
+      max: 10000
+    positions: 
+      base:
+        C : 2
+        PG : 1
+        SG : 1
+        PF : 1
+        SF : 1
+      flex: 
+        Util : 3
+        G :  2
+        F :  2
+  position_structure :
+    base_list :
+      - C
       - PG
       - SG
-      full_str: Guards
-    F: 
-      bases: 
       - PF
       - SF
-      full_str: Forwards
-punting_defaults :
-  No dynamic optimization :
-    omega : 0.0 
-    gamma : 0.0
-  Moderate punting : 
-    omega : 0.7
-    gamma : 0.25
-  Aggressive punting : 
-    omega : 1.0
-    gamma : 0.4
-punting_default_index : 
-  "Head to Head: Most Categories" : 1
-  "Head to Head: Each Category" : 1
-  "Rotisserie": 1
+    base:
+      C : 
+        full_str: Centers
+      PG : 
+        full_str: Point Guards
+      SG : 
+        full_str: Shooting Guards
+      PF : 
+        full_str: Power Forwards
+      SF : 
+        full_str: Small Forwards
+    flex_list :
+    - Util 
+    - G
+    - F
+    flex: 
+      Util : 
+        bases: 
+        - C
+        - PG
+        - SG
+        - PF
+        - SF
+        full_str: Utilities
+      G : 
+        bases: 
+        - PG
+        - SG
+        full_str: Guards
+      F: 
+        bases: 
+        - PF
+        - SF
+        full_str: Forwards
+  punting_defaults :
+    No dynamic optimization :
+      omega : 0.0 
+      gamma : 0.0
+    Moderate punting : 
+      omega : 0.7
+      gamma : 0.25
+    Aggressive punting : 
+      omega : 1.0
+      gamma : 0.4
+  punting_default_index : 
+    "Head to Head: Most Categories" : 1
+    "Head to Head: Each Category" : 1
+    "Rotisserie": 1
+  n_games : 82
+  n_games_per_week : 3
+WNBA:
+  counting-statistics:
+    - Threes
+    - Points
+    - Rebounds
+    - Assists
+    - Steals 
+    - Blocks
+    - Turnovers
+  ratio-statistics: 
+    Field Goal % : 
+      made-statistic : Field Goals Made
+      volume-statistic : Field Goal Attempts
+    Free Throw % : 
+      made-statistic : Free Throws Made
+      volume-statistic : Free Throw Attempts 
+  negative-statistics: 
+    - Turnovers
+  other-columns:
+    - Position
+    - Games Played %
+  current-season-api-renamer: 
+    PLAYER_NAME : Player
+    PTS : Points
+    REB : Rebounds
+    AST : Assists
+    STL: Steals
+    BLK : Blocks
+    FG3M : Threes
+    TOV : Turnovers
+    FTA : Free Throw Attempts
+    FTM : Free Throws Made
+    FGA : Field Goal Attempts
+    FGM : Field Goals Made
+    GAME_DATE : Game Date
+  historical-renamer: 
+    PLAYER_NAME : Player
+    PTS : Points
+    REB : Rebounds
+    AST : Assists
+    STL: Steals
+    BLK : Blocks
+    FG3M : Threes
+    TO : Turnovers
+    FTA : Free Throw Attempts
+    FTM : Free Throws Made
+    FGA : Field Goal Attempts
+    FGM : Field Goals Made
+    date : Date
+  rotowire-renamer: 
+    NAME : Player
+    PTS : Points
+    REB : Rebounds
+    AST : Assists
+    STL: Steals
+    BLK : Blocks
+    3PM : Threes
+    TO : Turnovers
+    FTA : Free Throw Attempts
+    FTM : Free Throws Made
+    FT% : Free Throw %
+    FGA : Field Goal Attempts
+    FGM : Field Goals Made
+    FG% : Field Goal %
+    Pos : Position
+  rotowire-position-adjuster:
+    C : C
+    G : PG,SG
+    F : PF,SF
+  stat-df-renamer:
+    SEASON : Season
+    NBA_PLAYER_NAME : Player
+    POINTS : Points
+    REBOUNDS : Rebounds
+    ASSISTS : Assists
+    STEALS : Steals
+    BLOCKS : Blocks
+    THREES : Threes
+    TURNOVERS : Turnovers
+    FREE_THROWS_MADE : Free Throws Made
+    FREE_THROW_ATTEMPTS : Free Throw Attempts
+    FIELD_GOALS_MADE : Field Goals Made
+    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+    POSITION_LIST : Position
+    GAMES_PLAYED_PERCENT : Games Played %
+  darko-renamer:
+    NBA_PLAYER_NAME : Player
+    POINTS : Points
+    REBOUNDS : Rebounds
+    ASSISTS : Assists
+    STEALS : Steals
+    BLOCKS : Blocks
+    THREES : Threes
+    TURNOVERS : Turnovers
+    FREE_THROW_ATTEMPTS : Free Throw Attempts
+    FREE_THROW_PERCENT : Free Throw %
+    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+    FIELD_GOAL_PERCENT : Field Goal %
+    POSITION_LIST : Position
+    MINUTES_PLAYED : Forecasted Minutes
+  schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
+  z-score-player-multiplier : 50
+  z-score-team-multiplier : 20
+  g-score-player-multiplier : 60
+  g-score-team-multiplier : 24
+  options : 
+    upsilon : 
+      default : 0.5
+      min : 0.0
+      max: 1.0
+    psi : 
+      default : 0.8
+      min : 0.0
+      max: 1.0
+    n_drafters : 
+      default : 6
+      min : 2
+      max: 
+    n_picks : 
+      default : 9
+      min : 1
+      max : 
+    omega : 
+      default : 1.2
+      min : 0.0
+      max: 2.0
+    gamma :
+      default : 0.1
+      min : 0.0
+      max : 1.0
+    chi : 
+      default : 0.6
+      min : 0.0
+      max: 1
+    n_iterations : 
+      default : 30
+      min : 10
+      max: 10000
+    positions: 
+      base:
+        C : 2
+        PG : 0
+        SG : 0
+        PF : 0
+        SF : 0
+      flex: 
+        Util : 3
+        G :  2
+        F :  2
+  position_structure :
+    base_list :
+      - C
+      - PG
+      - SG
+      - PF
+      - SF
+    base:
+      C : 
+        full_str: Centers
+      PG : 
+        full_str: Point Guards
+      SG : 
+        full_str: Shooting Guards
+      PF : 
+        full_str: Power Forwards
+      SF : 
+        full_str: Small Forwards
+    flex_list :
+    - Util 
+    - G
+    - F
+    flex: 
+      Util : 
+        bases: 
+        - C
+        - PG
+        - SG
+        - PF
+        - SF
+        full_str: Utilities
+      G : 
+        bases: 
+        - PG
+        - SG
+        full_str: Guards
+      F: 
+        bases: 
+        - PF
+        - SF
+        full_str: Forwards
+  punting_defaults :
+    No dynamic optimization :
+      omega : 0.0 
+      gamma : 0.0
+    Moderate punting : 
+      omega : 0.7
+      gamma : 0.25
+    Aggressive punting : 
+      omega : 1.0
+      gamma : 0.4
+  punting_default_index : 
+    "Head to Head: Most Categories" : 1
+    "Head to Head: Each Category" : 1
+    "Rotisserie": 1
+  n_games : 40
+  n_games_per_week : 3
+MLB:
+  counting-statistics:
+    - Runs
+    - Home Runs 
+    - RBI 
+    - Stolen Bases 
+    - Wins 
+    - Saves
+    - Strikeouts 
+  ratio-statistics:
+    Batting Average:
+      made-statistic: Hits
+      volume-statistic: At Bats 
+    ERA:
+      made-statistic: Earned Runs
+      volume-statistic: Innings Pitched
+    WHIP:
+      made-statistic: Walks and Hits
+      volume-statistic: Innings Pitched
+  negative-statistics:
+    - ERA
+    - WHIP
+  other-columns:
+  - Position
+  - Games Played %
+  batter_stats: 
+    - Runs
+    - Home Runs
+    - RBI
+    - Stolen Bases
+    - Batting Average
+  pitcher_stats:
+    - Wins
+    - Saves
+    - Strikeouts
+    - ERA
+    - WHIP
+  rotowire-renamer:
+    R : Runs
+    HR : Home Runs
+    RBI : RBI
+    SB : Stolen Bases
+    H : Hits
+    AB: At Bats
+    AVG: Batting Average
+    W: Wins
+    SV: Saves
+    K.1 : Strikeouts
+    ER: Earned Runs
+    IP: Innings Pitched
+    Name: Player
+    Pos: Position
+  rotowire-position-adjuster:
+    P : SP,RP 
+    C : C
+    1B : 1B
+    2B : 2B
+    SS : SS
+    3B : 3B
+    OF : OF
+    DH : DH
+  position_structure :
+    base_list :
+      - C
+      - 1B
+      - 2B
+      - 3B
+      - SS
+      - OF
+      - DH
+      - SP
+      - RP
+    base:
+      C : 
+        full_str: Catchers
+      1B : 
+        full_str: First Basemen
+      2B : 
+        full_str: Second Basemen
+      3B : 
+        full_str: Third Basemen
+      SS : 
+        full_str: Shortstop
+      OF : 
+        full_str: Outfielder
+      SP:
+        full_str: Starting Pitcher
+      RP: 
+        full_str: Relief Pitcher 
+      DH:
+        full_str: Designated Hitter
+    flex_list :
+    - CI
+    - MI
+    - Util 
+    - P
+    flex: 
+      CI: 
+         bases:
+         - 1B
+         - 3B
+         full_str: Corner Infielders
+      MI:
+        bases:
+        - 2B
+        - SS
+        full_str: Middle Infielders
+      Util : 
+        bases: 
+        - C
+        - 1B
+        - 2B
+        - 3B
+        - SS
+        - OF 
+        - DH
+        full_str: Utilities
+      P : 
+        bases: 
+        - SP
+        - RP
+        full_str: Pitchers
+  options : 
+    upsilon : 
+      default : 0.5
+      min : 0.0
+      max: 1.0
+    psi : 
+      default : 0.8
+      min : 0.0
+      max: 1.0
+    n_drafters : 
+      default : 12
+      min : 2
+      max: 
+    n_picks : 
+      default : 25
+      min : 1
+      max : 
+    omega : 
+      default : 1.2
+      min : 0.0
+      max: 2.0
+    gamma :
+      default : 0.1
+      min : 0.0
+      max : 1.0
+    chi : 
+      default : 0.6
+      min : 0.0
+      max: 1
+    n_iterations : 
+      default : 30
+      min : 10
+      max: 10000
+    positions: 
+      base:
+        C : 2
+        1B : 1
+        2B : 1
+        3B : 1
+        SS : 1
+        OF: 5
+        DH : 0
+        SP: 4
+        RP: 4
+      flex: 
+        CI: 1
+        MI: 1
+        Util: 2
+        P: 2
+  punting_defaults :
+    No dynamic optimization :
+      omega : 0.0 
+      gamma : 0.0
+    Moderate punting : 
+      omega : 0.7
+      gamma : 0.25
+    Aggressive punting : 
+      omega : 1.0
+      gamma : 0.4
+  punting_default_index : 
+    "Head to Head: Most Categories" : 1
+    "Head to Head: Each Category" : 1
+    "Rotisserie": 1
+  z-score-player-multiplier : 50
+  z-score-team-multiplier : 20
+  g-score-player-multiplier : 60
+  g-score-team-multiplier : 24
+  n_games : 162
+  n_games_per_week : 0.143 #this is weekly 

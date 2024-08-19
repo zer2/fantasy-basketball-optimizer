@@ -7,6 +7,7 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
+from src.helper_functions import get_n_games
 
 @st.cache_resource()
 def get_data_from_snowflake(table_name):
@@ -114,7 +115,7 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
      return pd.DataFrame()
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
-@st.cache_resource
+@st.cache_resource(ttl = '1d') 
 def get_historical_data():  
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
@@ -231,53 +232,81 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
-@st.cache_data(show_spinner = False)
-def get_specified_stats(historical_df : pd.DataFrame
-                     , current_data : dict
-                     , darko_data : dict
-                     , dataset_name : str) -> pd.DataFrame:
+@st.cache_data(show_spinner = False, ttl = 3600)
+def get_specified_stats(dataset_name : str
+                     , default_key : int) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
   Args:
-    historical_df: Dataframe of raw historical fantasy metrics by player/season
-    current_data: dictionary mapping to datasets based on the current season
-    darko_data: dictionary mapping to datasets based on DARKO
     dataset_name: the name of the dataset to fetch
+    default_key: used for caching. Increments whenever the default dataset is changed, so that this function
+                 gets rerun for sure whenever the default dataset changes
 
   Returns:
     Dataframe of fantasy statistics 
   """
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
-  if dataset_name in list(current_data.keys()):
-      df = current_data[dataset_name].copy()
-  elif 'DARKO' in dataset_name:
-      df = darko_data[dataset_name].copy()
-  elif 'RotoWire' in dataset_name:
-      if 'rotowire_data' in st.session_state:
-        raw_df = st.session_state.rotowire_data
-        df = process_rotowire_data(raw_df)
-      else:
-        df = darko_data['DARKO-L'].copy() #this is a bit of a hack
-  else:
-      df = historical_df.loc[dataset_name].copy()
-  
-  #adjust for the display
-  df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
-  df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
-  df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
+  if st.session_state.league in ('NBA','WNBA'):
 
-  df.index = df.index + ' (' + df['Position'] + ')'
-  df.index.name = 'Player'
-  return df.round(2) 
+    historical_df = get_historical_data()
+    current_data, expected_minutes = get_current_season_data()
+    darko_data = get_darko_data(expected_minutes)
+
+    if dataset_name in list(current_data.keys()):
+        df = current_data[dataset_name].copy()
+    elif 'DARKO' in dataset_name:
+        df = darko_data[dataset_name].copy()
+    elif 'RotoWire' in dataset_name:
+        if 'rotowire_data' in st.session_state:
+            raw_df = st.session_state.rotowire_data
+            df = process_basketball_rotowire_data(raw_df)
+        else:
+            df = darko_data['DARKO-L'].copy() #this is a bit of a hack
+    else:
+        df = historical_df.loc[dataset_name].copy()  
+    #adjust for the display
+    df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
+    df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
+    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
+
+    df.index = df.index + ' (' + df['Position'] + ')'
+    df.index.name = 'Player'
+    return df.round(2) 
+  
+  elif st.session_state.league in ('MLB'):
+    if 'rotowire_data' in st.session_state:
+        raw_df = st.session_state.rotowire_data
+        df = process_baseball_rotowire_data(raw_df)   
+    
+    df[r'Batting Average'] = (df[r'Batting Average'] * 100).round(1)
+    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
+
+    df.index = df.index + ' (' + df['Position'] + ')'
+    df.index.name = 'Player'
+
+    return df.round(2) 
+  
+def process_baseball_rotowire_data(raw_df):
    
-def process_rotowire_data(raw_df):
-   
-   raw_df.loc[:,'Games Played %'] = raw_df['G']/82
-   raw_df['FG%'] = raw_df['FG%']/100
-   raw_df['FT%'] = raw_df['FT%']/100
+   raw_df.loc[:,'Games Played %'] = 1 #we need to fix this later
+   raw_df['AVG'] = raw_df['AVG']/100
    raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
 
    raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
+
+   #baseball has some duplicate player names, which we need to deal with
+   is_duplicate_player = raw_df.groupby('Player')['Player'].transform('size') > 1
+   raw_df.loc[:,'Player'] = np.where(is_duplicate_player
+                                     ,raw_df['Player'] + ' (' + raw_df['Team'] + ')'
+                                     ,raw_df['Player']
+                                     )
+   
+   is_pitcher = raw_df['Position'].str.contains('P')
+   pitcher_stats = st.session_state.params['pitcher_stats']
+   batter_stats = st.session_state.params['batter_stats']
+
+   raw_df.loc[is_pitcher,pitcher_stats] = raw_df[is_pitcher][pitcher_stats].fillna(0)
+   raw_df.loc[~is_pitcher,batter_stats] = raw_df[~is_pitcher][batter_stats].fillna(0)
 
    raw_df = raw_df.set_index('Player')
 
@@ -286,7 +315,28 @@ def process_rotowire_data(raw_df):
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
                     st.session_state.params['other-columns']
    
-   raw_df = raw_df[required_columns]
+   raw_df = raw_df[list(set(required_columns))]
+
+   return raw_df
+
+def process_basketball_rotowire_data(raw_df):
+   
+   raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
+   raw_df['FG%'] = raw_df['FG%']/100
+   raw_df['FT%'] = raw_df['FT%']/100
+   raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
+
+   raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
+   
+   raw_df = raw_df.set_index('Player')
+
+
+   required_columns = st.session_state.params['counting-statistics'] + \
+                    list(st.session_state.params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
+                    st.session_state.params['other-columns']
+   
+   raw_df = raw_df[list(set(required_columns))]
 
    return raw_df
 

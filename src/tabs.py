@@ -10,7 +10,7 @@ import os
 import itertools
 from pathlib import Path
   
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_about_tab(md_path : str):
     """Make one of the tabs on the about page
 
@@ -26,7 +26,7 @@ def make_about_tab(md_path : str):
 
 ### Team tabs 
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_team_tab(_scores : pd.DataFrame
               , my_players : list[str]
               , n_drafters : int
@@ -69,7 +69,7 @@ def make_team_tab(_scores : pd.DataFrame
     st.markdown('This team does not have any players yet!')
   return team_stats
   
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_team_h_tab(my_players : list[str]
                   , n_picks : int
                   , base_h_score : float
@@ -97,6 +97,7 @@ def make_team_h_tab(my_players : list[str]
         base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
         st.dataframe(base_win_rates_formatted, hide_index = True)
   
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_full_team_tab(z_scores : pd.DataFrame
                   ,g_scores : pd.DataFrame
                   ,my_players : list[str]
@@ -151,7 +152,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
       st.markdown('Team H-score not defined until team is full') 
 ### Candidate tabs 
 
-@st.cache_data(show_spinner = True)
+@st.cache_data(show_spinner = True, ttl = 3600)
 def make_cand_tab(_scores : pd.DataFrame
               , selection_list : list[str]
               , player_multiplier : float
@@ -400,7 +401,7 @@ def make_h_cand_tab(H
             st.dataframe(comparison_df_styled)
 ### Waiver tabs 
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_waiver_tab(_scores : pd.DataFrame
                 , selection_list : list
                 , team_stats : pd.Series
@@ -442,7 +443,7 @@ def make_waiver_tab(_scores : pd.DataFrame
 
   st.dataframe(new_styled, use_container_width = True, hide_index = True) 
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_matchup_matrix(_x_scores : pd.DataFrame
                   , selections : pd.DataFrame
                   , scoring_format : str
@@ -523,7 +524,7 @@ def make_matchup_matrix(_x_scores : pd.DataFrame
       st.markdown("""Not enough full teams yet! Make sure at least two teams are full on the
             "Drafting & Teams" page then come back here""")
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_matchup_tab(player_stats
                   , selections
                   , matchup_seat
@@ -572,7 +573,7 @@ def make_matchup_tab(player_stats
   win_probabilities_styled = h_percentage_styler(win_probabilities)
   st.dataframe(win_probabilities_styled, hide_index = True)
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def get_base_h_score(_info : dict
                 , omega : float
                 , gamma : float
@@ -610,7 +611,7 @@ def get_base_h_score(_info : dict
 
   return next(H.get_h_scores(player_assignments, team))   
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_h_waiver_df(_H
                   , _player_stats : pd.DataFrame
                   , mod_my_players : list[str]
@@ -677,7 +678,7 @@ def make_h_waiver_df(_H
 
 ### Trade tabs
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_score_tab(_scores : pd.DataFrame
               , players_sent : list[str]
               , players_received : list[str]
@@ -725,7 +726,7 @@ def make_trade_score_tab(_scores : pd.DataFrame
                       , height = len(full_frame) * 35 + 38
                                                 )     
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_destination_display(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -794,7 +795,7 @@ def make_trade_destination_display(_H
 
   return values_to_team
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_target_display(_H
                   , _player_stats : pd.DataFrame
                   , my_team : str
@@ -877,7 +878,7 @@ def make_trade_target_display(_H
 
   return values_to_me
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def get_cross_combos(n : int
                       , m : int
                       , my_players : list[str]
@@ -942,7 +943,7 @@ def get_combos(players_with_weight : list[tuple]
                                       for m in player_combos_with_weight]
   return player_combos_with_total_weight
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_combo_df(all_combos : list
                   , player_stats : pd.DataFrame
                   , my_team : str
@@ -1004,7 +1005,8 @@ def make_combo_df(all_combos : list
   return full_dataframe
 
 @st.cache_data(show_spinner = """Finding suggested trades. How long this will take depends on 
-                                  the trade parameters""")
+                                  the trade parameters"""
+               , ttl = 3600)
 def make_trade_suggestion_display(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -1098,7 +1100,7 @@ def make_trade_suggestion_display(_H
   else: 
     st.markdown('No promising trades found')
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_h_tab(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -1172,7 +1174,7 @@ def make_trade_h_tab(_H
 
 ### Rank tabs 
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_rank_tab(scores : pd.DataFrame
                       , player_multiplier : float
                       , info_key : int):
@@ -1196,7 +1198,7 @@ def make_rank_tab(scores : pd.DataFrame
       
   rank_display = st.dataframe(scores_styled, hide_index = True, use_container_width = True)
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_h_rank_tab(info : dict
                   , omega : float
                   , gamma : float
