@@ -449,12 +449,12 @@ def move_forward_one_pick(row, drafter, n):
 
 def move_back_one_pick(row, drafter, n):
     if row % 2 == 1:
-      if drafter == 0:
+      if drafter == (n-1):
         row = row - 1
       else:
         drafter = drafter + 1
     else:
-      if (drafter == n - 1):
+      if (drafter == 0):
         row = row - 1
       else:
         drafter = drafter - 1

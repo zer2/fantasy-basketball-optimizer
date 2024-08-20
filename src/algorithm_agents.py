@@ -329,7 +329,10 @@ class HAgent():
         """
         players = [p for p in players if p == p]
 
-        n_extra_players = n_players + 1 - len(players)
+        if n_players == self.n_picks:
+            n_extra_players = 0
+        else:
+            n_extra_players = n_players + 1 - len(players)
 
         opposing_team_stats = np.array(self.x_scores.loc[players].sum(axis =0) + \
                                         n_extra_players * mean_extra_players)
