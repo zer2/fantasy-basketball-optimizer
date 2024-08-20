@@ -93,11 +93,11 @@ def clear_board():
   st.session_state.drafter = 0
   st.session_state.row = 0
 
-@st.cache_data()
-def load_params(key, default_key):
-  increment_default_key()
-  with open("parameters.yaml", "r") as stream:
-    st.session_state.params = yaml.safe_load(stream)[key]
+with open("parameters.yaml", "r") as stream:
+  st.session_state.all_params = yaml.safe_load(stream)
+
+def load_params(league):
+  st.session_state.params = st.session_state.all_params[league]
 
 st.title('Optimization for Fantasy Basketball :basketball:')
 
@@ -166,7 +166,7 @@ with param_tab:
         , on_change = increment_default_key
         )
       
-      load_params(st.session_state.league, st.session_state.player_stats_default_key)
+      load_params(st.session_state.league)
 
       mode = st.selectbox(
         'Which mode do you want to use?',
@@ -180,12 +180,6 @@ with param_tab:
 
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
-
-      #ZR: This needs to be parameterized 
-      if st.session_state.league in ('NBA','WNBA'):
-        coefficient_df = pd.read_csv('./basketball_coefficients.csv', index_col = 0)
-      elif st.session_state.league == 'MLB':
-        coefficient_df = pd.read_csv('./baseball_coefficients.csv', index_col = 0)
 
       if st.session_state['mode'] == 'Season Mode':
 
@@ -301,13 +295,13 @@ with param_tab:
 
         historical_df = get_historical_data()
         current_data, expected_minutes = get_current_season_data()
-        darko_data = get_darko_data(expected_minutes)
+        #darko_data = get_darko_data(expected_minutes)
 
         unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
         unique_datasets_current = list(current_data.keys())
-        unique_datasets_darko = list(darko_data.keys())
+        #unique_datasets_darko = list(darko_data.keys())
 
-        all_datasets = unique_datasets_historical + unique_datasets_current + ['RotoWire (req. upload)'] + unique_datasets_darko
+        all_datasets = unique_datasets_historical + unique_datasets_current + ['RotoWire (req. upload)'] 
         all_datasets.reverse()
 
       else:
@@ -344,8 +338,7 @@ with param_tab:
                       , key = 'selected_categories'
                       , options = st.session_state.params['counting-statistics'] + \
                                 list(st.session_state.params['ratio-statistics'].keys())
-                      , default = st.session_state.params['counting-statistics'] + \
-                                list(st.session_state.params['ratio-statistics'].keys())
+                      , default = st.session_state.params['default-categories']
                             )
         
 
@@ -387,17 +380,9 @@ with param_tab:
 
       mult_col, coef_col = st.columns(2)
     
-      st.subheader(f"Multipliers")
-
-      multiplier_df = pd.DataFrame({'Multiplier' : [1] * len(get_categories())}
-                                  , index = coefficient_df.index).T
-      multipliers = st.data_editor(multiplier_df, hide_index = True)
-      multipliers = multipliers.T
-  
-      st.caption('Manual multipliers for Z-scores and G-scores. E.g. to ignore turnovers completely, set the turnovers multiplier to 0. Note that H-scores will assume other drafters are using this weighting as well')
-        
       st.subheader(f"Coefficients")
-      conversion_factors = st.data_editor(coefficient_df.T, hide_index = True)
+      coefficient_series = pd.Series(st.session_state.params['coefficients'])
+      conversion_factors = st.data_editor(coefficient_series, hide_index = True)
       conversion_factors = conversion_factors.T                                                      
 
       st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
@@ -636,10 +621,10 @@ with info_tab:
                               , on_change = increment_player_stats_version)
 
       player_stats = player_stats.drop(injured_players)
+
       info = process_player_data(None
                               ,player_stats
                               ,conversion_factors
-                              ,multipliers
                               ,upsilon
                               ,psi
                               ,n_drafters
@@ -1124,7 +1109,6 @@ elif st.session_state['mode'] == 'Season Mode':
                         , n_picks
                         , n_drafters
                         , conversion_factors
-                        , multipliers
                         , psi
                         , nu
                         , scoring_format )

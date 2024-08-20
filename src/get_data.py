@@ -250,11 +250,11 @@ def get_specified_stats(dataset_name : str
 
     historical_df = get_historical_data()
     current_data, expected_minutes = get_current_season_data()
-    darko_data = get_darko_data(expected_minutes)
 
     if dataset_name in list(current_data.keys()):
         df = current_data[dataset_name].copy()
     elif 'DARKO' in dataset_name:
+        darko_data = get_darko_data(expected_minutes)
         df = darko_data[dataset_name].copy()
     elif 'RotoWire' in dataset_name:
         if 'rotowire_data' in st.session_state:

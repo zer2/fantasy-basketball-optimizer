@@ -27,7 +27,10 @@ def get_ratio_statistics():
       return ['Field Goal %','Free Throw %']
     
 def get_selected_categories():
-    return get_selected_ratio_statistics() + get_selected_counting_statistics()
+    if st.session_state:
+       return st.session_state['selected_categories']
+    else: 
+       return get_ratio_statistics() + get_counting_statistics()
     
 def get_selected_counting_statistics():
    if st.session_state:
