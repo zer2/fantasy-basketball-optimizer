@@ -84,6 +84,7 @@ def undo_selection():
   st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
                                     , st.session_state.drafter
                                     , st.session_state.selections_df.shape[1])
+  
   st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = None
 
   run_autodraft()
@@ -767,7 +768,7 @@ if st.session_state['mode'] == 'Draft Mode':
                                   , use_container_width = True)
           
         with button_col2:
-          undo_button = st.form_submit_button("Redo last selection"
+          undo_button = st.form_submit_button("Undo last selection"
                                   , on_click = undo_selection
                                   , use_container_width = True)
         with button_col3:
@@ -784,9 +785,11 @@ if st.session_state['mode'] == 'Draft Mode':
       
     with right:
 
+      non_autodrafters = [i for i,c in zip(range(selections.shape[1]),selections.columns) if c not in st.session_state.autodrafters]
+
       draft_seat = st.selectbox(f'Which drafter are you?'
           , selections.columns
-          , index = 0)
+          , index = 0 if len(non_autodrafters) ==0 else non_autodrafters[0])
 
       my_players = st.session_state.selections_df[draft_seat].dropna()
 

@@ -122,26 +122,26 @@ def make_full_team_tab(z_scores : pd.DataFrame
   Returns:
       None
   """
-  z_tab, g_tab, h_tab = st.tabs(["Z-score", "G-score","H-score"])
+  z_team_tab, g_team_tab, h_team_tab = st.tabs(["Z-score", "G-score","H-score"])
 
-  with z_tab:
+  with z_team_tab:
 
       make_team_tab(z_scores
-                              , my_players
-                              , n_drafters
-                              , st.session_state.params['z-score-player-multiplier']
-                              , st.session_state.params['z-score-team-multiplier']
-                              , info_key)
+                    , my_players
+                    , n_drafters
+                    , st.session_state.params['z-score-player-multiplier']
+                    , st.session_state.params['z-score-team-multiplier']
+                    , info_key)
 
-  with g_tab:
+  with g_team_tab:
 
       make_team_tab(g_scores
-                              , my_players
-                              , n_drafters
-                              , st.session_state.params['g-score-player-multiplier']
-                              , st.session_state.params['g-score-team-multiplier']
-                              , info_key)    
-  with h_tab:
+                      , my_players
+                      , n_drafters
+                      , st.session_state.params['g-score-player-multiplier']
+                      , st.session_state.params['g-score-team-multiplier']
+                      , info_key)    
+  with h_team_tab:
     if len(my_players) == n_picks:
 
       make_team_h_tab(my_players
@@ -294,7 +294,7 @@ def make_h_cand_tab(H
           st.dataframe(rate_display_styled, use_container_width = True)
       with weight_tab:
 
-        if display:
+        if display and (len(weights) > 0):
 
           weight_df = weights.loc[score_df.index].dropna()
           weight_display = score_df.merge(weight_df
@@ -310,8 +310,8 @@ def make_h_cand_tab(H
           st.dataframe(weight_display_styled, use_container_width = True)
 
       with roster_tab:
-          
-          if display & (len(rosters) > 0):
+                    
+          if display and (rosters.shape[1] > 0):
 
             my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x ==x]
             n_players = len(my_players)
@@ -335,9 +335,7 @@ def make_h_cand_tab(H
                                                     ,index = rosters.index
                                                     ,columns = get_position_numbers_unwound()
                                             )
-            
-            st.write(len(rosters_inverted))
-                        
+                                    
             for col in rosters_inverted:
                rosters_inverted[col] = rosters_inverted[col].fillna(filler)
 
@@ -360,7 +358,7 @@ def make_h_cand_tab(H
       for tab, position_shares_df in zip(position_tabs, position_shares_res):
           with tab: 
               
-              if display:
+              if display and (len(position_shares_df) > 0):
            
                 share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
                                       , left_index = True
@@ -533,7 +531,6 @@ def make_matchup_tab(player_stats
                   , n_picks
                   , n_drafters
                   , conversion_factors
-                  , multipliers
                   , psi
                   , nu
                   , scoring_format):
@@ -551,7 +548,6 @@ def make_matchup_tab(player_stats
   #ZR: WE should really clean up this keying mechanism
   week_specific_info = process_player_data(week_specific_player_stats
                         ,conversion_factors
-                        ,multipliers
                         ,psi
                         ,nu
                         ,n_drafters
