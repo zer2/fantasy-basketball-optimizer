@@ -1,4 +1,14 @@
 NBA:
+  default-categories:
+    - Field Goal %
+    - Free Throw %
+    - Threes
+    - Points
+    - Rebounds
+    - Assists
+    - Steals 
+    - Blocks
+    - Turnovers
   counting-statistics:
     - Threes
     - Points
@@ -19,6 +29,16 @@ NBA:
   other-columns:
     - Position
     - Games Played %
+  coefficients:
+    Field Goal % : 2.17
+    Free Throw % : 2.30
+    Threes : 1.11
+    Points : 1.45
+    Rebounds : 1.00
+    Assists : 0.79
+    Steals : 4.35
+    Blocks : 1.2
+    Turnovers : 1.73
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points
@@ -225,6 +245,16 @@ WNBA:
   other-columns:
     - Position
     - Games Played %
+  coefficients:
+    Field Goal % : 2.17
+    Free Throw % : 2.30
+    Threes : 1.11
+    Points : 1.45
+    Rebounds : 1.00
+    Assists : 0.79
+    Steals : 4.35
+    Blocks : 1.2
+    Turnovers : 1.73
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points
@@ -411,6 +441,17 @@ WNBA:
   n_games : 40
   n_games_per_week : 3
 MLB:
+  default-categories:
+    - Runs
+    - Home Runs 
+    - RBI 
+    - Stolen Bases 
+    - Batting Average
+    - Wins 
+    - Saves
+    - Strikeouts 
+    - ERA
+    - WHIP
   counting-statistics:
     - Runs
     - Home Runs 
@@ -435,6 +476,17 @@ MLB:
   other-columns:
   - Position
   - Games Played %
+  coefficients:
+    Runs : 1
+    Home Runs : 1
+    RBI : 1
+    Stolen Bases : 0.5
+    Batting Average : 1
+    Wins : 1
+    Saves : 1
+    Strikeouts : 1
+    ERA : 1
+    WHIP : 1
   batter_stats: 
     - Runs
     - Home Runs

@@ -923,8 +923,6 @@ def validate():
 
     renamer = st.session_state.params['historical-renamer']
 
-
-
     season_dfs = {file[0:7] : pd.read_csv('../data_for_testing/' + file).rename(columns = renamer) for file in file_list}
 
     matchups = [('H','G'),('G','G'),('G','Z'),('Z','G')]

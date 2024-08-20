@@ -156,12 +156,12 @@ def calculate_scores_from_coefficients(player_means : pd.DataFrame
         
     res = pd.concat([ratio_scores[ratio_stat] for ratio_stat in ratio_scores.keys() ] + [main_scores],axis = 1)  
 
-    res.columns = get_selected_categories()
+    res.columns = ratio_statistics + counting_statistics
 
     for negative_stat in params['negative-statistics']:
         if negative_stat in res.columns:
             res[negative_stat] = - res[negative_stat]
-    return res.fillna(0)
+    return res.fillna(0)[get_selected_categories()]
 
 def games_played_adjustment(scores : pd.DataFrame
                       , replacement_games_rate : pd.Series
@@ -213,7 +213,6 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
 def process_player_data(weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
-                        , multipliers : pd.Series
                         , upsilon : float
                         , psi : float
                         , n_drafters : int
@@ -227,7 +226,6 @@ def process_player_data(weekly_df : pd.DataFrame
       weekly_df: Dataframe of fantasy-relevant statistics at the weekly level 
       player_means: Dataframe of player means
       conversion_factors: Conversion factors for /sigma^2 to /tau^2. Needed if weekly_df is None
-      multipliers: Manual multipliers for categories, based on user inputs
       psi: parameter scaling the influence of no_play rate
       nu: parameter scaling the influence of category means in covariance calculation
       n_drafters: number of drafters
@@ -245,14 +243,13 @@ def process_player_data(weekly_df : pd.DataFrame
   else:
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
-                                                  , conversion_factors['Conversion Factor'])
+                                                  , conversion_factors)
         
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
                                                           ,1)
-  g_scores_first_order = g_scores_first_order * multipliers.loc[get_selected_categories(),:].T.values[0]
 
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
@@ -264,7 +261,7 @@ def process_player_data(weekly_df : pd.DataFrame
   else:
     coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
-                                                  , conversion_factors['Conversion Factor'])
+                                                  , conversion_factors)
     
 
   mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
@@ -280,10 +277,6 @@ def process_player_data(weekly_df : pd.DataFrame
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,representative_player_set, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,representative_player_set, params, v = v)
-
-  g_scores = g_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
-  z_scores = z_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
-  x_scores = x_scores * multipliers.loc[get_selected_categories(),:].T.values[0]
 
   z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
 
