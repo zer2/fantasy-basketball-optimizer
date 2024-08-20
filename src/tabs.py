@@ -569,7 +569,7 @@ def make_matchup_tab(player_stats
   win_probabilities_styled = h_percentage_styler(win_probabilities)
   st.dataframe(win_probabilities_styled, hide_index = True)
 
-#@st.cache_data(show_spinner = False, ttl = 3600)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def get_base_h_score(_info : dict
                 , omega : float
                 , gamma : float
