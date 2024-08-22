@@ -265,6 +265,8 @@ with param_tab:
         if selections is None:
           selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
+    with c2: 
+
       scoring_format = st.selectbox(
         'Which format are you playing?',
         ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
@@ -276,8 +278,6 @@ with param_tab:
         st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
 
       rotisserie = scoring_format == 'Rotisserie'
-
-    with c2: 
 
       punting_levels = st.session_state.params['punting_defaults']
 

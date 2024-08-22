@@ -285,3 +285,14 @@ def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Seri
         week_dict[week_str] = league_players['Team'].map(game_counts)
 
     return week_dict
+
+@st.cache_data(ttl=3600, show_spinner = False)
+def get_draft_results(league_id: str,_auth_path: str) -> List[League]:
+    sc = YahooFantasySportsQuery(
+        auth_dir=_auth_path,
+        league_id=league_id, # Shouldn't actually matter what this is since we are retrieving the user's leagues
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+    draft_results = sc.get_league_draft_results() 
+    return draft_results
