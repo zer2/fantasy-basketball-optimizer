@@ -182,15 +182,12 @@ with param_tab:
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
 
-      if st.session_state['mode'] == 'Season Mode':
 
-        data_source = st.selectbox(
-          'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
-          ('Enter your own data', 'Retrieve from Yahoo Fantasy')
-          , index = 0)
+      data_source = st.selectbox(
+        'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
+        ('Enter your own data', 'Retrieve from Yahoo Fantasy')
+        , index = 0)
 
-      else:
-        data_source = 'Enter your own data'
         
       if data_source == 'Enter your own data':
         n_drafters = st.number_input(r'How many drafters are in your league?'
@@ -216,6 +213,7 @@ with param_tab:
 
         if auth_dir is not None:
 
+
           user_leagues = yahoo_connect.get_user_leagues(auth_dir)
 
           get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
@@ -226,41 +224,52 @@ with param_tab:
             format_func=get_league_labels,
             index=None
           )
-          
-          if yahoo_league is not None:
 
-            yahoo_league_id = yahoo_league.league_id
+          if (st.session_state.mode == 'Season Mode'):
 
-            player_metadata = get_player_metadata()
-
-            team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, yahoo_league_id, player_metadata)
-            n_drafters = team_players_df.shape[1]
-            n_picks = team_players_df.shape[0]
-
-            #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
             
-            selections = team_players_df
+            if yahoo_league is not None:
 
-            #Just trying for now!
-            player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, auth_dir, player_metadata)
+              yahoo_league_id = yahoo_league.league_id
 
-            st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
-                                                                    (player_statuses['Status'] == 'INJ')
-                                                                    ]
-                                                                    )
-                                                            )
-                                                      )
+              player_metadata = get_player_metadata()
 
-            st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(yahoo_league_id
-                                                                        , auth_dir
-                                                                        , player_metadata)
+              team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, yahoo_league_id, player_metadata)
+              n_drafters = team_players_df.shape[1]
+              n_picks = team_players_df.shape[0]
 
-            st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(yahoo_league_id
-                                    , auth_dir)
+              #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+              
+              selections = team_players_df
 
-            yahoo_connect.clean_up_access_token(auth_dir)
-            
-            st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
+              #Just trying for now!
+              player_statuses = yahoo_connect.get_player_statuses(yahoo_league_id, auth_dir, player_metadata)
+
+              st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
+                                                                      (player_statuses['Status'] == 'INJ')
+                                                                      ]
+                                                                      )
+                                                              )
+                                                        )
+
+              st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(yahoo_league_id
+                                                                          , auth_dir
+                                                                          , player_metadata)
+
+              st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(yahoo_league_id
+                                      , auth_dir)
+
+              yahoo_connect.clean_up_access_token(auth_dir)
+              
+              st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
+
+          else:
+
+            if yahoo_league is not None:
+
+              yahoo_league_id = yahoo_league.league_id
+
+            selections = None
 
         if selections is None:
           selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
@@ -749,37 +758,54 @@ if st.session_state['mode'] == 'Draft Mode':
 
     with left:
 
-      selection_list = listify(st.session_state.selections_df)
-      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+      if data_source == 'Enter your own data':
 
-      with st.form("pick form", border = False):
-        selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
-                                  st.session_state.selections_df.columns[st.session_state.drafter]
-          ,key = 'selected_player'
-          ,options = g_scores_unselected.index)
+        selection_list = listify(st.session_state.selections_df)
+        g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
 
-        button_col1, button_col2, button_col3 = st.columns(3)
+        with st.form("pick form", border = False):
+          selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
+                                    st.session_state.selections_df.columns[st.session_state.drafter]
+            ,key = 'selected_player'
+            ,options = g_scores_unselected.index)
 
-        with button_col1:
-          draft_button = st.form_submit_button("Lock in selection"
-                                  , on_click = select_player_from_draft_board
-                                  , use_container_width = True)
+          button_col1, button_col2, button_col3 = st.columns(3)
+
+          with button_col1:
+            draft_button = st.form_submit_button("Lock in selection"
+                                    , on_click = select_player_from_draft_board
+                                    , use_container_width = True)
+            
+          with button_col2:
+            undo_button = st.form_submit_button("Undo last selection"
+                                    , on_click = undo_selection
+                                    , use_container_width = True)
+          with button_col3:
+            clear_board_button = st.form_submit_button("Clear draft board"
+                                    , on_click = clear_board
+                                    , use_container_width = True)
           
-        with button_col2:
-          undo_button = st.form_submit_button("Undo last selection"
-                                  , on_click = undo_selection
-                                  , use_container_width = True)
-        with button_col3:
-          clear_board_button = st.form_submit_button("Clear draft board"
-                                  , on_click = clear_board
-                                  , use_container_width = True)
-        
-      player_assignments = st.session_state.selections_df.to_dict('list')
+        player_assignments = st.session_state.selections_df.to_dict('list')
 
-      selections_df = st.dataframe(st.session_state.selections_df
-                                   ,key = 'selections_df'
-                                    , hide_index = True
-                                    , height = n_picks * 35 + 50)
+        selections_df = st.dataframe(st.session_state.selections_df
+                                    ,key = 'selections_df'
+                                      , hide_index = True
+                                      , height = n_picks * 35 + 50)
+        
+      else:
+        
+        #ZR: There must be a better way to do this 
+        player_metadata = player_stats['Position']
+        player_metadata.index = [player.split('(')[0][0:-1] for player in player_metadata.index]
+
+        draft_results = yahoo_connect.get_draft_results(yahoo_league_id, auth_dir, player_metadata)
+        selections_df = st.dataframe(draft_results
+                                    ,key = 'selections_df'
+                                      , hide_index = True
+                                      , height = n_picks * 35 + 50) 
+        
+        selection_list = listify(draft_results)
+
       
     with right:
 
