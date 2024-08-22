@@ -713,8 +713,6 @@ with rank_tab:
 
       st.caption(first_str + ' ' + second_str + third_str)
 
-
-
       h_ranks = make_h_rank_tab(info
                     ,omega
                     ,gamma
@@ -815,24 +813,17 @@ if st.session_state['mode'] == 'Draft Mode':
 
         with h_cand_tab:
 
-          if len(my_players) == n_picks:
-            st.markdown('Team is complete!')
-                    
-          elif not st.session_state.run_h_score:
-            with st.form(key='my_form_to_submit'):
-              h_score_button = st.form_submit_button(label='Run H-score algorithm'
-                                                  , on_click = run_h_score) 
-                      
-          else:
-
-            #record the fact that the run has already been invoked, no need to invoke it again
-            stop_run_h_score()
+          if selections.columns[st.session_state.drafter] == draft_seat:
 
             make_h_cand_tab(H
+                  ,g_scores_unselected
                   ,player_assignments
                   ,draft_seat
                   ,n_iterations
                   ,v)
+          else:
+
+            st.write('It is not your turn, so H-scoring will not run')
 
       with team_tab:
 

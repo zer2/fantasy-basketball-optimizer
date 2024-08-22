@@ -189,6 +189,7 @@ def make_cand_tab(_scores : pd.DataFrame
   return scores_unselected
 
 def make_h_cand_tab(H
+                    ,_g_scores_unselected
                     ,player_assignments
                     ,draft_seat
                     ,n_iterations
@@ -238,18 +239,21 @@ def make_h_cand_tab(H
       position_shares_res = [x[1] for x in position_shares_list]
 
       if cash_remaining_per_team:
-        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights'] + position_shares_tab_names + ['Rosters'])
+        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['G-Scores'])
         target_tab = all_tabs[0]
         rate_tab = all_tabs[1]
         weight_tab = all_tabs[2]
-        roster_tab = all_tabs[-1]
-        position_tabs = all_tabs[3:-1]
+        roster_tab = all_tabs[3]
+        position_tabs = all_tabs[4:-1]
+        raw_score_tab = all_tabs[-1]
+
       else:
-        all_tabs = st.tabs(['Expected Win Rates', 'Weights'] + position_shares_tab_names + ['Rosters'])
+        all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['G-Scores'])
         rate_tab = all_tabs[0]
         weight_tab = all_tabs[1]       
-        roster_tab = all_tabs[-1]
-        position_tabs = all_tabs[2:-1]
+        roster_tab = all_tabs[2]
+        position_tabs = all_tabs[3:-1]
+        raw_score_tab = all_tabs[-1]
 
       score = score.sort_values(ascending = False)
       score.name = 'H-score'
@@ -397,6 +401,12 @@ def make_h_cand_tab(H
                       .format('{:,.1%}', subset = rate_df.columns)
             
             st.dataframe(comparison_df_styled)
+
+      with raw_score_tab:
+          make_cand_tab(_g_scores_unselected.loc[score.index]
+              ,[]
+              , st.session_state.params['z-score-player-multiplier']
+              , info_key = st.session_state.info_key)
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False, ttl = 3600)
