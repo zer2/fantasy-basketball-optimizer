@@ -189,7 +189,7 @@ def make_cand_tab(_scores : pd.DataFrame
   return scores_unselected
 
 def make_h_cand_tab(H
-                    ,_g_scores_unselected
+                    ,_g_scores
                     ,player_assignments
                     ,draft_seat
                     ,n_iterations
@@ -403,10 +403,11 @@ def make_h_cand_tab(H
             st.dataframe(comparison_df_styled)
 
       with raw_score_tab:
-          make_cand_tab(_g_scores_unselected.loc[score.index]
-              ,[]
-              , st.session_state.params['z-score-player-multiplier']
-              , info_key = st.session_state.info_key)
+          
+        scores_unselected_styled = static_score_styler(_g_scores.loc[score.index]
+                                                       , st.session_state.params['g-score-player-multiplier'])
+
+        scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False, ttl = 3600)

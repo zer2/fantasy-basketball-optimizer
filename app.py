@@ -816,7 +816,7 @@ if st.session_state['mode'] == 'Draft Mode':
           if selections.columns[st.session_state.drafter] == draft_seat:
 
             make_h_cand_tab(H
-                  ,g_scores_unselected
+                  ,g_scores
                   ,player_assignments
                   ,draft_seat
                   ,n_iterations
@@ -970,6 +970,7 @@ if st.session_state['mode'] == 'Auction Mode':
             h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
             make_h_cand_tab(H
+                  ,g_scores
                   ,player_assignments.to_dict()
                   ,auction_seat
                   ,n_iterations
