@@ -817,6 +817,7 @@ if st.session_state['mode'] == 'Draft Mode':
 
             make_h_cand_tab(H
                   ,g_scores
+                  ,z_scores
                   ,player_assignments
                   ,draft_seat
                   ,n_iterations
@@ -971,6 +972,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
             make_h_cand_tab(H
                   ,g_scores
+                  ,z_scores
                   ,player_assignments.to_dict()
                   ,auction_seat
                   ,n_iterations
