@@ -8,7 +8,7 @@ import yaml
 from yfpy.models import League
 import time
 from schedule import every, repeat, run_pending
-from src.helper_functions import move_back_one_pick, move_forward_one_pick, get_position_numbers, listify \
+from src.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
                                   ,get_games_per_week, get_categories, get_ratio_statistics
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
@@ -17,6 +17,7 @@ from src.algorithm_agents import HAgent
 from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
+from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft
 
 #from streamlit_profiler import Profiler
 
@@ -67,39 +68,6 @@ def run_h_score():
 
 def stop_run_h_score():
     st.session_state.run_h_score = False
-
-def run_autodraft():
-  while (selections.columns[st.session_state.drafter] in st.session_state.autodrafters) and (st.session_state.row < n_picks):
-    selection_list = listify(st.session_state.selections_df)
-    g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
-    select_player_from_draft_board(g_scores_unselected.index[0])
-
-def select_player_from_draft_board(p = None):
-
-  if not p:
-    p = st.session_state.selected_player
-
-  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
-
-  st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
-                                                                          ,st.session_state.drafter
-                                                                          ,st.session_state.selections_df.shape[1])
-  
-  run_autodraft()
-
-def undo_selection():
-  st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
-                                    , st.session_state.drafter
-                                    , st.session_state.selections_df.shape[1])
-  
-  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = None
-
-  run_autodraft()
-
-def clear_board():
-  st.session_state.selections_df = selections
-  st.session_state.drafter = 0
-  st.session_state.row = 0
 
 with open("parameters.yaml", "r") as stream:
   st.session_state.all_params = yaml.safe_load(stream)
@@ -210,13 +178,14 @@ with param_tab:
                       
         # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
         
-        selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+        st.session_state.selections_default = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
       else:
 
-        selections = None
+        st.session_state.selections_default = None
 
         auth_dir = yahoo_connect.get_yahoo_access_token()
+        st.session_state.auth_dir = auth_dir
 
         if auth_dir is not None:
 
@@ -247,7 +216,7 @@ with param_tab:
 
               #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
               
-              selections = team_players_df
+              st.session_state.selections_default = team_players_df
 
               #Just trying for now!
               player_statuses = yahoo_connect.get_player_statuses(st.session_state.yahoo_league_id, auth_dir, player_metadata)
@@ -276,16 +245,17 @@ with param_tab:
 
               st.session_state.yahoo_league_id = yahoo_league.league_id
 
-            selections = None
+            st.session_state.selections_default = None
 
-        if selections is None:
-          selections = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+        if st.session_state.selections_default is None:
+          st.session_state.selections_default = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
     with c2: 
 
       scoring_format = st.selectbox(
         'Which format are you playing?',
         ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
+        , key = 'scoring_format'
         , index = 1)
     
       if scoring_format == 'Rotisserie':
@@ -361,11 +331,14 @@ with param_tab:
 
           if st.session_state['mode'] == 'Draft Mode':
               autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
-                    ,options = selections.columns
+                    ,options = st.session_state.selections_default.columns
                     ,key = 'autodrafters'
                     ,default = None)
           
           submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
+
+  st.session_state.n_drafters = n_drafters
+  st.session_state.n_picks = n_picks
 
   with advanced_params:
 
@@ -504,6 +477,7 @@ with param_tab:
         
         else: 
           chi = None
+          st.session_state.chi = None
 
         if st.session_state['mode'] == 'Auction Mode':
 
@@ -591,7 +565,7 @@ with info_tab:
                                     , st.session_state.player_stats_default_key)
 
     player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-    selections = selections.astype(player_category_type)
+    st.session_state.selections_default = st.session_state.selections_default.astype(player_category_type)
     
 
   if st.session_state['schedule']: 
@@ -626,10 +600,11 @@ with info_tab:
     for col in counting_statistics + volume_statistics:
       player_stats[col] = player_stats_editable[col] * player_stats['Games Played %']/100 * get_games_per_week()
 
+
   with injury_tab:
       st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
       default_injury_list = [p for p in st.session_state['injured_players'] \
-                              if (p in player_stats.index) and (not (p in listify(selections))) 
+                              if (p in player_stats.index) and (not (p in listify(st.session_state.selections_default))) 
                               ]
       
       injured_players = st.multiselect('Injured players'
@@ -638,6 +613,8 @@ with info_tab:
                               , on_change = increment_player_stats_version)
 
       player_stats = player_stats.drop(injured_players)
+
+      st.session_state.player_stats = player_stats
 
       info = process_player_data(None
                               ,player_stats
@@ -657,8 +634,9 @@ with info_tab:
 
       v = np.array(v/v.sum()).reshape(1,len(v))
       
-      z_scores = info['Z-scores']
-      g_scores = info['G-scores']
+      st.session_state.v = v
+      st.session_state.z_scores = info['Z-scores']
+      st.session_state.g_scores = info['G-scores']
 
   if st.session_state['schedule']:
     with games_played_tab: 
@@ -681,18 +659,18 @@ with info_tab:
       st.dataframe(game_stats)
 
 if 'selections_df' not in st.session_state:
-  st.session_state.selections_df = selections
+  st.session_state.selections_df = st.session_state.selections_default
 
 with rank_tab:
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
       
     with z_rank_tab:
-      make_rank_tab(z_scores
+      make_rank_tab(st.session_state.z_scores
                     , st.session_state.params['z-score-player-multiplier']
                     , st.session_state.info_key)  
 
     with g_rank_tab:
-      make_rank_tab(g_scores
+      make_rank_tab(st.session_state.g_scores
                     , st.session_state.params['g-score-player-multiplier']
                     , st.session_state.info_key)  
 
@@ -761,170 +739,11 @@ if st.session_state['mode'] == 'Draft Mode':
 
   with draft_tab:
 
-    def make_draft_tab_right(draft_seat, selection_list, player_assignments):
-
-      cand_tab, team_tab = st.tabs(["Candidates","Team"])
-
-      with cand_tab:
-
-        z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
-                  
-        with z_cand_tab:
-          
-          make_cand_tab(z_scores
-                        ,selection_list
-                        , st.session_state.params['z-score-player-multiplier']
-                        , info_key = st.session_state.info_key)
-
-        with g_cand_tab:
-
-          make_cand_tab(g_scores
-                        , selection_list
-                        , st.session_state.params['g-score-player-multiplier']
-                        , info_key = st.session_state.info_key)
-
-        with h_cand_tab:
-
-          if selections.columns[st.session_state.drafter] == draft_seat:
-
-            make_h_cand_tab(H
-                  ,g_scores
-                  ,z_scores
-                  ,player_assignments
-                  ,draft_seat
-                  ,n_iterations
-                  ,v)
-          else:
-
-            st.write('It is not your turn, so H-scoring will not run')
-
-      with team_tab:
-
-        if len(my_players) == n_picks:
-          base_h_res = get_base_h_score(info
-                                        ,omega
-                                        ,gamma
-                                        ,n_picks
-                                        ,n_drafters
-                                        ,scoring_format
-                                        ,chi
-                                        ,player_assignments
-                                        ,draft_seat
-                                        ,st.session_state.info_key)
-
-          base_h_score = base_h_res['Scores']
-          base_win_rates = base_h_res['Rates']
-
-        else:
-          base_h_score = None
-          base_win_rates = None
-
-        make_full_team_tab(z_scores
-                          ,g_scores
-                          ,my_players
-                          ,n_drafters
-                          ,n_picks
-                          ,base_h_score
-                          ,base_win_rates
-                          ,st.session_state.info_key
-                          )
-
-
     if data_source == 'Enter your own data':
-
-      left, right = st.columns(2)
-
-      with left:
-
-        selection_list = listify(st.session_state.selections_df)
-        g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
-
-        with st.form("pick form", border = False):
-          selected_player = st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
-                                    st.session_state.selections_df.columns[st.session_state.drafter]
-            ,key = 'selected_player'
-            ,options = g_scores_unselected.index)
-
-          button_col1, button_col2, button_col3 = st.columns(3)
-
-          with button_col1:
-            draft_button = st.form_submit_button("Lock in selection"
-                                    , on_click = select_player_from_draft_board
-                                    , use_container_width = True)
-            
-          with button_col2:
-            undo_button = st.form_submit_button("Undo last selection"
-                                    , on_click = undo_selection
-                                    , use_container_width = True)
-          with button_col3:
-            clear_board_button = st.form_submit_button("Clear draft board"
-                                    , on_click = clear_board
-                                    , use_container_width = True)
-          
-        player_assignments = st.session_state.selections_df.to_dict('list')
-
-        selections_df = st.dataframe(st.session_state.selections_df
-                                    ,key = 'selections_df'
-                                      , hide_index = True
-                                      , height = n_picks * 35 + 50)
-
-      with right:
-
-        non_autodrafters = [i for i,c in zip(range(selections.shape[1]),selections.columns) if c not in st.session_state.autodrafters]
-
-        draft_seat = st.selectbox(f'Which drafter are you?'
-            , selections_df.columns
-            , index = 0 if len(non_autodrafters) ==0 else non_autodrafters[0])
-
-        my_players = st.session_state.selections_df[draft_seat].dropna()
-
-        make_draft_tab_right(draft_seat, selection_list, player_assignments)
+      make_drafting_tab_own_data(H)
     else:
-        
-        st.session_state.live_draft_active = True
-      
-        @st.fragment(run_every = 5)
-        def update_live_draft():
-
-          left, right = st.columns(2)
-
-          with left:
-
-            if st.session_state.live_draft_active:
-
-              player_metadata = player_stats['Position']
-              player_metadata.index = [player.split('(')[0][0:-1] for player in player_metadata.index]
-
-              st.session_state.draft_results = yahoo_connect.get_draft_results(st.session_state.yahoo_league_id
-                                                                               , auth_dir
-                                                                               , player_metadata)
-
-            st.dataframe(st.session_state.draft_results
-                                ,key = 'selections_df'
-                                  , hide_index = True
-                                  , height = n_picks * 35 + 50) 
-            
-            
-            if (st.session_state.draft_results.isna().sum().sum() == 0):
-              st.session_state.live_action_draft = False
-
-            selection_list = listify(st.session_state.draft_results) 
-            player_assignments = st.session_state.selections_df.to_dict('list')
-
-          with right: 
-
-            st.write(st.session_state.selections_df.columns)
-            draft_seat = st.selectbox(f'Which drafter are you?'
-                , st.session_state.selections_df.columns
-                , index = 0)
-
-            my_players = st.session_state.selections_df[draft_seat].dropna()
-
-            make_draft_tab_right(draft_seat, selection_list, player_assignments)
-
-        update_live_draft()
-          
-
+      make_drafting_tab_live_data(H)
+    
 if st.session_state['mode'] == 'Auction Mode':
   with auction_tab:
 
@@ -999,7 +818,7 @@ if st.session_state['mode'] == 'Auction Mode':
                   
         with z_cand_tab:
           
-          z_scores_unselected = make_cand_tab(z_scores
+          z_scores_unselected = make_cand_tab(st.session_state.z_scores
                         ,selection_list
                         , st.session_state.params['z-score-player-multiplier']
                         ,remaining_cash
@@ -1009,7 +828,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
         with g_cand_tab:
 
-          g_scores_unselected = make_cand_tab(g_scores
+          g_scores_unselected = make_cand_tab(st.session_state.g_scores
                         , selection_list
                         , st.session_state.params['g-score-player-multiplier']
                         ,remaining_cash
@@ -1040,8 +859,8 @@ if st.session_state['mode'] == 'Auction Mode':
             h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
             make_h_cand_tab(H
-                  ,g_scores
-                  ,z_scores
+                  ,st.session_state.g_scores
+                  ,st.session_state.z_scores
                   ,player_assignments.to_dict()
                   ,auction_seat
                   ,n_iterations
@@ -1055,8 +874,8 @@ if st.session_state['mode'] == 'Auction Mode':
         base_h_score = None
         base_win_rates = None
 
-        make_full_team_tab(z_scores
-                          ,g_scores
+        make_full_team_tab(st.session_state.z_scores
+                          ,st.session_state.g_scores
                           ,my_players
                           ,n_drafters
                           ,n_picks
@@ -1074,14 +893,14 @@ elif st.session_state['mode'] == 'Season Mode':
     with left:
 
       st.caption("""Enter which player is on which team below""")
-      selections_df = st.data_editor(selections
+      selections_df = st.data_editor(st.session_state.selections
                                         , hide_index = True
                                         , height = n_picks * 35 + 50)  
       selection_list = listify(selections_df)
       player_assignments = selections_df.to_dict('list')
 
-      z_scores_unselected = z_scores[~z_scores.index.isin(selection_list)]
-      g_scores_unselected = g_scores[~g_scores.index.isin(selection_list)]
+      z_scores_unselected = st.session_state.z_scores[~st.session_state.z_scores.index.isin(selection_list)]
+      g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
 
       with right: 
 
@@ -1111,8 +930,8 @@ elif st.session_state['mode'] == 'Season Mode':
           base_h_score = None
           base_win_rates = None
 
-        make_full_team_tab(z_scores
-                            ,g_scores
+        make_full_team_tab(st.session_state.z_scores
+                            ,st.session_state.g_scores
                             ,inspection_players
                             ,n_drafters
                             ,n_picks
@@ -1196,16 +1015,16 @@ elif st.session_state['mode'] == 'Season Mode':
 
           else:
 
-            waiver_team_stats_z = z_scores[z_scores.index.isin(waiver_players)]
+            waiver_team_stats_z = st.session_state.z_scores[st.session_state.z_scores.index.isin(waiver_players)]
             waiver_team_stats_z.loc['Total', :] = waiver_team_stats_z.sum(axis = 0)
 
-            waiver_team_stats_g = g_scores[g_scores.index.isin(waiver_players)]
+            waiver_team_stats_g = st.session_state.g_scores[st.session_state.g_scores.index.isin(waiver_players)]
             waiver_team_stats_g.loc['Total', :] = waiver_team_stats_g.sum(axis = 0)
 
             if rotisserie:
-              worst_player = list(z_scores.index[z_scores.index.isin(waiver_players)])[-1]
+              worst_player = list(st.session_state.z_scores.index[st.session_state.z_scores.index.isin(waiver_players)])[-1]
             else:
-              worst_player = list(g_scores.index[g_scores.index.isin(waiver_players)])[-1]
+              worst_player = list(st.session_state.g_scores.index[st.session_state.g_scores.index.isin(waiver_players)])[-1]
 
             default_index = list(waiver_players).index(worst_player)
 
@@ -1234,7 +1053,7 @@ elif st.session_state['mode'] == 'Season Mode':
         with g_waiver_tab:
 
             st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(g_scores
+            make_waiver_tab(st.session_state.g_scores
                           , selection_list
                           , waiver_team_stats_g
                           , drop_player
@@ -1343,7 +1162,7 @@ elif st.session_state['mode'] == 'Season Mode':
             else:
 
               with z_tab:
-                make_trade_score_tab(z_scores 
+                make_trade_score_tab(st.session_state.z_scores 
                                   , players_sent
                                   , players_received 
                                   , st.session_state.params['z-score-player-multiplier']
@@ -1351,7 +1170,7 @@ elif st.session_state['mode'] == 'Season Mode':
                                   , st.session_state.info_key
                                   )
               with g_tab:
-                make_trade_score_tab(g_scores 
+                make_trade_score_tab(st.session_state.g_scores 
                                   , players_sent
                                   , players_received 
                                   , st.session_state.params['g-score-player-multiplier']
@@ -1396,10 +1215,10 @@ elif st.session_state['mode'] == 'Season Mode':
           with suggestions_tab:
 
             if rotisserie:
-              general_value = z_scores.sum(axis = 1)
+              general_value = st.session_state.z_scores.sum(axis = 1)
               replacement_value = z_scores_unselected.iloc[0].sum() 
             else:
-              general_value = g_scores.sum(axis = 1)
+              general_value = st.session_state.g_scores.sum(axis = 1)
               replacement_value = g_scores_unselected.iloc[0].sum()
 
             #slightly hacky way to make all of the multiselects blue
