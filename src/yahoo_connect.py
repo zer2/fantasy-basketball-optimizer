@@ -305,7 +305,6 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
 
     team_names = list(range(n_drafters))
 
-    #maybe?
     teams_dict = get_teams_dict(league_id, _auth_path)
     team_names = [teams_dict[int(draft_obj.team_key.split('.')[-1])] for draft_obj in draft_results[0:len(teams_dict)]]
 
@@ -315,7 +314,6 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
     row = 0
     drafter = 0
 
-    #we need to add position too 
     for draft_obj in draft_results:
 
         if len(draft_obj.player_key) > 0:

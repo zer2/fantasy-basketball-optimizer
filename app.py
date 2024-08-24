@@ -250,6 +250,9 @@ with param_tab:
         if st.session_state.selections_default is None:
           st.session_state.selections_default = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
 
+        st.session_state.n_drafters = n_drafters
+        st.session_state.n_picks = n_picks
+
     with c2: 
 
       scoring_format = st.selectbox(
@@ -336,9 +339,6 @@ with param_tab:
                     ,default = None)
           
           submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
-
-  st.session_state.n_drafters = n_drafters
-  st.session_state.n_picks = n_picks
 
   with advanced_params:
 

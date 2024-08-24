@@ -161,11 +161,16 @@ def make_drafting_tab_live_data(H):
 
     st.session_state.player_metadata = st.session_state.player_stats['Position']
 
-    @st.fragment(run_every = 100)
+    if (st.session_state.draft_results.isna().sum().sum() == 0):
+        run_every = None
+    else:
+        run_every = 5
+
+    @st.fragment(run_every = run_every)
     def update_live_draft():
         yahoo_league_id = st.session_state.yahoo_league_id
         auth_dir = st.session_state.auth_dir
-        player_metadata = st.session_state.player_metadata
+        player_metadata = st.session_state.player_metadata.copy()
 
         player_metadata.index = [player.split('(')[0][0:-1] for player in player_metadata.index]
 
