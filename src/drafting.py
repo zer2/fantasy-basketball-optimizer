@@ -161,8 +161,11 @@ def make_drafting_tab_live_data(H):
 
     st.session_state.player_metadata = st.session_state.player_stats['Position']
 
-    if (st.session_state.draft_results.isna().sum().sum() == 0):
-        run_every = None
+    if st.session_state.draft_results is not None:
+        if (st.session_state.draft_results.isna().sum().sum() == 0):
+            run_every = None
+        else:
+            run_every = 5
     else:
         run_every = 5
 
@@ -178,54 +181,55 @@ def make_drafting_tab_live_data(H):
                                                                             , auth_dir
                                                                             , player_metadata)
         
-        st.session_state.n_drafters = len(st.session_state.draft_results.columns)
-        
-        selection_list = listify(st.session_state.draft_results) 
-        player_assignments = st.session_state.draft_results.to_dict('list')
-        
-        if (st.session_state.draft_results.isna().sum().sum() == 0):
-            st.session_state.live_action_draft = False
-        
-        left, right = st.columns(2)
+        if st.session_state.draft_results is None:
 
-        with left: 
+            st.write('Draft has not yet begun')
 
-            st.dataframe(st.session_state.draft_results
-                                ,key = 'selections_df'
-                                    , hide_index = True
-                                    , height = st.session_state.n_picks * 35 + 50) 
+        else:
+        
+            st.session_state.n_drafters = len(st.session_state.draft_results.columns)
             
-        with right:
+            selection_list = listify(st.session_state.draft_results) 
+            player_assignments = st.session_state.draft_results.to_dict('list')
+            
+            left, right = st.columns(2)
 
-            draft_seat = st.selectbox(f'Which drafter are you?'
-                , st.session_state.draft_results.columns
-                , index = 0)
+            with left: 
 
-            my_players = st.session_state.draft_results[draft_seat].dropna()
-
-            cand_tab, team_tab = st.tabs(["Candidates","Team"])
-
-            with cand_tab:
-
-                z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
-                        
-                with z_cand_tab:
+                st.dataframe(st.session_state.draft_results
+                                    ,key = 'selections_df'
+                                        , hide_index = True
+                                        , height = st.session_state.n_picks * 35 + 50) 
                 
-                    make_cand_tab(st.session_state.z_scores
-                                    ,selection_list
-                                    , st.session_state.params['z-score-player-multiplier']
-                                    , info_key = st.session_state.info_key)
+            with right:
 
-                with g_cand_tab:
+                draft_seat = st.selectbox(f'Which drafter are you?'
+                    , st.session_state.draft_results.columns
+                    , index = 0)
 
-                    make_cand_tab(st.session_state.g_scores
-                                    , selection_list
-                                    , st.session_state.params['g-score-player-multiplier']
-                                    , info_key = st.session_state.info_key)
+                my_players = st.session_state.draft_results[draft_seat].dropna()
 
-                with h_cand_tab:
+                cand_tab, team_tab = st.tabs(["Candidates","Team"])
 
-                    if st.session_state.selections_default.columns[st.session_state.drafter] == draft_seat:
+                with cand_tab:
+
+                    z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
+                            
+                    with z_cand_tab:
+                    
+                        make_cand_tab(st.session_state.z_scores
+                                        ,selection_list
+                                        , st.session_state.params['z-score-player-multiplier']
+                                        , info_key = st.session_state.info_key)
+
+                    with g_cand_tab:
+
+                        make_cand_tab(st.session_state.g_scores
+                                        , selection_list
+                                        , st.session_state.params['g-score-player-multiplier']
+                                        , info_key = st.session_state.info_key)
+
+                    with h_cand_tab:
 
                         make_h_cand_tab(H
                             ,st.session_state.g_scores
@@ -234,39 +238,37 @@ def make_drafting_tab_live_data(H):
                             ,draft_seat
                             ,st.session_state.n_iterations
                             ,st.session_state.v)
+
+                with team_tab:
+
+                    if len(my_players) == st.session_state.n_picks:
+                        base_h_res = get_base_h_score(st.session_state.info
+                                                        ,st.session_state.omega
+                                                        ,st.session_state.gamma
+                                                        ,st.session_state.n_picks
+                                                        ,st.session_state.n_drafters
+                                                        ,st.session_state.scoring_format
+                                                        ,st.session_state.chi
+                                                        ,player_assignments
+                                                        ,draft_seat
+                                                        ,st.session_state.info_key)
+
+                        base_h_score = base_h_res['Scores']
+                        base_win_rates = base_h_res['Rates']
+
                     else:
-                        st.write('It is not your turn, so H-scoring will not run')
+                        base_h_score = None
+                        base_win_rates = None
 
-            with team_tab:
-
-                if len(my_players) == st.session_state.n_picks:
-                    base_h_res = get_base_h_score(st.session_state.info
-                                                    ,st.session_state.omega
-                                                    ,st.session_state.gamma
-                                                    ,st.session_state.n_picks
-                                                    ,st.session_state.n_drafters
-                                                    ,st.session_state.scoring_format
-                                                    ,st.session_state.chi
-                                                    ,player_assignments
-                                                    ,draft_seat
-                                                    ,st.session_state.info_key)
-
-                    base_h_score = base_h_res['Scores']
-                    base_win_rates = base_h_res['Rates']
-
-                else:
-                    base_h_score = None
-                    base_win_rates = None
-
-                make_full_team_tab(st.session_state.z_scores
-                                ,st.session_state.g_scores
-                                ,my_players
-                                ,st.session_state.n_drafters
-                                ,st.session_state.n_picks
-                                ,base_h_score
-                                ,base_win_rates
-                                ,st.session_state.info_key
-                                )
+                    make_full_team_tab(st.session_state.z_scores
+                                    ,st.session_state.g_scores
+                                    ,my_players
+                                    ,st.session_state.n_drafters
+                                    ,st.session_state.n_picks
+                                    ,base_h_score
+                                    ,base_win_rates
+                                    ,st.session_state.info_key
+                                    )
 
         
 
@@ -275,14 +277,8 @@ def make_drafting_tab_live_data(H):
 
 
 
-    st.session_state.live_draft_active = True
 
-    if st.session_state.live_draft_active:
-        update_live_draft()
-    else:
-        st.dataframe(st.session_state.draft_results
-                            ,key = 'selections_df'
-                            , hide_index = True
-                            , height = st.session_state.n_picks * 35 + 50) 
+    update_live_draft()
+
         
 

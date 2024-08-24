@@ -297,7 +297,10 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
 
     mapper_table = get_yahoo_key_to_name_mapper().set_index('YAHOO_PLAYER_ID')
 
-    draft_results = sc.get_league_draft_results()
+    try:
+        draft_results = sc.get_league_draft_results()
+    except:
+        return None
 
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
