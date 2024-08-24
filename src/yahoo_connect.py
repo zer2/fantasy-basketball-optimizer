@@ -287,7 +287,6 @@ def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Seri
 
     return week_dict
 
-@st.cache_data(ttl=3600, show_spinner = False)
 def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[League]:
     sc = YahooFantasySportsQuery(
         auth_dir=_auth_path,
@@ -304,20 +303,29 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
     n_picks = len(draft_results)
     n_drafters = int(n_picks/max_round)
 
+    team_names = list(range(n_drafters))
+
+    #maybe?
+    teams_dict = get_teams_dict(league_id, _auth_path)
+    team_names = [teams_dict[int(draft_obj.team_key.split('.')[-1])] for draft_obj in draft_results[0:len(teams_dict)]]
+
     df = pd.DataFrame(index = list(range(max_round))
-                      , columns = list(range(n_drafters)))
+                      , columns = team_names)
 
     row = 0
     drafter = 0
 
     #we need to add position too 
     for draft_obj in draft_results:
-        drafted_player = mapper_table.loc[int(draft_obj.player_key.split('.')[-1])]
-        drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
 
-        drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
+        if len(draft_obj.player_key) > 0:
+            drafted_player = mapper_table.loc[int(draft_obj.player_key.split('.')[-1])]
 
-        df.iloc[row, drafter] = drafted_player_mod
-        row, drafter = move_forward_one_pick(row, drafter, n_drafters)
+            drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
+
+            drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
+
+            df.iloc[row, drafter] = drafted_player_mod
+            row, drafter = move_forward_one_pick(row, drafter, n_drafters)
 
     return df

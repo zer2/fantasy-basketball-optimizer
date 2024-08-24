@@ -13,3 +13,4 @@ pyyaml
 numexpr
 statsmodels
 snowflake-connector-python
+schedule
