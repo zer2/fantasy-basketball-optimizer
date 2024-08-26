@@ -5,7 +5,8 @@ from tempfile import mkdtemp
 from typing import List, Optional
 from yfpy.models import League, Team, Roster
 from yfpy.query import YahooFantasySportsQuery
-from src.get_data import get_nba_schedule
+from src.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
+from src.helper_functions import move_forward_one_pick
 from collections import Counter
 
 import json
@@ -285,3 +286,46 @@ def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Seri
         week_dict[week_str] = league_players['Team'].map(game_counts)
 
     return week_dict
+
+def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[League]:
+    sc = YahooFantasySportsQuery(
+        auth_dir=_auth_path,
+        league_id=league_id, # Shouldn't actually matter what this is since we are retrieving the user's leagues
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+
+    mapper_table = get_yahoo_key_to_name_mapper().set_index('YAHOO_PLAYER_ID')
+
+    draft_results = sc.get_league_draft_results()
+
+    max_round = max([item.round for item in draft_results])
+    n_picks = len(draft_results)
+    n_drafters = int(n_picks/max_round)
+
+    team_names = list(range(n_drafters))
+
+    #maybe?
+    teams_dict = get_teams_dict(league_id, _auth_path)
+    team_names = [teams_dict[int(draft_obj.team_key.split('.')[-1])] for draft_obj in draft_results[0:len(teams_dict)]]
+
+    df = pd.DataFrame(index = list(range(max_round))
+                      , columns = team_names)
+
+    row = 0
+    drafter = 0
+
+    #we need to add position too 
+    for draft_obj in draft_results:
+
+        if len(draft_obj.player_key) > 0:
+            drafted_player = mapper_table.loc[int(draft_obj.player_key.split('.')[-1])]
+
+            drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
+
+            drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
+
+            df.iloc[row, drafter] = drafted_player_mod
+            row, drafter = move_forward_one_pick(row, drafter, n_drafters)
+
+    return df

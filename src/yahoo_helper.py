@@ -69,3 +69,16 @@ def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[Lea
             for player in player_dicts
                     ]
     return player_status_records
+
+def get_draft_results(sc: YahooFantasySportsQuery) -> List[League]:
+    """
+    Generates a list of leagues that the user has been a part of
+    
+    Parameters:
+    - sc (object): The YahooFantasySportsQuery object.
+
+    Returns:
+    - unsure?
+    """
+    draft_results = sc.get_league_draft_results() 
+    return draft_results
