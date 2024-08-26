@@ -151,8 +151,8 @@ with param_tab:
         , key = 'mode')
       
       # Setting default values
-      n_drafters = st.session_state.params['options']['n_drafters']['default']
-      n_picks = st.session_state.params['options']['n_picks']['default']
+      st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
+      st.session_state.n_picks = st.session_state.params['options']['n_picks']['default']
 
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
@@ -178,7 +178,9 @@ with param_tab:
                       
         # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
         
-        st.session_state.selections_default = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
+        st.session_state.selections_default = pd.DataFrame(
+          {'Drafter ' + str(n+1) : [None] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
+          )
 
       else:
 
@@ -211,8 +213,8 @@ with param_tab:
               player_metadata = get_player_metadata()
 
               team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, st.session_state.yahoo_league_id, player_metadata)
-              n_drafters = team_players_df.shape[1]
-              n_picks = team_players_df.shape[0]
+              st.session_state.n_drafters = team_players_df.shape[1]
+              st.session_state.n_picks = team_players_df.shape[0]
 
               #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
               
@@ -245,13 +247,15 @@ with param_tab:
 
               st.session_state.yahoo_league_id = yahoo_league.league_id
 
-            st.session_state.selections_default = None
+              st.session_state.selections_default = None
+              st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+              st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
+              st.session_state.n_picks = 13 #ZR: fix this
 
         if st.session_state.selections_default is None:
-          st.session_state.selections_default = pd.DataFrame({'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)})
-
-        st.session_state.n_drafters = n_drafters
-        st.session_state.n_picks = n_picks
+          st.session_state.selections_default = pd.DataFrame(
+            {'Drafter ' + str(n+1) : [None] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
+            )
 
     with c2: 
 
@@ -412,11 +416,11 @@ with param_tab:
           
       implied_n_picks = sum(n for n in get_position_numbers().values())
       
-      if implied_n_picks > n_picks:
+      if implied_n_picks > st.session_state.n_picks:
         st.write('There are more position slots than picks in your league. Change your configuration before proceeding')
         st.stop()
 
-      elif implied_n_picks < n_picks:
+      elif implied_n_picks < st.session_state.n_picks:
         st.write('There are fewer position slots than picks in your league. Change your configuration before proceeding')
         st.stop()
 
@@ -563,6 +567,8 @@ with info_tab:
   else:
     raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
+    
+    st.write(raw_stats_df)
 
     player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
     st.session_state.selections_default = st.session_state.selections_default.astype(player_category_type)
@@ -621,8 +627,8 @@ with info_tab:
                               ,conversion_factors
                               ,upsilon
                               ,psi
-                              ,n_drafters
-                              ,n_picks
+                              ,st.session_state.n_drafters
+                              ,st.session_state.n_picks
                               ,st.session_state.params
                               ,st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
       st.session_state.info = info #useful for testing
@@ -710,8 +716,8 @@ with rank_tab:
       h_ranks = make_h_rank_tab(info
                     ,omega
                     ,gamma
-                    ,n_picks
-                    ,n_drafters
+                    ,st.session_state.n_picks
+                    ,st.session_state.n_drafters
                     ,n_iterations
                     ,scoring_format
                     ,st.session_state['mode']
@@ -723,8 +729,8 @@ with rank_tab:
 H = HAgent(info = info
     , omega = omega
     , gamma = gamma
-    , n_picks = n_picks
-    , n_drafters = n_drafters
+    , n_picks = st.session_state.n_picks
+    , n_drafters = st.session_state.n_drafters
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
     , chi = chi )
@@ -756,9 +762,9 @@ if st.session_state['mode'] == 'Auction Mode':
                 , min_value = 1
                 , value = 200)
 
-      teams = ['Team ' + str(n) for n in range(n_drafters)]
+      teams = ['Team ' + str(n) for n in range(st.session_state.n_drafters)]
 
-      auction_selections_default = pd.DataFrame([[None] * 3] * n_picks * n_drafters
+      auction_selections_default = pd.DataFrame([[None] * 3] * st.session_state.n_picks * st.session_state.n_drafters
                                         ,columns = ['Player','Team','Cost'])
 
       auction_selections_default.loc[:'Player'] = \
@@ -778,7 +784,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
       selection_list = auction_selections['Player'].dropna()
 
-      total_cash = cash_per_team * n_drafters
+      total_cash = cash_per_team * st.session_state.n_drafters
 
       amount_spent = auction_selections['Cost'].dropna().sum()
 
@@ -808,7 +814,7 @@ if st.session_state['mode'] == 'Auction Mode':
       my_remaining_cash = cash_remaining_per_team[auction_seat]
 
       st.caption(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(cash_per_team) \
-              + ' to select ' + str(n_picks - n_my_players) + ' of ' + str(n_picks) + ' players')
+              + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players')
 
       cand_tab, team_tab = st.tabs(["Candidates","Team"])
             
@@ -822,7 +828,7 @@ if st.session_state['mode'] == 'Auction Mode':
                         ,selection_list
                         , st.session_state.params['z-score-player-multiplier']
                         ,remaining_cash
-                        ,n_drafters * n_picks
+                        ,st.session_state.n_drafters * st.session_state.n_picks
                         ,st.session_state.info_key
 )
 
@@ -832,12 +838,12 @@ if st.session_state['mode'] == 'Auction Mode':
                         , selection_list
                         , st.session_state.params['g-score-player-multiplier']
                         ,remaining_cash
-                        , n_drafters * n_picks
+                        ,st.session_state.n_drafters * st.session_state.n_picks
                         ,st.session_state.info_key)
 
         with h_cand_tab:
 
-          if len(my_players) == n_picks:
+          if len(my_players) == st.session_state.n_picks:
             st.markdown('Team is complete!')
                     
           elif not st.session_state.run_h_score:
@@ -852,7 +858,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
             h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
             h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
-                                                          , n_picks * n_drafters - len(selection_list)
+                                                          , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
                                                           , remaining_cash
                                                           , st.session_state['streaming_noise_h'])
             
@@ -865,9 +871,10 @@ if st.session_state['mode'] == 'Auction Mode':
                   ,auction_seat
                   ,n_iterations
                   ,v
+                  ,5 #display frequency
                   ,cash_remaining_per_team.to_dict()
                   ,h_defaults_savor
-                  ,n_drafters * n_picks)
+                  ,st.session_state.n_drafters * st.session_state.n_picks)
 
       with team_tab:
 
@@ -877,8 +884,8 @@ if st.session_state['mode'] == 'Auction Mode':
         make_full_team_tab(st.session_state.z_scores
                           ,st.session_state.g_scores
                           ,my_players
-                          ,n_drafters
-                          ,n_picks
+                          ,st.session_state.n_drafters
+                          ,st.session_state.n_picks
                           ,base_h_score
                           ,base_win_rates
                           ,st.session_state.info_key
@@ -895,7 +902,7 @@ elif st.session_state['mode'] == 'Season Mode':
       st.caption("""Enter which player is on which team below""")
       selections_df = st.data_editor(st.session_state.selections
                                         , hide_index = True
-                                        , height = n_picks * 35 + 50)  
+                                        , height = st.session_state.n_picks * 35 + 50)  
       selection_list = listify(selections_df)
       player_assignments = selections_df.to_dict('list')
 
@@ -910,13 +917,13 @@ elif st.session_state['mode'] == 'Season Mode':
 
         inspection_players = selections_df[roster_inspection_seat].dropna()
 
-        if len(inspection_players) == n_picks:
+        if len(inspection_players) == st.session_state.n_picks:
 
           base_h_res = get_base_h_score(info
                                         ,omega
                                         ,gamma
-                                        ,n_picks
-                                        ,n_drafters
+                                        ,st.session_state.n_picks
+                                        ,st.session_state.n_drafters
                                         ,scoring_format
                                         ,chi
                                         ,player_assignments
@@ -933,8 +940,8 @@ elif st.session_state['mode'] == 'Season Mode':
         make_full_team_tab(st.session_state.z_scores
                             ,st.session_state.g_scores
                             ,inspection_players
-                            ,n_drafters
-                            ,n_picks
+                            ,st.session_state.n_drafters
+                            ,st.session_state.n_picks
                             ,base_h_score
                             ,base_win_rates
                             ,st.session_state.info_key
@@ -981,21 +988,21 @@ elif st.session_state['mode'] == 'Season Mode':
         else:
           with c3: 
             opponent_seat = st.selectbox(f'Against which team?'
-                                              , [s for s in selections.columns if s != matchup_seat]
+                                              , [s for s in st.session_state.selections.columns if s != matchup_seat]
                                               , index = 0)
         st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
                   expected game volume for each player based on the NBA's schedule""")
 
         make_matchup_tab(player_stats
-                        , selections
+                        , st.session_state.selections
                         , matchup_seat
                         , opponent_seat
                         , matchup_week
-                        , n_picks
-                        , n_drafters
+                        , st.session_state.n_picks
+                        , st.session_state.n_drafters
                         , conversion_factors
                         , psi
-                        , nu
+                        , st.session_state.nu
                         , scoring_format )
         ######## END TAB
   with waiver_tab:
@@ -1004,13 +1011,13 @@ elif st.session_state['mode'] == 'Season Mode':
 
       with c1: 
         waiver_inspection_seat = st.selectbox(f'Which team so you want to drop a player from?'
-            , selections.columns
+            , st.session_state.selections.columns
             , index = 0)
 
       with c2: 
           waiver_players = selections_df[waiver_inspection_seat].dropna()
 
-          if len(waiver_players) < n_picks:
+          if len(waiver_players) < st.session_state.n_picks:
               st.markdown("""This team is not full yet!""")
 
           else:
@@ -1034,7 +1041,7 @@ elif st.session_state['mode'] == 'Season Mode':
               ,index = default_index
             )
 
-      if len(waiver_players) == n_picks:
+      if len(waiver_players) == st.session_state.n_picks:
 
         mod_waiver_players = [x for x in waiver_players if x != drop_player]
 
@@ -1065,8 +1072,8 @@ elif st.session_state['mode'] == 'Season Mode':
             base_h_res = get_base_h_score(info
                             ,omega
                             ,gamma
-                            ,n_picks
-                            ,n_drafters
+                            ,st.session_state.n_picks
+                            ,st.session_state.n_drafters
                             ,scoring_format
                             ,chi
                             ,player_assignments
@@ -1098,7 +1105,7 @@ elif st.session_state['mode'] == 'Season Mode':
     with c2: 
       trade_party_players = selections_df[trade_party_seat].dropna()
 
-      if len(trade_party_players) < n_picks:
+      if len(trade_party_players) < st.session_state.n_picks:
           st.markdown("""This team is not full yet! Fill it and other teams out on the 
                       "Teams" page then come back here""")
 
@@ -1121,9 +1128,9 @@ elif st.session_state['mode'] == 'Season Mode':
         else: 
           trade_counterparty_players = []
 
-    if len(trade_party_players) == n_picks:
+    if len(trade_party_players) == st.session_state.n_picks:
 
-      if len(trade_counterparty_players) < n_picks:
+      if len(trade_counterparty_players) < st.session_state.n_picks:
         st.markdown('The other team is not full yet!')
       else:
 

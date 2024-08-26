@@ -188,13 +188,15 @@ def make_cand_tab(_scores : pd.DataFrame
 
   return scores_unselected
 
-def make_h_cand_tab(H
+@st.cache_data(show_spinner = False)
+def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
                     ,player_assignments
                     ,draft_seat
                     ,n_iterations
                     ,v
+                    ,display_period : int = 5
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
                     ,total_players : int = None):
@@ -212,7 +214,7 @@ def make_h_cand_tab(H
       DataFrame of stats of unselected players, to use in other tabs
   """
           
-  generator = H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+  generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
 
   placeholder = st.empty()
 
@@ -220,11 +222,18 @@ def make_h_cand_tab(H
   for i in range(max(1,n_iterations)):
 
     res = next(generator)
-    score = res['Scores']
-    weights = res['Weights']
-    win_rates = res['Rates']
-    position_shares = res['Position-Shares']
     rosters = res['Rosters']
+
+    fits_roster = rosters.loc[:,0] >= 0
+
+    rosters = rosters[list(fits_roster.values)]
+
+    score = res['Scores'][fits_roster]
+    weights = res['Weights'][fits_roster]
+    win_rates = res['Rates'][fits_roster]
+    position_shares = res['Position-Shares']
+
+    #should filter for rosters that are viable 
 
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
@@ -237,7 +246,7 @@ def make_h_cand_tab(H
 
       position_shares_list = [(k, v) for k, v in position_shares.items()]
       position_shares_tab_names = ['Flex- ' + x[0] for x in position_shares_list]
-      position_shares_res = [x[1] for x in position_shares_list]
+      position_shares_res = [x[1][list(fits_roster.values)] for x in position_shares_list]
 
       if cash_remaining_per_team:
         all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores'])
@@ -257,12 +266,12 @@ def make_h_cand_tab(H
         position_tabs = all_tabs[3:-2]
         raw_z_tab = all_tabs[-2]
         raw_g_tab = all_tabs[-1]
-        
+
       score = score.sort_values(ascending = False)
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
-      display = ((i-1) % 5 == 0) or (i == n_iterations - 1)
+      display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
 
       with rate_tab:
 
