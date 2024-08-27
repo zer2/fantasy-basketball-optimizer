@@ -154,25 +154,23 @@ def make_drafting_tab_own_data(H):
                             )
 
         
+def refresh_analysis():
+    yahoo_league_id = st.session_state.yahoo_league_id
+    auth_dir = st.session_state.auth_dir
+    player_metadata = st.session_state.player_metadata.copy()
 
+    player_metadata.index = [player.split('(')[0][0:-1] for player in player_metadata.index]
 
-
-
+    st.session_state.draft_results = yahoo_connect.get_draft_results(yahoo_league_id
+                                                                        , auth_dir
+                                                                        , player_metadata)
+        
 def make_drafting_tab_live_data(H):
 
     st.session_state.player_metadata = st.session_state.player_stats['Position']
 
-    def refresh_analysis():
-        yahoo_league_id = st.session_state.yahoo_league_id
-        auth_dir = st.session_state.auth_dir
-        player_metadata = st.session_state.player_metadata.copy()
-
-        player_metadata.index = [player.split('(')[0][0:-1] for player in player_metadata.index]
-
-        st.session_state.draft_results = yahoo_connect.get_draft_results(yahoo_league_id
-                                                                            , auth_dir
-                                                                            , player_metadata)
-        
+    if st.session_state.draft_results is None:
+        refresh_analysis()
 
     if 'team_names' in st.session_state:
 
@@ -211,7 +209,7 @@ def make_drafting_tab_live_data(H):
                     ,draft_seat
                     ,st.session_state.n_iterations
                     ,st.session_state.v
-                    ,100)
+                    ,5)
 
         with team_tab:
 

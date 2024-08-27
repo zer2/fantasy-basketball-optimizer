@@ -301,7 +301,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
         draft_results = sc.get_league_draft_results()
     except:
         return None
-    
+            
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
     n_drafters = int(n_picks/max_round)
@@ -309,6 +309,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
     team_names = list(range(n_drafters))
 
     teams_dict = get_teams_dict(league_id, _auth_path)
+
     team_names = [teams_dict[int(draft_obj.team_key.split('.')[-1])] for draft_obj in draft_results[0:len(teams_dict)]]
 
     df = pd.DataFrame(index = list(range(max_round))

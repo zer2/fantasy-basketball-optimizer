@@ -61,7 +61,7 @@ if 'yahoo_league_id' not in st.session_state:
     st.session_state.yahoo_league_id = None
 
 if 'draft_results' not in st.session_state:
-    st.session_state.draft_results = pd.DataFrame()
+    st.session_state.draft_results = None
 
 def run_h_score():
     st.session_state.run_h_score = True
@@ -74,6 +74,11 @@ with open("parameters.yaml", "r") as stream:
 
 def load_params(league):
   st.session_state.params = st.session_state.all_params[league]
+
+def clear_info():
+  if 'draft_results' in st.session_state:
+    del st.session_state.draft_results 
+
 
 st.title('Optimization for Fantasy Basketball :basketball:')
 
@@ -161,6 +166,7 @@ with param_tab:
       data_source = st.selectbox(
         'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
         ('Enter your own data', 'Retrieve from Yahoo Fantasy')
+        , on_change = clear_info
         , index = 0)
 
         
@@ -203,9 +209,23 @@ with param_tab:
             index=None
           )
 
+          if yahoo_league is not None:
+              st.session_state.yahoo_league_id = yahoo_league.league_id
+
+              st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
+              st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+          else:
+               st.number_input(label =  "For a Mock draft, manually write in league ID (from URL, after nba/ or mlid = )"
+                               ,min_value = 0
+                               ,value = None
+                               ,key = 'yahoo_league_id')
+               
+               if st.session_state.yahoo_league_id is not None:
+                st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
+                st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+
           if (st.session_state.mode == 'Season Mode'):
 
-            
             if yahoo_league is not None:
 
               st.session_state.yahoo_league_id = yahoo_league.league_id
