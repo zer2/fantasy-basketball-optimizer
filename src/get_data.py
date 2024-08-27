@@ -27,6 +27,9 @@ def get_data_from_snowflake(table_name):
 def get_yahoo_key_to_name_mapper():
    return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
 
+def get_yahoo_key_to_position_eligibility(season = 2024):
+   return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
+
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
