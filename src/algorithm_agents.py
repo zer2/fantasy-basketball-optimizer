@@ -540,8 +540,16 @@ class HAgent():
                 category_weights = None
                 expected_future_diff = None
                 pdf_estimates = None
-                rosters = None
-                
+
+                team_positions = self.positions.loc[self.players]
+                 
+
+                #ZR: This is actually super inefficient. Should be fixed later
+                rosters = {0 : 
+                                       [1 if check_eligibility_alternate(self.positions.loc[player], team_positions) else -1 
+                                         for player in result_index]
+                                        }
+  
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
                                         , pdf_estimates
