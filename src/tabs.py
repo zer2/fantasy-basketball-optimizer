@@ -188,7 +188,7 @@ def make_cand_tab(_scores : pd.DataFrame
 
   return scores_unselected
 
-#@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False)
 def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
