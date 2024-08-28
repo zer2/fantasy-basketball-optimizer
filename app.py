@@ -192,15 +192,16 @@ with param_tab:
 
         st.session_state.selections_default = None
 
+        print('Boo')
+
         auth_dir = yahoo_connect.get_yahoo_access_token()
         st.session_state.auth_dir = auth_dir
 
         if auth_dir is not None:
-          print('HIII')
+          print('Hoo')
 
           user_leagues = yahoo_connect.get_user_leagues(auth_dir)
-          print('There')
-
+          
           get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
 
           yahoo_league = st.selectbox(
