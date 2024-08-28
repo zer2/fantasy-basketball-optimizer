@@ -128,6 +128,8 @@ elif st.session_state['mode'] == 'Season Mode':
   waiver_tab = main_tabs[5]
   trade_tab = main_tabs[6]
   about_tab = main_tabs[7]
+
+print('URA')
                 
 with param_tab: 
 
@@ -198,7 +200,6 @@ with param_tab:
         st.session_state.auth_dir = auth_dir
 
         if auth_dir is not None:
-          print('Hoo')
 
           user_leagues = yahoo_connect.get_user_leagues(auth_dir)
           
