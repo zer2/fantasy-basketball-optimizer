@@ -327,7 +327,7 @@ def make_h_cand_tab(_H
 
       with roster_tab:
                     
-          if display and (rosters.shape[1] > 0):
+          if display and (rosters.shape[1] > 1):
 
             my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x ==x]
             n_players = len(my_players)
