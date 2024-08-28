@@ -1,4 +1,3 @@
-print('OWL')
 import streamlit as st
 import pandas as pd
 from pandas.api.types import CategoricalDtype
@@ -15,7 +14,6 @@ from src.helper_functions import  get_position_numbers, listify \
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
-print('GRR')
 from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
