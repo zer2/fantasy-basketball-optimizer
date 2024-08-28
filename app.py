@@ -30,6 +30,8 @@ st.set_page_config(page_title='Fantasy BBall Optimization'
           , initial_sidebar_state="auto"
           , menu_items=None)
 
+print('OOF')
+
 if 'player_stats_editable' not in st.session_state:
     st.session_state.player_stats_editable = 0
 
@@ -193,8 +195,6 @@ with param_tab:
       else:
 
         st.session_state.selections_default = None
-
-        print('Boo')
 
         auth_dir = yahoo_connect.get_yahoo_access_token()
         st.session_state.auth_dir = auth_dir
