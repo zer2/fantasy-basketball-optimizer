@@ -10,7 +10,7 @@ import time
 from schedule import every, repeat, run_pending
 from src.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
-                                  ,get_games_per_week, get_categories, get_ratio_statistics
+                                  ,get_games_per_week, get_categories, get_ratio_statistics, clear_draft_board
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
@@ -74,11 +74,6 @@ with open("parameters.yaml", "r") as stream:
 
 def load_params(league):
   st.session_state.params = st.session_state.all_params[league]
-
-def clear_info():
-  if 'draft_results' in st.session_state:
-    del st.session_state.draft_results 
-
 
 st.title('Optimization for Fantasy Basketball :basketball:')
 
@@ -166,7 +161,7 @@ with param_tab:
       data_source = st.selectbox(
         'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
         ('Enter your own data', 'Retrieve from Yahoo Fantasy')
-        , on_change = clear_info
+        , on_change = clear_draft_board
         , index = 0)
 
         
@@ -205,7 +200,9 @@ with param_tab:
             label='Which league should player data be pulled from?',
             options=user_leagues,
             format_func=get_league_labels,
-            index=None
+            index=None,
+            on_change = clear_draft_board
+
           )
 
           if yahoo_league is not None:
@@ -214,10 +211,11 @@ with param_tab:
               st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
           else:
-               st.number_input(label =  "For a Mock draft, manually write in league ID (from URL, after nba/ or mlid = )"
+               st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after nba/ or mlid = )"
                                ,min_value = 0
                                ,value = None
-                               ,key = 'yahoo_league_id')
+                               ,key = 'yahoo_league_id'
+                               , on_change = clear_draft_board)
                
                if st.session_state.yahoo_league_id is not None:
                 st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())

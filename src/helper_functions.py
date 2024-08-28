@@ -411,6 +411,10 @@ def increment_default_key():
   if st.session_state:
     st.session_state.player_stats_default_key += 1
 
+def clear_draft_board():
+  if 'draft_results' in st.session_state:
+    del st.session_state.draft_results 
+
 
 def autodraft(autodraft_df, g_scores):
 
