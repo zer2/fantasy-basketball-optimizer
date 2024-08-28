@@ -1,3 +1,4 @@
+print('OWL')
 import streamlit as st
 import pandas as pd
 from pandas.api.types import CategoricalDtype
@@ -19,7 +20,6 @@ from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
 from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft
-print('OWL')
 
 #from streamlit_profiler import Profiler
 
