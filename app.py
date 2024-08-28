@@ -14,10 +14,12 @@ from src.helper_functions import  get_position_numbers, listify \
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
+print('GRR')
 from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
 from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft
+print('OWL')
 
 #from streamlit_profiler import Profiler
 
@@ -29,8 +31,6 @@ st.set_page_config(page_title='Fantasy BBall Optimization'
           , layout="wide"
           , initial_sidebar_state="auto"
           , menu_items=None)
-
-print('OOF')
 
 if 'player_stats_editable' not in st.session_state:
     st.session_state.player_stats_editable = 0
@@ -130,8 +130,6 @@ elif st.session_state['mode'] == 'Season Mode':
   waiver_tab = main_tabs[5]
   trade_tab = main_tabs[6]
   about_tab = main_tabs[7]
-
-print('URA')
                 
 with param_tab: 
 
