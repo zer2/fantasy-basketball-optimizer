@@ -167,9 +167,7 @@ def get_user_leagues(_auth_path: str) -> List[League]:
         league_id="", # Shouldn't actually matter what this is since we are retrieving the user's leagues
         game_code="nba"
     )
-    print('HI')
     LOGGER.info(f"sc: {sc}")
-    print('There')
     leagues = yahoo_helper.get_user_leagues(sc)
     
     # Sort in reverse chronological order
