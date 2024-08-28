@@ -196,9 +196,10 @@ with param_tab:
         st.session_state.auth_dir = auth_dir
 
         if auth_dir is not None:
-
+          print('HIII')
 
           user_leagues = yahoo_connect.get_user_leagues(auth_dir)
+          print('There')
 
           get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
 
