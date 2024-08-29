@@ -305,12 +305,15 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
     n_drafters = int(n_picks/max_round)
+    st.session_state.n_drafters = n_drafters #ZR: hack, this is bad 
 
     team_names = list(range(n_drafters))
 
     teams_dict = get_teams_dict(league_id, _auth_path)
 
-    team_names = [teams_dict[int(draft_obj.team_key.split('.')[-1])] for draft_obj in draft_results[0:len(teams_dict)]]
+    all_team_ids = [draft_obj.team_key.split('.')[-1] for draft_obj in draft_results[0:n_drafters]]
+
+    team_names = ['Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)] for team_id in all_team_ids]
 
     df = pd.DataFrame(index = list(range(max_round))
                       , columns = team_names)
@@ -323,7 +326,8 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
         if len(draft_obj.player_key) > 0:
             drafted_player = mapper_table.loc[int(draft_obj.player_key.split('.')[-1])]
 
-            team_name = teams_dict[int(draft_obj.team_key.split('.')[-1])]
+            team_id = draft_obj.team_key.split('.')[-1]
+            team_name = 'Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
 
             drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
 
