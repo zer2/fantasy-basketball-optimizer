@@ -126,7 +126,7 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
 
     return players_df
 
-@st.cache_data(ttl=3600, show_spinner = False)
+#@st.cache_data(ttl=3600, show_spinner = False)
 def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
@@ -287,7 +287,7 @@ def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Seri
 
     return week_dict
 
-def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[League]:
+def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     sc = YahooFantasySportsQuery(
         auth_dir=_auth_path,
         league_id=league_id, # Shouldn't actually matter what this is since we are retrieving the user's leagues
@@ -338,3 +338,43 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata) -> List[L
             row, drafter = move_forward_one_pick(row, drafter, n_drafters)
 
     return df
+
+def get_auction_results(league_id: str,_auth_path: str, player_metadata):
+    sc = YahooFantasySportsQuery(
+        auth_dir=_auth_path,
+        league_id=league_id, # Shouldn't actually matter what this is since we are retrieving the user's leagues
+        game_code="nba"
+    )
+    LOGGER.info(f"sc: {sc}")
+
+    mapper_table = get_yahoo_key_to_name_mapper().set_index('YAHOO_PLAYER_ID')
+
+    try:
+        draft_results = sc.get_league_draft_results()
+    except:
+        return None
+
+    teams_dict = get_teams_dict(league_id, _auth_path)
+
+    def parse_draft_obj(draft_obj):
+
+        drafted_player = mapper_table.loc[int(draft_obj.player_key.split('.')[-1])]
+
+        team_id = draft_obj.team_key.split('.')[-1]
+        team_name = 'Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
+
+        drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
+
+        drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
+
+        row = pd.Series({'Player' : drafted_player_mod
+                            ,'Cost' : draft_obj.cost
+                            ,'Team' : team_name})
+        return row
+    
+    
+    df = pd.concat([parse_draft_obj(draft_obj) for draft_obj in draft_results], axis = 1).T
+
+    return df
+
+            
