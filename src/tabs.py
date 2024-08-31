@@ -188,7 +188,7 @@ def make_cand_tab(_scores : pd.DataFrame
 
   return scores_unselected
 
-@st.cache_data(show_spinner = False)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
@@ -279,6 +279,10 @@ def make_h_cand_tab(_H
 
           rate_df = win_rates.loc[score_df.index].dropna()
           rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
+
+          if sum(fits_roster) == 0:
+             st.error('Illegal roster!')
+             st.stop()
 
           if cash_remaining_per_team:
 
@@ -396,6 +400,7 @@ def make_h_cand_tab(_H
  
             comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
                                           , '$ Value' : generic_player_value.loc[rate_display.index]})
+            
             comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
             comparison_df = comparison_df.join(rate_df)
