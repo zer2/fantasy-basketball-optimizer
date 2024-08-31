@@ -249,12 +249,11 @@ def make_h_cand_tab(_H
       position_shares_res = [x[1][list(fits_roster.values)] for x in position_shares_list]
 
       if cash_remaining_per_team:
-        all_tabs = st.tabs(['Targets','Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores'])
+        all_tabs = st.tabs(['Targets','Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores'])
         target_tab = all_tabs[0]
-        rate_tab = all_tabs[1]
-        weight_tab = all_tabs[2]
-        roster_tab = all_tabs[3]
-        position_tabs = all_tabs[4:-2]
+        weight_tab = all_tabs[1]
+        roster_tab = all_tabs[2]
+        position_tabs = all_tabs[3:-2]
         raw_z_tab = all_tabs[-2]
         raw_g_tab = all_tabs[-1]
 
@@ -267,24 +266,23 @@ def make_h_cand_tab(_H
         raw_z_tab = all_tabs[-2]
         raw_g_tab = all_tabs[-1]
 
-      score = score.sort_values(ascending = False)
+      
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
       display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
+      if cash_remaining_per_team:
+         
+        with target_tab:
 
-      with rate_tab:
+          if display:
 
-        if display:
+            if sum(fits_roster) == 0:
+              st.error('Illegal roster!')
+              st.stop()
 
-          rate_df = win_rates.loc[score_df.index].dropna()
-          rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
-
-          if sum(fits_roster) == 0:
-             st.error('Illegal roster!')
-             st.stop()
-
-          if cash_remaining_per_team:
+            rate_df = win_rates.dropna()
+            rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
             players_chosen = [x for v in player_assignments.values() for x in v if x == x]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
@@ -295,23 +293,52 @@ def make_h_cand_tab(_H
                                                             , st.session_state['streaming_noise_h'])
 
             rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
+ 
+            comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
+                                          , '$ Value' : generic_player_value.loc[rate_display.index]})
+            
+            comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
-            rate_display_styled = rate_display.style.format("{:.1%}"
-                              ,subset = pd.IndexSlice[:,['H-score']]) \
-                            .format("{:.1f}"
-                              ,subset = pd.IndexSlice[:,['$ Value']]) \
+            comparison_df = comparison_df.sort_values('Difference', ascending = False)
+            score_df = score_df.loc[comparison_df.index]
+
+            comparison_df = comparison_df.join(rate_df)
+
+            comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
+
+            comparison_df_styled = comparison_df.style.format("{:.1f}"
+                                                              , subset = ['Your $ Value', '$ Value','Difference']) \
                       .map(styler_a
-                            , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
+                          , subset = ['Your $ Value', '$ Value']) \
+                      .background_gradient(axis = None
+                                          ,cmap = 'PiYG'
+                                          ,subset = ['Difference']) \
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                       .format('{:,.1%}', subset = rate_df.columns)
-          else:
+            
+            st.dataframe(comparison_df_styled)
+      else:
+        with rate_tab:
+
+          if display:
+
+            score_df = score_df.sort_values('H-score',ascending = False)
+
+
+            if sum(fits_roster) == 0:
+              st.error('Illegal roster!')
+              st.stop()
+
+            rate_df = win_rates.loc[score_df.index].dropna()
+            rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
+
             rate_display_styled = rate_display.style.format("{:.1%}"
                               ,subset = pd.IndexSlice[:,['H-score']]) \
                       .map(styler_a
                             , subset = pd.IndexSlice[:,['H-score']]) \
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                       .format('{:,.1%}', subset = rate_df.columns)
-          st.dataframe(rate_display_styled, use_container_width = True)
+            st.dataframe(rate_display_styled, use_container_width = True)
       with weight_tab:
 
         if display and (len(weights) > 0):
@@ -391,33 +418,6 @@ def make_h_cand_tab(_H
                                 , subset = pd.IndexSlice[:,['H-score']]) \
                           .background_gradient(axis = None,subset = position_shares_df.columns) 
                 st.dataframe(share_display_styled, use_container_width = True)
-
-      if cash_remaining_per_team:
-         
-         with target_tab:
-
-          if display:
- 
-            comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
-                                          , '$ Value' : generic_player_value.loc[rate_display.index]})
-            
-            comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
-
-            comparison_df = comparison_df.join(rate_df)
-
-            comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
-
-            comparison_df_styled = comparison_df.style.format("{:.1f}"
-                                                              , subset = ['Your $ Value', '$ Value','Difference']) \
-                      .map(styler_a
-                          , subset = ['Your $ Value', '$ Value']) \
-                      .background_gradient(axis = None
-                                          ,cmap = 'PiYG'
-                                          ,subset = ['Difference']) \
-                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns)
-            
-            st.dataframe(comparison_df_styled)
 
       with raw_g_tab:
           
