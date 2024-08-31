@@ -299,7 +299,8 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
 
     try:
         draft_results = sc.get_league_draft_results()
-    except:
+    except Exception as e:
+        st.write(e)
         return None
             
     max_round = max([item.round for item in draft_results])
@@ -321,6 +322,10 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
 
     row = 0
     drafter = 0
+
+    if 'cost' in draft_results[0]:
+        st.error('This is an auction, not a draft! Change the game mode')
+        st.stop()
 
     for draft_obj in draft_results:
 
@@ -351,7 +356,7 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
 
     try:
         draft_results = sc.get_league_draft_results()
-    except:
+    except Exception as e:
         return None
 
     teams_dict = get_teams_dict(league_id, _auth_path)

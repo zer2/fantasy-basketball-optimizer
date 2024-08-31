@@ -272,7 +272,7 @@ def make_auction_tab_live_data(H):
        
     if st.session_state.draft_results is None:
 
-        st.write('Draft has not yet begun')
+        st.write('Auction has not begun, or just began. There is sometimes a lag of ~1 minute before data can be fetched')
 
     else:
 
