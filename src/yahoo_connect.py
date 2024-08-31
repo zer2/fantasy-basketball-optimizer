@@ -322,7 +322,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     row = 0
     drafter = 0
 
-    if 'cost' in draft_results[0]:
+    if 'Cost' in draft_results[0]:
         st.error('This is an auction, not a draft! Change the game mode')
         st.stop()
 
@@ -357,6 +357,10 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
         draft_results = sc.get_league_draft_results()
     except Exception as e:
         return None
+    
+    if 'Cost' not in draft_results[0]:
+        st.error('This is a draft, not an auction! Change the game mode')
+        st.stop()
 
     teams_dict = get_teams_dict(league_id, _auth_path)
 
