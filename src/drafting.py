@@ -183,6 +183,9 @@ def make_drafting_tab_live_data(H):
         st.write('No league info has been passed')
         st.stop()
 
+    if st.session_state.draft_results is None:
+        refresh_analysis()
+
     c1, c2 = st.columns([0.1,0.9])
 
     with c1:
@@ -259,6 +262,9 @@ def make_auction_tab_live_data(H):
     if 'team_names' not in st.session_state:
         st.write('No league info has been passed')
         st.stop()
+
+    if st.session_state.draft_results is None:
+        refresh_analysis()
 
     c1, c2 = st.columns([0.1,0.9])
 
