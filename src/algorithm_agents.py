@@ -7,7 +7,7 @@ from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_p
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
 from src.helper_functions import get_position_structure, get_position_indices, get_L_weights
-from src.position_optimization import optimize_positions_all_players, check_eligibility_alternate
+from src.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 import datetime
 import scipy
 
@@ -545,10 +545,8 @@ class HAgent():
                  
 
                 #ZR: This is actually super inefficient. Should be fixed later
-                rosters = {0 : 
-                                       [1 if check_eligibility_alternate(self.positions.loc[player], team_positions) else -1 
-                                         for player in result_index]
-                                        }
+                player_eligibilities = check_all_player_eligibility(self.positions.loc[result_index], team_positions)
+                rosters = [1 if x else -1 for x in player_eligibilities]
   
                 score = self.get_objective_and_pdf_weights(
                                         cdf_estimates
@@ -1182,7 +1180,7 @@ def choose_eligible_player(team, available_players, positions):
 
     team_positions = positions.loc[team]
     for player in available_players:        
-        if check_eligibility_alternate(positions.loc[player], team_positions):
+        if check_single_player_eligibility(positions.loc[player], team_positions):
             return player
 
 
