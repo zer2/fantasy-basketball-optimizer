@@ -185,7 +185,7 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
     
     return rosters, final_positions, flex_shares
 
-def check_eligibility_alternate(player, team_so_far):
+def check_single_player_eligibility(player, team_so_far):
    
     position_numbers = get_position_numbers()
     n_total_picks = sum([v for k, v in position_numbers.items()])
@@ -207,3 +207,23 @@ def check_eligibility_alternate(player, team_so_far):
         return True
     else: 
        return False
+    
+def check_all_player_eligibility(players, team_so_far):
+   
+    position_numbers = get_position_numbers()
+    n_total_picks = sum([v for k, v in position_numbers.items()])
+    n_base_positions = len(get_position_structure()['base_list'])
+
+    position_rewards = np.array([[0] * n_base_positions])
+    n_remaining_players = n_total_picks -1 - len(team_so_far)
+    reward_vector = get_future_player_rows(position_rewards)[0]
+    team_so_far_array = get_player_rows(team_so_far) if len(team_so_far) > 0 else np.empty((0,n_total_picks))
+    player_rows = get_player_rows(players)
+
+    all_res = [all(optimize_positions_for_prospective_player(player_row
+                                                        , reward_vector
+                                                        , team_so_far_array
+                                                        , n_remaining_players) >=0 ) 
+                for player_row in player_rows]
+    
+    return all_res

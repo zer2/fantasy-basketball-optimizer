@@ -290,7 +290,7 @@ def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Seri
 def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     sc = YahooFantasySportsQuery(
         auth_dir=_auth_path,
-        league_id=league_id, # Shouldn't actually matter what this is since we are retrieving the user's leagues
+        league_id=league_id, 
         game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
@@ -300,7 +300,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     try:
         draft_results = sc.get_league_draft_results()
     except Exception as e:
-        return None
+        return None, False
             
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
@@ -322,9 +322,10 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     row = 0
     drafter = 0
 
-    if 'Cost' in draft_results[0]:
-        st.error('This is an auction, not a draft! Change the game mode')
-        st.stop()
+    if len(draft_results) > 0:
+        if hasattr(draft_results[0], 'cost'):
+            st.error('This is an auction, not a draft! Change the game mode')
+            st.stop()
 
     for draft_obj in draft_results:
 
@@ -341,7 +342,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
             df.loc[row, team_name] = drafted_player_mod
             row, drafter = move_forward_one_pick(row, drafter, n_drafters)
 
-    return df
+    return df, True
 
 def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     sc = YahooFantasySportsQuery(
@@ -356,11 +357,11 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     try:
         draft_results = sc.get_league_draft_results()
     except Exception as e:
-        return None
+        return None, False
     
-    if 'Cost' not in draft_results[0]:
-        st.error('This is a draft, not an auction! Change the game mode')
-        st.stop()
+    if len(draft_results) > 0:
+        if not hasattr(draft_results[0], 'cost'):
+            st.error('This is a draft, not an auction! Change the game mode')
 
     teams_dict = get_teams_dict(league_id, _auth_path)
 
@@ -383,6 +384,6 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     
     df = pd.concat([parse_draft_obj(draft_obj) for draft_obj in draft_results], axis = 1).T
 
-    return df
+    return df, True
 
             
