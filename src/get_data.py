@@ -357,6 +357,8 @@ def process_basketball_monster_data(raw_df):
    
    raw_df.loc[:,'Games Played %'] = raw_df['g']/get_n_games()
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
+
+   raw_df['Position'] = raw_df['Position'].str.replace('/',',')
    
    raw_df = raw_df.set_index('Player')
 
