@@ -341,7 +341,8 @@ with param_tab:
           st.warning('Upload a dataset from RotoWire or change the default dataset before proceeding')
           st.stop()
       elif 'Basketball Monster' in dataset_name:
-        uploaded_file = st.file_uploader("Upload Basketball Monster Per Game Stats, as a csv (you may have to convert from XLS)"
+        uploaded_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv (To get all required columns for 
+                                         projections, you may have to download as XLSX then save as CSV utf-8)'''
                                          , type=['csv']
                                          , on_change = increment_default_key)
         if uploaded_file is not None:

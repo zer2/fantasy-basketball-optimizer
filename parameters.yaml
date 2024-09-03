@@ -89,6 +89,8 @@ NBA:
     F : PF,SF
   bbm-renamer:
     Name : Player
+    g : Games Played
+    games : Games Played
     p/g : Points
     r/g : Rebounds
     a/g : Assists
