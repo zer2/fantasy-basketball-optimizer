@@ -256,18 +256,25 @@ def get_specified_stats(dataset_name : str
 
     historical_df = get_historical_data()
     current_data, expected_minutes = get_current_season_data()
+    darko_data = get_darko_data(expected_minutes)
 
     if dataset_name in list(current_data.keys()):
         df = current_data[dataset_name].copy()
     elif 'DARKO' in dataset_name:
-        darko_data = get_darko_data(expected_minutes)
         df = darko_data[dataset_name].copy()
     elif 'RotoWire' in dataset_name:
         if 'rotowire_data' in st.session_state:
             raw_df = st.session_state.rotowire_data
             df = process_basketball_rotowire_data(raw_df)
         else:
-            df = darko_data['DARKO-L'].copy() #this is a bit of a hack
+            st.error('Error! No rotowire data found: this should not happen')
+    elif 'Basketball Monster' in dataset_name:
+       if 'bbm_data' in st.session_state:
+            raw_df = st.session_state.bbm_data
+            df = process_basketball_monster_data(raw_df)
+       else:
+            st.error('Error! No Basketball Monster data found: this should not happen')
+
     else:
         df = historical_df.loc[dataset_name].copy()  
     #adjust for the display
@@ -336,6 +343,24 @@ def process_basketball_rotowire_data(raw_df):
    
    raw_df = raw_df.set_index('Player')
 
+
+   required_columns = st.session_state.params['counting-statistics'] + \
+                    list(st.session_state.params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
+                    st.session_state.params['other-columns']
+   
+   raw_df = raw_df[list(set(required_columns))]
+
+   return raw_df
+
+def process_basketball_monster_data(raw_df):
+   
+   raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
+   raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
+
+   raw_df['Position'] = raw_df['Position'].str.replace('/',',')
+   
+   raw_df = raw_df.set_index('Player')
 
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \

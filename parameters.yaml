@@ -87,6 +87,22 @@ NBA:
     C : C
     G : PG,SG
     F : PF,SF
+  bbm-renamer:
+    Name : Player
+    g : Games Played
+    games : Games Played
+    p/g : Points
+    r/g : Rebounds
+    a/g : Assists
+    s/g : Steals
+    3/g : Threes
+    b/g : Blocks
+    to/g : Turnovers
+    fta/g: Free Throw Attempts
+    ft% : Free Throw %
+    fga/g: Field Goal Attempts
+    fg%: Field Goal %
+    Pos : Position
   stat-df-renamer:
     SEASON : Season
     NBA_PLAYER_NAME : Player

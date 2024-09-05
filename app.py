@@ -155,8 +155,8 @@ with param_tab:
         , key = 'mode')
       
       # Setting default values
-      st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
-      st.session_state.n_picks = st.session_state.params['options']['n_picks']['default']
+      #st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
+      #st.session_state.n_picks = st.session_state.params['options']['n_picks']['default']
 
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
@@ -317,7 +317,7 @@ with param_tab:
         unique_datasets_current = list(current_data.keys())
         #unique_datasets_darko = list(darko_data.keys())
 
-        all_datasets = unique_datasets_historical + unique_datasets_current + ['RotoWire (req. upload)'] 
+        all_datasets = unique_datasets_historical + unique_datasets_current + ['Basketball Monster (req. upload)'] + ['RotoWire (req. upload)'] 
         all_datasets.reverse()
 
       else:
@@ -330,7 +330,7 @@ with param_tab:
         ,on_change = increment_default_key
       )
 
-      if 'Roto' in dataset_name:
+      if 'RotoWire' in dataset_name:
         uploaded_file = st.file_uploader("Upload RotoWire data, as a csv"
                                          , type=['csv']
                                          , on_change = increment_default_key)
@@ -339,6 +339,18 @@ with param_tab:
           st.session_state.rotowire_data  = pd.read_csv(uploaded_file, skiprows = 1)
         else:
           st.warning('Upload a dataset from RotoWire or change the default dataset before proceeding')
+          st.stop()
+      elif 'Basketball Monster' in dataset_name:
+        uploaded_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv (To get all required columns for 
+                                         projections, you may have to download as XLSX then save as CSV utf-8)'''
+                                         , type=['csv']
+                                         , on_change = increment_default_key)
+        if uploaded_file is not None:
+          # Adding a 
+          st.session_state.bbm_data  = pd.read_csv(uploaded_file)
+        else:
+          st.warning('Upload a dataset from Basketball Monster or change the default dataset before proceeding')
+          st.stop()
       else:
         uploaded_file = None
 

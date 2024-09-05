@@ -70,7 +70,7 @@ def get_position_numbers():
 def get_position_numbers_unwound():
    position_numbers = get_position_numbers()
    return reduce(lambda x, y: x + y ,
-                  [[position_code + str(i+1) for i in range(position_number)] 
+                  [[position_code + str(i+1) if position_number >1 else position_code for i in range(position_number)] 
                    for position_code, position_number in position_numbers.items()]
                  )
     
