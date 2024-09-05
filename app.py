@@ -155,8 +155,8 @@ with param_tab:
         , key = 'mode')
       
       # Setting default values
-      st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
-      st.session_state.n_picks = st.session_state.params['options']['n_picks']['default']
+      #st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
+      #st.session_state.n_picks = st.session_state.params['options']['n_picks']['default']
 
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
