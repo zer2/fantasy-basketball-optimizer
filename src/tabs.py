@@ -324,7 +324,6 @@ def make_h_cand_tab(_H
 
             score_df = score_df.sort_values('H-score',ascending = False)
 
-
             if sum(fits_roster) == 0:
               st.error('Illegal roster!')
               st.stop()
@@ -420,15 +419,21 @@ def make_h_cand_tab(_H
                 st.dataframe(share_display_styled, use_container_width = True)
 
       with raw_g_tab:
+
+        g_df = _g_scores.loc[score.index]
+        g_display = score_df.merge(g_df, left_index = True, right_index = True)
           
-        scores_unselected_styled = static_score_styler(_g_scores.loc[score.index]
+        scores_unselected_styled = static_score_styler(g_display
                                                        , st.session_state.params['g-score-player-multiplier'])
 
         st.dataframe(scores_unselected_styled, use_container_width = True)
 
       with raw_z_tab:
+
+        z_df = _z_scores.loc[score.index]
+        z_display = score_df.merge(z_df, left_index = True, right_index = True)
           
-        scores_unselected_styled = static_score_styler(_z_scores.loc[score.index]
+        scores_unselected_styled = static_score_styler(z_display
                                                        , st.session_state.params['z-score-player-multiplier'])
 
         st.dataframe(scores_unselected_styled, use_container_width = True)
