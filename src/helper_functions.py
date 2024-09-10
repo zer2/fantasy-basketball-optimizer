@@ -187,6 +187,7 @@ def listify(x : pd.DataFrame) -> list:
     x = x.values.tolist()
     return [item for row in x for item in row]
 
+#ZR: Ideally this should merge with the h percentage styler, so it can handle anything
 def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   """Helper function for styling tables of Z or G scores
 
@@ -197,13 +198,17 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
     Styled dataframe
   """
 
-  agg_columns = [col for col in ['$ Value','Total'] if col in df.columns]
+  agg_columns = [col for col in ['H-score','$ Value','Total'] if col in df.columns]
   index_columns = [col for col in ['Rank','Player'] if col in df.columns]
+  perc_columns = ['H-score'] if 'H-score' in df.columns else []
+
 
   df = df[index_columns + agg_columns + get_selected_categories()]
 
   df_styled = df.style.format("{:.2f}"
                               , subset = pd.IndexSlice[:,agg_columns + get_selected_categories()]) \
+                              .format("{:.1%}"
+                                , subset = pd.IndexSlice[:,perc_columns] ) \
                             .map(styler_a
                                 ,subset = pd.IndexSlice[:,agg_columns]) \
                             .map(stat_styler

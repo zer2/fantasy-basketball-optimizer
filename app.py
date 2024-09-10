@@ -225,6 +225,7 @@ with param_tab:
                if st.session_state.yahoo_league_id is not None:
                 st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())                
                 st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+                
 
           if (st.session_state.mode == 'Season Mode'):
 
@@ -280,32 +281,6 @@ with param_tab:
             )
 
     with c2: 
-
-      scoring_format = st.selectbox(
-        'Which format are you playing?',
-        ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
-        , key = 'scoring_format'
-        , index = 1)
-    
-      if scoring_format == 'Rotisserie':
-        st.caption('Note that it is recommended to use Z-scores rather than G-scores to evaluate players for Rotisserie. Also, Rotisserie H-scores are experimental and have not been tested')
-      else:
-        st.caption('Note that it is recommended to use G-scores rather than Z-scores to evaluate players for Head to Head')
-
-      rotisserie = scoring_format == 'Rotisserie'
-
-      punting_levels = st.session_state.params['punting_defaults']
-
-      default_punting = st.session_state.params['punting_default_index'][scoring_format]
-
-      punting_level = st.selectbox(
-        'What level of punting do you want H-scores to apply when modeling your future draft picks?'
-        ,list(punting_levels.keys())
-        ,index = default_punting
-      )
-
-      st.caption('''This option sets the default parameters for H-scoring. 
-            For more granular control, use the Advanced tab which is next to this one''')
       
       if st.session_state.league == 'NBA':
 
@@ -317,7 +292,10 @@ with param_tab:
         unique_datasets_current = list(current_data.keys())
         #unique_datasets_darko = list(darko_data.keys())
 
-        all_datasets = unique_datasets_historical + unique_datasets_current + ['Basketball Monster (req. upload)'] + ['RotoWire (req. upload)'] 
+        all_datasets = unique_datasets_historical + \
+                        unique_datasets_current + \
+                          ['Basketball Monster (req. upload)'] + \
+                          ['RotoWire (req. upload)'] 
         all_datasets.reverse()
 
       else:
@@ -337,9 +315,13 @@ with param_tab:
         if uploaded_file is not None:
           # Adding a 
           st.session_state.rotowire_data  = pd.read_csv(uploaded_file, skiprows = 1)
+          st.warning('''Rotowire projections assume that players will not experience long-term injuries. Keep that in mind when 
+            drafting players you expect to be injury prone''')
         else:
           st.warning('Upload a dataset from RotoWire or change the default dataset before proceeding')
           st.stop()
+
+
       elif 'Basketball Monster' in dataset_name:
         uploaded_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv (To get all required columns for 
                                          projections, you may have to download as XLSX then save as CSV utf-8)'''
@@ -348,6 +330,8 @@ with param_tab:
         if uploaded_file is not None:
           # Adding a 
           st.session_state.bbm_data  = pd.read_csv(uploaded_file)
+          st.warning('''BBM projections assume that players will not experience long-term injuries. Keep that in mind when 
+            drafting players you expect to be injury prone''')
         else:
           st.warning('Upload a dataset from Basketball Monster or change the default dataset before proceeding')
           st.stop()
@@ -359,6 +343,31 @@ with param_tab:
         def run_autodraft_and_increment():
           increment_player_stats_version()
           run_autodraft()
+
+
+        scoring_format = st.selectbox(
+          'Which format are you playing?',
+          ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
+          , key = 'scoring_format'
+          , index = 1)
+      
+        if scoring_format == 'Rotisserie':
+          st.caption('Note that H-scores for Rotisserie are experimental and have not been tested')
+
+        rotisserie = scoring_format == 'Rotisserie'
+
+        punting_levels = st.session_state.params['punting_defaults']
+
+        default_punting = st.session_state.params['punting_default_index'][scoring_format]
+
+        punting_level = st.selectbox(
+          'What level of punting do you want H-scores to apply when modeling your future draft picks?'
+          ,list(punting_levels.keys())
+          ,index = default_punting
+        )
+
+        st.caption('''This option sets the default parameters for H-scoring. 
+              For more granular control, use the Advanced tab which is next to this one''')
 
         with st.form("more options"):
 
