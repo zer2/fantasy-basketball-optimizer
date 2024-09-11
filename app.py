@@ -209,6 +209,7 @@ with param_tab:
 
           )
 
+
           if yahoo_league is not None:
               st.session_state.yahoo_league_id = yahoo_league.league_id
 
@@ -216,7 +217,7 @@ with param_tab:
               st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
           else:
-               st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
+               yahoo_league = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
                                ,min_value = 0
                                ,value = None
                                ,key = 'yahoo_league_id'
@@ -229,9 +230,7 @@ with param_tab:
 
           if (st.session_state.mode == 'Season Mode'):
 
-            if yahoo_league is not None:
-
-              st.session_state.yahoo_league_id = yahoo_league.league_id
+            if st.session_state.yahoo_league_id is not None:
 
               player_metadata = get_player_metadata()
 
@@ -266,9 +265,7 @@ with param_tab:
 
           else:
 
-            if yahoo_league is not None:
-
-              st.session_state.yahoo_league_id = yahoo_league.league_id
+            if st.session_state.yahoo_league_id is not None:
 
               st.session_state.selections_default = None
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
@@ -324,7 +321,7 @@ with param_tab:
 
       elif 'Basketball Monster' in dataset_name:
         uploaded_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv (To get all required columns for 
-                                         projections, you may have to download as XLSX then save as CSV utf-8)'''
+                                         projections, you may have to export to excel then save as CSV utf-8)'''
                                          , type=['csv']
                                          , on_change = increment_default_key)
         if uploaded_file is not None:

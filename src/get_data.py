@@ -238,7 +238,7 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
-@st.cache_data(show_spinner = False, ttl = 3600)
+#@st.cache_data(show_spinner = False, ttl = 3600)
 def get_specified_stats(dataset_name : str
                      , default_key : int) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
@@ -343,7 +343,6 @@ def process_basketball_rotowire_data(raw_df):
    
    raw_df = raw_df.set_index('Player')
 
-
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
@@ -360,6 +359,24 @@ def process_basketball_monster_data(raw_df):
 
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
    
+   def name_renamer(name):
+      name = ' '.join(name.split(' ')[0:2])
+      if name == 'Nicolas Claxton':
+         name = 'Nic Claxton'
+      if name == 'C.J. McCollum':
+         name = 'CJ McCollum'
+      if name == 'R.J. Barrett':
+         name = 'RJ Barrett'
+      if name == 'Herb Jones':
+         name = 'Herbert Jones'
+      if name == 'Cam Johnson':
+         name = 'Cameron Johnson'
+      if name == 'O.G. Anunoby':
+         name = 'OG Anunoby'
+      return name
+      
+   raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
+
    raw_df = raw_df.set_index('Player')
 
    required_columns = st.session_state.params['counting-statistics'] + \
