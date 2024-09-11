@@ -324,8 +324,9 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
 
     if len(draft_results) > 0:
         if hasattr(draft_results[0], 'cost'):
-            st.error('This is an auction, not a draft! Change the game mode')
-            st.stop()
+            if draft_results[0].cost is not None:
+                st.error('This is an auction, not a draft! Change the game mode')
+                st.stop()
 
     for draft_obj in draft_results:
 
