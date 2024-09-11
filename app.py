@@ -505,24 +505,20 @@ with param_tab:
         else:
           n_iterations = 0 
 
-        if scoring_format == 'Rotisserie':
 
-          chi = st.number_input(r'Select a $\chi$ value'
-                  , key = 'chi'
-                  , value = float(st.session_state.params['options']['chi']['default'])
-                  , min_value = float(st.session_state.params['options']['chi']['min'])
-                  , max_value = float(st.session_state.params['options']['chi']['max']))
-          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                        If performance means were known exactly beforehand, chi would be 1/M where M 
-                        is the number weeks in the season. However, in practice, season-long means are 
-                        not known before the season begins, so it is recommended to set chi to be higher 
-                        '''
-          st.caption(chi_str)
+        chi = st.number_input(r'Select a $\chi$ value'
+                , key = 'chi'
+                , value = float(st.session_state.params['options']['chi']['default'])
+                , min_value = float(st.session_state.params['options']['chi']['min'])
+                , max_value = float(st.session_state.params['options']['chi']['max']))
         
-        else: 
-          chi = None
-          st.session_state.chi = None
-
+        chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                      If performance means were known exactly beforehand, chi would be 1/M where M 
+                      is the number weeks in the season. However, in practice, season-long means are 
+                      not known before the season begins, so it is recommended to set chi to be higher 
+                      '''
+        st.caption(chi_str)
+        
         if st.session_state['mode'] == 'Auction Mode':
 
           streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'

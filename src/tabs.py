@@ -374,7 +374,7 @@ def make_h_cand_tab(_H
           
             filler = {x : x.split(' ')[1] for x in rosters.index}
 
-            rosters = rosters.loc[score.index]
+            rosters = rosters.loc[score_df.index]
             
             rosters_inverted = [[get_player(row, i) for i in range(len(row))] for k,row in rosters.iterrows()]
             rosters_inverted = pd.DataFrame(rosters_inverted 
