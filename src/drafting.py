@@ -159,7 +159,7 @@ def refresh_analysis():
     auth_dir = st.session_state.auth_dir
     player_metadata = st.session_state.player_metadata.copy()
 
-    player_metadata.index = [player.split('(')[0][0:-1] for player in player_metadata.index]
+    player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
     if st.session_state.mode == 'Draft Mode':
 
