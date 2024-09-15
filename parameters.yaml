@@ -136,8 +136,10 @@ NBA:
     MINUTES_PLAYED : Forecasted Minutes
   schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
   z-score-player-multiplier : 50
+  z-score-total-multiplier : 40
   z-score-team-multiplier : 20
   g-score-player-multiplier : 60
+  g-score-total-multiplier : 50
   g-score-team-multiplier : 24
   options : 
     upsilon : 

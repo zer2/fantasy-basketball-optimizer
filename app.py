@@ -505,24 +505,20 @@ with param_tab:
         else:
           n_iterations = 0 
 
-        if scoring_format == 'Rotisserie':
 
-          chi = st.number_input(r'Select a $\chi$ value'
-                  , key = 'chi'
-                  , value = float(st.session_state.params['options']['chi']['default'])
-                  , min_value = float(st.session_state.params['options']['chi']['min'])
-                  , max_value = float(st.session_state.params['options']['chi']['max']))
-          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                        If performance means were known exactly beforehand, chi would be 1/M where M 
-                        is the number weeks in the season. However, in practice, season-long means are 
-                        not known before the season begins, so it is recommended to set chi to be higher 
-                        '''
-          st.caption(chi_str)
+        chi = st.number_input(r'Select a $\chi$ value'
+                , key = 'chi'
+                , value = float(st.session_state.params['options']['chi']['default'])
+                , min_value = float(st.session_state.params['options']['chi']['min'])
+                , max_value = float(st.session_state.params['options']['chi']['max']))
         
-        else: 
-          chi = None
-          st.session_state.chi = None
-
+        chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                      If performance means were known exactly beforehand, chi would be 1/M where M 
+                      is the number weeks in the season. However, in practice, season-long means are 
+                      not known before the season begins, so it is recommended to set chi to be higher 
+                      '''
+        st.caption(chi_str)
+        
         if st.session_state['mode'] == 'Auction Mode':
 
           streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
@@ -709,14 +705,33 @@ with rank_tab:
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
       
     with z_rank_tab:
-      make_rank_tab(st.session_state.z_scores
-                    , st.session_state.params['z-score-player-multiplier']
-                    , st.session_state.info_key)  
+        
+        z_scores = st.session_state.z_scores.copy()
+
+        if st.session_state.mode == 'Auction Mode':
+
+          z_scores.loc[:,'$ Value'] = savor_calculation(z_scores['Total']
+                                                                , st.session_state.n_picks * st.session_state.n_drafters
+                                                                , 200 * st.session_state.n_drafters
+                                                                , st.session_state['streaming_noise'])
+          
+        make_rank_tab(z_scores
+                      , st.session_state.params['z-score-player-multiplier']
+                      , st.session_state.info_key)  
 
     with g_rank_tab:
-      make_rank_tab(st.session_state.g_scores
-                    , st.session_state.params['g-score-player-multiplier']
-                    , st.session_state.info_key)  
+
+        g_scores = st.session_state.z_scores.copy()
+
+        if st.session_state.mode == 'Auction Mode':
+
+          g_scores.loc[:,'$ Value'] = savor_calculation(g_scores['Total']
+                                                                , st.session_state.n_picks * st.session_state.n_drafters
+                                                                , 200 * st.session_state.n_drafters
+                                                                , st.session_state['streaming_noise'])
+        make_rank_tab(g_scores
+                      , st.session_state.params['g-score-player-multiplier']
+                      , st.session_state.info_key)  
 
     with h_rank_tab:
       rel_score_string = 'Z-scores' if rotisserie else 'G-scores'

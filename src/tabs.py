@@ -54,21 +54,16 @@ def make_team_tab(_scores : pd.DataFrame
 
   n_players_on_team = team_stats.shape[0] - 1
 
-  if n_players_on_team > 0:
+  team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
+                                              .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
+                                              .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
+                                              .map(stat_styler, subset = pd.IndexSlice[my_players, get_selected_categories()], multiplier = player_multiplier) \
+                                              .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()], multiplier = team_multiplier)
+  display = st.dataframe(team_stats_styled
+                      , use_container_width = True
+                      , height = len(team_stats) * 35 + 38
+                                                )     
 
-      team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
-                                                  .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
-                                                  .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
-                                                  .map(stat_styler, subset = pd.IndexSlice[my_players, get_selected_categories()], multiplier = player_multiplier) \
-                                                  .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()], multiplier = team_multiplier)
-      display = st.dataframe(team_stats_styled
-                          , use_container_width = True
-                          , height = len(team_stats) * 35 + 38
-                                                    )     
-  else:
-    st.markdown('This team does not have any players yet!')
-  return team_stats
-  
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_team_h_tab(my_players : list[str]
                   , n_picks : int
@@ -86,16 +81,13 @@ def make_team_h_tab(my_players : list[str]
   Returns:
       None
   """
-  if len(my_players) < n_picks:
-        st.markdown('This team is not full yet! Come back here when it is a full team')
-  else:
-        st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
+  st.markdown('The H-score of your team is ' + str((base_h_score * 100).round(1).values[0]) + '%')
 
-        base_win_rates_copy = base_win_rates.copy()
-        base_win_rates_copy.insert(0, 'H-score', base_h_score)
+  base_win_rates_copy = base_win_rates.copy()
+  base_win_rates_copy.insert(0, 'H-score', base_h_score)
 
-        base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
-        st.dataframe(base_win_rates_formatted, hide_index = True)
+  base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
+  st.dataframe(base_win_rates_formatted, hide_index = True)
   
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_full_team_tab(z_scores : pd.DataFrame
@@ -122,34 +114,39 @@ def make_full_team_tab(z_scores : pd.DataFrame
   Returns:
       None
   """
-  z_team_tab, g_team_tab, h_team_tab = st.tabs(["Z-score", "G-score","H-score"])
 
-  with z_team_tab:
+  if len(my_players) == 0:
+     st.write('This team has no players')
 
-      make_team_tab(z_scores
-                    , my_players
-                    , n_drafters
-                    , st.session_state.params['z-score-player-multiplier']
-                    , st.session_state.params['z-score-team-multiplier']
-                    , info_key)
+  else:
+    z_team_tab, g_team_tab, h_team_tab = st.tabs(["Z-score", "G-score","H-score"])
 
-  with g_team_tab:
+    with z_team_tab:
 
-      make_team_tab(g_scores
+        make_team_tab(z_scores
                       , my_players
                       , n_drafters
-                      , st.session_state.params['g-score-player-multiplier']
-                      , st.session_state.params['g-score-team-multiplier']
-                      , info_key)    
-  with h_team_tab:
-    if len(my_players) == n_picks:
+                      , st.session_state.params['z-score-player-multiplier']
+                      , st.session_state.params['z-score-team-multiplier']
+                      , info_key)
 
-      make_team_h_tab(my_players
-                    ,n_picks
-                    ,base_h_score
-                    ,base_win_rates)
-    else:
-      st.markdown('Team H-score not defined until team is full') 
+    with g_team_tab:
+
+        make_team_tab(g_scores
+                        , my_players
+                        , n_drafters
+                        , st.session_state.params['g-score-player-multiplier']
+                        , st.session_state.params['g-score-team-multiplier']
+                        , info_key)    
+    with h_team_tab:
+      if len(my_players) == n_picks:
+
+        make_team_h_tab(my_players
+                      ,n_picks
+                      ,base_h_score
+                      ,base_win_rates)
+      else:
+        st.markdown('Team H-score not defined until team is full') 
 ### Candidate tabs 
 
 @st.cache_data(show_spinner = True, ttl = 3600)
@@ -271,6 +268,7 @@ def make_h_cand_tab(_H
       score_df = pd.DataFrame(score)
 
       display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
+
       if cash_remaining_per_team:
          
         with target_tab:
@@ -287,10 +285,12 @@ def make_h_cand_tab(_H
             players_chosen = [x for v in player_assignments.values() for x in v if x == x]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
-            rate_display.loc[:,'$ Value'] = savor_calculation(score_df
+            rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
                                                             , total_players - len(players_chosen)
                                                             , total_cash_remaining
                                                             , st.session_state['streaming_noise_h'])
+            
+            st.write(rate_display.loc[:,'$ Value'])
 
             rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
  
@@ -374,7 +374,7 @@ def make_h_cand_tab(_H
           
             filler = {x : x.split(' ')[1] for x in rosters.index}
 
-            rosters = rosters.loc[score.index]
+            rosters = rosters.loc[score_df.index]
             
             rosters_inverted = [[get_player(row, i) for i in range(len(row))] for k,row in rosters.iterrows()]
             rosters_inverted = pd.DataFrame(rosters_inverted 
@@ -424,7 +424,8 @@ def make_h_cand_tab(_H
         g_display = score_df.merge(g_df, left_index = True, right_index = True)
           
         scores_unselected_styled = static_score_styler(g_display
-                                                       , st.session_state.params['g-score-player-multiplier'])
+                                                       , st.session_state.params['g-score-player-multiplier']
+                                                       , st.session_state.params['g-score-total-multiplier'])
 
         st.dataframe(scores_unselected_styled, use_container_width = True)
 
@@ -434,7 +435,8 @@ def make_h_cand_tab(_H
         z_display = score_df.merge(z_df, left_index = True, right_index = True)
           
         scores_unselected_styled = static_score_styler(z_display
-                                                       , st.session_state.params['z-score-player-multiplier'])
+                                                       , st.session_state.params['z-score-player-multiplier']
+                                                       , st.session_state.params['z-score-total-multiplier'])
 
         st.dataframe(scores_unselected_styled, use_container_width = True)
 ### Waiver tabs 
@@ -1228,7 +1230,11 @@ def make_rank_tab(scores : pd.DataFrame
 
   scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
   scores_copy.loc[:,'Player'] = scores_copy.index
-  scores_copy = scores_copy[['Rank','Player','Total'] + get_selected_categories()]
+
+  if '$ Value' in scores_copy.columns:
+    scores_copy = scores_copy[['Rank','Player','$ Value','Total'] + get_selected_categories()]
+  else:
+    scores_copy = scores_copy[['Rank','Player','Total'] + get_selected_categories()]
   
   scores_styled = static_score_styler(scores_copy,player_multiplier)
       
@@ -1309,8 +1315,8 @@ def make_h_rank_tab(info : dict
                                                     , n_picks * n_drafters
                                                     , 200*n_drafters
                                                     , st.session_state['streaming_noise_h'])
-
-    h_res = h_res[['Player','$ Value','H-score'] + get_selected_categories()]
+    
+    h_res = h_res[['Rank','Player','$ Value','H-score'] + get_selected_categories()]
 
     h_res_styled = h_res.style.format("{:.1%}"
                       ,subset = pd.IndexSlice[:,['H-score']]) \

@@ -91,36 +91,18 @@ def make_drafting_tab_own_data(H):
 
         with cand_tab:
 
-            z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
-                    
-            with z_cand_tab:
-            
-                make_cand_tab(st.session_state.z_scores
-                                ,selection_list
-                                , st.session_state.params['z-score-player-multiplier']
-                                , info_key = st.session_state.info_key)
+            if st.session_state.selections_default.columns[st.session_state.drafter] == draft_seat:
 
-            with g_cand_tab:
-
-                make_cand_tab(st.session_state.g_scores
-                                , selection_list
-                                , st.session_state.params['g-score-player-multiplier']
-                                , info_key = st.session_state.info_key)
-
-            with h_cand_tab:
-
-                if st.session_state.selections_default.columns[st.session_state.drafter] == draft_seat:
-
-                    make_h_cand_tab(H
-                        ,st.session_state.g_scores
-                        ,st.session_state.z_scores
-                        ,player_assignments
-                        ,draft_seat
-                        ,st.session_state.n_iterations
-                        ,st.session_state.v
-                        ,30)
-                else:
-                    st.write('It is not your turn, so H-scoring will not run')
+                make_h_cand_tab(H
+                    ,st.session_state.g_scores
+                    ,st.session_state.z_scores
+                    ,player_assignments
+                    ,draft_seat
+                    ,st.session_state.n_iterations
+                    ,st.session_state.v
+                    ,30)
+            else:
+                st.write('It is not your turn, so H-scoring will not run')
 
         with team_tab:
 
