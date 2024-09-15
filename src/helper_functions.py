@@ -188,7 +188,7 @@ def listify(x : pd.DataFrame) -> list:
     return [item for row in x for item in row]
 
 #ZR: Ideally this should merge with the h percentage styler, so it can handle anything
-def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
+def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier : float = None) -> pd.DataFrame:
   """Helper function for styling tables of Z or G scores
 
   Args:
@@ -202,6 +202,12 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
   index_columns = [col for col in ['Rank','Player'] if col in df.columns]
   perc_columns = ['H-score'] if 'H-score' in df.columns else []
 
+  colored_total_column = ['Total'] if (('H-score' in df.columns) and ('Total' in df.columns)) else []
+
+  if colored_total_column:
+    total_middle = df[colored_total_column[0]].nlargest(10).iloc[-1]
+  else:
+    total_middle = 0
 
   df = df[index_columns + agg_columns + get_selected_categories()]
 
@@ -213,7 +219,13 @@ def static_score_styler(df : pd.DataFrame, multiplier : float) -> pd.DataFrame:
                                 ,subset = pd.IndexSlice[:,agg_columns]) \
                             .map(stat_styler
                               , subset = pd.IndexSlice[:,get_selected_categories()]
-                              , multiplier = multiplier)
+                              , multiplier = multiplier) \
+                            .map(stat_styler
+                                 , subset = pd.IndexSlice[:,colored_total_column]
+                                 , multiplier = total_multiplier
+                                 , mode = 'yellow'
+                                 , middle = total_middle
+                                 )
   return df_styled
 
 def h_percentage_styler(df : pd.DataFrame
@@ -241,7 +253,7 @@ def h_percentage_styler(df : pd.DataFrame
                               , subset = get_selected_categories())
   return df_styled
 
-def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> str:
+def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode = 'rgb') -> str:
   """Styler function used for coloring stat values red/green with varying intensities 
 
   Args:
@@ -254,14 +266,25 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0) -> s
          
   if value != value:
     return f"background-color:white;color:white" 
+  
+  if mode == 'rgb':
 
-  intensity = min(int(abs((value-middle)*multiplier)), 255)
+    intensity = min(int(abs((value-middle)*multiplier)), 255)
 
-  if (value - middle)*multiplier > 0:
-    rgb = (255 -  intensity,255 , 255 -  intensity)
-  else:
-    rgb = (255, 255 - intensity, 255 - intensity)
-      
+    if (value - middle)*multiplier > 0:
+      rgb = (255 -  intensity,255 , 255 -  intensity)
+    else:
+      rgb = (255, 255 - intensity, 255 - intensity)
+        
+  elif mode == 'yellow': 
+
+    intensity = min(int(abs((value-middle)*multiplier)), 255)
+
+    if (value - middle)*multiplier > 0:
+      rgb = (255,255 , 255 - intensity)
+    else:
+      rgb = (255,255 - intensity,255)
+
   bgc = '#%02x%02x%02x' % rgb
 
   #formula adapted from
