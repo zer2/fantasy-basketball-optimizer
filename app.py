@@ -721,7 +721,7 @@ with rank_tab:
 
     with g_rank_tab:
 
-        g_scores = st.session_state.z_scores.copy()
+        g_scores = st.session_state.g_scores.copy()
 
         if st.session_state.mode == 'Auction Mode':
 
