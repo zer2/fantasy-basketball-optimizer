@@ -151,7 +151,7 @@ def run_multiple_seasons(teams : dict[list]
     #assuming each season has 11 weeks, we need 11 * n total rows of data per player
     #ZR: Note that for now a "week" of data is just one game per player
     #in real basketball multiple games are played per week, so we need to adjust for that 
-    performances = season_df.groupby('Player').sample(n_weeks*n_seasons, replace = True)
+    performances = season_df.groupby('Player').sample(n_weeks*n_seasons, replace = True, random_state = 0)
     performances.loc[:,'Week'] = performances.groupby('Player').cumcount()
     performances.loc[:,'Season'] = performances['Week'] // n_weeks #integer division seperates weeks in groups 
 
