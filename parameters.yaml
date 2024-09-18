@@ -103,6 +103,21 @@ NBA:
     fga/g: Field Goal Attempts
     fg%: Field Goal %
     Pos : Position
+  htb-renamer:
+    PLAYER : Player
+    GP : Games Played
+    PTS : Points
+    TREB : Rebounds
+    AST : Assists
+    STL : Steals
+    3PM : Threes
+    BLK : Blocks
+    TO : Turnovers
+    FTA : Free Throw Attempts
+    FT% : Free Throw %
+    FGA : Field Goal Attempts
+    FG% : Field Goal %
+    POS : Position
   stat-df-renamer:
     SEASON : Season
     NBA_PLAYER_NAME : Player
