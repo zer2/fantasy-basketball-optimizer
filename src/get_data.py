@@ -275,7 +275,8 @@ def get_specified_stats(dataset_name : str
     elif 'Basketball Monster' in dataset_name:
        if 'bbm_data' in st.session_state:
             raw_df = st.session_state.bbm_data
-            df = process_basketball_monster_data(raw_df)
+            df = process_basketball_monster_data(raw_df
+                                                 , default_projections = process_htb_data(htb_data))
        else:
             st.error('Error! No Basketball Monster data found: this should not happen')
 
@@ -391,7 +392,8 @@ def process_htb_data(raw_df):
    raw_df = raw_df[list(set(required_columns))]
 
    return raw_df
-def process_basketball_monster_data(raw_df):
+def process_basketball_monster_data(raw_df
+                                    , default_projections = None):
    
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
@@ -425,7 +427,11 @@ def process_basketball_monster_data(raw_df):
    
    raw_df = raw_df[list(set(required_columns))]
 
-   return raw_df
+   #Add HTB projections for players not forecasts by BBM
+   extra_df = default_projections[~(default_projections.index.isin(raw_df.index))]
+   full_df = pd.concat([raw_df, extra_df], axis = 0)
+
+   return full_df
 
 @st.cache_data(show_spinner = False)
 def get_nba_schedule():
