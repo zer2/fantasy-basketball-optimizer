@@ -298,7 +298,9 @@ with param_tab:
         all_datasets = unique_datasets_historical + \
                         unique_datasets_current + \
                           ['Basketball Monster (req. upload)'] + \
-                          ['RotoWire (req. upload)'] 
+                          ['RotoWire (req. upload)'] + \
+                          ['Hashtag Basketball']
+
         all_datasets.reverse()
 
       else:

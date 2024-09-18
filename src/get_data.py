@@ -8,6 +8,7 @@ import requests
 import os
 import snowflake.connector
 from src.helper_functions import get_n_games
+from unidecode import unidecode
 
 @st.cache_resource()
 def get_data_from_snowflake(table_name):
@@ -257,11 +258,14 @@ def get_specified_stats(dataset_name : str
     historical_df = get_historical_data()
     current_data, expected_minutes = get_current_season_data()
     darko_data = get_darko_data(expected_minutes)
+    htb_data = get_data_from_snowflake('HTB_PROJECTION_TABLE')
 
     if dataset_name in list(current_data.keys()):
         df = current_data[dataset_name].copy()
     elif 'DARKO' in dataset_name:
         df = darko_data[dataset_name].copy()
+    elif 'Hashtag' in dataset_name:
+        df = process_htb_data(htb_data)
     elif 'RotoWire' in dataset_name:
         if 'rotowire_data' in st.session_state:
             raw_df = st.session_state.rotowire_data
@@ -352,6 +356,41 @@ def process_basketball_rotowire_data(raw_df):
 
    return raw_df
 
+def process_htb_data(raw_df):
+   raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
+   raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
+
+   raw_df['Position'] = raw_df['Position'].str.replace('/',',')
+   
+   def name_renamer(name):
+      name = unidecode(name)
+      name = ' '.join(name.split(' ')[0:2])
+      if name == 'Nicolas Claxton':
+         name = 'Nic Claxton'
+      if name == 'C.J. McCollum':
+         name = 'CJ McCollum'
+      if name == 'R.J. Barrett':
+         name = 'RJ Barrett'
+      if name == 'Herb Jones':
+         name = 'Herbert Jones'
+      if name == 'Cam Johnson':
+         name = 'Cameron Johnson'
+      if name == 'O.G. Anunoby':
+         name = 'OG Anunoby'
+      return name
+      
+   raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
+
+   raw_df = raw_df.set_index('Player')
+
+   required_columns = st.session_state.params['counting-statistics'] + \
+                    list(st.session_state.params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
+                    st.session_state.params['other-columns']
+   
+   raw_df = raw_df[list(set(required_columns))]
+
+   return raw_df
 def process_basketball_monster_data(raw_df):
    
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
