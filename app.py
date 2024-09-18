@@ -330,8 +330,9 @@ with param_tab:
       elif 'Basketball Monster' in dataset_name:
         uploaded_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
                                          projections, you may have to export to excel then save as CSV utf-8. Also, make sure to 
-                                         switch the filter to 'all players' before you export- if you do not, this app will replace
-                                         the additional players with projections from another source'''
+                                         switch the filter to 'All Players' before you export- if you do not, some players will be 
+                                         excluded from the export. In that case this app will fill them in with projections from 
+                                         another source'''
                                          , type=['csv']
                                          , on_change = increment_default_key)
         if uploaded_file is not None:
