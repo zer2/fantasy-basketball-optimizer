@@ -871,6 +871,8 @@ if st.session_state['mode'] == 'Auction Mode':
         auction_selections_default = pd.DataFrame([[None] * 3] * st.session_state.n_picks * st.session_state.n_drafters
                                           ,columns = ['Player','Team','Cost'])
 
+        player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+
         auction_selections_default.loc[:'Player'] = \
             auction_selections_default.loc[:'Player'].astype(player_category_type)
 
