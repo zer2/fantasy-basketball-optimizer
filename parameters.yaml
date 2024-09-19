@@ -190,6 +190,7 @@ NBA:
       min : 10
       max: 10000
     positions: 
+     13:
       base:
         C : 2
         PG : 1
@@ -200,6 +201,28 @@ NBA:
         Util : 3
         G :  2
         F :  2
+     14: 
+      base:
+        C : 2
+        PG : 1
+        SG : 1
+        PF : 1
+        SF : 1
+      flex: 
+        Util : 4
+        G :  2
+        F :  2
+     15: 
+      base:
+        C : 2
+        PG : 1
+        SG : 1
+        PF : 1
+        SF : 1
+      flex: 
+        Util : 3
+        G :  3
+        F :  3
   position_structure :
     base_list :
       - C
@@ -406,6 +429,7 @@ WNBA:
       min : 10
       max: 10000
     positions: 
+     9: 
       base:
         C : 2
         PG : 0
@@ -651,6 +675,7 @@ MLB:
       min : 10
       max: 10000
     positions: 
+     25:
       base:
         C : 2
         1B : 1

@@ -282,6 +282,16 @@ with param_tab:
           st.session_state.selections_default = pd.DataFrame(
             {'Drafter ' + str(n+1) : [None] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
             )
+          
+      #set default position numbers, based on n_picks
+      all_position_defaults = st.session_state.params['options']['positions']
+      
+      if st.session_state.n_picks in all_position_defaults:
+        position_defaults = all_position_defaults[st.session_state.n_picks]
+      else:
+        position_defaults = all_position_defaults[st.session_state.params['options']['n_picks']['default']]
+        st.error('''There is no default position structure for a league with this number of picks. 
+                 Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
       
@@ -347,6 +357,11 @@ with param_tab:
 
       else:
         uploaded_file = None
+
+      if 'Hashtag' in dataset_name:
+        st.warning('''Hashtag projections assume that players will not experience long-term injuries. Keep that in mind when 
+            drafting players you expect to be injury prone''')
+
 
       with c3: 
 
@@ -446,7 +461,6 @@ with param_tab:
 
         st.write('Base positions')
 
-        position_defaults = st.session_state.params['options']['positions']
         for position_code, position_info in st.session_state.params['position_structure']['base'].items():
 
           st.number_input(position_info['full_str']
@@ -470,11 +484,11 @@ with param_tab:
       implied_n_picks = sum(n for n in get_position_numbers().values())
       
       if implied_n_picks > st.session_state.n_picks:
-        st.write('There are more position slots than picks in your league. Change your configuration before proceeding')
+        st.error('There are more position slots than picks in your league. Change your configuration before proceeding')
         st.stop()
 
       elif implied_n_picks < st.session_state.n_picks:
-        st.write('There are fewer position slots than picks in your league. Change your configuration before proceeding')
+        st.error('There are fewer position slots than picks in your league. Change your configuration before proceeding')
         st.stop()
 
     with algorithm_param_column:
