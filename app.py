@@ -11,7 +11,8 @@ from schedule import every, repeat, run_pending
 from src.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
                                   ,get_games_per_week, get_categories, get_ratio_statistics, clear_draft_board
-from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, get_player_metadata
+from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
+                        get_player_metadata, get_data_from_snowflake, combine_nba_projections
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
 from src import yahoo_connect
@@ -130,11 +131,11 @@ elif st.session_state['mode'] == 'Season Mode':
                 
 with param_tab: 
 
-  general_params, advanced_params = st.tabs(['General','Advanced'])
+  general_params, data_params, advanced_params = st.tabs(['General','Data','Advanced'])
 
   with general_params:
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
 
     with c1: 
 
@@ -294,76 +295,14 @@ with param_tab:
                  Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
-      
-      if st.session_state.league == 'NBA':
+    
 
-        historical_df = get_historical_data()
-        current_data, expected_minutes = get_current_season_data()
-        #darko_data = get_darko_data(expected_minutes)
-
-        unique_datasets_historical = [str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))]
-        unique_datasets_current = list(current_data.keys())
-        #unique_datasets_darko = list(darko_data.keys())
-
-        all_datasets = unique_datasets_historical + \
-                        unique_datasets_current + \
-                          ['Basketball Monster (req. upload)'] + \
-                          ['RotoWire (req. upload)'] + \
-                          ['Hashtag Basketball']
-
-        all_datasets.reverse()
-
-      else:
-        all_datasets = ['RotoWire (req. upload)'] 
-        
-      dataset_name = st.selectbox(
-        'Which dataset do you want to default to?'
-        ,all_datasets
-        ,index = 0
-        ,on_change = increment_default_key
-      )
-
-      if 'RotoWire' in dataset_name:
-        uploaded_file = st.file_uploader("Upload RotoWire data, as a csv"
-                                         , type=['csv']
-                                         , on_change = increment_default_key)
-        if uploaded_file is not None:
-          # Adding a 
-          st.session_state.rotowire_data  = pd.read_csv(uploaded_file, skiprows = 1)
-          st.warning('''Rotowire projections assume that players will not experience long-term injuries. Keep that in mind when 
-            drafting players you expect to be injury prone''')
-        else:
-          st.warning('Upload a dataset from RotoWire or change the default dataset before proceeding')
-          st.stop()
-
-
-      elif 'Basketball Monster' in dataset_name:
-        uploaded_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
-                                         projections, you may have to export to excel then save as CSV utf-8. Also, make sure to 
-                                         switch the filter to 'All Players' before you export- if you do not, some players will be 
-                                         excluded from the export. In that case this app will fill them in with projections from 
-                                         another source'''
-                                         , type=['csv']
-                                         , on_change = increment_default_key)
-        if uploaded_file is not None:
-          # Adding a 
-          st.session_state.bbm_data  = pd.read_csv(uploaded_file)
-        else:
-          st.warning('Upload a dataset from Basketball Monster or change the default dataset before proceeding')
-          st.stop()
-
-        st.warning('''BBM projections assume that players will not experience long-term injuries. Keep that in mind when 
-            drafting players you expect to be injury prone''')
-
-      else:
-        uploaded_file = None
-
-      if 'Hashtag' in dataset_name:
-        st.warning('''Hashtag projections assume that players will not experience long-term injuries. Keep that in mind when 
-            drafting players you expect to be injury prone''')
-
-
-      with c3: 
+        kind_of_dataset = st.selectbox(
+                                  'Which kind of dataset do you want to use? (specify further on the data tab)'
+                                  ,['Projection','Historical']
+                                  , index = 0
+                                  , on_change = increment_default_key
+        )
 
         def run_autodraft_and_increment():
           increment_player_stats_version()
@@ -391,8 +330,7 @@ with param_tab:
           ,index = default_punting
         )
 
-        st.caption('''This option sets the default parameters for H-scoring. 
-              For more granular control, use the Advanced tab which is next to this one''')
+        st.caption('''For more granular control, use the Advanced tab which is next to this one''')
 
         with st.form("more options"):
 
@@ -411,6 +349,97 @@ with param_tab:
                     ,default = None)
           
           submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
+
+  with data_params:
+    if st.session_state.league == 'NBA':
+
+        current_data, expected_minutes = get_current_season_data()
+        #darko_data = get_darko_data(expected_minutes)
+
+        unique_datasets_current = list(current_data.keys())
+        #unique_datasets_darko = list(darko_data.keys())
+        if kind_of_dataset == 'Historical':
+        
+          historical_df = get_historical_data()
+
+          unique_datasets_historical = reversed([str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))])
+
+          dataset_name = st.selectbox(
+            'Which dataset do you want to default to?'
+            ,unique_datasets_historical
+            ,index = 0
+            ,on_change = increment_default_key
+          )
+          raw_stats_df = get_specified_stats(dataset_name
+                                    , st.session_state.player_stats_default_key)
+    
+          player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
+          st.session_state.selections_default = st.session_state.selections_default.astype(player_category_type)
+
+        else: 
+
+          hashtag_c, roto_c, bbm_c, = st.columns(3)
+
+          with hashtag_c:
+            hashtag_upload = get_data_from_snowflake('HTB_PROJECTION_TABLE')
+            hashtag_slider = st.slider('Hashtag Basketball Weight'
+                                      , min_value = 0.0
+                                      , value = 1.0
+                                      , max_value = 1.0
+                                      , on_change = increment_default_key)
+
+          with roto_c:
+
+            rotowire_slider = st.slider('RotoWire Weight'
+                            , min_value = 0.0
+                            , max_value = 1.0
+                            , on_change = increment_default_key)
+
+            
+            rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
+                                            , type=['csv']
+                                            , on_change = increment_default_key)
+            if rotowire_file is not None:
+              rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
+            else:
+              rotowire_upload = None
+
+            if (rotowire_slider > 0) & (rotowire_upload is None):
+              st.error('Upload RotoWire projection file')
+              st.stop()
+
+          with bbm_c:
+
+            bbm_slider = st.slider('BBM Weight'
+                      , min_value = 0.0
+                      , max_value = 1.0
+                      , on_change = increment_default_key)
+
+            bbm_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
+                                            projections, you may have to export to excel then save as CSV utf-8.'''
+                                            , type=['csv']
+                                            , on_change = increment_default_key)
+            if bbm_file is not None:
+              # Adding a 
+              bbm_upload  = pd.read_csv(bbm_file)
+            else:
+              bbm_upload = None
+
+
+            if (bbm_slider > 0) & (bbm_upload is None):
+              st.error('Upload Basketball Monster projection file')
+              st.stop()
+
+          raw_stats_df = combine_nba_projections(hashtag_upload
+                            , rotowire_upload
+                            , bbm_upload
+                            , hashtag_slider
+                            , rotowire_slider
+                            , bbm_slider)
+                    
+    else:
+          all_datasets = ['RotoWire (req. upload)'] 
+          raw_stats_df = get_specified_stats('RotoWire (req. upload)')
 
   with advanced_params:
 
@@ -623,17 +652,7 @@ with param_tab:
 
         combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
 
-with info_tab:
-
-  if ('Roto' in dataset_name) & (uploaded_file is None):
-    st.stop()
-  else:
-    raw_stats_df = get_specified_stats(dataset_name
-                                    , st.session_state.player_stats_default_key)
-    
-    player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-    st.session_state.selections_default = st.session_state.selections_default.astype(player_category_type)
-    
+with info_tab:    
 
   if st.session_state['schedule']: 
     stat_tab, injury_tab, games_played_tab = st.tabs([
@@ -998,7 +1017,7 @@ elif st.session_state['mode'] == 'Season Mode':
       with right: 
 
         roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
-        , selections.columns
+        , selections_df.columns
         , index = 0)
 
         inspection_players = selections_df[roster_inspection_seat].dropna()
@@ -1185,7 +1204,7 @@ elif st.session_state['mode'] == 'Season Mode':
 
     with c1: 
       trade_party_seat = st.selectbox(f'Which team do you want to trade from?'
-          , selections.columns
+          , selections_df.columns
           , index = 0)
 
     with c2: 
