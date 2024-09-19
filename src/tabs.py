@@ -185,7 +185,6 @@ def make_cand_tab(_scores : pd.DataFrame
 
   return scores_unselected
 
-@st.cache_data(show_spinner = False, ttl = 3600)
 def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
@@ -282,7 +281,7 @@ def make_h_cand_tab(_H
             rate_df = win_rates.dropna()
             rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
-            players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+            players_chosen = [x for v in player_assignments.values() for x in v if x is not None]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
             rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
@@ -359,7 +358,7 @@ def make_h_cand_tab(_H
                     
           if display and (rosters.shape[1] > 1):
 
-            my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x ==x]
+            my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x is not None]
             n_players = len(my_players)
 
             player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)

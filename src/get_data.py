@@ -241,7 +241,7 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
 #data is cached locally so that different users can have different cuts loaded
 #@st.cache_data(show_spinner = False, ttl = 3600)
 def get_specified_stats(dataset_name : str
-                     , default_key : int) -> pd.DataFrame:
+                     , default_key : int = None) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
   Args:
     dataset_name: the name of the dataset to fetch
@@ -302,6 +302,53 @@ def get_specified_stats(dataset_name : str
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
+    return df.round(2) 
+  
+def combine_nba_projections(hashtag_upload
+                            , rotowire_upload
+                            , bbm_upload
+                            , hashtag_slider
+                            , rotowire_slider
+                            , bbm_slider):
+    slider_sum = hashtag_slider + rotowire_slider + bbm_slider
+
+    hashtag_stats = None if hashtag_upload is None else process_htb_data(hashtag_upload)
+    rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload)
+    bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload)
+
+    hashtag_weight = [hashtag_slider] if hashtag_upload is not None else []
+    rotowire_weight = [rotowire_slider] if rotowire_upload is not None else []
+    bbm_weight = [bbm_slider] if bbm_upload is not None else []
+
+    weights = hashtag_weight + rotowire_weight + bbm_weight
+
+    all_players = set([] if hashtag_stats is None else [p for p in hashtag_stats.index] + \
+                  [] if rotowire_stats is None else [p for p in rotowire_stats.index] + \
+                  [] if bbm_stats is None else [p for p in bbm_stats.index])
+    
+    df =  pd.concat({'HTB' : hashtag_stats 
+                        ,'RotoWire' : rotowire_stats
+                        ,'BBM' : bbm_stats}, names = ['Source'])
+    
+    new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM'], all_players], names = ['Source','Player'])
+    df = df.reindex(new_index)
+    
+    weights = [hashtag_slider, rotowire_slider, bbm_slider]
+    
+    df = df.groupby('Player') \
+                .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
+                    if np.issubdtype(x.dtype, np.number) \
+                    else x[0])
+            
+    df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
+    df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
+    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
+
+    df['Position'] = df['Position'].fillna('NP')
+    df = df.fillna(0)
+
+    df.index = df.index + ' (' + df['Position'] + ')'
+    df.index.name = 'Player'
     return df.round(2) 
   
 def process_baseball_rotowire_data(raw_df):
@@ -392,8 +439,7 @@ def process_htb_data(raw_df):
    raw_df = raw_df[list(set(required_columns))]
 
    return raw_df
-def process_basketball_monster_data(raw_df
-                                    , default_projections = None):
+def process_basketball_monster_data(raw_df):
    
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
@@ -427,11 +473,7 @@ def process_basketball_monster_data(raw_df
    
    raw_df = raw_df[list(set(required_columns))]
 
-   #Add HTB projections for players not forecasts by BBM
-   extra_df = default_projections[~(default_projections.index.isin(raw_df.index))]
-   full_df = pd.concat([raw_df, extra_df], axis = 0)
-
-   return full_df
+   return raw_df
 
 @st.cache_data(show_spinner = False)
 def get_nba_schedule():
