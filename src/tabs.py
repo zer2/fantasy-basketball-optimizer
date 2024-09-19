@@ -10,7 +10,7 @@ import os
 import itertools
 from pathlib import Path
   
-#@st.cache_data(show_spinner = False, ttl = 3600)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def make_about_tab(md_path : str):
     """Make one of the tabs on the about page
 
