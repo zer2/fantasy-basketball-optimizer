@@ -1,4 +1,6 @@
-This website aims to implement the category-based fantasy basketball optimization methods described in [my paper](https://arxiv.org/abs/2307.02188).
+This website aims to implement the category-based fantasy basketball optimization methods described in my two papers on fantasy basketball
+- https://arxiv.org/abs/2307.02188 
+- https://arxiv.org/abs/2409.09884
 
 If you are unfamiliar with fantasy basketball, here are some potentially useful links:
 - [*General intro*](https://dunkorthree.com/how-fantasy-basketball-work/)

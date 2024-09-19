@@ -1,6 +1,6 @@
 # Adapting to Rotisserie
 
-I did not include Rotisserie in the H-scoring paper because its objective function is hard to calculate. Still, I wanted to have some sort of implementation for this site, so I designed a duck-tape-and-glue way of handling Rotisserie. 
+I did not include Rotisserie in the H-scoring paper because its objective function is hard to calculate. Still, I wanted to have some sort of implementation for this site, so I designed a duck-tape-and-glue way of handling Rotisserie. I'm working on a better version now, but keeping this in for the time being. 
 
 The Rotisserie format has considerably different dynamics from its head-to-head counterparts. For one, scores are aggregated across an entire season rather than across individual weeks. Additionally, winning in Rotisserie requires winning against every single opponent at the same time, rather than individual opponents across multiple matchups. These two distinctions pose unique problems when trying to game-plan for Rotisserie, and warrant significant adjustments. 
 

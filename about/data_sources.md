@@ -1,20 +1,38 @@
 # Available data
 
-This website pulls data from three sources, all of which have slightly different purposes
-
 ## Historical season data
 
 Data from old seasons is mostly for fun. See what the algorithms would have recommended for those seasons, given perfect information about player stats! 
 
-This data was pulled from the NBA API and stored in a one-time load
+The box score data was pulled from the NBA API. 
 
-## Current season data
+## Projection sources 
+
+Projections are great for drafting, since they are meant to apply to the upcoming season.
+
+One important thing to note about projections is that they generally do not account for the possibility of long-term injury. Some players are known to be more injury prone, and therefore have significant downside risk that is not accounted for by the projections. App users should keep this in mind when directed to draft potentially injury-prone players.
+
+### Hashtag Basketball 
+
+[Hashtag Basketball](https://hashtagbasketball.com/) provides free projections for the 2024-25 season. 
+
+At the moment, these projections are loaded from Hashtag Basketball manually. So I will not necessarily update them as frequently as the projections are updated on the website itself.
+
+### RotoWire
+
+[Rotowire](https://www.rotowire.com/) is another source of projections. Unlike Hashtag Basketball, their projections are not free, so I have not included them within the app by default. To use them you must buy the projections and download them, so you can upload them to the data tab 
+
+### Basketball Monster
+
+The third projection source is [Basketball Monster](https://basketballmonster.com/). Basketball Monster is also a paid service, and is not included in the app by default. When I downloaded BBM projections, I needed to download them as excel and then save them as CSV to get all of the required information
+
+## Current season data (currently unavailable)
 
 Current season data is pulled on a daily basis from the NBA's API. Using actual season data is a standard and simple method for game-planning for the remainder of the season. 
 
 This data set excludes games when players are injured and provides no forecast for likelihood of future injury. You can write in injury risk in the "No Play %" column if you would like 
 
-## DARKO
+## DARKO (currently unavailable)
 
 [DARKO](https://apanalytics.shinyapps.io/DARKO/) is a "machine learning-driven basketball player box-score score projection system." Evidence suggests that DARKO projections are the most 
 accurate short-term forecasts available. 
@@ -38,15 +56,3 @@ The idea of DARKO-L is to remove the short-term bias from DARKO-S by anchoring o
 more useful for making  long-term add/drop decisions than DARKO-S, because it is not affected by recent circumstances such as injuries. However, discounting injuries can also be dangerous. 
 If a player is injured to the extent that they will miss much of the remaining fantasy season, then that injury is relevant even in the long-term. For this reason, when using DARKO-S, 
 it is wise to temper expectations with your own understanding of player injuriy status
-
-# Additional data aspirations
-
-## Pre-season projections
-
-Ideally, we could provide pre-season projections from sources such as HashTagBasketball and BasketballMonster. However, this is complicated because their projections are paid products. For 
-now, you can paste their projections in manually if you have access to them
-
-## Rest-of-season projections
-
-DARKo-L is a basic attempt at extending DARKO for a full season, and could be greatly improved with a more sophisticated treatment. The author of DARKO has mentioned season-long projections
-as a future goal, so this will likely be  available eventually!

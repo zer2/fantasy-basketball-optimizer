@@ -8,7 +8,13 @@ Most fantasy analysts approach this from the static perspective, aiming to quant
 
 Of course, just like for drafting, any static system will be suboptimal, no matter how sophisticated. A more optimal way of valuing players is adapting H-scores for auctions
 
+## Dynamic value quantification 
+
+The H-scoring algorithm works slightly differently for auctions than it does for snake drafting, because of the importance of money and player slots. See the [second paper](https://arxiv.org/abs/2409.09884) for more details 
+
 ## Static value quantification
+
+This app uses an additional adjustment after H-scores are calculated, beyond what is described in the paper 
 
 ### The basic auction model
 
@@ -125,10 +131,5 @@ I define H-scores for the auction context relative to dollars. So a player equiv
 It should be noted that even if all of this theory is perfect and quantifies player value perfectly, just having this information available does not guarantee a good auction: if a bidder always pays full money for each of their picks, they won't have an above-average team even in theory. 
 
 One way to make a good team is to target players that have high auction values according to H-score versus what others are willing to pay, which could perhaps be inferred from typical auction values or the static Z-score procedure. Even then, there are many additional dimensions to auction drafting: the very best auction managers know how to use psychology to get good deals on the players they want or bump up the prices of players that they are not interested in. Perfecting auction drafting is difficult, and goes far beyond the mathematics discussed here
-
-
-
-
-
 
 
