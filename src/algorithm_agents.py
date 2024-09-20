@@ -224,8 +224,6 @@ class HAgent():
 
         my_players = [p for p in player_assignments[drafter] if p == p]
 
-        print(my_players)
-
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis = 0))
 
         #assume that players for the rest of the round will be chosen from the default ordering 
