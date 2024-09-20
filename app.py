@@ -187,9 +187,6 @@ with param_tab:
         st.session_state.selections_default = pd.DataFrame(
           {'Drafter ' + str(n+1) : [np.nan] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
           )
-        
-        print('Place 1')
-        print(st.session_state.selections_default)
 
       else:
 
@@ -377,9 +374,6 @@ with param_tab:
           raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
   
-
-          print('Place 2')
-
         else: 
 
           hashtag_c, roto_c, bbm_c, = st.columns(3)
