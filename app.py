@@ -185,8 +185,11 @@ with param_tab:
         # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
         
         st.session_state.selections_default = pd.DataFrame(
-          {'Drafter ' + str(n+1) : [None] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
+          {'Drafter ' + str(n+1) : [np.nan] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
           )
+        
+        print('Place 1')
+        print(st.session_state.selections_default)
 
       else:
 
@@ -283,6 +286,7 @@ with param_tab:
           st.session_state.selections_default = pd.DataFrame(
             {'Drafter ' + str(n+1) : [None] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
             )
+
           
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
@@ -372,9 +376,9 @@ with param_tab:
           )
           raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
-    
-          player_category_type = CategoricalDtype(categories=list(raw_stats_df.index), ordered=True)
-          st.session_state.selections_default = st.session_state.selections_default.astype(player_category_type)
+  
+
+          print('Place 2')
 
         else: 
 
@@ -1011,6 +1015,7 @@ elif st.session_state['mode'] == 'Season Mode':
                                         , hide_index = True
                                         , height = st.session_state.n_picks * 35 + 50)  
       selection_list = listify(selections_df)
+
       player_assignments = selections_df.to_dict('list')
 
       z_scores_unselected = st.session_state.z_scores[~st.session_state.z_scores.index.isin(selection_list)]

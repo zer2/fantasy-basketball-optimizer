@@ -101,7 +101,7 @@ def make_drafting_tab_own_data(H):
                     ,draft_seat
                     ,st.session_state.n_iterations
                     ,st.session_state.v
-                    ,30)
+                    ,5)
             else:
                 st.write('It is not your turn, so H-scoring will not run')
 

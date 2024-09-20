@@ -59,6 +59,8 @@ def make_team_tab(_scores : pd.DataFrame
                                               .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
                                               .map(stat_styler, subset = pd.IndexSlice[my_players, get_selected_categories()], multiplier = player_multiplier) \
                                               .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()], multiplier = team_multiplier)
+  
+  
   display = st.dataframe(team_stats_styled
                       , use_container_width = True
                       , height = len(team_stats) * 35 + 38
@@ -281,7 +283,7 @@ def make_h_cand_tab(_H
             rate_df = win_rates.dropna()
             rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
-            players_chosen = [x for v in player_assignments.values() for x in v if x is not None]
+            players_chosen = [x for v in player_assignments.values() for x in v if x == x]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
             rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
@@ -358,7 +360,7 @@ def make_h_cand_tab(_H
                     
           if display and (rosters.shape[1] > 1):
 
-            my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x is not None]
+            my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x == x]
             n_players = len(my_players)
 
             player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)
