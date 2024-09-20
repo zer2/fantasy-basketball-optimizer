@@ -291,8 +291,6 @@ def make_h_cand_tab(_H
                                                             , total_cash_remaining
                                                             , st.session_state['streaming_noise_h'])
             
-            st.write(rate_display.loc[:,'$ Value'])
-
             rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
  
             comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']

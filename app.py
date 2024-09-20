@@ -1395,4 +1395,3 @@ with about_tab:
   for tab, path in zip(tabs, about_paths):
     with tab:
       make_about_tab(path)   
-
