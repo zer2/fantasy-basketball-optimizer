@@ -139,13 +139,13 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
-        my_players = [p for p in player_assignments[drafter] if p is not None]
+        my_players = [p for p in player_assignments[drafter] if p == p]
 
         self.players = my_players #this is a bit of a hack
 
         n_players_selected = len(my_players) 
 
-        players_chosen = [x for v in player_assignments.values() for x in v if x is not None]
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list) & \
                                                 self.x_scores.index.isin(self.positions.index)]
         
@@ -222,12 +222,14 @@ class HAgent():
             Series of form {cat : expected value of opposing teams for the cat}
         """
 
-        my_players = [p for p in player_assignments[drafter] if p is not None]
+        my_players = [p for p in player_assignments[drafter] if p == p]
+
+        print(my_players)
 
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis = 0))
 
         #assume that players for the rest of the round will be chosen from the default ordering 
-        players_chosen = [x for v in player_assignments.values() for x in v if x is not None]
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
 
         if cash_remaining_per_team:
 
@@ -294,7 +296,7 @@ class HAgent():
             n_values = None
 
         diff_vars = np.vstack(
-            [self.get_diff_var(len([p for p in players if p is not None])) for team, players \
+            [self.get_diff_var(len([p for p in players if p == p])) for team, players \
                                     in player_assignments.items() if team != drafter]
         ).T
         
@@ -328,7 +330,7 @@ class HAgent():
         Returns:
             1xself.n_categories array, scores by category
         """
-        players = [p for p in players if p is not None]
+        players = [p for p in players if p == p]
 
         if n_players == self.n_picks:
             n_extra_players = 0
