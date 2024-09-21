@@ -8,6 +8,7 @@ from yfpy.query import YahooFantasySportsQuery
 from src.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
 from src.helper_functions import move_forward_one_pick
 from collections import Counter
+from src.helper_functions import standardize_name
 
 import json
 import os
@@ -124,6 +125,10 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
     rosters_dict = get_rosters_dict(league_id, _auth_dir, team_ids)
     players_df = _get_players_df(rosters_dict, teams_dict, player_metadata)
 
+    #when yahoo data is loaded, refresh the default selection df
+    st.session_state.selections_default = players_df
+    del st.session_state.selections_df
+
     return players_df
 
 #@st.cache_data(ttl=3600, show_spinner = False)
@@ -178,13 +183,14 @@ def _get_players_df(rosters_dict: dict[int, Roster], teams_dict: dict[int, str],
     players_df = pd.DataFrame()
 
     team_players_dict = {}
+    player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
     max_team_size = 0
 
     for team_id, roster in rosters_dict.items():
         team_name = teams_dict[team_id]
         relevant_player_names = [
-            f'{player.name.full} ({player_metadata.loc[player.name.full]})' #Appending position after player name
+            f'{standardize_name(player.name.full)} ({player_metadata.loc[standardize_name(player.name.full)]})' #Appending position after player name
             for player in roster.players 
             if 
                 player.selected_position.position != 'IL'

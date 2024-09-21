@@ -243,8 +243,6 @@ with param_tab:
 
               #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
               
-              st.session_state.selections_default = team_players_df
-
               #Just trying for now!
               player_statuses = yahoo_connect.get_player_statuses(st.session_state.yahoo_league_id, auth_dir, player_metadata)
 
@@ -1005,7 +1003,7 @@ elif st.session_state['mode'] == 'Season Mode':
     with left:
 
       st.caption("""Enter which player is on which team below""")
-      selections_df = st.data_editor(st.session_state.selections
+      selections_df = st.data_editor(st.session_state.selections_df
                                         , hide_index = True
                                         , height = st.session_state.n_picks * 35 + 50)  
       selection_list = listify(selections_df)
@@ -1072,7 +1070,7 @@ elif st.session_state['mode'] == 'Season Mode':
 
         with c1:
           matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
-                                            , selections.columns
+                                            , st.session_state.selections_df.columns
                                             , index = 0)
         
         with c2:
@@ -1094,13 +1092,13 @@ elif st.session_state['mode'] == 'Season Mode':
         else:
           with c3: 
             opponent_seat = st.selectbox(f'Against which team?'
-                                              , [s for s in st.session_state.selections.columns if s != matchup_seat]
+                                              , [s for s in st.session_state.selections_df.columns if s != matchup_seat]
                                               , index = 0)
         st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
                   expected game volume for each player based on the NBA's schedule""")
 
         make_matchup_tab(player_stats
-                        , st.session_state.selections
+                        , st.session_state.selections_df
                         , matchup_seat
                         , opponent_seat
                         , matchup_week
@@ -1108,7 +1106,6 @@ elif st.session_state['mode'] == 'Season Mode':
                         , st.session_state.n_drafters
                         , conversion_factors
                         , psi
-                        , st.session_state.nu
                         , scoring_format )
         ######## END TAB
   with waiver_tab:
@@ -1117,7 +1114,7 @@ elif st.session_state['mode'] == 'Season Mode':
 
       with c1: 
         waiver_inspection_seat = st.selectbox(f'Which team so you want to drop a player from?'
-            , st.session_state.selections.columns
+            , st.session_state.selections_df.columns
             , index = 0)
 
       with c2: 

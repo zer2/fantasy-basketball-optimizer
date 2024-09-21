@@ -44,6 +44,8 @@ def get_current_season_data(season : int = 2024) -> tuple:
       1) Dictionary of structure name of dataset -> dataframe, where the dataframes have fantasy-relevant player statistics
       2) Series of player -> minutes, calculated as average minutes per game played 
   """
+
+  #ZR: I believe this function currently does not work 
            
   season_str = str(season -1) + '-' + str(season -2000)
   pgl_df = pd.concat(
@@ -152,7 +154,10 @@ def get_player_metadata() -> pd.Series:
    Returns:
       Currently: A series of the form Player Name -> Position
    """
-  
+
+   return st.session_state.player_stats['Position']
+
+   '''
    playerindex = nba_endpoints.playerindex.PlayerIndex()
    data = playerindex.data_sets[0].get_dict()['data']
    headers = playerindex.data_sets[0].get_dict()['headers']
@@ -167,6 +172,7 @@ def get_player_metadata() -> pd.Series:
    simplified.name = 'Position'
 
    return simplified
+   '''
 
 @st.cache_resource(ttl = '1d') 
 def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
