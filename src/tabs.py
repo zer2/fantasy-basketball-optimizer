@@ -588,8 +588,8 @@ def make_matchup_tab(player_stats
     week_specific_player_stats[col] = week_specific_player_stats[col] * effective_games_played_percent * \
                                                                         potential_games/3
   #ZR: WE should really clean up this keying mechanism
-  week_specific_info = process_player_data(week_specific_player_stats
-                        ,None
+  week_specific_info = process_player_data(None
+                        ,week_specific_player_stats
                         ,conversion_factors
                         ,0 #Upsilon isn't needed for this function anymore- should be removed 
                         ,psi
