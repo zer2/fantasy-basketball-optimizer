@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, styler_a, styler_b, styler_c, stat_styler
+from src.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
+                                styler_a, styler_b, styler_c, stat_styler, \
+                                get_selected_counting_statistics, get_selected_volume_statistics
 from src.algorithm_agents import HAgent
 from src.h_score_analysis import estimate_matchup_result, analyze_trade, analyze_trade_value
 from src.algorithm_helpers import savor_calculation
@@ -573,7 +575,6 @@ def make_matchup_tab(player_stats
                   , n_drafters
                   , conversion_factors
                   , psi
-                  , nu
                   , scoring_format):
   ### BELOW HERE SHOULD BE IN A CACHED TAB
   potential_games = st.session_state['schedule'][matchup_week].reindex(player_stats.index).fillna(3)
@@ -583,16 +584,18 @@ def make_matchup_tab(player_stats
 
   effective_games_played_percent = 1 - psi * (1- player_stats['Games Played %']/100)
 
-  for col in st.session_state.params['counting-statistics']  + st.session_state.params['volume-statistics'] :
+  for col in get_selected_counting_statistics() + get_selected_volume_statistics() :
     week_specific_player_stats[col] = week_specific_player_stats[col] * effective_games_played_percent * \
                                                                         potential_games/3
   #ZR: WE should really clean up this keying mechanism
-  week_specific_info = process_player_data(week_specific_player_stats
+  week_specific_info = process_player_data(None
+                        ,week_specific_player_stats
                         ,conversion_factors
+                        ,0 #Upsilon isn't needed for this function anymore- should be removed 
                         ,psi
-                        ,nu
                         ,n_drafters
                         ,n_picks
+                        ,st.session_state.params
                         ,st.session_state.player_stats_editable_version + week_number*100)
   
   week_specific_x_scores = week_specific_info['X-scores']

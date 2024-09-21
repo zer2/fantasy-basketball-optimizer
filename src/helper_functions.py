@@ -7,10 +7,14 @@ import streamlit as st
 import numexpr as ne
 from datetime import datetime
 from functools import reduce 
+from unidecode import unidecode
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
     return get_ratio_statistics() + get_counting_statistics()
+
+def get_selected_volume_statistics():
+   return [st.session_state['params']['ratio-statistics'][x]['volume-statistic'] for x in get_selected_ratio_statistics()] 
     
 def get_counting_statistics():
     #convenience function to get the list of categories used for fantasy basketball
@@ -178,6 +182,10 @@ def get_n_games():
 def get_games_per_week():
    if st.session_state:
       return st.session_state.params['n_games_per_week']
+   
+def standardize_name(name):
+   name = ' '.join(name.split(' ')[0:2])
+   return unidecode(name)
 
 
 def listify(x : pd.DataFrame) -> list:
