@@ -377,6 +377,11 @@ def clear_draft_board():
   if 'draft_results' in st.session_state:
     del st.session_state.draft_results 
     del st.session_state.live_draft_active
+    del st.session_state.selections_df
+
+def increment_default_key_and_clear_draft_board():
+  increment_default_key()
+  clear_draft_board()
 
 
 def autodraft(autodraft_df, g_scores):
