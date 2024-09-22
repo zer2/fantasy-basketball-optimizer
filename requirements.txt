@@ -6,7 +6,7 @@ plotly
 nba_api
 yahoo_oauth
 yahoo_fantasy_api
-yfpy
+yfpy==15.0.3
 requests_oauthlib
 requests
 pyyaml
