@@ -9,7 +9,7 @@ from src.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
 from src.helper_functions import move_forward_one_pick
 from collections import Counter
 from src.helper_functions import standardize_name
-
+from datetime import datetime
 import json
 import os
 import pandas as pd
@@ -307,7 +307,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
         draft_results = sc.get_league_draft_results()
     except Exception as e:
         return None, False
-            
+
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
     n_drafters = int(n_picks/max_round)

@@ -245,7 +245,7 @@ def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) 
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
-#@st.cache_data(show_spinner = False, ttl = 3600)
+@st.cache_data(show_spinner = False, ttl = 3600)
 def get_specified_stats(dataset_name : str
                      , default_key : int = None) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
@@ -310,6 +310,7 @@ def get_specified_stats(dataset_name : str
 
     return df.round(2) 
   
+@st.cache_data(ttl = 3600)
 def combine_nba_projections(hashtag_upload
                             , rotowire_upload
                             , bbm_upload
@@ -317,6 +318,8 @@ def combine_nba_projections(hashtag_upload
                             , rotowire_slider
                             , bbm_slider):
     slider_sum = hashtag_slider + rotowire_slider + bbm_slider
+
+    st.write('BOOOOO')
 
     hashtag_stats = None if hashtag_upload is None else process_htb_data(hashtag_upload)
     rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload)
@@ -390,6 +393,7 @@ def process_baseball_rotowire_data(raw_df):
 
    return raw_df
 
+@st.cache_data()
 def process_basketball_rotowire_data(raw_df):
    
    raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
@@ -410,6 +414,7 @@ def process_basketball_rotowire_data(raw_df):
 
    return raw_df
 
+@st.cache_data()
 def process_htb_data(raw_df):
    raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()

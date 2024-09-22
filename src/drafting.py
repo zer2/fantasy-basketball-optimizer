@@ -3,6 +3,7 @@ import streamlit as st
 from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick
 from src.tabs import *
 from src import yahoo_connect
+from datetime import datetime
 
 def run_autodraft():
   while (st.session_state.selections_df.columns[st.session_state.drafter] in st.session_state.autodrafters) and (st.session_state.row < st.session_state.n_picks):
@@ -144,6 +145,8 @@ def refresh_analysis():
 
     player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
+    start = datetime.now()
+
     if st.session_state.mode == 'Draft Mode':
 
         draft_result = yahoo_connect.get_draft_results(yahoo_league_id
@@ -155,6 +158,8 @@ def refresh_analysis():
         draft_result = yahoo_connect.get_auction_results(yahoo_league_id
                                                                     , auth_dir
                                                                     , player_metadata)
+        
+    st.write(datetime.now() - start)
         
     st.session_state.draft_results, st.session_state.live_draft_active = draft_result
    
@@ -234,9 +239,11 @@ def make_drafting_tab_live_data(H):
                     ,draft_seat
                     ,st.session_state.n_iterations
                     ,st.session_state.v
-                    ,5)
-
-
+                    ,5
+                    ,None
+                    ,None
+                    ,None
+                    ,True)
 
 def make_auction_tab_live_data(H):
 

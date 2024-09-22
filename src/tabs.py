@@ -189,6 +189,8 @@ def make_cand_tab(_scores : pd.DataFrame
 
   return scores_unselected
 
+
+#ZR: Make a version of this that only updates when the drafter's players are updated 
 def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
@@ -199,7 +201,8 @@ def make_h_cand_tab(_H
                     ,display_period : int = 5
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
-                    ,total_players : int = None):
+                    ,total_players : int = None
+                    ,fastmode : bool = False):
   """Make a tab showing H-scores for the current draft situation
 
   Args:
@@ -216,21 +219,48 @@ def make_h_cand_tab(_H
           
   generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
 
+  #last name only because this is for the roster display
+  my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x == x] 
+  players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+
   placeholder = st.empty()
 
-  #if n_iterations is 0 we run just once
-  for i in range(max(1,n_iterations)):
+  if fastmode and (st.session_state.current_my_players == my_players):
+    res = st.session_state.current_res
 
-    res = next(generator)
+    valid_options = (res['Rosters'].loc[:,0] >= 0) & ~(res['Rosters'].index.isin(players_chosen))
+
+    process_res(placeholder, res, _z_scores, _g_scores
+            , player_assignments, cash_remaining_per_team, v, my_players, generic_player_value, valid_options)
+
+  else:
+    #if n_iterations is 0 we run just once
+    for i in range(max(1,n_iterations)):
+
+      res = next(generator)
+      display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
+
+      if display:
+        valid_options = res['Rosters'].loc[:,0] >= 0
+
+        process_res(placeholder, res, _z_scores, _g_scores
+                    , players_chosen, cash_remaining_per_team, v, my_players, generic_player_value, valid_options)
+     
+    if fastmode:
+      st.session_state.current_res = res
+      st.session_state.current_my_players = my_players
+
+def process_res(placeholder, res, _z_scores, _g_scores, players_chosen
+                , cash_remaining_per_team, v, my_players, generic_player_value, valid_options):
     rosters = res['Rosters']
 
     fits_roster = rosters.loc[:,0] >= 0
 
-    rosters = rosters[list(fits_roster.values)]
+    rosters = rosters[list(valid_options.values)]
 
-    score = res['Scores'][fits_roster]
-    weights = res['Weights'][fits_roster]
-    win_rates = res['Rates'][fits_roster]
+    score = res['Scores'][valid_options]
+    weights = res['Weights'][valid_options]
+    win_rates = res['Rates'][valid_options]
     position_shares = res['Position-Shares']
 
     #should filter for rosters that are viable 
@@ -266,17 +296,12 @@ def make_h_cand_tab(_H
         raw_z_tab = all_tabs[-2]
         raw_g_tab = all_tabs[-1]
 
-      
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
-
-      display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
 
       if cash_remaining_per_team:
          
         with target_tab:
-
-          if display:
 
             if sum(fits_roster) == 0:
               st.error('Illegal roster!')
@@ -285,7 +310,6 @@ def make_h_cand_tab(_H
             rate_df = win_rates.dropna()
             rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
-            players_chosen = [x for v in player_assignments.values() for x in v if x == x]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
             rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
@@ -321,8 +345,6 @@ def make_h_cand_tab(_H
       else:
         with rate_tab:
 
-          if display:
-
             score_df = score_df.sort_values('H-score',ascending = False)
 
             if sum(fits_roster) == 0:
@@ -341,7 +363,7 @@ def make_h_cand_tab(_H
             st.dataframe(rate_display_styled, use_container_width = True)
       with weight_tab:
 
-        if display and (len(weights) > 0):
+        if (len(weights) > 0):
 
           weight_df = weights.loc[score_df.index].dropna()
           weight_display = score_df.merge(weight_df
@@ -358,9 +380,8 @@ def make_h_cand_tab(_H
 
       with roster_tab:
                     
-          if display and (rosters.shape[1] > 1):
+          if (rosters.shape[1] > 1):
 
-            my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x == x]
             n_players = len(my_players)
 
             player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)
@@ -405,7 +426,7 @@ def make_h_cand_tab(_H
       for tab, position_shares_df in zip(position_tabs, position_shares_res):
           with tab: 
               
-              if display and (len(position_shares_df) > 0):
+              if (len(position_shares_df) > 0):
            
                 share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
                                       , left_index = True
@@ -440,6 +461,7 @@ def make_h_cand_tab(_H
                                                        , st.session_state.params['z-score-total-multiplier'])
 
         st.dataframe(scores_unselected_styled, use_container_width = True)
+
 ### Waiver tabs 
 
 @st.cache_data(show_spinner = False, ttl = 3600)

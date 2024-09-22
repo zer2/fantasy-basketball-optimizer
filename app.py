@@ -20,9 +20,6 @@ from src.tabs import *
 from src.data_editor import make_data_editor
 from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft, make_auction_tab_live_data
 
-#from streamlit_profiler import Profiler
-
-#with Profiler():
 
 ### SETUP
 st.set_page_config(page_title='Fantasy BBall Optimization'
@@ -67,6 +64,12 @@ if 'draft_results' not in st.session_state:
 
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
+
+if 'current_res' not in st.session_state:
+  st.session_state.current_res = None
+
+if 'current_my_players' not in st.session_state:
+  st.session_state.current_my_players = None
 
 def run_h_score():
     st.session_state.run_h_score = True
@@ -218,16 +221,16 @@ with param_tab:
               st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
           else:
-               yahoo_league = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
-                               ,min_value = 0
-                               ,value = None
-                               ,key = 'yahoo_league_id'
-                               , on_change = clear_draft_board)
-               
-               if st.session_state.yahoo_league_id is not None:
+              yahoo_league = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
+                              ,min_value = 0
+                              ,value = None
+                              ,key = 'yahoo_league_id'
+                              , on_change = clear_draft_board)
+              
+              if st.session_state.yahoo_league_id is not None:
                 st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())                
                 st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
-               else:
+              else:
                 st.session_state.n_drafters = 12 #Kind of a hack
                 
 
@@ -291,7 +294,7 @@ with param_tab:
       else:
         position_defaults = all_position_defaults[st.session_state.params['options']['n_picks']['default']]
         st.error('''There is no default position structure for a league with this number of picks. 
-                 Position structure must be met manually on the Advanced tab.''')
+                Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
     
@@ -352,10 +355,10 @@ with param_tab:
   with data_params:
     if st.session_state.league == 'NBA':
 
-        current_data, expected_minutes = get_current_season_data()
+        #current_data, expected_minutes = get_current_season_data()
         #darko_data = get_darko_data(expected_minutes)
 
-        unique_datasets_current = list(current_data.keys())
+        #unique_datasets_current = list(current_data.keys())
         #unique_datasets_darko = list(darko_data.keys())
         if kind_of_dataset == 'Historical':
         
