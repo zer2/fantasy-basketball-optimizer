@@ -10,7 +10,8 @@ import time
 from schedule import every, repeat, run_pending
 from src.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
-                                  ,get_games_per_week, get_categories, get_ratio_statistics, clear_draft_board
+                                  ,get_games_per_week, get_categories, get_ratio_statistics, clear_draft_board \
+                                  ,increment_default_key_and_clear_draft_board
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
                         get_player_metadata, get_data_from_snowflake, combine_nba_projections
 from src.process_player_data import process_player_data
@@ -144,7 +145,7 @@ with param_tab:
         ('NBA', 'WNBA') #MLB excluded for now
         , index = 0
         , key = 'league'
-        , on_change = increment_default_key
+        , on_change = increment_default_key_and_clear_draft_board
         )
       
       load_params(st.session_state.league)
@@ -175,6 +176,7 @@ with param_tab:
                                       , key = 'n_drafters'
                                       , min_value = st.session_state.params['options']['n_drafters']['min']
                                       , value = st.session_state.params['options']['n_drafters']['default']
+                                      , on_change = clear_draft_board
                                       )
 
         n_picks = st.number_input(r'How many players will each drafter choose?'
@@ -301,7 +303,7 @@ with param_tab:
                                   'Which kind of dataset do you want to use? (specify further on the data tab)'
                                   ,['Projection','Historical']
                                   , index = 0
-                                  , on_change = increment_default_key
+                                  , on_change = increment_default_key_and_clear_draft_board
         )
 
         def run_autodraft_and_increment():
@@ -368,7 +370,7 @@ with param_tab:
             'Which dataset do you want to default to?'
             ,unique_datasets_historical
             ,index = 0
-            ,on_change = increment_default_key
+            ,on_change = increment_default_key_and_clear_draft_board
           )
           raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
