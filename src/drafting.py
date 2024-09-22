@@ -160,83 +160,83 @@ def refresh_analysis():
    
 def make_drafting_tab_live_data(H):
 
-    st.session_state.player_metadata = st.session_state.player_stats['Position']
+    with st.container():
 
-    if 'team_names' not in st.session_state:
-        st.write('No league info has been passed')
-        st.stop()
+        st.session_state.player_metadata = st.session_state.player_stats['Position']
 
-    if st.session_state.draft_results is None:
-        refresh_analysis()
+        if 'team_names' not in st.session_state:
+            st.write('No league info has been passed')
+            st.stop()
 
-    c1, c2 = st.columns([0.1,0.9])
+        if st.session_state.draft_results is None:
+            refresh_analysis()
 
-    with c1:
-        st.button('Refresh Analysis', on_click = refresh_analysis)
+        c1, c2 = st.columns([0.1,0.9])
 
-    with c2:
-        draft_seat = st.selectbox(f'Which drafter are you?'
-        , st.session_state.team_names
-        , key = 'draft_seat')
-  
-    if not st.session_state.live_draft_active:
+        with c1:
+            st.button('Refresh Analysis', on_click = refresh_analysis)
 
-        st.write('Draft has not yet begun')
+        with c2:
+            draft_seat = st.selectbox(f'Which drafter are you?'
+            , st.session_state.team_names
+            , key = 'draft_seat')
+    
+        if not st.session_state.live_draft_active:
 
-    else:
-        
-        selection_list = listify(st.session_state.draft_results) 
-        player_assignments = st.session_state.draft_results.to_dict('list')
+            st.write('Draft has not yet begun')
 
-        my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
-        
-        cand_tab, team_tab = st.tabs(["Candidates","Team"])
+        else:
+            
+            selection_list = listify(st.session_state.draft_results) 
+            player_assignments = st.session_state.draft_results.to_dict('list')
 
-        with team_tab:
+            my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
+            
+            cand_tab, team_tab = st.tabs(["Candidates","Team"])
 
-            if len(my_players) == st.session_state.n_picks:
-                base_h_res = get_base_h_score(st.session_state.info
-                                                ,st.session_state.omega
-                                                ,st.session_state.gamma
-                                                ,st.session_state.n_picks
-                                                ,st.session_state.n_drafters
-                                                ,st.session_state.scoring_format
-                                                ,st.session_state.chi
-                                                ,player_assignments
-                                                ,draft_seat
-                                                ,st.session_state.info_key)
+            with team_tab:
 
-                base_h_score = base_h_res['Scores']
-                base_win_rates = base_h_res['Rates']
+                if len(my_players) == st.session_state.n_picks:
+                    base_h_res = get_base_h_score(st.session_state.info
+                                                    ,st.session_state.omega
+                                                    ,st.session_state.gamma
+                                                    ,st.session_state.n_picks
+                                                    ,st.session_state.n_drafters
+                                                    ,st.session_state.scoring_format
+                                                    ,st.session_state.chi
+                                                    ,player_assignments
+                                                    ,draft_seat
+                                                    ,st.session_state.info_key)
 
-            else:
-                base_h_score = None
-                base_win_rates = None
+                    base_h_score = base_h_res['Scores']
+                    base_win_rates = base_h_res['Rates']
 
-            make_full_team_tab(st.session_state.z_scores
-                            ,st.session_state.g_scores
-                            ,my_players
-                            ,st.session_state.n_drafters
-                            ,st.session_state.n_picks
-                            ,base_h_score
-                            ,base_win_rates
-                            ,st.session_state.info_key
-                            )        
+                else:
+                    base_h_score = None
+                    base_win_rates = None
 
-        with cand_tab:
+                make_full_team_tab(st.session_state.z_scores
+                                ,st.session_state.g_scores
+                                ,my_players
+                                ,st.session_state.n_drafters
+                                ,st.session_state.n_picks
+                                ,base_h_score
+                                ,base_win_rates
+                                ,st.session_state.info_key
+                                )        
 
-            if len(my_players) < st.session_state.n_picks:
+            with cand_tab:
 
-                make_h_cand_tab(H
-                    ,st.session_state.g_scores
-                    ,st.session_state.z_scores
-                    ,player_assignments
-                    ,draft_seat
-                    ,st.session_state.n_iterations
-                    ,st.session_state.v
-                    ,5)
+                if len(my_players) < st.session_state.n_picks:
 
-
+                    make_h_cand_tab(H
+                        ,st.session_state.g_scores
+                        ,st.session_state.z_scores
+                        ,player_assignments
+                        ,draft_seat
+                        ,st.session_state.n_iterations
+                        ,st.session_state.v
+                        ,5)
 
 def make_auction_tab_live_data(H):
 
