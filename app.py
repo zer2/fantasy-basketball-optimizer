@@ -217,6 +217,7 @@ with param_tab:
               #ZR: Ideally we could fix this for mock drafts with dummies
               st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+
           else:
                yahoo_league = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
                                ,min_value = 0
@@ -226,7 +227,7 @@ with param_tab:
                
                if st.session_state.yahoo_league_id is not None:
                 st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())                
-                st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+                st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir)) 
                else:
                 st.session_state.n_drafters = 12 #Kind of a hack
                 
@@ -352,10 +353,10 @@ with param_tab:
   with data_params:
     if st.session_state.league == 'NBA':
 
-        current_data, expected_minutes = get_current_season_data()
+        #current_data, expected_minutes = get_current_season_data()
         #darko_data = get_darko_data(expected_minutes)
 
-        unique_datasets_current = list(current_data.keys())
+        #unique_datasets_current = list(current_data.keys())
         #unique_datasets_darko = list(darko_data.keys())
         if kind_of_dataset == 'Historical':
         
