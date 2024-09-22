@@ -68,6 +68,9 @@ if 'draft_results' not in st.session_state:
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
+if 'draft_frequency' not in st.session_state:
+    st.session_state.draft_frequency = "1s"
+
 def run_h_score():
     st.session_state.run_h_score = True
 
@@ -217,6 +220,7 @@ with param_tab:
               #ZR: Ideally we could fix this for mock drafts with dummies
               st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
+
           else:
                yahoo_league = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
                                ,min_value = 0
@@ -227,7 +231,8 @@ with param_tab:
                if st.session_state.yahoo_league_id is not None:
                 st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())                
                 st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
-
+                st.write(st.session_state.n_drafters)
+ 
                else:
                 st.session_state.n_drafters = 12 #Kind of a hack
                 

@@ -139,6 +139,7 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
+        self.n_drafters = len(player_assignments) #ZR: Kind of a hack, but it helps sometimes when the session state gets messed up
         my_players = [p for p in player_assignments[drafter] if p == p]
 
         self.players = my_players #this is a bit of a hack

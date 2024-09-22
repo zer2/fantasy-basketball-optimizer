@@ -131,7 +131,7 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
 
     return players_df
 
-#@st.cache_data(ttl=3600, show_spinner = False)
+@st.cache_data(ttl=300, show_spinner = False)
 def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
     LOGGER.info(f"League id: {league_id}")
     sc = YahooFantasySportsQuery(
@@ -314,8 +314,6 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
 
     st.session_state.n_drafters = n_drafters #ZR: hack, this is bad 
 
-    team_names = list(range(n_drafters))
-
     teams_dict = get_teams_dict(league_id, _auth_path)
 
     all_team_ids = [draft_obj.team_key.split('.')[-1] for draft_obj in draft_results[0:n_drafters]]
@@ -329,11 +327,34 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     drafter = 0
 
     if len(draft_results) > 0:
-        if hasattr(draft_results[0], 'cost'):
-            if draft_results[0].cost is not None:
-                st.error('This is an auction, not a draft! Change the game mode')
-                st.stop()
+        try:
+            if hasattr(draft_results[0], 'cost'):
+                if draft_results[0].cost is not None:
+                    st.error('This is an auction, not a draft! Change the game mode')
+                    st.stop()
+        except: st.stop()
 
+    draft_result_raw_df = pd.DataFrame([(draft_obj.player_key, draft_obj.team_key) for draft_obj in draft_results \
+                                        if len(draft_obj.player_key) > 0]
+                                       , columns = ['Player','Team'] )
+    
+    #next_team = teams_dict[int(draft_results[len(draft_result_raw_df)].team_key.split('.')[-1])]
+    #if next_team != st.session_state.draft_seat:
+    #    return None, True
+
+    draft_result_raw_df['Player'] = mapper_table.loc[draft_result_raw_df['Player'].str.split('.').str[-1].astype(int).values, 'NBA_PLAYER_NAME'].values
+    draft_result_raw_df['PlayerMod'] = draft_result_raw_df['Player'].apply(lambda x : ' '.join(x.split(' ')[0:2]))
+
+    draft_result_raw_df['PlayerMod'] = [x + ' (' + player_metadata[x] + ')' for x in draft_result_raw_df['PlayerMod'].astype(str)]
+    draft_result_raw_df['Team'] = draft_result_raw_df['Team'].str.split('.').str[-1].astype(int)
+    draft_result_raw_df['Team'] = ['Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
+                                   for team_id in draft_result_raw_df['Team']]
+            
+    for k, v in draft_result_raw_df.iterrows():
+        df.loc[row, v['Team']] = v['PlayerMod']
+        row, drafter = move_forward_one_pick(row, drafter, n_drafters)
+
+    return df, True
     for draft_obj in draft_results:
 
         if len(draft_obj.player_key) > 0:

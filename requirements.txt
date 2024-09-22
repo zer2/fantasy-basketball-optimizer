@@ -15,3 +15,4 @@ statsmodels
 snowflake-connector-python
 schedule
 unidecode
+streamlit-profiler

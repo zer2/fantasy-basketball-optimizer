@@ -270,7 +270,7 @@ def make_h_cand_tab(_H
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
-      display = (i % display_period == 0) or (i == n_iterations - 1)
+      display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
 
       if cash_remaining_per_team:
          
