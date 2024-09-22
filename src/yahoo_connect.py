@@ -312,7 +312,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     n_picks = len(draft_results)
     n_drafters = int(n_picks/max_round)
 
-    #st.session_state.n_drafters = n_drafters #ZR: hack, this is bad 
+    st.session_state.n_drafters = n_drafters #ZR: hack, this is bad 
 
     team_names = list(range(n_drafters))
 
