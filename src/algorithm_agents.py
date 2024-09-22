@@ -139,7 +139,6 @@ class HAgent():
         Returns:
             String indicating chosen player
         """
-        self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
 
         self.players = my_players #this is a bit of a hack
