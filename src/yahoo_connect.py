@@ -355,22 +355,6 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
         row, drafter = move_forward_one_pick(row, drafter, n_drafters)
 
     return df, True
-    for draft_obj in draft_results:
-
-        if len(draft_obj.player_key) > 0:
-            drafted_player = mapper_table.loc[int(draft_obj.player_key.split('.')[-1])]
-
-            team_id = draft_obj.team_key.split('.')[-1]
-            team_name = 'Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
-
-            drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
-
-            drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
-
-            df.loc[row, team_name] = drafted_player_mod
-            row, drafter = move_forward_one_pick(row, drafter, n_drafters)
-
-    return df, True
 
 def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     sc = YahooFantasySportsQuery(
