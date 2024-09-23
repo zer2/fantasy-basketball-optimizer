@@ -30,6 +30,9 @@ NBA:
     Three %:
       made-statistic: Threes
       volume-statistic: Three Attempts 
+    Assist to TO:
+      made-statistic: Assists
+      volume-statistic: Turnovers
   negative-statistics: 
     - Turnovers
   other-columns:
@@ -49,6 +52,7 @@ NBA:
     Def Rebounds: 1.27
     Three %: 12.79
     Double Doubles : 1.06
+    Assist to TO : 2.04
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points

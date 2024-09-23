@@ -139,6 +139,8 @@ def get_historical_data():
   full_df.loc[:,'Field Goal %'] = full_df.loc[:,'Field Goals Made']/full_df.loc[:,'Field Goal Attempts']
   full_df.loc[:,'Three %'] = full_df.loc[:,'Threes']/full_df.loc[:,'Three Attempts']
 
+  full_df.loc[:,'Assist to TO'] = full_df['Assists']/full_df['Turnovers']
+
   full_df['Position'] = full_df['Position'].fillna('NP')
 
   full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
@@ -413,6 +415,10 @@ def process_basketball_rotowire_data(raw_df):
    #Rotowire doesn't forecast double doubles
    raw_df.loc[:,'Double Doubles'] = np.nan
 
+   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
+
+
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
@@ -447,6 +453,9 @@ def process_htb_data(raw_df):
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
+
+   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
 
    raw_df = raw_df.set_index('Player')
 
@@ -486,6 +495,9 @@ def process_basketball_monster_data(raw_df):
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
 
    raw_df = raw_df.set_index('Player')
+
+   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
 
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \

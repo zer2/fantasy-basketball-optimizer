@@ -28,7 +28,7 @@ def get_ratio_statistics():
     if st.session_state:
       return list(st.session_state['params']['ratio-statistics'].keys()) 
     else: 
-      return ['Field Goal %','Free Throw %','Three %']
+      return ['Field Goal %','Free Throw %','Three %','Assist to TO']
     
 def get_selected_categories():
     if st.session_state:
