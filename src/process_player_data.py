@@ -2,9 +2,11 @@ import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
 from src.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
-                                ,get_position_structure, weighted_cov_matrix, increment_info_key
+                                ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
+                                ,get_ratio_statistics
 import os
 import streamlit as st
+import sys
 
 def calculate_coefficients(player_means : pd.DataFrame
                      , representative_player_set : list
@@ -63,6 +65,7 @@ def calculate_coefficients(player_means : pd.DataFrame
 def calculate_coefficients_historical(weekly_df : pd.DataFrame
                      , representative_player_set : list
                      , params : dict
+                     , coefficient_exploration_mode : bool = False
                      ) -> dict:
     """calculate the coefficients from a real weekly dataset by week
 
@@ -73,9 +76,13 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
         Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
 
     """
-
-    counting_statistics = get_selected_counting_statistics()
-    ratio_statistics = get_selected_ratio_statistics()
+    if coefficient_exploration_mode:
+        counting_statistics = get_counting_statistics()
+        ratio_statistics = get_ratio_statistics()
+    else:
+        counting_statistics = get_selected_counting_statistics()
+        ratio_statistics = get_selected_ratio_statistics()
+        
     player_stats = weekly_df.groupby(level = 'Player').agg(['mean','var'])
 
     #counting stats
@@ -113,6 +120,12 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
                             ,'Mean of Variances' : mean_of_vars.droplevel(level = 1)
                             }
                             )
+    
+    if coefficient_exploration_mode:
+       print(coefficients)
+       print(coefficients['Mean of Variances']/coefficients['Variance of Means'])
+       sys.exit()
+
     return coefficients
   
 def calculate_scores_from_coefficients(player_means : pd.DataFrame
@@ -219,6 +232,7 @@ def process_player_data(weekly_df : pd.DataFrame
                         , n_picks : int
                         , params : dict
                         , player_stats_key
+                        , coefficient_exploration_mode = False
                         ) -> dict:
   """Based on player stats and parameters, do all calculations to set up for running algorithms
 
@@ -244,26 +258,26 @@ def process_player_data(weekly_df : pd.DataFrame
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors)
-        
+            
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
                                                           ,1)
-
+    
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
 
   if weekly_df is not None:
     coefficients = calculate_coefficients_historical(weekly_df
                                                 , representative_player_set
-                                                , params)
+                                                , params
+                                                , coefficient_exploration_mode)
   else:
     coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
                                                   , conversion_factors)
     
-
   mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_selected_categories() , 'Variance of Means']
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later

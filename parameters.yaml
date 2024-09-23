@@ -36,19 +36,19 @@ NBA:
     - Position
     - Games Played %
   coefficients:
-    Field Goal % : 2.17
-    Free Throw % : 2.30
-    Threes : 1.11
-    Points : 1.45
-    Rebounds : 1.00
-    Assists : 0.79
-    Steals : 4.35
-    Blocks : 1.2
-    Turnovers : 1.73
-    Off Rebounds: 1.00
-    Def Rebounds: 1.00
-    Three %: 1.00
-    Double Doubles : 2.00
+    Field Goal % : 2.23
+    Free Throw % : 2.34
+    Threes : 1.21
+    Points : 1.59
+    Rebounds : 1.03
+    Assists : 0.88
+    Steals : 4.64
+    Blocks : 1.19
+    Turnovers : 1.85
+    Off Rebounds: 0.97
+    Def Rebounds: 1.27
+    Three %: 12.79
+    Double Doubles : 1.06
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points
