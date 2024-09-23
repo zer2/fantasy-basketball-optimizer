@@ -21,32 +21,32 @@ def get_counting_statistics():
     if st.session_state:
       return st.session_state['params']['counting-statistics']
     else: 
-      return ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
+      return ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers','Double Doubles','Off Rebounds','Def Rebounds']
     
 def get_ratio_statistics():
     #convenience function to get the list of categories used for fantasy basketball
     if st.session_state:
       return list(st.session_state['params']['ratio-statistics'].keys()) 
     else: 
-      return ['Field Goal %','Free Throw %']
+      return ['Field Goal %','Free Throw %','Three %','Assist to TO']
     
 def get_selected_categories():
     if st.session_state:
        return st.session_state['selected_categories']
     else: 
-       return get_ratio_statistics() + get_counting_statistics()
+       return get_selected_counting_statistics() + get_selected_ratio_statistics()
     
 def get_selected_counting_statistics():
    if st.session_state:
       return [category for category in st.session_state['selected_categories'] if category in get_counting_statistics()]
    else:
-      return get_counting_statistics()
+      return  ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
    
 def get_selected_ratio_statistics():
    if st.session_state:
       return [category for category in st.session_state['selected_categories'] if category in get_ratio_statistics()]
    else:
-      return get_ratio_statistics()
+      return ['Field Goal %','Free Throw %']
 
 def get_position_numbers():
 

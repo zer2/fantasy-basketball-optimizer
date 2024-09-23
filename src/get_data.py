@@ -124,7 +124,7 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
      return pd.DataFrame()
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
-@st.cache_resource(ttl = '1d') 
+#@st.cache_resource(ttl = '1d') 
 def get_historical_data():  
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
@@ -137,6 +137,9 @@ def get_historical_data():
 
   full_df.loc[:,'Free Throw %'] = full_df.loc[:,'Free Throws Made']/full_df.loc[:,'Free Throw Attempts']
   full_df.loc[:,'Field Goal %'] = full_df.loc[:,'Field Goals Made']/full_df.loc[:,'Field Goal Attempts']
+  full_df.loc[:,'Three %'] = full_df.loc[:,'Threes']/full_df.loc[:,'Three Attempts']
+
+  full_df.loc[:,'Assist to TO'] = full_df['Assists']/full_df['Turnovers']
 
   full_df['Position'] = full_df['Position'].fillna('NP')
 
@@ -262,15 +265,15 @@ def get_specified_stats(dataset_name : str
   if st.session_state.league in ('NBA','WNBA'):
 
     historical_df = get_historical_data()
-    current_data, expected_minutes = get_current_season_data()
-    darko_data = get_darko_data(expected_minutes)
+    #current_data, expected_minutes = get_current_season_data()
+    #darko_data = get_darko_data(expected_minutes)
     htb_data = get_data_from_snowflake('HTB_PROJECTION_TABLE')
 
-    if dataset_name in list(current_data.keys()):
-        df = current_data[dataset_name].copy()
-    elif 'DARKO' in dataset_name:
-        df = darko_data[dataset_name].copy()
-    elif 'Hashtag' in dataset_name:
+    #if dataset_name in list(current_data.keys()):
+    #    df = current_data[dataset_name].copy()
+    #elif 'DARKO' in dataset_name:
+    #    df = darko_data[dataset_name].copy()
+    if 'Hashtag' in dataset_name:
         df = process_htb_data(htb_data)
     elif 'RotoWire' in dataset_name:
         if 'rotowire_data' in st.session_state:
@@ -295,7 +298,7 @@ def get_specified_stats(dataset_name : str
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
-    return df.round(2) 
+    return df.round(3) 
   
   elif st.session_state.league in ('MLB'):
     if 'rotowire_data' in st.session_state:
@@ -310,7 +313,7 @@ def get_specified_stats(dataset_name : str
 
     return df.round(2) 
   
-@st.cache_data()
+#@st.cache_data()
 def combine_nba_projections(hashtag_upload
                             , rotowire_upload
                             , bbm_upload
@@ -346,10 +349,14 @@ def combine_nba_projections(hashtag_upload
                 .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
                     if np.issubdtype(x.dtype, np.number) \
                     else x[0])
-            
+        
+    #Need to include this because not every source projects double doubles, which gets messy
+    df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
+
     df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
     df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
     df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
+    df[r'Three %'] = (df[r'Three %'] * 100).round(1)
 
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
@@ -398,17 +405,25 @@ def process_basketball_rotowire_data(raw_df):
    raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
    raw_df['FG%'] = raw_df['FG%']/100
    raw_df['FT%'] = raw_df['FT%']/100
+   raw_df['3P%'] = raw_df['3P%']/100
    raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
 
    raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
    
    raw_df = raw_df.set_index('Player')
 
+   #Rotowire doesn't forecast double doubles
+   raw_df.loc[:,'Double Doubles'] = np.nan
+
+   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
+
+
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
                     st.session_state.params['other-columns']
-   
+      
    raw_df = raw_df[list(set(required_columns))]
 
    return raw_df
@@ -438,6 +453,9 @@ def process_htb_data(raw_df):
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
+
+   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
 
    raw_df = raw_df.set_index('Player')
 
@@ -477,6 +495,9 @@ def process_basketball_monster_data(raw_df):
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
 
    raw_df = raw_df.set_index('Player')
+
+   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
 
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \

@@ -17,6 +17,9 @@ NBA:
     - Steals 
     - Blocks
     - Turnovers
+    - Def Rebounds
+    - Off Rebounds
+    - Double Doubles 
   ratio-statistics: 
     Field Goal % : 
       made-statistic : Field Goals Made
@@ -24,21 +27,32 @@ NBA:
     Free Throw % : 
       made-statistic : Free Throws Made
       volume-statistic : Free Throw Attempts 
+    Three %:
+      made-statistic: Threes
+      volume-statistic: Three Attempts 
+    Assist to TO:
+      made-statistic: Assists
+      volume-statistic: Turnovers
   negative-statistics: 
     - Turnovers
   other-columns:
     - Position
     - Games Played %
   coefficients:
-    Field Goal % : 2.17
-    Free Throw % : 2.30
-    Threes : 1.11
-    Points : 1.45
-    Rebounds : 1.00
-    Assists : 0.79
-    Steals : 4.35
-    Blocks : 1.2
-    Turnovers : 1.73
+    Field Goal % : 2.23
+    Free Throw % : 2.34
+    Threes : 1.21
+    Points : 1.59
+    Rebounds : 1.03
+    Assists : 0.88
+    Steals : 4.64
+    Blocks : 1.19
+    Turnovers : 1.85
+    Off Rebounds: 0.97
+    Def Rebounds: 1.27
+    Three %: 12.79
+    Double Doubles : 1.06
+    Assist to TO : 2.04
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points
@@ -71,6 +85,8 @@ NBA:
     NAME : Player
     PTS : Points
     REB : Rebounds
+    OREB: Off Rebounds
+    DREB: Def Rebounds
     AST : Assists
     STL: Steals
     BLK : Blocks
@@ -82,6 +98,8 @@ NBA:
     FGA : Field Goal Attempts
     FGM : Field Goals Made
     FG% : Field Goal %
+    3P% : Three % 
+    3PA: Three Attempts 
     Pos : Position
   rotowire-position-adjuster:
     C : C
@@ -93,6 +111,8 @@ NBA:
     games : Games Played
     p/g : Points
     r/g : Rebounds
+    dr/g : Def Rebounds
+    or/g : Off Rebounds
     a/g : Assists
     s/g : Steals
     3/g : Threes
@@ -102,12 +122,17 @@ NBA:
     ft% : Free Throw %
     fga/g: Field Goal Attempts
     fg%: Field Goal %
+    3% : Three %
+    3a/g: Three Attempts
+    2d/g : Double Doubles
     Pos : Position
   htb-renamer:
     PLAYER : Player
     GP : Games Played
     PTS : Points
     TREB : Rebounds
+    OREB: Off Rebounds
+    DREB: Def Rebounds
     AST : Assists
     STL : Steals
     3PM : Threes
@@ -117,12 +142,17 @@ NBA:
     FT% : Free Throw %
     FGA : Field Goal Attempts
     FG% : Field Goal %
+    3P% : Three %
+    3PA : Three Attempts
+    DD: Double Doubles
     POS : Position
   stat-df-renamer:
     SEASON : Season
     NBA_PLAYER_NAME : Player
     POINTS : Points
     REBOUNDS : Rebounds
+    DEFENSIVE_REBOUNDS : Def Rebounds
+    OFFENSIVE_REBOUNDS : Off Rebounds
     ASSISTS : Assists
     STEALS : Steals
     BLOCKS : Blocks
@@ -132,6 +162,8 @@ NBA:
     FREE_THROW_ATTEMPTS : Free Throw Attempts
     FIELD_GOALS_MADE : Field Goals Made
     FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+    THREE_ATTEMPTS : Three Attempts 
+    DOUBLE_DOUBLE : Double Doubles
     POSITION_LIST : Position
     GAMES_PLAYED_PERCENT : Games Played %
   darko-renamer:
@@ -289,6 +321,9 @@ WNBA:
     - Steals 
     - Blocks
     - Turnovers
+    - Def Rebounds
+    - Off Rebounds
+    - Double Doubles 
   ratio-statistics: 
     Field Goal % : 
       made-statistic : Field Goals Made
@@ -296,6 +331,9 @@ WNBA:
     Free Throw % : 
       made-statistic : Free Throws Made
       volume-statistic : Free Throw Attempts 
+    Three %:
+      made-statistic: Threes
+      volume-statistic: Three Attempts 
   negative-statistics: 
     - Turnovers
   other-columns:
@@ -343,6 +381,8 @@ WNBA:
     NAME : Player
     PTS : Points
     REB : Rebounds
+    OREB: Off Rebounds
+    DREB: Def Rebounds
     AST : Assists
     STL: Steals
     BLK : Blocks
@@ -354,6 +394,8 @@ WNBA:
     FGA : Field Goal Attempts
     FGM : Field Goals Made
     FG% : Field Goal %
+    3P% : Three % 
+    3PA: Three Attempts 
     Pos : Position
   rotowire-position-adjuster:
     C : C

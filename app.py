@@ -683,7 +683,7 @@ with info_tab:
     player_stats['Games Played %'] = 100 - ( 100 - player_stats['Games Played %']) * upsilon 
 
     for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col] * player_stats['Games Played %']/100 * get_games_per_week()
+      player_stats[col] = player_stats_editable[col].astype(float) * player_stats['Games Played %']/100 * get_games_per_week()
 
 
   with injury_tab:
