@@ -423,6 +423,8 @@ def process_basketball_rotowire_data(raw_df):
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
                     st.session_state.params['other-columns']
+   
+   required_columns =[x for x in required_columns if x in raw_df.columns]
       
    raw_df = raw_df[list(set(required_columns))]
 
@@ -504,6 +506,8 @@ def process_basketball_monster_data(raw_df):
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
                     st.session_state.params['other-columns']
    
+   required_columns =[x for x in required_columns if x in raw_df.columns]
+
    raw_df = raw_df[list(set(required_columns))]
 
    return raw_df
