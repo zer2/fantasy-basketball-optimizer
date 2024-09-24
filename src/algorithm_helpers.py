@@ -102,7 +102,7 @@ def get_win_grid(n_categories):
 
 @st.cache_data()
 def get_tie_grid(n_categories):
-    #create a grid representing 126 scenarios where 5 categories are won and 4 are lost
+    #create a grid representing 126 scenarios where the same number of categories are won or lost 
 
     which = np.array([list(combinations(range(n_categories), int(n_categories/2)))] )
 
