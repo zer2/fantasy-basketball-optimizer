@@ -50,7 +50,8 @@ def calculate_coefficients(player_means : pd.DataFrame
             ratio_var_of_means = numerator.var()
             var_of_means.loc[ratio_stat] = ratio_var_of_means
 
-            translation_factors[volume_statistic] = 0
+            if volume_statistic not in translation_factors:
+                translation_factors[volume_statistic] = 0
 
     #get mean of vars
     mean_of_vars = var_of_means * translation_factors
@@ -60,6 +61,8 @@ def calculate_coefficients(player_means : pd.DataFrame
                                 ,'Mean of Variances' : mean_of_vars
                                 }
                                )
+    
+
     return coefficients
 
 def calculate_coefficients_historical(weekly_df : pd.DataFrame
@@ -258,7 +261,7 @@ def process_player_data(weekly_df : pd.DataFrame
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors)
-            
+                
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
@@ -277,6 +280,7 @@ def process_player_data(weekly_df : pd.DataFrame
     coefficients = calculate_coefficients(_player_means
                                                   , representative_player_set
                                                   , conversion_factors)
+    
     
   mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_selected_categories() , 'Variance of Means']

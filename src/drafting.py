@@ -1,6 +1,6 @@
   
 import streamlit as st 
-from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick
+from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs import *
 from src import yahoo_connect
 
@@ -9,6 +9,12 @@ def run_autodraft():
     selection_list = listify(st.session_state.selections_df)
     g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
     select_player_from_draft_board(g_scores_unselected.index[0])
+
+def run_autodraft_and_increment():
+    increment_player_stats_version()
+
+    if 'autodrafters' in st.session_state:
+      run_autodraft()
 
 def select_player_from_draft_board(p = None):
 

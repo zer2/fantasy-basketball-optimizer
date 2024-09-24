@@ -11,7 +11,7 @@ from schedule import every, repeat, run_pending
 from src.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
                                   ,get_games_per_week, get_categories, get_ratio_statistics, clear_draft_board \
-                                  ,increment_default_key_and_clear_draft_board
+                                  ,increment_default_key_and_clear_draft_board, get_selections_default
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
                         get_player_metadata, get_data_from_snowflake, combine_nba_projections
 from src.process_player_data import process_player_data
@@ -19,7 +19,8 @@ from src.algorithm_agents import HAgent
 from src import yahoo_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
-from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft, make_auction_tab_live_data
+from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft, make_auction_tab_live_data \
+                          ,run_autodraft_and_increment
 
 #from streamlit_profiler import Profiler
 
@@ -182,7 +183,8 @@ with param_tab:
         n_picks = st.number_input(r'How many players will each drafter choose?'
                       , key = 'n_picks'
                       , min_value = st.session_state.params['options']['n_picks']['min']
-                      , value = st.session_state.params['options']['n_picks']['default'])
+                      , value = st.session_state.params['options']['n_picks']['default']
+                      , on_change = clear_draft_board)
                       
         # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
         
@@ -280,11 +282,8 @@ with param_tab:
               st.session_state.n_picks = 13
               st.session_state.n_drafters = 12
 
-        if st.session_state.selections_default is None:
-          st.session_state.selections_default = pd.DataFrame(
-            {'Drafter ' + str(n+1) : [None] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
-            )
-
+        st.session_state.selections_default = get_selections_default(st.session_state.n_picks
+                                                                     ,st.session_state.n_drafters)
           
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
@@ -297,19 +296,16 @@ with param_tab:
                  Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
+        
+        data_options = ['Projection','Historical'] if data_source == 'Enter your own data' else ['Projection']
     
 
         kind_of_dataset = st.selectbox(
                                   'Which kind of dataset do you want to use? (specify further on the data tab)'
-                                  ,['Projection','Historical']
+                                  , data_options
                                   , index = 0
                                   , on_change = increment_default_key_and_clear_draft_board
         )
-
-        def run_autodraft_and_increment():
-          increment_player_stats_version()
-          run_autodraft()
-
 
         scoring_format = st.selectbox(
           'Which format are you playing?',
@@ -349,8 +345,13 @@ with param_tab:
                     ,options = st.session_state.selections_default.columns
                     ,key = 'autodrafters'
                     ,default = None)
+              
+          c1, c2 = st.columns([0.2,0.8])
           
-          submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
+          with c1: 
+            submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
+          with c2:
+            st.warning('Make sure to lock in after making changes')
 
   with data_params:
     if st.session_state.league == 'NBA':
@@ -701,6 +702,7 @@ with info_tab:
 
       st.session_state.player_stats = player_stats
 
+      st.write(player_stats)
       info = process_player_data(None
                               ,player_stats
                               ,conversion_factors
