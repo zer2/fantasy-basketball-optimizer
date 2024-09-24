@@ -373,10 +373,21 @@ def increment_default_key():
   if st.session_state:
     st.session_state.player_stats_default_key += 1
 
+@st.cache_data()
+def get_selections_default(n_picks, n_drafters):
+   return pd.DataFrame(
+            {'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)}
+            )
+
+
 def clear_draft_board():
   if 'draft_results' in st.session_state:
     del st.session_state.draft_results 
+
+  if 'live_draft_active' in st.session_state:
     del st.session_state.live_draft_active
+
+  if 'selections_df' in st.session_state:
     del st.session_state.selections_df
 
 def increment_default_key_and_clear_draft_board():
