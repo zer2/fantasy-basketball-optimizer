@@ -224,7 +224,10 @@ def make_h_cand_tab(_H
     res = next(generator)
     rosters = res['Rosters']
 
-    fits_roster = rosters.loc[:,0] >= 0
+    if rosters.shape[1] > 0:
+      fits_roster = rosters.loc[:,0] >= 0
+    else:
+      fits_roster = pd.Series([True] * len(res['Scores']), index = res['Scores'].index)
 
     rosters = rosters[list(fits_roster.values)]
 
