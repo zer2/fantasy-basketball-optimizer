@@ -40,7 +40,7 @@ if 'player_stats_editable_version' not in st.session_state:
     st.session_state.player_stats_editable_version = 0
 
 if 'player_stats_default_key' not in st.session_state:
-    st.session_state.player_stats_default_key = 0
+    st.session_state.player_stats_default_key = np.random.randint(100000)
 
 if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
@@ -375,7 +375,7 @@ with param_tab:
           )
           raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
-  
+            
         else: 
 
           hashtag_c, roto_c, bbm_c, = st.columns(3)
@@ -702,7 +702,7 @@ with info_tab:
 
       st.session_state.player_stats = player_stats
 
-      st.write(player_stats)
+      st.write(st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
       info = process_player_data(None
                               ,player_stats
                               ,conversion_factors
@@ -712,6 +712,7 @@ with info_tab:
                               ,st.session_state.n_picks
                               ,st.session_state.params
                               ,st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
+      st.write(info['Z-scores'])
       st.session_state.info = info #useful for testing
 
       mov = info['Mov']
