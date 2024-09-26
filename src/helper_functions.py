@@ -21,7 +21,8 @@ def get_counting_statistics():
     if st.session_state:
       return st.session_state['params']['counting-statistics']
     else: 
-      return ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers','Double Doubles','Off Rebounds','Def Rebounds']
+      return ['Threes','Points','Rebounds','Assists','Steals','Blocks'
+              ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made']
     
 def get_ratio_statistics():
     #convenience function to get the list of categories used for fantasy basketball

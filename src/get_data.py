@@ -417,7 +417,7 @@ def process_basketball_rotowire_data(raw_df):
 
    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
    raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
-
+   raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
 
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
@@ -458,6 +458,7 @@ def process_htb_data(raw_df):
 
    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
    raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
+   raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
 
    raw_df = raw_df.set_index('Player')
 
@@ -500,6 +501,7 @@ def process_basketball_monster_data(raw_df):
 
    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
    raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
+   raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
 
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \

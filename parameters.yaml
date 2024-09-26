@@ -20,6 +20,7 @@ NBA:
     - Def Rebounds
     - Off Rebounds
     - Double Doubles 
+    - Field Goals Made
   ratio-statistics: 
     Field Goal % : 
       made-statistic : Field Goals Made
@@ -53,6 +54,7 @@ NBA:
     Three %: 12.79
     Double Doubles : 1.06
     Assist to TO : 2.04
+    Field Goals Made : 1.83
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points
