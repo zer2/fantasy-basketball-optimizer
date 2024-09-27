@@ -102,6 +102,9 @@ class HAgent():
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
 
+            #ZR: For now 
+            self.x_scores.loc['RP', :] = -1
+
             v = np.sqrt(mov/(mov + vom))
 
         self.v = np.array(v/v.sum()).reshape(self.n_categories,1)

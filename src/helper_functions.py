@@ -8,6 +8,8 @@ import numexpr as ne
 from datetime import datetime
 from functools import reduce 
 from unidecode import unidecode
+import snowflake.connector
+import os 
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
@@ -21,15 +23,21 @@ def get_counting_statistics():
     if st.session_state:
       return st.session_state['params']['counting-statistics']
     else: 
-      return ['Threes','Points','Rebounds','Assists','Steals','Blocks'
-              ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made']
-    
+      if os.environ['SPORT'] == 'NBA':
+        return ['Threes','Points','Rebounds','Assists','Steals','Blocks'
+                ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made']
+      elif os.environ['SPORT'] == 'MLB':
+        return ['Runs','Home Runs', 'RBI', 'Stolen Bases', 'Wins', 'Saves', 'Strikeouts'] 
+          
 def get_ratio_statistics():
     #convenience function to get the list of categories used for fantasy basketball
     if st.session_state:
       return list(st.session_state['params']['ratio-statistics'].keys()) 
     else: 
-      return ['Field Goal %','Free Throw %','Three %','Assist to TO']
+      if os.environ['SPORT'] == 'NBA':
+        return ['Field Goal %','Free Throw %','Three %','Assist to TO']
+      elif os.environ['SPORT'] == 'MLB':
+        return ['Batting Average', 'Slugging %', 'OBP', 'ERA','WHIP']
     
 def get_selected_categories():
     if st.session_state:
@@ -41,13 +49,19 @@ def get_selected_counting_statistics():
    if st.session_state:
       return [category for category in st.session_state['selected_categories'] if category in get_counting_statistics()]
    else:
-      return  ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
-   
+      if os.environ['SPORT'] == 'NBA':
+        return  ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
+      elif os.environ['SPORT'] == 'MLB':
+        return ['Runs','Home Runs', 'RBI', 'Stolen Bases', 'Wins', 'Saves', 'Strikeouts'] 
+
 def get_selected_ratio_statistics():
    if st.session_state:
       return [category for category in st.session_state['selected_categories'] if category in get_ratio_statistics()]
    else:
-      return ['Field Goal %','Free Throw %']
+      if os.environ['SPORT'] == 'NBA':
+        return ['Field Goal %','Free Throw %']
+      elif os.environ['SPORT'] == 'MLB':
+        return ['Batting Average','ERA','WHIP']
 
 def get_position_numbers():
 
@@ -444,3 +458,19 @@ def move_back_one_pick(row, drafter, n):
         drafter = drafter - 1
 
     return row, drafter 
+
+@st.cache_resource()
+def get_data_from_snowflake(table_name
+                            , schema = 'FANTASYBASKETBALLOPTIMIZER'):
+   
+   con = snowflake.connector.connect(
+        user=st.secrets['SNOWFLAKE_USER']
+        ,password=st.secrets['SNOWFLAKE_PASSWORD']
+        ,account='aib52055.us-east-1'
+        ,database = 'FANTASYOPTIMIZER'
+        ,schema = schema
+    )
+   
+   df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
+
+   return df

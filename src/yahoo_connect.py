@@ -342,10 +342,12 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     #if next_team != st.session_state.draft_seat:
     #    return None, True
 
-    draft_result_raw_df['Player'] = mapper_table.loc[draft_result_raw_df['Player'].str.split('.').str[-1].astype(int).values, 'NBA_PLAYER_NAME'].values
+    player_codes = draft_result_raw_df['Player'].str.split('.').str[-1].astype(int).values
+    draft_result_raw_df['Player'] = ['RP' if x not in mapper_table.index else mapper_table.loc[x, 'NBA_PLAYER_NAME'] for x in player_codes]
     draft_result_raw_df['PlayerMod'] = draft_result_raw_df['Player'].apply(lambda x : ' '.join(x.split(' ')[0:2]))
 
-    draft_result_raw_df['PlayerMod'] = [x + ' (' + player_metadata[x] + ')' for x in draft_result_raw_df['PlayerMod'].astype(str)]
+    draft_result_raw_df['PlayerMod'] = ['RP' if x not in player_metadata.index else x + ' (' + player_metadata[x] + ')' 
+                                        for x in draft_result_raw_df['PlayerMod'].astype(str)]
     draft_result_raw_df['Team'] = draft_result_raw_df['Team'].str.split('.').str[-1].astype(int)
     draft_result_raw_df['Team'] = ['Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
                                    for team_id in draft_result_raw_df['Team']]
@@ -386,7 +388,10 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
 
         drafted_player_mod = ' '.join(drafted_player.values[0].split(' ')[0:2])
 
-        drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
+        if drafted_player_mod in player_metadata.index:
+            drafted_player_mod = drafted_player_mod + ' (' + player_metadata[drafted_player_mod] + ')' 
+        else:
+            drafted_player_mod = 'RP'
 
         row = pd.Series({'Player' : drafted_player_mod
                             ,'Cost' : draft_obj.cost
