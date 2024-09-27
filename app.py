@@ -702,7 +702,6 @@ with info_tab:
 
       st.session_state.player_stats = player_stats
 
-      st.write(st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
       info = process_player_data(None
                               ,player_stats
                               ,conversion_factors
@@ -712,7 +711,6 @@ with info_tab:
                               ,st.session_state.n_picks
                               ,st.session_state.params
                               ,st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
-      st.write(info['Z-scores'])
       st.session_state.info = info #useful for testing
 
       mov = info['Mov']

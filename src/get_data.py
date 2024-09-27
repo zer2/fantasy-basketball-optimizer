@@ -7,30 +7,15 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helper_functions import get_n_games
+from src.helper_functions import get_n_games, get_data_from_snowflake
+from src.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
-
-@st.cache_resource()
-def get_data_from_snowflake(table_name):
-   
-   con = snowflake.connector.connect(
-        user=st.secrets['SNOWFLAKE_USER']
-        ,password=st.secrets['SNOWFLAKE_PASSWORD']
-        ,account='aib52055.us-east-1'
-        ,database = 'FANTASYOPTIMIZER'
-        ,schema = 'FANTASYBASKETBALLOPTIMIZER'
-    )
-   
-   df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
-
-   return df
 
 def get_yahoo_key_to_name_mapper():
    return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
 
 def get_yahoo_key_to_position_eligibility(season = 2024):
    return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
-
 
 #cache this globally so it doesn't have to be rerun constantly 
 @st.cache_resource(ttl = '1d') 
@@ -124,7 +109,7 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
      return pd.DataFrame()
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
-#@st.cache_resource(ttl = '1d') 
+@st.cache_resource(ttl = '1d') 
 def get_historical_data():  
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
@@ -267,14 +252,13 @@ def get_specified_stats(dataset_name : str
     historical_df = get_historical_data()
     #current_data, expected_minutes = get_current_season_data()
     #darko_data = get_darko_data(expected_minutes)
-    htb_data = get_data_from_snowflake('HTB_PROJECTION_TABLE')
 
     #if dataset_name in list(current_data.keys()):
     #    df = current_data[dataset_name].copy()
     #elif 'DARKO' in dataset_name:
     #    df = darko_data[dataset_name].copy()
     if 'Hashtag' in dataset_name:
-        df = process_htb_data(htb_data)
+        df = get_htb_projections()
     elif 'RotoWire' in dataset_name:
         if 'rotowire_data' in st.session_state:
             raw_df = st.session_state.rotowire_data
@@ -285,7 +269,7 @@ def get_specified_stats(dataset_name : str
        if 'bbm_data' in st.session_state:
             raw_df = st.session_state.bbm_data
             df = process_basketball_monster_data(raw_df
-                                                 , default_projections = process_htb_data(htb_data))
+                                                 , default_projections = get_htb_projections())
        else:
             st.error('Error! No Basketball Monster data found: this should not happen')
 
@@ -301,9 +285,14 @@ def get_specified_stats(dataset_name : str
     return df.round(3) 
   
   elif st.session_state.league in ('MLB'):
+    
+    historical_df = get_baseball_historical_data()
+
     if 'rotowire_data' in st.session_state:
         raw_df = st.session_state.rotowire_data
-        df = process_baseball_rotowire_data(raw_df)   
+        df = process_baseball_rotowire_data(raw_df)
+    else: 
+        df = historical_df.loc[dataset_name].copy()  
     
     df[r'Batting Average'] = (df[r'Batting Average'] * 100).round(1)
     df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
@@ -322,7 +311,7 @@ def combine_nba_projections(hashtag_upload
                             , bbm_slider):
     slider_sum = hashtag_slider + rotowire_slider + bbm_slider
 
-    hashtag_stats = None if hashtag_upload is None else process_htb_data(hashtag_upload)
+    hashtag_stats = None if hashtag_upload is None else get_htb_projections()
     rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload)
 
@@ -364,40 +353,7 @@ def combine_nba_projections(hashtag_upload
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
     return df.round(2) 
-  
-@st.cache_data()
-def process_baseball_rotowire_data(raw_df):
-   
-   raw_df.loc[:,'Games Played %'] = 1 #we need to fix this later
-   raw_df['AVG'] = raw_df['AVG']/100
-   raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
 
-   raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
-
-   #baseball has some duplicate player names, which we need to deal with
-   is_duplicate_player = raw_df.groupby('Player')['Player'].transform('size') > 1
-   raw_df.loc[:,'Player'] = np.where(is_duplicate_player
-                                     ,raw_df['Player'] + ' (' + raw_df['Team'] + ')'
-                                     ,raw_df['Player']
-                                     )
-   
-   is_pitcher = raw_df['Position'].str.contains('P')
-   pitcher_stats = st.session_state.params['pitcher_stats']
-   batter_stats = st.session_state.params['batter_stats']
-
-   raw_df.loc[is_pitcher,pitcher_stats] = raw_df[is_pitcher][pitcher_stats].fillna(0)
-   raw_df.loc[~is_pitcher,batter_stats] = raw_df[~is_pitcher][batter_stats].fillna(0)
-
-   raw_df = raw_df.set_index('Player')
-
-   required_columns = st.session_state.params['counting-statistics'] + \
-                    list(st.session_state.params['ratio-statistics'].keys()) + \
-                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns']
-   
-   raw_df = raw_df[list(set(required_columns))]
-
-   return raw_df
 
 @st.cache_data()
 def process_basketball_rotowire_data(raw_df):
@@ -431,7 +387,21 @@ def process_basketball_rotowire_data(raw_df):
    return raw_df
 
 @st.cache_data(ttl = 3600)
-def process_htb_data(raw_df):
+def get_htb_adp():
+   df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
+   df = df.rename(columns = st.session_state.params['htb-renamer'])
+
+   df['Position'] = df['Position'].str.replace('/',',')
+
+   df['Player'] = df['Player'] + ' (' + df['Position'] + ')'
+
+   df = df[['Player','ADP']]
+   return df.set_index('Player')
+
+@st.cache_data(ttl = 3600)
+def get_htb_projections():
+   raw_df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
+
    raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
 
@@ -452,6 +422,8 @@ def process_htb_data(raw_df):
          name = 'Cameron Johnson'
       if name == 'O.G. Anunoby':
          name = 'OG Anunoby'
+      if name == 'Alexandre Sarr':
+         name = 'Alex Sarr'
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
@@ -465,7 +437,7 @@ def process_htb_data(raw_df):
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns']
+                    st.session_state.params['other-columns'] 
    
    raw_df = raw_df[list(set(required_columns))]
 
@@ -493,6 +465,8 @@ def process_basketball_monster_data(raw_df):
          name = 'Cameron Johnson'
       if name == 'O.G. Anunoby':
          name = 'OG Anunoby'
+      if name == 'Alexandre Sarr':
+         name = 'Alex Sarr'
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
@@ -513,6 +487,8 @@ def process_basketball_monster_data(raw_df):
    raw_df = raw_df[list(set(required_columns))]
 
    return raw_df
+
+
 
 @st.cache_data(show_spinner = False)
 def get_nba_schedule():

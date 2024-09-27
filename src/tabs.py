@@ -8,6 +8,7 @@ from src.algorithm_agents import HAgent
 from src.h_score_analysis import estimate_matchup_result, analyze_trade, analyze_trade_value
 from src.algorithm_helpers import savor_calculation
 from src.process_player_data import process_player_data
+from src.get_data import get_htb_adp
 import os
 import itertools
 from pathlib import Path
@@ -218,6 +219,8 @@ def make_h_cand_tab(_H
 
   placeholder = st.empty()
 
+  adps = get_htb_adp()
+
   #if n_iterations is 0 we run just once
   for i in range(max(1,n_iterations)):
 
@@ -333,12 +336,15 @@ def make_h_cand_tab(_H
               st.stop()
 
             rate_df = win_rates.loc[score_df.index].dropna()
-            rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
-
+            rate_display = score_df.merge(adps, left_index = True, right_index = True) \
+                                    .merge(rate_df, left_index = True, right_index = True)           
+            
             rate_display_styled = rate_display.style.format("{:.1%}"
                               ,subset = pd.IndexSlice[:,['H-score']]) \
+                                                    .format("{:.1f}"
+                              ,subset = pd.IndexSlice[:,['ADP']]) \
                       .map(styler_a
-                            , subset = pd.IndexSlice[:,['H-score']]) \
+                            , subset = pd.IndexSlice[:,['H-score','ADP']]) \
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                       .format('{:,.1%}', subset = rate_df.columns)
             st.dataframe(rate_display_styled, use_container_width = True)

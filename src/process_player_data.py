@@ -18,6 +18,7 @@ def calculate_coefficients(player_means : pd.DataFrame
         player_means: dataframe of fantasy-relevant statistics 
         representative_player_set: list of players to use as sample for coefficients
         translation_factors: series, converts sigma^2 to tau^2
+        categories: list of categories for which to calculate coefficients 
     Returns:
         Dictionary mapping 'Mean of Means' -> (series mapping category to /mu^2 etc.) 
 

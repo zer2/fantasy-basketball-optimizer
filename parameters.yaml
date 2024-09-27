@@ -569,8 +569,14 @@ MLB:
       made-statistic: Earned Runs
       volume-statistic: Innings Pitched
     WHIP:
-      made-statistic: Walks and Hits
+      made-statistic: Pitching WH
       volume-statistic: Innings Pitched
+    Slugging %:
+      made-statistic : Slugging
+      volume-statistic : Effective At Bats
+    OPS:
+      made-statistic : Batting WH
+      volume-statistic: At Bats  
   negative-statistics:
     - ERA
     - WHIP
@@ -594,6 +600,8 @@ MLB:
     - RBI
     - Stolen Bases
     - Batting Average
+    - Slugging %
+    - OPS
   pitcher_stats:
     - Wins
     - Saves
@@ -615,6 +623,24 @@ MLB:
     IP: Innings Pitched
     Name: Player
     Pos: Position
+  stat-df-renamer:
+    MLB_PLAYER_NAME : Player
+    SEASON : Season
+    HITS : Hits
+    AT_BATS : At Bats
+    HOME_RUNS : Home Runs
+    RBI : RBI
+    STOLEN_BASES : Stolen Bases
+    WINS : Wins
+    SAVES : Saves
+    EARNED_RUNS : Earned Runs
+    WALKS_AND_HITS: Walks and Hits
+    INNINGS_PITCHED : Innings Pitched
+    STRIKEOUTS : Strikouts
+    QUALITY_STARTS : Quality Starts
+    PITCHING_WALKS_AND_HITS : Pitching WH
+    BATTING_WALKS_AND_HITS : Batting WH 
+    EFFECTIVE_AT_BATS: Effective At Bats
   rotowire-position-adjuster:
     P : SP,RP 
     C : C
