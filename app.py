@@ -17,6 +17,7 @@ from src.get_data import get_historical_data, get_current_season_data, get_darko
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
 from src import yahoo_connect
+from src import fantrax_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
 from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft, make_auction_tab_live_data \
@@ -164,10 +165,19 @@ with param_tab:
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
 
+      if st.session_state.mode == 'Draft Mode':
+        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax']
+
+      elif st.session_state.mode == 'Auction Mode':
+        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy'] 
+
+      elif st.session_state.mode == 'Season Mode':
+        data_source_options = ['Enter your own data'] 
 
       data_source = st.selectbox(
-        'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league',
-        ('Enter your own data', 'Retrieve from Yahoo Fantasy')
+        'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league'
+        , data_source_options
+        , key = 'data_source'
         , on_change = clear_draft_board
         , index = 0)
 
@@ -192,7 +202,7 @@ with param_tab:
           {'Drafter ' + str(n+1) : [np.nan] * st.session_state.n_picks for n in range(st.session_state.n_drafters)}
           )
 
-      else:
+      elif data_source == 'Retrieve from Yahoo Fantasy':
 
         st.session_state.selections_default = None
 
@@ -204,14 +214,13 @@ with param_tab:
           user_leagues = yahoo_connect.get_user_leagues(auth_dir)
           
           get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
-
+          
           yahoo_league = st.selectbox(
             label='Which league should player data be pulled from?',
             options=user_leagues,
             format_func=get_league_labels,
             index=None,
-            on_change = clear_draft_board
-
+            on_change = increment_default_key_and_clear_draft_board
           )
 
 
@@ -234,7 +243,6 @@ with param_tab:
                 st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir)) 
                else:
                 st.session_state.n_drafters = 12 #Kind of a hack
-                
 
           if (st.session_state.mode == 'Season Mode'):
 
@@ -284,7 +292,56 @@ with param_tab:
 
         st.session_state.selections_default = get_selections_default(st.session_state.n_picks
                                                                      ,st.session_state.n_drafters)
-          
+        
+      elif data_source == 'Retrieve from Fantrax':          
+
+          fantrax_league = st.text_input(
+            label='Which league ID should player data be pulled from? (Find league ID after /league/ in your draft room URL)'
+            ,key = 'fantrax_league'
+            ,value = None
+            ,on_change = clear_draft_board
+
+          )    
+
+          if fantrax_league is not None:
+                team_names = list(fantrax_connect.get_teams_dict(fantrax_league).keys())  
+                st.session_state.team_names = team_names              
+                st.session_state.n_drafters = len(team_names)
+                st.session_state.n_picks = fantrax_connect.get_n_picks(fantrax_league)
+          else:
+                st.session_state.n_drafters = 12 #Kind of a hack
+                st.session_state.n_picks = 13
+
+          if (st.session_state.mode == 'Season Mode'):
+              player_metadata = get_player_metadata()
+
+              team_players_df = fantrax_connect.get_fantrax_roster(fantrax_league
+                                                                   , player_metadata)
+              st.session_state.n_drafters = team_players_df.shape[1]
+              st.session_state.n_picks = team_players_df.shape[0]
+
+              #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+              
+              #Just trying for now!
+              player_statuses = fantrax_connect.get_player_statuses(player_metadata)
+
+              st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
+                                                                      (player_statuses['Status'] == 'INJ')
+                                                                      ]
+                                                                      )
+                                                              )
+                                                        )
+
+              #st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(st.session_state.yahoo_league_id
+              #                                                            , auth_dir
+              #                                                            , player_metadata)
+              #
+              #st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(st.session_state.yahoo_league_id
+              #                        , auth_dir)
+              
+              st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
+
+
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
       
@@ -732,8 +789,9 @@ with info_tab:
       schedule = st.session_state['schedule'] 
       week_chosen = st.selectbox('Select a particular fantasy week'
                                 ,list(schedule.keys()))
-
-      default_potential_games = schedule[week_chosen].reindex(player_stats.index).fillna(3)
+      
+      #ZR: Idk why we need to drop duplicates      
+      default_potential_games = schedule[week_chosen].drop_duplicates().reindex(player_stats.index).fillna(3)
       game_stats = pd.DataFrame({ 'Potential Games' : default_potential_games
                                   }
                                   ,index = player_stats.index

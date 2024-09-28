@@ -6,7 +6,7 @@ from typing import List, Optional
 from yfpy.models import League, Team, Roster
 from yfpy.query import YahooFantasySportsQuery
 from src.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
-from src.helper_functions import move_forward_one_pick
+from src.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names
 from collections import Counter
 from src.helper_functions import standardize_name
 
@@ -127,7 +127,9 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
 
     #when yahoo data is loaded, refresh the default selection df
     st.session_state.selections_default = players_df
-    del st.session_state.selections_df
+
+    if 'selections_df' in st.session_state:
+        del st.session_state.selections_df
 
     return players_df
 
@@ -143,19 +145,7 @@ def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
     teams = yahoo_helper.get_teams(sc)
     teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
 
-    all_names = []
-    for k, v in teams_dict.items():
-        i = 1
-        new_name = v 
-
-        while new_name in all_names:
-            i = i + 1
-            new_name = v + ' ' + str(i)
-
-        all_names = all_names + [new_name]
-
-        if i != 1:
-            teams_dict[k] = new_name
+    teams_dict = adjust_teams_dict_for_duplicate_names(teams_dict)
 
     return teams_dict
 
@@ -367,6 +357,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     draft_result_raw_df['Team'] = ['Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
                                    for team_id in draft_result_raw_df['Team']]
             
+    #ZR: I am pretty sure we don't need a for loop to do this
     for k, v in draft_result_raw_df.iterrows():
         df.loc[row, v['Team']] = v['PlayerMod']
         row, drafter = move_forward_one_pick(row, drafter, n_drafters)
