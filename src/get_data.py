@@ -495,6 +495,8 @@ def get_nba_schedule():
     nba_schedule = requests.get(st.session_state.params['schedule-url']).json()
     game_dates = nba_schedule['leagueSchedule']['gameDates']
 
+    st.write(game_dates)
+
     def get_all_teams_playing(game_date):
          return [game['homeTeam']['teamTricode'] for game in game_date['games']] + \
                 [game['awayTeam']['teamTricode'] for game in game_date['games']]

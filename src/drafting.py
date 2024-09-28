@@ -2,7 +2,9 @@
 import streamlit as st 
 from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs import *
-from src import yahoo_connect
+from src import yahoo_connect, fantrax_connect
+from src.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names
+
 
 def run_autodraft():
   while (st.session_state.selections_df.columns[st.session_state.drafter] in st.session_state.autodrafters) and (st.session_state.row < st.session_state.n_picks):
@@ -48,7 +50,6 @@ def make_drafting_tab_own_data(H):
     left, right = st.columns([0.47,0.53])
 
     with left:
-
 
         selection_list = listify(st.session_state.selections_df)
         g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
@@ -140,106 +141,122 @@ def make_drafting_tab_own_data(H):
 
         
 def refresh_analysis():
-    yahoo_league_id = st.session_state.yahoo_league_id
-    auth_dir = st.session_state.auth_dir
+
     player_metadata = st.session_state.player_metadata.copy()
 
     player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
-    if st.session_state.mode == 'Draft Mode':
+    if st.session_state.data_source == 'Retrieve from Yahoo Fantasy':
 
-        draft_result = yahoo_connect.get_draft_results(yahoo_league_id
-                                                    , auth_dir
-                                                    , player_metadata)
-                
+        yahoo_league_id = st.session_state.yahoo_league_id
+        auth_dir = st.session_state.auth_dir
+
+        if st.session_state.mode == 'Draft Mode':
+
+            draft_result = yahoo_connect.get_draft_results(yahoo_league_id
+                                                        , auth_dir
+                                                        , player_metadata)
+                    
+        else:
+
+            draft_result = yahoo_connect.get_auction_results(yahoo_league_id
+                                                                        , auth_dir
+                                                                        , player_metadata)
+            
     else:
 
-        draft_result = yahoo_connect.get_auction_results(yahoo_league_id
-                                                                    , auth_dir
-                                                                    , player_metadata)
-        
+        if st.session_state.mode == 'Draft Mode':
+
+            draft_result = fantrax_connect.get_draft_results(st.session_state.fantrax_league
+                                                        , player_metadata)
+                                
+        else:
+
+            draft_result = fantrax_connect.get_auction_results(st.session_state.fantrax_league
+                                                                        , player_metadata)
+                        
     st.session_state.draft_results, st.session_state.live_draft_active = draft_result
    
 @st.fragment
 def make_drafting_tab_live_data(H):
 
-    with st.container():
+    st.session_state.player_metadata = st.session_state.player_stats['Position']
 
-        st.session_state.player_metadata = st.session_state.player_stats['Position']
+    if 'team_names' not in st.session_state:
+        st.write('No league info has been passed')
+        st.stop()
 
-        if 'team_names' not in st.session_state:
-            st.write('No league info has been passed')
-            st.stop()
+    if st.session_state.draft_results is None:
+        refresh_analysis()
 
-        if st.session_state.draft_results is None:
-            refresh_analysis()
+    c1, c2 = st.columns([0.1,0.9])
 
-        c1, c2 = st.columns([0.1,0.9])
+    with c1:
+        st.button('Refresh Analysis', on_click = refresh_analysis)
 
-        with c1:
-            st.button('Refresh Analysis', on_click = refresh_analysis)
+    with c2:
+        draft_seat = st.selectbox(f'Which drafter are you?'
+        , st.session_state.team_names
+        , key = 'draft_seat'
+        , on_change = refresh_analysis)
 
-        with c2:
-            draft_seat = st.selectbox(f'Which drafter are you?'
-            , st.session_state.team_names
-            , key = 'draft_seat'
-            , on_change = refresh_analysis)
-    
-        if not st.session_state.live_draft_active:
+    if not st.session_state.live_draft_active:
 
-            st.write('Draft has not yet begun')
+        st.write('Draft has not yet begun')
 
-        else:
-            
-            player_assignments = st.session_state.draft_results.to_dict('list')
+    else:
+        
+        player_assignments = st.session_state.draft_results.to_dict('list')
 
-            my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
-            
-            cand_tab, team_tab = st.tabs(["Candidates","Team"])
+        my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
+        
+        cand_tab, team_tab = st.tabs(["Candidates","Team"])
 
-            with team_tab:
+        with team_tab:
 
-                if len(my_players) == st.session_state.n_picks:
-                    base_h_res = get_base_h_score(st.session_state.info
-                                                    ,st.session_state.omega
-                                                    ,st.session_state.gamma
-                                                    ,st.session_state.n_picks
-                                                    ,st.session_state.n_drafters
-                                                    ,st.session_state.scoring_format
-                                                    ,st.session_state.chi
-                                                    ,player_assignments
-                                                    ,draft_seat
-                                                    ,st.session_state.info_key)
+            if len(my_players) == st.session_state.n_picks:
+                base_h_res = get_base_h_score(st.session_state.info
+                                                ,st.session_state.omega
+                                                ,st.session_state.gamma
+                                                ,st.session_state.n_picks
+                                                ,st.session_state.n_drafters
+                                                ,st.session_state.scoring_format
+                                                ,st.session_state.chi
+                                                ,player_assignments
+                                                ,draft_seat
+                                                ,st.session_state.info_key)
 
-                    base_h_score = base_h_res['Scores']
-                    base_win_rates = base_h_res['Rates']
+                base_h_score = base_h_res['Scores']
+                base_win_rates = base_h_res['Rates']
 
-                else:
-                    base_h_score = None
-                    base_win_rates = None
+            else:
+                base_h_score = None
+                base_win_rates = None
 
-                make_full_team_tab(st.session_state.z_scores
-                                ,st.session_state.g_scores
-                                ,my_players
-                                ,st.session_state.n_drafters
-                                ,st.session_state.n_picks
-                                ,base_h_score
-                                ,base_win_rates
-                                ,st.session_state.info_key
-                                )        
+            make_full_team_tab(st.session_state.z_scores
+                            ,st.session_state.g_scores
+                            ,my_players
+                            ,st.session_state.n_drafters
+                            ,st.session_state.n_picks
+                            ,base_h_score
+                            ,base_win_rates
+                            ,st.session_state.info_key
+                            )        
 
-            with cand_tab:
+        with cand_tab:
 
-                if len(my_players) < st.session_state.n_picks:
+            if len(my_players) < st.session_state.n_picks:
 
-                    make_h_cand_tab(H
-                        ,st.session_state.g_scores
-                        ,st.session_state.z_scores
-                        ,player_assignments
-                        ,draft_seat
-                        ,st.session_state.n_iterations
-                        ,st.session_state.v
-                        ,5)
+                make_h_cand_tab(H
+                    ,st.session_state.g_scores
+                    ,st.session_state.z_scores
+                    ,player_assignments
+                    ,draft_seat
+                    ,st.session_state.n_iterations
+                    ,st.session_state.v
+                    ,5)
+            else:
+                st.write('You have selected all of your players')
 
 @st.fragment
 def make_auction_tab_live_data(H):

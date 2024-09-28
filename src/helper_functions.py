@@ -171,6 +171,23 @@ def get_position_indices(position_structure):
                                     for position_code, position_info in flex_info.items()
             }
 
+def adjust_teams_dict_for_duplicate_names(teams_dict):
+    all_names = []
+    for k, v in teams_dict.items():
+        i = 1
+        new_name = v 
+
+        while new_name in all_names:
+            i = i + 1
+            new_name = v + ' ' + str(i)
+
+        all_names = all_names + [new_name]
+
+        if i != 1:
+            teams_dict[k] = new_name
+
+    return teams_dict
+
 def get_L_weights() -> pd.Series:
    #calculate a default weighting for L
    #this assumes that all flex positions are weighted evenly among their bases 

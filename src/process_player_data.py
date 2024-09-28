@@ -350,7 +350,12 @@ def process_player_data(weekly_df : pd.DataFrame
   except:
     position_means = None        
     L_by_position = np.array([x_scores.cov()])
-    
+
+  #Replacement players, for the rare case when a player is not found in the database
+  x_scores.loc['RP', :] = -1
+  z_scores.loc['RP', :] = -1
+  g_scores.loc['RP', :] = -1
+
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores

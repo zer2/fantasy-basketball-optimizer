@@ -257,6 +257,17 @@ NBA:
         Util : 3
         G :  3
         F :  3
+     16:
+        base :
+          C : 3
+          PG : 1
+          SG : 1
+          PF : 1
+          SF : 1
+        flex :
+          Util : 3
+          G : 3
+          F : 3
   position_structure :
     base_list :
       - C

@@ -1,0 +1,85 @@
+from fantraxapi import FantraxAPI
+import streamlit as st
+from src.helper_functions import adjust_teams_dict_for_duplicate_names
+import pandas as pd
+
+def get_api(league_id):
+    return FantraxAPI(league_id)
+
+def get_n_picks(league_id):
+    api = get_api(league_id)
+    teams = get_teams_dict(league_id)
+    return sum([x['max'] for x in api._request("getTeamRosterInfo", teamId=list(teams.values())[0])['miscData']['statusTotals']])
+
+def get_teams_dict(league_id):
+    teams_dict = {t['name'] : t['id'] for t in get_api(league_id)._request("getFantasyTeams")['fantasyTeams']}
+
+    return adjust_teams_dict_for_duplicate_names(teams_dict)
+
+def get_fixed_player_name(player_name, player_metadata):
+
+    def name_renamer(name):
+      if name == 'Nicolas Claxton':
+         name = 'Nic Claxton'
+      if name == 'C.J. McCollum':
+         name = 'CJ McCollum'
+      if name == 'R.J. Barrett':
+         name = 'RJ Barrett'
+      if name == 'Herb Jones':
+         name = 'Herbert Jones'
+      if name == 'Cam Johnson':
+         name = 'Cameron Johnson'
+      if name == 'O.G. Anunoby':
+         name = 'OG Anunoby'
+      if name == 'Alexandre Sarr':
+         name = 'Alex Sarr'
+      if name == 'Cameron Thomas':
+         name = 'Cam Thomas'
+      if name == 'Kelly Oubre Jr.':
+          name = 'Kelly Oubre'
+      return name
+    
+    player_name = name_renamer(player_name)
+
+    if player_name in player_metadata.index:
+
+        return player_name + ' (' + player_metadata[player_name] + ')'
+    else:
+        print(player_name)
+        return 'RP'
+    
+def get_team_info(api, team_id):
+    return api._request("getTeamRosterInfo", teamId=team_id)['tables'][0]['rows']
+
+def get_fantrax_roster(league_id
+                        , player_metadata):
+    
+    api = get_api(league_id)
+    teams = get_teams_dict(league_id)
+    
+    rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) for z in get_team_info(api, team_id) if 'scorer' in z] 
+           for name, team_id in teams.items() 
+          }
+        
+    return rosters
+    
+def get_player_statuses(league_id, player_metadata):
+    return None
+
+def get_draft_results(league_id
+                      ,player_metadata):
+    
+    rosters = get_fantrax_roster(league_id
+                , player_metadata)
+    
+    rosters_df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rosters.items() ]))
+    
+    return rosters_df, True
+    
+    try:
+        rosters = get_fantrax_roster(league_id
+                    , player_metadata)
+        
+        return pd.DataFrame(rosters), True
+    except:
+        return None, False
