@@ -142,6 +142,21 @@ def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
     LOGGER.info(f"sc: {sc}")
     teams = yahoo_helper.get_teams(sc)
     teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
+
+    all_names = []
+    for k, v in teams_dict.items():
+        i = 1
+        new_name = v 
+
+        while new_name in all_names:
+            i = i + 1
+            new_name = v + ' ' + str(i)
+
+        all_names = all_names + [new_name]
+
+        if i != 1:
+            teams_dict[k] = new_name
+
     return teams_dict
 
 @st.cache_data(ttl=3600
