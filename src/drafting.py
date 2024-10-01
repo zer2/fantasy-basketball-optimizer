@@ -36,7 +36,7 @@ def undo_selection():
                                     , st.session_state.drafter
                                     , st.session_state.selections_df.shape[1])
   
-  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = None
+  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = np.nan
 
   run_autodraft()
 
@@ -77,6 +77,7 @@ def make_drafting_tab_own_data(H):
                                         , use_container_width = True)
             
         player_assignments = st.session_state.selections_df.to_dict('list')
+        print(player_assignments)
 
         st.dataframe(st.session_state.selections_df
                                     ,key = 'selections_df'
