@@ -304,7 +304,15 @@ with param_tab:
           )    
 
           if fantrax_league is not None:
-                team_names = list(fantrax_connect.get_teams_dict(fantrax_league).keys())  
+                
+                division_dict = fantrax_connect.get_division_dict(fantrax_league)
+                if len(division_dict) == 0:
+                  team_names = list(fantrax_connect.get_teams_dict(fantrax_league).keys())  
+                else:
+                  division = st.selectbox(label = 'Which division are you in?'
+                                          ,options = list(division_dict.keys()))
+                  team_names = fantrax_connect.get_teams_dict_by_division(fantrax_league, division_dict[division])
+
                 st.session_state.team_names = team_names              
                 st.session_state.n_drafters = len(team_names)
                 st.session_state.n_picks = fantrax_connect.get_n_picks(fantrax_league)
@@ -349,8 +357,8 @@ with param_tab:
         position_defaults = all_position_defaults[st.session_state.n_picks]
       else:
         position_defaults = all_position_defaults[st.session_state.params['options']['n_picks']['default']]
-        st.error('''There is no default position structure for a league with this number of picks. 
-                 Position structure must be met manually on the Advanced tab.''')
+        st.error('''There is no default position structure for a league with''' + str(st.session_state.n_picks) + \
+                 ''' picks. Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
         

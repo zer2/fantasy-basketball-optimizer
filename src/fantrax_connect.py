@@ -6,15 +6,34 @@ import pandas as pd
 def get_api(league_id):
     return FantraxAPI(league_id)
 
+@st.cache_data(ttl = 3600)
 def get_n_picks(league_id):
     api = get_api(league_id)
     teams = get_teams_dict(league_id)
-    return sum([x['max'] for x in api._request("getTeamRosterInfo", teamId=list(teams.values())[0])['miscData']['statusTotals']])
+    return min( sum([x['max'] for x in api._request("getTeamRosterInfo", teamId=list(teams.values())[0])['miscData']['statusTotals'] \
+                if x['name'] != "Inj Res"]), 16
+                )
 
+@st.cache_data(ttl = 3600)
+def get_division_dict(league_id):
+    api = get_api(league_id)
+    divisions = {x['name'] : x['id'] for x in api._request("getStandings", view="SCHEDULE")['displayedLists']['tabs'] 
+             if x['name'] not in ['All','Combined','Results','Season Stats','Playoffs']}
+    return divisions
+
+@st.cache_data(ttl = 3600)
 def get_teams_dict(league_id):
     teams_dict = {t['name'] : t['id'] for t in get_api(league_id)._request("getFantasyTeams")['fantasyTeams']}
-
     return adjust_teams_dict_for_duplicate_names(teams_dict)
+
+@st.cache_data(ttl = 3600)
+def get_teams_dict_by_division(league_id, division_id):
+    api = get_api(league_id)
+
+    res = {x['fixedCells'][1]['content']  : x['fixedCells'][1]['teamId'] 
+     for x in api._request("getStandings", view= division_id)['tableList'][0]['rows'] }
+    
+    return res
 
 def get_fixed_player_name(player_name, player_metadata):
 
@@ -55,10 +74,9 @@ def get_fantrax_roster(league_id
                         , player_metadata):
     
     api = get_api(league_id)
-    teams = get_teams_dict(league_id)
     
     rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) for z in get_team_info(api, team_id) if 'scorer' in z] 
-           for name, team_id in teams.items() 
+           for name, team_id in st.session_state.teams_dict.items() 
           }
         
     return rosters
