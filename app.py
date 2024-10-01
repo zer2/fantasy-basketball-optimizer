@@ -307,11 +307,13 @@ with param_tab:
                 
                 division_dict = fantrax_connect.get_division_dict(fantrax_league)
                 if len(division_dict) == 0:
-                  team_names = list(fantrax_connect.get_teams_dict(fantrax_league).keys())  
+                  st.session_state.teams_dict = fantrax_connect.get_teams_dict(fantrax_league)
                 else:
                   division = st.selectbox(label = 'Which division are you in?'
                                           ,options = list(division_dict.keys()))
-                  team_names = fantrax_connect.get_teams_dict_by_division(fantrax_league, division_dict[division])
+                  st.session_state.teams_dict = fantrax_connect.get_teams_dict_by_division(fantrax_league, division_dict[division])
+
+                team_names = list(st.session_state.teams_dict.keys())  
 
                 st.session_state.team_names = team_names              
                 st.session_state.n_drafters = len(team_names)
@@ -577,14 +579,11 @@ with param_tab:
           
       implied_n_picks = sum(n for n in get_position_numbers().values())
       
-      if implied_n_picks > st.session_state.n_picks:
-        st.error('There are more position slots than picks in your league. Change your configuration before proceeding')
+      if implied_n_picks != st.session_state.n_picks:
+        st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(st.session_state.n_picks) + \
+                 ' picks per manager. Adjust the position slots before proceeding')
         st.stop()
-
-      elif implied_n_picks < st.session_state.n_picks:
-        st.error('There are fewer position slots than picks in your league. Change your configuration before proceeding')
-        st.stop()
-
+        
     with algorithm_param_column:
         
         st.subheader('Algorithm Parameters')
