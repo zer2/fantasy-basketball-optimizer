@@ -168,7 +168,6 @@ class HAgent():
 
         if self.initial_category_weights is None:
 
-
             initial_category_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                     default_weights).mean(axis = 2)
             initial_category_weights = initial_category_weights/(initial_category_weights.sum(axis = 1).reshape(-1,1))
@@ -977,7 +976,10 @@ class HAgent():
         x_mu = np.einsum('aij, ajk -> aik',L, last_four_terms)
         return x_mu
 
-
+    def clear_initial_weights(self):
+        self.initial_category_weights = None
+        self.initial_position_shares = None
+        return self
     #below functions use the simplified form of X_mu 
     #term 1: L (covariance)
     #term 2: vj^T - jv^T

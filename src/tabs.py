@@ -214,6 +214,7 @@ def make_h_cand_tab(_H
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
+  _H = _H.clear_initial_weights()
           
   generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
 
@@ -272,7 +273,6 @@ def make_h_cand_tab(_H
         raw_z_tab = all_tabs[-2]
         raw_g_tab = all_tabs[-1]
 
-      
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
