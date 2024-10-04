@@ -391,6 +391,28 @@ def get_htb_adp():
    df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
    df = df.rename(columns = st.session_state.params['htb-renamer'])
 
+   #ZR: This should be from snowflake, or mapping in dictionary
+   def name_renamer(name):
+      name = unidecode(name)
+      name = ' '.join(name.split(' ')[0:2])
+      if name == 'Nicolas Claxton':
+         name = 'Nic Claxton'
+      if name == 'C.J. McCollum':
+         name = 'CJ McCollum'
+      if name == 'R.J. Barrett':
+         name = 'RJ Barrett'
+      if name == 'Herb Jones':
+         name = 'Herbert Jones'
+      if name == 'Cam Johnson':
+         name = 'Cameron Johnson'
+      if name == 'O.G. Anunoby':
+         name = 'OG Anunoby'
+      if name == 'Alexandre Sarr':
+         name = 'Alex Sarr'
+      return name
+      
+   df['Player'] = [name_renamer(name) for name in df['Player']]
+
    df['Position'] = df['Position'].str.replace('/',',')
 
    df['Player'] = df['Player'] + ' (' + df['Position'] + ')'

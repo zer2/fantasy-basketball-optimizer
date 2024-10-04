@@ -336,7 +336,7 @@ def make_h_cand_tab(_H
               st.stop()
 
             rate_df = win_rates.loc[score_df.index].dropna()
-            rate_display = score_df.merge(adps, left_index = True, right_index = True) \
+            rate_display = score_df.merge(adps, left_index = True, right_index = True, how = 'left') \
                                     .merge(rate_df, left_index = True, right_index = True)           
             
             rate_display_styled = rate_display.style.format("{:.1%}"

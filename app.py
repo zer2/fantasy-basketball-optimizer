@@ -310,7 +310,8 @@ with param_tab:
                   st.session_state.teams_dict = fantrax_connect.get_teams_dict(fantrax_league)
                 else:
                   division = st.selectbox(label = 'Which division are you in?'
-                                          ,options = list(division_dict.keys()))
+                                          ,options = list(division_dict.keys())
+                                          , on_change = clear_draft_board)
                   st.session_state.teams_dict = fantrax_connect.get_teams_dict_by_division(fantrax_league, division_dict[division])
 
                 team_names = list(st.session_state.teams_dict.keys())  
@@ -583,7 +584,7 @@ with param_tab:
         st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(st.session_state.n_picks) + \
                  ' picks per manager. Adjust the position slots before proceeding')
         st.stop()
-        
+
     with algorithm_param_column:
         
         st.subheader('Algorithm Parameters')
