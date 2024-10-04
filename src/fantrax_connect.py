@@ -78,7 +78,7 @@ def get_fantrax_roster(league_id
     rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) for z in get_team_info(api, team_id) if 'scorer' in z] 
            for name, team_id in st.session_state.teams_dict.items() 
           }
-        
+            
     return rosters
     
 def get_player_statuses(league_id, player_metadata):
