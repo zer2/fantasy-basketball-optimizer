@@ -30,8 +30,13 @@ def get_teams_dict(league_id):
 def get_teams_dict_by_division(league_id, division_id):
     api = get_api(league_id)
 
+    #ZR: Sometimes the first entry in tablelist has the information. sometimes it ie empty and we need to check the second
+    standings_rows = api._request("getStandings", view= division_id)['tableList'][0]['rows']
+    if len(standings_rows) == 0:
+        standings_rows = api._request("getStandings", view= division_id)['tableList'][1]['rows']
+
     res = {x['fixedCells'][1]['content']  : x['fixedCells'][1]['teamId'] 
-     for x in api._request("getStandings", view= division_id)['tableList'][0]['rows'] }
+     for x in standings_rows }
     
     return res
 
