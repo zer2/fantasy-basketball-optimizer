@@ -306,6 +306,7 @@ with param_tab:
           if fantrax_league is not None:
                 
                 division_dict = fantrax_connect.get_division_dict(fantrax_league)
+
                 if len(division_dict) == 0:
                   st.session_state.teams_dict = fantrax_connect.get_teams_dict(fantrax_league)
                 else:

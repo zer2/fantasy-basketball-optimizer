@@ -47,7 +47,7 @@ def get_selected_categories():
     
 def get_selected_counting_statistics():
    if st.session_state:
-      return [category for category in st.session_state['selected_categories'] if category in get_counting_statistics()]
+      return [category for category in get_counting_statistics() if category in st.session_state['selected_categories']]
    else:
       if os.environ['SPORT'] == 'NBA':
         return  ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
@@ -56,7 +56,7 @@ def get_selected_counting_statistics():
 
 def get_selected_ratio_statistics():
    if st.session_state:
-      return [category for category in st.session_state['selected_categories'] if category in get_ratio_statistics()]
+      return [category for category in get_ratio_statistics() if category in st.session_state['selected_categories']]
    else:
       if os.environ['SPORT'] == 'NBA':
         return ['Field Goal %','Free Throw %']

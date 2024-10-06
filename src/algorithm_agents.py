@@ -171,7 +171,6 @@ class HAgent():
             initial_category_weights = ((diff_means + x_scores_available_array)/((default_weights * category_momentum_factor)) + \
                     default_weights).mean(axis = 2)
             initial_category_weights = initial_category_weights/(initial_category_weights.sum(axis = 1).reshape(-1,1))
-
                     
             initial_position_shares = {
                         position_code : 
