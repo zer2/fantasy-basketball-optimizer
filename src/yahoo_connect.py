@@ -178,7 +178,7 @@ def get_user_leagues(_auth_path: str) -> List[League]:
         game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
-    leagues = yahoo_helper.get_user_leagues(sc)
+    leagues = yahoo_helper.get_user_leagues(sc)        
     
     # Sort in reverse chronological order
     sorted_leagues = sorted(leagues, key = lambda league: league.season, reverse=True)

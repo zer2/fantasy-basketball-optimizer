@@ -10,8 +10,7 @@ import time
 from schedule import every, repeat, run_pending
 from src.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
-                                  ,get_games_per_week, get_categories, get_ratio_statistics, clear_draft_board \
-                                  ,increment_default_key_and_clear_draft_board, get_selections_default
+                                  ,get_games_per_week, get_categories, get_ratio_statistics, get_selections_default
 from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
                         get_player_metadata, get_data_from_snowflake, combine_nba_projections
 from src.process_player_data import process_player_data
@@ -20,8 +19,8 @@ from src import yahoo_connect
 from src import fantrax_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
-from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, run_autodraft, make_auction_tab_live_data \
-                          ,run_autodraft_and_increment
+from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
+                          ,increment_and_reset_draft, clear_draft_board
 
 #from streamlit_profiler import Profiler
 
@@ -147,7 +146,7 @@ with param_tab:
         ('NBA', 'WNBA') #MLB excluded for now
         , index = 0
         , key = 'league'
-        , on_change = increment_default_key_and_clear_draft_board
+        , on_change = increment_and_reset_draft
         )
       
       load_params(st.session_state.league)
@@ -220,7 +219,7 @@ with param_tab:
             options=user_leagues,
             format_func=get_league_labels,
             index=None,
-            on_change = increment_default_key_and_clear_draft_board
+            on_change = increment_and_reset_draft
           )
 
 
@@ -365,64 +364,66 @@ with param_tab:
                  ''' picks. Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
-        
-        data_options = ['Projection','Historical'] if data_source == 'Enter your own data' else ['Projection']
-    
-
-        kind_of_dataset = st.selectbox(
-                                  'Which kind of dataset do you want to use? (specify further on the data tab)'
-                                  , data_options
-                                  , index = 0
-                                  , on_change = increment_default_key_and_clear_draft_board
-        )
-
-        scoring_format = st.selectbox(
-          'Which format are you playing?',
-          ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
-          , key = 'scoring_format'
-          , index = 1)
-      
-        if scoring_format == 'Rotisserie':
-          st.caption('Note that H-scores for Rotisserie are experimental and have not been tested')
-
-        rotisserie = scoring_format == 'Rotisserie'
-
-        punting_levels = st.session_state.params['punting_defaults']
-
-        default_punting = st.session_state.params['punting_default_index'][scoring_format]
-
-        punting_level = st.selectbox(
-          'What level of punting do you want H-scores to apply when modeling your future draft picks?'
-          ,list(punting_levels.keys())
-          ,index = default_punting
-        )
-
-        st.caption('''For more granular control, use the Advanced tab which is next to this one''')
-
-        with st.form("more options"):
-
-          categories = st.multiselect('Which categories does you league use?'
-                      , key = 'selected_categories'
-                      , options = st.session_state.params['counting-statistics'] + \
-                                list(st.session_state.params['ratio-statistics'].keys())
-                      , default = st.session_state.params['default-categories']
-                            )
-        
-
-          if st.session_state['mode'] == 'Draft Mode':
-              autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
-                    ,options = st.session_state.selections_default.columns
-                    ,key = 'autodrafters'
-                    ,default = None)
-              
-          c1, c2 = st.columns([0.2,0.8])
           
-          with c1: 
-            submit = st.form_submit_button("Lock in",on_click = run_autodraft_and_increment)
-          with c2:
-            st.warning('Make sure to lock in after making changes')
+          scoring_format = st.selectbox(
+              'Which format are you playing?',
+              ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
+              , key = 'scoring_format'
+              , index = 1
+              , on_change = increment_default_key)
+          
+          if scoring_format == 'Rotisserie':
+              st.caption('Note that H-scores for Rotisserie are experimental and have not been tested')
+
+          rotisserie = scoring_format == 'Rotisserie'
+
+          punting_levels = st.session_state.params['punting_defaults']
+
+          default_punting = st.session_state.params['punting_default_index'][scoring_format]
+
+          punting_level = st.selectbox(
+            'What level of punting do you want H-scores to apply when modeling your future draft picks?'
+            ,list(punting_levels.keys())
+            ,index = default_punting
+          )
+
+          st.caption('''For more granular control, use the Advanced tab which is next to this one''')
+      
+
+          with st.form("more options"):
+
+            data_options = ['Projection','Historical'] if data_source == 'Enter your own data' else ['Projection']
+      
+
+            kind_of_dataset = st.selectbox(
+                                      'Which kind of dataset do you want to use? (specify further on the data tab)'
+                                      , data_options
+                                      , index = 0
+            )
+
+            categories = st.multiselect('Which categories does you league use?'
+                        , key = 'selected_categories'
+                        , options = st.session_state.params['counting-statistics'] + \
+                                  list(st.session_state.params['ratio-statistics'].keys())
+                        , default = st.session_state.params['default-categories']
+                              )
+          
+
+            if st.session_state['mode'] == 'Draft Mode':
+                autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
+                      ,options = st.session_state.selections_default.columns
+                      ,key = 'autodrafters'
+                      ,default = None)
+                
+            c1, c2 = st.columns([0.2,0.8])
+            
+            with c1: 
+              submit = st.form_submit_button("Lock in",on_click = increment_and_reset_draft)
+            with c2:
+              st.warning('Make sure to lock in after making changes')
 
   with data_params:
+
     if st.session_state.league == 'NBA':
 
         #current_data, expected_minutes = get_current_season_data()
@@ -440,64 +441,68 @@ with param_tab:
             'Which dataset do you want to default to?'
             ,unique_datasets_historical
             ,index = 0
-            ,on_change = increment_default_key_and_clear_draft_board
+            ,on_change = increment_and_reset_draft
           )
           raw_stats_df = get_specified_stats(dataset_name
                                     , st.session_state.player_stats_default_key)
             
         else: 
 
-          hashtag_c, roto_c, bbm_c, = st.columns(3)
+          with st.form('basketball_data_sources'):
 
-          with hashtag_c:
-            hashtag_upload = get_data_from_snowflake('HTB_PROJECTION_TABLE')
-            hashtag_slider = st.slider('Hashtag Basketball Weight'
-                                      , min_value = 0.0
-                                      , value = 1.0
-                                      , max_value = 1.0
-                                      , on_change = increment_default_key)
+            hashtag_c, roto_c, bbm_c, = st.columns(3)
 
-          with roto_c:
+            with hashtag_c:
+              hashtag_upload = get_data_from_snowflake('HTB_PROJECTION_TABLE')
+              hashtag_slider = st.slider('Hashtag Basketball Weight'
+                                        , min_value = 0.0
+                                        , value = 1.0
+                                        , max_value = 1.0)
 
-            rotowire_slider = st.slider('RotoWire Weight'
-                            , min_value = 0.0
-                            , max_value = 1.0
-                            , on_change = increment_default_key)
+            with roto_c:
 
+                rotowire_slider = st.slider('RotoWire Weight'
+                                , min_value = 0.0
+                                , max_value = 1.0)
+
+                
+                rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
+                                                , type=['csv'])
+                if rotowire_file is not None:
+                  rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
+                else:
+                  rotowire_upload = None
+
+                if (rotowire_slider > 0) & (rotowire_upload is None):
+                  st.error('Upload RotoWire projection file')
+                  st.stop()
+
+            with bbm_c:
+
+                bbm_slider = st.slider('BBM Weight'
+                          , min_value = 0.0
+                          , max_value = 1.0)
+
+                bbm_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
+                                                projections, you may have to export to excel then save as CSV utf-8.'''
+                                                , type=['csv'])
+                if bbm_file is not None:
+                  # Adding a 
+                  bbm_upload  = pd.read_csv(bbm_file)
+                else:
+                  bbm_upload = None
+
+
+                if (bbm_slider > 0) & (bbm_upload is None):
+                  st.error('Upload Basketball Monster projection file')
+                  st.stop()
+
+            c1, c2 = st.columns([0.2,0.8])
             
-            rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
-                                            , type=['csv']
-                                            , on_change = increment_default_key)
-            if rotowire_file is not None:
-              rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
-            else:
-              rotowire_upload = None
-
-            if (rotowire_slider > 0) & (rotowire_upload is None):
-              st.error('Upload RotoWire projection file')
-              st.stop()
-
-          with bbm_c:
-
-            bbm_slider = st.slider('BBM Weight'
-                      , min_value = 0.0
-                      , max_value = 1.0
-                      , on_change = increment_default_key)
-
-            bbm_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
-                                            projections, you may have to export to excel then save as CSV utf-8.'''
-                                            , type=['csv']
-                                            , on_change = increment_default_key)
-            if bbm_file is not None:
-              # Adding a 
-              bbm_upload  = pd.read_csv(bbm_file)
-            else:
-              bbm_upload = None
-
-
-            if (bbm_slider > 0) & (bbm_upload is None):
-              st.error('Upload Basketball Monster projection file')
-              st.stop()
+            with c1: 
+              submit = st.form_submit_button("Lock in",on_click = increment_default_key)
+            with c2:
+              st.warning('Make sure to lock in after making changes')
 
           raw_stats_df = combine_nba_projections(hashtag_upload
                             , rotowire_upload
@@ -512,211 +517,232 @@ with param_tab:
 
   with advanced_params:
 
-    player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
+      player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
 
-    with player_param_column:
-      st.subheader('Player Statistics')
+      with player_param_column:
 
-      upsilon = st.number_input(r'Select a $\upsilon$ value'
-                        , key = 'upsilon'
-                        , min_value = float(st.session_state.params['options']['upsilon']['min'])
-                        , value = float(st.session_state.params['options']['upsilon']['default'])
-                      , max_value = float(st.session_state.params['options']['upsilon']['max']))
-      upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
-                    miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
-                    $15\%$ of games instead'''
-      st.caption(upsilon_str)
+        with st.form("player_stat_params"):
+
+          st.subheader('Player Statistics')
+
+          upsilon = st.number_input(r'Select a $\upsilon$ value'
+                            , key = 'upsilon'
+                            , min_value = float(st.session_state.params['options']['upsilon']['min'])
+                            , value = float(st.session_state.params['options']['upsilon']['default'])
+                          , max_value = float(st.session_state.params['options']['upsilon']['max']))
+          upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
+                        miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
+                        $15\%$ of games instead'''
+          st.caption(upsilon_str)
 
 
-      psi = st.number_input(r'Select a $\psi$ value'
-                        , key = 'psi'
-                        , min_value = float(st.session_state.params['options']['psi']['min'])
-                        , value = float(st.session_state.params['options']['psi']['default'])
-                      , max_value = float(st.session_state.params['options']['psi']['max']))
-      psi_str = r'''It it assumed that of the games a player will miss, 
-                    they are replaced by a replacement-level player for $\psi \%$ of them'''
-    
-      st.caption(psi_str)
-
-      mult_col, coef_col = st.columns(2)
-    
-      st.subheader(f"Coefficients")
-      coefficient_series = pd.Series(st.session_state.params['coefficients'])
-      conversion_factors = st.data_editor(coefficient_series, hide_index = True)
-      conversion_factors = conversion_factors.T                                                      
-
-      st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
-
-    with position_param_column: 
-
-      st.subheader('Position Requirements')
-
-      st.caption('The H-scoring algorithm will choose players assuming that its team ultimately need to fit this structure')
-
-      left_position_col, right_position_col = st.columns(2)
-
-      with left_position_col:
-
-        st.write('Base positions')
-
-        for position_code, position_info in st.session_state.params['position_structure']['base'].items():
-
-          st.number_input(position_info['full_str']
-                    , key = 'n_' + position_code
-                    , value = position_defaults['base'][position_code]
-                    , min_value = 0
-                        )
+          psi = st.number_input(r'Select a $\psi$ value'
+                            , key = 'psi'
+                            , min_value = float(st.session_state.params['options']['psi']['min'])
+                            , value = float(st.session_state.params['options']['psi']['default'])
+                          , max_value = float(st.session_state.params['options']['psi']['max']))
+          psi_str = r'''It it assumed that of the games a player will miss, 
+                        they are replaced by a replacement-level player for $\psi \%$ of them'''
         
-      with right_position_col:
+          st.caption(psi_str)
 
-        st.write('Flex positions')
-
-        for position_code, position_info in st.session_state.params['position_structure']['flex'].items():
-
-          st.number_input(position_info['full_str']
-                    , key = 'n_' + position_code
-                    , value = position_defaults['flex'][position_code]
-                    , min_value = 0
-                        )
-          
-      implied_n_picks = sum(n for n in get_position_numbers().values())
+          chi = st.number_input(r'Select a $\chi$ value'
+              , key = 'chi'
+              , value = float(st.session_state.params['options']['chi']['default'])
+              , min_value = float(st.session_state.params['options']['chi']['min'])
+              , max_value = float(st.session_state.params['options']['chi']['max']))
       
-      if implied_n_picks != st.session_state.n_picks:
-        st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(st.session_state.n_picks) + \
-                 ' picks per manager. Adjust the position slots before proceeding')
-        st.stop()
-
-    with algorithm_param_column:
+          chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
+                          Uncertainty in season-long means is higher than uncertainty week-over-week 
+                          '''
+          st.caption(chi_str)
         
-        st.subheader('Algorithm Parameters')
+          #I don't think we need people to be able to modify the coefficients
+          coefficient_series = pd.Series(st.session_state.params['coefficients'])
+          conversion_factors = coefficient_series.T                                                      
 
-        omega = st.number_input(r'Select a $\omega$ value'
-                              , key = 'omega'
-                              , value = punting_levels[punting_level]['omega']
-                              , min_value = float(st.session_state.params['options']['omega']['min'])
-                              , max_value = float(st.session_state.params['options']['omega']['max']))
-        omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
-                        it quantifies how much better the optimal player choice will be compared to the player that would be 
-                        chosen with baseline weights'''
-        st.caption(omega_str)
+          #st.caption('Conversion factor for translating from σ² to 𝜏² as defined in the paper. Player stats are input as averages rather than week-by-week numbers, so 𝜏² must be estimated. The default conversion factors from σ² to 𝜏² are based on historical values')
 
-        if omega > 0:
-      
-          gamma = st.number_input(r'Select a $\gamma$ value'
-                                , key = 'gamma'
-                                , value = punting_levels[punting_level]['gamma']
-                                , min_value = float(st.session_state.params['options']['gamma']['min'])
-                                , max_value = float(st.session_state.params['options']['gamma']['max']))
-          gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
-                  tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
-                  players that  work best for its strategy'''
-          st.caption(gamma_str)
+          c1, c2 = st.columns([0.4,0.6])
 
-        else: 
-          gamma = None
-
-        if omega > 0:
-    
-          n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
-                                    , key = 'n_iterations'
-                                    , value = st.session_state.params['options']['n_iterations']['default']
-                                    , min_value = st.session_state.params['options']['n_iterations']['min']
-                                    , max_value = st.session_state.params['options']['n_iterations']['max'])
-          n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
-          st.caption(n_iterations_str)
-        else:
-          n_iterations = 0 
+          with c1:
+            st.form_submit_button("Lock in")
+          with c2:
+            st.warning('Make sure to lock in after making changes')
 
 
-        chi = st.number_input(r'Select a $\chi$ value'
-                , key = 'chi'
-                , value = float(st.session_state.params['options']['chi']['default'])
-                , min_value = float(st.session_state.params['options']['chi']['min'])
-                , max_value = float(st.session_state.params['options']['chi']['max']))
-        
-        chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                      If performance means were known exactly beforehand, chi would be 1/M where M 
-                      is the number weeks in the season. However, in practice, season-long means are 
-                      not known before the season begins, so it is recommended to set chi to be higher 
-                      '''
-        st.caption(chi_str)
-        
-        if st.session_state['mode'] == 'Auction Mode':
+      with position_param_column: 
 
-          streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
-                                    , key = 'streaming_noise'
-                                    , value = 1.0
-                                    , min_value = 0.0
-                                    , max_value = None)
-          stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
-                                more long-term performance noise is expected, making low-value 
-                                players more heavily down-weighted due to the possibility that
-                                they drop below  streaming-level value'''
-          st.caption(stream_noise_str)         
+        with st.form('position_params'):
 
-          streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
-                        , key = 'streaming_noise_h'
-                        , value = 0.1
-                        , min_value = 0.0
-                        , max_value = None)
+          st.subheader('Position Requirements')
 
-          stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
-          st.caption(stream_noise_str_h)         
+          st.caption('The H-scoring algorithm will choose players assuming that its team ultimately need to fit this structure')
 
-    with trade_param_column:
-        st.subheader('Trading Parameters')
+          left_position_col, right_position_col = st.columns(2)
 
-        your_differential_threshold = st.number_input(
-              r'Your differential threshold for the automatic trade suggester'
-              , value = 0)
-        ydt_str = r'''Only trades which improve your H-score 
-                      by the threshold (as a percentage) will be shown'''
-        st.caption(ydt_str)
-        your_differential_threshold = your_differential_threshold /100
+          with left_position_col:
 
-        their_differential_threshold = st.number_input(
-              r'Counterparty differential threshold for the automatic trade suggester'
-              , value = 0)
-        tdt_str = r'''Only trades which improve the counterparty's H-score 
-                    by the threshold (as a percentage) will be shown'''
-        st.caption(tdt_str)
-        their_differential_threshold = their_differential_threshold/100
+            st.write('Base positions')
 
-        with st.form("Combo params"):
-          combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
-                                        ,'N-received' : [1,2,3]
-                                        ,'T1' : [0,0,0]
-                                        ,'T2' : [1,0.25,0.1]}
-                                        )
+            for position_code, position_info in st.session_state.params['position_structure']['base'].items():
 
-          combo_params_df = st.data_editor(combo_params_default
-                                            , hide_index = True
-                                            , num_rows = "dynamic"
-                                            , column_config={
-                              "N-traded": st.column_config.NumberColumn("N-traded", default=1)
-                              ,"N-received": st.column_config.NumberColumn("N-received", default=1)
-                              ,"T1": st.column_config.NumberColumn("T1", default=0)
-                              ,"T2": st.column_config.NumberColumn("T2", default=0)
+              st.number_input(position_info['full_str']
+                        , key = 'n_' + position_code
+                        , value = position_defaults['base'][position_code]
+                        , min_value = 0
+                            )
+            
+          with right_position_col:
 
-                                                      }
-                                              ) 
-          combo_params_df[['N-traded','N-received']] = \
-                combo_params_df[['N-traded','N-received']].astype(int)
+            st.write('Flex positions')
 
-          combo_params_df['T1'] = combo_params_df['T1']/100
+            for position_code, position_info in st.session_state.params['position_structure']['flex'].items():
+
+              st.number_input(position_info['full_str']
+                        , key = 'n_' + position_code
+                        , value = position_defaults['flex'][position_code]
+                        , min_value = 0
+                            )
+              
+          c1, c2 = st.columns([0.4,0.6])
+
+          with c1:
+            st.form_submit_button("Lock in")
+          with c2:
+            st.warning('Make sure to lock in after making changes')
+              
+          implied_n_picks = sum(n for n in get_position_numbers().values())
           
-          submitted = st.form_submit_button("Submit", use_container_width = True)
+          if implied_n_picks != st.session_state.n_picks:
+            st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(st.session_state.n_picks) + \
+                    ' picks per manager. Adjust the position slots before proceeding')
+            st.stop()
 
-        combo_params_str =  \
-          """Each row is a specification for a kind of trade that will be automatically evaluated. 
-          N-traded is the number of players traded from your team, and N-received is the number of 
-          players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
-          column. Only players with the specified targetedness or above will be considered. T2 is a 
-          threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
-          differences larger than T2 will not be evaluated"""
-        st.caption(combo_params_str)
 
-        combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
+      with algorithm_param_column:
+          
+          with st.form('algo_params'):
+          
+            st.subheader('Algorithm Parameters')
+
+            omega = st.number_input(r'Select a $\omega$ value'
+                                  , key = 'omega'
+                                  , value = punting_levels[punting_level]['omega']
+                                  , min_value = float(st.session_state.params['options']['omega']['min'])
+                                  , max_value = float(st.session_state.params['options']['omega']['max']))
+            omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
+                            it quantifies how much better the optimal player choice will be compared to the player that would be 
+                            chosen with baseline weights'''
+            st.caption(omega_str)
+          
+            gamma = st.number_input(r'Select a $\gamma$ value'
+                                  , key = 'gamma'
+                                  , value = punting_levels[punting_level]['gamma']
+                                  , min_value = float(st.session_state.params['options']['gamma']['min'])
+                                  , max_value = float(st.session_state.params['options']['gamma']['max']))
+            gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
+                    tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
+                    players that  work best for its strategy'''
+            st.caption(gamma_str)
+        
+            n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
+                                      , key = 'n_iterations'
+                                      , value = punting_levels[punting_level]['n_iterations']
+                                      , min_value = st.session_state.params['options']['n_iterations']['min']
+                                      , max_value = st.session_state.params['options']['n_iterations']['max'])
+            n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
+            st.caption(n_iterations_str)
+
+            if st.session_state['mode'] == 'Auction Mode':
+
+              streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                        , key = 'streaming_noise'
+                                        , value = 1.0
+                                        , min_value = 0.0
+                                        , max_value = None)
+              stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
+                                    more long-term performance noise is expected, making low-value 
+                                    players more heavily down-weighted due to the possibility that
+                                    they drop below  streaming-level value'''
+              st.caption(stream_noise_str)         
+
+              streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
+                            , key = 'streaming_noise_h'
+                            , value = 0.1
+                            , min_value = 0.0
+                            , max_value = None)
+
+              stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
+              st.caption(stream_noise_str_h)      
+
+            c1, c2 = st.columns([0.4,0.6])
+
+            with c1:
+              st.form_submit_button("Lock in")
+            with c2:
+              st.warning('Make sure to lock in after making changes')   
+
+      with trade_param_column:
+          
+          with st.form('trading_form'):
+            st.subheader('Trading Parameters')
+
+            your_differential_threshold = st.number_input(
+                  r'Your differential threshold for the automatic trade suggester'
+                  , value = 0)
+            ydt_str = r'''Only trades which improve your H-score 
+                          by this percent will be shown'''
+            st.caption(ydt_str)
+            your_differential_threshold = your_differential_threshold /100
+
+            their_differential_threshold = st.number_input(
+                  r'Counterparty differential threshold for the automatic trade suggester'
+                  , value = 0)
+            tdt_str = r'''Only trades which improve their H-score 
+                        by this percent will be shown'''
+            st.caption(tdt_str)
+            their_differential_threshold = their_differential_threshold/100
+
+            combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
+                                          ,'N-received' : [1,2,3]
+                                          ,'T1' : [0,0,0]
+                                          ,'T2' : [1,0.25,0.1]}
+                                          )
+
+            combo_params_df = st.data_editor(combo_params_default
+                                              , hide_index = True
+                                              , num_rows = "dynamic"
+                                              , column_config={
+                                "N-traded": st.column_config.NumberColumn("N-traded", default=1)
+                                ,"N-received": st.column_config.NumberColumn("N-received", default=1)
+                                ,"T1": st.column_config.NumberColumn("T1", default=0)
+                                ,"T2": st.column_config.NumberColumn("T2", default=0)
+
+                                                        }
+                                                ) 
+            combo_params_df[['N-traded','N-received']] = \
+                  combo_params_df[['N-traded','N-received']].astype(int)
+
+            combo_params_df['T1'] = combo_params_df['T1']/100
+              
+            combo_params_str =  \
+              """Each row is a specification for a kind of trade that will be automatically evaluated. 
+              N-traded is the number of players traded from your team, and N-received is the number of 
+              players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
+              column. Only players with the specified targetedness or above will be considered. T2 is a 
+              threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
+              differences larger than T2 will not be evaluated"""
+            st.caption(combo_params_str)
+
+            combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
+
+            c1, c2 = st.columns([0.4,0.6])
+
+            with c1:
+              st.form_submit_button("Lock in")
+            with c2:
+              st.warning('Make sure to lock in after making changes')
 
 with info_tab:    
 

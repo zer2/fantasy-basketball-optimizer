@@ -3,17 +3,32 @@ import streamlit as st
 from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs import *
 from src import yahoo_connect, fantrax_connect
-from src.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names
+from src.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names, increment_default_key
 
+def clear_draft_board():
+  if 'draft_results' in st.session_state:
+    del st.session_state.draft_results 
+
+  if 'live_draft_active' in st.session_state:
+    del st.session_state.live_draft_active
+
+  if 'selections_df' in st.session_state:
+    del st.session_state.selections_df
 
 def run_autodraft():
+  
+  if 'selections_df' not in st.session_state:
+    st.session_state.selections_df = st.session_state.selections_default
+
   while (st.session_state.selections_df.columns[st.session_state.drafter] in st.session_state.autodrafters) and (st.session_state.row < st.session_state.n_picks):
     selection_list = listify(st.session_state.selections_df)
     g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
     select_player_from_draft_board(g_scores_unselected.index[0])
 
-def run_autodraft_and_increment():
+#run_autodraft_and_increment
+def increment_and_reset_draft():
     increment_player_stats_version()
+    clear_draft_board()
 
     if 'autodrafters' in st.session_state:
       run_autodraft()

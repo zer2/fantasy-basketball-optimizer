@@ -220,8 +220,7 @@ NBA:
       min : 0.0
       max: 1
     n_iterations : 
-      default : 30
-      min : 10
+      min : 0
       max: 10000
     positions: 
      13:
@@ -313,12 +312,15 @@ NBA:
     No dynamic optimization :
       omega : 0.0 
       gamma : 0.0
+      n_iterations : 0
     Moderate punting : 
       omega : 0.7
       gamma : 0.25
+      n_iterations : 30
     Aggressive punting : 
       omega : 1.0
       gamma : 0.4
+      n_iterations : 30
   punting_default_index : 
     "Head to Head: Most Categories" : 1
     "Head to Head: Each Category" : 1
@@ -540,12 +542,15 @@ WNBA:
     No dynamic optimization :
       omega : 0.0 
       gamma : 0.0
+      n_iterations : 0
     Moderate punting : 
       omega : 0.7
       gamma : 0.25
+      n_iterations : 30
     Aggressive punting : 
       omega : 1.0
       gamma : 0.4
+      n_iterations : 30
   punting_default_index : 
     "Head to Head: Most Categories" : 1
     "Head to Head: Each Category" : 1
@@ -776,12 +781,15 @@ MLB:
     No dynamic optimization :
       omega : 0.0 
       gamma : 0.0
+      n_iterations : 0
     Moderate punting : 
       omega : 0.7
       gamma : 0.25
+      n_iterations : 30
     Aggressive punting : 
       omega : 1.0
       gamma : 0.4
+      n_iterations : 30
   punting_default_index : 
     "Head to Head: Most Categories" : 1
     "Head to Head: Each Category" : 1

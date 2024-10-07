@@ -12,6 +12,7 @@ from src.get_data import get_htb_adp
 import os
 import itertools
 from pathlib import Path
+import gc
   
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_about_tab(md_path : str):
@@ -256,27 +257,27 @@ def make_h_cand_tab(_H
       position_shares_res = [x[1][list(fits_roster.values)] for x in position_shares_list]
 
       if cash_remaining_per_team:
-        all_tabs = st.tabs(['Targets','Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores'])
+        all_tabs = st.tabs(['Targets','Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
         target_tab = all_tabs[0]
         weight_tab = all_tabs[1]
         roster_tab = all_tabs[2]
-        position_tabs = all_tabs[3:-2]
-        raw_z_tab = all_tabs[-2]
-        raw_g_tab = all_tabs[-1]
+
 
       else:
-        all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores'])
+        all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
         rate_tab = all_tabs[0]
         weight_tab = all_tabs[1]       
         roster_tab = all_tabs[2]
-        position_tabs = all_tabs[3:-2]
-        raw_z_tab = all_tabs[-2]
-        raw_g_tab = all_tabs[-1]
+
+      position_tabs = all_tabs[3:-3]
+      raw_z_tab = all_tabs[-3]
+      raw_g_tab = all_tabs[-2]
+      matchup_tab = all_tabs[-1]
 
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
-      display = ((i+1) % display_period == 0) or (i == n_iterations - 1)
+      display = ((i+1) % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
 
       if cash_remaining_per_team:
          
@@ -430,26 +431,68 @@ def make_h_cand_tab(_H
 
       with raw_g_tab:
 
-        g_df = _g_scores.loc[score.index]
-        g_display = score_df.merge(g_df, left_index = True, right_index = True)
-          
-        scores_unselected_styled = static_score_styler(g_display
-                                                       , st.session_state.params['g-score-player-multiplier']
-                                                       , st.session_state.params['g-score-total-multiplier'])
+        if display:
 
-        st.dataframe(scores_unselected_styled, use_container_width = True)
+          g_df = _g_scores.loc[score.index]
+          g_display = score_df.merge(g_df, left_index = True, right_index = True)
+            
+          scores_unselected_styled = static_score_styler(g_display
+                                                        , st.session_state.params['g-score-player-multiplier']
+                                                        , st.session_state.params['g-score-total-multiplier'])
+
+          st.dataframe(scores_unselected_styled, use_container_width = True)
 
       with raw_z_tab:
 
-        z_df = _z_scores.loc[score.index]
-        z_display = score_df.merge(z_df, left_index = True, right_index = True)
-          
-        scores_unselected_styled = static_score_styler(z_display
-                                                       , st.session_state.params['z-score-player-multiplier']
-                                                       , st.session_state.params['z-score-total-multiplier'])
+        if display:
 
-        st.dataframe(scores_unselected_styled, use_container_width = True)
+          z_df = _z_scores.loc[score.index]
+          z_display = score_df.merge(z_df, left_index = True, right_index = True)
+            
+          scores_unselected_styled = static_score_styler(z_display
+                                                        , st.session_state.params['z-score-player-multiplier']
+                                                        , st.session_state.params['z-score-total-multiplier'])
+
+          st.dataframe(scores_unselected_styled, use_container_width = True)
+
+      with matchup_tab:
+
+        if display: 
+          make_cand_matchup_tab(res['CDFs'], score_df.index, list(player_assignments.keys()), draft_seat, i)
 ### Waiver tabs 
+
+@st.fragment()
+def make_cand_matchup_tab(cdfs, players, teams, draft_seat, i):
+
+
+
+    opponents = [team for team in teams if team != draft_seat]
+    tabs = st.tabs(opponents)
+
+    for opponent_index, tab in zip(range(len(opponents)), tabs):
+      with tab:
+
+        c1, c2 = st.columns([0.2, 0.8])
+
+        with c1: 
+          st.caption('''Note that the H-score displayed is for Each Category. For this view
+                     , H-score for Most Categories is not yet supported''')
+          st.caption('''Also note that these scores assume that you will dynamically adapt with remaining picks
+                      based on your algorithm parameter preferences, while your opponent will not. If you want to 
+                     see results as they stand now without any dynamic adaptations, set punting level to "no dynamic adaptation"''')
+        with c2: 
+
+          cdfs_selected = cdfs[opponent_index].loc[players]
+
+          cdfs_selected.loc[:,'H-score'] = cdfs_selected.mean(axis = 1)
+          cdfs_selected = cdfs_selected[['H-score'] + get_selected_categories()]
+
+          cdfs_styled = h_percentage_styler(cdfs_selected)
+
+          st.dataframe(cdfs_styled)
+
+
+
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_waiver_tab(_scores : pd.DataFrame
