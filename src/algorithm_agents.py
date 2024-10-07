@@ -6,7 +6,7 @@ from itertools import combinations
 from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_position_structure, get_position_indices, get_L_weights
+from src.helper_functions import get_position_structure, get_position_indices, get_L_weights, get_selected_categories
 from src.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 import datetime
 import scipy
@@ -631,6 +631,9 @@ class HAgent():
                                                      for position_code, position_info in self.position_structure['flex'].items()
                                             } if position_shares_current is not None else \
                                                 {position_code : None for position_code in self.position_structure['flex'].keys() }
+                    ,'CDFs' : [pd.DataFrame(cdf_estimates[:,:,i]
+                                            , index = result_index
+                                            , columns = get_selected_categories()) for i in range(self.n_drafters -1)]
                     
                     }
 

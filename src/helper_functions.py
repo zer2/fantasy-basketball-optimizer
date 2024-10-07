@@ -410,43 +410,6 @@ def get_selections_default(n_picks, n_drafters):
    return pd.DataFrame(
             {'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)}
             )
-
-
-def clear_draft_board():
-  if 'draft_results' in st.session_state:
-    del st.session_state.draft_results 
-
-  if 'live_draft_active' in st.session_state:
-    del st.session_state.live_draft_active
-
-  if 'selections_df' in st.session_state:
-    del st.session_state.selections_df
-
-def increment_default_key_and_clear_draft_board():
-  increment_default_key()
-  clear_draft_board()
-
-
-def autodraft(autodraft_df, g_scores):
-
-  #print("AUTODRAFTING")
-   
-  row = 0
-  drafter = 0
-
-  while not ((autodraft_df.columns[drafter] not in st.session_state.autodrafters) and \
-                (autodraft_df.iloc[row,drafter] != autodraft_df.iloc[row,drafter])):
-    top_player = g_scores.index[0]
-
-    row, drafter = move_forward_one_pick(row, drafter, autodraft_df.shape[1])
-
-    if (autodraft_df.iloc[row,drafter] != autodraft_df.iloc[row,drafter]):
-      autodraft_df.iloc[row, drafter] = top_player
-      g_scores = g_scores[1:]
-
-  st.session_state.selections_df = autodraft_df
-
-  return row, drafter
       
 def move_forward_one_pick(row, drafter, n):
     if row % 2 == 1:
