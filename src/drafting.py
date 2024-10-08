@@ -30,7 +30,7 @@ def increment_and_reset_draft():
     increment_player_stats_version()
     clear_draft_board()
 
-    if 'autodrafters' in st.session_state:
+    if ('autodrafters' in st.session_state) and ('drafter' in st.session_state):
       run_autodraft()
 
 def select_player_from_draft_board(p = None):
