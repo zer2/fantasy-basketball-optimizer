@@ -99,10 +99,10 @@ def get_draft_results(league_id
     
     return rosters_df, True
     
-    try:
-        rosters = get_fantrax_roster(league_id
-                    , player_metadata)
-        
-        return pd.DataFrame(rosters), True
-    except:
-        return None, False
+#def get_fantrax_matchups(league_id: str, _auth_path: str) -> dict[int, str]:
+#
+#    teams = get_teams_dict(league_id, _auth_path)
+#
+#    matchups = {team_name : {matchup.week : matchup.opponent for matchup in get_team_matchups(league_id, team_id)} \
+#                        for team_id, team_name in teams.items()}
+#    return matchups
