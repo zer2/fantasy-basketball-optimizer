@@ -72,7 +72,7 @@ def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[Lea
             , 'Team' : player.editorial_team_abbr
             , 'ID' : player.player_id
             } #Add team
-            for player in player_dicts
+            for player in player_dicts if player.player_id != 10401 #This is a hack, to deal with the second Jaylin Williams
                     ]
     return player_status_records
 

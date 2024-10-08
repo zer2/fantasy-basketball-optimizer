@@ -125,9 +125,7 @@ def get_yahoo_players_df(_auth_dir: str, league_id: str, player_metadata: pd.Ser
     rosters_dict = get_rosters_dict(league_id, _auth_dir, team_ids)
     players_df = _get_players_df(rosters_dict, teams_dict, player_metadata)
 
-    #when yahoo data is loaded, refresh the default selection df
-    st.session_state.selections_default = players_df
-
+    #when yahoo data is loaded, refresh selections df 
     if 'selections_df' in st.session_state:
         del st.session_state.selections_df
 
@@ -231,6 +229,7 @@ def get_player_statuses(league_id: str, _auth_path: str, player_metadata: pd.Ser
         game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
+    #ignore
     player_status_records = yahoo_helper.get_league_players(sc, player_metadata)
 
     ##Fill out below
@@ -278,7 +277,7 @@ def get_yahoo_schedule(league_id: str, _auth_path: str, player_metadata: pd.Seri
     league_players = get_player_statuses(league_id
                                             , _auth_path
                                             , player_metadata)
-
+    
     league_players = league_players.set_index('Player')
 
     week_dict = {}

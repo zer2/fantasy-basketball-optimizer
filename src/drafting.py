@@ -7,7 +7,7 @@ from src.helper_functions import move_forward_one_pick, adjust_teams_dict_for_du
 
 def clear_draft_board():
   if 'draft_results' in st.session_state:
-    del st.session_state.draft_results 
+    st.session_state.draft_results = None
 
   if 'live_draft_active' in st.session_state:
     del st.session_state.live_draft_active

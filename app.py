@@ -155,7 +155,8 @@ with param_tab:
         'Which mode do you want to use?',
         ('Draft Mode', 'Auction Mode','Season Mode')
         , index = 0
-        , key = 'mode')
+        , key = 'mode'
+        , on_change = increment_and_reset_draft())
       
       # Setting default values
       #st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
@@ -171,7 +172,7 @@ with param_tab:
         data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy'] 
 
       elif st.session_state.mode == 'Season Mode':
-        data_source_options = ['Enter your own data'] 
+        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy'] 
 
       data_source = st.selectbox(
         'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league'
@@ -203,12 +204,12 @@ with param_tab:
 
       elif data_source == 'Retrieve from Yahoo Fantasy':
 
-        st.session_state.selections_default = None
-
         auth_dir = yahoo_connect.get_yahoo_access_token()
         st.session_state.auth_dir = auth_dir
 
-        if auth_dir is not None:
+        if auth_dir is None:
+          st.stop()
+        else:
 
           user_leagues = yahoo_connect.get_user_leagues(auth_dir)
           
@@ -243,6 +244,9 @@ with param_tab:
                else:
                 st.session_state.n_drafters = 12 #Kind of a hack
 
+          st.session_state.selections_default = get_selections_default(st.session_state.n_picks
+                                                      ,st.session_state.n_drafters)
+
           if (st.session_state.mode == 'Season Mode'):
 
             if st.session_state.yahoo_league_id is not None:
@@ -252,6 +256,7 @@ with param_tab:
               team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, st.session_state.yahoo_league_id, player_metadata)
               st.session_state.n_drafters = team_players_df.shape[1]
               st.session_state.n_picks = team_players_df.shape[0]
+              st.session_state.selections_default = team_players_df
 
               #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
               
@@ -276,21 +281,26 @@ with param_tab:
               
               st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
+            else: 
+              st.session_state.n_picks = 13
+              st.session_state.n_drafters = 12
+              st.session_state.selections_default = get_selections_default(st.session_state.n_picks
+                                                                          ,st.session_state.n_drafters)
           else:
 
             if st.session_state.yahoo_league_id is not None:
 
-              st.session_state.selections_default = None
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
               st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_picks = 13 #ZR: fix this
-
+              st.session_state.selections_default = get_selections_default(st.session_state.n_picks
+                                                                          ,st.session_state.n_drafters)
             else: 
               st.session_state.n_picks = 13
               st.session_state.n_drafters = 12
-
-        st.session_state.selections_default = get_selections_default(st.session_state.n_picks
-                                                                     ,st.session_state.n_drafters)
+              st.session_state.selections_default = get_selections_default(st.session_state.n_picks
+                                                                          ,st.session_state.n_drafters)
+              
         
       elif data_source == 'Retrieve from Fantrax':          
 
@@ -334,23 +344,21 @@ with param_tab:
               #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
               
               #Just trying for now!
-              player_statuses = fantrax_connect.get_player_statuses(player_metadata)
-
-              st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
-                                                                      (player_statuses['Status'] == 'INJ')
-                                                                      ]
-                                                                      )
-                                                              )
-                                                        )
-
-              #st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(st.session_state.yahoo_league_id
-              #                                                            , auth_dir
-              #                                                            , player_metadata)
+              #player_statuses = fantrax_connect.get_player_statuses(player_metadata)
               #
-              #st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(st.session_state.yahoo_league_id
-              #                        , auth_dir)
+              #st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
+              #                                                        (player_statuses['Status'] == 'INJ')
+              #                                                        ]
+              #                                                        )
+              #                                                )
+              #                                          )
+
+              st.session_state['schedule'] = fantrax_connect.get_fantrax_schedule(fantrax_league
+                                                                          , player_metadata)
               
-              st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
+              st.session_state['matchups'] = fantrax_connect.get_fantrax_matchups(fantrax_league)
+              
+              st.write('Player info successfully retrieved from fantrax! :partying_face:')
 
 
       #set default position numbers, based on n_picks

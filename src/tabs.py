@@ -525,7 +525,7 @@ def make_waiver_tab(_scores : pd.DataFrame
       None
   """
 
-  scores_unselected = _scores[~_scores.index.isin(selection_list)]
+  scores_unselected = _scores[~_scores.index.isin(selection_list + ['RP'])]
 
   no_drop = team_stats.loc[['Total'],:]
   no_drop.index = [drop_player]
@@ -638,7 +638,7 @@ def make_matchup_tab(player_stats
                   , conversion_factors
                   , psi
                   , scoring_format):
-  ### BELOW HERE SHOULD BE IN A CACHED TAB
+  
   potential_games = st.session_state['schedule'][matchup_week].reindex(player_stats.index).fillna(3)
   week_number = int(matchup_week.split(':')[0].split(' ')[1])
 
