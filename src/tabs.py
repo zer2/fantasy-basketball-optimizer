@@ -13,7 +13,8 @@ import os
 import itertools
 from pathlib import Path
 import gc
-  
+from src.algorithm_helpers import combinatorial_calculation
+
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_about_tab(md_path : str):
     """Make one of the tabs on the about page
@@ -457,14 +458,12 @@ def make_h_cand_tab(_H
 
       with matchup_tab:
 
-        if display: 
+        if i >= n_iterations-1: 
           make_cand_matchup_tab(res['CDFs'], score_df.index, list(player_assignments.keys()), draft_seat, i)
 ### Waiver tabs 
 
 @st.fragment()
 def make_cand_matchup_tab(cdfs, players, teams, draft_seat, i):
-
-
 
     opponents = [team for team in teams if team != draft_seat]
     tabs = st.tabs(opponents)
@@ -475,8 +474,8 @@ def make_cand_matchup_tab(cdfs, players, teams, draft_seat, i):
         c1, c2 = st.columns([0.2, 0.8])
 
         with c1: 
-          st.caption('''Note that the H-score displayed is for Each Category. For this view
-                     , H-score for Most Categories is not yet supported''')
+          st.caption('''If scoring type is Most Categories, overall score is probability of winning a matchup. Otherwise, 
+                     it is the average percent of expected points won''')
           st.caption('''Also note that these scores assume that you will dynamically adapt with remaining picks
                       based on your algorithm parameter preferences, while your opponent will not. If you want to 
                      see results as they stand now without any dynamic adaptations, set punting level to "no dynamic adaptation"''')
@@ -484,8 +483,19 @@ def make_cand_matchup_tab(cdfs, players, teams, draft_seat, i):
 
           cdfs_selected = cdfs[opponent_index].loc[players]
 
-          cdfs_selected.loc[:,'H-score'] = cdfs_selected.mean(axis = 1)
-          cdfs_selected = cdfs_selected[['H-score'] + get_selected_categories()]
+          if st.session_state.scoring_format == 'Head to Head: Most Categories':
+
+            #We've already calculated this but it is not retained by the algorithm agent
+            cdfs_expanded = np.expand_dims(cdfs_selected, axis = 2)
+            cdfs_selected.loc[:,'Overall'] = combinatorial_calculation(cdfs_expanded
+                                                                       , 1 - cdfs_expanded)
+
+          else:
+
+            cdfs_selected.loc[:,'Overall'] = cdfs_selected.mean(axis = 1)
+
+
+          cdfs_selected = cdfs_selected[['Overall'] + get_selected_categories()]
 
           cdfs_styled = h_percentage_styler(cdfs_selected)
 
