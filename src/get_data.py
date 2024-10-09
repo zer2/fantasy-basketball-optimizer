@@ -249,7 +249,6 @@ def get_specified_stats(dataset_name : str
   #overwriting the version in the cache
   if st.session_state.league in ('NBA','WNBA'):
 
-    historical_df = get_historical_data()
     #current_data, expected_minutes = get_current_season_data()
     #darko_data = get_darko_data(expected_minutes)
 
@@ -257,6 +256,7 @@ def get_specified_stats(dataset_name : str
     #    df = current_data[dataset_name].copy()
     #elif 'DARKO' in dataset_name:
     #    df = darko_data[dataset_name].copy()
+
     if 'Hashtag' in dataset_name:
         df = get_htb_projections()
     elif 'RotoWire' in dataset_name:
@@ -265,6 +265,7 @@ def get_specified_stats(dataset_name : str
             df = process_basketball_rotowire_data(raw_df)
         else:
             st.error('Error! No rotowire data found: this should not happen')
+            st.stop()
     elif 'Basketball Monster' in dataset_name:
        if 'bbm_data' in st.session_state:
             raw_df = st.session_state.bbm_data
@@ -274,6 +275,7 @@ def get_specified_stats(dataset_name : str
             st.error('Error! No Basketball Monster data found: this should not happen')
 
     else:
+        historical_df = get_historical_data()
         df = historical_df.loc[dataset_name].copy()  
     #adjust for the display
     df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
@@ -312,7 +314,7 @@ def combine_nba_projections(hashtag_upload
     slider_sum = hashtag_slider + rotowire_slider + bbm_slider
 
     hashtag_stats = None if hashtag_upload is None else get_htb_projections()
-    rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload)
+    rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload)
 
     hashtag_weight = [hashtag_slider] if hashtag_upload is not None else []
@@ -321,14 +323,16 @@ def combine_nba_projections(hashtag_upload
 
     weights = hashtag_weight + rotowire_weight + bbm_weight
 
-    all_players = set([] if hashtag_stats is None else [p for p in hashtag_stats.index] + \
-                  [] if rotowire_stats is None else [p for p in rotowire_stats.index] + \
-                  [] if bbm_stats is None else [p for p in bbm_stats.index])
-    
+    all_players = set(
+                  ([] if hashtag_stats is None else [p for p in hashtag_stats.index]) + \
+                  ([] if rotowire_stats is None else [p for p in rotowire_stats.index]) + \
+                  ([] if bbm_stats is None else [p for p in bbm_stats.index])
+                  )
+        
     df =  pd.concat({'HTB' : hashtag_stats 
                         ,'RotoWire' : rotowire_stats
                         ,'BBM' : bbm_stats}, names = ['Source'])
-    
+        
     new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM'], all_players], names = ['Source','Player'])
     df = df.reindex(new_index)
     
@@ -337,8 +341,8 @@ def combine_nba_projections(hashtag_upload
     df = df.groupby('Player') \
                 .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
                     if np.issubdtype(x.dtype, np.number) \
-                    else x[0])
-        
+                    else x.dropna()[0])
+            
     #Need to include this because not every source projects double doubles, which gets messy
     df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
 
@@ -516,8 +520,6 @@ def process_basketball_monster_data(raw_df):
 def get_nba_schedule():
     nba_schedule = requests.get(st.session_state.params['schedule-url']).json()
     game_dates = nba_schedule['leagueSchedule']['gameDates']
-
-    st.write(game_dates)
 
     def get_all_teams_playing(game_date):
          return [game['homeTeam']['teamTricode'] for game in game_date['games']] + \

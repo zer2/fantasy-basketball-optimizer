@@ -1284,7 +1284,7 @@ def make_rank_tab(scores : pd.DataFrame
   Returns:
       None
   """
-  scores_copy = scores.copy()
+  scores_copy = scores.copy().drop('RP')
 
   scores_copy.loc[:,'Rank'] = np.arange(scores_copy.shape[0]) + 1
   scores_copy.loc[:,'Player'] = scores_copy.index

@@ -328,6 +328,16 @@ NBA:
   n_games : 82
   n_games_per_week : 3
 WNBA:
+  default-categories:
+    - Field Goal %
+    - Free Throw %
+    - Threes
+    - Points
+    - Rebounds
+    - Assists
+    - Steals 
+    - Blocks
+    - Turnovers
   counting-statistics:
     - Threes
     - Points
