@@ -69,7 +69,6 @@ def get_fixed_player_name(player_name, player_metadata):
 
         return player_name + ' (' + player_metadata[player_name] + ')'
     else:
-        print(player_name)
         return 'RP'
     
 def get_team_info(api, team_id):

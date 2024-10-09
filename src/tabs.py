@@ -72,16 +72,12 @@ def make_team_tab(_scores : pd.DataFrame
                                                 )     
 
 @st.cache_data(show_spinner = False, ttl = 3600)
-def make_team_h_tab(my_players : list[str]
-                  , n_picks : int
-                  , base_h_score : float
+def make_team_h_tab( base_h_score : float
                   , base_win_rates: pd.Series 
                   ) -> pd.DataFrame:
   """Display the H-score for your team
 
   Args:
-      my_players: list of players on 'your' team
-      n_picks: number of players per drafter
       base_h_score: The H-score of your full team
       base_win_rates: expected win rates for each category
 
@@ -146,11 +142,9 @@ def make_full_team_tab(z_scores : pd.DataFrame
                         , st.session_state.params['g-score-team-multiplier']
                         , info_key)    
     with h_team_tab:
-      if len(my_players) == n_picks:
+      if len(my_players) >= n_picks:
 
-        make_team_h_tab(my_players
-                      ,n_picks
-                      ,base_h_score
+        make_team_h_tab(base_h_score
                       ,base_win_rates)
       else:
         st.markdown('Team H-score not defined until team is full') 
