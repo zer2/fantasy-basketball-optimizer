@@ -524,8 +524,23 @@ with param_tab:
                     
     else:
           all_datasets = ['RotoWire (req. upload)'] 
-          raw_stats_df = get_specified_stats('RotoWire (req. upload)')
+          
+          rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
+                                          , type=['csv'])
+          if rotowire_file is not None:
+            rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
+          else:
+            rotowire_upload = None
+            st.error('Upload RotoWire projection file')
+            st.stop()
 
+          raw_stats_df = combine_nba_projections(None
+                            , rotowire_upload
+                            , None
+                            , 0
+                            , 1
+                            , 0)
+                    
   with advanced_params:
 
       player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
