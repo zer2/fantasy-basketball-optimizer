@@ -142,7 +142,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
                         , st.session_state.params['g-score-team-multiplier']
                         , info_key)    
     with h_team_tab:
-      if len(my_players) >= n_picks:
+      if base_h_score is not None:
 
         make_team_h_tab(base_h_score
                       ,base_win_rates)
