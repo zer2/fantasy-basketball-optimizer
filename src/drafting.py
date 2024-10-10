@@ -414,18 +414,34 @@ def make_auction_tab_own_data(H):
 
         with team_tab:
 
-          base_h_score = None
-          base_win_rates = None
+            if len(my_players) >= st.session_state.n_starters:
+                base_h_res = get_base_h_score(st.session_state.info
+                                                ,st.session_state.omega
+                                                ,st.session_state.gamma
+                                                ,st.session_state.n_starters
+                                                ,st.session_state.n_drafters
+                                                ,st.session_state.scoring_format
+                                                ,st.session_state.chi
+                                                ,player_assignments
+                                                ,auction_seat
+                                                ,st.session_state.info_key)
 
-          make_full_team_tab(st.session_state.z_scores
-                            ,st.session_state.g_scores
-                            ,my_players
-                            ,st.session_state.n_drafters
-                            ,st.session_state.n_picks
-                            ,base_h_score
-                            ,base_win_rates
-                            ,st.session_state.info_key
-                            )
+                base_h_score = base_h_res['Scores']
+                base_win_rates = base_h_res['Rates']
+
+            else:
+                base_h_score = None
+                base_win_rates = None
+
+            make_full_team_tab(st.session_state.z_scores
+                                ,st.session_state.g_scores
+                                ,my_players
+                                ,st.session_state.n_drafters
+                                ,st.session_state.n_picks
+                                ,base_h_score
+                                ,base_win_rates
+                                ,st.session_state.info_key
+                                )
 @st.fragment
 def make_auction_tab_live_data(H):
 
@@ -501,8 +517,25 @@ def make_auction_tab_live_data(H):
 
             with team_tab:
 
-                base_h_score = None
-                base_win_rates = None
+                if len(my_players) >= st.session_state.n_starters:
+                    base_h_res = get_base_h_score(st.session_state.info
+                                                    ,st.session_state.omega
+                                                    ,st.session_state.gamma
+                                                    ,st.session_state.n_starters
+                                                    ,st.session_state.n_drafters
+                                                    ,st.session_state.scoring_format
+                                                    ,st.session_state.chi
+                                                    ,player_assignments
+                                                    ,auction_seat
+                                                    ,st.session_state.info_key)
+
+                    base_h_score = base_h_res['Scores']
+                    base_win_rates = base_h_res['Rates']
+
+                else:
+                    base_h_score = None
+                    base_win_rates = None
+
 
                 make_full_team_tab(st.session_state.z_scores
                                     ,st.session_state.g_scores
