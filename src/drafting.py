@@ -463,9 +463,9 @@ def make_auction_tab_live_data(H):
             cash_per_team = 200
             
             selection_list = st.session_state.draft_results['Player'].dropna()
-            player_assignments = st.session_state.draft_results.dropna()[0:st.session_state.n_starters]  \
+            player_assignments = st.session_state.draft_results.dropna()  \
                                 .groupby('Team', observed = False)['Player'].apply(list)
-
+            
             cash_spent_per_team = st.session_state.draft_results.dropna().groupby('Team', observed = False)['Cost'].sum()
             cash_remaining_per_team = cash_per_team - cash_spent_per_team
 

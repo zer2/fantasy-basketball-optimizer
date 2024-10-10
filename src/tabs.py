@@ -197,6 +197,8 @@ def make_h_cand_tab(_H
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
                     ,total_players : int = None):
+  
+
   """Make a tab showing H-scores for the current draft situation
 
   Args:
