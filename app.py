@@ -194,7 +194,7 @@ with param_tab:
         
         st.write('Enter team names here:')
         
-        team_df = st.data_editor(pd.DataFrame({'Team ' + str(i) : ['Drafter ' + str(i)] for i in range(n_picks)})
+        team_df = st.data_editor(pd.DataFrame({'Team ' + str(i) : ['Drafter ' + str(i)] for i in range(n_drafters)})
                        , hide_index = True
                        , on_change = increment_and_reset_draft)
         
@@ -650,6 +650,7 @@ with param_tab:
             st.stop()
 
           st.session_state.n_starters = st.session_state.n_picks - st.session_state.n_bench
+
 
 
       with algorithm_param_column:
