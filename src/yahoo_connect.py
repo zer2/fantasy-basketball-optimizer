@@ -377,7 +377,7 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
         draft_results = sc.get_league_draft_results()
     except Exception as e:
         return None, False
-    
+
     if len(draft_results) > 0:
         if not hasattr(draft_results[0], 'cost'):
             st.error('This is a draft, not an auction! Change the game mode')

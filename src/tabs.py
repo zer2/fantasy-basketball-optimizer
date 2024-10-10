@@ -197,6 +197,8 @@ def make_h_cand_tab(_H
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
                     ,total_players : int = None):
+  
+
   """Make a tab showing H-scores for the current draft situation
 
   Args:
@@ -211,6 +213,8 @@ def make_h_cand_tab(_H
       DataFrame of stats of unselected players, to use in other tabs
   """
   _H = _H.clear_initial_weights()
+
+  st.write(player_assignments)
           
   generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
 
