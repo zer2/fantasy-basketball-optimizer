@@ -468,7 +468,6 @@ class HAgent():
 
         while True:
 
-                            
             category_weights_current = category_weights
             position_shares_current = position_shares
 

@@ -67,7 +67,6 @@ if 'yahoo_league_id' not in st.session_state:
 
 if 'draft_results' not in st.session_state:
     st.session_state.draft_results = None
-    st.session_state.live_draft_active = False
 
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
@@ -956,7 +955,7 @@ with rank_tab:
 H = HAgent(info = info
     , omega = omega
     , gamma = gamma
-    , n_picks = st.session_state.n_picks
+    , n_picks = st.session_state.n_starters
     , n_drafters = st.session_state.n_drafters
     , dynamic = n_iterations > 0
     , scoring_format = scoring_format
