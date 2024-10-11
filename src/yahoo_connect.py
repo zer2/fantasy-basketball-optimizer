@@ -140,7 +140,12 @@ def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
         game_code="nba"
     )
     LOGGER.info(f"sc: {sc}")
-    teams = yahoo_helper.get_teams(sc)
+    try:
+        teams = yahoo_helper.get_teams(sc)
+    except: 
+        #If yahoo isn't returning anything, just keep the same dict
+        return st.cache_data.get_cached_result(get_teams_dict, league_id, _auth_path)
+
     teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
 
     teams_dict = adjust_teams_dict_for_duplicate_names(teams_dict)
@@ -310,7 +315,10 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
     try:
         draft_results = sc.get_league_draft_results()
     except Exception as e:
-        return None, False
+        if st.session_state.live_draft_active:
+            return st.session_state.draft_results, True
+        else:
+            return None, False
             
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
@@ -334,10 +342,12 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
         try:
             if hasattr(draft_results[0], 'cost'):
                 if draft_results[0].cost is not None:
-                    st.error('This is an auction, not a draft! Change the game mode')
-                    st.stop()
-        except: st.stop()
-
+                    error_string = 'This is an auction, not a draft! Change the game mode'
+                    return None, error_string
+        except:     
+            error_string = 'Something has gone wrong- refresh analysis in a few moments'
+            return None, error_string
+        
     draft_result_raw_df = pd.DataFrame([(draft_obj.player_key, draft_obj.team_key) for draft_obj in draft_results \
                                         if len(draft_obj.player_key) > 0]
                                        , columns = ['Player','Team'] )
@@ -361,7 +371,7 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
         df.loc[row, v['Team']] = v['PlayerMod']
         row, drafter = move_forward_one_pick(row, drafter, n_drafters)
 
-    return df, True
+    return df, 'Success'
 
 def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     sc = YahooFantasySportsQuery(
@@ -376,11 +386,19 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     try:
         draft_results = sc.get_league_draft_results()
     except Exception as e:
-        return None, False
+        if st.session_state.live_draft_active:
+            return st.session_state.draft_results, True
+        else:
+            return None, False
 
     if len(draft_results) > 0:
-        if not hasattr(draft_results[0], 'cost'):
-            st.error('This is a draft, not an auction! Change the game mode')
+        try:
+            if not hasattr(draft_results[0], 'cost'):
+                error_string = 'This is a draft, not an auction! Change the game mode'
+                return None, error_string
+        except: 
+            error_string = 'Something has gone wrong- refresh analysis in a few moments'
+            return None, error_string
 
     teams_dict = get_teams_dict(league_id, _auth_path)
 
@@ -406,6 +424,6 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
     
     df = pd.concat([parse_draft_obj(draft_obj) for draft_obj in draft_results], axis = 1).T
 
-    return df, True
+    return df, 'Success'
 
             

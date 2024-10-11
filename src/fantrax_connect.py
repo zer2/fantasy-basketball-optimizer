@@ -96,7 +96,7 @@ def get_draft_results(league_id
     
     rosters_df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rosters.items() ]))
     
-    return rosters_df, True
+    return rosters_df, 'Success'
     
 #def get_fantrax_matchups(league_id: str, _auth_path: str) -> dict[int, str]:
 #

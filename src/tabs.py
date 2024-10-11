@@ -304,7 +304,7 @@ def make_h_cand_tab(_H
             
             comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
-            comparison_df = comparison_df.sort_values('Difference', ascending = False)
+            comparison_df = comparison_df.sort_values('Your $ Value', ascending = False)
             score_df = score_df.loc[comparison_df.index]
 
             comparison_df = comparison_df.join(rate_df)

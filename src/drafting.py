@@ -20,7 +20,7 @@ def clear_draft_board():
     st.session_state.draft_results = None
 
   if 'live_draft_active' in st.session_state:
-    del st.session_state.live_draft_active
+    st.session_state.live_draft_active = False
 
   if 'selections_df' in st.session_state:
     del st.session_state.selections_df
@@ -179,13 +179,13 @@ def refresh_analysis():
 
         if st.session_state.mode == 'Draft Mode':
 
-            draft_result = yahoo_connect.get_draft_results(yahoo_league_id
+            draft_results, error_string = yahoo_connect.get_draft_results(yahoo_league_id
                                                         , auth_dir
                                                         , player_metadata)
                     
         else:
 
-            draft_result = yahoo_connect.get_auction_results(yahoo_league_id
+            draft_results, error_string  = yahoo_connect.get_auction_results(yahoo_league_id
                                                                         , auth_dir
                                                                         , player_metadata)
             
@@ -193,15 +193,22 @@ def refresh_analysis():
 
         if st.session_state.mode == 'Draft Mode':
 
-            draft_result = fantrax_connect.get_draft_results(st.session_state.fantrax_league
+            draft_results, error_string = fantrax_connect.get_draft_results(st.session_state.fantrax_league
                                                         , player_metadata)
                                 
         else:
 
-            draft_result = fantrax_connect.get_auction_results(st.session_state.fantrax_league
+            draft_results, error_string = fantrax_connect.get_auction_results(st.session_state.fantrax_league
                                                                         , player_metadata)
                         
-    st.session_state.draft_results, st.session_state.live_draft_active = draft_result
+    st.session_state.draft_results = draft_results
+
+    if error_string == 'Success':
+        st.session_state.live_draft_active = True
+    else:
+        if st.session_state.live_draft_active:
+            st.error(error_string)
+            st.stop()
    
 @st.fragment
 def make_drafting_tab_live_data(H):
@@ -210,79 +217,79 @@ def make_drafting_tab_live_data(H):
 
     if 'team_names' not in st.session_state:
         st.write('No league info has been passed')
-        st.stop()
-
-    if st.session_state.draft_results is None:
-        refresh_analysis()
-
-    c1, c2 = st.columns([0.1,0.9])
-
-    with c1:
-        st.button('Refresh Analysis', on_click = refresh_analysis)
-
-    with c2:
-        draft_seat = st.selectbox(f'Which drafter are you?'
-        , st.session_state.team_names
-        , key = 'draft_seat'
-        , on_change = refresh_analysis)
-
-    if not st.session_state.live_draft_active:
-
-        st.write('Draft has not yet begun')
-
     else:
-        
-        player_assignments = st.session_state.draft_results[0:st.session_state.n_starters].to_dict('list')
 
-        my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
-        
-        cand_tab, team_tab = st.tabs(["Candidates","Team"])
+        if st.session_state.draft_results is None:
+            refresh_analysis()
 
-        with team_tab:
+        c1, c2 = st.columns([0.1,0.9])
 
-            if len(my_players) >= st.session_state.n_starters:
-                base_h_res = get_base_h_score(st.session_state.info
-                                                ,st.session_state.omega
-                                                ,st.session_state.gamma
-                                                ,st.session_state.n_starters
-                                                ,st.session_state.n_drafters
-                                                ,st.session_state.scoring_format
-                                                ,st.session_state.chi
-                                                ,player_assignments
-                                                ,draft_seat
-                                                ,st.session_state.info_key)
+        with c1:
+            st.button('Refresh Analysis', on_click = refresh_analysis)
 
-                base_h_score = base_h_res['Scores']
-                base_win_rates = base_h_res['Rates']
+        with c2:
+            draft_seat = st.selectbox(f'Which drafter are you?'
+            , st.session_state.team_names
+            , key = 'draft_seat'
+            , on_change = refresh_analysis)
 
-            else:
-                base_h_score = None
-                base_win_rates = None
+        if not st.session_state.live_draft_active:
 
-            make_full_team_tab(st.session_state.z_scores
-                            ,st.session_state.g_scores
-                            ,my_players
-                            ,st.session_state.n_drafters
-                            ,st.session_state.n_starters
-                            ,base_h_score
-                            ,base_win_rates
-                            ,st.session_state.info_key
-                            )        
+            st.write('Draft has not yet begun')
 
-        with cand_tab:
+        else:
+            
+            player_assignments = st.session_state.draft_results[0:st.session_state.n_starters].to_dict('list')
 
-            if len(my_players) < st.session_state.n_starters:
+            my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
+            
+            cand_tab, team_tab = st.tabs(["Candidates","Team"])
 
-                make_h_cand_tab(H
-                    ,st.session_state.g_scores
-                    ,st.session_state.z_scores
-                    ,player_assignments
-                    ,draft_seat
-                    ,st.session_state.n_iterations
-                    ,st.session_state.v
-                    ,5)
-            else:
-                st.write('You have selected all of your players')
+            with team_tab:
+
+                if len(my_players) >= st.session_state.n_starters:
+                    base_h_res = get_base_h_score(st.session_state.info
+                                                    ,st.session_state.omega
+                                                    ,st.session_state.gamma
+                                                    ,st.session_state.n_starters
+                                                    ,st.session_state.n_drafters
+                                                    ,st.session_state.scoring_format
+                                                    ,st.session_state.chi
+                                                    ,player_assignments
+                                                    ,draft_seat
+                                                    ,st.session_state.info_key)
+
+                    base_h_score = base_h_res['Scores']
+                    base_win_rates = base_h_res['Rates']
+
+                else:
+                    base_h_score = None
+                    base_win_rates = None
+
+                make_full_team_tab(st.session_state.z_scores
+                                ,st.session_state.g_scores
+                                ,my_players
+                                ,st.session_state.n_drafters
+                                ,st.session_state.n_starters
+                                ,base_h_score
+                                ,base_win_rates
+                                ,st.session_state.info_key
+                                )        
+
+            with cand_tab:
+
+                if len(my_players) < st.session_state.n_starters:
+
+                    make_h_cand_tab(H
+                        ,st.session_state.g_scores
+                        ,st.session_state.z_scores
+                        ,player_assignments
+                        ,draft_seat
+                        ,st.session_state.n_iterations
+                        ,st.session_state.v
+                        ,5)
+                else:
+                    st.write('You have selected all of your players')
 
 @st.fragment 
 def make_auction_tab_own_data(H):
@@ -422,7 +429,7 @@ def make_auction_tab_own_data(H):
                                                 ,st.session_state.n_drafters
                                                 ,st.session_state.scoring_format
                                                 ,st.session_state.chi
-                                                ,player_assignments
+                                                ,player_assignments.to_dict()
                                                 ,auction_seat
                                                 ,st.session_state.info_key)
 
@@ -451,113 +458,118 @@ def make_auction_tab_live_data(H):
 
         if 'team_names' not in st.session_state:
             st.write('No league info has been passed')
-            st.stop()
-
-        if st.session_state.draft_results is None:
-            refresh_analysis()
-
-        c1, c2 = st.columns([0.1,0.9])
-
-        with c1:
-            st.button('Refresh Analysis'
-                        , on_click = refresh_analysis)
-            
-        with c2:
-            auction_seat = st.selectbox(f'Which drafter are you?'
-            , st.session_state.team_names
-            , key = 'auction_seat'
-            , on_change = refresh_analysis)
-        
-        if not st.session_state.live_draft_active:
-
-            st.write('Auction has not begun, or just began. There is sometimes a lag of ~1 minute before data can be fetched')
-
         else:
 
-            cand_tab, team_tab = st.tabs(["Candidates","Team"])
+            if st.session_state.draft_results is None:
+                refresh_analysis()
 
-            cash_per_team = 200
-            
-            selection_list = st.session_state.draft_results['Player'].dropna()
-            player_assignments = st.session_state.draft_results.dropna()  \
-                                .groupby('Team', observed = False)['Player'].apply(list)
-            
-            cash_spent_per_team = st.session_state.draft_results.dropna().groupby('Team', observed = False)['Cost'].sum()
-            cash_remaining_per_team = cash_per_team - cash_spent_per_team
+            c1, c2 = st.columns([0.1,0.9])
 
-            total_cash = cash_per_team * st.session_state.n_drafters
-
-            amount_spent = st.session_state.draft_results['Cost'].dropna().sum()
-
-            remaining_cash = total_cash - amount_spent
-
-            for team in st.session_state.team_names:
-                if not team in cash_remaining_per_team.index:
-                    cash_remaining_per_team.loc[team] = cash_per_team
-
-                if not team in player_assignments.index:
-                    player_assignments.loc[team] = []
-
-            my_players = player_assignments[auction_seat]
-            n_my_players = len(my_players)
-
-            my_remaining_cash = cash_remaining_per_team[auction_seat]
-
-            h_ranks_unselected = st.session_state.h_ranks[~st.session_state.h_ranks['Player'].isin(selection_list)]
-
-            h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
-                                                            , st.session_state.n_starters * st.session_state.n_drafters - len(selection_list)
-                                                            , remaining_cash
-                                                            , st.session_state['streaming_noise_h'])
-                                
-            h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
-
-            #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
-            h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
-
-            with team_tab:
-
-                if len(my_players) >= st.session_state.n_starters:
-                    base_h_res = get_base_h_score(st.session_state.info
-                                                    ,st.session_state.omega
-                                                    ,st.session_state.gamma
-                                                    ,st.session_state.n_starters
-                                                    ,st.session_state.n_drafters
-                                                    ,st.session_state.scoring_format
-                                                    ,st.session_state.chi
-                                                    ,player_assignments
-                                                    ,auction_seat
-                                                    ,st.session_state.info_key)
-
-                    base_h_score = base_h_res['Scores']
-                    base_win_rates = base_h_res['Rates']
-
-                else:
-                    base_h_score = None
-                    base_win_rates = None
-
-
-                make_full_team_tab(st.session_state.z_scores
-                                    ,st.session_state.g_scores
-                                    ,my_players
-                                    ,st.session_state.n_drafters
-                                    ,st.session_state.n_starters
-                                    ,base_h_score
-                                    ,base_win_rates
-                                    ,st.session_state.info_key
-                                    )
-
+            with c1:
+                st.button('Refresh Analysis'
+                            , on_click = refresh_analysis)
                 
-            with cand_tab:
+            with c2:
+                auction_seat = st.selectbox(f'Which drafter are you?'
+                , st.session_state.team_names
+                , key = 'auction_seat'
+                , on_change = refresh_analysis)
+            
+            if not st.session_state.live_draft_active:
 
-                make_h_cand_tab(H
-                    ,st.session_state.g_scores
-                    ,st.session_state.z_scores
-                    ,player_assignments.to_dict()
-                    ,auction_seat
-                    ,st.session_state.n_iterations
-                    ,st.session_state.v
-                    ,5 #display frequency
-                    ,cash_remaining_per_team.to_dict()
-                    ,h_defaults_savor
-                    ,st.session_state.n_drafters * st.session_state.n_starters)
+                st.write('Auction has not begun, or just began. There is sometimes a lag of ~1 minute before data can be fetched')
+
+            else:
+
+                cand_tab, team_tab = st.tabs(["Candidates","Team"])
+
+                cash_per_team = 200
+                
+                selection_list = st.session_state.draft_results['Player'].dropna()
+                player_assignments = st.session_state.draft_results.dropna()  \
+                                    .groupby('Team', observed = False)['Player'].apply(list)
+                
+                cash_spent_per_team = st.session_state.draft_results.dropna().groupby('Team', observed = False)['Cost'].sum()
+                cash_remaining_per_team = cash_per_team - cash_spent_per_team
+
+                total_cash = cash_per_team * st.session_state.n_drafters
+
+                amount_spent = st.session_state.draft_results['Cost'].dropna().sum()
+
+                remaining_cash = total_cash - amount_spent
+
+                for team in st.session_state.team_names:
+                    if not team in cash_remaining_per_team.index:
+                        cash_remaining_per_team.loc[team] = cash_per_team
+
+                    if not team in player_assignments.index:
+                        player_assignments.loc[team] = []
+
+                my_players = player_assignments[auction_seat]
+                n_my_players = len(my_players)
+
+                my_remaining_cash = cash_remaining_per_team[auction_seat]
+
+                h_ranks_unselected = st.session_state.h_ranks[~st.session_state.h_ranks['Player'].isin(selection_list)]
+
+                h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+                                                                , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
+                                                                , remaining_cash
+                                                                , st.session_state['streaming_noise_h'])
+                                    
+                h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
+
+                #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
+                h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
+
+                with team_tab:
+
+                    if len(my_players) >= st.session_state.n_picks:
+
+                        base_h_res = get_base_h_score(st.session_state.info
+                                                        ,st.session_state.omega
+                                                        ,st.session_state.gamma
+                                                        ,st.session_state.n_picks
+                                                        ,st.session_state.n_drafters
+                                                        ,st.session_state.scoring_format
+                                                        ,st.session_state.chi
+                                                        ,player_assignments.to_dict()
+                                                        ,auction_seat
+                                                        ,st.session_state.info_key)
+
+                        base_h_score = base_h_res['Scores']
+                        base_win_rates = base_h_res['Rates']
+
+                    else:
+                        base_h_score = None
+                        base_win_rates = None
+
+
+                    make_full_team_tab(st.session_state.z_scores
+                                        ,st.session_state.g_scores
+                                        ,my_players
+                                        ,st.session_state.n_drafters
+                                        ,st.session_state.n_picks
+                                        ,base_h_score
+                                        ,base_win_rates
+                                        ,st.session_state.info_key
+                                        )
+                    
+                with cand_tab:
+
+                    if len(my_players) < st.session_state.n_picks:
+
+                        make_h_cand_tab(H
+                            ,st.session_state.g_scores
+                            ,st.session_state.z_scores
+                            ,player_assignments.to_dict()
+                            ,auction_seat
+                            ,st.session_state.n_iterations
+                            ,st.session_state.v
+                            ,5 #display frequency
+                            ,cash_remaining_per_team.to_dict()
+                            ,h_defaults_savor
+                            ,st.session_state.n_drafters * st.session_state.n_picks)
+                        
+                    else:
+                        st.write('Your team is full')
