@@ -231,7 +231,6 @@ with param_tab:
               st.session_state.yahoo_league_id = yahoo_league.league_id
 
               #ZR: Ideally we could fix this for mock drafts with dummies
-              st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
               st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
 
           else:
