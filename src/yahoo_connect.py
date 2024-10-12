@@ -144,11 +144,13 @@ def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
         teams = yahoo_helper.get_teams(sc)
     except: 
         #If yahoo isn't returning anything, just keep the same dict
-        return st.cache_data.get_cached_result(get_teams_dict, league_id, _auth_path)
+        return st.teams_dict
 
     teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
 
     teams_dict = adjust_teams_dict_for_duplicate_names(teams_dict)
+
+    st.session_state.teams_dict = teams_dict
 
     return teams_dict
 
@@ -316,9 +318,9 @@ def get_draft_results(league_id: str,_auth_path: str, player_metadata):
         draft_results = sc.get_league_draft_results()
     except Exception as e:
         if st.session_state.live_draft_active:
-            return st.session_state.draft_results, True
+            return st.session_state.draft_results, 'Success'
         else:
-            return None, False
+            return None, 'Draft has not started yet'
             
     max_round = max([item.round for item in draft_results])
     n_picks = len(draft_results)
@@ -387,9 +389,9 @@ def get_auction_results(league_id: str,_auth_path: str, player_metadata):
         draft_results = sc.get_league_draft_results()
     except Exception as e:
         if st.session_state.live_draft_active:
-            return st.session_state.draft_results, True
+            return st.session_state.draft_results, 'Success'
         else:
-            return None, False
+            return None, 'Auction has not started'
 
     if len(draft_results) > 0:
         try:
