@@ -167,7 +167,7 @@ with param_tab:
         data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy'] 
 
       elif st.session_state.mode == 'Season Mode':
-        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy'] 
+        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax'] 
 
       data_source = st.selectbox(
         'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league'
@@ -336,31 +336,31 @@ with param_tab:
                 st.session_state.n_picks = 13
 
           if (st.session_state.mode == 'Season Mode'):
-              player_metadata = get_player_metadata()
+              if fantrax_league is not None:
 
-              team_players_df = fantrax_connect.get_fantrax_roster(fantrax_league
-                                                                   , player_metadata)
-              st.session_state.n_drafters = team_players_df.shape[1]
-              st.session_state.n_picks = team_players_df.shape[0]
+                #this is all messed up lol
 
-              #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
-              
-              #Just trying for now!
-              #player_statuses = fantrax_connect.get_player_statuses(player_metadata)
-              #
-              #st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
-              #                                                        (player_statuses['Status'] == 'INJ')
-              #                                                        ]
-              #                                                        )
-              #                                                )
-              #                                          )
+                st.session_state.player_metadata = st.session_state.player_stats['Position']
+                player_metadata = st.session_state.player_metadata.copy()
+                player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
-              st.session_state['schedule'] = fantrax_connect.get_fantrax_schedule(fantrax_league
-                                                                          , player_metadata)
+                fantrax_roster = fantrax_connect.get_fantrax_roster(fantrax_league, player_metadata)
+                team_players_df = pd.DataFrame({k : pd.Series(v) for k,v in fantrax_roster.items()})
+                st.session_state.selections_default = team_players_df
+
+                st.session_state.n_drafters = team_players_df.shape[1]
+                st.session_state.n_picks = team_players_df.shape[0]
+
+                st.session_state['schedule'] = None
+                st.session_state['matchups'] = None
+
+                st.write('Team info successfully retrieved from fantrax! :partying_face:')
+                st.write('Note that for fantrax, only active players are pulled in and counted')
+
+              else:
+                st.session_state.n_drafters = 12 #Kind of a hack
+                st.session_state.n_picks = 13
               
-              st.session_state['matchups'] = fantrax_connect.get_fantrax_matchups(fantrax_league)
-              
-              st.write('Player info successfully retrieved from fantrax! :partying_face:')
 
 
       #set default position numbers, based on n_picks
@@ -370,8 +370,10 @@ with param_tab:
         position_defaults = all_position_defaults[st.session_state.n_picks]
       else:
         position_defaults = all_position_defaults[st.session_state.params['options']['n_picks']['default']]
-        st.error('''There is no default position structure for a league with''' + str(st.session_state.n_picks) + \
-                 ''' picks. Position structure must be met manually on the Advanced tab.''')
+
+        if st.session_state.mode != 'Season Mode':
+          st.error('''There is no default position structure for a league with''' + str(st.session_state.n_picks) + \
+                  ''' picks. Position structure must be met manually on the Advanced tab.''')
 
     with c2: 
           
@@ -642,7 +644,7 @@ with param_tab:
               
           implied_n_picks = sum(n for n in get_position_numbers().values()) + st.session_state.n_bench
           
-          if implied_n_picks != st.session_state.n_picks:
+          if (implied_n_picks != st.session_state.n_picks) & (st.session_state.mode != 'Season Mode'):
             st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(st.session_state.n_picks) + \
                     ' picks per manager. Adjust the position slots before proceeding')
             st.stop()
