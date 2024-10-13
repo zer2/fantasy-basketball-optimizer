@@ -72,17 +72,21 @@ def get_fixed_player_name(player_name, player_metadata):
         return 'RP'
     
 def get_team_info(api, team_id):
-    return api._request("getTeamRosterInfo", teamId=team_id)['tables'][0]['rows']
+    res = api._request("getTeamRosterInfo", teamId=team_id)['tables'][0]['rows']
+    return res
 
 def get_fantrax_roster(league_id
                         , player_metadata):
     
     api = get_api(league_id)
+
+    exclusions = ('2','3') if st.session_state.mode == 'Season Mode' else ()
     
-    rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) for z in get_team_info(api, team_id) if 'scorer' in z] 
+    rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) \
+                        for z in get_team_info(api, team_id) if 'scorer' in z and z['statusId'] not in exclusions] 
            for name, team_id in st.session_state.teams_dict.items() 
           }
-            
+                
     return rosters
     
 def get_player_statuses(league_id, player_metadata):

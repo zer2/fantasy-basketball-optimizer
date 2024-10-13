@@ -144,7 +144,7 @@ def get_teams_dict(league_id: str, _auth_path: str) -> dict[int, str]:
         teams = yahoo_helper.get_teams(sc)
     except: 
         #If yahoo isn't returning anything, just keep the same dict
-        return st.teams_dict
+        return st.session_state.teams_dict
 
     teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
 
