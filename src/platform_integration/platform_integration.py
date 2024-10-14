@@ -15,20 +15,11 @@ class PlatformIntegration(abc.ABC):
         #if necessary, run any authentication steps
         pass
 
-    @abc.abstractmethod
-    def get_rosters_df() -> pd.DataFrame:
-        pass
-
     #
     # 
     # Drafting methods 
     #
     #
-
-    @abc.abstractmethod
-    def get_n_picks() -> int:
-        #return the number of picks that each time will make during the draft 
-        pass
 
     @abc.abstractmethod
     def get_team_names() -> list:
