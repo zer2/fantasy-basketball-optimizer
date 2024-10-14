@@ -3,8 +3,7 @@ import streamlit as st
 from pandas.api.types import CategoricalDtype
 from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs import *
-from src import yahoo_connect, fantrax_connect
-from src.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names, increment_default_key
+from src.helper_functions import move_forward_one_pick, increment_default_key
 
 def run_h_score():
     st.session_state.run_h_score = True
@@ -172,35 +171,15 @@ def refresh_analysis():
 
     player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
-    if st.session_state.data_source == 'Retrieve from Yahoo Fantasy':
+    if st.session_state.mode == 'Draft Mode':
 
-        yahoo_league_id = st.session_state.yahoo_league_id
-        auth_dir = st.session_state.auth_dir
-
-        if st.session_state.mode == 'Draft Mode':
-
-            draft_results, error_string = yahoo_connect.get_draft_results(yahoo_league_id
-                                                        , auth_dir
-                                                        , player_metadata)
-                    
-        else:
-
-            draft_results, error_string  = yahoo_connect.get_auction_results(yahoo_league_id
-                                                                        , auth_dir
-                                                                        , player_metadata)
-            
+        draft_results, error_string = st.session_state.integration.get_draft_results(player_metadata)
+                
     else:
 
-        if st.session_state.mode == 'Draft Mode':
+        draft_results, error_string  = st.session_state.integration.get_auction_results(player_metadata)
+            
 
-            draft_results, error_string = fantrax_connect.get_draft_results(st.session_state.fantrax_league
-                                                        , player_metadata)
-                                
-        else:
-
-            draft_results, error_string = fantrax_connect.get_auction_results(st.session_state.fantrax_league
-                                                                        , player_metadata)
-                        
     st.session_state.draft_results = draft_results
 
     if error_string == 'Success':
@@ -229,7 +208,7 @@ def make_drafting_tab_live_data(H):
 
         with c2:
             draft_seat = st.selectbox(f'Which drafter are you?'
-            , st.session_state.team_names
+            , st.session_state.integration.get_team_names(st.session_state.integration.league_id)
             , key = 'draft_seat'
             , on_change = refresh_analysis)
 

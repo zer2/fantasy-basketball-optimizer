@@ -14,12 +14,12 @@ from src.get_data import get_historical_data, get_current_season_data, get_darko
                         get_player_metadata, get_data_from_snowflake, combine_nba_projections
 from src.process_player_data import process_player_data
 from src.algorithm_agents import HAgent
-from src import yahoo_connect
-from src import fantrax_connect
 from src.tabs import *
 from src.data_editor import make_data_editor
 from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
+from src.platform_integration.fantrax_integration import FantraxIntegration
+from src.platform_integration.yahoo_integration import YahooIntegration
 
 #from streamlit_profiler import Profiler
 
@@ -146,13 +146,13 @@ with param_tab:
       
       load_params(st.session_state.league)
 
-      mode = st.selectbox(
-        'Which mode do you want to use?',
-        ('Draft Mode', 'Auction Mode','Season Mode')
-        , index = 0
-        , key = 'mode'
-        , on_change = increment_and_reset_draft())
-      
+      data_source = st.selectbox(
+        'Do you want to integrate with a fantasy platform?'
+        , ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax']
+        , key = 'data_source'
+        , on_change = clear_draft_board
+        , index = 0)
+
       # Setting default values
       #st.session_state.n_drafters = st.session_state.params['options']['n_drafters']['default']
       #st.session_state.n_picks = st.session_state.params['options']['n_picks']['default']
@@ -160,22 +160,22 @@ with param_tab:
       #These are based on 2023-2024 excluding injury
       #might need to modify these at some point? 
 
-      if st.session_state.mode == 'Draft Mode':
-        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax']
+      
+      if st.session_state.data_source == 'Enter your own data':
+        mode_options = ('Draft Mode', 'Auction Mode','Season Mode')      
 
-      elif st.session_state.mode == 'Auction Mode':
-        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy'] 
+      elif st.session_state.data_source == 'Retrieve from Yahoo Fantasy':
+        mode_options = YahooIntegration().get_available_modes()
 
-      elif st.session_state.mode == 'Season Mode':
-        data_source_options = ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax'] 
+      elif st.session_state.data_source == 'Retrieve from Fantrax':
+        mode_options = FantraxIntegration().get_available_modes()
 
-      data_source = st.selectbox(
-        'How would you like to set draft player info? You can either enter your own data or fetch from a Yahoo league'
-        , data_source_options
-        , key = 'data_source'
-        , on_change = clear_draft_board
-        , index = 0)
-
+      mode = st.selectbox(
+        'Which mode do you want to use?'
+        , mode_options
+        , index = 0
+        , key = 'mode'
+        , on_change = increment_and_reset_draft())
         
       if data_source == 'Enter your own data':
         n_drafters = st.number_input(r'How many drafters are in your league?'
@@ -207,161 +207,28 @@ with param_tab:
 
       elif data_source == 'Retrieve from Yahoo Fantasy':
 
-        auth_dir = yahoo_connect.get_yahoo_access_token()
-        st.session_state.auth_dir = auth_dir
+        yahoo_integration = YahooIntegration()
+        yahoo_integration.setup()
 
-        if auth_dir is None:
-          st.stop()
-        else:
+        st.session_state.integration = yahoo_integration
 
-          user_leagues = yahoo_connect.get_user_leagues(auth_dir)
-          
-          get_league_labels: Callable[[League], str] = lambda league: f"{league.name.decode('UTF-8')} ({league.season}-{league.season + 1} Season)"
-          
-          yahoo_league = st.selectbox(
-            label='Which league should player data be pulled from?',
-            options=user_leagues,
-            format_func=get_league_labels,
-            index=None,
-            on_change = increment_and_reset_draft
-          )
-
-
-          if yahoo_league is not None:
-              st.session_state.yahoo_league_id = yahoo_league.league_id
-
-              #ZR: Ideally we could fix this for mock drafts with dummies
-              st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
-
-          else:
-               yahoo_league = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
-                               ,min_value = 0
-                               ,value = None
-                               ,key = 'yahoo_league_id'
-                               , on_change = clear_draft_board)
-               
-               if st.session_state.yahoo_league_id is not None:
-                st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())                
-                st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir)) 
-               else:
-                st.session_state.n_drafters = 12 #Kind of a hack
-
-          st.session_state.selections_default = get_selections_default(st.session_state.n_picks
-                                                      ,st.session_state.n_drafters)
-
-          if (st.session_state.mode == 'Season Mode'):
-
-            if st.session_state.yahoo_league_id is not None:
-
-              player_metadata = get_player_metadata()
-
-              team_players_df = yahoo_connect.get_yahoo_players_df(auth_dir, st.session_state.yahoo_league_id, player_metadata)
-              st.session_state.n_drafters = team_players_df.shape[1]
-              st.session_state.n_picks = team_players_df.shape[0]
-              st.session_state.selections_default = team_players_df
-
-              #make the selection df use a categorical variable for players, so that only players can be chosen, and it autofills
+        st.session_state.team_names = yahoo_integration.get_team_names(yahoo_integration.league_id) 
+        st.session_state.n_drafters = len(yahoo_integration.team_names)
+        st.session_state.n_picks = yahoo_integration.get_n_picks(yahoo_integration.league_id)
+        st.session_state.selections_default = yahoo_integration.selections_default
               
-              #Just trying for now!
-              player_statuses = yahoo_connect.get_player_statuses(st.session_state.yahoo_league_id, auth_dir, player_metadata)
+      elif data_source == 'Retrieve from Fantrax':     
 
-              st.session_state['injured_players'].update(set(list(player_statuses['Player'][ \
-                                                                      (player_statuses['Status'] == 'INJ')
-                                                                      ]
-                                                                      )
-                                                              )
-                                                        )
+          fantrax_integration = FantraxIntegration()     
 
-              st.session_state['schedule'] = yahoo_connect.get_yahoo_schedule(st.session_state.yahoo_league_id
-                                                                          , auth_dir
-                                                                          , player_metadata)
+          fantrax_integration.setup()
 
-              st.session_state['matchups'] = yahoo_connect.get_yahoo_matchups(st.session_state.yahoo_league_id
-                                      , auth_dir)
+          st.session_state.integration = fantrax_integration
 
-              yahoo_connect.clean_up_access_token(auth_dir)
-              
-              st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
-
-            else: 
-              st.session_state.n_picks = 13
-              st.session_state.n_drafters = 12
-              st.session_state.selections_default = get_selections_default(st.session_state.n_picks
-                                                                          ,st.session_state.n_drafters)
-          else:
-
-            if st.session_state.yahoo_league_id is not None:
-
-              st.session_state.n_drafters = len(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir))
-              st.session_state.team_names = list(yahoo_connect.get_teams_dict(st.session_state.yahoo_league_id, auth_dir).values())
-              st.session_state.n_picks = 13 #ZR: fix this
-              st.session_state.selections_default = get_selections_default(st.session_state.n_picks
-                                                                          ,st.session_state.n_drafters)
-            else: 
-              st.session_state.n_picks = 13
-              st.session_state.n_drafters = 12
-              st.session_state.selections_default = get_selections_default(st.session_state.n_picks
-                                                                          ,st.session_state.n_drafters)
-              
-        
-      elif data_source == 'Retrieve from Fantrax':          
-
-          fantrax_league = st.text_input(
-            label='Which league ID should player data be pulled from? (Find league ID after /league/ in your draft room URL)'
-            ,key = 'fantrax_league'
-            ,value = None
-            ,on_change = clear_draft_board
-
-          )    
-
-          if fantrax_league is not None:
-                
-                division_dict = fantrax_connect.get_division_dict(fantrax_league)
-
-                if len(division_dict) == 0:
-                  st.session_state.teams_dict = fantrax_connect.get_teams_dict(fantrax_league)
-                else:
-                  division = st.selectbox(label = 'Which division are you in?'
-                                          ,options = list(division_dict.keys())
-                                          , on_change = clear_draft_board)
-                  st.session_state.teams_dict = fantrax_connect.get_teams_dict_by_division(fantrax_league, division_dict[division])
-
-                team_names = list(st.session_state.teams_dict.keys())  
-
-                st.session_state.team_names = team_names              
-                st.session_state.n_drafters = len(team_names)
-                st.session_state.n_picks = fantrax_connect.get_n_picks(fantrax_league)
-          else:
-                st.session_state.n_drafters = 12 #Kind of a hack
-                st.session_state.n_picks = 13
-
-          if (st.session_state.mode == 'Season Mode'):
-              if fantrax_league is not None:
-
-                #this is all messed up lol
-
-                st.session_state.player_metadata = st.session_state.player_stats['Position']
-                player_metadata = st.session_state.player_metadata.copy()
-                player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
-
-                fantrax_roster = fantrax_connect.get_fantrax_roster(fantrax_league, player_metadata)
-                team_players_df = pd.DataFrame({k : pd.Series(v) for k,v in fantrax_roster.items()})
-                st.session_state.selections_default = team_players_df
-
-                st.session_state.n_drafters = team_players_df.shape[1]
-                st.session_state.n_picks = team_players_df.shape[0]
-
-                st.session_state['schedule'] = None
-                st.session_state['matchups'] = None
-
-                st.write('Team info successfully retrieved from fantrax! :partying_face:')
-                st.write('Note that for fantrax, only active players are pulled in and counted')
-
-              else:
-                st.session_state.n_drafters = 12 #Kind of a hack
-                st.session_state.n_picks = 13
-              
-
+          st.session_state.team_names = fantrax_integration.get_team_names(fantrax_integration.league_id) 
+          st.session_state.n_drafters = len(fantrax_integration.team_names)
+          st.session_state.n_picks = fantrax_integration.get_n_picks(fantrax_integration.league_id)
+          st.session_state.selections_default = fantrax_integration.selections_default
 
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
