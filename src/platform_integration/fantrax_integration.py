@@ -15,10 +15,29 @@ class FantraxIntegration(PlatformIntegration):
         return self.available_modes
 
     @st.cache_data()
-    def get_api(_self, league_id):
+    def get_api(_self
+                , league_id : str):
+        """Get an API object from the FantraxAPI package. It is associated with a league
+
+        Args:
+            league_id: A fantrax league ID
+
+        Returns:
+            API object
+        """
+
         return FantraxAPI(league_id)
     
     def setup(self):
+        """Collect information from the user, and use it to set up the integration.
+        This function is not cached, so it is run every time the app re=runs
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
 
         self.league_id = st.text_input(
             label='Which league ID should player data be pulled from? (Find league ID after /league/ in your draft room URL)'
@@ -69,7 +88,16 @@ class FantraxIntegration(PlatformIntegration):
 
 
     @st.cache_data()
-    def get_division_dict(_self, league_id) -> dict:
+    def get_division_dict(_self
+                          , league_id: str) -> dict:
+        """Get a dictionary relating the names of divisions to their associated IDs
+
+        Args:
+            league_id: A fantrax league ID
+
+        Returns:
+            dict of structure {name : id}
+        """
         api = _self.get_api(league_id)
         api_response = api._request("getStandings", view="SCHEDULE")['displayedLists']['tabs'] 
         divisions = {x['name'] : x['id'] for x in api_response
@@ -77,8 +105,18 @@ class FantraxIntegration(PlatformIntegration):
         return divisions
 
     @st.cache_data()
-    def get_teams_dict_by_division(_self, league_id, division_id) -> dict:
-        #return a dictionary with structure {team id : team name}
+    def get_teams_dict_by_division(_self
+                                   , league_id : str
+                                   , division_id : str) -> dict:
+        """Get a dictionary relating the names of teams to their associated IDs, filtered by division ID
+
+        Args:
+            league_id: A fantrax league ID
+            division_id: A fantrax division ID
+
+        Returns:
+            dict with structure {team id : team name}
+        """
         api = _self.get_api(league_id)
         if division_id is None:
             teams_dict = {t['name'] : t['id'] for t in api._request("getFantasyTeams")['fantasyTeams']}
@@ -92,25 +130,51 @@ class FantraxIntegration(PlatformIntegration):
             return res
 
     @st.cache_data(ttl = 3600)
-    def get_n_picks(_self, league_id):
+    def get_n_picks(_self
+                    , league_id : str):
+        """Get the number of picks that will be made in a fantrax draft
+
+        Args:
+            league_id: A fantrax league ID
+
+        Returns:
+            Integer, number of picks
+        """
         api = _self.get_api(league_id)
         api_response = api._request("getTeamRosterInfo", teamId=list(_self.teams_dict.values())[0])['miscData']['statusTotals']
         return min( sum([x['max'] for x in api_response \
                     if x['name'] != "Inj Res"]), 16
                     )
     
-    def get_team_info(_self,api, team_id):
+    def get_team_info(_self
+                      , team_id : str) -> dict:
+        """Get a dictionary of team info,
+
+        Args:
+            team_id: A fantrax division ID
+
+        Returns:
+            dictionary with team info
+        """
+        api = _self.get_api(_self.league_id)
         res = api._request("getTeamRosterInfo", teamId=team_id)['tables'][0]['rows']
         return res
     
-    def get_rosters_df(_self, player_metadata):
-    
-        api = _self.get_api(_self.league_id)
+    def get_rosters_df(_self
+                       , player_metadata):
+        """Get a dataframe with a column per team and cell per player chosen by that team
 
+        Args:
+            player_metadata
+
+        Returns:
+            DataFrame with roster info
+        """
+    
         exclusions = ('2','3') if st.session_state.mode == 'Season Mode' else ()
         
         rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) \
-                            for z in _self.get_team_info(api, team_id) if 'scorer' in z and z['statusId'] not in exclusions] 
+                            for z in _self.get_team_info(team_id) if 'scorer' in z and z['statusId'] not in exclusions] 
                             for name, team_id in _self.teams_dict.items() 
             }
         
@@ -118,7 +182,19 @@ class FantraxIntegration(PlatformIntegration):
                 
         return rosters_df
     
-    def get_draft_results(_self, player_metadata):
+    def get_draft_results(_self
+                          , player_metadata):
+        """Get a tuple with
+        1) a dataframe reflecting the state of the draft, with np.nan in place of undrafted players
+               structure is one column per team, one row per pick 
+        2) a string representing the status of the draft 
+
+        Args:
+            player_metadata
+
+        Returns:
+            tuple
+        """
             
         rosters_df = _self.get_rosters_df(player_metadata)
         
@@ -128,11 +204,26 @@ class FantraxIntegration(PlatformIntegration):
         #not implemented
         return None
     
-    def get_team_names(_self, league_id):
+    @st.cache_data()
+    def get_team_names(_self
+                       , league_id) -> list:
+        #get list of team names. Cached by league id; when league id changes the function will refresh
         return list(_self.teams_dict.keys())
     
     
-def get_fixed_player_name(player_name, player_metadata):
+@st.cache_data()
+def get_fixed_player_name(player_name : str
+                          , _player_metadata) -> str:
+    
+    """Fix player name string to adhere to common standard
+
+    Args:
+        player_name: string
+        player_metadata
+
+    Returns:
+        fixed name string
+     """
 
     def name_renamer(name):
       if name == 'Nicolas Claxton':
@@ -157,8 +248,8 @@ def get_fixed_player_name(player_name, player_metadata):
     
     player_name = name_renamer(player_name)
 
-    if player_name in player_metadata.index:
+    if player_name in _player_metadata.index:
 
-        return player_name + ' (' + player_metadata[player_name] + ')'
+        return player_name + ' (' + _player_metadata[player_name] + ')'
     else:
         return 'RP'

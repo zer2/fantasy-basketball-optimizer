@@ -436,7 +436,7 @@ class HAgent():
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
                            ,n_values
-                           ) -> dict:
+                           ):
         """Performs one iteration of H-scoring
          
          Case (1): If n_players_selected < n_picks -1, the Gaussian multivariate assumption is used for future picks and weight is chosen by gradient descent

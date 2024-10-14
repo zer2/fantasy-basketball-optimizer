@@ -38,6 +38,15 @@ class YahooIntegration(PlatformIntegration):
         return self.available_modes
         
     def setup(self):
+        """Collect information from the user, and use it to set up the integration.
+        This function is not cached, so it is run every time the app re=runs
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.auth_dir = self.get_yahoo_access_token()
 
         if self.auth_dir is None:
@@ -220,7 +229,18 @@ class YahooIntegration(PlatformIntegration):
         shutil.rmtree(_self.auth_dir)
 
     @st.cache_data(ttl=3600, show_spinner = False)
-    def get_rosters_df(_self, league_id: str, player_metadata: pd.Series) -> pd.DataFrame:
+    def get_rosters_df(_self
+                       , league_id: str
+                       , player_metadata: pd.Series) -> pd.DataFrame:
+        """Get a dataframe with a column per team and cell per player chosen by that team
+
+        Args:
+            player_metadata
+
+        Returns:
+            DataFrame with roster info
+        """
+    
         teams_dict = _self.get_teams_dict(league_id)
         team_ids = list(teams_dict.keys())
         rosters_dict = _self.get_rosters_dict(league_id, team_ids)
@@ -233,7 +253,20 @@ class YahooIntegration(PlatformIntegration):
         return players_df
 
     @st.cache_data(ttl=300, show_spinner = False)
-    def get_teams_dict(_self, league_id: str) -> dict[int, str]:
+    def get_teams_dict(_self
+                       , league_id: str) -> dict[int, str]:
+        """Get a dictionary relating the names of teams to their associated IDs
+        Sometimes yahoo shuts off its API access after a mock draft is over. For that reason, when the API can't be accessed, 
+        this function returns the old value
+
+        Args:
+            league_id: A yahoo league ID
+
+        Returns:
+            DataFrame with roster info
+        """
+        _self.teams_dict = None
+
         LOGGER.info(f"League id: {league_id}")
         sc = YahooFantasySportsQuery(
             auth_dir= _self.auth_dir,
@@ -257,7 +290,18 @@ class YahooIntegration(PlatformIntegration):
 
     @st.cache_data(ttl=3600
                     , show_spinner = "Fetching rosters from your Yahoo league. This should take about ten seconds")
-    def get_rosters_dict(_self, league_id: str, team_ids: list[int]) -> dict[int, Roster]:    
+    def get_rosters_dict(_self
+                         , league_id: str
+                         , team_ids: list[int]) -> dict[int, Roster]:    
+        """Get a dictionary relating team IDs to their rosters
+
+        Args:
+            league_Id: a yahoo league ID
+            team_ids: a list of Yahoo team IDs
+
+        Returns:
+            Dictionary with roster info
+        """
 
         league_id = league_id
         LOGGER.info(f"League id: {league_id}")
@@ -278,6 +322,14 @@ class YahooIntegration(PlatformIntegration):
 
     @st.cache_data(ttl=3600, show_spinner = False)
     def get_user_leagues(_self) -> List[League]:
+        """Get a list of leagues that the user is a part of 
+
+        Args:
+            None
+
+        Returns:
+            List of leagues
+        """
         sc = YahooFantasySportsQuery(
             auth_dir=_self.auth_dir,
             league_id="", # Shouldn't actually matter what this is since we are retrieving the user's leagues
@@ -294,6 +346,16 @@ class YahooIntegration(PlatformIntegration):
                         , rosters_dict: dict[int, Roster]
                         , teams_dict: dict[int, str]
                         , player_metadata: pd.Series):
+        """Get a dataframe with a column per team and cell per player chosen by that team, based on roster_dict
+
+        Args:
+            rosters_dict: dictionary with roster info
+            teams_dict: dictionary relating team IDs to name
+            player_metadata
+
+        Returns:
+            DataFrame with roster info
+        """
         players_df = pd.DataFrame()
 
         team_players_dict = {}
@@ -332,7 +394,11 @@ class YahooIntegration(PlatformIntegration):
 
     @st.cache_data(ttl=3600
                     , show_spinner = "Fetching player status information from Yahoo. This should take about thirty seconds")
-    def get_player_statuses(_self, league_id: str, player_metadata: pd.Series) -> dict[int, str]:
+    def get_player_statuses(_self
+                            , league_id: str
+                            , player_metadata: pd.Series) -> dict[int, str]:
+        #get player statuses, such as whether or not they are injured. Currently not working
+        
         LOGGER.info(f"League id: {league_id}")
         sc = YahooFantasySportsQuery(
             auth_dir= _self.auth_dir,
@@ -350,6 +416,7 @@ class YahooIntegration(PlatformIntegration):
 
     @st.cache_resource(ttl=3600)
     def get_yahoo_weeks(_self, league_id: str) -> dict[int, str]:
+        #get dictionary of weeks in the fantasy season. Currently not being used
         LOGGER.info(f"League id: {league_id}")
         sc = YahooFantasySportsQuery(
             auth_dir= _self.auth_dir,
@@ -365,6 +432,7 @@ class YahooIntegration(PlatformIntegration):
     @st.cache_resource(ttl=3600
                 , show_spinner = "Fetching matchup details from Yahoo. This should take about twenty seconds")
     def get_yahoo_matchups(_self, league_id: str, _auth_path: str) -> dict[int, str]:
+        #get which fantasy teams are against which others. Currently not being used 
         LOGGER.info(f"League id: {league_id}")
 
         teams = _self.get_teams_dict(_self.league_id)
@@ -385,6 +453,8 @@ class YahooIntegration(PlatformIntegration):
                            ,league_id: str
                            , _auth_path: str
                            , player_metadata: pd.Series) -> dict[int, str]:
+        #get numbers of games played per week by each team. Currently not being used
+
         yahoo_weeks = _self.get_yahoo_weeks(league_id, _auth_path)
         nba_schedule = get_nba_schedule()
 
@@ -413,6 +483,19 @@ class YahooIntegration(PlatformIntegration):
 
     def get_draft_results(_self
                           , player_metadata):
+        
+        """Get a tuple with
+        1) a dataframe reflecting the state of the draft, with np.nan in place of undrafted players
+               structure is one column per team, one row per pick 
+        2) a string representing the status of the draft 
+
+        Args:
+            player_metadata
+
+        Returns:
+            tuple
+        """
+            
         sc = YahooFantasySportsQuery(
             auth_dir=_self.auth_dir,
             league_id=_self.league_id, 
@@ -483,7 +566,19 @@ class YahooIntegration(PlatformIntegration):
 
         return df, 'Success'
 
-    def get_auction_results(_self, player_metadata):
+    def get_auction_results(_self
+                            , player_metadata):
+        """Get a tuple with
+        1) a dataframe reflecting the state of the auction. Structure is three columns; player/team/cost
+        2) a string representing the status of the draft 
+
+        Args:
+            player_metadata
+
+        Returns:
+            tuple
+        """
+            
         sc = YahooFantasySportsQuery(
             auth_dir= _self.auth_dir
             ,league_id= _self.league_id

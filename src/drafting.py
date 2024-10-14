@@ -124,14 +124,18 @@ def make_drafting_tab_own_data(H):
 
         with cand_tab:
 
-            make_h_cand_tab(H
-                ,st.session_state.g_scores
-                ,st.session_state.z_scores
-                ,player_assignments
-                ,draft_seat
-                ,st.session_state.n_iterations
-                ,st.session_state.v
-                ,5)
+            if st.session_state.selections_default.columns[st.session_state.drafter] == draft_seat:
+
+                make_h_cand_tab(H
+                    ,st.session_state.g_scores
+                    ,st.session_state.z_scores
+                    ,player_assignments
+                    ,draft_seat
+                    ,st.session_state.n_iterations
+                    ,st.session_state.v
+                    ,5)
+            else:
+                st.write('It is not your turn, so H-scoring will not run')
 
         with team_tab:
 
