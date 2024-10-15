@@ -607,7 +607,7 @@ with param_tab:
 
             combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
                                           ,'N-received' : [1,2,3]
-                                          ,'T1' : [0,0,0]
+                                          ,'T1' : [0.0,0.0,0.0]
                                           ,'T2' : [1,0.25,0.1]}
                                           )
 
@@ -631,7 +631,8 @@ with param_tab:
               """Each row is a specification for a kind of trade that will be automatically evaluated. 
               N-traded is the number of players traded from your team, and N-received is the number of 
               players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
-              column. Only players with the specified targetedness or above will be considered. T2 is a 
+              column. Only players with the specified targetedness or above will be considered- as a decimal 
+              not a percentage, e.g. 0.02 instead of 2%. T2 is a 
               threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
               differences larger than T2 will not be evaluated"""
             st.caption(combo_params_str)
