@@ -31,7 +31,8 @@ def make_about_tab(md_path : str):
 
 ### Team tabs 
 
-@st.cache_data(show_spinner = False, ttl = 3600)
+#ZR: Uncaching because having this cached messes up the display somehow
+#@st.cache_data(show_spinner = False, ttl = 3600)
 def make_team_tab(_scores : pd.DataFrame
               , my_players : list[str]
               , n_drafters : int
@@ -66,9 +67,10 @@ def make_team_tab(_scores : pd.DataFrame
                                               .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()], multiplier = team_multiplier)
   
   
-  display = st.dataframe(team_stats_styled
+  st.write(team_stats_styled
                       , use_container_width = True
                       , height = len(team_stats) * 35 + 38
+                      , key = str(info_key) + '_player_df' 
                                                 )     
 
 @st.cache_data(show_spinner = False, ttl = 3600)
@@ -140,7 +142,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
                         , n_drafters
                         , st.session_state.params['g-score-player-multiplier']
                         , st.session_state.params['g-score-team-multiplier']
-                        , info_key)    
+                        , info_key + 1)    
     with h_team_tab:
       if base_h_score is not None:
 
