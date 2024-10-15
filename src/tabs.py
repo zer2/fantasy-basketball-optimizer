@@ -1006,7 +1006,6 @@ def get_cross_combos(n : int
   Returns:
       Dataframe of viable trades according to the criteria
   """
-
   #helper function for getting trades between combos. Creates a dataframe for vectorized filtering
   my_candidate_players = [p for p in my_players if values_to_them[p] > heuristic_differential_threshold ]
   their_candidate_players = [p for p in their_players if values_to_me[p] > heuristic_differential_threshold ]
@@ -1069,7 +1068,7 @@ def make_combo_df(all_combos : list
   full_dataframe = pd.DataFrame()
     
   for key, row in all_combos.iterrows():
-
+      
       my_trade = row['My Trade']
       their_trade = row['Their Trade']
 
@@ -1119,7 +1118,6 @@ def make_trade_suggestion_display(_H
                   , your_differential_threshold : float
                   , their_differential_threshold : float
                   , combo_params : list[tuple]
-                  , trade_filter : list[tuple[int]]
                   , scoring_format : str
                   , info_key : int):
   """Shows automatic trade suggestions 
@@ -1148,6 +1146,7 @@ def make_trade_suggestion_display(_H
   my_players = player_assignments[my_team]
   their_players = player_assignments[their_team]
 
+
   all_combos = pd.concat([get_cross_combos(n
                                 , m
                                 , my_players 
@@ -1158,6 +1157,7 @@ def make_trade_suggestion_display(_H
                                 , values_to_them 
                                 , hdt
                                 , vt) for n,m,hdt,vt in combo_params])
+
 
   full_dataframe = make_combo_df(all_combos
                   , _player_stats 
@@ -1173,10 +1173,8 @@ def make_trade_suggestion_display(_H
   lens = pd.Series(zip(full_dataframe['Send'].map(len), full_dataframe['Receive'].map(len))
                     , index = full_dataframe.index)
 
-  lens_criteria = lens.isin(trade_filter)
-
-  full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria & \
-                                  lens_criteria]
+  full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria]
+  
 
   if len(full_dataframe) > 0:
 

@@ -1224,6 +1224,8 @@ elif st.session_state['mode'] == 'Season Mode':
                                       , [(1,1),(2,2),(3,3)]
                                       , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
                                       , default = [(1,1)])
+            
+            filtered_combo_params = [x for x in combo_params if (x[0],x[1]) in trade_filter]
 
             make_trade_suggestion_display(H
                 , player_stats 
@@ -1236,8 +1238,7 @@ elif st.session_state['mode'] == 'Season Mode':
                 , values_to_team[trade_counterparty_seat]
                 , your_differential_threshold
                 , their_differential_threshold
-                , combo_params
-                , trade_filter
+                , filtered_combo_params
                 , scoring_format
                 , st.session_state.info_key)               
 
