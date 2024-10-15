@@ -67,7 +67,7 @@ def make_team_tab(_scores : pd.DataFrame
                                               .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()], multiplier = team_multiplier)
   
   
-  st.write(team_stats_styled
+  st.dataframe(team_stats_styled
                       , use_container_width = True
                       , height = len(team_stats) * 35 + 38
                       , key = str(info_key) + '_player_df' 
