@@ -20,6 +20,7 @@ from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
 from src.platform_integration.fantrax_integration import FantraxIntegration
 from src.platform_integration.yahoo_integration import YahooIntegration
+from pandas.api.types import CategoricalDtype
 
 #from streamlit_profiler import Profiler
 
@@ -150,7 +151,7 @@ with param_tab:
         'Do you want to integrate with a fantasy platform?'
         , ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax']
         , key = 'data_source'
-        , on_change = clear_draft_board
+        , on_change = increment_and_reset_draft
         , index = 0)
 
       # Setting default values
@@ -862,10 +863,23 @@ elif st.session_state['mode'] == 'Season Mode':
       
     with left:
 
+
       st.caption("""Enter which player is on which team below""")
-      selections_df = st.data_editor(st.session_state.selections_df
-                                        , hide_index = True
-                                        , height = st.session_state.n_picks * 35 + 50)  
+      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index), ordered=True)
+
+      with st.form('manual_rosters'):
+
+        selections_df = st.data_editor(st.session_state.selections_df.astype(player_category_type)
+                                          , hide_index = True
+                                          , height = st.session_state.n_picks * 35 + 50)  
+        
+        c1, c2 = st.columns([0.2,0.8])
+            
+        with c1: 
+          submit = st.form_submit_button("Lock in")
+        with c2:
+          st.warning('Lock in to update rosters')
+
       selection_list = listify(selections_df)
 
       player_assignments = selections_df.to_dict('list')
