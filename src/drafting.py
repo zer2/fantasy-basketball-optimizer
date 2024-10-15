@@ -120,11 +120,13 @@ def make_drafting_tab_own_data(H):
 
         my_players = st.session_state.selections_df[draft_seat].dropna()
 
+
         cand_tab, team_tab = st.tabs(["Candidates","Team"])
 
         with cand_tab:
 
-            if st.session_state.selections_default.columns[st.session_state.drafter] == draft_seat:
+            if st.session_state.run_h_score:
+                st.session_state.run_h_score = False
 
                 make_h_cand_tab(H
                     ,st.session_state.g_scores
@@ -135,7 +137,12 @@ def make_drafting_tab_own_data(H):
                     ,st.session_state.v
                     ,5)
             else:
-                st.write('It is not your turn, so H-scoring will not run')
+
+                def run():
+                   st.session_state.run_h_score = True
+
+                button = st.button('Run H-score', on_click = run)
+
 
         with team_tab:
 
