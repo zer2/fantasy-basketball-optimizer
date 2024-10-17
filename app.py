@@ -220,6 +220,8 @@ with param_tab:
         yahoo_integration = YahooIntegration()
         yahoo_integration.setup()
 
+        st.session_state.n_picks = yahoo_integration.get_n_picks(yahoo_integration.league_id)
+
         st.session_state.integration = yahoo_integration
               
       elif data_source == 'Retrieve from Fantrax':     
@@ -227,7 +229,7 @@ with param_tab:
           fantrax_integration = FantraxIntegration()     
 
           fantrax_integration.setup()
-
+          st.session_state.n_picks = fantrax_integration.get_n_picks(fantrax_integration.league_id)
           st.session_state.integration = fantrax_integration
 
       #set default position numbers, based on n_picks
@@ -414,7 +416,6 @@ with param_tab:
     #ZR: These should be managed properties 
     st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id) 
     st.session_state.n_drafters = len(st.session_state.team_names)
-    st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
     st.session_state.selections_default = st.session_state.integration.selections_default
 
     st.session_state.selections_df = st.session_state.selections_default

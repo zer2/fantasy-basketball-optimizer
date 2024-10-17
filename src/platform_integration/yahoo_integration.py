@@ -2,7 +2,7 @@ import streamlit as st
 from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.tabs.drafting import clear_draft_board
+from src.tabs.drafting import clear_draft_board, increment_and_reset_draft
 from typing import Callable, List, Optional
 from yfpy.models import League, Team, Roster
 
@@ -65,7 +65,7 @@ class YahooIntegration(PlatformIntegration):
             options=user_leagues,
             format_func=get_league_labels,
             index=None,
-            on_change = clear_draft_board
+            on_change = increment_and_reset_draft
           )
 
           if yahoo_league is not None:
@@ -80,8 +80,8 @@ class YahooIntegration(PlatformIntegration):
                                ,min_value = 0
                                ,value = None
                                ,key = 'yahoo_league_id'
-                               , on_change = clear_draft_board)
-               
+                               , on_change = increment_and_reset_draft)
+               self.n_picks = 13 #hack
                if self.league_id is not None:
                 self.team_names = self.get_team_names(self.league_id)
                 self.n_drafters = len(self.get_teams_dict(self.league_id)) 
