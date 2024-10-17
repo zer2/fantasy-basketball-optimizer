@@ -25,7 +25,7 @@ class HAgent():
                  , fudge_factor : float = 1
                  , positions : pd.Series = None
                  , collect_info : bool = False
-                 , team_names : list = st.session_state.team_names
+                 , team_names : list = None
                     ):
         """Initializes an H-score agent, which can calculate H-scores based on given info 
 
@@ -48,7 +48,10 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
-        self.team_names = team_names
+        if team_names is not None:
+            self.team_names = team_names
+        else:
+            self.team_names = st.session_state.team_names
 
         #ZR: we really need to fix this later lol. The thing is that the positions table 
         #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it

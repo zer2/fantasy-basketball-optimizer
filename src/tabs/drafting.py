@@ -45,10 +45,10 @@ def increment_and_reset_draft():
     if ('autodrafters' in st.session_state) and ('drafter' in st.session_state):
       run_autodraft()
 
-    if 'selection_df' in st.session_state:
-       del st.session_state.selection_df
-
     st.session_state.live_draft_active = False
+
+    if 'selections_df' in st.session_state:
+        del st.session_state.selections_df
 
 def select_player_from_draft_board(p = None):
 

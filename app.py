@@ -206,6 +206,7 @@ with param_tab:
         st.session_state.team_names = list(team_df.iloc[0])
                              
         # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
+        #Should this just be called if selections_df not in session state?
         st.session_state.selections_default = pd.DataFrame(
           {team : [np.nan] * st.session_state.n_picks for team in st.session_state.team_names}
           )
@@ -415,6 +416,8 @@ with param_tab:
     st.session_state.n_drafters = len(st.session_state.team_names)
     st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
     st.session_state.selections_default = st.session_state.integration.selections_default
+
+    st.session_state.selections_df = st.session_state.selections_default
             
   with advanced_params:
 
