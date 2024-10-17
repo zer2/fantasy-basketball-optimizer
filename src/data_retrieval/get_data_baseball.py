@@ -5,13 +5,20 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helper_functions import get_n_games, get_data_from_snowflake
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake
 from unidecode import unidecode
 
 
 @st.cache_data()
 def process_baseball_rotowire_data(raw_df):
-   
+   """Turn a raw csv baseball projection from rotowire into a data format that can be understood by the app 
+   Rotowire projections can be found here: https://www.rotowire.com/baseball/projections-ros.php
+
+   Args:
+         Dataframe, created directly from a rotowire csv file
+   Returns:
+         Dataframe post formatting
+   """
    raw_df.loc[:,'Games Played %'] = 1 #we need to fix this later
    raw_df['AVG'] = raw_df['AVG']/100
    raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
@@ -45,6 +52,13 @@ def process_baseball_rotowire_data(raw_df):
 
 @st.cache_resource(ttl = '1d') 
 def get_baseball_historical_data():  
+  """Get historical baseball data, which is stored in Snowflake, and process it
+
+  Args:
+      None
+  Returns:
+      Dataframe of historical baseball data- weekly player averages per season
+  """
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW', 'FANTASYBASEBALLOPTIMIZER')
 
   renamer = st.session_state.params['stat-df-renamer']

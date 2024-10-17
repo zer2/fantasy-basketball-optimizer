@@ -1,9 +1,9 @@
 from fantraxapi import FantraxAPI
 import streamlit as st
-from src.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.drafting import clear_draft_board
+from src.tabs.drafting import clear_draft_board
 
 class FantraxIntegration(PlatformIntegration):
 
@@ -62,6 +62,12 @@ class FantraxIntegration(PlatformIntegration):
                 
             self.teams_dict = self.get_teams_dict_by_division(self.league_id, self.division_id)
 
+
+        st.write('Team info successfully retrieved from fantrax! :partying_face:')
+        st.write('Note that for fantrax, only active players are pulled in and counted')
+
+    def set_defaults(self):
+
             self.team_names = list(self.teams_dict.keys())  
             self.n_drafters = len(self.team_names)
             self.n_picks = self.get_n_picks(self.league_id)
@@ -82,9 +88,6 @@ class FantraxIntegration(PlatformIntegration):
 
                 st.session_state['schedule'] = None
                 st.session_state['matchups'] = None
-
-                st.write('Team info successfully retrieved from fantrax! :partying_face:')
-                st.write('Note that for fantrax, only active players are pulled in and counted')
 
 
     @st.cache_data()

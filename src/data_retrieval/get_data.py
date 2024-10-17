@@ -7,8 +7,8 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helper_functions import get_n_games, get_data_from_snowflake
-from src.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake
+from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
 
 def get_yahoo_key_to_name_mapper():
@@ -337,6 +337,10 @@ def combine_nba_projections(hashtag_upload
     df = df.reindex(new_index)
     
     weights = [hashtag_slider, rotowire_slider, bbm_slider]
+
+    player_ineligible = (df.isna().groupby('Player').sum() == 3).sum(axis = 1) > 0
+    inelegible_players = player_ineligible.index[player_ineligible]
+    df = df[~df.index.get_level_values('Player').isin(inelegible_players)]
     
     df = df.groupby('Player') \
                 .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
@@ -494,6 +498,8 @@ def process_basketball_monster_data(raw_df):
       if name == 'Alexandre Sarr':
          name = 'Alex Sarr'
       return name
+
+   raw_df = raw_df.dropna()
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
 

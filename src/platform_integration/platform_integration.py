@@ -37,8 +37,7 @@ class PlatformIntegration(abc.ABC):
     @abc.abstractmethod
     def get_auction_results() -> tuple[pd.DataFrame, str]:
         #get a tuple with
-        # 1) a dataframe reflecting the state of the draft, with np.nan in place of undrafted players
-        #       structure is one column per team, one row per pick 
+        # 1) a dataframe reflecting the state of the auction. Structure is three columns; player/team/cost
         # 2) a string representing the status of the draft 
         pass
 

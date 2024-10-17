@@ -1,9 +1,15 @@
   
 import streamlit as st 
 from pandas.api.types import CategoricalDtype
-from src.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
-from src.tabs import *
-from src.helper_functions import move_forward_one_pick, increment_default_key
+from src.helpers.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
+from src.tabs.team_subtabs import *
+from src.tabs.candidate_subtabs import *
+from src.helpers.helper_functions import move_forward_one_pick, increment_default_key
+
+import pandas as pd 
+import numpy as np
+from src.math.algorithm_helpers import savor_calculation
+from src.math.algorithm_agents import get_base_h_score
 
 def run_h_score():
     st.session_state.run_h_score = True
@@ -18,11 +24,8 @@ def clear_draft_board():
   if 'draft_results' in st.session_state:
     st.session_state.draft_results = None
 
-  if 'live_draft_active' in st.session_state:
-    st.session_state.live_draft_active = False
-
   if 'selections_df' in st.session_state:
-    del st.session_state.selections_df
+    st.session_state.selections_df = st.session_state.selections_default
 
 def run_autodraft():
   
@@ -41,6 +44,11 @@ def increment_and_reset_draft():
 
     if ('autodrafters' in st.session_state) and ('drafter' in st.session_state):
       run_autodraft()
+
+    if 'selection_df' in st.session_state:
+       del st.session_state.selection_df
+
+    st.session_state.live_draft_active = False
 
 def select_player_from_draft_board(p = None):
 
@@ -158,21 +166,17 @@ def make_drafting_tab_own_data(H):
                                                 ,draft_seat
                                                 ,st.session_state.info_key)
 
-                base_h_score = base_h_res['Scores']
-                base_win_rates = base_h_res['Rates']
-
             else:
-                base_h_score = None
-                base_win_rates = None
+                base_h_res = None
 
             make_full_team_tab(st.session_state.z_scores
                             ,st.session_state.g_scores
                             ,my_players
                             ,st.session_state.n_drafters
                             ,st.session_state.n_starters
-                            ,base_h_score
-                            ,base_win_rates
+                            ,base_h_res
                             ,st.session_state.info_key
+                            ,draft_seat
                             )
 
         
@@ -249,21 +253,18 @@ def make_drafting_tab_live_data(H):
                                                     ,draft_seat
                                                     ,st.session_state.info_key)
 
-                    base_h_score = base_h_res['Scores']
-                    base_win_rates = base_h_res['Rates']
-
                 else:
-                    base_h_score = None
-                    base_win_rates = None
+                    base_h_res = None
+                    
 
                 make_full_team_tab(st.session_state.z_scores
                                 ,st.session_state.g_scores
                                 ,my_players
                                 ,st.session_state.n_drafters
                                 ,st.session_state.n_starters
-                                ,base_h_score
-                                ,base_win_rates
+                                ,base_h_res
                                 ,st.session_state.info_key
+                                ,draft_seat
                                 )        
 
             with cand_tab:
@@ -423,21 +424,17 @@ def make_auction_tab_own_data(H):
                                                 ,auction_seat
                                                 ,st.session_state.info_key)
 
-                base_h_score = base_h_res['Scores']
-                base_win_rates = base_h_res['Rates']
-
             else:
-                base_h_score = None
-                base_win_rates = None
+                base_h_res = None
 
             make_full_team_tab(st.session_state.z_scores
                                 ,st.session_state.g_scores
                                 ,my_players
                                 ,st.session_state.n_drafters
                                 ,st.session_state.n_picks
-                                ,base_h_score
-                                ,base_win_rates
+                                ,base_h_res
                                 ,st.session_state.info_key
+                                ,auction_seat
                                 )
 @st.fragment
 def make_auction_tab_live_data(H):
@@ -525,22 +522,18 @@ def make_auction_tab_live_data(H):
                                                     ,auction_seat
                                                     ,st.session_state.info_key)
 
-                    base_h_score = base_h_res['Scores']
-                    base_win_rates = base_h_res['Rates']
 
                 else:
-                    base_h_score = None
-                    base_win_rates = None
-
+                    base_h_res = None
 
                 make_full_team_tab(st.session_state.z_scores
                                     ,st.session_state.g_scores
                                     ,my_players
                                     ,st.session_state.n_drafters
                                     ,st.session_state.n_picks
-                                    ,base_h_score
-                                    ,base_win_rates
+                                    ,base_h_res
                                     ,st.session_state.info_key
+                                    ,auction_seat
                                     )
                 
             with cand_tab:

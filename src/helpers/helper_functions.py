@@ -347,46 +347,6 @@ def rotate(l, n):
   #rotate list l by n positions 
   return l[-n:] + l[:-n]
 
-def make_progress_chart(res : list[pd.DataFrame]):
-    """Chart the progress of gradient descent in action, for the top 10 players 
-
-    Args:
-        res: List of dataframes of H-scoring results
-
-    Returns:
-        Line chart showing scores per player by iteration
-
-    """
-    
-    data = pd.concat([pd.DataFrame({'H-score' : [r.loc[player] for r in res]
-                                , 'Player' : player
-                               , 'Iteration' : list(range(len(res)))})
-        for player in res[-1].sort_values(ascending = False).index[0:10]])
-    
-    fig = px.line(data
-                  , x = "Iteration"
-                  , y = 'H-score'
-                  , color = "Player")
-    
-    fig.update_layout(legend=dict(
-        yanchor="bottom",
-        y=0.01,
-        xanchor="right",
-        x=0.99
-                ))
-
-    fig.update_layout(yaxis={'visible': False, 'showticklabels': True})
-
-    fig.update_layout(margin=go.layout.Margin(
-                                    l=0, #left margin
-                                    r=0, #right margin
-                                    b=0, #bottom margin
-                                    t=0, #top margin
-                                            )
-                     )
-
-    return fig
-
 def weighted_cov_matrix(df, weights):
     weighted_means = np.average(df, axis=0, weights=weights)
     deviations = df - weighted_means
@@ -454,3 +414,4 @@ def get_data_from_snowflake(table_name
    df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
 
    return df
+
