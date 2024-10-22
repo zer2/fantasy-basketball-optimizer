@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
+from src.helpers.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
                                 ,get_ratio_statistics
 import os

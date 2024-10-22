@@ -3,11 +3,11 @@ import pandas as pd
 from scipy.stats import norm, rankdata
 import os
 from itertools import combinations
-from src.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
-from src.process_player_data import get_category_level_rv
+from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
+from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helper_functions import get_position_structure, get_position_indices, get_L_weights, get_selected_categories
-from src.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
+from src.helpers.helper_functions import get_position_structure, get_position_indices, get_L_weights, get_selected_categories
+from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 import datetime
 import scipy
 
@@ -25,6 +25,7 @@ class HAgent():
                  , fudge_factor : float = 1
                  , positions : pd.Series = None
                  , collect_info : bool = False
+                 , team_names : list = None
                     ):
         """Initializes an H-score agent, which can calculate H-scores based on given info 
 
@@ -47,6 +48,10 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
+        if team_names is not None:
+            self.team_names = team_names
+        else:
+            self.team_names = st.session_state.team_names
 
         #ZR: we really need to fix this later lol. The thing is that the positions table 
         #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
@@ -253,12 +258,12 @@ class HAgent():
 
             diff_means = np.vstack(
                 [self.get_diff_means_auction(x_self_sum.reshape(1,self.n_categories,1) - \
-                                                np.array(self.x_scores.loc[players].sum(axis = 0)).reshape(1,self.n_categories,1)
+                                                np.array(self.x_scores.loc[player_assignments[team]].sum(axis = 0)).reshape(1,self.n_categories,1)
                                             , cash_remaining_per_team[drafter] - cash_remaining_per_team[team]
-                                            , len(my_players) - len(players)
+                                            , len(my_players) - len(player_assignments[team])
                                             , category_value_per_dollar
-                                            , replacement_value_by_category) for team, players \
-                                        in player_assignments.items() if team != drafter]
+                                            , replacement_value_by_category) for team \
+                                        in self.team_names if team != drafter]
             ).T
 
         else: 
@@ -267,8 +272,8 @@ class HAgent():
             mean_extra_players = x_scores_available.iloc[0:extra_players_needed].mean().fillna(0)
 
             other_team_sums = np.vstack(
-                [self.get_opposing_team_means(players, mean_extra_players, len(my_players)) for team, players \
-                                        in player_assignments.items() if team != drafter]
+                [self.get_opposing_team_means(player_assignments[team], mean_extra_players, len(my_players)) for team \
+                                        in self.team_names if team != drafter]
             ).T
 
             diff_means = x_self_sum.reshape(1,self.n_categories,1) - \
@@ -294,8 +299,8 @@ class HAgent():
             n_values = None
 
         diff_vars = np.vstack(
-            [self.get_diff_var(len([p for p in players if p == p])) for team, players \
-                                    in player_assignments.items() if team != drafter]
+            [self.get_diff_var(len([p for p in player_assignments[team] if p == p])) for team \
+                                    in self.team_names if team != drafter]
         ).T
         
         diff_vars = diff_vars.reshape(1,self.n_categories,self.n_drafters - 1)
@@ -1215,3 +1220,42 @@ class AdamOptimizer:
         update = self.learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
         return update 
+    
+#ZR: This should be a method of the H-score class
+@st.cache_data(show_spinner = False, ttl = 3600)
+def get_base_h_score(_info : dict
+                , omega : float
+                , gamma : float
+                , n_picks : int
+                , n_drafters : int
+                , scoring_format : str
+                , chi : float
+                , player_assignments : dict[list[str]]
+                , team : str
+                , info_key : int):
+  """Calculate your team's H-score
+
+  Args:
+    info: dictionary with info related to player statistics etc. 
+    omega: float, parameter as described in the paper
+    gamma: float, parameter as described in the paper
+    n_picks: int, number of picks each drafter gets 
+    n_drafters: int, number of drafters
+    scoring_format: 
+    player_assignments : player assignment dictionary
+    team: name of team to evaluate
+
+  Returns:
+      None
+  """
+
+  H = HAgent(info = _info
+    , omega = omega
+    , gamma = gamma
+    , n_picks = n_picks
+    , n_drafters = n_drafters
+    , dynamic = False
+    , scoring_format = scoring_format
+    , chi = chi)
+
+  return next(H.get_h_scores(player_assignments, team))   

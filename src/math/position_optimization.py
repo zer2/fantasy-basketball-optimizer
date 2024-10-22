@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from src.helper_functions import get_position_structure, get_position_numbers, get_position_ranges, get_position_indices
+from src.helpers.helper_functions import get_position_structure, get_position_numbers, get_position_ranges, get_position_indices
 import streamlit as st
 import pandas as pd 
 

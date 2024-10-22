@@ -3,7 +3,7 @@ from scipy.stats import norm
 import numpy as np
 import streamlit as st
 from itertools import combinations
-from src.helper_functions import get_selected_categories
+from src.helpers.helper_functions import get_selected_categories
 import numexpr as ne
 
 def savor_calculation(raw_values_unselected : pd.Series

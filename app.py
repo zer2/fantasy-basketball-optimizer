@@ -7,17 +7,25 @@ import yaml
 from yfpy.models import League
 import time
 from schedule import every, repeat, run_pending
-from src.helper_functions import  get_position_numbers, listify \
+from src.helpers.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_info_key, increment_default_key \
                                   ,get_games_per_week, get_categories, get_ratio_statistics, get_selections_default
-from src.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
+from src.data_retrieval.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
                         get_player_metadata, get_data_from_snowflake, combine_nba_projections
-from src.process_player_data import process_player_data
-from src.algorithm_agents import HAgent
-from src.tabs import *
-from src.data_editor import make_data_editor
-from src.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
+from src.math.process_player_data import process_player_data
+from src.math.algorithm_agents import HAgent
+from src.tabs.ranks import make_rank_tab, make_h_rank_tab
+from src.tabs.trading import make_trade_destination_display, make_trade_h_tab, make_trade_score_tab, \
+                              make_trade_suggestion_display, make_trade_target_display
+from src.helpers.data_editor import make_data_editor
+from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
+from src.tabs.matchups import make_matchup_tab, make_matchup_matrix
+from src.tabs.team_subtabs import make_full_team_tab, roster_inspection
+from src.tabs.candidate_subtabs import make_h_waiver_df, make_waiver_tab
+from src.tabs.other_tabs import make_about_tab
+from src.math.algorithm_helpers import savor_calculation
+from src.math.algorithm_agents import get_base_h_score
 from src.platform_integration.fantrax_integration import FantraxIntegration
 from src.platform_integration.yahoo_integration import YahooIntegration
 from pandas.api.types import CategoricalDtype
@@ -56,9 +64,6 @@ if 'mode' not in st.session_state:
 
 if 'have_locked_in' not in st.session_state:
   st.session_state.have_locked_in = False
-
-if 'selections_df_original' not in st.session_state:
-    st.session_state['selections_df_original'] = pd.DataFrame()
 
 if 'live_draft_active' not in st.session_state:
     st.session_state.live_draft_active = False
@@ -176,7 +181,7 @@ with param_tab:
         , mode_options
         , index = 0
         , key = 'mode'
-        , on_change = increment_and_reset_draft())
+        , on_change = increment_and_reset_draft)
         
       if data_source == 'Enter your own data':
         n_drafters = st.number_input(r'How many drafters are in your league?'
@@ -201,10 +206,14 @@ with param_tab:
         st.session_state.team_names = list(team_df.iloc[0])
                              
         # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-        
+        #Should this just be called if selections_df not in session state?
         st.session_state.selections_default = pd.DataFrame(
           {team : [np.nan] * st.session_state.n_picks for team in st.session_state.team_names}
           )
+        
+        if 'selections_df' not in st.session_state:
+          st.session_state.selections_df = st.session_state.selections_default 
+
 
       elif data_source == 'Retrieve from Yahoo Fantasy':
 
@@ -212,24 +221,13 @@ with param_tab:
         yahoo_integration.setup()
 
         st.session_state.integration = yahoo_integration
-
-        st.session_state.team_names = yahoo_integration.get_team_names(yahoo_integration.league_id) 
-        st.session_state.n_drafters = len(yahoo_integration.team_names)
-        st.session_state.n_picks = yahoo_integration.get_n_picks(yahoo_integration.league_id)
-        st.session_state.selections_default = yahoo_integration.selections_default
               
       elif data_source == 'Retrieve from Fantrax':     
 
           fantrax_integration = FantraxIntegration()     
 
           fantrax_integration.setup()
-
           st.session_state.integration = fantrax_integration
-
-          st.session_state.team_names = fantrax_integration.get_team_names(fantrax_integration.league_id) 
-          st.session_state.n_drafters = len(fantrax_integration.team_names)
-          st.session_state.n_picks = fantrax_integration.get_n_picks(fantrax_integration.league_id)
-          st.session_state.selections_default = fantrax_integration.selections_default
 
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
@@ -278,6 +276,7 @@ with param_tab:
             kind_of_dataset = st.selectbox(
                                       'Which kind of dataset do you want to use? (specify further on the data tab)'
                                       , data_options
+                                      ,key = 'data_option'
                                       , index = 0
             )
 
@@ -408,7 +407,18 @@ with param_tab:
                             , 0
                             , 1
                             , 0)
-                    
+
+  if 'integration' in st.session_state:
+        #ZR: These should be managed properties 
+    st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                                              ,st.session_state.integration.division_id) 
+    st.session_state.n_drafters = len(st.session_state.team_names)
+    st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
+
+    st.session_state.selections_default = st.session_state.integration.selections_default
+
+    st.session_state.selections_df = st.session_state.selections_default
+            
   with advanced_params:
 
       player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
@@ -739,9 +749,6 @@ with info_tab:
                     
       st.dataframe(game_stats)
 
-if 'selections_df' not in st.session_state:
-  st.session_state.selections_df = st.session_state.selections_default
-
 with rank_tab:
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
       
@@ -864,15 +871,15 @@ elif st.session_state['mode'] == 'Season Mode':
       
     with left:
 
-
       st.caption("""Enter which player is on which team below""")
-      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index), ordered=True)
+      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index) + ['RP']
+                                              , ordered=True)
 
       with st.form('manual_rosters'):
 
         selections_df = st.data_editor(st.session_state.selections_df.astype(player_category_type)
                                           , hide_index = True
-                                          , height = st.session_state.n_picks * 35 + 50)  
+                                          , height = st.session_state.n_picks * 35 + 50).fillna('RP')
         
         c1, c2 = st.columns([0.2,0.8])
             
@@ -890,41 +897,13 @@ elif st.session_state['mode'] == 'Season Mode':
 
       with right: 
 
-        roster_inspection_seat = st.selectbox(f'Which team do you want to get aggregated statistics for?'
-        , selections_df.columns
-        , index = 0)
-
-        inspection_players = selections_df[roster_inspection_seat].dropna()
-
-        if len(inspection_players) == st.session_state.n_picks:
-
-          base_h_res = get_base_h_score(info
-                                        ,omega
-                                        ,gamma
-                                        ,st.session_state.n_picks
-                                        ,st.session_state.n_drafters
-                                        ,scoring_format
-                                        ,chi
-                                        ,player_assignments
-                                        ,roster_inspection_seat
-                                        ,st.session_state.info_key)
-
-          base_h_score = base_h_res['Scores']
-          base_win_rates = base_h_res['Rates']
-
-        else:
-          base_h_score = None
-          base_win_rates = None
-
-        make_full_team_tab(st.session_state.z_scores
-                            ,st.session_state.g_scores
-                            ,inspection_players
-                            ,st.session_state.n_drafters
-                            ,st.session_state.n_picks
-                            ,base_h_score
-                            ,base_win_rates
-                            ,st.session_state.info_key
-                            )
+        roster_inspection(selections_df.fillna('RP')
+                        , info
+                        , omega
+                        , gamma
+                        , scoring_format
+                        , chi
+                        , player_assignments)  
 
   with matchup_tab:
 
@@ -973,7 +952,7 @@ elif st.session_state['mode'] == 'Season Mode':
                   expected game volume for each player based on the NBA's schedule""")
 
         make_matchup_tab(player_stats
-                        , st.session_state.selections_df
+                        , selections_df
                         , matchup_seat
                         , opponent_seat
                         , matchup_week
@@ -993,7 +972,7 @@ elif st.session_state['mode'] == 'Season Mode':
             , index = 0)
 
       with c2: 
-          waiver_players = selections_df[waiver_inspection_seat].dropna()
+          waiver_players = [x for x in selections_df[waiver_inspection_seat] if x != 'RP']
 
           if len(waiver_players) < st.session_state.n_picks:
               st.markdown("""This team is not full yet!""")
@@ -1021,55 +1000,55 @@ elif st.session_state['mode'] == 'Season Mode':
 
       if len(waiver_players) == st.session_state.n_picks:
 
-        mod_waiver_players = [x for x in waiver_players if x != drop_player]
+            mod_waiver_players = [x for x in waiver_players if x != drop_player]
 
-        z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-        with z_waiver_tab:
+            with z_waiver_tab:
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(z_scores
-                          , selection_list
-                          , waiver_team_stats_z
-                          , drop_player
-                          , st.session_state.params['z-score-team-multiplier']
-                          , st.session_state.info_key)
+                st.markdown('Projected team stats with chosen player:')
+                make_waiver_tab(z_scores
+                              , selection_list
+                              , waiver_team_stats_z
+                              , drop_player
+                              , st.session_state.params['z-score-team-multiplier']
+                              , st.session_state.info_key)
 
-        with g_waiver_tab:
+            with g_waiver_tab:
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(st.session_state.g_scores
-                          , selection_list
-                          , waiver_team_stats_g
-                          , drop_player
-                          , st.session_state.params['g-score-team-multiplier']
-                          , st.session_state.info_key)
+                st.markdown('Projected team stats with chosen player:')
+                make_waiver_tab(st.session_state.g_scores
+                              , selection_list
+                              , waiver_team_stats_g
+                              , drop_player
+                              , st.session_state.params['g-score-team-multiplier']
+                              , st.session_state.info_key)
 
-        with h_waiver_tab:
+            with h_waiver_tab:
 
-            base_h_res = get_base_h_score(info
-                            ,omega
-                            ,gamma
-                            ,st.session_state.n_picks
-                            ,st.session_state.n_drafters
-                            ,scoring_format
-                            ,chi
-                            ,player_assignments
-                            ,waiver_inspection_seat
-                            ,st.session_state.info_key)
+                base_h_res = get_base_h_score(info
+                                ,omega
+                                ,gamma
+                                ,st.session_state.n_picks
+                                ,st.session_state.n_drafters
+                                ,scoring_format
+                                ,chi
+                                ,player_assignments
+                                ,waiver_inspection_seat
+                                ,st.session_state.info_key)
 
-            waiver_base_h_score = base_h_res['Scores']
-            waiver_base_win_rates = base_h_res['Rates']
+                waiver_base_h_score = base_h_res['Scores']
+                waiver_base_win_rates = base_h_res['Rates']
 
-            make_h_waiver_df(H
-                        , player_stats
-                        , mod_waiver_players
-                        , drop_player
-                        , player_assignments
-                        , waiver_inspection_seat
-                        , waiver_base_h_score
-                        , waiver_base_win_rates
-                        , st.session_state.info_key)
+                make_h_waiver_df(H
+                            , player_stats
+                            , mod_waiver_players
+                            , drop_player
+                            , player_assignments
+                            , waiver_inspection_seat
+                            , waiver_base_h_score
+                            , waiver_base_win_rates
+                            , st.session_state.info_key)
 
   with trade_tab:
 
@@ -1081,16 +1060,16 @@ elif st.session_state['mode'] == 'Season Mode':
           , index = 0)
 
     with c2: 
-      trade_party_players = selections_df[trade_party_seat].dropna()
+      trade_party_players = [x for x in selections_df[trade_party_seat] if x != 'RP']
 
       if len(trade_party_players) < st.session_state.n_picks:
           st.markdown("""This team is not full yet! Fill it and other teams out on the 
-                      "Teams" page then come back here""")
+                      "Rosters" page then come back here""")
 
       else:
         
         counterparty_players_dict = { team : players for team, players in selections_df.items() 
-                                if ((team != trade_party_seat) & (not  any(p!=p for p in players)))
+                                if ((team != trade_party_seat) & (not  any(p == 'RP' for p in players)))
                                   }
         
         if len(counterparty_players_dict) >=1:

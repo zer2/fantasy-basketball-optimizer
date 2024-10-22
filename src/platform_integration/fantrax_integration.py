@@ -1,9 +1,10 @@
 from fantraxapi import FantraxAPI
 import streamlit as st
-from src.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.drafting import clear_draft_board
+from src.tabs.drafting import clear_draft_board
+from src.data_retrieval.get_data import get_player_metadata
 
 class FantraxIntegration(PlatformIntegration):
 
@@ -62,30 +63,29 @@ class FantraxIntegration(PlatformIntegration):
                 
             self.teams_dict = self.get_teams_dict_by_division(self.league_id, self.division_id)
 
-            self.team_names = list(self.teams_dict.keys())  
-            self.n_drafters = len(self.team_names)
-            self.n_picks = self.get_n_picks(self.league_id)
+        self.team_names = list(self.teams_dict.keys())  
+        self.n_drafters = len(self.team_names)
+        self.n_picks = self.get_n_picks(self.league_id)
 
-            if (st.session_state.mode == 'Draft Mode'):
-                self.selections_default = get_selections_default(self.n_picks
-                                                                ,self.n_drafters)
-            else:
-                #this is all messed up lol
+        if (st.session_state.mode == 'Draft Mode'):
+            self.selections_default = get_selections_default(self.n_picks
+                                                            ,self.n_drafters)
+        else:
+            #this is all messed up lol
 
-                st.session_state.player_metadata = st.session_state.player_stats['Position']
-                player_metadata = st.session_state.player_metadata.copy()
-                player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
+            st.session_state.player_metadata = get_player_metadata()
+            player_metadata = st.session_state.player_metadata.copy()
+            player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
-                self.selections_default = self.get_rosters_df(player_metadata)
-                self.n_drafters = st.session_state.selections_default.shape[1]
-                self.n_picks = st.session_state.selections_default.shape[0]
+            self.selections_default = self.get_rosters_df(player_metadata)
+            self.n_drafters = st.session_state.selections_default.shape[1]
+            self.n_picks = st.session_state.selections_default.shape[0]
 
-                st.session_state['schedule'] = None
-                st.session_state['matchups'] = None
+            st.session_state['schedule'] = None
+            st.session_state['matchups'] = None
 
-                st.write('Team info successfully retrieved from fantrax! :partying_face:')
-                st.write('Note that for fantrax, only active players are pulled in and counted')
-
+        st.write('Team info successfully retrieved from fantrax! :partying_face:')
+        st.write('Note that for fantrax, only active players are pulled in and counted')
 
     @st.cache_data()
     def get_division_dict(_self
@@ -171,12 +171,24 @@ class FantraxIntegration(PlatformIntegration):
             DataFrame with roster info
         """
     
-        exclusions = ('2','3') if st.session_state.mode == 'Season Mode' else ()
+        exclusions = ('3') if st.session_state.mode == 'Season Mode' else ()
+
+        def get_rosters(team_id):
+            roster = []
+            for z in _self.get_team_info(team_id):
+                if 'scorer' in z: 
+                    player = get_fixed_player_name(z['scorer']['name'], player_metadata)
+                    if z['statusId'] in exclusions:
+                        st.session_state['injured_players'].add(player)
+                    else:
+                        roster = roster + [player]
+            return roster
         
-        rosters = { name : [ get_fixed_player_name(z['scorer']['name'], player_metadata) \
-                            for z in _self.get_team_info(team_id) if 'scorer' in z and z['statusId'] not in exclusions] 
+        rosters = { name : get_rosters(team_id) 
                             for name, team_id in _self.teams_dict.items() 
             }
+
+        []
         
         rosters_df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in rosters.items() ]))
                 
@@ -206,8 +218,9 @@ class FantraxIntegration(PlatformIntegration):
     
     @st.cache_data()
     def get_team_names(_self
-                       , league_id) -> list:
-        #get list of team names. Cached by league id; when league id changes the function will refresh
+                       , league_id
+                       , division_id) -> list:
+        #get list of team names. Cached by league id and division id; when they change the function will refresh
         return list(_self.teams_dict.keys())
     
     

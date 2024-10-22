@@ -1,5 +1,5 @@
-from src.algorithm_agents import HAgent
-from src.algorithm_helpers import savor_calculation, combinatorial_calculation, calculate_tipping_points
+from src.math.algorithm_agents import HAgent
+from src.math.algorithm_helpers import savor_calculation, combinatorial_calculation, calculate_tipping_points
 from streamlit.testing.v1 import AppTest
 import numpy as np 
 import pandas as pd

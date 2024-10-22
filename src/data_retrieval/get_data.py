@@ -7,8 +7,8 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helper_functions import get_n_games, get_data_from_snowflake
-from src.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake
+from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
 
 def get_yahoo_key_to_name_mapper():
@@ -143,7 +143,11 @@ def get_player_metadata() -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   return st.session_state.player_stats['Position']
+   df = get_htb_projections()
+   df.index = df.index + ' (' + df['Position'] + ')'
+   df.index.name = 'Player'
+
+   return df['Position']
 
    '''
    playerindex = nba_endpoints.playerindex.PlayerIndex()
@@ -337,6 +341,10 @@ def combine_nba_projections(hashtag_upload
     df = df.reindex(new_index)
     
     weights = [hashtag_slider, rotowire_slider, bbm_slider]
+
+    player_ineligible = (df.isna().groupby('Player').sum() == 3).sum(axis = 1) > 0
+    inelegible_players = player_ineligible.index[player_ineligible]
+    df = df[~df.index.get_level_values('Player').isin(inelegible_players)]
     
     df = df.groupby('Player') \
                 .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
@@ -413,6 +421,8 @@ def get_htb_adp():
          name = 'OG Anunoby'
       if name == 'Alexandre Sarr':
          name = 'Alex Sarr'
+      if name == 'Rob Dillingham':
+         name = 'Robert Dillingham'
       return name
       
    df['Player'] = [name_renamer(name) for name in df['Player']]
@@ -450,6 +460,8 @@ def get_htb_projections():
          name = 'OG Anunoby'
       if name == 'Alexandre Sarr':
          name = 'Alex Sarr'
+      if name == 'Rob Dillingham':
+         name = 'Robert Dillingham'
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
@@ -473,11 +485,16 @@ def get_htb_projections():
 def process_basketball_monster_data(raw_df):
    
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
+
+   #handling case where there is an extra column that gets interpreted as a missing value
+   raw_df = raw_df.loc[:,[c for c in raw_df.columns if 'Unnamed' not in c]]
+
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
 
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
    
    def name_renamer(name):
+      name = unidecode(name)
       name = ' '.join(name.split(' ')[0:2])
       if name == 'Nicolas Claxton':
          name = 'Nic Claxton'
@@ -493,7 +510,11 @@ def process_basketball_monster_data(raw_df):
          name = 'OG Anunoby'
       if name == 'Alexandre Sarr':
          name = 'Alex Sarr'
+      if name == 'Rob Dillingham':
+         name = 'Robert Dillingham'
       return name
+      
+   raw_df = raw_df.dropna()
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
 
