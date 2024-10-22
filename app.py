@@ -409,9 +409,7 @@ with param_tab:
                             , 0)
 
   if 'integration' in st.session_state:
-    
-    st.session_state.integration.set_defaults()
-    #ZR: These should be managed properties 
+        #ZR: These should be managed properties 
     st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
                                                                               ,st.session_state.integration.division_id) 
     st.session_state.n_drafters = len(st.session_state.team_names)

@@ -125,13 +125,7 @@ class YahooIntegration(PlatformIntegration):
             self.n_picks = 13 #ZR: fix this
             self.selections_default = get_selections_default(self.n_picks,self.n_drafters
             )
-
-    def set_defaults(self):
-        pass
-
-
-
-              
+    
     def get_yahoo_access_token(_self) -> Optional[str]:
         # Client_ID and Secret from https://developer.yahoo.com/apps/
         cid = st.secrets["YAHOO_CLIENT_ID"]

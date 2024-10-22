@@ -86,9 +86,6 @@ class FantraxIntegration(PlatformIntegration):
 
         st.write('Team info successfully retrieved from fantrax! :partying_face:')
         st.write('Note that for fantrax, only active players are pulled in and counted')
-    def set_defaults(self):
-        pass
-
 
     @st.cache_data()
     def get_division_dict(_self

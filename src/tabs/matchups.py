@@ -89,7 +89,8 @@ def make_matchup_matrix(_x_scores : pd.DataFrame
 
       matchup_df_styled = matchup_df_styled.apply(highlight_diag, axis = None) \
                                           .apply(highlight_diag_2, axis = None)
-      st.dataframe(matchup_df_styled)
+      st.dataframe(matchup_df_styled
+                    , height = 35 * len(matchup_df) + 38)
     
     else: 
 
@@ -142,7 +143,9 @@ def make_matchup_tab(player_stats
   win_probabilities.loc[:,'Overall'] = result
   win_probabilities = win_probabilities[['Overall'] + get_selected_categories()]
   win_probabilities_styled = h_percentage_styler(win_probabilities)
-  st.dataframe(win_probabilities_styled, hide_index = True)
+  st.dataframe(win_probabilities_styled
+                , hide_index = True
+                , height = 35 * len(win_probabilities) + 38)
 
 
 @st.cache_data(show_spinner = False, ttl = 3600)
