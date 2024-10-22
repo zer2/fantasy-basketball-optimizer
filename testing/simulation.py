@@ -1,11 +1,11 @@
 
 import numpy as np
 import pandas as pd
-from src.algorithm_agents import HAgent, SimpleAgent
-from src.helper_functions import get_selected_categories, stat_styler, styler_a, rotate
-from src.process_player_data import process_player_data
-from src.get_data import get_player_metadata
-from src.tabs import make_team_tab
+from src.math.algorithm_agents import HAgent, SimpleAgent
+from src.helpers.helper_functions import get_selected_categories, stat_styler, styler_a, rotate
+from src.math.process_player_data import process_player_data
+from src.data_retrieval.get_data import get_player_metadata
+from src.tabs.other_tabs import make_team_tab
 import copy
 import datetime
 import streamlit as st

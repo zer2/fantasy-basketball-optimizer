@@ -16,6 +16,12 @@ def get_user_leagues(sc: YahooFantasySportsQuery) -> List[League]:
     Returns:
     - List[League]: A list of the leagues.
     """
+    leagues: List[dict[str, League]] = sc.get_user_leagues_by_game_key(game_key="nba") # type: ignore
+
+    if isinstance(leagues[0], dict):
+        # The yfpy method for some reason sometimes returns a list of dicts rather than the leagues directly
+        leagues = [league_dict["league"] for league_dict in leagues] 
+
     try:
         leagues: List[dict[str, League]] = sc.get_user_leagues_by_game_key(game_key="nba") # type: ignore
 

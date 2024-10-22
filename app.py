@@ -220,8 +220,6 @@ with param_tab:
         yahoo_integration = YahooIntegration()
         yahoo_integration.setup()
 
-        st.session_state.n_picks = yahoo_integration.get_n_picks(yahoo_integration.league_id)
-
         st.session_state.integration = yahoo_integration
               
       elif data_source == 'Retrieve from Fantrax':     
@@ -229,7 +227,6 @@ with param_tab:
           fantrax_integration = FantraxIntegration()     
 
           fantrax_integration.setup()
-          st.session_state.n_picks = fantrax_integration.get_n_picks(fantrax_integration.league_id)
           st.session_state.integration = fantrax_integration
 
       #set default position numbers, based on n_picks
@@ -279,6 +276,7 @@ with param_tab:
             kind_of_dataset = st.selectbox(
                                       'Which kind of dataset do you want to use? (specify further on the data tab)'
                                       , data_options
+                                      ,key = 'data_option'
                                       , index = 0
             )
 
@@ -414,8 +412,11 @@ with param_tab:
     
     st.session_state.integration.set_defaults()
     #ZR: These should be managed properties 
-    st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id) 
+    st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                                              ,st.session_state.integration.division_id) 
     st.session_state.n_drafters = len(st.session_state.team_names)
+    st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
+
     st.session_state.selections_default = st.session_state.integration.selections_default
 
     st.session_state.selections_df = st.session_state.selections_default
@@ -873,13 +874,14 @@ elif st.session_state['mode'] == 'Season Mode':
     with left:
 
       st.caption("""Enter which player is on which team below""")
-      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index), ordered=True)
+      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index) + ['RP']
+                                              , ordered=True)
 
       with st.form('manual_rosters'):
 
         selections_df = st.data_editor(st.session_state.selections_df.astype(player_category_type)
                                           , hide_index = True
-                                          , height = st.session_state.n_picks * 35 + 50)  
+                                          , height = st.session_state.n_picks * 35 + 50).fillna('RP')
         
         c1, c2 = st.columns([0.2,0.8])
             
@@ -897,7 +899,7 @@ elif st.session_state['mode'] == 'Season Mode':
 
       with right: 
 
-        roster_inspection(selections_df
+        roster_inspection(selections_df.fillna('RP')
                         , info
                         , omega
                         , gamma
@@ -972,7 +974,7 @@ elif st.session_state['mode'] == 'Season Mode':
             , index = 0)
 
       with c2: 
-          waiver_players = selections_df[waiver_inspection_seat].dropna()
+          waiver_players = [x for x in selections_df[waiver_inspection_seat] if x != 'RP']
 
           if len(waiver_players) < st.session_state.n_picks:
               st.markdown("""This team is not full yet!""")
@@ -1000,55 +1002,55 @@ elif st.session_state['mode'] == 'Season Mode':
 
       if len(waiver_players) == st.session_state.n_picks:
 
-        mod_waiver_players = [x for x in waiver_players if x != drop_player]
+            mod_waiver_players = [x for x in waiver_players if x != drop_player]
 
-        z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
+            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
 
-        with z_waiver_tab:
+            with z_waiver_tab:
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(z_scores
-                          , selection_list
-                          , waiver_team_stats_z
-                          , drop_player
-                          , st.session_state.params['z-score-team-multiplier']
-                          , st.session_state.info_key)
+                st.markdown('Projected team stats with chosen player:')
+                make_waiver_tab(z_scores
+                              , selection_list
+                              , waiver_team_stats_z
+                              , drop_player
+                              , st.session_state.params['z-score-team-multiplier']
+                              , st.session_state.info_key)
 
-        with g_waiver_tab:
+            with g_waiver_tab:
 
-            st.markdown('Projected team stats with chosen player:')
-            make_waiver_tab(st.session_state.g_scores
-                          , selection_list
-                          , waiver_team_stats_g
-                          , drop_player
-                          , st.session_state.params['g-score-team-multiplier']
-                          , st.session_state.info_key)
+                st.markdown('Projected team stats with chosen player:')
+                make_waiver_tab(st.session_state.g_scores
+                              , selection_list
+                              , waiver_team_stats_g
+                              , drop_player
+                              , st.session_state.params['g-score-team-multiplier']
+                              , st.session_state.info_key)
 
-        with h_waiver_tab:
+            with h_waiver_tab:
 
-            base_h_res = get_base_h_score(info
-                            ,omega
-                            ,gamma
-                            ,st.session_state.n_picks
-                            ,st.session_state.n_drafters
-                            ,scoring_format
-                            ,chi
-                            ,player_assignments
-                            ,waiver_inspection_seat
-                            ,st.session_state.info_key)
+                base_h_res = get_base_h_score(info
+                                ,omega
+                                ,gamma
+                                ,st.session_state.n_picks
+                                ,st.session_state.n_drafters
+                                ,scoring_format
+                                ,chi
+                                ,player_assignments
+                                ,waiver_inspection_seat
+                                ,st.session_state.info_key)
 
-            waiver_base_h_score = base_h_res['Scores']
-            waiver_base_win_rates = base_h_res['Rates']
+                waiver_base_h_score = base_h_res['Scores']
+                waiver_base_win_rates = base_h_res['Rates']
 
-            make_h_waiver_df(H
-                        , player_stats
-                        , mod_waiver_players
-                        , drop_player
-                        , player_assignments
-                        , waiver_inspection_seat
-                        , waiver_base_h_score
-                        , waiver_base_win_rates
-                        , st.session_state.info_key)
+                make_h_waiver_df(H
+                            , player_stats
+                            , mod_waiver_players
+                            , drop_player
+                            , player_assignments
+                            , waiver_inspection_seat
+                            , waiver_base_h_score
+                            , waiver_base_win_rates
+                            , st.session_state.info_key)
 
   with trade_tab:
 
@@ -1060,16 +1062,16 @@ elif st.session_state['mode'] == 'Season Mode':
           , index = 0)
 
     with c2: 
-      trade_party_players = selections_df[trade_party_seat].dropna()
+      trade_party_players = [x for x in selections_df[trade_party_seat] if x != 'RP']
 
       if len(trade_party_players) < st.session_state.n_picks:
           st.markdown("""This team is not full yet! Fill it and other teams out on the 
-                      "Teams" page then come back here""")
+                      "Rosters" page then come back here""")
 
       else:
         
         counterparty_players_dict = { team : players for team, players in selections_df.items() 
-                                if ((team != trade_party_seat) & (not  any(p!=p for p in players)))
+                                if ((team != trade_party_seat) & (not  any(p == 'RP' for p in players)))
                                   }
         
         if len(counterparty_players_dict) >=1:

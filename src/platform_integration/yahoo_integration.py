@@ -51,6 +51,7 @@ class YahooIntegration(PlatformIntegration):
             None
         """
         self.auth_dir = self.get_yahoo_access_token()
+        self.division_id = None #as far as I know, yahoo doesnt have divisions
 
         if self.auth_dir is None:
           st.stop()
@@ -74,6 +75,7 @@ class YahooIntegration(PlatformIntegration):
               #ZR: Ideally we could fix this for mock drafts with dummies
               self.n_drafters = len(self.get_teams_dict(self.league_id))
               self.team_names = self.get_team_names(self.league_id)
+              self.n_picks = 13
 
           else:
                self.league_id = st.number_input(label =  "For a mock draft, manually write in league ID (from URL, after mlid = )"
@@ -81,7 +83,6 @@ class YahooIntegration(PlatformIntegration):
                                ,value = None
                                ,key = 'yahoo_league_id'
                                , on_change = increment_and_reset_draft)
-               self.n_picks = 13 #hack
                if self.league_id is not None:
                 self.team_names = self.get_team_names(self.league_id)
                 self.n_drafters = len(self.get_teams_dict(self.league_id)) 
@@ -91,9 +92,7 @@ class YahooIntegration(PlatformIntegration):
 
         st.write('Player info successfully retrieved from yahoo fantasy! :partying_face:')
 
-    def set_defaults(self):
-
-          if (st.session_state.mode == 'Season Mode'):
+        if (st.session_state.mode == 'Season Mode'):
 
               player_metadata = get_player_metadata()
 
@@ -119,12 +118,18 @@ class YahooIntegration(PlatformIntegration):
               #  
               #st.session_state['matchups'] = self.get_yahoo_matchups(st.session_state.yahoo_league_id)
 
-          else:
+        else:
 
             self.n_drafters = len(self.get_teams_dict(self.league_id))
             self.team_names = list(self.get_teams_dict(self.league_id).values())
             self.n_picks = 13 #ZR: fix this
-            self.selections_default = get_selections_default(self.n_picks,self.n_drafters)
+            self.selections_default = get_selections_default(self.n_picks,self.n_drafters
+            )
+
+    def set_defaults(self):
+        pass
+
+
 
               
     def get_yahoo_access_token(_self) -> Optional[str]:
@@ -244,7 +249,7 @@ class YahooIntegration(PlatformIntegration):
 
         return players_df
 
-    @st.cache_data(ttl=300, show_spinner = False)
+    #@st.cache_data(ttl=300, show_spinner = False)
     def get_teams_dict(_self
                        , league_id: str) -> dict[int, str]:
         """Get a dictionary relating the names of teams to their associated IDs
@@ -311,7 +316,7 @@ class YahooIntegration(PlatformIntegration):
         
         return rosters_dict
 
-    @st.cache_data(ttl=3600, show_spinner = False)
+    #@st.cache_data(ttl=3600, show_spinner = False)
     def get_user_leagues(_self) -> List[League]:
         """Get a list of leagues that the user is a part of 
 
@@ -327,7 +332,7 @@ class YahooIntegration(PlatformIntegration):
             game_code="nba"
         )
         LOGGER.info(f"sc: {sc}")
-        leagues = yahoo_helper.get_user_leagues(sc)        
+        leagues = yahoo_helper.get_user_leagues(sc)       
         
         # Sort in reverse chronological order
         sorted_leagues = sorted(leagues, key = lambda league: league.season, reverse=True)
@@ -360,12 +365,12 @@ class YahooIntegration(PlatformIntegration):
                 f'{standardize_name(player.name.full)} ({player_metadata.loc[standardize_name(player.name.full)]})' #Appending position after player name
                 for player in roster.players 
                 if 
-                    player.selected_position.position != 'IL'
+                    player.selected_position.position not in ('IL', 'IL+')
                     and player.selected_position.position is not None
             ]
 
             for player in roster.players:
-                if player.selected_position.position == 'IL':
+                if player.selected_position.position in ('IL', 'IL+'):
                     st.session_state['injured_players'].add( \
                                 f'{standardize_name(player.name.full)} ({player_metadata.loc[standardize_name(player.name.full)]})' 
                                                             )
@@ -442,15 +447,13 @@ class YahooIntegration(PlatformIntegration):
     @st.cache_resource(ttl=3600)
     def get_yahoo_schedule(_self
                            ,league_id: str
-                           , _auth_path: str
                            , player_metadata: pd.Series) -> dict[int, str]:
         #get numbers of games played per week by each team. Currently not being used
 
-        yahoo_weeks = _self.get_yahoo_weeks(league_id, _auth_path)
+        yahoo_weeks = _self.get_yahoo_weeks(league_id)
         nba_schedule = get_nba_schedule()
 
         league_players = _self.get_player_statuses(league_id
-                                                , _auth_path
                                                 , player_metadata)
         
         league_players = league_players.set_index('Player')
@@ -625,5 +628,5 @@ class YahooIntegration(PlatformIntegration):
     def get_n_picks(_self, league_id):
         return _self.n_picks
     
-    def get_team_names(_self, league_id):
+    def get_team_names(_self, league_id, division_id = None):
         return list(_self.get_teams_dict(league_id).values())

@@ -149,8 +149,10 @@ def make_full_team_tab(z_scores : pd.DataFrame
 
     with z_team_tab:
 
+        my_real_players = [x for x in my_players if x != 'RP']
+
         make_team_tab(z_scores
-                      , my_players
+                      , my_real_players
                       , n_drafters
                       , st.session_state.params['z-score-player-multiplier']
                       , st.session_state.params['z-score-team-multiplier']
@@ -159,7 +161,7 @@ def make_full_team_tab(z_scores : pd.DataFrame
     with g_team_tab:
 
         make_team_tab(g_scores
-                        , my_players
+                        , my_real_players
                         , n_drafters
                         , st.session_state.params['g-score-player-multiplier']
                         , st.session_state.params['g-score-team-multiplier']

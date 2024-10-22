@@ -191,15 +191,21 @@ def make_h_cand_tab(_H
               st.stop()
 
             rate_df = win_rates.loc[score_df.index].dropna()
-            rate_display = score_df.merge(adps, left_index = True, right_index = True, how = 'left') \
-                                    .merge(rate_df, left_index = True, right_index = True)           
+
+            if st.session_state.data_option == 'Projection':
+              rate_display = score_df.merge(adps, left_index = True, right_index = True, how = 'left') \
+                                      .merge(rate_df, left_index = True, right_index = True)      
+              adp_col = ['ADP']
+            else:
+              rate_display = score_df.merge(rate_df, left_index = True, right_index = True)    
+              adp_col = []
             
             rate_display_styled = rate_display.style.format("{:.1%}"
                               ,subset = pd.IndexSlice[:,['H-score']]) \
                                                     .format("{:.1f}"
-                              ,subset = pd.IndexSlice[:,['ADP']]) \
+                              ,subset = pd.IndexSlice[:,adp_col]) \
                       .map(styler_a
-                            , subset = pd.IndexSlice[:,['H-score','ADP']]) \
+                            , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                       .format('{:,.1%}', subset = rate_df.columns)
             st.dataframe(rate_display_styled, use_container_width = True)
@@ -335,7 +341,6 @@ def make_waiver_tab(_scores : pd.DataFrame
   Returns:
       None
   """
-
   scores_unselected = _scores[~_scores.index.isin(selection_list + ['RP'])]
 
   no_drop = team_stats.loc[['Total'],:]
@@ -381,14 +386,18 @@ def make_h_waiver_df(_H
   Returns:
       None
   """
+
   player_assignments_post_drop = player_assignments.copy()
   player_assignments_post_drop[team] = mod_my_players
   h_score_results = next(_H.get_h_scores(player_assignments_post_drop, team))
 
   res = h_score_results['Scores']
+
   res = res.drop(index = [drop_player])
   win_rates = h_score_results['Rates'] 
+
   win_rates = win_rates.drop(index = [drop_player]) #we can think about other ways to do this
+
 
   res = res.sort_values(ascending = False)
   win_rates = win_rates.loc[res.index]
