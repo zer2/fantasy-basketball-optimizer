@@ -7,6 +7,188 @@ from src.math.algorithm_agents import HAgent
 import itertools
 from src.math.algorithm_helpers import combinatorial_calculation
 
+@st.fragment
+def make_trade_tab(H
+                   ,selections_df
+                   ,player_stats
+                   , player_assignments
+                   , z_scores_unselected
+                   , g_scores_unselected
+                   , combo_params
+                   , rotisserie
+                   , your_differential_threshold
+                   , their_differential_threshold):
+  c1, c2 = st.columns([0.5,0.5])
+
+  with c1: 
+    trade_party_seat = st.selectbox(f'Which team do you want to trade from?'
+        , selections_df.columns
+        , index = 0)
+
+  with c2: 
+    trade_party_players = [x for x in selections_df[trade_party_seat] if x != 'RP']
+
+    if len(trade_party_players) < st.session_state.n_picks:
+        st.markdown("""This team is not full yet! Fill it and other teams out on the 
+                    "Rosters" page then come back here""")
+
+    else:
+        
+        counterparty_players_dict = { team : players for team, players in selections_df.items() 
+                                if ((team != trade_party_seat) & (not  any(p == 'RP' for p in players)))
+                                  }
+        
+        if len(counterparty_players_dict) >=1:
+
+          trade_counterparty_seat = st.selectbox(
+              f'Which team do you want to trade with?',
+              [s for s in counterparty_players_dict.keys()],
+              index = 0
+            )
+          
+          trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
+
+        else: 
+          trade_counterparty_players = []
+
+  if len(trade_party_players) == st.session_state.n_picks:
+
+    if len(trade_counterparty_players) < st.session_state.n_picks:
+      st.markdown('The other team is not full yet!')
+    else:
+
+      inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
+                                                          ,'Destinations'
+                                                          ,'Targets'
+                                                          ,'Trade Suggestions'
+                                                          ])
+      with inspection_tab:
+
+          c1, c2 = st.columns(2)
+
+          with c1: 
+
+            with st.form("trade inspection form"):
+
+              players_sent = st.multiselect(
+                'Which players are you trading?'
+                ,trade_party_players
+                )
+                
+              players_received = st.multiselect(
+                    'Which players are you receiving?'
+                    ,trade_counterparty_players
+                )
+
+              submitted = st.form_submit_button("Submit"
+                                                , use_container_width = True)
+
+          with c2: 
+
+            z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
+
+            if (len(players_sent) == 0) | (len(players_received) == 0):
+              st.markdown('A trade must include at least one player from each team')
+
+            else:
+
+              with z_tab:
+                make_trade_score_tab(st.session_state.z_scores 
+                                  , players_sent
+                                  , players_received 
+                                  , st.session_state.params['z-score-player-multiplier']
+                                  , st.session_state.params['z-score-team-multiplier']
+                                  , st.session_state.info_key
+                                  )
+              with g_tab:
+                make_trade_score_tab(st.session_state.g_scores 
+                                  , players_sent
+                                  , players_received 
+                                  , st.session_state.params['g-score-player-multiplier']
+                                  , st.session_state.params['g-score-team-multiplier']
+                                  , st.session_state.info_key
+                                  )
+              with h_tab:
+                make_trade_h_tab(H
+                                , player_stats 
+                                , player_assignments 
+                                , st.session_state.n_iterations 
+                                , trade_party_seat
+                                , players_sent
+                                , trade_counterparty_seat
+                                , players_received
+                                , st.session_state.scoring_format
+                                , st.session_state.info_key)
+
+
+      with destinations_tab:
+
+          values_to_team = make_trade_destination_display(H
+                                , player_stats
+                                , player_assignments 
+                                , trade_party_seat 
+                                , st.session_state.scoring_format
+                                , st.session_state.info_key
+                                      )
+
+      with target_tab:
+
+          values_to_me = make_trade_target_display(H
+                , player_stats
+                , trade_party_seat
+                , trade_counterparty_seat
+                , player_assignments
+                , values_to_team[trade_counterparty_seat]
+                , st.session_state.scoring_format
+                , st.session_state.info_key
+                      )
+
+          with suggestions_tab:
+
+            if rotisserie:
+              general_value = st.session_state.z_scores.sum(axis = 1)
+              replacement_value = z_scores_unselected.iloc[0].sum() 
+            else:
+              general_value = st.session_state.g_scores.sum(axis = 1)
+              replacement_value = g_scores_unselected.iloc[0].sum()
+
+            #slightly hacky way to make all of the multiselects blue
+            st.markdown("""
+                <style>
+                    span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                        background-color: #3580BB; color:white;
+                    }
+                    span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                        background-color: #3580BB; color:white;
+                    }
+                    span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                        background-color: #3580BB; color:white;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+
+            trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
+                                      , [(1,1),(2,2),(3,3)]
+                                      , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
+                                      , default = [(1,1)])
+            
+            filtered_combo_params = [x for x in combo_params if (x[0],x[1]) in trade_filter]
+
+            make_trade_suggestion_display(H
+                , player_stats
+                , player_assignments
+                , trade_party_seat
+                , trade_counterparty_seat
+                , general_value
+                , replacement_value
+                , values_to_me
+                , values_to_team[trade_counterparty_seat]
+                , your_differential_threshold
+                , their_differential_threshold
+                , filtered_combo_params
+                , st.session_state.scoring_format
+                , st.session_state.info_key) 
+
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_score_tab(_scores : pd.DataFrame
               , players_sent : list[str]
@@ -239,6 +421,7 @@ def get_cross_combos(n : int
   my_candidate_players = [p for p in my_players if values_to_them[p] > heuristic_differential_threshold ]
   their_candidate_players = [p for p in their_players if values_to_me[p] > heuristic_differential_threshold ]
 
+
   my_players_with_weight = [(p,general_values[p]) for p in my_candidate_players]
   their_players_with_weight = [(p,general_values[p])  for p in their_candidate_players]
 
@@ -295,46 +478,49 @@ def make_combo_df(all_combos : list
   """
   
   full_dataframe = pd.DataFrame()
+
+  if len(all_combos) > 0:
     
-  for key, row in all_combos.iterrows():
-      
-      my_trade = row['My Trade']
-      their_trade = row['Their Trade']
+    for key, row in all_combos.iterrows():
+        
+        my_trade = row['My Trade']
+        their_trade = row['Their Trade']
 
-      my_general_value = row['My Value']
-      their_general_value = row['Their Value']
-      #check if the general value disparity is extreme. If it is, pass 
+        my_general_value = row['My Value']
+        their_general_value = row['Their Value']
+        #check if the general value disparity is extreme. If it is, pass 
 
-      trade_results = analyze_trade(my_team
-                                , my_trade
-                                , their_team
-                                , their_trade
-                                , _H
-                                , player_stats
-                                , player_assignments
-                                , 1)
-      your_score_pre_trade = trade_results[1]['pre']['H-score']
-      your_score_post_trade = trade_results[1]['post']['H-score']
-      their_score_pre_trade = trade_results[2]['pre']['H-score']
-      their_score_post_trade = trade_results[2]['post']['H-score']
+        trade_results = analyze_trade(my_team
+                                  , my_trade
+                                  , their_team
+                                  , their_trade
+                                  , _H
+                                  , player_stats
+                                  , player_assignments
+                                  , 1)
+        your_score_pre_trade = trade_results[1]['pre']['H-score']
+        your_score_post_trade = trade_results[1]['post']['H-score']
+        their_score_pre_trade = trade_results[2]['pre']['H-score']
+        their_score_post_trade = trade_results[2]['post']['H-score']
 
-      your_differential = your_score_post_trade - your_score_pre_trade
-      their_differential = their_score_post_trade - their_score_pre_trade
+        your_differential = your_score_post_trade - your_score_pre_trade
+        their_differential = their_score_post_trade - their_score_pre_trade
 
-      new_row = pd.DataFrame({ 'Send' : [my_trade]
-                                ,'Receive' : [their_trade]
-                                ,'Your H-score Differential' : [your_differential]
-                                ,'Their H-score Differential' : [their_differential]
-                                })
-      full_dataframe = pd.concat([full_dataframe, new_row])
+        new_row = pd.DataFrame({ 'Send' : [my_trade]
+                                  ,'Receive' : [their_trade]
+                                  ,'Your H-score Differential' : [your_differential]
+                                  ,'Their H-score Differential' : [their_differential]
+                                  })
+        full_dataframe = pd.concat([full_dataframe, new_row])
+
+  else:
+     return pd.DataFrame(columns = ['Send','Receive','Your H-score Differential','Their H-score Differential'])
 
   full_dataframe = full_dataframe.sort_values('Your H-score Differential', ascending = False)
 
   return full_dataframe
 
-@st.cache_data(show_spinner = """Finding suggested trades. How long this will take depends on 
-                                  the trade parameters"""
-               , ttl = 3600)
+@st.fragment
 def make_trade_suggestion_display(_H
                   , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
@@ -374,8 +560,7 @@ def make_trade_suggestion_display(_H
 
   my_players = player_assignments[my_team]
   their_players = player_assignments[their_team]
-
-
+  
   all_combos = pd.concat([get_cross_combos(n
                                 , m
                                 , my_players 
@@ -386,7 +571,7 @@ def make_trade_suggestion_display(_H
                                 , values_to_them 
                                 , hdt
                                 , vt) for n,m,hdt,vt in combo_params])
-
+  
 
   full_dataframe = make_combo_df(all_combos
                   , _player_stats 
@@ -395,7 +580,7 @@ def make_trade_suggestion_display(_H
                   , _H
                   , player_assignments 
                   , scoring_format) 
-
+  
   my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
   their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
   

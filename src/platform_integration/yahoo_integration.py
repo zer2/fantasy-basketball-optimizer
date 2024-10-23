@@ -264,6 +264,9 @@ class YahooIntegration(PlatformIntegration):
             game_code="nba"
         )
         LOGGER.info(f"sc: {sc}")
+
+        teams = yahoo_helper.get_teams(sc)
+        
         try:
             teams = yahoo_helper.get_teams(sc)
         except: 

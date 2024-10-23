@@ -15,8 +15,7 @@ from src.data_retrieval.get_data import get_historical_data, get_current_season_
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
 from src.tabs.ranks import make_rank_tab, make_h_rank_tab
-from src.tabs.trading import make_trade_destination_display, make_trade_h_tab, make_trade_score_tab, \
-                              make_trade_suggestion_display, make_trade_target_display
+from src.tabs.trading import make_trade_tab
 from src.helpers.data_editor import make_data_editor
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
@@ -215,19 +214,30 @@ with param_tab:
           st.session_state.selections_df = st.session_state.selections_default 
 
 
-      elif data_source == 'Retrieve from Yahoo Fantasy':
+      else:
+        
+        if data_source == 'Retrieve from Yahoo Fantasy':
 
-        yahoo_integration = YahooIntegration()
-        yahoo_integration.setup()
+          yahoo_integration = YahooIntegration()
+          yahoo_integration.setup()
 
-        st.session_state.integration = yahoo_integration
-              
-      elif data_source == 'Retrieve from Fantrax':     
+          st.session_state.integration = yahoo_integration
+                
+        elif data_source == 'Retrieve from Fantrax':     
 
           fantrax_integration = FantraxIntegration()     
 
           fantrax_integration.setup()
           st.session_state.integration = fantrax_integration
+
+        st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                                              ,st.session_state.integration.division_id) 
+        st.session_state.n_drafters = len(st.session_state.team_names)
+        st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
+
+        st.session_state.selections_default = st.session_state.integration.selections_default
+
+        st.session_state.selections_df = st.session_state.selections_default
 
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
@@ -408,17 +418,6 @@ with param_tab:
                             , 1
                             , 0)
 
-  if 'integration' in st.session_state:
-        #ZR: These should be managed properties 
-    st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
-                                                                              ,st.session_state.integration.division_id) 
-    st.session_state.n_drafters = len(st.session_state.team_names)
-    st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
-
-    st.session_state.selections_default = st.session_state.integration.selections_default
-
-    st.session_state.selections_df = st.session_state.selections_default
-            
   with advanced_params:
 
       player_param_column, position_param_column, algorithm_param_column, trade_param_column = st.columns(4)
@@ -1052,175 +1051,16 @@ elif st.session_state['mode'] == 'Season Mode':
 
   with trade_tab:
 
-    c1, c2 = st.columns([0.5,0.5])
-
-    with c1: 
-      trade_party_seat = st.selectbox(f'Which team do you want to trade from?'
-          , selections_df.columns
-          , index = 0)
-
-    with c2: 
-      trade_party_players = [x for x in selections_df[trade_party_seat] if x != 'RP']
-
-      if len(trade_party_players) < st.session_state.n_picks:
-          st.markdown("""This team is not full yet! Fill it and other teams out on the 
-                      "Rosters" page then come back here""")
-
-      else:
-        
-        counterparty_players_dict = { team : players for team, players in selections_df.items() 
-                                if ((team != trade_party_seat) & (not  any(p == 'RP' for p in players)))
-                                  }
-        
-        if len(counterparty_players_dict) >=1:
-
-          trade_counterparty_seat = st.selectbox(
-              f'Which team do you want to trade with?',
-              [s for s in counterparty_players_dict.keys()],
-              index = 0
-            )
-          
-          trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
-
-        else: 
-          trade_counterparty_players = []
-
-    if len(trade_party_players) == st.session_state.n_picks:
-
-      if len(trade_counterparty_players) < st.session_state.n_picks:
-        st.markdown('The other team is not full yet!')
-      else:
-
-        inspection_tab, destinations_tab, target_tab, suggestions_tab = st.tabs(['Trade Inspection'
-                                                            ,'Destinations'
-                                                            ,'Targets'
-                                                            ,'Trade Suggestions'
-                                                            ])
-        with inspection_tab:
-
-          c1, c2 = st.columns(2)
-
-          with c1: 
-
-            with st.form("trade inspection form"):
-
-              players_sent = st.multiselect(
-                'Which players are you trading?'
-                ,trade_party_players
-                )
-                
-              players_received = st.multiselect(
-                    'Which players are you receiving?'
-                    ,trade_counterparty_players
-                )
-
-              submitted = st.form_submit_button("Submit", use_container_width = True)
-
-          with c2: 
-
-            z_tab, g_tab, h_tab = st.tabs(['Z-score','G-score','H-score'])
-
-            if (len(players_sent) == 0) | (len(players_received) == 0):
-              st.markdown('A trade must include at least one player from each team')
-
-            else:
-
-              with z_tab:
-                make_trade_score_tab(st.session_state.z_scores 
-                                  , players_sent
-                                  , players_received 
-                                  , st.session_state.params['z-score-player-multiplier']
-                                  , st.session_state.params['z-score-team-multiplier']
-                                  , st.session_state.info_key
-                                  )
-              with g_tab:
-                make_trade_score_tab(st.session_state.g_scores 
-                                  , players_sent
-                                  , players_received 
-                                  , st.session_state.params['g-score-player-multiplier']
-                                  , st.session_state.params['g-score-team-multiplier']
-                                  , st.session_state.info_key
-                                  )
-              with h_tab:
-                make_trade_h_tab(H
-                                , player_stats 
-                                , player_assignments 
-                                , n_iterations 
-                                , trade_party_seat
-                                , players_sent
-                                , trade_counterparty_seat
-                                , players_received
-                                , scoring_format
-                                , st.session_state.info_key)
-
-
-        with destinations_tab:
-
-          values_to_team = make_trade_destination_display(H
-                                , player_stats
-                                , player_assignments 
-                                , trade_party_seat 
-                                , scoring_format
-                                , st.session_state.info_key
-                                      )
-
-        with target_tab:
-
-          values_to_me = make_trade_target_display(H
-                , player_stats
-                , trade_party_seat
-                , trade_counterparty_seat
-                , player_assignments
-                , values_to_team[trade_counterparty_seat]
-                , scoring_format
-                , st.session_state.info_key
-                      )
-
-          with suggestions_tab:
-
-            if rotisserie:
-              general_value = st.session_state.z_scores.sum(axis = 1)
-              replacement_value = z_scores_unselected.iloc[0].sum() 
-            else:
-              general_value = st.session_state.g_scores.sum(axis = 1)
-              replacement_value = g_scores_unselected.iloc[0].sum()
-
-            #slightly hacky way to make all of the multiselects blue
-            st.markdown("""
-                <style>
-                    span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                        background-color: #3580BB; color:white;
-                    }
-                    span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                        background-color: #3580BB; color:white;
-                    }
-                    span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                        background-color: #3580BB; color:white;
-                    }
-                </style>
-                """, unsafe_allow_html=True)
-
-            trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
-                                      , [(1,1),(2,2),(3,3)]
-                                      , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
-                                      , default = [(1,1)])
-            
-            filtered_combo_params = [x for x in combo_params if (x[0],x[1]) in trade_filter]
-
-            make_trade_suggestion_display(H
-                , player_stats 
-                , player_assignments
-                , trade_party_seat
-                , trade_counterparty_seat
-                , general_value
-                , replacement_value
-                , values_to_me
-                , values_to_team[trade_counterparty_seat]
-                , your_differential_threshold
-                , their_differential_threshold
-                , filtered_combo_params
-                , scoring_format
-                , st.session_state.info_key)               
+    make_trade_tab(H
+                   , selections_df
+                   , player_stats
+                   , player_assignments
+                   , z_scores_unselected
+                   , g_scores_unselected
+                   , combo_params
+                   , rotisserie
+                   , your_differential_threshold
+                   , their_differential_threshold)              
 
 with about_tab:
 
