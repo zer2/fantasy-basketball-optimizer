@@ -21,6 +21,7 @@ NBA:
     - Off Rebounds
     - Double Doubles 
     - Field Goals Made
+    - Free Throws Made
   ratio-statistics: 
     Field Goal % : 
       made-statistic : Field Goals Made
@@ -55,6 +56,7 @@ NBA:
     Double Doubles : 1.06
     Assist to TO : 2.04
     Field Goals Made : 1.83
+    Free Throws Made : 1.09
   current-season-api-renamer: 
     PLAYER_NAME : Player
     PTS : Points
@@ -170,19 +172,20 @@ NBA:
     GAMES_PLAYED_PERCENT : Games Played %
   darko-renamer:
     NBA_PLAYER_NAME : Player
-    POINTS : Points
-    REBOUNDS : Rebounds
-    ASSISTS : Assists
-    STEALS : Steals
-    BLOCKS : Blocks
-    THREES : Threes
-    TURNOVERS : Turnovers
-    FREE_THROW_ATTEMPTS : Free Throw Attempts
-    FREE_THROW_PERCENT : Free Throw %
-    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
-    FIELD_GOAL_PERCENT : Field Goal %
-    POSITION_LIST : Position
-    MINUTES_PLAYED : Forecasted Minutes
+    POINTS_PER_HUNDRED : Points/100
+    REBOUNDS_PER_HUNDRED  : Rebounds/100
+    ASSISTS_PER_HUNDRED  : Assists/100
+    STEALS_PER_HUNDRED  : Steals/100
+    BLOCKS_PER_HUNDRED  : Blocks/100
+    THREES_PER_HUNDRED  : Threes/100
+    TURNOVERS_PER_HUNDRED  : Turnovers/100
+    FREE_THROW_ATTEMPTS_PER_HUNDRED  : Free Throw Attempts/100
+    FREE_THROW_PERCENT  : Free Throw %
+    FIELD_GOAL_ATTEMPTS_PER_HUNDRED  : Field Goal Attempts/100
+    FIELD_GOAL_PERCENT  : Field Goal %
+    THREE_ATTEMPTS_PER_HUNDRED : Three Attempts/100
+    THREE_PERCENT : Three % 
+    PACE : Pace
   schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
   z-score-player-multiplier : 50
   z-score-total-multiplier : 40

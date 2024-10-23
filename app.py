@@ -1,37 +1,27 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os 
-from typing import Callable
 import yaml
-from yfpy.models import League
-import time
-from schedule import every, repeat, run_pending
 from src.helpers.helper_functions import  get_position_numbers, listify \
-                                  ,increment_player_stats_version, increment_info_key, increment_default_key \
-                                  ,get_games_per_week, get_categories, get_ratio_statistics, get_selections_default
-from src.data_retrieval.get_data import get_historical_data, get_current_season_data, get_darko_data, get_specified_stats, \
-                        get_player_metadata, get_data_from_snowflake, combine_nba_projections
+                                  ,increment_player_stats_version, increment_default_key \
+                                  ,get_games_per_week, get_ratio_statistics
+from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
+                        get_data_from_snowflake, combine_nba_projections
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
-from src.tabs.ranks import make_rank_tab, make_h_rank_tab
+from src.tabs.ranks import make_full_rank_tab
 from src.tabs.trading import make_trade_tab
 from src.helpers.data_editor import make_data_editor
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
 from src.tabs.matchups import make_matchup_tab, make_matchup_matrix
-from src.tabs.team_subtabs import make_full_team_tab, roster_inspection
-from src.tabs.candidate_subtabs import make_h_waiver_df, make_waiver_tab
+from src.tabs.team_subtabs import roster_inspection
+from src.tabs.waivers import make_full_waiver_tab
 from src.tabs.other_tabs import make_about_tab
-from src.math.algorithm_helpers import savor_calculation
-from src.math.algorithm_agents import get_base_h_score
+
 from src.platform_integration.fantrax_integration import FantraxIntegration
 from src.platform_integration.yahoo_integration import YahooIntegration
 from pandas.api.types import CategoricalDtype
-
-#from streamlit_profiler import Profiler
-
-#with Profiler():
 
 ### SETUP
 st.set_page_config(page_title='Fantasy BBall Optimization'
@@ -339,16 +329,33 @@ with param_tab:
 
           with st.form('basketball_data_sources'):
 
-            hashtag_c, roto_c, bbm_c, = st.columns(3)
+            c1, c2 = st.columns(2)
 
-            with hashtag_c:
-              hashtag_upload = get_data_from_snowflake('HTB_PROJECTION_TABLE')
+            with c1:
+    
               hashtag_slider = st.slider('Hashtag Basketball Weight'
                                         , min_value = 0.0
                                         , value = 1.0
                                         , max_value = 1.0)
 
-            with roto_c:
+              bbm_slider = st.slider('BBM Weight'
+                        , min_value = 0.0
+                        , max_value = 1.0)
+
+              bbm_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
+                                              projections, you may have to export to excel then save as CSV utf-8.'''
+                                              , type=['csv'])
+              if bbm_file is not None:
+                # Adding a 
+                bbm_upload  = pd.read_csv(bbm_file)
+              else:
+                bbm_upload = None
+
+            with c2:
+                
+                darko_slider = st.slider('Darko Weight'
+                                         , min_value = 0.0
+                                         , max_value = 1.0)
 
                 rotowire_slider = st.slider('RotoWire Weight'
                                 , min_value = 0.0
@@ -366,21 +373,6 @@ with param_tab:
                   st.error('Upload RotoWire projection file')
                   st.stop()
 
-            with bbm_c:
-
-                bbm_slider = st.slider('BBM Weight'
-                          , min_value = 0.0
-                          , max_value = 1.0)
-
-                bbm_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
-                                                projections, you may have to export to excel then save as CSV utf-8.'''
-                                                , type=['csv'])
-                if bbm_file is not None:
-                  # Adding a 
-                  bbm_upload  = pd.read_csv(bbm_file)
-                else:
-                  bbm_upload = None
-
             c1, c2 = st.columns([0.2,0.8])
             
             with c1: 
@@ -392,12 +384,12 @@ with param_tab:
               st.error('Upload Basketball Monster projection file')
               st.stop()
 
-          raw_stats_df = combine_nba_projections(hashtag_upload
-                            , rotowire_upload
+          raw_stats_df = combine_nba_projections(rotowire_upload
                             , bbm_upload
                             , hashtag_slider
-                            , rotowire_slider
-                            , bbm_slider)
+                            , bbm_slider
+                            , darko_slider
+                            , rotowire_slider)
                     
     else:
           all_datasets = ['RotoWire (req. upload)'] 
@@ -600,6 +592,7 @@ with param_tab:
 
             your_differential_threshold = st.number_input(
                   r'Your differential threshold for the automatic trade suggester'
+                  , key = 'your_differential_threshold'
                   , value = 0)
             ydt_str = r'''Only trades which improve your H-score 
                           by this percent will be shown'''
@@ -608,6 +601,7 @@ with param_tab:
 
             their_differential_threshold = st.number_input(
                   r'Counterparty differential threshold for the automatic trade suggester'
+                  , key = 'their_differential_threshold'
                   , value = 0)
             tdt_str = r'''Only trades which improve their H-score 
                         by this percent will be shown'''
@@ -620,21 +614,18 @@ with param_tab:
                                           ,'T2' : [1,0.25,0.1]}
                                           )
 
-            combo_params_df = st.data_editor(combo_params_default
-                                              , hide_index = True
-                                              , num_rows = "dynamic"
-                                              , column_config={
-                                "N-traded": st.column_config.NumberColumn("N-traded", default=1)
-                                ,"N-received": st.column_config.NumberColumn("N-received", default=1)
-                                ,"T1": st.column_config.NumberColumn("T1", default=0)
-                                ,"T2": st.column_config.NumberColumn("T2", default=0)
+            st.session_state['combo_params_df'] = st.data_editor(combo_params_default
+                                                                , hide_index = True
+                                                                , num_rows = "dynamic"
+                                                                , column_config={
+                                                  "N-traded": st.column_config.NumberColumn("N-traded", default=1)
+                                                  ,"N-received": st.column_config.NumberColumn("N-received", default=1)
+                                                  ,"T1": st.column_config.NumberColumn("T1", default=0)
+                                                  ,"T2": st.column_config.NumberColumn("T2", default=0)
 
-                                                        }
-                                                ) 
-            combo_params_df[['N-traded','N-received']] = \
-                  combo_params_df[['N-traded','N-received']].astype(int)
-
-            combo_params_df['T1'] = combo_params_df['T1']/100
+                                                                          }
+                                                                  ) 
+                            
               
             combo_params_str =  \
               """Each row is a specification for a kind of trade that will be automatically evaluated. 
@@ -646,7 +637,6 @@ with param_tab:
               differences larger than T2 will not be evaluated"""
             st.caption(combo_params_str)
 
-            combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
 
             c1, c2 = st.columns([0.4,0.6])
 
@@ -695,13 +685,11 @@ with info_tab:
       default_injury_list = [p for p in st.session_state['injured_players'] \
                               if (p in player_stats.index) and (not (p in listify(st.session_state.selections_default))) 
                               ]
-      
+ 
       injured_players = st.multiselect('Injured players'
                               , player_stats.index
                               , default = default_injury_list
                               , on_change = increment_player_stats_version)
-
-      player_stats = player_stats.drop(injured_players)
 
       st.session_state.player_stats = player_stats
 
@@ -749,84 +737,7 @@ with info_tab:
       st.dataframe(game_stats)
 
 with rank_tab:
-    z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
-      
-    with z_rank_tab:
-        
-        z_scores = st.session_state.z_scores.copy()
-
-        if st.session_state.mode == 'Auction Mode':
-
-          z_scores.loc[:,'$ Value'] = savor_calculation(z_scores['Total']
-                                                                , st.session_state.n_picks * st.session_state.n_drafters
-                                                                , 200 * st.session_state.n_drafters
-                                                                , st.session_state['streaming_noise'])
-          
-        make_rank_tab(z_scores
-                      , st.session_state.params['z-score-player-multiplier']
-                      , st.session_state.info_key)  
-
-    with g_rank_tab:
-
-        g_scores = st.session_state.g_scores.copy()
-
-        if st.session_state.mode == 'Auction Mode':
-
-          g_scores.loc[:,'$ Value'] = savor_calculation(g_scores['Total']
-                                                                , st.session_state.n_picks * st.session_state.n_drafters
-                                                                , 200 * st.session_state.n_drafters
-                                                                , st.session_state['streaming_noise'])
-        make_rank_tab(g_scores
-                      , st.session_state.params['g-score-player-multiplier']
-                      , st.session_state.info_key)  
-
-    with h_rank_tab:
-      rel_score_string = 'Z-scores' if rotisserie else 'G-scores'
-
-      if st.session_state['mode'] == 'Auction Mode':
-        taken_str = 'for free'
-      else:
-        taken_str = 'with the first overall pick'
-
-      if scoring_format == 'Rotisserie':
-        first_str = """Rankings are based on estimates of win probability against a field of 
-                  eleven opposing teams given the candidate player is taken """ + taken_str + """ and 
-                  future picks are adjusted accordingly. Corresponding category scores, based on the
-                  probability of scoring a point against in arbitrary opponent, are calculated with 
-                  H-scoring adjustments incorporated."""
-      elif scoring_format == 'Head to Head: Most Categories': 
-        first_str = """Rankings are based on estimates of overall win probability for an arbitrary head to head 
-                matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
-                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated."""
-      elif scoring_format == 'Head to Head: Each Category': 
-        first_str = """Rankings are based on estimates of mean category win probability for an arbitrary head to head 
-                matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
-                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated."""
-
-      second_str = 'Note that these scores are unique to the ' + scoring_format + \
-                ' format and all the H-scoring parameters defined on the parameter tab'
-      
-      if st.session_state['mode'] == 'Auction Mode':
-        third_str = r'. $ values assume 200 per drafter'
-      else: 
-        third_str = ''
-
-      st.caption(first_str + ' ' + second_str + third_str)
-
-      h_ranks = make_h_rank_tab(info
-                    ,omega
-                    ,gamma
-                    ,st.session_state.n_picks
-                    ,st.session_state.n_drafters
-                    ,n_iterations
-                    ,scoring_format
-                    ,st.session_state['mode']
-                    ,psi
-                    ,upsilon
-                    ,chi
-                    ,st.session_state.info_key)
-      
-      st.session_state.h_ranks = h_ranks
+  make_full_rank_tab()
 
 H = HAgent(info = info
     , omega = omega
@@ -963,104 +874,18 @@ elif st.session_state['mode'] == 'Season Mode':
         ######## END TAB
   with waiver_tab:
 
-      c1, c2 = st.columns([0.5,0.5])
-
-      with c1: 
-        waiver_inspection_seat = st.selectbox(f'Which team so you want to drop a player from?'
-            , st.session_state.selections_df.columns
-            , index = 0)
-
-      with c2: 
-          waiver_players = [x for x in selections_df[waiver_inspection_seat] if x != 'RP']
-
-          if len(waiver_players) < st.session_state.n_picks:
-              st.markdown("""This team is not full yet!""")
-
-          else:
-
-            waiver_team_stats_z = st.session_state.z_scores[st.session_state.z_scores.index.isin(waiver_players)]
-            waiver_team_stats_z.loc['Total', :] = waiver_team_stats_z.sum(axis = 0)
-
-            waiver_team_stats_g = st.session_state.g_scores[st.session_state.g_scores.index.isin(waiver_players)]
-            waiver_team_stats_g.loc['Total', :] = waiver_team_stats_g.sum(axis = 0)
-
-            if rotisserie:
-              worst_player = list(st.session_state.z_scores.index[st.session_state.z_scores.index.isin(waiver_players)])[-1]
-            else:
-              worst_player = list(st.session_state.g_scores.index[st.session_state.g_scores.index.isin(waiver_players)])[-1]
-
-            default_index = list(waiver_players).index(worst_player)
-
-            drop_player = st.selectbox(
-              'Which player are you considering dropping?'
-              ,waiver_players
-              ,index = default_index
-            )
-
-      if len(waiver_players) == st.session_state.n_picks:
-
-            mod_waiver_players = [x for x in waiver_players if x != drop_player]
-
-            z_waiver_tab, g_waiver_tab, h_waiver_tab = st.tabs(['Z-score','G-score','H-score'])
-
-            with z_waiver_tab:
-
-                st.markdown('Projected team stats with chosen player:')
-                make_waiver_tab(z_scores
-                              , selection_list
-                              , waiver_team_stats_z
-                              , drop_player
-                              , st.session_state.params['z-score-team-multiplier']
-                              , st.session_state.info_key)
-
-            with g_waiver_tab:
-
-                st.markdown('Projected team stats with chosen player:')
-                make_waiver_tab(st.session_state.g_scores
-                              , selection_list
-                              , waiver_team_stats_g
-                              , drop_player
-                              , st.session_state.params['g-score-team-multiplier']
-                              , st.session_state.info_key)
-
-            with h_waiver_tab:
-
-                base_h_res = get_base_h_score(info
-                                ,omega
-                                ,gamma
-                                ,st.session_state.n_picks
-                                ,st.session_state.n_drafters
-                                ,scoring_format
-                                ,chi
-                                ,player_assignments
-                                ,waiver_inspection_seat
-                                ,st.session_state.info_key)
-
-                waiver_base_h_score = base_h_res['Scores']
-                waiver_base_win_rates = base_h_res['Rates']
-
-                make_h_waiver_df(H
-                            , player_stats
-                            , mod_waiver_players
-                            , drop_player
-                            , player_assignments
-                            , waiver_inspection_seat
-                            , waiver_base_h_score
-                            , waiver_base_win_rates
-                            , st.session_state.info_key)
+      make_full_waiver_tab(H
+                           ,selections_df
+                           ,player_assignments
+                           ,selection_list)
 
   with trade_tab:
 
     make_trade_tab(H
                    , selections_df
-                   , player_stats
                    , player_assignments
                    , z_scores_unselected
-                   , g_scores_unselected
-                   , combo_params
-                   , rotisserie
-                   , your_differential_threshold
-                   , their_differential_threshold)              
+                   , g_scores_unselected)              
 
 with about_tab:
 

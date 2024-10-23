@@ -25,7 +25,7 @@ def get_counting_statistics():
     else: 
       if os.environ['SPORT'] == 'NBA':
         return ['Threes','Points','Rebounds','Assists','Steals','Blocks'
-                ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made']
+                ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made', 'Free Throws Made']
       elif os.environ['SPORT'] == 'MLB':
         return ['Runs','Home Runs', 'RBI', 'Stolen Bases', 'Wins', 'Saves', 'Strikeouts'] 
           
@@ -219,6 +219,22 @@ def standardize_name(name):
    name = ' '.join(name.split(' ')[0:2])
    return unidecode(name)
 
+def get_your_differential_threshold():
+   return st.session_state.your_differential_threshold / 100
+
+def get_their_differential_threshold():
+   return st.session_state.their_differential_threshold / 100
+
+def get_combo_params():
+  combo_params_df = st.session_state.combo_params_df
+  combo_params_df[['N-traded','N-received']] = \
+        combo_params_df[['N-traded','N-received']].astype(int)
+
+  combo_params_df['T1'] = combo_params_df['T1']/100
+
+  combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
+
+  return combo_params
 
 def listify(x : pd.DataFrame) -> list:
     #get all values from a dataframe into a list. Useful for listing all chosen players 
@@ -410,7 +426,7 @@ def get_data_from_snowflake(table_name
         ,database = 'FANTASYOPTIMIZER'
         ,schema = schema
     )
-   
+
    df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
 
    return df

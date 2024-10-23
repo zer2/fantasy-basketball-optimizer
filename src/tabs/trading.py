@@ -2,22 +2,30 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helpers.helper_functions import h_percentage_styler, get_selected_categories, \
-                                styler_a, styler_b, styler_c, stat_styler
-from src.math.algorithm_agents import HAgent
+                                styler_a, styler_b, styler_c, stat_styler, \
+                                get_your_differential_threshold, get_their_differential_threshold, get_combo_params
 import itertools
-from src.math.algorithm_helpers import combinatorial_calculation
 
 @st.fragment
 def make_trade_tab(H
-                   ,selections_df
-                   ,player_stats
-                   , player_assignments
-                   , z_scores_unselected
-                   , g_scores_unselected
-                   , combo_params
-                   , rotisserie
-                   , your_differential_threshold
-                   , their_differential_threshold):
+                   ,selections_df : pd.DataFrame
+                   , player_assignments : dict[list]
+                   , z_scores_unselected: pd.DataFrame
+                   , g_scores_unselected: pd.DataFrame):
+  """Make the full trading tab- ideal destinations, targets, and suggestions
+
+  Args:
+    H: H-scoring agent, which can be used to calculate H-score 
+    selections_df: The selections df from the rosters page- potentially modified by the user
+    player_assignments: Dictionary form of the selections df
+    z_scores_unselected: Z-score dataframe, filtered to only include unselected players
+    g_scores_unselected: G-score dataframe, filtered to only include unselected players
+
+)
+  Returns:
+      None
+  """
+  
   c1, c2 = st.columns([0.5,0.5])
 
   with c1: 
@@ -80,8 +88,7 @@ def make_trade_tab(H
                     ,trade_counterparty_players
                 )
 
-              submitted = st.form_submit_button("Submit"
-                                                , use_container_width = True)
+              st.form_submit_button("Submit", use_container_width = True)
 
           with c2: 
 
@@ -110,7 +117,6 @@ def make_trade_tab(H
                                   )
               with h_tab:
                 make_trade_h_tab(H
-                                , player_stats 
                                 , player_assignments 
                                 , st.session_state.n_iterations 
                                 , trade_party_seat
@@ -124,7 +130,6 @@ def make_trade_tab(H
       with destinations_tab:
 
           values_to_team = make_trade_destination_display(H
-                                , player_stats
                                 , player_assignments 
                                 , trade_party_seat 
                                 , st.session_state.scoring_format
@@ -134,7 +139,6 @@ def make_trade_tab(H
       with target_tab:
 
           values_to_me = make_trade_target_display(H
-                , player_stats
                 , trade_party_seat
                 , trade_counterparty_seat
                 , player_assignments
@@ -145,7 +149,7 @@ def make_trade_tab(H
 
           with suggestions_tab:
 
-            if rotisserie:
+            if st.session_state.scoring_format == 'Rotisserie':
               general_value = st.session_state.z_scores.sum(axis = 1)
               replacement_value = z_scores_unselected.iloc[0].sum() 
             else:
@@ -172,10 +176,9 @@ def make_trade_tab(H
                                       , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
                                       , default = [(1,1)])
             
-            filtered_combo_params = [x for x in combo_params if (x[0],x[1]) in trade_filter]
+            filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
 
             make_trade_suggestion_display(H
-                , player_stats
                 , player_assignments
                 , trade_party_seat
                 , trade_counterparty_seat
@@ -183,8 +186,8 @@ def make_trade_tab(H
                 , replacement_value
                 , values_to_me
                 , values_to_team[trade_counterparty_seat]
-                , your_differential_threshold
-                , their_differential_threshold
+                , get_your_differential_threshold()
+                , get_their_differential_threshold()
                 , filtered_combo_params
                 , st.session_state.scoring_format
                 , st.session_state.info_key) 
@@ -232,14 +235,13 @@ def make_trade_score_tab(_scores : pd.DataFrame
                                               .map(stat_styler, subset = pd.IndexSlice[['Total Difference']
                                                                                   , get_selected_categories()]
                                                                                   , multiplier = player_multiplier)  
-  display = st.dataframe(full_frame_styled
-                      , use_container_width = True
-                      , height = len(full_frame) * 35 + 38
-                                                )     
+  st.dataframe(full_frame_styled
+                , use_container_width = True
+                , height = len(full_frame) * 35 + 38
+                                          )     
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_destination_display(_H
-                  , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
                   , my_team : list[str]
                   , scoring_format : str
@@ -249,7 +251,6 @@ def make_trade_destination_display(_H
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
-    player_stats: DataFrame of player statistics 
     player_assignments:
     my_team:
     their_team:
@@ -273,7 +274,6 @@ def make_trade_destination_display(_H
   values_to_me = pd.Series([analyze_trade_value(player
                                       , my_team
                                       , _H
-                                      , _player_stats
                                       , player_assignments) for player in my_players
                     ]
                     , index = my_players)
@@ -283,7 +283,6 @@ def make_trade_destination_display(_H
                               {their_team : [analyze_trade_value(player
                                                     , their_team
                                                     , _H
-                                                    , _player_stats
                                                     , player_assignments) 
                                         for player in my_players]
                                 for their_team, their_players in their_players_dict.items()
@@ -308,7 +307,6 @@ def make_trade_destination_display(_H
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_target_display(_H
-                  , _player_stats : pd.DataFrame
                   , my_team : str
                   , their_team : str
                   , player_assignments : dict[list[str]]
@@ -320,7 +318,6 @@ def make_trade_target_display(_H
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
-    player_stats: DataFrame of player statistics 
     my_team: 
     their_team: 
     player_assignments:
@@ -337,7 +334,6 @@ def make_trade_target_display(_H
   values_to_me = pd.Series([analyze_trade_value(player
                                       , my_team
                                       , _H
-                                      , _player_stats
                                       , player_assignments) for player in their_players
                     ]
                     , index = their_players)
@@ -347,7 +343,6 @@ def make_trade_target_display(_H
   value_to_them = pd.Series([analyze_trade_value(player
                                       , their_team
                                       , _H
-                                      , _player_stats
                                       , player_assignments) for player in their_players
                     ]
                     , index = their_players)
@@ -399,7 +394,8 @@ def get_cross_combos(n : int
                       , values_to_me : pd.Series
                       , values_to_them : pd.Series
                       , heuristic_differential_threshold : float
-                      , value_threshold : float) -> pd.DataFrame :
+                      , value_threshold : float
+                      , info_key : int) -> pd.DataFrame :
   """Helper function for trade suggesions. Makes a dataframe of viable trades 
 
   Args:
@@ -456,17 +452,16 @@ def get_combos(players_with_weight : list[tuple]
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_combo_df(all_combos : list
-                  , player_stats : pd.DataFrame
                   , my_team : str
                   , their_team : str
                   , _H
                   , player_assignments : dict[list[str]]
-                  , scoring_format : str) -> pd.DataFrame:
+                  , scoring_format : str
+                  , info_key) -> pd.DataFrame:
   """Makes a dataframe of all trade possibilities according to specifications
 
   Args:
     combos: list of trades to try. These are tuples where the first specifies players to send, and the second to receive 
-    player_stats: DataFrame of player statistics 
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     _H: H-scoring agent, which can be used to calculate H-score 
@@ -477,52 +472,45 @@ def make_combo_df(all_combos : list
       None
   """
   
-  full_dataframe = pd.DataFrame()
-
-  if len(all_combos) > 0:
+  full_dataframe = pd.DataFrame(columns = ['Send','Receive','Your H-score Differential','Their H-score Differential'])
     
-    for key, row in all_combos.iterrows():
-        
-        my_trade = row['My Trade']
-        their_trade = row['Their Trade']
+  for key, row in all_combos.iterrows():
+      
+      my_trade = row['My Trade']
+      their_trade = row['Their Trade']
 
-        my_general_value = row['My Value']
-        their_general_value = row['Their Value']
-        #check if the general value disparity is extreme. If it is, pass 
 
-        trade_results = analyze_trade(my_team
-                                  , my_trade
-                                  , their_team
-                                  , their_trade
-                                  , _H
-                                  , player_stats
-                                  , player_assignments
-                                  , 1)
-        your_score_pre_trade = trade_results[1]['pre']['H-score']
-        your_score_post_trade = trade_results[1]['post']['H-score']
-        their_score_pre_trade = trade_results[2]['pre']['H-score']
-        their_score_post_trade = trade_results[2]['post']['H-score']
+      #check if the general value disparity is extreme. If it is, pass 
+      trade_results = analyze_trade(my_team
+                                , my_trade
+                                , their_team
+                                , their_trade
+                                , _H
+                                , player_assignments
+                                , 1)
+      your_score_pre_trade = trade_results[1]['pre']['H-score']
+      your_score_post_trade = trade_results[1]['post']['H-score']
+      their_score_pre_trade = trade_results[2]['pre']['H-score']
+      their_score_post_trade = trade_results[2]['post']['H-score']
 
-        your_differential = your_score_post_trade - your_score_pre_trade
-        their_differential = their_score_post_trade - their_score_pre_trade
+      your_differential = your_score_post_trade - your_score_pre_trade
+      their_differential = their_score_post_trade - their_score_pre_trade
 
-        new_row = pd.DataFrame({ 'Send' : [my_trade]
-                                  ,'Receive' : [their_trade]
-                                  ,'Your H-score Differential' : [your_differential]
-                                  ,'Their H-score Differential' : [their_differential]
-                                  })
-        full_dataframe = pd.concat([full_dataframe, new_row])
-
-  else:
-     return pd.DataFrame(columns = ['Send','Receive','Your H-score Differential','Their H-score Differential'])
+      new_row = pd.DataFrame({ 'Send' : [my_trade]
+                                ,'Receive' : [their_trade]
+                                ,'Your H-score Differential' : [your_differential]
+                                ,'Their H-score Differential' : [their_differential]
+                                })
+      full_dataframe = pd.concat([full_dataframe, new_row])
 
   full_dataframe = full_dataframe.sort_values('Your H-score Differential', ascending = False)
 
   return full_dataframe
 
-@st.fragment
+@st.cache_data(show_spinner = """Finding suggested trades. How long this will take depends on 
+                                  the trade parameters"""
+               , ttl = 3600)
 def make_trade_suggestion_display(_H
-                  , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
                   , my_team : str
                   , their_team : str
@@ -539,7 +527,6 @@ def make_trade_suggestion_display(_H
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
-    player_stats: DataFrame of player statistics 
     player_assignments: 
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
@@ -570,22 +557,20 @@ def make_trade_suggestion_display(_H
                                 , values_to_me 
                                 , values_to_them 
                                 , hdt
-                                , vt) for n,m,hdt,vt in combo_params])
+                                , vt
+                                , st.session_state.info_key) for n,m,hdt,vt in combo_params])
   
 
   full_dataframe = make_combo_df(all_combos
-                  , _player_stats 
                   , my_team
                   , their_team
                   , _H
                   , player_assignments 
-                  , scoring_format) 
+                  , scoring_format
+                  , st.session_state.info_key) 
   
   my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
   their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
-  
-  lens = pd.Series(zip(full_dataframe['Send'].map(len), full_dataframe['Receive'].map(len))
-                    , index = full_dataframe.index)
 
   full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria]
   
@@ -614,7 +599,6 @@ def make_trade_suggestion_display(_H
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_h_tab(_H
-                  , _player_stats : pd.DataFrame
                   , player_assignments : dict[list[str]]
                   , n_iterations : int
                   , my_team : str
@@ -627,7 +611,6 @@ def make_trade_h_tab(_H
 
   Args:
     _H: H-scoring agent, which can be used to calculate H-score 
-    player_stats: DataFrame of player statistics 
     player_assignments: 
     n_iterations: int, number of gradient descent steps
     my_trade: player(s) to be traded from your team
@@ -656,7 +639,6 @@ def make_trade_h_tab(_H
                                 , their_team
                                 , their_trade
                                 , _H
-                                , _player_stats
                                 , player_assignments
                                 ,n_iterations)
       your_team_pre_trade = trade_results[1]['pre']
@@ -690,7 +672,6 @@ def analyze_trade(team_1
                   ,team_2
                   ,team_2_trade : list[str]
                   ,H
-                  ,player_stats : pd.DataFrame
                   ,player_assignments : dict[list[str]]
                   ,n_iterations : int
                   ) -> dict:    
@@ -703,7 +684,6 @@ def analyze_trade(team_1
       team_2_other: remaining players, not to be traded from the first team
       team_2_trade: player(s) to be traded from the second team
       H: H-scoring agent, which can be used to calculate H-score 
-      player_stats: DataFrame of player statistics 
       players_chosen: list of all chosen players
       n_iterations: int, number of gradient descent steps
 
@@ -766,7 +746,6 @@ def analyze_trade(team_1
 def analyze_trade_value(player : str
                   ,team : str
                   ,H
-                  ,player_stats : pd.DataFrame
                   ,player_assignments : dict[list[str]]
                   ) -> float:    
 
@@ -776,7 +755,6 @@ def analyze_trade_value(player : str
       player: player to evaluate
       rest_of_team: other player(s) on team
       H: H-scoring agent, which can be used to calculate H-score 
-      player_stats: DataFrame of player statistics 
       players_chosen: list of all chosen players
 
     Returns:

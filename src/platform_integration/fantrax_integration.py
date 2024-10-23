@@ -3,7 +3,7 @@ import streamlit as st
 from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.tabs.drafting import clear_draft_board
+from src.tabs.drafting import increment_and_reset_draft
 from src.data_retrieval.get_data import get_player_metadata
 
 class FantraxIntegration(PlatformIntegration):
@@ -43,7 +43,7 @@ class FantraxIntegration(PlatformIntegration):
         self.league_id = st.text_input(
             label='Which league ID should player data be pulled from? (Find league ID after /league/ in your draft room URL)'
             ,value = None
-            ,on_change = clear_draft_board
+            ,on_change = increment_and_reset_draft
           )    
         
         if self.league_id is None:
@@ -57,7 +57,7 @@ class FantraxIntegration(PlatformIntegration):
             else:
                 division = st.selectbox(label = 'Which division are you in?'
                                         ,options = list(division_dict.keys())
-                                        , on_change = clear_draft_board)
+                                        , on_change = increment_and_reset_draft)
                 
                 self.division_id = division_dict[division]
                 
@@ -85,7 +85,6 @@ class FantraxIntegration(PlatformIntegration):
             st.session_state['matchups'] = None
 
         st.write('Team info successfully retrieved from fantrax! :partying_face:')
-        st.write('Note that for fantrax, only active players are pulled in and counted')
 
     @st.cache_data()
     def get_division_dict(_self

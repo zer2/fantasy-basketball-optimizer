@@ -167,7 +167,7 @@ def get_player_metadata() -> pd.Series:
    '''
 
 @st.cache_resource(ttl = '1d') 
-def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
+def get_darko_data() -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
 
   Args:
@@ -180,60 +180,49 @@ def get_darko_data(expected_minutes : pd.Series) -> dict[pd.DataFrame]:
   darko_df = darko_df.rename(columns = renamer)
   darko_df = darko_df.apply(pd.to_numeric, errors='ignore')
 
-  darko_df['Position'] = darko_df['Position'].fillna('NP')
+  darko_df['Position'] = 'NP'
   darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
-    
+
+  extra_info = get_data_from_snowflake('HTB_PROJECTION_TABLE')[['PLAYER','MPG','GP']]
+  extra_info.loc[:,'GP'] = extra_info['GP']/get_n_games()
+  extra_info.columns = ['Player','Minutes','Games Played %']
+  extra_info = extra_info.set_index('Player')
+
+  darko_long_term = darko_df.merge(extra_info, left_index = True, right_index = True)
+  posessions_per_game = darko_long_term['Pace']/100 * darko_long_term['Minutes']/48
+
+  darko_long_term.loc[:,'Points'] = darko_long_term.loc[:,'Points/100'] * posessions_per_game
+  darko_long_term.loc[:,'Rebounds'] = darko_long_term.loc[:,'Rebounds/100'] * posessions_per_game
+  darko_long_term.loc[:,'Assists'] = darko_long_term.loc[:,'Assists/100'] * posessions_per_game
+  darko_long_term.loc[:,'Steals'] = darko_long_term.loc[:,'Steals/100'] * posessions_per_game
+  darko_long_term.loc[:,'Blocks'] = darko_long_term.loc[:,'Blocks/100'] * posessions_per_game
+  darko_long_term.loc[:,'Threes'] =  darko_long_term.loc[:,'Threes/100'] * posessions_per_game
+  darko_long_term.loc[:,'Turnovers'] = darko_long_term.loc[:,'Turnovers/100'] * posessions_per_game
+  darko_long_term.loc[:,'Free Throw Attempts'] = darko_long_term.loc[:,'Free Throw Attempts/100'] * posessions_per_game
+  darko_long_term.loc[:,'Field Goal Attempts'] = darko_long_term.loc[:,'Field Goal Attempts/100'] * posessions_per_game
+
+  darko_long_term.loc[:,'Three Attempts'] = darko_long_term.loc[:,'Three Attempts/100'] * posessions_per_game
+  darko_long_term.loc[:,'Field Goals Made'] = darko_long_term.loc[:,'Field Goal Attempts/100'] * \
+                                                darko_long_term.loc[:,'Field Goal %'] * \
+                                                posessions_per_game
+  darko_long_term.loc[:,'Field Goal Attempts'] = darko_long_term.loc[:,'Field Goal Attempts/100'] * posessions_per_game
+  darko_long_term.loc[:,'Assist to TO'] = darko_long_term.loc[:,'Assists']/darko_long_term.loc[:,'Turnovers']
+
+  darko_long_term.loc[:,'Def Rebounds'] = np.nan
+  darko_long_term.loc[:,'Off Rebounds'] = np.nan
+  darko_long_term.loc[:,'Double Doubles'] = np.nan
+
   required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
                     st.session_state.params['other-columns']
-  darko_short_term = get_darko_short_term(darko_df)[required_columns]
-  darko_long_term = get_darko_long_term(darko_df, expected_minutes)[required_columns]
+     
+  required_columns =[x for x in required_columns if x in darko_long_term.columns]
+      
+  darko_long_term = darko_long_term[list(set(required_columns))]
+   
+  return darko_long_term
 
-  return {'DARKO-S' : darko_short_term
-           ,'DARKO-L' : darko_long_term}
-
-def get_darko_short_term(all_darko : pd.DataFrame) -> pd.DataFrame:
-  """Get a short term version of darko, based on next-game predictions for counting statistics
-
-  Args:
-      all_darko: Datafrmae of all raw DARKO forecasts
-      expected_minutes: Series of expecteed minutes projections, used to build DAKRO-L
-  Returns:
-      Dataframe of predictions
-  """
-  
-  darko_short_term = all_darko.fillna(0)  
-  darko_short_term.loc[:,'Games Played %'] = 1
-
-  return darko_short_term
-
-
-def get_darko_long_term(all_darko : pd.DataFrame, expected_minutes : pd.Series) -> pd.DataFrame:
-    """Get a long term version of darko, based on skill statistics and expected minutes
-  
-    Args:
-        all_darko: Datafrmae of all raw DARKO forecasts
-        expected_minutes: series of expected minutes to use for DARKO recalibration
-    Returns:
-        Dataframe of predictions
-    """
-    darko_long_term = all_darko.merge(expected_minutes, left_index = True, right_index = True)
-
-    minutes_adjustment_factor = darko_long_term['Minutes']/darko_long_term['Forecasted Minutes']
- 
-    darko_long_term.loc[:,'Points'] = darko_long_term.loc[:,'Points'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Rebounds'] = darko_long_term.loc[:,'Rebounds'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Assists'] = darko_long_term.loc[:,'Assists'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Steals'] = darko_long_term.loc[:,'Steals'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Blocks'] = darko_long_term.loc[:,'Blocks'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Threes'] =  darko_long_term.loc[:,'Threes'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Turnovers'] = darko_long_term.loc[:,'Turnovers'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Free Throw Attempts'] = darko_long_term.loc[:,'Free Throw Attempts'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Field Goal Attempts'] = darko_long_term.loc[:,'Field Goal Attempts'] * minutes_adjustment_factor
-    darko_long_term.loc[:,'Games Played %'] = 1
-
-    return darko_long_term
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
@@ -308,41 +297,44 @@ def get_specified_stats(dataset_name : str
 
     return df.round(2) 
   
-#@st.cache_data()
-def combine_nba_projections(hashtag_upload
-                            , rotowire_upload
+@st.cache_data()
+def combine_nba_projections(rotowire_upload
                             , bbm_upload
                             , hashtag_slider
-                            , rotowire_slider
-                            , bbm_slider):
-    slider_sum = hashtag_slider + rotowire_slider + bbm_slider
-
-    hashtag_stats = None if hashtag_upload is None else get_htb_projections()
+                            , bbm_slider
+                            , darko_slider 
+                            , rotowire_slider):
+    
+    hashtag_stats = get_htb_projections()
     rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload)
+    darko_stats = None if darko_slider == 0 else get_darko_data()
 
-    hashtag_weight = [hashtag_slider] if hashtag_upload is not None else []
+    hashtag_weight = [hashtag_slider] 
     rotowire_weight = [rotowire_slider] if rotowire_upload is not None else []
     bbm_weight = [bbm_slider] if bbm_upload is not None else []
+    darko_weight = [darko_slider] if darko_slider > 0 else []
 
-    weights = hashtag_weight + rotowire_weight + bbm_weight
+    weights = hashtag_weight + rotowire_weight + bbm_weight + darko_weight
 
     all_players = set(
                   ([] if hashtag_stats is None else [p for p in hashtag_stats.index]) + \
                   ([] if rotowire_stats is None else [p for p in rotowire_stats.index]) + \
-                  ([] if bbm_stats is None else [p for p in bbm_stats.index])
+                  ([] if bbm_stats is None else [p for p in bbm_stats.index]) + \
+                  ([] if darko_stats is None else [p for p in darko_stats.index])
                   )
         
     df =  pd.concat({'HTB' : hashtag_stats 
                         ,'RotoWire' : rotowire_stats
-                        ,'BBM' : bbm_stats}, names = ['Source'])
-        
-    new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM'], all_players], names = ['Source','Player'])
+                        ,'BBM' : bbm_stats
+                        ,'Darko' : darko_stats}, names = ['Source'])
+            
+    new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM','Darko'], all_players], names = ['Source','Player'])
     df = df.reindex(new_index)
     
-    weights = [hashtag_slider, rotowire_slider, bbm_slider]
+    weights = [hashtag_slider, rotowire_slider, bbm_slider, darko_slider]
 
-    player_ineligible = (df.isna().groupby('Player').sum() == 3).sum(axis = 1) > 0
+    player_ineligible = (df.isna().groupby('Player').sum() == 4).sum(axis = 1) > 0
     inelegible_players = player_ineligible.index[player_ineligible]
     df = df[~df.index.get_level_values('Player').isin(inelegible_players)]
     
@@ -460,8 +452,8 @@ def get_htb_projections():
          name = 'OG Anunoby'
       if name == 'Alexandre Sarr':
          name = 'Alex Sarr'
-      if name == 'Rob Dillingham':
-         name = 'Robert Dillingham'
+      #if name == 'Rob Dillingham':
+      #   name = 'Robert Dillingham'
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
@@ -469,6 +461,7 @@ def get_htb_projections():
    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
    raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
    raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
+   raw_df.loc[:,'Free Throws Made'] = raw_df['Free Throw %'] * raw_df['Free Throw Attempts']
 
    raw_df = raw_df.set_index('Player')
 
@@ -513,7 +506,7 @@ def process_basketball_monster_data(raw_df):
       if name == 'Rob Dillingham':
          name = 'Robert Dillingham'
       return name
-      
+
    raw_df = raw_df.dropna()
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
