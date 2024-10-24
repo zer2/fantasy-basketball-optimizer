@@ -6,6 +6,86 @@ from src.helpers.helper_functions import static_score_styler, h_percentage_style
 from src.math.algorithm_agents import HAgent
 from src.math.algorithm_helpers import savor_calculation
 
+def make_full_rank_tab():
+    z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
+      
+    with z_rank_tab:
+        
+        z_scores = st.session_state.z_scores.copy()
+
+        if st.session_state.mode == 'Auction Mode':
+
+          z_scores.loc[:,'$ Value'] = savor_calculation(z_scores['Total']
+                                                                , st.session_state.n_picks * st.session_state.n_drafters
+                                                                , 200 * st.session_state.n_drafters
+                                                                , st.session_state['streaming_noise'])
+          
+        make_rank_tab(z_scores
+                      , st.session_state.params['z-score-player-multiplier']
+                      , st.session_state.info_key)  
+
+    with g_rank_tab:
+
+        g_scores = st.session_state.g_scores.copy()
+
+        if st.session_state.mode == 'Auction Mode':
+
+          g_scores.loc[:,'$ Value'] = savor_calculation(g_scores['Total']
+                                                                , st.session_state.n_picks * st.session_state.n_drafters
+                                                                , 200 * st.session_state.n_drafters
+                                                                , st.session_state['streaming_noise'])
+        make_rank_tab(g_scores
+                      , st.session_state.params['g-score-player-multiplier']
+                      , st.session_state.info_key)  
+
+    with h_rank_tab:
+      rel_score_string = 'Z-scores' if st.session_state.scoring_format == 'Rotisserie' else 'G-scores'
+
+      if st.session_state['mode'] == 'Auction Mode':
+        taken_str = 'for free'
+      else:
+        taken_str = 'with the first overall pick'
+
+      if st.session_state.scoring_format == 'Rotisserie':
+        first_str = """Rankings are based on estimates of win probability against a field of 
+                  eleven opposing teams given the candidate player is taken """ + taken_str + """ and 
+                  future picks are adjusted accordingly. Corresponding category scores, based on the
+                  probability of scoring a point against in arbitrary opponent, are calculated with 
+                  H-scoring adjustments incorporated."""
+      elif st.session_state.scoring_format == 'Head to Head: Most Categories': 
+        first_str = """Rankings are based on estimates of overall win probability for an arbitrary head to head 
+                matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
+                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated."""
+      elif st.session_state.scoring_format == 'Head to Head: Each Category': 
+        first_str = """Rankings are based on estimates of mean category win probability for an arbitrary head to head 
+                matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
+                accordingly. Corresponding category scores are calculated with H-scoring adjustments incorporated."""
+
+      second_str = 'Note that these scores are unique to the ' + st.session_state.scoring_format + \
+                ' format and all the H-scoring parameters defined on the parameter tab'
+      
+      if st.session_state['mode'] == 'Auction Mode':
+        third_str = r'. $ values assume 200 per drafter'
+      else: 
+        third_str = ''
+
+      st.caption(first_str + ' ' + second_str + third_str)
+
+      h_ranks = make_h_rank_tab(st.session_state.info
+                    ,st.session_state.omega
+                    ,st.session_state.gamma
+                    ,st.session_state.n_picks
+                    ,st.session_state.n_drafters
+                    ,st.session_state.n_iterations
+                    ,st.session_state.scoring_format
+                    ,st.session_state['mode']
+                    ,st.session_state.psi
+                    ,st.session_state.upsilon
+                    ,st.session_state.chi
+                    ,st.session_state.info_key)
+      
+      st.session_state.h_ranks = h_ranks
+
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_rank_tab(scores : pd.DataFrame
