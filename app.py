@@ -690,6 +690,7 @@ with info_tab:
                               , player_stats.index
                               , default = default_injury_list
                               , on_change = increment_player_stats_version)
+      player_stats = player_stats.drop(injured_players)
 
       st.session_state.player_stats = player_stats
 
