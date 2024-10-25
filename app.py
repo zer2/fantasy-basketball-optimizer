@@ -131,13 +131,16 @@ with param_tab:
 
     with c1: 
 
-      league = st.selectbox(
-        'Which fantasy sport are you playing?',
-        ('NBA', 'WNBA') #MLB excluded for now
-        , index = 0
-        , key = 'league'
-        , on_change = increment_and_reset_draft
-        )
+      #league = st.selectbox(
+      #  'Which fantasy sport are you playing?',
+      #  ('NBA', 'WNBA') #MLB excluded for now
+      #  , index = 0
+      #  , key = 'league'
+      #  , on_change = increment_and_reset_draft
+      #  )
+
+      #for now
+      st.session_state.league = 'NBA'
       
       load_params(st.session_state.league)
 
@@ -602,7 +605,7 @@ with param_tab:
             their_differential_threshold = st.number_input(
                   r'Counterparty differential threshold for the automatic trade suggester'
                   , key = 'their_differential_threshold'
-                  , value = 0)
+                  , value = -0.2)
             tdt_str = r'''Only trades which improve their H-score 
                         by this percent will be shown'''
             st.caption(tdt_str)
