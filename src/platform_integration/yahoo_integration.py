@@ -50,7 +50,13 @@ class YahooIntegration(PlatformIntegration):
         Returns:
             None
         """
-        self.auth_dir = self.get_yahoo_access_token()
+
+        if 'temp_dir' not in st.session_state:
+            self.auth_dir = self.get_yahoo_access_token()
+            st.stop()
+
+        self.auth_dir = st.session_state.temp_dir
+
         self.division_id = None #as far as I know, yahoo doesnt have divisions
 
         if self.auth_dir is None:
@@ -126,8 +132,10 @@ class YahooIntegration(PlatformIntegration):
             self.selections_default = get_selections_default(self.n_picks,self.n_drafters
             )
     
+    @st.dialog("Authenticate with Yahoo")
     def get_yahoo_access_token(_self) -> Optional[str]:
         # Client_ID and Secret from https://developer.yahoo.com/apps/
+        
         cid = st.secrets["YAHOO_CLIENT_ID"]
         cse = st.secrets["YAHOO_CLIENT_SECRET"]
         
@@ -218,7 +226,10 @@ class YahooIntegration(PlatformIntegration):
             with open(private_file_path, 'w') as f:
                 json.dump(private_data, f)
 
-            return temp_dir
+            #saving to see if it work work later. If it does, no need to run all this
+            st.session_state.temp_dir = temp_dir
+
+            st.rerun()
 
     def clean_up_access_token(_self):
         shutil.rmtree(_self.auth_dir)
@@ -266,7 +277,7 @@ class YahooIntegration(PlatformIntegration):
         LOGGER.info(f"sc: {sc}")
 
         teams = yahoo_helper.get_teams(sc)
-        
+
         try:
             teams = yahoo_helper.get_teams(sc)
         except: 
