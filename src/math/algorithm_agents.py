@@ -543,6 +543,7 @@ class HAgent():
                                             , diff_vars)
 
                 category_weights = None
+                category_weights_current = None
                 expected_future_diff = None
                 pdf_estimates = None
 

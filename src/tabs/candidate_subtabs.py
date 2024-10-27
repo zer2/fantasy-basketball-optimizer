@@ -53,7 +53,8 @@ def make_h_cand_tab(_H
                     ,display_period : int = 5
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
-                    ,total_players : int = None):
+                    ,total_players : int = None
+                    ,drop_player : str = None):
   
 
   """Make a tab showing H-scores for the current draft situation
@@ -71,7 +72,13 @@ def make_h_cand_tab(_H
   """
   _H = _H.clear_initial_weights()
           
-  generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+  if drop_player is None:
+    generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+  else:
+    from copy import deepcopy 
+    player_assignments = deepcopy(player_assignments)
+    player_assignments[draft_seat] = [player for player in player_assignments[draft_seat] if player != drop_player]
+    generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
 
   placeholder = st.empty()
 
@@ -89,20 +96,21 @@ def make_h_cand_tab(_H
       fits_roster = pd.Series([True] * len(res['Scores']), index = res['Scores'].index)
 
     rosters = rosters[list(fits_roster.values)]
-
     score = res['Scores'][fits_roster]
     weights = res['Weights'][fits_roster]
     win_rates = res['Rates'][fits_roster]
     position_shares = res['Position-Shares']
 
-    #should filter for rosters that are viable 
+    win_rates.columns = get_selected_categories()
+
+    #this represents a run that needs to optimize weights, and so should display weights
+    dynamic_run = weights.iloc[0,0] == weights.iloc[0,0] 
 
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
                   , index = score.index
                   , columns = get_selected_categories())/v
     
-    win_rates.columns = get_selected_categories()
     
     with placeholder.container():
 
@@ -110,23 +118,34 @@ def make_h_cand_tab(_H
       position_shares_tab_names = ['Flex- ' + x[0] for x in position_shares_list]
       position_shares_res = [x[1][list(fits_roster.values)] for x in position_shares_list]
 
-      if cash_remaining_per_team:
-        all_tabs = st.tabs(['Targets','Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
-        target_tab = all_tabs[0]
-        weight_tab = all_tabs[1]
-        roster_tab = all_tabs[2]
 
+
+      if dynamic_run:
+
+        if cash_remaining_per_team:
+          all_tabs = st.tabs(['Targets','Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
+          target_tab = all_tabs[0]
+          weight_tab = all_tabs[1]
+          roster_tab = all_tabs[2]
+
+
+        else:
+          all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
+          rate_tab = all_tabs[0]
+          weight_tab = all_tabs[1]       
+          roster_tab = all_tabs[2]
+
+        position_tabs = all_tabs[3:-3]
+        raw_z_tab = all_tabs[-3]
+        raw_g_tab = all_tabs[-2]
+        matchup_tab = all_tabs[-1]
 
       else:
-        all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
-        rate_tab = all_tabs[0]
-        weight_tab = all_tabs[1]       
-        roster_tab = all_tabs[2]
-
-      position_tabs = all_tabs[3:-3]
-      raw_z_tab = all_tabs[-3]
-      raw_g_tab = all_tabs[-2]
-      matchup_tab = all_tabs[-1]
+          all_tabs = st.tabs(['Expected Win Rates','Z-scores','G-Scores','Matchups'])
+          rate_tab = all_tabs[0]
+          raw_z_tab = all_tabs[1]       
+          raw_g_tab = all_tabs[2]
+          matchup_tab = all_tabs[3]
 
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
@@ -200,7 +219,27 @@ def make_h_cand_tab(_H
               rate_display = score_df.merge(rate_df, left_index = True, right_index = True)    
               adp_col = []
             
-            rate_display_styled = rate_display.style.format("{:.1%}"
+            
+            if drop_player is not None:
+              def color_blue(label):
+                  return "background-color: blue; color:white" if label == drop_player else None
+              
+              rate_display_styled = rate_display.reset_index().style.format("{:.1%}"
+                              ,subset = pd.IndexSlice[:,['H-score']]) \
+                                                    .format("{:.1f}"
+                              ,subset = pd.IndexSlice[:,adp_col]) \
+                      .map(styler_a
+                            , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
+                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                      .format('{:,.1%}', subset = rate_df.columns) \
+                      .map(color_blue, subset = pd.IndexSlice[:,['Player']])
+
+              st.dataframe(rate_display_styled
+                           , use_container_width = True
+                           , hide_index = True)
+
+            else:
+              rate_display_styled = rate_display.style.format("{:.1%}"
                               ,subset = pd.IndexSlice[:,['H-score']]) \
                                                     .format("{:.1f}"
                               ,subset = pd.IndexSlice[:,adp_col]) \
@@ -208,10 +247,13 @@ def make_h_cand_tab(_H
                             , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                       .format('{:,.1%}', subset = rate_df.columns)
-            st.dataframe(rate_display_styled, use_container_width = True)
-      with weight_tab:
+              
+              st.dataframe(rate_display_styled, use_container_width = True)
 
-        if display and (len(weights) > 0):
+      
+      if display and dynamic_run:
+
+        with weight_tab:
 
           weight_df = weights.loc[score_df.index].dropna()
           weight_display = score_df.merge(weight_df
@@ -226,12 +268,11 @@ def make_h_cand_tab(_H
                     .background_gradient(axis = None,subset = weight_df.columns) 
           st.dataframe(weight_display_styled, use_container_width = True)
 
-      with roster_tab:
+      if display and dynamic_run:
                     
-          if display and (rosters.shape[1] > 1):
+          with roster_tab:
 
             my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x == x]
-            n_players = len(my_players)
 
             player_list = my_players + [None] + [''] * (rosters.shape[1] - len(my_players) - 1)
 
@@ -271,23 +312,23 @@ def make_h_cand_tab(_H
                          , column_config = {col : st.column_config.TextColumn(width = 'small') for col in rosters_styled.columns}
                            )
 
+      if display and dynamic_run:
 
-      for tab, position_shares_df in zip(position_tabs, position_shares_res):
-          with tab: 
-              
-              if display and (len(position_shares_df) > 0):
-           
-                share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
-                                      , left_index = True
-                                      , right_index = True)
-                share_display_styled = share_display.style.format("{:.0%}"
-                                                            , subset = position_shares_df.columns)\
-                          .format("{:.1%}"
-                                  ,subset = pd.IndexSlice[:,['H-score']]) \
-                          .map(styler_a
-                                , subset = pd.IndexSlice[:,['H-score']]) \
-                          .background_gradient(axis = None,subset = position_shares_df.columns) 
-                st.dataframe(share_display_styled, use_container_width = True)
+        for tab, position_shares_df in zip(position_tabs, position_shares_res):
+            with tab: 
+                
+            
+                  share_display = score_df.merge(position_shares_df.loc[score_df.index].dropna()
+                                        , left_index = True
+                                        , right_index = True)
+                  share_display_styled = share_display.style.format("{:.0%}"
+                                                              , subset = position_shares_df.columns)\
+                            .format("{:.1%}"
+                                    ,subset = pd.IndexSlice[:,['H-score']]) \
+                            .map(styler_a
+                                  , subset = pd.IndexSlice[:,['H-score']]) \
+                            .background_gradient(axis = None,subset = position_shares_df.columns) 
+                  st.dataframe(share_display_styled, use_container_width = True)
 
       with raw_g_tab:
 
@@ -295,12 +336,23 @@ def make_h_cand_tab(_H
 
           g_df = _g_scores.loc[score.index]
           g_display = score_df.merge(g_df, left_index = True, right_index = True)
-            
-          scores_unselected_styled = static_score_styler(g_display
-                                                        , st.session_state.params['g-score-player-multiplier']
-                                                        , st.session_state.params['g-score-total-multiplier'])
 
-          st.dataframe(scores_unselected_styled, use_container_width = True)
+          if drop_player is not None:
+
+            scores_unselected_styled = static_score_styler(g_display.reset_index()
+                                              , st.session_state.params['g-score-player-multiplier']
+                                              , st.session_state.params['g-score-total-multiplier'])
+            
+            scores_unselected_styled = scores_unselected_styled.map(color_blue
+                                                                    , subset = pd.IndexSlice[:,['Player']])
+            st.dataframe(scores_unselected_styled, use_container_width = True, hide_index = True)
+    
+          else:
+            scores_unselected_styled = static_score_styler(g_display
+                                              , st.session_state.params['g-score-player-multiplier']
+                                              , st.session_state.params['g-score-total-multiplier'])
+
+            st.dataframe(scores_unselected_styled, use_container_width = True)
 
       with raw_z_tab:
 
@@ -308,20 +360,39 @@ def make_h_cand_tab(_H
 
           z_df = _z_scores.loc[score.index]
           z_display = score_df.merge(z_df, left_index = True, right_index = True)
-            
-          scores_unselected_styled = static_score_styler(z_display
+          
+          if drop_player is not None:
+            scores_unselected_styled = static_score_styler(z_display.reset_index()
                                                         , st.session_state.params['z-score-player-multiplier']
                                                         , st.session_state.params['z-score-total-multiplier'])
+            
+            scores_unselected_styled = scores_unselected_styled.map(color_blue, subset = pd.IndexSlice[:,['Player']])
+            st.dataframe(scores_unselected_styled, use_container_width = True, hide_index = True)
 
-          st.dataframe(scores_unselected_styled, use_container_width = True)
+          else:
+            scores_unselected_styled = static_score_styler(z_display
+                                              , st.session_state.params['z-score-player-multiplier']
+                                              , st.session_state.params['z-score-total-multiplier'])
+
+            st.dataframe(scores_unselected_styled, use_container_width = True)
 
       with matchup_tab:
 
         if i >= n_iterations-1: 
-          make_cand_matchup_tab(res['CDFs'], score_df.index, list(player_assignments.keys()), draft_seat, i)
+          make_cand_matchup_tab(res['CDFs']
+                                , score_df.index
+                                , list(player_assignments.keys())
+                                , draft_seat
+                                , drop_player
+                                , i)
 
 @st.fragment()
-def make_cand_matchup_tab(cdfs, players, teams, draft_seat, i):
+def make_cand_matchup_tab(cdfs
+                          , players
+                          , teams
+                          , draft_seat
+                          , drop_player
+                          , i):
 
     opponents = [team for team in teams if team != draft_seat]
     tabs = st.tabs(opponents)
@@ -355,6 +426,12 @@ def make_cand_matchup_tab(cdfs, players, teams, draft_seat, i):
 
           cdfs_selected = cdfs_selected[['Overall'] + get_selected_categories()]
 
-          cdfs_styled = h_percentage_styler(cdfs_selected)
+          if drop_player is not None:
 
-          st.dataframe(cdfs_styled)
+              cdfs_styled = h_percentage_styler(cdfs_selected.reset_index(), drop_player = drop_player)
+              st.dataframe(cdfs_styled, hide_index = True)
+
+          else:
+              cdfs_styled = h_percentage_styler(cdfs_selected)
+
+              st.dataframe(cdfs_styled)

@@ -286,7 +286,8 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
 
 def h_percentage_styler(df : pd.DataFrame
                         , middle : float = 0.5
-                        , multiplier : float = 300) -> pd.DataFrame:
+                        , multiplier : float = 300
+                        , drop_player = None) -> pd.DataFrame:
   """Helper function for styling tables of H-score results
 
   Args:
@@ -307,6 +308,11 @@ def h_percentage_styler(df : pd.DataFrame
                               , middle = middle
                               , multiplier = multiplier
                               , subset = get_selected_categories())
+  
+  if drop_player is not None:
+     def color_blue(label):
+          return "background-color: blue; color:white" if label == drop_player else None
+     df_styled = df_styled.map(color_blue , subset = pd.IndexSlice[:,['Player']])
   return df_styled
 
 def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode = 'rgb') -> str:
