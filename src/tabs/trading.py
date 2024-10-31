@@ -172,7 +172,7 @@ def make_trade_tab(H
                 """, unsafe_allow_html=True)
 
             trade_filter = st.multiselect('Which kinds of trades do you want get suggestions for?'
-                                      , [(1,1),(2,2),(3,3)]
+                                      , [(x[0],x[1]) for x in get_combo_params()]
                                       , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
                                       , default = [(1,1)])
             
