@@ -219,6 +219,49 @@ def standardize_name(name):
    name = ' '.join(name.split(' ')[0:2])
    return unidecode(name)
 
+@st.cache_data()
+def get_fixed_player_name(player_name : str
+                          , _player_metadata) -> str:
+    
+    """Fix player name string to adhere to common standard
+
+    Args:
+        player_name: string
+        player_metadata
+
+    Returns:
+        fixed name string
+     """
+
+    def name_renamer(name):
+      if name == 'Nicolas Claxton':
+         name = 'Nic Claxton'
+      if name == 'C.J. McCollum':
+         name = 'CJ McCollum'
+      if name == 'R.J. Barrett':
+         name = 'RJ Barrett'
+      if name == 'Herb Jones':
+         name = 'Herbert Jones'
+      if name == 'Cam Johnson':
+         name = 'Cameron Johnson'
+      if name == 'O.G. Anunoby':
+         name = 'OG Anunoby'
+      if name == 'Alexandre Sarr':
+         name = 'Alex Sarr'
+      if name == 'Cameron Thomas':
+         name = 'Cam Thomas'
+      if name == 'Kelly Oubre Jr.':
+          name = 'Kelly Oubre'
+      return name
+    
+    player_name = name_renamer(player_name)
+
+    if player_name in _player_metadata.index:
+
+        return player_name + ' (' + _player_metadata[player_name] + ')'
+    else:
+        return 'RP'
+    
 def get_your_differential_threshold():
    return st.session_state.your_differential_threshold / 100
 
