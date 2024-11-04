@@ -60,17 +60,17 @@ def make_full_waiver_tab(H
           ,index = default_index
         )
 
-  make_h_cand_tab(H
-        ,st.session_state.g_scores
-        ,st.session_state.g_scores
-        ,player_assignments
-        ,waiver_inspection_seat
-        ,1
-        ,st.session_state.v
-        ,1
-        ,None
-        ,None
-        ,st.session_state.n_picks * st.session_state.n_drafters
-        ,drop_player)
+        make_h_cand_tab(H
+                ,st.session_state.g_scores
+                ,st.session_state.g_scores
+                ,player_assignments
+                ,waiver_inspection_seat
+                ,1
+                ,st.session_state.v
+                ,1
+                ,None
+                ,None
+                ,st.session_state.n_picks * st.session_state.n_drafters
+                ,drop_player)
 
-  
+        
