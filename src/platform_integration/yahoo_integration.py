@@ -31,6 +31,14 @@ LOGGER = get_logger(__name__)
 class YahooIntegration(PlatformIntegration):
 
     @property
+    def description_string(self) -> str:
+        return 'Retrieve from Yahoo'
+    
+    def get_description_string(self) -> str:
+        return self.description_string
+    
+
+    @property
     def available_modes(self) -> list:
         return ['Draft Mode', 'Season Mode', 'Auction Mode']
     
@@ -39,7 +47,8 @@ class YahooIntegration(PlatformIntegration):
 
     def __init__(self):
         self.teams_dict = None
-        
+        self.division_id = None #as far as I know, yahoo doesnt have divisions
+
     def setup(self):
         """Collect information from the user, and use it to set up the integration.
         This function is not cached, so it is run every time the app re=runs
@@ -56,8 +65,6 @@ class YahooIntegration(PlatformIntegration):
             st.stop()
 
         self.auth_dir = st.session_state.temp_dir
-
-        self.division_id = None #as far as I know, yahoo doesnt have divisions
 
         if self.auth_dir is None:
           st.stop()
@@ -324,7 +331,7 @@ class YahooIntegration(PlatformIntegration):
         
         return rosters_dict
 
-    #@st.cache_data(ttl=3600, show_spinner = False)
+    @st.cache_data(ttl=3600, show_spinner = False)
     def get_user_leagues(_self) -> List[League]:
         """Get a list of leagues that the user is a part of 
 

@@ -9,6 +9,13 @@ from src.data_retrieval.get_data import get_player_metadata
 class FantraxIntegration(PlatformIntegration):
 
     @property
+    def description_string(self) -> str:
+        return 'Retrieve from Fantrax'
+    
+    def get_description_string(self) -> str:
+        return self.description_string
+    
+    @property
     def available_modes(self) -> list:
         return ['Draft Mode', 'Season Mode']
     
