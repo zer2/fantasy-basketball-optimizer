@@ -9,6 +9,13 @@ class PlatformIntegration(abc.ABC):
         #return list of modes available with this integration
         pass
 
+    @property
+    @abc.abstractmethod
+    def get_description_string() -> list:
+        #return list of modes available with this integration
+        pass
+
+
     @abc.abstractmethod
     def setup():
         #get info from user about the league or division, and save results back as fields of the class 
@@ -25,6 +32,9 @@ class PlatformIntegration(abc.ABC):
     def get_team_names() -> list:
         #get a list of team names
         pass
+
+    def get_n_picks() -> int:
+        pass 
 
     @abc.abstractmethod
     def get_draft_results() -> tuple[pd.DataFrame, str]:

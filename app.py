@@ -21,6 +21,8 @@ from src.tabs.other_tabs import make_about_tab
 
 from src.platform_integration.fantrax_integration import FantraxIntegration
 from src.platform_integration.yahoo_integration import YahooIntegration
+from src.platform_integration.espn_integration import ESPNIntegration
+
 from pandas.api.types import CategoricalDtype
 
 ### SETUP
@@ -144,9 +146,11 @@ with param_tab:
       
       load_params(st.session_state.league)
 
+      integrations = {integration.get_description_string() : integration for integration in [YahooIntegration(), FantraxIntegration(), ESPNIntegration()]}
+
       data_source = st.selectbox(
         'Do you want to integrate with a fantasy platform?'
-        , ['Enter your own data', 'Retrieve from Yahoo Fantasy','Retrieve from Fantrax']
+        , ['Enter your own data'] + list(integrations.keys())
         , key = 'data_source'
         , on_change = increment_and_reset_draft
         , index = 0)
@@ -162,11 +166,9 @@ with param_tab:
       if st.session_state.data_source == 'Enter your own data':
         mode_options = ('Draft Mode', 'Auction Mode','Season Mode')      
 
-      elif st.session_state.data_source == 'Retrieve from Yahoo Fantasy':
-        mode_options = YahooIntegration().get_available_modes()
-
-      elif st.session_state.data_source == 'Retrieve from Fantrax':
-        mode_options = FantraxIntegration().get_available_modes()
+      else:
+        st.session_state.integration = integrations[data_source]
+        mode_options = st.session_state.integration.get_available_modes()
 
       mode = st.selectbox(
         'Which mode do you want to use?'
@@ -209,19 +211,7 @@ with param_tab:
 
       else:
         
-        if data_source == 'Retrieve from Yahoo Fantasy':
-
-          yahoo_integration = YahooIntegration()
-          yahoo_integration.setup()
-
-          st.session_state.integration = yahoo_integration
-                
-        elif data_source == 'Retrieve from Fantrax':     
-
-          fantrax_integration = FantraxIntegration()     
-
-          fantrax_integration.setup()
-          st.session_state.integration = fantrax_integration
+        st.session_state.integration.setup()
 
         st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
                                                                               ,st.session_state.integration.division_id) 
