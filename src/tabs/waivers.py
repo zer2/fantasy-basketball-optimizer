@@ -60,6 +60,7 @@ def make_full_waiver_tab(H
           ,index = default_index
         )
 
+  if len(waiver_players) >= st.session_state.n_picks:
         make_h_cand_tab(H
                 ,st.session_state.g_scores
                 ,st.session_state.g_scores

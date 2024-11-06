@@ -415,6 +415,8 @@ def get_htb_adp():
          name = 'Alex Sarr'
       if name == 'Rob Dillingham':
          name = 'Robert Dillingham'
+      if name == 'Jacob Poeltl':
+         name = 'Jacob Poltl'
       return name
       
    df['Player'] = [name_renamer(name) for name in df['Player']]
