@@ -415,8 +415,8 @@ def get_htb_adp():
          name = 'Alex Sarr'
       if name == 'Rob Dillingham':
          name = 'Robert Dillingham'
-      if name == 'Jacob Poeltl':
-         name = 'Jacob Poltl'
+      if name == 'Jakob Poeltl':
+         name = 'Jakob Poltl'
       return name
       
    df['Player'] = [name_renamer(name) for name in df['Player']]
@@ -456,6 +456,8 @@ def get_htb_projections():
          name = 'Alex Sarr'
       #if name == 'Rob Dillingham':
       #   name = 'Robert Dillingham'
+      if name == 'Jakob Poeltl':
+         name = 'Jakob Poltl'
       return name
       
    raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
@@ -507,6 +509,8 @@ def process_basketball_monster_data(raw_df):
          name = 'Alex Sarr'
       if name == 'Rob Dillingham':
          name = 'Robert Dillingham'
+      if name == 'Jakob Poeltl':
+         name = 'Jakob Poltl'
       return name
 
    raw_df = raw_df.dropna()
