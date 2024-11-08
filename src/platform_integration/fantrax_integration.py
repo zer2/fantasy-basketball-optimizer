@@ -16,6 +16,13 @@ class FantraxIntegration(PlatformIntegration):
         return self.description_string
     
     @property
+    def player_name_column(self) -> str:
+        return 'FANTRAX_PLAYER_NAME'
+    
+    def get_player_name_column(self) -> str:
+        return self.player_name_column
+    
+    @property
     def available_modes(self) -> list:
         return ['Draft Mode', 'Season Mode']
     
@@ -82,7 +89,6 @@ class FantraxIntegration(PlatformIntegration):
 
             st.session_state.player_metadata = get_player_metadata()
             player_metadata = st.session_state.player_metadata.copy()
-            player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
             self.selections_default = self.get_rosters_df(player_metadata)
             self.n_drafters = st.session_state.selections_default.shape[1]

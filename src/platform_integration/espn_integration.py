@@ -15,7 +15,7 @@ from yfpy.query import YahooFantasySportsQuery
 from src.data_retrieval.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper, get_player_metadata
 from src.helpers.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names
 from collections import Counter
-from src.helpers.helper_functions import standardize_name, get_fixed_player_name
+from src.helpers.helper_functions import get_fixed_player_name
 
 import json
 import os
@@ -40,6 +40,13 @@ class ESPNIntegration(PlatformIntegration):
     
     def get_description_string(self) -> str:
         return self.description_string
+    
+    @property
+    def player_name_column(self) -> str:
+        return 'ESPN_NAME'
+    
+    def get_player_name_column(self) -> str:
+        return self.player_name_column
     
     @property
     def available_modes(self) -> list:
@@ -134,11 +141,11 @@ class ESPNIntegration(PlatformIntegration):
                         , swid=st.session_state.espn_swid)
         
         teams = league.teams
-        player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
 
         team_players_dict = {team.team_name :
                 [get_fixed_player_name(player.name, player_metadata) for player in team.roster] 
                               for team in teams}
+        
         max_team_size = max([len(x) for x in team_players_dict.values()])
 
         players_df = pd.DataFrame()

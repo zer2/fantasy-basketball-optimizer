@@ -184,8 +184,6 @@ def refresh_analysis():
 
     player_metadata = st.session_state.player_metadata.copy()
 
-    player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
-
     if st.session_state.mode == 'Draft Mode':
 
         draft_results, error_string = st.session_state.integration.get_draft_results(player_metadata)

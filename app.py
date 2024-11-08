@@ -316,7 +316,7 @@ with param_tab:
             ,on_change = increment_and_reset_draft
           )
           raw_stats_df = get_specified_stats(dataset_name
-                                    , st.session_state.player_stats_default_key)
+                                              , st.session_state.player_stats_default_key)
             
         else: 
 
@@ -382,7 +382,8 @@ with param_tab:
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider
-                            , rotowire_slider)
+                            , rotowire_slider
+                            , st.session_state.data_source)
                     
     else:
           all_datasets = ['RotoWire (req. upload)'] 
@@ -401,7 +402,8 @@ with param_tab:
                             , None
                             , 0
                             , 1
-                            , 0)
+                            , 0
+                            , st.session_state.data_source)
 
   with advanced_params:
 

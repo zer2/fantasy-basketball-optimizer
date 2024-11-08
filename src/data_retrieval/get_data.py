@@ -11,9 +11,11 @@ from src.helpers.helper_functions import get_n_games, get_data_from_snowflake
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
 
+@st.cache_data()
 def get_yahoo_key_to_name_mapper():
-   return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
+   return get_data_from_snowflake('PLAYER_MAPPING_VIEW')[['YAHOO_PLAYER_ID','PLAYER_NAME']].set_index('YAHOO_PLAYER_ID')
 
+#ZR: This is obviously wrong?
 def get_yahoo_key_to_position_eligibility(season = 2024):
    return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
 
@@ -133,7 +135,7 @@ def get_historical_data():
   return full_df
 
 
-@st.cache_resource(ttl = '1d') 
+#@st.cache_resource(ttl = '1d') 
 def get_player_metadata() -> pd.Series:
    """Get player data from the NBA api
 
@@ -143,9 +145,7 @@ def get_player_metadata() -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   df = get_htb_projections()
-   df.index = df.index + ' (' + df['Position'] + ')'
-   df.index.name = 'Player'
+   df = get_htb_projections(st.session_state.data_source)
 
    return df['Position']
 
@@ -167,7 +167,7 @@ def get_player_metadata() -> pd.Series:
    '''
 
 @st.cache_resource(ttl = '1d') 
-def get_darko_data() -> dict[pd.DataFrame]:
+def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
 
   Args:
@@ -179,13 +179,19 @@ def get_darko_data() -> dict[pd.DataFrame]:
   renamer = st.session_state.params['darko-renamer']
   darko_df = darko_df.rename(columns = renamer)
   darko_df = darko_df.apply(pd.to_numeric, errors='ignore')
+  
+  raw_df = map_player_names(raw_df, 'DARKO_NAME')
 
   darko_df['Position'] = 'NP'
   darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
 
+  #ZR: This should be simplified. We don't need to do this multiple times
   extra_info = get_data_from_snowflake('HTB_PROJECTION_TABLE')[['PLAYER','MPG','GP']]
   extra_info.loc[:,'GP'] = extra_info['GP']/get_n_games()
   extra_info.columns = ['Player','Minutes','Games Played %']
+
+  extra_info = map_player_names(extra_info, 'BBM_NAME')
+
   extra_info = extra_info.set_index('Player')
 
   darko_long_term = darko_df.merge(extra_info, left_index = True, right_index = True)
@@ -303,12 +309,14 @@ def combine_nba_projections(rotowire_upload
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider 
-                            , rotowire_slider):
+                            , rotowire_slider
+                            , integration_source #just for caching purposes
+                            ): 
     
-    hashtag_stats = get_htb_projections()
-    rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload).fillna(0)
-    bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload)
-    darko_stats = None if darko_slider == 0 else get_darko_data()
+    hashtag_stats = get_htb_projections(integration_source)
+    rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload, integration_source).fillna(0)
+    bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, integration_source)
+    darko_stats = None if darko_slider == 0 else get_darko_data(integration_source)
 
     hashtag_weight = [hashtag_slider] 
     rotowire_weight = [rotowire_slider] if rotowire_upload is not None else []
@@ -330,6 +338,8 @@ def combine_nba_projections(rotowire_upload
                         ,'Darko' : darko_stats}, names = ['Source'])
             
     new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM','Darko'], all_players], names = ['Source','Player'])
+
+    st.write(df)
     df = df.reindex(new_index)
     
     weights = [hashtag_slider, rotowire_slider, bbm_slider, darko_slider]
@@ -360,7 +370,7 @@ def combine_nba_projections(rotowire_upload
 
 
 @st.cache_data()
-def process_basketball_rotowire_data(raw_df):
+def process_basketball_rotowire_data(raw_df, integration_source = None):
    
    raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
    raw_df['FG%'] = raw_df['FG%']/100
@@ -395,32 +405,7 @@ def get_htb_adp():
    df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
    df = df.rename(columns = st.session_state.params['htb-renamer'])
 
-   #ZR: This should be from snowflake, or mapping in dictionary
-   def name_renamer(name):
-      name = unidecode(name)
-      name = ' '.join(name.split(' ')[0:2])
-      if name == 'Nicolas Claxton':
-         name = 'Nic Claxton'
-      if name == 'C.J. McCollum':
-         name = 'CJ McCollum'
-      if name == 'R.J. Barrett':
-         name = 'RJ Barrett'
-      if name == 'Herb Jones':
-         name = 'Herbert Jones'
-      if name == 'Cam Johnson':
-         name = 'Cameron Johnson'
-      if name == 'O.G. Anunoby':
-         name = 'OG Anunoby'
-      if name == 'Alexandre Sarr':
-         name = 'Alex Sarr'
-      if name == 'Rob Dillingham':
-         name = 'Robert Dillingham'
-      if name == 'Jakob Poeltl':
-         name = 'Jakob Poltl'
-      return name
-      
-   df['Player'] = [name_renamer(name) for name in df['Player']]
-
+   df = map_player_names(df, 'HTB_NAME')
    df['Position'] = df['Position'].str.replace('/',',')
 
    df['Player'] = df['Player'] + ' (' + df['Position'] + ')'
@@ -428,8 +413,8 @@ def get_htb_adp():
    df = df[['Player','ADP']]
    return df.set_index('Player')
 
-@st.cache_data(ttl = 3600)
-def get_htb_projections():
+#@st.cache_data(ttl = 3600)
+def get_htb_projections(integration_source = None):
    raw_df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
 
    raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
@@ -437,30 +422,7 @@ def get_htb_projections():
 
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
    
-   def name_renamer(name):
-      name = unidecode(name)
-      name = ' '.join(name.split(' ')[0:2])
-      if name == 'Nicolas Claxton':
-         name = 'Nic Claxton'
-      if name == 'C.J. McCollum':
-         name = 'CJ McCollum'
-      if name == 'R.J. Barrett':
-         name = 'RJ Barrett'
-      if name == 'Herb Jones':
-         name = 'Herbert Jones'
-      if name == 'Cam Johnson':
-         name = 'Cameron Johnson'
-      if name == 'O.G. Anunoby':
-         name = 'OG Anunoby'
-      if name == 'Alexandre Sarr':
-         name = 'Alex Sarr'
-      #if name == 'Rob Dillingham':
-      #   name = 'Robert Dillingham'
-      if name == 'Jakob Poeltl':
-         name = 'Jakob Poltl'
-      return name
-      
-   raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
+   raw_df = map_player_names(raw_df, 'HTB_NAME')
 
    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
    raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
@@ -479,43 +441,17 @@ def get_htb_projections():
    return raw_df
 
 @st.cache_data(ttl = 3600)
-def process_basketball_monster_data(raw_df):
+def process_basketball_monster_data(raw_df, integration_source = None):
    
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
 
    #handling case where there is an extra column that gets interpreted as a missing value
    raw_df = raw_df.loc[:,[c for c in raw_df.columns if 'Unnamed' not in c]]
-
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
-
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
-   
-   def name_renamer(name):
-      name = unidecode(name)
-      name = ' '.join(name.split(' ')[0:2])
-      if name == 'Nicolas Claxton':
-         name = 'Nic Claxton'
-      if name == 'C.J. McCollum':
-         name = 'CJ McCollum'
-      if name == 'R.J. Barrett':
-         name = 'RJ Barrett'
-      if name == 'Herb Jones':
-         name = 'Herbert Jones'
-      if name == 'Cam Johnson':
-         name = 'Cameron Johnson'
-      if name == 'O.G. Anunoby':
-         name = 'OG Anunoby'
-      if name == 'Alexandre Sarr':
-         name = 'Alex Sarr'
-      if name == 'Rob Dillingham':
-         name = 'Robert Dillingham'
-      if name == 'Jakob Poeltl':
-         name = 'Jakob Poltl'
-      return name
-
    raw_df = raw_df.dropna()
-      
-   raw_df['Player'] = [name_renamer(name) for name in raw_df['Player']]
+
+   raw_df = map_player_names(raw_df, 'BBM_NAME')
 
    raw_df = raw_df.set_index('Player')
 
@@ -551,3 +487,9 @@ def get_nba_schedule():
 
     return teams_playing
 
+def map_player_names(df, source_name):
+   player_name_column = st.session_state.integration.get_player_name_column()
+   mapper_table = get_data_from_snowflake('PLAYER_MAPPING_VIEW').dropna(subset = [source_name]) \
+                                                                  .set_index(source_name)[player_name_column]
+   df['Player'] = df['Player'].map(mapper_table).fillna(df['Player'])
+   return df
