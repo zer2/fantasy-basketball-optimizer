@@ -90,7 +90,7 @@ class ESPNIntegration(PlatformIntegration):
               self.team_names = self.get_team_names(self.league_id)
               self.n_drafters = len(self.get_teams_dict(self.league_id)) 
 
-              player_metadata = get_player_metadata()
+              player_metadata = get_player_metadata(st.session_state.data_source)
               team_players_df = self.get_rosters_df(self.league_id, player_metadata)
               self.selections_default = team_players_df
 

@@ -20,7 +20,7 @@ def get_yahoo_key_to_position_eligibility(season = 2024):
    return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
 
 #cache this globally so it doesn't have to be rerun constantly 
-@st.cache_resource(ttl = '1d') 
+@st.cache_data(ttl = '1d') 
 def get_current_season_data(season : int = 2024) -> tuple:
   """Get all box scores from the current season and calculate various running averages. Currently 2-week, 4-week, and season to date
 
@@ -59,7 +59,7 @@ def get_current_season_data(season : int = 2024) -> tuple:
   two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= two_weeks_ago].drop(columns = ['Game Date'])
   full_subset = pgl_df.drop(columns = ['Game Date'])
 
-  player_metadata = get_player_metadata()
+  player_metadata = get_player_metadata(st.session_state.data_source)
 
   season_display_string = str(season - 1) + '-' + str(season)
 
@@ -111,7 +111,7 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
      return pd.DataFrame()
 
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
-@st.cache_resource(ttl = '1d') 
+@st.cache_data(ttl = '1d') 
 def get_historical_data():  
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
@@ -134,9 +134,8 @@ def get_historical_data():
 
   return full_df
 
-
-#@st.cache_resource(ttl = '1d') 
-def get_player_metadata() -> pd.Series:
+@st.cache_data(ttl = 3600) 
+def get_player_metadata(data_source) -> pd.Series:
    """Get player data from the NBA api
 
    Args:
@@ -145,28 +144,14 @@ def get_player_metadata() -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   df = get_htb_projections(st.session_state.data_source)
+   print('I am here hi')
+   print(data_source)
+   df = get_htb_projections(data_source)
 
    return df['Position']
 
-   '''
-   playerindex = nba_endpoints.playerindex.PlayerIndex()
-   data = playerindex.data_sets[0].get_dict()['data']
-   headers = playerindex.data_sets[0].get_dict()['headers']
 
-   players_df = pd.DataFrame(
-    data, columns=headers
-           )
-
-   simplified = players_df['POSITION'].str[0]
-   simplified.index = players_df['PLAYER_FIRST_NAME'] + ' ' + players_df['PLAYER_LAST_NAME']
-   simplified.index.name = 'Player'
-   simplified.name = 'Position'
-
-   return simplified
-   '''
-
-@st.cache_resource(ttl = '1d') 
+@st.cache_data(ttl = '1d') 
 def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
 
@@ -339,7 +324,6 @@ def combine_nba_projections(rotowire_upload
             
     new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM','Darko'], all_players], names = ['Source','Player'])
 
-    st.write(df)
     df = df.reindex(new_index)
     
     weights = [hashtag_slider, rotowire_slider, bbm_slider, darko_slider]
@@ -413,15 +397,16 @@ def get_htb_adp():
    df = df[['Player','ADP']]
    return df.set_index('Player')
 
-#@st.cache_data(ttl = 3600)
-def get_htb_projections(integration_source = None):
+@st.cache_data(ttl = 3600)
+def get_htb_projections(integration_source):
+
    raw_df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
 
    raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
 
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
-   
+
    raw_df = map_player_names(raw_df, 'HTB_NAME')
 
    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
@@ -488,8 +473,15 @@ def get_nba_schedule():
     return teams_playing
 
 def map_player_names(df, source_name):
-   player_name_column = st.session_state.integration.get_player_name_column()
+
+   if 'integration' in st.session_state:
+      player_name_column = st.session_state.integration.get_player_name_column()
+   else:
+      player_name_column = 'PLAYER_NAME'
+
    mapper_table = get_data_from_snowflake('PLAYER_MAPPING_VIEW').dropna(subset = [source_name]) \
                                                                   .set_index(source_name)[player_name_column]
+   
+   #does not get here
    df['Player'] = df['Player'].map(mapper_table).fillna(df['Player'])
    return df

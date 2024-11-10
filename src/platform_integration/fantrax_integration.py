@@ -87,8 +87,7 @@ class FantraxIntegration(PlatformIntegration):
         else:
             #this is all messed up lol
 
-            st.session_state.player_metadata = get_player_metadata()
-            player_metadata = st.session_state.player_metadata.copy()
+            player_metadata = get_player_metadata(st.session_state.data_source)
 
             self.selections_default = self.get_rosters_df(player_metadata)
             self.n_drafters = st.session_state.selections_default.shape[1]

@@ -230,7 +230,6 @@ def get_fixed_player_name(player_name : str
      """
         
     if player_name in _player_metadata.index:
-
         return player_name + ' (' + _player_metadata[player_name] + ')'
     else:
         return 'RP'
@@ -437,19 +436,24 @@ def move_back_one_pick(row, drafter, n):
 
     return row, drafter 
 
-@st.cache_resource()
+@st.cache_data()
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
    
-   con = snowflake.connector.connect(
-        user=st.secrets['SNOWFLAKE_USER']
-        ,password=st.secrets['SNOWFLAKE_PASSWORD']
-        ,account='aib52055.us-east-1'
-        ,database = 'FANTASYOPTIMIZER'
-        ,schema = schema
-    )
+   con = get_snowflake_connection(schema)
 
    df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
 
    return df
 
+@st.cache_resource()
+def get_snowflake_connection(schema):
+      con = snowflake.connector.connect(
+        user=st.secrets['SNOWFLAKE_USER']
+        ,password=st.secrets['SNOWFLAKE_PASSWORD']
+        ,account='aib52055.us-east-1'
+        ,database = 'FANTASYOPTIMIZER'
+        ,schema = schema
+        )
+      return con
+      

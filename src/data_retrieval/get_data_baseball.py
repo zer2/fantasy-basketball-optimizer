@@ -50,7 +50,7 @@ def process_baseball_rotowire_data(raw_df):
 
    return raw_df
 
-@st.cache_resource(ttl = '1d') 
+@st.cache_data(ttl = '1d') 
 def get_baseball_historical_data():  
   """Get historical baseball data, which is stored in Snowflake, and process it
 
