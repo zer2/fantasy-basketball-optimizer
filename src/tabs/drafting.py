@@ -223,7 +223,8 @@ def make_drafting_tab_live_data(H):
 
         with c2:
             draft_seat = st.selectbox(f'Which drafter are you?'
-            , st.session_state.integration.get_team_names(st.session_state.integration.league_id)
+            , st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                          ,st.session_state.integration.division_id)
             , key = 'draft_seat'
             , on_change = refresh_analysis)
 
