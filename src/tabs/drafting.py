@@ -210,8 +210,16 @@ def make_drafting_tab_live_data(H):
             refresh_analysis()
 
         c1, c2 = st.columns([0.1,0.9])
+        
+        with c1:
+            st.button('Refresh Analysis', on_click = refresh_analysis)
 
-        c1.button('Refresh Analysis', on_click = refresh_analysis)
+        with c2:
+            draft_seat = st.selectbox(f'Which drafter are you?'
+            , st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                          ,st.session_state.integration.division_id)
+            , key = 'draft_seat'
+            , on_change = refresh_analysis)
 
         draft_seat = c2.selectbox(f'Which drafter are you?'
                 , st.session_state.integration.get_team_names(st.session_state.integration.league_id
