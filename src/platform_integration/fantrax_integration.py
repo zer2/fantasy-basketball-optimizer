@@ -29,7 +29,6 @@ class FantraxIntegration(PlatformIntegration):
     def get_available_modes(self) -> list:
         return self.available_modes
 
-    @st.cache_data()
     def get_api(_self
                 , league_id : str):
         """Get an API object from the FantraxAPI package. It is associated with a league

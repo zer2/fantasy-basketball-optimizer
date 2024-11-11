@@ -215,7 +215,8 @@ def get_games_per_week():
    if st.session_state:
       return st.session_state.params['n_games_per_week']
 
-@st.cache_data()
+#ZR: For efficiency, should make this a series and save it beforehand. The caching wont work
+#The problem is that there might be names that we miss, which would be bad
 def get_fixed_player_name(player_name : str
                           , _player_metadata) -> str:
     
@@ -439,7 +440,7 @@ def move_back_one_pick(row, drafter, n):
 @st.cache_data()
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
-   
+
    con = get_snowflake_connection(schema)
 
    df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()

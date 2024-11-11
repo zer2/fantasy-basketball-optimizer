@@ -250,8 +250,6 @@ def make_drafting_tab_live_data(H):
                 else:
                     base_h_res = None
                     
-                print('MOO')
-
                 make_full_team_tab(st.session_state.z_scores
                                 ,st.session_state.g_scores
                                 ,my_players
@@ -264,11 +262,7 @@ def make_drafting_tab_live_data(H):
                 
             with cand_tab:
 
-                print('HERE')
-
                 if len(my_players) < st.session_state.n_starters:
-
-                    print('THERE')
 
                     make_h_cand_tab(H
                         ,st.session_state.g_scores
@@ -279,11 +273,9 @@ def make_drafting_tab_live_data(H):
                         ,st.session_state.v
                         ,5)
                     
-                    print('EVERYWHERE')
                 else:
                     st.write('You have selected all of your players')
 
-            print('SCISSORS')
 
 @st.fragment 
 def make_auction_tab_own_data(H):

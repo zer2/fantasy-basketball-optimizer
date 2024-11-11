@@ -6,7 +6,7 @@ from src.helpers.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_default_key \
                                   ,get_games_per_week, get_ratio_statistics
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
-                        get_data_from_snowflake, combine_nba_projections, get_player_metadata
+                        get_data_from_snowflake, combine_nba_projections, get_player_metadata, get_yahoo_key_to_name_mapper
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
 from src.tabs.ranks import make_full_rank_tab
@@ -223,6 +223,8 @@ with param_tab:
         st.session_state.selections_df = st.session_state.selections_default
 
         st.session_state.player_metadata = get_player_metadata(st.session_state.data_source)
+
+        st.session_state.yahoo_key_to_name_mapper = get_yahoo_key_to_name_mapper()
 
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
