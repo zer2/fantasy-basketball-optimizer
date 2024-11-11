@@ -165,7 +165,7 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   darko_df = darko_df.rename(columns = renamer)
   darko_df = darko_df.apply(pd.to_numeric, errors='ignore')
   
-  raw_df = map_player_names(raw_df, 'DARKO_NAME')
+  darko_df = map_player_names(darko_df, 'DARKO_NAME')
 
   darko_df['Position'] = 'NP'
   darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
