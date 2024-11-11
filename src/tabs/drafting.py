@@ -1,6 +1,7 @@
   
 import streamlit as st 
 from pandas.api.types import CategoricalDtype
+from src.data_retrieval.get_data import get_player_metadata
 from src.helpers.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs.team_subtabs import *
 from src.tabs.candidate_subtabs import *
@@ -182,19 +183,13 @@ def make_drafting_tab_own_data(H):
         
 def refresh_analysis():
 
-    player_metadata = st.session_state.player_metadata.copy()
-
-    player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
-
     if st.session_state.mode == 'Draft Mode':
 
-        draft_results, error_string = st.session_state.integration.get_draft_results(player_metadata)
-                
+        draft_results, error_string = st.session_state.integration.get_draft_results(st.session_state.player_metadata)
     else:
 
-        draft_results, error_string  = st.session_state.integration.get_auction_results(player_metadata)
+        draft_results, error_string  = st.session_state.integration.get_auction_results(st.session_state.player_metadata)
             
-
     st.session_state.draft_results = draft_results
 
     if error_string == 'Success':
@@ -207,8 +202,6 @@ def refresh_analysis():
 @st.fragment
 def make_drafting_tab_live_data(H):
 
-    st.session_state.player_metadata = st.session_state.player_stats['Position']
-
     if 'team_names' not in st.session_state:
         st.write('No league info has been passed')
     else:
@@ -217,7 +210,7 @@ def make_drafting_tab_live_data(H):
             refresh_analysis()
 
         c1, c2 = st.columns([0.1,0.9])
-
+        
         with c1:
             st.button('Refresh Analysis', on_click = refresh_analysis)
 
@@ -228,6 +221,12 @@ def make_drafting_tab_live_data(H):
             , key = 'draft_seat'
             , on_change = refresh_analysis)
 
+        draft_seat = c2.selectbox(f'Which drafter are you?'
+                , st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                              , st.session_state.integration.division_id)
+                , key = 'draft_seat'
+                , on_change = refresh_analysis)
+                
         if not st.session_state.live_draft_active:
 
             st.write('Draft has not yet begun')
@@ -239,6 +238,8 @@ def make_drafting_tab_live_data(H):
             my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
             
             cand_tab, team_tab = st.tabs(["Candidates","Team"])
+
+            #does not get here
 
             with team_tab:
 
@@ -257,7 +258,6 @@ def make_drafting_tab_live_data(H):
                 else:
                     base_h_res = None
                     
-
                 make_full_team_tab(st.session_state.z_scores
                                 ,st.session_state.g_scores
                                 ,my_players
@@ -267,7 +267,7 @@ def make_drafting_tab_live_data(H):
                                 ,st.session_state.info_key
                                 ,draft_seat
                                 )        
-
+                
             with cand_tab:
 
                 if len(my_players) < st.session_state.n_starters:
@@ -280,8 +280,10 @@ def make_drafting_tab_live_data(H):
                         ,st.session_state.n_iterations
                         ,st.session_state.v
                         ,5)
+                    
                 else:
                     st.write('You have selected all of your players')
+
 
 @st.fragment 
 def make_auction_tab_own_data(H):
@@ -439,8 +441,6 @@ def make_auction_tab_own_data(H):
                                 )
 @st.fragment
 def make_auction_tab_live_data(H):
-
-    st.session_state.player_metadata = st.session_state.player_stats['Position']
 
     if 'team_names' not in st.session_state:
         st.write('No league info has been passed')

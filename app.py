@@ -6,7 +6,7 @@ from src.helpers.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version, increment_default_key \
                                   ,get_games_per_week, get_ratio_statistics
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
-                        get_data_from_snowflake, combine_nba_projections
+                        get_data_from_snowflake, combine_nba_projections, get_player_metadata, get_yahoo_key_to_name_mapper
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
 from src.tabs.ranks import make_full_rank_tab
@@ -222,6 +222,10 @@ with param_tab:
 
         st.session_state.selections_df = st.session_state.selections_default
 
+        st.session_state.player_metadata = get_player_metadata(st.session_state.data_source)
+
+        st.session_state.yahoo_key_to_name_mapper = get_yahoo_key_to_name_mapper()
+
       #set default position numbers, based on n_picks
       all_position_defaults = st.session_state.params['options']['positions']
       
@@ -316,7 +320,7 @@ with param_tab:
             ,on_change = increment_and_reset_draft
           )
           raw_stats_df = get_specified_stats(dataset_name
-                                    , st.session_state.player_stats_default_key)
+                                              , st.session_state.player_stats_default_key)
             
         else: 
 
@@ -382,7 +386,8 @@ with param_tab:
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider
-                            , rotowire_slider)
+                            , rotowire_slider
+                            , st.session_state.data_source)
                     
     else:
           all_datasets = ['RotoWire (req. upload)'] 
@@ -401,7 +406,8 @@ with param_tab:
                             , None
                             , 0
                             , 1
-                            , 0)
+                            , 0
+                            , st.session_state.data_source)
 
   with advanced_params:
 
@@ -756,6 +762,7 @@ if st.session_state['mode'] == 'Draft Mode':
       make_drafting_tab_own_data(H)
     else:
       make_drafting_tab_live_data(H)
+      print('ROCK')
     
 if st.session_state['mode'] == 'Auction Mode':
 
@@ -882,6 +889,8 @@ elif st.session_state['mode'] == 'Season Mode':
                    , g_scores_unselected)              
 
 with about_tab:
+
+  print('PAPER')
 
   tabs = st.tabs(['Intro'
                   ,'G-scoring'

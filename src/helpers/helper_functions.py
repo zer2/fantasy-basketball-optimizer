@@ -214,12 +214,9 @@ def get_n_games():
 def get_games_per_week():
    if st.session_state:
       return st.session_state.params['n_games_per_week']
-   
-def standardize_name(name):
-   name = ' '.join(name.split(' ')[0:2])
-   return unidecode(name)
 
-@st.cache_data()
+#ZR: For efficiency, should make this a series and save it beforehand. The caching wont work
+#The problem is that there might be names that we miss, which would be bad
 def get_fixed_player_name(player_name : str
                           , _player_metadata) -> str:
     
@@ -232,32 +229,8 @@ def get_fixed_player_name(player_name : str
     Returns:
         fixed name string
      """
-
-    def name_renamer(name):
-      if name == 'Nicolas Claxton':
-         name = 'Nic Claxton'
-      if name == 'C.J. McCollum':
-         name = 'CJ McCollum'
-      if name == 'R.J. Barrett':
-         name = 'RJ Barrett'
-      if name == 'Herb Jones':
-         name = 'Herbert Jones'
-      if name == 'Cam Johnson':
-         name = 'Cameron Johnson'
-      if name == 'O.G. Anunoby':
-         name = 'OG Anunoby'
-      if name == 'Alexandre Sarr':
-         name = 'Alex Sarr'
-      if name == 'Cameron Thomas':
-         name = 'Cam Thomas'
-      if name == 'Kelly Oubre Jr.':
-          name = 'Kelly Oubre'
-      return name
-    
-    player_name = name_renamer(player_name)
-
+        
     if player_name in _player_metadata.index:
-
         return player_name + ' (' + _player_metadata[player_name] + ')'
     else:
         return 'RP'
@@ -464,19 +437,24 @@ def move_back_one_pick(row, drafter, n):
 
     return row, drafter 
 
-@st.cache_resource()
+@st.cache_data()
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
-   
-   con = snowflake.connector.connect(
-        user=st.secrets['SNOWFLAKE_USER']
-        ,password=st.secrets['SNOWFLAKE_PASSWORD']
-        ,account='aib52055.us-east-1'
-        ,database = 'FANTASYOPTIMIZER'
-        ,schema = schema
-    )
+
+   con = get_snowflake_connection(schema)
 
    df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()
 
    return df
 
+@st.cache_resource()
+def get_snowflake_connection(schema):
+      con = snowflake.connector.connect(
+        user=st.secrets['SNOWFLAKE_USER']
+        ,password=st.secrets['SNOWFLAKE_PASSWORD']
+        ,account='aib52055.us-east-1'
+        ,database = 'FANTASYOPTIMIZER'
+        ,schema = schema
+        )
+      return con
+      

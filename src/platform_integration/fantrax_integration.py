@@ -16,13 +16,19 @@ class FantraxIntegration(PlatformIntegration):
         return self.description_string
     
     @property
+    def player_name_column(self) -> str:
+        return 'FANTRAX_PLAYER_NAME'
+    
+    def get_player_name_column(self) -> str:
+        return self.player_name_column
+    
+    @property
     def available_modes(self) -> list:
         return ['Draft Mode', 'Season Mode']
     
     def get_available_modes(self) -> list:
         return self.available_modes
 
-    @st.cache_data()
     def get_api(_self
                 , league_id : str):
         """Get an API object from the FantraxAPI package. It is associated with a league
@@ -80,9 +86,7 @@ class FantraxIntegration(PlatformIntegration):
         else:
             #this is all messed up lol
 
-            st.session_state.player_metadata = get_player_metadata()
-            player_metadata = st.session_state.player_metadata.copy()
-            player_metadata.index = [' '.join(player.split('(')[0].split(' ')[0:2]) for player in player_metadata.index]
+            player_metadata = get_player_metadata(st.session_state.data_source)
 
             self.selections_default = self.get_rosters_df(player_metadata)
             self.n_drafters = st.session_state.selections_default.shape[1]

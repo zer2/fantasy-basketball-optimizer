@@ -674,7 +674,7 @@ def run_season(season_df
             player_averages.loc[:,'Free Throw %'] = player_averages['Free Throws Made']/player_averages['Free Throw Attempts']
             player_averages.loc[:,'Field Goal %'] = player_averages['Field Goals Made']/player_averages['Field Goal Attempts']
 
-            metadata = get_player_metadata()
+            metadata = get_player_metadata(st.session_state.data_source)
 
             player_averages = player_averages.merge(metadata, left_index = True, right_index = True, how = 'left')
             

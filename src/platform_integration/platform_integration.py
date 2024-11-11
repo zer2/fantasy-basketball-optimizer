@@ -33,7 +33,12 @@ class PlatformIntegration(abc.ABC):
         #get a list of team names
         pass
 
+    @abc.abstractmethod
     def get_n_picks() -> int:
+        pass 
+
+    @abc.abstractmethod
+    def get_player_name_column() -> int:
         pass 
 
     @abc.abstractmethod
