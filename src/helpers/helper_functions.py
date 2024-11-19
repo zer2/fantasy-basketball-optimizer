@@ -447,7 +447,7 @@ def get_data_from_snowflake(table_name
 
    return df
 
-@st.cache_resource()
+@st.cache_resource(ttl = 3600*24)
 def get_snowflake_connection(schema):
       con = snowflake.connector.connect(
         user=st.secrets['SNOWFLAKE_USER']
