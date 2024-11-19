@@ -762,7 +762,6 @@ if st.session_state['mode'] == 'Draft Mode':
       make_drafting_tab_own_data(H)
     else:
       make_drafting_tab_live_data(H)
-      print('ROCK')
     
 if st.session_state['mode'] == 'Auction Mode':
 
@@ -889,8 +888,6 @@ elif st.session_state['mode'] == 'Season Mode':
                    , g_scores_unselected)              
 
 with about_tab:
-
-  print('PAPER')
 
   tabs = st.tabs(['Intro'
                   ,'G-scoring'
