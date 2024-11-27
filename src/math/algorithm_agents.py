@@ -89,11 +89,18 @@ class HAgent():
             self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
 
+            categories = x_scores.columns
+            rho = np.array(st.session_state.rho.set_index('Category').loc[categories, categories])
+
+            np.fill_diagonal(rho, 1)
+            self.rho = np.expand_dims(rho, 0)
+
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
 
             v = np.sqrt(mov/(mov + vom))
-
+        
+        self.original_v = np.array(v)
         self.v = np.array(v/v.sum()).reshape(self.n_categories,1)
 
         turnover_inverted_v = self.v.copy()
@@ -113,7 +120,7 @@ class HAgent():
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
-        self.rho = np.expand_dims(np.identity(9),0) #ZR: Hack for now
+
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -536,7 +543,7 @@ class HAgent():
                 rosters = [1 if x else -1 for x in player_eligibilities]
   
                 score = self.get_objective_and_pdf_weights(
-                                        diff_means
+                                        x_diff_array
                                         , diff_vars
                                         , cdf_estimates
                                         , pdf_estimates
@@ -603,7 +610,7 @@ class HAgent():
             cdf_means = cdf_estimates.mean(axis = 2)
 
             if expected_future_diff is not None:
-                expected_diff_means = expected_future_diff.mean(axis = 2)
+                expected_diff_means = expected_future_diff.mean(axis = 2) / (self.original_v.reshape(1,-1))
             else:
                 expected_diff_means = None
 
@@ -685,15 +692,14 @@ class HAgent():
             cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
     
             score, pdf_weights = self.get_objective_and_pdf_weights(
-                                    diff_means
+                                    x_diff_array
                                     , diff_vars
                                     , cdf_estimates
                                     , pdf_estimates
                                     , sigma_2_m
                                     , calculate_pdf_weights = True)
-
+            
             category_gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
-
 
             if self.position_means is not None:
                 position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
@@ -729,7 +735,7 @@ class HAgent():
 
     
     def get_objective_and_pdf_weights(self
-                                        ,diff_means
+                                        ,x_diff_array
                                         ,diff_vars
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
@@ -758,7 +764,7 @@ class HAgent():
         elif self.scoring_format == 'Rotisserie':
 
             return self.get_objective_and_pdf_weights_rotisserie(
-                        diff_means
+                        x_diff_array
                         , diff_vars
                         , cdf_estimates
                         , pdf_estimates
@@ -833,7 +839,7 @@ class HAgent():
 
 
     def get_objective_and_pdf_weights_rotisserie(self
-                                , diff_means : np.array
+                                , x_diff_array : np.array
                                 , diff_vars : np.array
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
@@ -854,7 +860,8 @@ class HAgent():
             Objective or Objective, Gradient 
         """
         #make sure the PDF and CDF estimates, plus diff_means, are adjusted to the specs of Roto
-        diff_means = diff_means / np.sqrt(diff_vars) 
+
+        diff_means = x_diff_array / np.sqrt(diff_vars) 
         pdf_estimates = norm.pdf(diff_means)
         #CDF estimates dont need to be adjusted
 
@@ -885,10 +892,14 @@ class HAgent():
         
             gradient = self.get_del_v(sigma_d, del_mu_d, mu_d, del_sigma_2_p)
 
+            #remember that del_v is relative to the modified basis for mu. It must be translated back into the regular mu basis
+            gradient = gradient * np.sqrt(diff_vars)
+            print(np.sqrt(diff_vars))
+
             if test_mode:
                 return gradient
             else:
-                pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
+                pdf_weights = gradient.sum(axis = 2)
 
                 return objective, pdf_weights
 
@@ -1228,6 +1239,7 @@ class HAgent():
                         , pdfs : np.array
                         , cdfs : np.array
                         , f : np.array) -> np.array:
+        
 
         rho_ignoring_diag = rho.copy()
         rho_ignoring_diag[:,np.arange(rho_ignoring_diag.shape[1]),np.arange(rho_ignoring_diag.shape[2])] = 0

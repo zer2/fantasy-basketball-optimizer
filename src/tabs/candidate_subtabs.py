@@ -130,7 +130,13 @@ def make_h_cand_tab(_H
 
 
         else:
-          all_tabs = st.tabs(['Expected Win Rates', 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
+
+          if st.session_state.scoring_format == 'Rotisserie':
+            first_tab = 'Expected Totals'
+          else:
+            first_tab = 'Expected Win Rates'
+
+          all_tabs = st.tabs([first_tab, 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
           rate_tab = all_tabs[0]
           weight_tab = all_tabs[1]       
           roster_tab = all_tabs[2]
@@ -209,7 +215,18 @@ def make_h_cand_tab(_H
               st.error('Illegal roster!')
               st.stop()
 
-            rate_df = win_rates.loc[score_df.index].dropna()
+            if st.session_state.scoring_format == 'Rotisserie':
+              diffs = res['Diff'][fits_roster]
+              rate_df = diffs.loc[score_df.index].dropna()
+              style_format = "{:.1f}"
+              format_middle = 0
+              format_multiplier = 20 
+
+            else:
+              rate_df = win_rates.loc[score_df.index].dropna()
+              style_format = "{:.1%}"
+              format_middle = 0.5
+              format_multiplier = 300
 
             if st.session_state.data_option == 'Projection':
               rate_display = score_df.merge(adps, left_index = True, right_index = True, how = 'left') \
@@ -224,14 +241,14 @@ def make_h_cand_tab(_H
               def color_blue(label):
                   return "background-color: blue; color:white" if label == drop_player else None
               
-              rate_display_styled = rate_display.reset_index().style.format("{:.1%}"
+              rate_display_styled = rate_display.reset_index().style.format("{:.1f}"
                               ,subset = pd.IndexSlice[:,['H-score']]) \
                                                     .format("{:.1f}"
                               ,subset = pd.IndexSlice[:,adp_col]) \
                       .map(styler_a
                             , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
-                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns) \
+                      .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+                      .format(style_format, subset = rate_df.columns) \
                       .map(color_blue, subset = pd.IndexSlice[:,['Player']])
 
               st.dataframe(rate_display_styled
@@ -245,8 +262,8 @@ def make_h_cand_tab(_H
                               ,subset = pd.IndexSlice[:,adp_col]) \
                       .map(styler_a
                             , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
-                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns)
+                      .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+                      .format(style_format, subset = rate_df.columns)
               
               st.dataframe(rate_display_styled, use_container_width = True)
 
