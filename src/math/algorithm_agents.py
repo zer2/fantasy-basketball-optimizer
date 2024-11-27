@@ -89,26 +89,18 @@ class HAgent():
             self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
 
-            #scale is standard deviation of overall "luck"
-            player_stat_luck_overall = np.sqrt(self.n_categories)
+            categories = x_scores.columns
+            rho = np.array(st.session_state.rho.set_index('Category').loc[categories, categories])
 
-            max_luck_expected =  norm.ppf((self.n_drafters - 1 - 0.375)/(self.n_drafters - 1 + 0.25)) * \
-                                    player_stat_luck_overall
-            
-            player_stat_luck_per_category = max_luck_expected * self.fudge_factor /self.n_categories
-
-            max_cdf = norm.cdf(player_stat_luck_per_category)
-
-            ev_max_wins = max_cdf * (self.n_drafters-1) * self.n_categories
-
-            self.mu_m = ev_max_wins
-            self.var_m = max_cdf * (1-max_cdf) * (self.n_drafters-1) * self.n_categories
+            np.fill_diagonal(rho, 1)
+            self.rho = np.expand_dims(rho, 0)
 
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
 
             v = np.sqrt(mov/(mov + vom))
-
+        
+        self.original_v = np.array(v)
         self.v = np.array(v/v.sum()).reshape(self.n_categories,1)
 
         turnover_inverted_v = self.v.copy()
@@ -127,6 +119,8 @@ class HAgent():
 
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
+
+
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -157,7 +151,7 @@ class HAgent():
         
         total_players = self.n_picks * self.n_drafters
 
-        diff_means, diff_vars, n_values = self.get_diff_distributions(player_assignments
+        diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(player_assignments
                                         , drafter
                                         , x_scores_available
                                         , cash_remaining_per_team
@@ -209,7 +203,7 @@ class HAgent():
                                        , diff_vars
                                        , x_scores_available_array
                                        , x_scores_available.index
-                                       , n_values)
+                                       , sigma_2_m)
 
     def get_diff_distributions(self
                     , player_assignments : dict[list[str]]
@@ -281,22 +275,14 @@ class HAgent():
 
         #make order statistics adjustment for Roto 
         if self.scoring_format == 'Rotisserie':
-            total_players = self.n_drafters * self.n_picks 
-            remaining_players = total_players - len(players_chosen)
-
-            scale = np.sqrt(self.cross_player_var * \
-                            self.n_picks * \
-                            remaining_players/total_players
-                            )
-
-            n_values = rankdata(diff_means, axis = 2, method = 'ordinal')
-            player_variance_adjustment =  norm.ppf((n_values - 0.375)/(self.n_drafters - 1 + 0.25))
-
-            #let's try without this 
-            #diff_means = diff_means + player_variance_adjustment * scale.values.reshape(1,self.n_categories,1)
-
+            sigma_c = diff_means[0,:,:].std(axis = 1, ddof = 1) * np.sqrt(2)
+            h_m = self.get_h_m(sigma_c,self.n_drafters)
+            sigma_2_m = self.get_sigma_2_m(sigma_c
+                            ,  h_m
+                            , self.rho
+                            , self.n_drafters)
         else:
-            n_values = None
+            sigma_2_m = None
 
         diff_vars = np.vstack(
             [self.get_diff_var(len([p for p in player_assignments[team] if p == p])) for team \
@@ -310,14 +296,14 @@ class HAgent():
             self.value_of_money = self.get_value_of_money_auction(
                         diff_means
                         , diff_vars
-                        , n_values
+                        , sigma_2_m
                         , category_value_per_dollar
                         , replacement_value_by_category)
         else:
             self.value_of_money = None
 
 
-        return diff_means, diff_vars, n_values
+        return diff_means, diff_vars, sigma_2_m
 
     def get_opposing_team_means(self
                             , players : list[str]
@@ -395,7 +381,7 @@ class HAgent():
     def get_value_of_money_auction(self
                                    , diff_means
                                    , diff_vars
-                                   , n_values
+                                   , sigma_2_m
                                    , category_value_per_dollar
                                    , replacement_value_by_category
                                    , max_money = 200
@@ -406,7 +392,7 @@ class HAgent():
         Args:
             diff_means : 
             diff_vars: 
-            n_values:
+            sigma_2_m:
             category_value_per_dollar:
             replacement_value_by_category:
             max_money: maximum amount of money to check 
@@ -420,9 +406,11 @@ class HAgent():
         cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
 
         score = self.get_objective_and_pdf_weights(
-                                cdf_estimates
+                                x_diff_array
+                                , diff_vars
+                                , cdf_estimates
                                 , None
-                                , n_values
+                                , sigma_2_m
                                 , calculate_pdf_weights = False)
         
         money_df = pd.DataFrame({'value' : score}
@@ -440,7 +428,7 @@ class HAgent():
                            ,diff_vars : pd.Series
                            ,x_scores_available_array : pd.DataFrame
                            ,result_index
-                           ,n_values
+                           ,sigma_2_m
                            ):
         """Performs one iteration of H-scoring
          
@@ -486,7 +474,7 @@ class HAgent():
                                                     ,x_scores_available_array
                                                     ,result_index
                                                     ,n_players_selected
-                                                    ,n_values)
+                                                    ,sigma_2_m)
                 score = res['Score']
                 gradients = res['Gradients']
                 cdf_estimates = res['CDF-Estimates']
@@ -555,9 +543,11 @@ class HAgent():
                 rosters = [1 if x else -1 for x in player_eligibilities]
   
                 score = self.get_objective_and_pdf_weights(
-                                        cdf_estimates
+                                        x_diff_array
+                                        , diff_vars
+                                        , cdf_estimates
                                         , pdf_estimates
-                                        , n_values
+                                        , sigma_2_m
                                         , calculate_pdf_weights = False)
 
             #case where no new players need to be chosen
@@ -572,9 +562,11 @@ class HAgent():
                 rosters = None
                 
                 score = self.get_objective_and_pdf_weights(
-                                        cdf_estimates
+                                        diff_means
+                                        , diff_vars
+                                        , cdf_estimates
                                         , pdf_estimates
-                                        , n_values
+                                        , sigma_2_m
                                         , calculate_pdf_weights = False)
                 
 
@@ -599,9 +591,11 @@ class HAgent():
                 pdf_estimates = None
                                         
                 score = self.get_objective_and_pdf_weights(
-                                        cdf_estimates
+                                        diff_means
+                                        , diff_vars
+                                        , cdf_estimates
                                         , pdf_estimates
-                                        , n_values
+                                        , sigma_2_m
                                         , calculate_pdf_weights = False)
 
                 result_index = drop_potentials.index
@@ -616,7 +610,7 @@ class HAgent():
             cdf_means = cdf_estimates.mean(axis = 2)
 
             if expected_future_diff is not None:
-                expected_diff_means = expected_future_diff.mean(axis = 2)
+                expected_diff_means = expected_future_diff.mean(axis = 2) / (self.original_v.reshape(1,-1))
             else:
                 expected_diff_means = None
 
@@ -658,7 +652,7 @@ class HAgent():
                                     ,x_scores_available_array
                                     ,result_index
                                     ,n_players_selected
-                                    ,n_values
+                                    ,sigma_2_m
                                     ,):
         
             #calculate scores and category-level gradients
@@ -698,13 +692,14 @@ class HAgent():
             cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
     
             score, pdf_weights = self.get_objective_and_pdf_weights(
-                                    cdf_estimates
+                                    x_diff_array
+                                    , diff_vars
+                                    , cdf_estimates
                                     , pdf_estimates
-                                    , n_values
+                                    , sigma_2_m
                                     , calculate_pdf_weights = True)
-
+            
             category_gradient = np.einsum('ai , aik -> ak', pdf_weights, del_full)
-
 
             if self.position_means is not None:
                 position_gradient = np.einsum('ai , aki -> ak', pdf_weights, self.position_means) 
@@ -740,9 +735,11 @@ class HAgent():
 
     
     def get_objective_and_pdf_weights(self
+                                        ,x_diff_array
+                                        ,diff_vars
                                         ,cdf_estimates : np.array
                                         , pdf_estimates : np.array
-                                        , n_values : np.array = None
+                                        , sigma_2_m : np.array = None
                                         , calculate_pdf_weights : bool = False):
         """
         Calculate the objective function and optionally pdf weights for the gradient 
@@ -750,7 +747,7 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            n_values: order of matchup means. Useful for Toro
+            sigma_2_m: order of matchup means. Useful for Toro
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
@@ -767,9 +764,11 @@ class HAgent():
         elif self.scoring_format == 'Rotisserie':
 
             return self.get_objective_and_pdf_weights_rotisserie(
-                        cdf_estimates
+                        x_diff_array
+                        , diff_vars
+                        , cdf_estimates
                         , pdf_estimates
-                        , n_values
+                        , sigma_2_m
                         , calculate_pdf_weights) 
 
         elif self.scoring_format == 'Head to Head: Each Category':
@@ -840,9 +839,11 @@ class HAgent():
 
 
     def get_objective_and_pdf_weights_rotisserie(self
+                                , x_diff_array : np.array
+                                , diff_vars : np.array
                                 , cdf_estimates : np.array
                                 , pdf_estimates : np.array
-                                , n_values : np.array = None
+                                , sigma_2_m : float
                                 , calculate_pdf_weights : bool = False
                                 , test_mode : bool = False):
 
@@ -852,52 +853,53 @@ class HAgent():
         Args:
             cdf_estimates: array of CDF at 0 estimates for differentials against opponents
             pdf_estimates: array of PDF at 0 estimates for differentials against opponents
-            n_values: order of matchup means. Useful for Roto
+            sigma_2_m: order of matchup means. Useful for Roto
             calculate_pdf_weights: True if pdf weights should also be returned, in addition to objective
 
         Returns:
             Objective or Objective, Gradient 
         """
-        n_opponents = self.n_drafters - 1
+        #make sure the PDF and CDF estimates, plus diff_means, are adjusted to the specs of Roto
 
-        drafter_mean = cdf_estimates.sum(axis = (1,2)).reshape(-1,1,1)
+        diff_means = x_diff_array / np.sqrt(diff_vars) 
+        pdf_estimates = norm.pdf(diff_means)
+        #CDF estimates dont need to be adjusted
 
-        if n_values is None:
-            n_values = rankdata(cdf_estimates, axis = 2, method = 'ordinal')
+        f = self.get_f(pdf_estimates)
+        g = self.get_g(pdf_estimates)
+        h_p = self.get_h_p(f,g)
 
-        mu_values = cdf_estimates.sum(axis = 2).reshape(-1
-                                                            , self.n_categories
-                                                            , 1) 
+        sigma_2_l = self.get_sigma_2_l(sigma_2_m, self.n_drafters)
+        sigma_2_p = self.get_sigma_2_p(cdf_estimates, h_p, self.rho)
 
-        variance_contributions = cdf_estimates * \
-                                    (2 * n_opponents - 2 * n_values - 2 * mu_values + 1 )
-        category_variance = variance_contributions.sum(axis = 2).reshape(-1
-                                                            , self.n_categories
-                                                            , 1)
+        mu_l = self.get_mu_l(sigma_2_m, self.n_drafters)
+        mu_p = self.get_mu_p(cdf_estimates)
+        sigma_2_d = self.get_sigma_2_d( sigma_2_p, sigma_2_l, self.n_drafters).reshape(-1,1,1)
+        mu_d = self.get_mu_d(mu_p, mu_l, self.n_drafters, self.n_categories).reshape(-1,1,1)
 
-        extra_term = mu_values**2
-
-        category_variance = category_variance + extra_term
-
-        drafter_variance = category_variance.sum(axis = 1).reshape(-1,1,1)
-
-        total_variance = drafter_variance + self.var_m
-
-        objective = norm.cdf(drafter_mean - self.mu_m
-                            , scale = np.sqrt(total_variance)).reshape(-1)
-        
+        sigma_d = np.sqrt(sigma_2_d)
+        objective = self.get_v(mu_d, sigma_d)
+    
         if calculate_pdf_weights:
 
-            nabla = total_variance + (self.mu_m - drafter_mean) * (n_opponents - n_values - mu_values + 0.5) 
+            del_sigma_2_p = self.get_del_sigma_2_p(diff_means
+                            , self.rho
+                            , pdf_estimates
+                            , cdf_estimates
+                            , f)
 
-            outer_pdf = norm.pdf((drafter_mean - self.mu_m)/np.sqrt(total_variance))
+            del_mu_d = self.get_del_mu_d(self.n_drafters, pdf_estimates)
+        
+            gradient = self.get_del_v(sigma_d, del_mu_d, mu_d, del_sigma_2_p)
 
-            gradient = nabla * outer_pdf/ (total_variance * np.sqrt(total_variance))
+            #remember that del_v is relative to the modified basis for mu. It must be translated back into the regular mu basis
+            gradient = gradient * np.sqrt(diff_vars)
+            print(np.sqrt(diff_vars))
 
             if test_mode:
                 return gradient
             else:
-                pdf_weights = (gradient*pdf_estimates).mean(axis = 2)
+                pdf_weights = gradient.sum(axis = 2)
 
                 return objective, pdf_weights
 
@@ -987,6 +989,7 @@ class HAgent():
         self.initial_category_weights = None
         self.initial_position_shares = None
         return self
+
     #below functions use the simplified form of X_mu 
     #term 1: L (covariance)
     #term 2: vj^T - jv^T
@@ -1132,6 +1135,136 @@ class HAgent():
 
     def get_del_full(self,c, L):
         return np.einsum('aij, ajk -> aik',L,self.get_del_last_four_terms(c,L))
+    
+
+    #below functions implement the Rotisserie objective 
+    #helpers
+    def get_f(self, pdfs : np.array) -> np.array:
+        #equation 1
+        return pdfs.sum(axis = 2)
+
+    def get_g(self, pdfs : np.array) -> np.array:
+        #equation 2
+        return np.einsum('pao,pbo -> pab', pdfs, pdfs)
+
+    def get_h_p(self
+                ,f : np.array
+                ,g : np.array) -> np.array :
+        g1 = g.copy()
+        g1[:,np.arange(g.shape[1]),np.arange(g.shape[2])] = 0
+
+        g2 = g * np.expand_dims(np.identity(self.n_categories),0)
+
+        f_part = np.einsum('pa, pb -> pab', f,f)
+
+        return f_part + g1 - g2
+
+    def get_h_m(self
+                ,sigma_c : np.array
+                ,n_managers : int ) -> np.array:
+        sigmas_mod = (sigma_c**2) + 1
+        sigma_matrix = np.sqrt(np.einsum('a, b -> ab', sigmas_mod,sigmas_mod))
+        first_version = n_managers/sigma_matrix - (2/sigma_matrix)*np.identity(len(sigma_c))
+    
+        return (n_managers - 1)/(2 * np.pi) * first_version
+
+    #main functions
+
+    def get_v(self
+            ,mu_d
+            ,sigma_d) -> np.array:
+        #equation 5
+        return norm.cdf(mu_d/sigma_d).reshape(-1)
+
+    def get_mu_d(self
+                , mu_p : float
+                , mu_l : float
+                , n_managers : int
+                , n_categories : int) -> float:
+        #equation 6
+        first_component = mu_p*n_managers/(n_managers - 1)
+        second_component = n_categories * n_managers/2
+        return first_component - second_component - mu_l
+
+    def get_sigma_2_d( self
+                    , sigma_2_p : float
+                    , sigma_2_l : float
+                    , n_managers : int) -> float:
+        #equation 7
+        first_component = sigma_2_p * n_managers / (n_managers - 1)
+        return first_component + sigma_2_l
+
+    def get_mu_p(self
+                , cdfs : np.array) -> float:
+        #equation 8
+        return cdfs.sum(axis = (1,2))
+
+    def get_mu_l(self
+                , sigma_2_m : float
+                , n_managers : int) -> float :
+        #equation 9
+        first_component = norm.ppf((n_managers - 1 - np.pi/8)/(n_managers - np.pi/4))
+        return first_component * np.sqrt(sigma_2_m)
+
+    def get_sigma_2_p(self
+                    , cdfs : np.array
+                    , h_p : np.array
+                    , rho : np.array) -> float:
+        #equation 10
+        first_component = (cdfs * (1 - cdfs)).sum(axis = (1,2))
+        second_component = (rho * h_p).sum(axis = (1,2))/2
+        return first_component + second_component
+    
+    def get_sigma_2_l(self
+                    , sigma_2_m : np.array
+                    , n_managers : int) -> np.array:
+        #equation 11
+        return 2 * sigma_2_m/(n_managers - 1)
+
+    def get_sigma_2_m(self
+                    , sigma_c : np.array
+                    , h_m : np.array
+                    , rho : np.array
+                    , n_managers : int) -> float:
+        #equation 12
+        sigma_squared = sigma_c**2
+        component_1 = (n_managers - 1) * np.arccos(sigma_squared/(1 + sigma_squared)).sum()/(2 * np.pi)
+        component_2 = (rho * h_m).sum(axis = (1,2))/2
+        return component_1 + component_2
+
+
+    def get_del_sigma_2_p(self
+                        , opponent_mu_matrix : np.array
+                        , rho : np.array
+                        , pdfs : np.array
+                        , cdfs : np.array
+                        , f : np.array) -> np.array:
+        
+
+        rho_ignoring_diag = rho.copy()
+        rho_ignoring_diag[:,np.arange(rho_ignoring_diag.shape[1]),np.arange(rho_ignoring_diag.shape[2])] = 0
+    
+        #ZR: first component is totally wrong
+        inside = - pdfs - f.reshape(-1,f.shape[1],1)
+        first_part = np.einsum('pab, pbc -> pac', rho_ignoring_diag, inside)
+
+        first_component = (opponent_mu_matrix * pdfs) * (first_part + (pdfs - f.reshape(-1,f.shape[1],1)))
+        second_component = pdfs * (1 - 2 * cdfs)
+
+        return first_component + second_component
+
+    def get_del_mu_d(self
+                    , n_managers : int
+                    , pdfs : np.array) -> np.array:
+        return n_managers/(n_managers - 1) * pdfs
+
+    def get_del_v(self
+                , sigma_d : np.array
+                , del_mu_d : np.array
+                , mu_d : np.array
+                , del_sigma_2_p : np.array) -> np.array:
+        del_v = norm.pdf(mu_d/sigma_d)/(sigma_d**3) * (sigma_d**2 * del_mu_d - mu_d * del_sigma_2_p/2)
+        return del_v
 
     def make_pick(self
                   , player_assignments : dict[list]

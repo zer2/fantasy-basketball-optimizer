@@ -77,7 +77,10 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
   agg.name = 'Minutes'
   return agg
 
-  
+def get_correlations():
+   if st.session_state.league == 'NBA':
+    return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
+
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataFrame:
   """Convert box scores to the format needed for fantasy

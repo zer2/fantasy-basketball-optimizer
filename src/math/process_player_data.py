@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
+from src.data_retrieval.get_data import get_correlations
 from src.helpers.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
                                 ,get_ratio_statistics
+from src.data_retrieval.get_data import get_correlations
 import os
 import streamlit as st
 import sys
@@ -126,8 +128,19 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
                             )
     
     if coefficient_exploration_mode:
-       print(coefficients)
+       print(pd.DataFrame(coefficients))
        print(coefficients['Mean of Variances']/coefficients['Variance of Means'])
+
+       columns_1 = counting_statistics + ['volume_adjusted_' + ratio_stat for ratio_stat in ratio_statistics]
+       columns_2 = counting_statistics + ratio_statistics
+       wdf_mod = weekly_df[columns_1]
+       wdf_mod.columns = columns_2
+
+       player_cov = wdf_mod.loc[representative_player_set].groupby('Player').corr()
+       player_cov.index = player_cov.index.rename(['player', 'cat'])
+       player_cov = pd.DataFrame(player_cov.groupby('cat').mean())
+       player_cov.to_csv('Correlations')
+       print(player_cov)
        sys.exit()
 
     return coefficients
@@ -368,5 +381,8 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'Positions' : positions}
 
   increment_info_key()
+
+  
+  st.session_state.rho = get_correlations()
   
   return info
