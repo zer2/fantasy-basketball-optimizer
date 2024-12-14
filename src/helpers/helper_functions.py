@@ -437,6 +437,28 @@ def move_back_one_pick(row, drafter, n):
 
     return row, drafter 
 
+def get_league_type():
+   if st.session_state:
+      return st.session_state.league
+   else:
+      return  'NBA'
+   
+def get_rho():
+   if st.session_state:
+      return st.session_state.rho
+   else:
+      return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
+   
+def get_max_info(N):
+   if st.session_state:
+      max_table  = st.session_state.max_table
+   else:
+      max_table = pd.read_csv('src/data_retrieval/max_table.csv')
+
+   info = max_table.set_index('N').loc[N]
+
+   return info['EV(X)'],info['VAR(X)'] 
+   
 @st.cache_data()
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):

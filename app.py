@@ -693,11 +693,15 @@ with info_tab:
 
       st.session_state.player_stats = player_stats
 
+      st.write('BOOO')
+
       info = process_player_data(None
                               ,player_stats
                               ,conversion_factors
                               ,upsilon
                               ,psi
+                              ,chi
+                              ,scoring_format
                               ,st.session_state.n_drafters
                               ,st.session_state.n_picks
                               ,st.session_state.params

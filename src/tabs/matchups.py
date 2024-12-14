@@ -125,6 +125,8 @@ def make_matchup_tab(player_stats
                         ,conversion_factors
                         ,0 #Upsilon isn't needed for this function anymore- should be removed 
                         ,psi
+                        ,0
+                        ,scoring_format
                         ,n_drafters
                         ,n_picks
                         ,st.session_state.params

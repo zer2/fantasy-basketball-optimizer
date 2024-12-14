@@ -6,7 +6,8 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_position_structure, get_position_indices, get_L_weights, get_selected_categories
+from src.helpers.helper_functions import get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
+                                            ,get_max_info
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 import datetime
 import scipy
@@ -86,14 +87,21 @@ class HAgent():
         vom = info['Vom']
 
         if scoring_format == 'Rotisserie':
-            self.x_scores = x_scores.loc[info['Z-scores'].sum(axis = 1).sort_values(ascending = False).index]
+            self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
             v = np.sqrt(mov/vom)  
 
             categories = x_scores.columns
-            rho = np.array(st.session_state.rho.set_index('Category').loc[categories, categories])
+            rho = np.array(get_rho().set_index('Category').loc[categories, categories])
 
+            #ZR: This next line is not necessary is it?
             np.fill_diagonal(rho, 1)
             self.rho = np.expand_dims(rho, 0)
+
+            if self.n_drafters <= 21:
+                self.max_ev, self.max_var = get_max_info(self.n_drafters - 1)
+            else:
+                self.max_ev = np.sqrt( 2 * np.log(self.n_drafters - 1))
+                self.max_var = 2/(self.n_drafters - 1)
 
         else:
             self.x_scores = x_scores.loc[info['G-scores'].sum(axis = 1).sort_values(ascending = False).index]
@@ -610,7 +618,7 @@ class HAgent():
             cdf_means = cdf_estimates.mean(axis = 2)
 
             if expected_future_diff is not None:
-                expected_diff_means = expected_future_diff.mean(axis = 2) / (self.original_v.reshape(1,-1))
+                expected_diff_means = (expected_future_diff.mean(axis = 2) + diff_means.mean(axis = 2)) / (self.original_v.reshape(1,-1))
             else:
                 expected_diff_means = None
 
@@ -894,7 +902,6 @@ class HAgent():
 
             #remember that del_v is relative to the modified basis for mu. It must be translated back into the regular mu basis
             gradient = gradient * np.sqrt(diff_vars)
-            print(np.sqrt(diff_vars))
 
             if test_mode:
                 return gradient
@@ -1203,8 +1210,7 @@ class HAgent():
                 , sigma_2_m : float
                 , n_managers : int) -> float :
         #equation 9
-        first_component = norm.ppf((n_managers - 1 - np.pi/8)/(n_managers - np.pi/4))
-        return first_component * np.sqrt(sigma_2_m)
+        return self.max_ev * np.sqrt(sigma_2_m)
 
     def get_sigma_2_p(self
                     , cdfs : np.array
@@ -1219,7 +1225,7 @@ class HAgent():
                     , sigma_2_m : np.array
                     , n_managers : int) -> np.array:
         #equation 11
-        return 2 * sigma_2_m/(n_managers - 1)
+        return sigma_2_m * self.max_var
 
     def get_sigma_2_m(self
                     , sigma_c : np.array
@@ -1298,6 +1304,7 @@ class SimpleAgent():
     #Comment
 
     def __init__(self, order, positions = None):
+
         self.order = order
         self.players = []
         self.positions = positions
@@ -1324,6 +1331,7 @@ class SimpleAgent():
 def choose_eligible_player(team, available_players, positions):
 
     team_positions = positions.loc[team]
+
     for player in available_players:        
         if check_single_player_eligibility(positions.loc[player], team_positions):
             return player

@@ -1,11 +1,10 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.data_retrieval.get_data import get_correlations
 from src.helpers.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
                                 ,get_ratio_statistics
-from src.data_retrieval.get_data import get_correlations
+from src.data_retrieval.get_data import get_correlations, get_max_table
 import os
 import streamlit as st
 import sys
@@ -245,6 +244,8 @@ def process_player_data(weekly_df : pd.DataFrame
                         , conversion_factors :pd.Series
                         , upsilon : float
                         , psi : float
+                        , chi : float
+                        , scoring_format : str
                         , n_drafters : int
                         , n_picks : int
                         , params : dict
@@ -280,7 +281,7 @@ def process_player_data(weekly_df : pd.DataFrame
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
-                                                          ,1)
+                                                          , chi if scoring_format == 'Rotisserie' else 1)
     
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
@@ -301,7 +302,7 @@ def process_player_data(weekly_df : pd.DataFrame
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
-  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,1)
+  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,chi if scoring_format == 'Rotisserie' else 1)
   z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
 
@@ -309,6 +310,11 @@ def process_player_data(weekly_df : pd.DataFrame
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,representative_player_set, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,representative_player_set, params, v = v)
+
+  #Replacement players, for the rare case when a player is not found in the database
+  x_scores.loc['RP', :] = -1
+  z_scores.loc['RP', :] = -1
+  g_scores.loc['RP', :] = -1
 
   z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
 
@@ -364,11 +370,6 @@ def process_player_data(weekly_df : pd.DataFrame
     position_means = None        
     L_by_position = np.array([x_scores.cov()])
 
-  #Replacement players, for the rare case when a player is not found in the database
-  x_scores.loc['RP', :] = -1
-  z_scores.loc['RP', :] = -1
-  g_scores.loc['RP', :] = -1
-
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
@@ -384,5 +385,6 @@ def process_player_data(weekly_df : pd.DataFrame
 
   
   st.session_state.rho = get_correlations()
-  
+  st.session_state.max_table = get_max_table()
+
   return info
