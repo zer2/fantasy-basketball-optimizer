@@ -7,7 +7,7 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
 
@@ -78,8 +78,11 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
   return agg
 
 def get_correlations():
-   if st.session_state.league == 'NBA':
+   if get_league_type() == 'NBA':
     return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
+   
+def get_max_table():
+    return pd.read_csv('src/data_retrieval/max_table.csv')
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataFrame:

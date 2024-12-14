@@ -698,6 +698,8 @@ with info_tab:
                               ,conversion_factors
                               ,upsilon
                               ,psi
+                              ,chi
+                              ,scoring_format
                               ,st.session_state.n_drafters
                               ,st.session_state.n_picks
                               ,st.session_state.params

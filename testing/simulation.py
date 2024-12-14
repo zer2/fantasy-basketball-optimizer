@@ -9,6 +9,7 @@ import copy
 import datetime
 import streamlit as st
 import os
+from src.data_retrieval.get_data import get_correlations
 pd.options.mode.chained_assignment = None
 
 import statsmodels.api as sm
@@ -117,6 +118,9 @@ def run_multiple_seasons(teams : dict[list]
                          , n_weeks : int = 20
                          , scoring_format : str = 'Head to Head: Each Category'
                          , params : dict = None
+                         , chi : float = None
+                         , n_picks : float = 13
+                         , mov : pd.Series = None
                          , return_detailed_results : bool = False ):
     """Simulate multiple seasons with the same drafters 
     
@@ -146,15 +150,11 @@ def run_multiple_seasons(teams : dict[list]
     season_df.loc[:,'Team'] = season_df['Player'].map(team_dict) 
     season_df = season_df.dropna(subset = ['Team'])
 
-    #use sampling to simulate many seasons at the same time
-    #assuming each season has 11 weeks, we need 11 * n total rows of data per player
-    #ZR: Note that for now a "week" of data is just one game per player
-    #in real basketball multiple games are played per week, so we need to adjust for that 
-    performances = season_df.groupby('Player').sample(n_weeks*n_seasons, replace = True, random_state = 0)
-    performances.loc[:,'Week'] = performances.groupby('Player').cumcount()
-    performances.loc[:,'Season'] = performances['Week'] // n_weeks #integer division seperates weeks in groups 
-
     if scoring_format in ('Head to Head: Most Categories','Head to Head: Each Category'):
+
+        performances = season_df.groupby('Player').sample(n_weeks*n_seasons, replace = True, random_state = 0)
+        performances.loc[:,'Week'] = performances.groupby('Player').cumcount()
+        performances.loc[:,'Season'] = performances['Week'] // n_weeks #integer division seperates weeks in groups 
 
         #total team performances are simply the sum of statistics for each player 
         team_performances = performances.groupby(['Season','Team','Week']).sum()
@@ -195,15 +195,32 @@ def run_multiple_seasons(teams : dict[list]
 
     elif scoring_format == 'Rotisserie':
 
-        team_performances = performances.drop(columns = ['Player','Week']) \
-                                            .groupby(['Season','Team']).sum()
+        team_performances = season_df.drop(columns = ['Player']) \
+                                            .groupby('Team').mean() * n_picks
+
 
         team_performances.loc[:,'Free Throw %'] = (team_performances['Free Throws Made']/team_performances['Free Throw Attempts']).fillna(0)
         team_performances.loc[:,'Field Goal %'] = (team_performances['Field Goals Made']/team_performances['Field Goal Attempts']).fillna(0)
-        
+        team_performances = team_performances[get_selected_categories()]
         #for all categories except turnovers, higher numbers are better. So we invert turnovers 
         team_performances['Turnovers'] = - team_performances['Turnovers'] 
-        season_points_by_category = team_performances.groupby('Season')[get_selected_categories()].rank()
+
+        #make on season_df per season. These will then be maipulated with the chi factor 
+        team_performances = pd.concat({s : team_performances for s in range(n_seasons)}, names = ['Season'])
+
+        corrs = get_correlations()
+        
+        corrs = corrs.set_index('Category').loc[get_selected_categories(), get_selected_categories()]
+
+        std  = np.sqrt(mov* np.array([n_picks] * 7 + [1/n_picks]*2))
+        cross_variances = std.values.reshape(-1,1).dot(std.values.reshape(1,-1))
+        covariance = corrs * cross_variances * (chi ** 2) 
+        chi_factor = np.random.multivariate_normal(size = team_performances.shape[0]
+                                      , mean = [0] * len(get_selected_categories())
+                                      , cov = covariance) 
+        team_performances = team_performances + chi_factor
+
+        season_points_by_category = team_performances.groupby('Season').rank()
 
         season_points = season_points_by_category.sum(axis = 1)
         winners_after_ties = season_points[season_points == season_points.groupby('Season').transform('max')]
@@ -253,6 +270,8 @@ def try_strategy(_primary_agent
                  , n_primary : int
                  , scoring_format : str
                  , params : dict
+                 , chi : float = None
+                 , mov : pd.Series = None
                  ) -> tuple:
     """Try a particular strategy (enacted by the primary agent) against a field of default agents
     
@@ -302,6 +321,9 @@ def try_strategy(_primary_agent
                                    , n_seasons = n_seasons
                                    , scoring_format = scoring_format
                                    , params = params
+                                   , chi = chi
+                                   , n_picks = n_picks
+                                   , mov = mov
                                    , return_detailed_results = True)
         detailed_res = pd.concat([detailed_res, details.loc[i,:]])
         
@@ -630,6 +652,7 @@ def get_estimate_of_omega_gamma(info, params):
     
     return omega, gamma
 
+#ZR: below is deprectated
 def run_season(season_df
                         ,matchups : list[tuple]
                         ,n_drafters : int
@@ -698,6 +721,8 @@ def run_season(season_df
                                 , 0
                                 , 0 
                                 , 0 
+                                , chi
+                                , scoring_format
                                 , n_drafters
                                 , n_picks
                                 , params

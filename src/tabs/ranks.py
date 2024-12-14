@@ -7,6 +7,7 @@ from src.math.algorithm_agents import HAgent
 from src.math.algorithm_helpers import savor_calculation
 
 def make_full_rank_tab():
+    
     z_rank_tab, g_rank_tab, h_rank_tab = st.tabs(['Z-score','G-score','H-score'])
       
     with z_rank_tab:
