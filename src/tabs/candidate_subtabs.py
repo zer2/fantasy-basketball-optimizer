@@ -220,7 +220,7 @@ def make_h_cand_tab(_H
               rate_df = e_points.loc[score_df.index].dropna()
               style_format = "{:.1f}"
               format_middle = (len(player_assignments) -1)/2 + 1
-              format_multiplier = 20 
+              format_multiplier = 15 
 
             else:
               rate_df = win_rates.loc[score_df.index].dropna()
@@ -266,6 +266,13 @@ def make_h_cand_tab(_H
                       .format(style_format, subset = rate_df.columns)
               
               st.dataframe(rate_display_styled, use_container_width = True)
+
+            if st.session_state.scoring_format == 'Rotisserie':
+
+                st.caption('''Expected totals are based on standard fantasy point scoring. 
+                           One point for last, two points for second last, etc. The baseline 
+                           expected total for a category is ''' + str(format_middle))
+
 
       
       if display and dynamic_run:
