@@ -216,10 +216,10 @@ def make_h_cand_tab(_H
               st.stop()
 
             if st.session_state.scoring_format == 'Rotisserie':
-              diffs = res['Diff'][fits_roster]
-              rate_df = diffs.loc[score_df.index].dropna()
+              e_points = res['Rates'][fits_roster] * (len(player_assignments) -1) + 1
+              rate_df = e_points.loc[score_df.index].dropna()
               style_format = "{:.1f}"
-              format_middle = 0
+              format_middle = (len(player_assignments) -1)/2 + 1
               format_multiplier = 20 
 
             else:
