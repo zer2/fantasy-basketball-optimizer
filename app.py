@@ -693,8 +693,6 @@ with info_tab:
 
       st.session_state.player_stats = player_stats
 
-      st.write('BOOO')
-
       info = process_player_data(None
                               ,player_stats
                               ,conversion_factors
