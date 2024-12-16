@@ -99,6 +99,7 @@ class HAgent():
 
             if self.n_drafters <= 21:
                 self.max_ev, self.max_var = get_max_info(self.n_drafters - 1)
+
             else:
                 self.max_ev = np.sqrt( 2 * np.log(self.n_drafters - 1))
                 self.max_var = 2/(self.n_drafters - 1)
@@ -281,10 +282,17 @@ class HAgent():
             diff_means = x_self_sum.reshape(1,self.n_categories,1) - \
                         other_team_sums.reshape(1,self.n_categories,self.n_drafters - 1)
 
+        diff_vars = np.vstack(
+            [self.get_diff_var(len([p for p in player_assignments[team] if p == p])) for team \
+                                    in self.team_names if team != drafter]
+        ).T
+
         #make order statistics adjustment for Roto 
         if self.scoring_format == 'Rotisserie':
-            sigma_c = diff_means[0,:,:].std(axis = 1, ddof = 1) * np.sqrt(2)
+            sigma_c = (diff_means / np.sqrt(diff_vars))[0,:,:].std(axis = 1, ddof = 1) * np.sqrt(2)
+
             h_m = self.get_h_m(sigma_c,self.n_drafters)
+
             sigma_2_m = self.get_sigma_2_m(sigma_c
                             ,  h_m
                             , self.rho
@@ -292,11 +300,6 @@ class HAgent():
         else:
             sigma_2_m = None
 
-        diff_vars = np.vstack(
-            [self.get_diff_var(len([p for p in player_assignments[team] if p == p])) for team \
-                                    in self.team_names if team != drafter]
-        ).T
-        
         diff_vars = diff_vars.reshape(1,self.n_categories,self.n_drafters - 1)
 
         #ZR: this is a super ugly implementation
@@ -872,9 +875,10 @@ class HAgent():
         diff_means = x_diff_array / np.sqrt(diff_vars) 
         pdf_estimates = norm.pdf(diff_means)
         #CDF estimates dont need to be adjusted
-
         f = self.get_f(pdf_estimates)
         g = self.get_g(pdf_estimates)
+        f00 = f[0][0] * f[0][0]
+
         h_p = self.get_h_p(f,g)
 
         sigma_2_l = self.get_sigma_2_l(sigma_2_m, self.n_drafters)
@@ -882,6 +886,7 @@ class HAgent():
 
         mu_l = self.get_mu_l(sigma_2_m, self.n_drafters)
         mu_p = self.get_mu_p(cdf_estimates)
+
         sigma_2_d = self.get_sigma_2_d( sigma_2_p, sigma_2_l, self.n_drafters).reshape(-1,1,1)
         mu_d = self.get_mu_d(mu_p, mu_l, self.n_drafters, self.n_categories).reshape(-1,1,1)
 
@@ -1170,7 +1175,9 @@ class HAgent():
                 ,sigma_c : np.array
                 ,n_managers : int ) -> np.array:
         sigmas_mod = (sigma_c**2) + 1
+
         sigma_matrix = np.sqrt(np.einsum('a, b -> ab', sigmas_mod,sigmas_mod))
+
         first_version = n_managers/sigma_matrix - (2/sigma_matrix)*np.identity(len(sigma_c))
     
         return (n_managers - 1)/(2 * np.pi) * first_version
