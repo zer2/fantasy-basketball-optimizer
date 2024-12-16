@@ -241,7 +241,7 @@ def make_h_cand_tab(_H
               def color_blue(label):
                   return "background-color: blue; color:white" if label == drop_player else None
               
-              rate_display_styled = rate_display.reset_index().style.format("{:.1f}"
+              rate_display_styled = rate_display.reset_index().style.format("{:.1%}"
                               ,subset = pd.IndexSlice[:,['H-score']]) \
                                                     .format("{:.1f}"
                               ,subset = pd.IndexSlice[:,adp_col]) \
