@@ -134,6 +134,7 @@ class HAgent():
             self.pitching_L = self.L[:,self.pitching_stat_indices][:,:,self.pitching_stat_indices]
             self.batting_L = self.L[:,self.batting_stat_indices][:,:,self.batting_stat_indices]
 
+
             batting_v = v[self.batting_stat_indices]
             pitching_v = v[self.pitching_stat_indices]
 
@@ -720,15 +721,23 @@ class HAgent():
                 del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L, self.v)
 
             elif st.session_state.league == 'MLB':
+
+                #ZR: This works for now, but should be careful about it 
+                pitching_share = future_position_array[:, -2:].sum(axis = 1).reshape(-1,1,1)
+                batting_share = 1 - pitching_share
+
                 batting_diff = self.get_x_mu_simplified_form(category_weights[:,self.batting_stat_indices]
                                                                             , self.batting_L
                                                                             , self.batting_v) 
+                batting_diff_single = batting_diff * batting_share
                 
                 pitching_diff = self.get_x_mu_simplified_form(category_weights[:,self.pitching_stat_indices]
                                                             , self.pitching_L
                                                             , self.pitching_v) 
+                pitching_diff_single = pitching_diff * pitching_share
                                                 
-                expected_future_diff_single = np.concatenate([batting_diff,pitching_diff], axis = 1) + position_mu
+                expected_future_diff_single = np.concatenate([batting_diff_single,pitching_diff_single], axis = 1) \
+                                                            + position_mu
 
                 del_batting = self.get_del_full(category_weights[:,self.batting_stat_indices]
                                                 , self.batting_L
@@ -738,8 +747,8 @@ class HAgent():
                                                  , self.pitching_v)
 
                 del_full = np.zeros(shape = (del_batting.shape[0], self.n_categories, self.n_categories))
-                del_full[:,:del_batting.shape[1], :del_batting.shape[1]] = del_batting
-                del_full[:,del_batting.shape[1]:, del_batting.shape[1]:] = del_pitching
+                del_full[:,:del_batting.shape[1], :del_batting.shape[1]] = del_batting * batting_share
+                del_full[:,del_batting.shape[1]:, del_batting.shape[1]:] = del_pitching * pitching_share
                 del_full = del_full * (self.n_picks-1-n_players_selected) 
 
             expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,self.n_categories,1)
