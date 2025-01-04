@@ -593,7 +593,7 @@ MLB:
   ratio-statistics:
     Batting Average:
       made-statistic: Hits
-      volume-statistic: At Bats 
+      volume-statistic: Effective At Bats 
     ERA:
       made-statistic: Earned Runs
       volume-statistic: Innings Pitched
@@ -652,6 +652,8 @@ MLB:
     IP: Innings Pitched
     Name: Player
     Pos: Position
+    SLG : Slugging % 
+    BB : Walks
   stat-df-renamer:
     MLB_PLAYER_NAME : Player
     SEASON : Season
@@ -670,6 +672,30 @@ MLB:
     PITCHING_WALKS_AND_HITS : Pitching WH
     BATTING_WALKS_AND_HITS : Batting WH 
     EFFECTIVE_AT_BATS: Effective At Bats
+  htb-renamer: 
+    GP : Games Played
+    R : Runs
+    HR : Home Runs
+    RBI : RBI
+    SB : Stolen Bases
+    H : Hits
+    AB: At Bats
+    EAB: Effective At Bats
+    AVG: Batting Average
+    W: Wins
+    SV: Saves
+    K : Strikeouts
+    ER: Earned Runs
+    IP: Innings Pitched
+    PLAYER : Player
+    POS : Position
+    SLG : Slugging %
+    TEAM : Team
+  z-score-total-multiplier : 40
+  z-score-team-multiplier : 20
+  g-score-player-multiplier : 60
+  g-score-total-multiplier : 50
+  g-score-team-multiplier : 24
   rotowire-position-adjuster:
     P : SP,RP 
     C : C

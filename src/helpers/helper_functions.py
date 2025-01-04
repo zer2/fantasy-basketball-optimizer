@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objs as go
+#import plotly.express as px
+#import plotly.graph_objs as go
 import itertools
 import streamlit as st
 import numexpr as ne
@@ -462,6 +462,8 @@ def get_max_info(N):
 @st.cache_data()
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
+   
+   print('BOO')
 
    con = get_snowflake_connection(schema)
 

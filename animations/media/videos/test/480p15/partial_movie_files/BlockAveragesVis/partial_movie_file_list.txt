@@ -1,0 +1,8 @@
+# This file is used internally by FFMPEG.
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/1185818338_3837732163_223132457.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/624642324_913175856_3668558065.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/624642324_1141282389_3192827387.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/624642324_2514825492_3928807837.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/624642324_2475379470_2544677416.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/624642324_3315828528_1039377456.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/animations/media/videos/test/480p15/partial_movie_files/BlockAveragesVis/624642324_2475379470_702916955.mp4'

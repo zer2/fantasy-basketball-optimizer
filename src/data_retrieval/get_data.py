@@ -150,8 +150,6 @@ def get_player_metadata(data_source) -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   print('I am here hi')
-   print(data_source)
    df = get_htb_projections(data_source)
 
    return df['Position']

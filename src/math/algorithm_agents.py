@@ -6,7 +6,7 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
+from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
                                             ,get_max_info
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 import datetime
@@ -126,6 +126,20 @@ class HAgent():
 
         self.initial_category_weights = None
 
+        if get_league_type() == 'MLB':
+            cats = x_scores.columns
+            self.pitching_stat_indices = [i for i in range(len(cats)) if cats[i] in st.session_state.params['pitcher_stats']]
+            self.batting_stat_indices = [i for i in range(len(cats)) if i not in self.pitching_stat_indices]
+
+            self.pitching_L = self.L[:,self.pitching_stat_indices][:,:,self.pitching_stat_indices]
+            self.batting_L = self.L[:,self.batting_stat_indices][:,:,self.batting_stat_indices]
+
+            batting_v = v[self.batting_stat_indices]
+            pitching_v = v[self.pitching_stat_indices]
+
+            self.batting_v = np.array(batting_v/batting_v.sum()).reshape(-1,1)
+            self.pitching_v = np.array(pitching_v/pitching_v.sum()).reshape(-1,1)
+
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
@@ -155,6 +169,7 @@ class HAgent():
         n_players_selected = len(my_players) 
 
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+
         x_scores_available = self.x_scores[~self.x_scores.index.isin(players_chosen + exclusion_list) & \
                                                 self.x_scores.index.isin(self.positions.index)]
         
@@ -202,6 +217,7 @@ class HAgent():
                                                 ) 
                         for position_code, position_info in self.position_structure['flex'].items()  
                                         }
+            
                 
 
         return self.perform_iterations(initial_category_weights
@@ -486,6 +502,7 @@ class HAgent():
                                                     ,result_index
                                                     ,n_players_selected
                                                     ,sigma_2_m)
+                
                 score = res['Score']
                 gradients = res['Gradients']
                 cdf_estimates = res['CDF-Estimates']
@@ -498,8 +515,16 @@ class HAgent():
 
                 category_weights = category_weights + category_updates
                 category_weights[category_weights < 0] = 0
-                category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
 
+                if get_league_type() == 'NBA':
+                    category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
+                elif get_league_type() == 'MLB': 
+                    batting_weights = category_weights[:,self.batting_stat_indices] 
+                    category_weights[:,self.batting_stat_indices] = batting_weights/(2 * batting_weights.sum(axis = 1).reshape(-1,1))
+
+                    pitching_weights = category_weights[:,self.pitching_stat_indices] 
+                    category_weights[:,self.pitching_stat_indices] = pitching_weights/(2 * pitching_weights.sum(axis = 1).reshape(-1,1))
+                    
                 assert np.all(np.abs(category_weights.sum(axis=1).reshape(-1, 1) - 1) < 1e-8)
 
                 weights_df = pd.DataFrame(category_weights, index = result_index, columns = self.x_scores.columns)
@@ -678,8 +703,6 @@ class HAgent():
                                                                         ,self.positions.loc[self.players]
                                                                         , position_shares)
                 
-
-
                 position_mu = np.einsum('aij, bi-> bj',self.position_means ,future_position_array)
                 position_mu = np.expand_dims(position_mu, axis = 2)
             else:
@@ -691,11 +714,35 @@ class HAgent():
             #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
             L = self.L
 
-            del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L)
 
-            expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L) + position_mu
+            if st.session_state.league == 'NBA':
+                expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L, self.v) + position_mu
+                del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L, self.v)
+
+            elif st.session_state.league == 'MLB':
+                batting_diff = self.get_x_mu_simplified_form(category_weights[:,self.batting_stat_indices]
+                                                                            , self.batting_L
+                                                                            , self.batting_v) 
+                
+                pitching_diff = self.get_x_mu_simplified_form(category_weights[:,self.pitching_stat_indices]
+                                                            , self.pitching_L
+                                                            , self.pitching_v) 
+                                                
+                expected_future_diff_single = np.concatenate([batting_diff,pitching_diff], axis = 1) + position_mu
+
+                del_batting = self.get_del_full(category_weights[:,self.batting_stat_indices]
+                                                , self.batting_L
+                                                , self.batting_v)
+                del_pitching = self.get_del_full(category_weights[:,self.pitching_stat_indices]
+                                                 , self.pitching_L
+                                                 , self.pitching_v)
+
+                del_full = np.zeros(shape = (del_batting.shape[0], self.n_categories, self.n_categories))
+                del_full[:,:del_batting.shape[1], :del_batting.shape[1]] = del_batting
+                del_full[:,del_batting.shape[1]:, del_batting.shape[1]:] = del_pitching
+                del_full = del_full * (self.n_picks-1-n_players_selected) 
+
             expected_future_diff = ((self.n_picks-1-n_players_selected) * expected_future_diff_single).reshape(-1,self.n_categories,1)
-
 
             x_diff_array = diff_means + x_scores_available_array + expected_future_diff
 
@@ -969,15 +1016,15 @@ class HAgent():
 
         return cdf_estimates_reshaped
 
-    def get_x_mu_long_form(self,c):
+    def get_x_mu_long_form(self,c, v):
         #uses the pre-simplified formula for x_mu from page 19 of the paper
 
-        factor = (self.v.dot(self.v.T).dot(self.L).dot(c.T)/self.v.T.dot(self.L).dot(self.v)).T
+        factor = (v.dot(v.T).dot(self.L).dot(c.T)/v.T.dot(self.L).dot(v)).T
 
         c_mod = c - factor
         sigma = np.sqrt((c_mod.dot(self.L) * c_mod).sum(axis = 1))
         
-        U = np.array([[self.v.reshape(self.n_categories),c_0.reshape(self.n_categories)] for c_0 in c])
+        U = np.array([[v.reshape(self.n_categories),c_0.reshape(self.n_categories)] for c_0 in c])
         b = np.array([[-self.gamma * s,self.omega * s] for s in sigma]).reshape(-1,2,1)
         U_T = np.swapaxes(U, 1, 2)
         
@@ -992,8 +1039,8 @@ class HAgent():
 
         return x_mu
 
-    def get_x_mu_simplified_form(self,c, L):
-        last_four_terms = self.get_last_four_terms(c,L)
+    def get_x_mu_simplified_form(self,c, L, v):
+        last_four_terms = self.get_last_four_terms(c,L, v)
         x_mu = np.einsum('aij, ajk -> aik',L, last_four_terms)
         return x_mu
 
@@ -1009,39 +1056,39 @@ class HAgent():
     #term 4: -gamma * j - omega * v
     #term 5: sigma / (j^T L j v^T L V - (v^T L j)^2) 
 
-    def get_term_two(self,c, L = None):
-        return - self.v.reshape(-1,self.n_categories,1) * c.reshape(-1,1,self.n_categories) + \
-                            c.reshape(-1,self.n_categories,1) * self.v.reshape(-1,1,self.n_categories)
+    def get_term_two(self,c, v):
+        return - v.reshape(-1,v.shape[0],1) * c.reshape(-1,1,v.shape[0]) + \
+                            c.reshape(-1,v.shape[0],1) * v.reshape(-1,1,v.shape[0])
 
-    def get_del_term_two(self,c, L = None):
-        arr_a = np.zeros((self.n_categories,self.n_categories,self.n_categories))
-        for i in range(self.n_categories):
-            arr_a[i,:,i] = self.v.reshape(self.n_categories,)
+    def get_del_term_two(self,v ):
+        arr_a = np.zeros((v.shape[0],v.shape[0],v.shape[0]))
+        for i in range(v.shape[0]):
+            arr_a[i,:,i] = v.reshape(v.shape[0],)
 
-        arr_b = np.zeros((self.n_categories,self.n_categories,self.n_categories))
-        for i in range(self.n_categories):
-            arr_b[:,i,i] = self.v.reshape(self.n_categories,)  
+        arr_b = np.zeros((v.shape[0],v.shape[0],v.shape[0]))
+        for i in range(v.shape[0]):
+            arr_b[:,i,i] = v.reshape(v.shape[0],)  
 
         arr_full = arr_a - arr_b
 
-        return arr_full.reshape(1,self.n_categories,self.n_categories,self.n_categories)
+        return arr_full.reshape(1,v.shape[0],v.shape[0],v.shape[0])
 
-    def get_term_four(self,c, L = None):
-        #v = np.array([1/self.n_categories] * self.n_categories).reshape(self.n_categories,1)
+    def get_term_four(self,c, v):
+        #v = np.array([1/v.shape[0]] * v.shape[0]).reshape(v.shape[0],1)
 
-        return (c * self.gamma).reshape(-1,self.n_categories,1) + (self.v * self.omega).reshape(1,self.n_categories,1)
+        return (c * self.gamma).reshape(-1,v.shape[0],1) + (v * self.omega).reshape(1,v.shape[0],1)
 
-    def get_term_five(self,c,L):
-        return self.get_term_five_a(c,L)/self.get_term_five_b(c,L)
+    def get_term_five(self,c,L,v):
+        return self.get_term_five_a(c,L,v)/self.get_term_five_b(c,L,v)
 
-    def get_term_five_a(self,c, L):
+    def get_term_five_a(self,c, L,v):
 
 
-        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)
+        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', v.dot(v.T), L)
         factor_top = np.einsum('pad, dp -> ap', v_dot_v_T_dot_L, c.T)
 
-        v_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
-        v_dot_L_dot_v = np.einsum('pad, dc -> ap', v_dot_L, self.v)
+        v_dot_L = np.einsum('ac, pcd -> pad', v.T, L)
+        v_dot_L_dot_v = np.einsum('pad, dc -> ap', v_dot_L, v)
 
         factor =  (factor_top/v_dot_L_dot_v).T
         
@@ -1053,35 +1100,35 @@ class HAgent():
 
         return res
 
-    def get_term_five_b(self,c,L):
+    def get_term_five_b(self,c,L,v):
 
         c_dot_L = np.einsum('pc, pcd -> pd', c, L)
         c_dot_L_c = np.einsum('pd, pd -> p', c_dot_L, c)
 
-        v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
-        v_T_dot_L_dot_v = np.einsum('pad, dc -> ap', v_T_dot_L, self.v)
+        v_T_dot_L = np.einsum('ac, pcd -> pad', v.T, L)
+        v_T_dot_L_dot_v = np.einsum('pad, dc -> ap', v_T_dot_L, v)
 
         L_dot_c_T = np.einsum('pcd, dp -> cp', L, c.T)
-        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', self.v.T, L_dot_c_T)
+        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', v.T, L_dot_c_T)
 
         res = (c_dot_L_c * v_T_dot_L_dot_v - v_T_dot_L_dot_c**2).reshape(-1,1,1)
 
         return res
 
-    def get_terms_four_five(self,c,L):
+    def get_terms_four_five(self,c,L, v):
         #is this the right shape
-        return self.get_term_four(c) * self.get_term_five(c,L)
+        return self.get_term_four(c, v) * self.get_term_five(c,L,v)
 
-    def get_del_term_four(self,c, L = None):
-        return (np.identity(self.n_categories) * self.gamma).reshape(1,self.n_categories,self.n_categories)
+    def get_del_term_four(self,c, v):
+        return (np.identity(v.shape[0]) * self.gamma).reshape(1,v.shape[0],v.shape[0])
 
-    def get_del_term_five_a(self,c,L):
+    def get_del_term_five_a(self,c,L,v):
 
-        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)
+        v_dot_v_T_dot_L = np.einsum('ac, pcd -> pad', v.dot(v.T), L)
         factor_top = np.einsum('pad, dp -> ap', v_dot_v_T_dot_L, c.T)
 
-        v_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
-        v_dot_L_dot_v = np.einsum('pad, dj -> jp', v_dot_L, self.v)
+        v_dot_L = np.einsum('ac, pcd -> pad', v.T, L)
+        v_dot_L_dot_v = np.einsum('pad, dj -> jp', v_dot_L, v)
 
         factor =  (factor_top/v_dot_L_dot_v).T
 
@@ -1089,64 +1136,64 @@ class HAgent():
 
         top_og = np.einsum('pc, pcd -> pd', c_mod, L)
 
-        top = top_og.reshape(-1,1,self.n_categories)
+        top = top_og.reshape(-1,1,v.shape[0])
         bottom = np.sqrt((np.einsum('pd, pd -> p',top_og,c_mod)).reshape(-1,1,1))
 
-        side= np.identity(self.n_categories) - np.einsum('ac, pcd -> pad', self.v.dot(self.v.T), L)/v_dot_L_dot_v.reshape(-1,1,1)
+        side= np.identity(v.shape[0]) - np.einsum('ac, pcd -> pad', v.dot(v.T), L)/v_dot_L_dot_v.reshape(-1,1,1)
         res = np.einsum('pia, pad -> pid', top/bottom, side)
 
-        return res.reshape(-1,1,self.n_categories)
+        return res.reshape(-1,1,v.shape[0])
 
-    def get_del_term_five_b(self,c,L):
+    def get_del_term_five_b(self,c,L, v):
 
         c_dot_L = np.einsum('pc, pcd -> pd', c, L)
 
-        v_T_dot_L = np.einsum('ac, pcd -> pad', self.v.T, L)
-        v_T_dot_L_dot_v = np.einsum('pad, dj -> paj', v_T_dot_L, self.v)
+        v_T_dot_L = np.einsum('ac, pcd -> pad', v.T, L)
+        v_T_dot_L_dot_v = np.einsum('pad, dj -> paj', v_T_dot_L, v)
 
         L_dot_c_T = np.einsum('pcd, dp -> cp', L, c.T)
-        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', self.v.T, L_dot_c_T)
+        v_T_dot_L_dot_c = np.einsum('ac, cp -> ap', v.T, L_dot_c_T)
 
-        term_one = (2 * c_dot_L * v_T_dot_L_dot_v.reshape(-1,1)).reshape(-1,1,self.n_categories)
+        term_one = (2 * c_dot_L * v_T_dot_L_dot_v.reshape(-1,1)).reshape(-1,1,v.shape[0])
         term_two = (2 * v_T_dot_L_dot_c.T).reshape(-1,1,1)
-        term_three = v_T_dot_L.reshape(-1,1,self.n_categories)
+        term_three = v_T_dot_L.reshape(-1,1,v.shape[0])
 
-        res = term_one.reshape(-1,1,self.n_categories) - (term_two * term_three).reshape(-1,1,self.n_categories)
+        res = term_one.reshape(-1,1,v.shape[0]) - (term_two * term_three).reshape(-1,1,v.shape[0])
 
         return res
 
-    def get_del_term_five(self,c,L):
-        a = self.get_term_five_a(c,L)
-        del_a = self.get_del_term_five_a(c,L)
-        b = self.get_term_five_b(c,L)
-        del_b = self.get_del_term_five_b(c,L)
+    def get_del_term_five(self,c,L,v):
+        a = self.get_term_five_a(c,L,v)
+        del_a = self.get_del_term_five_a(c,L,v)
+        b = self.get_term_five_b(c,L,v)
+        del_b = self.get_del_term_five_b(c,L,v)
 
         return (del_a * b - a * del_b) / b**2
 
-    def get_del_terms_four_five(self,c,L):
-        return self.get_term_four(c) * self.get_del_term_five(c,L) + \
-                    self.get_del_term_four(c) * self.get_term_five(c,L)
+    def get_del_terms_four_five(self,c,L,v):
+        return self.get_term_four(c, v) * self.get_del_term_five(c,L,v) + \
+                    self.get_del_term_four(c, v) * self.get_term_five(c,L,v)
 
-    def get_last_three_terms(self,c,L):
-        return np.einsum('aij, ajk -> aik',L,self.get_terms_four_five(c,L))
+    def get_last_three_terms(self,c,L,v):
+        return np.einsum('aij, ajk -> aik',L,self.get_terms_four_five(c,L,v))
 
-    def get_del_last_three_terms(self,c,L):
-        return np.einsum('aij, ajk -> aik',L,self.get_del_terms_four_five(c,L))
+    def get_del_last_three_terms(self,c,L,v):
+        return np.einsum('aij, ajk -> aik',L,self.get_del_terms_four_five(c,L,v))
 
-    def get_last_four_terms(self,c,L):
-        term_two = self.get_term_two(c)
-        last_three = self.get_last_three_terms(c,L)
+    def get_last_four_terms(self,c,L,v):
+        term_two = self.get_term_two(c,v)
+        last_three = self.get_last_three_terms(c,L,v)
         return np.einsum('aij, ajk -> aik', term_two, last_three)
 
-    def get_del_last_four_terms(self,c,L):
-        comp_i = self.get_del_term_two(c)
-        comp_ii = self.get_last_three_terms(c,L)
-        term_a = np.einsum('aijk, aj -> aik', comp_i, comp_ii.reshape(-1,self.n_categories))
-        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c), self.get_del_last_three_terms(c,L))
+    def get_del_last_four_terms(self,c,L, v):
+        comp_i = self.get_del_term_two(v)
+        comp_ii = self.get_last_three_terms(c,L,v)
+        term_a = np.einsum('aijk, aj -> aik', comp_i, comp_ii.reshape(-1,v.shape[0]))
+        term_b = np.einsum('aij, ajk -> aik', self.get_term_two(c,v), self.get_del_last_three_terms(c,L,v))
         return term_a + term_b
 
-    def get_del_full(self,c, L):
-        return np.einsum('aij, ajk -> aik',L,self.get_del_last_four_terms(c,L))
+    def get_del_full(self,c, L,v):
+        return np.einsum('aij, ajk -> aik',L,self.get_del_last_four_terms(c,L,v))
     
 
     #below functions implement the Rotisserie objective 

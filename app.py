@@ -7,6 +7,7 @@ from src.helpers.helper_functions import  get_position_numbers, listify \
                                   ,get_games_per_week, get_ratio_statistics
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
                         get_data_from_snowflake, combine_nba_projections, get_player_metadata, get_yahoo_key_to_name_mapper
+from src.data_retrieval.get_data_baseball import get_baseball_historical_data, combine_baseball_projections
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
 from src.tabs.ranks import make_full_rank_tab
@@ -133,16 +134,13 @@ with param_tab:
 
     with c1: 
 
-      #league = st.selectbox(
-      #  'Which fantasy sport are you playing?',
-      #  ('NBA', 'WNBA') #MLB excluded for now
-      #  , index = 0
-      #  , key = 'league'
-      #  , on_change = increment_and_reset_draft
-      #  )
-
-      #for now
-      st.session_state.league = 'NBA'
+      league = st.selectbox(
+        'Which fantasy sport are you playing?',
+        ('NBA', 'WNBA','MLB') #MLB excluded for now
+        , index = 0
+        , key = 'league'
+        , on_change = increment_and_reset_draft
+        )
       
       load_params(st.session_state.league)
 
@@ -264,12 +262,16 @@ with param_tab:
 
           st.caption('''For more granular control, use the Advanced tab which is next to this one''')
       
-
           with st.form("more options"):
 
-            data_options = ['Projection','Historical'] if data_source == 'Enter your own data' else ['Projection']
-      
+            if st.session_state.league == 'NBA':
 
+              data_options = ['Projection','Historical'] if data_source == 'Enter your own data' else ['Projection']
+
+            else:
+
+              data_options = ['Projection']
+      
             kind_of_dataset = st.selectbox(
                                       'Which kind of dataset do you want to use? (specify further on the data tab)'
                                       , data_options
@@ -330,7 +332,7 @@ with param_tab:
 
             with c1:
     
-              hashtag_slider = st.slider('Hashtag Basketball Weight'
+              hashtag_slider = st.slider('Hashtag Baseball Weight'
                                         , min_value = 0.0
                                         , value = 1.0
                                         , max_value = 1.0)
@@ -389,24 +391,71 @@ with param_tab:
                             , rotowire_slider
                             , st.session_state.data_source)
                     
-    else:
-          all_datasets = ['RotoWire (req. upload)'] 
+    elif st.session_state.league == 'MLB':
           
-          rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
-                                          , type=['csv'])
-          if rotowire_file is not None:
-            rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
-          else:
-            rotowire_upload = None
-            st.error('Upload RotoWire projection file')
-            st.stop()
+        #current_data, expected_minutes = get_current_season_data()
+        #darko_data = get_darko_data(expected_minutes)
 
-          raw_stats_df = combine_nba_projections(None
-                            , rotowire_upload
-                            , None
-                            , 0
-                            , 1
-                            , 0
+        #unique_datasets_current = list(current_data.keys())
+        #unique_datasets_darko = list(darko_data.keys())
+        if kind_of_dataset == 'Historical':
+        
+          historical_df = get_baseball_historical_data()
+
+          unique_datasets_historical = reversed([str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))])
+
+          dataset_name = st.selectbox(
+            'Which dataset do you want to default to?'
+            ,unique_datasets_historical
+            ,index = 0
+            ,on_change = increment_and_reset_draft
+          )
+          raw_stats_df = get_specified_stats(dataset_name
+                                              , st.session_state.player_stats_default_key)
+            
+        else: 
+
+          with st.form('basketball_data_sources'):
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+    
+              hashtag_slider = st.slider('Hashtag Basketball Weight'
+                                        , min_value = 0.0
+                                        , value = 1.0
+                                        , max_value = 1.0)
+
+            with c2:
+                
+                rotowire_slider = st.slider('RotoWire Weight'
+                                , min_value = 0.0
+                                , max_value = 1.0)
+
+                
+                rotowire_file_baseball = st.file_uploader("Upload RotoWire data, as a csv"
+                                                 , key = 'rotowirefile_baseball'
+                                                , type=['csv'])
+                
+                if rotowire_file_baseball is not None:
+                  rotowire_upload_baseball  = pd.read_csv(rotowire_file_baseball, skiprows = 1)
+                else:
+                  rotowire_upload_baseball = None
+
+                if (rotowire_slider > 0) & (rotowire_upload_baseball is None):
+                  st.error('Upload RotoWire projection file')
+                  st.stop()
+
+            c1, c2 = st.columns([0.2,0.8])
+            
+            with c1: 
+              submit = st.form_submit_button("Lock in",on_click = increment_default_key)
+            with c2:
+              st.warning('Make sure to lock in after making changes')
+
+          raw_stats_df = combine_baseball_projections(rotowire_upload_baseball
+                            , hashtag_slider
+                            , rotowire_slider
                             , st.session_state.data_source)
 
   with advanced_params:
