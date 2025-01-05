@@ -590,9 +590,23 @@ MLB:
     - Wins 
     - Saves
     - Strikeouts 
+    - Hits 
+    - Doubles
+    - Triples
+    - Total Bases
+    - Losses
+    - Quality Starts
+    - Holds
+    - Saves and Holds
   ratio-statistics:
     Batting Average:
       made-statistic: Hits
+      volume-statistic: Effective At Bats 
+    Slugging %:
+      made-statistic : Total Bases
+      volume-statistic : Effective At Bats
+    On Base %: 
+      made-statistic : Batting WH
       volume-statistic: At Bats 
     ERA:
       made-statistic: Earned Runs
@@ -600,29 +614,43 @@ MLB:
     WHIP:
       made-statistic: Pitching WH
       volume-statistic: Innings Pitched
-    Slugging %:
-      made-statistic : Slugging
-      volume-statistic : Effective At Bats
-    OPS:
-      made-statistic : Batting WH
-      volume-statistic: At Bats  
+    K/9: 
+      made-statistic: Strikeouts
+      volume-statistic: Innings Pitched
+    K/BB:
+      made-statistic: Strikeouts
+      volume-statistic: Walks Pitched 
   negative-statistics:
     - ERA
     - WHIP
+    - Losses
   other-columns:
   - Position
   - Games Played %
   coefficients:
-    Runs : 1
-    Home Runs : 1
-    RBI : 1
-    Stolen Bases : 0.5
-    Batting Average : 1
-    Wins : 1
-    Saves : 1
-    Strikeouts : 1
-    ERA : 1
-    WHIP : 1
+    Runs : 1.100200
+    Home Runs : 2.395556
+    RBI :  1.571588
+    Stolen Bases : 1.670590
+    Batting Average : 9.092495
+    Wins :  1.836450
+    Saves : 0.663058
+    Strikeouts : 0.375062
+    ERA : 5.507204
+    WHIP : 3.453456
+    K/9 : 1.010746
+    Slugging % : 6.943831
+    On Base % : 5.245426
+    Hits : 0.691049
+    Doubles : 2.436699
+    Triples : 8.383130
+    Total Bases :  0.879762
+    Losses : 3.285418
+    Quality Starts: 1.136292
+    Holds : 2.124855
+    Saves and Holds : 0.544072
+    K/BB : 2.783619
+    Innings Pitched : 0.245492
   batter_stats: 
     - Runs
     - Home Runs
@@ -630,28 +658,53 @@ MLB:
     - Stolen Bases
     - Batting Average
     - Slugging %
-    - OPS
+    - On Base % 
+    - Hits
+    - Doubles
+    - Triples
+    - Total Bases
   pitcher_stats:
     - Wins
     - Saves
     - Strikeouts
     - ERA
     - WHIP
+    - Innings Pitched
+    - Quality Starts
+    - Holds
+    - Saves and Holds
+    - K/9
+    - K/BB
   rotowire-renamer:
+    Name: Player
+    Pos: Position
     R : Runs
+    1B : Singles
+    2B : Doubles
+    3B : Triples
+    BB : Walks
     HR : Home Runs
     RBI : RBI
     SB : Stolen Bases
     H : Hits
     AB: At Bats
     AVG: Batting Average
+    SLG : Slugging % 
+    OBP : On Base % 
     W: Wins
     SV: Saves
     K.1 : Strikeouts
+    QS: Quality Starts
+    L : Losses
+    SV : Saves
+    HLD : Holds
+    BB/9 : BB/9
+    K/BB : K/BB
     ER: Earned Runs
+    ERA : ERA
+    WHIP : WHIP
     IP: Innings Pitched
-    Name: Player
-    Pos: Position
+    BB.1 : Walks Pitched
   stat-df-renamer:
     MLB_PLAYER_NAME : Player
     SEASON : Season
@@ -670,6 +723,41 @@ MLB:
     PITCHING_WALKS_AND_HITS : Pitching WH
     BATTING_WALKS_AND_HITS : Batting WH 
     EFFECTIVE_AT_BATS: Effective At Bats
+  htb-renamer: 
+    GP : Games Played
+    R : Runs
+    H : Hits
+    HR : Home Runs
+    RBI : RBI
+    2B : Doubles
+    3B : Triples
+    TB : Total Bases
+    SB : Stolen Bases
+    AVG: Batting Average
+    SLG : Slugging %
+    OBP: On Base %
+    AB: At Bats
+    EAB: Effective At Bats
+    W: Wins
+    L: Losses
+    QS: Quality Starts
+    SV: Saves
+    HLD: Holds
+    SVHLD : Saves and Holds
+    K : Strikeouts
+    ERA : ERA
+    WHIP : WHIP
+    K/9 : K/9
+    K/BB : K/BB
+    IP: Innings Pitched
+    PLAYER : Player
+    POS : Position
+    TEAM : Team
+  z-score-total-multiplier : 40
+  z-score-team-multiplier : 20
+  g-score-player-multiplier : 60
+  g-score-total-multiplier : 50
+  g-score-team-multiplier : 24
   rotowire-position-adjuster:
     P : SP,RP 
     C : C

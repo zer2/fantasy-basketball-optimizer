@@ -80,6 +80,8 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
 def get_correlations():
    if get_league_type() == 'NBA':
     return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
+   elif get_league_type() == 'MLB':
+    return pd.read_csv('src/data_retrieval/baseball_correlations.csv')
    
 def get_max_table():
     return pd.read_csv('src/data_retrieval/max_table.csv')
@@ -150,8 +152,6 @@ def get_player_metadata(data_source) -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   print('I am here hi')
-   print(data_source)
    df = get_htb_projections(data_source)
 
    return df['Position']

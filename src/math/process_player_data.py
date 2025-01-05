@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
-from src.helpers.helper_functions import get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
+from src.helpers.helper_functions import get_league_type, get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
-                                ,get_ratio_statistics
+                                ,get_ratio_statistics, get_position_numbers
 from src.data_retrieval.get_data import get_correlations, get_max_table
 import os
 import streamlit as st
@@ -138,7 +138,15 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
        player_cov = wdf_mod.loc[representative_player_set].groupby('Player').corr()
        player_cov.index = player_cov.index.rename(['player', 'cat'])
        player_cov = pd.DataFrame(player_cov.groupby('cat').mean())
-       player_cov.to_csv('Correlations')
+
+       if 'pitcher_stats' in params:
+          pitcher_stats = params['pitcher_stats']
+          batter_stats = params['batter_stats']
+
+          player_cov.loc[pitcher_stats, batter_stats] = 0
+          player_cov.loc[batter_stats, pitcher_stats] = 0
+
+       player_cov.to_csv('Correlations.csv')
        print(player_cov)
        sys.exit()
 
@@ -296,7 +304,6 @@ def process_player_data(weekly_df : pd.DataFrame
                                                   , representative_player_set
                                                   , conversion_factors)
     
-    
   mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_selected_categories() , 'Variance of Means']
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
@@ -305,7 +312,7 @@ def process_player_data(weekly_df : pd.DataFrame
   g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,chi if scoring_format == 'Rotisserie' else 1)
   z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
-
+    
   replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)
   z_scores = games_played_adjustment(z_scores, replacement_games_rate,representative_player_set, params)
@@ -333,12 +340,13 @@ def process_player_data(weekly_df : pd.DataFrame
   #get position averages, to make sure the covariance matrix measures differences relative to position
   #we need to weight averages to avoid over-counting the players that can take multiple positions
   # 
-   
+
   try: 
     players_and_positions = pd.merge(x_scores
                         , positions
                         , left_index = True
                         , right_index = True)
+
 
     players_and_positions_limited = players_and_positions[0:n_players]
     categories = get_selected_categories()
@@ -366,9 +374,62 @@ def process_player_data(weekly_df : pd.DataFrame
                                                                                             ,position_mean_weights.columns[0]]) 
                                                                 for position in base_position_list}
                                 )
+    
+
   except:
     position_means = None        
     L_by_position = np.array([x_scores.cov()])
+
+  #for fantasy baseball: make sure that batting positions only interact with batting positions, same with pitchibg
+  #ZR: I think this should be weighted by how many of the base categories you need?
+  if get_league_type() == 'MLB':
+        pitching_positions = ['SP','RP']
+        batting_positions = [pos for pos in position_means.index if pos not in pitching_positions]
+
+        batting_stats = [x for x in params['batter_stats'] if x in position_means.columns]
+        pitching_stats = [x for x in params['pitcher_stats'] if x in position_means.columns]
+
+        position_numbers = get_position_numbers()
+        base_positions = get_position_structure()['base_list']
+
+        pitching_positions = ['SP','RP']
+        batting_positions = [x for x in base_positions if x not in pitching_positions]
+
+        pitching_numbers = {p : v for p, v in position_numbers.items() if p in pitching_positions}
+        batting_numbers= {p : v for p, v in position_numbers.items() if p in batting_positions}
+
+        pitching_series = pd.Series(pitching_numbers)
+        batting_series = pd.Series(batting_numbers)
+
+        pitching_series = pitching_series/pitching_series.sum()
+        batting_series = batting_series/batting_series.sum()
+
+        position_means.loc[pitching_positions, batting_stats] = 0 
+        fix_factor = position_means.loc[pitching_positions, pitching_stats].mean(axis = 1).values.reshape(-1,1)
+
+        position_means.loc[pitching_positions, pitching_stats] = position_means.loc[pitching_positions, pitching_stats] - \
+                                                            fix_factor 
+        
+        #this should be weighted by position share 
+        st.write(position_means.loc[pitching_positions, pitching_stats])
+        st.write(pitching_series)
+
+        fix_factor_2 = (position_means.loc[pitching_positions, pitching_stats] * pitching_series.values.reshape(-1,1))\
+                            .sum(axis = 0).values.reshape(1,-1)
+        position_means.loc[pitching_positions, pitching_stats] = position_means.loc[pitching_positions, pitching_stats] - \
+                                                            fix_factor_2
+
+        position_means.loc[batting_positions, pitching_stats] = 0 
+        fix_factor = position_means.loc[batting_positions, batting_stats].mean(axis = 1).values.reshape(-1,1)
+        position_means.loc[batting_positions, batting_stats] = position_means.loc[batting_positions, batting_stats] - \
+                                                            fix_factor 
+        
+        fix_factor_2 = (position_means.loc[batting_positions, batting_stats] * batting_series.values.reshape(-1,1)) \
+                            .sum(axis = 0).values.reshape(1,-1)
+        position_means.loc[batting_positions, batting_stats] = position_means.loc[batting_positions, batting_stats] - \
+                                                            fix_factor_2
+
+        #ZR: There should be a simpler/better way to do this right???
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
