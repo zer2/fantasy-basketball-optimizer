@@ -66,7 +66,7 @@ def make_full_rank_tab():
                 ' format and all the H-scoring parameters defined on the parameter tab'
       
       if st.session_state['mode'] == 'Auction Mode':
-        third_str = r'H-scores represent the monetary equivalent of the player, if money was spent with no strategy at all. $ values assume 200 per drafter'
+        third_str = r'. H-scores represent the monetary equivalent of the player, if money was spent with no strategy at all. $ values assume 200 per drafter'
       else: 
         third_str = ''
 

@@ -136,7 +136,7 @@ with param_tab:
 
       league = st.selectbox(
         'Which fantasy sport are you playing?',
-        ('NBA', 'WNBA','MLB') #MLB excluded for now
+        ('NBA','MLB') #WNBA excluded for now
         , index = 0
         , key = 'league'
         , on_change = increment_and_reset_draft
