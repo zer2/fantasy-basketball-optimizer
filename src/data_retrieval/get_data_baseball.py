@@ -20,7 +20,7 @@ def process_baseball_rotowire_data(raw_df, integration_source):
          Dataframe post formatting
    """
    raw_df.loc[:,'Games Played %'] = 1 #we need to fix this later
-   raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
+   #raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
 
    raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
 
@@ -31,10 +31,17 @@ def process_baseball_rotowire_data(raw_df, integration_source):
                                      ,raw_df['Player']
                                      )
    
-   is_pitcher = raw_df['Position'].str.contains('P')
+   is_pitcher = raw_df['Position'].str.contains('P').fillna(True) 
    pitcher_stats = st.session_state.params['pitcher_stats']
    batter_stats = st.session_state.params['batter_stats']
+
+   #add some other stats that are needed
    raw_df['Effective At Bats'] = raw_df['At Bats'] - raw_df['Walks']
+   raw_df.loc[:,'Saves and Holds'] = raw_df['Saves'] + raw_df['Holds']
+   raw_df.loc[:,'Total Bases'] = raw_df['Singles'] + \
+                                 2 * raw_df['Doubles'] + \
+                                 3 * raw_df['Triples'] + \
+                                 4 * raw_df['Home Runs']
 
    raw_df.loc[is_pitcher,pitcher_stats] = raw_df[is_pitcher][pitcher_stats].fillna(0)
    raw_df.loc[~is_pitcher,batter_stats] = raw_df[~is_pitcher][batter_stats].fillna(0)
@@ -107,6 +114,7 @@ def get_baseball_htb_projections(integration_source):
 
    raw_df = raw_df.set_index('Player')
 
+   raw_df.loc[:,'Walks Pitched'] = (raw_df['Strikeouts']/raw_df['K/BB']).replace('--', None).fillna(0)
 
    required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \

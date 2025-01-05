@@ -27,7 +27,8 @@ def get_counting_statistics():
         return ['Threes','Points','Rebounds','Assists','Steals','Blocks'
                 ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made', 'Free Throws Made']
       elif os.environ['SPORT'] == 'MLB':
-        return ['Runs','Home Runs', 'RBI', 'Stolen Bases', 'Wins', 'Saves', 'Strikeouts'] 
+        return ['Runs','Home Runs', 'RBI', 'Stolen Bases','Doubles','Triples','Hits','Total Bases'
+                ,'Wins', 'Strikeouts','Saves', 'Holds','Saves and Holds','Innings Pitched', 'Quality Starts','Losses'] 
           
 def get_ratio_statistics():
     #convenience function to get the list of categories used for fantasy basketball
@@ -37,7 +38,7 @@ def get_ratio_statistics():
       if os.environ['SPORT'] == 'NBA':
         return ['Field Goal %','Free Throw %','Three %','Assist to TO']
       elif os.environ['SPORT'] == 'MLB':
-        return ['Batting Average', 'Slugging %', 'OBP', 'ERA','WHIP']
+        return ['Batting Average', 'Slugging %', 'On Base %', 'ERA','WHIP','K/9','K/BB']
     
 def get_selected_categories():
     if st.session_state:

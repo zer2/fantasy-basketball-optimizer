@@ -80,6 +80,8 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
 def get_correlations():
    if get_league_type() == 'NBA':
     return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
+   elif get_league_type() == 'MLB':
+    return pd.read_csv('src/data_retrieval/baseball_correlations.csv')
    
 def get_max_table():
     return pd.read_csv('src/data_retrieval/max_table.csv')

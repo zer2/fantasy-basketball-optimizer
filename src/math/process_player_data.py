@@ -138,7 +138,15 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
        player_cov = wdf_mod.loc[representative_player_set].groupby('Player').corr()
        player_cov.index = player_cov.index.rename(['player', 'cat'])
        player_cov = pd.DataFrame(player_cov.groupby('cat').mean())
-       player_cov.to_csv('Correlations')
+
+       if 'pitcher_stats' in params:
+          pitcher_stats = params['pitcher_stats']
+          batter_stats = params['batter_stats']
+
+          player_cov.loc[pitcher_stats, batter_stats] = 0
+          player_cov.loc[batter_stats, pitcher_stats] = 0
+
+       player_cov.to_csv('Correlations.csv')
        print(player_cov)
        sys.exit()
 
@@ -282,7 +290,6 @@ def process_player_data(weekly_df : pd.DataFrame
                                                           , params
                                                           , 1
                                                           , chi if scoring_format == 'Rotisserie' else 1)
-
     
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]

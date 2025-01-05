@@ -433,18 +433,29 @@ with param_tab:
                                 , max_value = 1.0)
 
                 
-                rotowire_file_baseball = st.file_uploader("Upload RotoWire data, as a csv"
-                                                 , key = 'rotowirefile_baseball'
+                rotowire_file_batters = st.file_uploader("Upload RotoWire data for batters, as a csv"
                                                 , type=['csv'])
+                rotowire_file_pitchers = st.file_uploader("Upload RotoWire data for pitchers, as a csv"
+                                , type=['csv'])
                 
-                if rotowire_file_baseball is not None:
-                  rotowire_upload_baseball  = pd.read_csv(rotowire_file_baseball, skiprows = 1)
+                if (rotowire_file_batters is not None):
+                  rotowire_upload_batters  = pd.read_csv(rotowire_file_batters).rename(columns = {'K' :  'K.0'})
                 else:
-                  rotowire_upload_baseball = None
+                  rotowire_upload_batters = pd.DataFrame()
 
-                if (rotowire_slider > 0) & (rotowire_upload_baseball is None):
-                  st.error('Upload RotoWire projection file')
-                  st.stop()
+                if (rotowire_file_pitchers is not None):
+                  rotowire_upload_pitchers  = pd.read_csv(rotowire_file_pitchers).rename(columns = {'K' :  'K.1'
+                                                                                                    ,'BB' : 'BB.1'})
+                  rotowire_upload_pitchers.loc[:,'Pos'] = np.where(rotowire_upload_pitchers['SV'] > 0
+                                                                   ,'RP'
+                                                                   ,'SP')
+                else:
+                  rotowire_upload_pitchers = pd.DataFrame()
+
+                rotowire_upload_baseball = pd.concat([rotowire_upload_batters, rotowire_upload_pitchers]).reset_index()
+
+                if (rotowire_slider > 0) & (len(rotowire_upload_baseball) == 0):
+                      st.error('Upload at least one RotoWire projection file')
 
             c1, c2 = st.columns([0.2,0.8])
             
@@ -452,6 +463,9 @@ with param_tab:
               submit = st.form_submit_button("Lock in",on_click = increment_default_key)
             with c2:
               st.warning('Make sure to lock in after making changes')
+
+            if (rotowire_slider > 0) & (len(rotowire_upload_baseball) == 0):
+                  st.stop()
 
           raw_stats_df = combine_baseball_projections(rotowire_upload_baseball
                             , hashtag_slider
