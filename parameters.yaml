@@ -628,28 +628,29 @@ MLB:
   - Position
   - Games Played %
   coefficients:
-    Runs : 1
-    Home Runs : 1
-    RBI : 1
-    Stolen Bases : 0.5
-    Batting Average : 1
-    Wins : 1
-    Saves : 1
-    Strikeouts : 1
-    ERA : 1
-    WHIP : 1
-    K/9 : 1
-    Slugging % : 1
-    On Base % : 1
-    Hits : 1
-    Doubles : 1
-    Triples : 1
-    Total Bases : 1
-    Losses : 1
-    Quality Starts: 1
-    Holds : 1
-    Saves and Holds : 1
-    K/BB : 1
+    Runs : 1.100200
+    Home Runs : 2.395556
+    RBI :  1.571588
+    Stolen Bases : 1.670590
+    Batting Average : 9.092495
+    Wins :  1.836450
+    Saves : 0.663058
+    Strikeouts : 0.375062
+    ERA : 5.507204
+    WHIP : 3.453456
+    K/9 : 1.010746
+    Slugging % : 6.943831
+    On Base % : 5.245426
+    Hits : 0.691049
+    Doubles : 2.436699
+    Triples : 8.383130
+    Total Bases :  0.879762
+    Losses : 3.285418
+    Quality Starts: 1.136292
+    Holds : 2.124855
+    Saves and Holds : 0.544072
+    K/BB : 2.783619
+    Innings Pitched : 0.245492
   batter_stats: 
     - Runs
     - Home Runs

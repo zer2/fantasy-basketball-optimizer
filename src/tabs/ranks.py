@@ -48,11 +48,11 @@ def make_full_rank_tab():
         taken_str = 'with the first overall pick'
 
       if st.session_state.scoring_format == 'Rotisserie':
-        first_str = """Rankings are based on estimates of win probability against a field of 
+        first_str = """Rankings are based on estimates of overall win probability against a field of 
                   eleven opposing teams given the candidate player is taken """ + taken_str + """ and 
-                  future picks are adjusted accordingly. Corresponding category scores, based on the
-                  probability of scoring a point against in arbitrary opponent, are calculated with 
-                  H-scoring adjustments incorporated."""
+                  future picks are adjusted accordingly. Corresponding category scores are the
+                  expected total of fantasy points earned with standard scoring (1 point for last
+                  , 2 points for second-last, etc.), calculated with H-scoring adjustments incorporated."""
       elif st.session_state.scoring_format == 'Head to Head: Most Categories': 
         first_str = """Rankings are based on estimates of overall win probability for an arbitrary head to head 
                 matchup, given the candidate player is taken """ + taken_str + """ and future picks are adjusted 
@@ -66,7 +66,7 @@ def make_full_rank_tab():
                 ' format and all the H-scoring parameters defined on the parameter tab'
       
       if st.session_state['mode'] == 'Auction Mode':
-        third_str = r'. $ values assume 200 per drafter'
+        third_str = r'H-scores represent the monetary equivalent of the player, if money was spent with no strategy at all. $ values assume 200 per drafter'
       else: 
         third_str = ''
 
@@ -182,6 +182,14 @@ def make_h_rank_tab(info : dict
                         ,'H-score' : h_res.values
                       })
 
+  if st.session_state.scoring_format == 'Rotisserie':
+
+      e_points = res['Rates']* (n_drafters -1) + 1
+      rate_df = e_points.loc[h_res['Player']].dropna()
+      style_format = "{:.1f}"
+      format_middle = (n_drafters -1)/2 + 1
+      format_multiplier = 15 
+
   h_res = h_res.merge(rate_df
                       , left_on = 'Player'
                       ,right_index = True)
@@ -195,17 +203,40 @@ def make_h_rank_tab(info : dict
     
     h_res = h_res[['Rank','Player','$ Value','H-score'] + get_selected_categories()]
 
-    h_res_styled = h_res.style.format("{:.1%}"
+    if st.session_state.scoring_format == 'Rotisserie':
+
+
+      h_res_styled = h_res.style.format("{:.1%}"
                       ,subset = pd.IndexSlice[:,['H-score']]) \
-                    .format("{:.1f}"
-                      ,subset = pd.IndexSlice[:,['$ Value']]) \
+                                            .format("{:.1f}"
+                      ,subset = pd.IndexSlice[:,'$ Value']) \
               .map(styler_a
                     , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
-              .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-              .format('{:,.1%}', subset = rate_df.columns)
-    
+              .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+              .format(style_format, subset = rate_df.columns)
+      
+    else:
+
+      h_res_styled = h_res.style.format("{:.1%}"
+                        ,subset = pd.IndexSlice[:,['H-score']]) \
+                      .format("{:.1f}"
+                        ,subset = pd.IndexSlice[:,['$ Value']]) \
+                .map(styler_a
+                      , subset = pd.IndexSlice[:,['H-score','$ Value']]) \
+                .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                .format('{:,.1%}', subset = rate_df.columns)
+      
   else:
-    h_res_styled = h_percentage_styler(h_res)
+    if st.session_state.scoring_format == 'Rotisserie':
+      h_res_styled = h_res.style.format("{:.1%}"
+                      ,subset = pd.IndexSlice[:,['H-score']]) \
+              .map(styler_a
+                    , subset = pd.IndexSlice[:,['H-score']]) \
+              .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+              .format(style_format, subset = rate_df.columns)
+    
+    else:
+      h_res_styled = h_percentage_styler(h_res)
 
   st.dataframe(h_res_styled, hide_index = True, use_container_width = True)
   return h_res
