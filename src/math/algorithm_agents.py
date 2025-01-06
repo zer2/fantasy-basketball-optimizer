@@ -141,8 +141,24 @@ class HAgent():
             self.batting_v = np.array(batting_v/batting_v.sum()).reshape(-1,1)
             self.pitching_v = np.array(pitching_v/pitching_v.sum()).reshape(-1,1)
 
+            self.average_round_value = info['Average-Round-Value']
+
+            #if you were to transfer one point of G-score from a batter to a pitcher, what would it look like?
+            #start by inverting v: this converts one point of G-score into one point of X-score
+            pitching_preference_vector = 1/self.v
+            #normalize so that the scores add up to 1 for both hitters and batters
+            pitching_preference_vector[self.pitching_stat_indices] = pitching_preference_vector[self.pitching_stat_indices]/ \
+                                                                    pitching_preference_vector[self.pitching_stat_indices].sum()
+            pitching_preference_vector[self.batting_stat_indices] = - pitching_preference_vector[self.batting_stat_indices]/ \
+                                                                        pitching_preference_vector[self.batting_stat_indices].sum()
+
+            #multiply by two because v naturally adds up to 1
+            self.pitching_preference_vector = pitching_preference_vector
+            self.pitching_preference_damper = 0.2
+
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
+
 
 
 
@@ -487,6 +503,12 @@ class HAgent():
                                       for position_code in self.position_structure['flex'].keys()}
         }
 
+        if get_league_type() == 'MLB':
+            optimizers['Pitcher Preference'] = AdamOptimizer(learning_rate = 0.05)
+            pitching_preference = 0
+        else:
+            pitching_preference = None
+
         while True:
 
             category_weights_current = category_weights
@@ -502,7 +524,8 @@ class HAgent():
                                                     ,x_scores_available_array
                                                     ,result_index
                                                     ,n_players_selected
-                                                    ,sigma_2_m)
+                                                    ,sigma_2_m
+                                                    ,pitching_preference)
                 
                 score = res['Score']
                 gradients = res['Gradients']
@@ -526,6 +549,10 @@ class HAgent():
                     pitching_weights = category_weights[:,self.pitching_stat_indices] 
                     category_weights[:,self.pitching_stat_indices] = pitching_weights/(2 * pitching_weights.sum(axis = 1).reshape(-1,1))
                     
+                    #make the pitching adjustment 
+                    pitching_preference_update = optimizers['Pitcher Preference'].minimize(gradients['Pitcher Preference'])
+                    pitching_preference = np.clip(pitching_preference + pitching_preference_update, -0.5, 0.5)
+
                 assert np.all(np.abs(category_weights.sum(axis=1).reshape(-1, 1) - 1) < 1e-8)
 
                 weights_df = pd.DataFrame(category_weights, index = result_index, columns = self.x_scores.columns)
@@ -690,6 +717,7 @@ class HAgent():
                                     ,result_index
                                     ,n_players_selected
                                     ,sigma_2_m
+                                    ,pitching_preference = None
                                     ,):
         
             #calculate scores and category-level gradients
@@ -735,9 +763,20 @@ class HAgent():
                                                             , self.pitching_L
                                                             , self.pitching_v) 
                 pitching_diff_single = pitching_diff * pitching_share
+
+                #pitching preference adjustment
+                convertible_slots = (np.minimum(batting_share, pitching_share) * (self.n_picks-1-n_players_selected)).astype(int)
+                total_convertible_value_map = {slots : self.average_round_value[n_players_selected:n_players_selected + slots].sum() + \
+                                        self.average_round_value[-slots:].sum() for slots in pd.unique(convertible_slots[:,0,0])}
+                total_convertible_value = np.array([total_convertible_value_map[x] for x in convertible_slots[:,0,0]]) * \
+                                            self.pitching_preference_damper
+
+                values_converted = (total_convertible_value * pitching_preference).reshape(-1,1,1) * \
+                                    self.pitching_preference_vector.reshape(1,-1,1)
                                                 
                 expected_future_diff_single = np.concatenate([batting_diff_single,pitching_diff_single], axis = 1) \
-                                                            + position_mu
+                                                            + position_mu + values_converted/(self.n_picks-1-n_players_selected)
+    
 
                 del_batting = self.get_del_full(category_weights[:,self.batting_stat_indices]
                                                 , self.batting_L
@@ -787,6 +826,10 @@ class HAgent():
                     }
 
                 flex_shares = None
+
+            if get_league_type() == 'MLB':
+                #this is just proportional to the gradient- it is not exact
+                gradients['Pitcher Preference'] = np.einsum('ai , ik -> a', pdf_weights, self.pitching_preference_vector) 
 
             res = {'Score' : score
                 ,'Gradients' : gradients
