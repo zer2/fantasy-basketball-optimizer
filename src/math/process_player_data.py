@@ -363,26 +363,13 @@ def process_player_data(weekly_df : pd.DataFrame
     #also all of the position rules should be modularized 
     base_position_list = get_position_structure()['base_list']
     position_means = position_means.loc[base_position_list, :] #this is the order we always use for positions
-    
     position_means_g = position_means * v
-    position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
-    position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) #experimental
-    position_means = position_means_g / v
 
-    L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
-                                                                , position_mean_weights.loc[pd.IndexSlice[:,position]
-                                                                                            ,position_mean_weights.columns[0]]) 
-                                                                for position in base_position_list}
-                                )
-    
+    #for fantasy baseball: make sure that batting positions only interact with batting positions, same with pitchibg
+    #ZR: I think this should be weighted by how many of the base categories you need?
+    if get_league_type() == 'MLB':
+        #ZR: There should be a simpler/better way to do this right???
 
-  except:
-    position_means = None        
-    L_by_position = np.array([x_scores.cov()])
-
-  #for fantasy baseball: make sure that batting positions only interact with batting positions, same with pitchibg
-  #ZR: I think this should be weighted by how many of the base categories you need?
-  if get_league_type() == 'MLB':
         pitching_positions = ['SP','RP']
         batting_positions = [pos for pos in position_means.index if pos not in pitching_positions]
 
@@ -404,32 +391,53 @@ def process_player_data(weekly_df : pd.DataFrame
         pitching_series = pitching_series/pitching_series.sum()
         batting_series = batting_series/batting_series.sum()
 
-        position_means.loc[pitching_positions, batting_stats] = 0 
-        fix_factor = position_means.loc[pitching_positions, pitching_stats].mean(axis = 1).values.reshape(-1,1)
+        position_means_g.loc[pitching_positions, batting_stats] = 0 
+        fix_factor = position_means_g.loc[pitching_positions, pitching_stats].mean(axis = 1).values.reshape(-1,1)
 
-        position_means.loc[pitching_positions, pitching_stats] = position_means.loc[pitching_positions, pitching_stats] - \
+        position_means_g.loc[pitching_positions, pitching_stats] = position_means_g.loc[pitching_positions, pitching_stats] - \
                                                             fix_factor 
         
-        #this should be weighted by position share 
-        st.write(position_means.loc[pitching_positions, pitching_stats])
-        st.write(pitching_series)
-
-        fix_factor_2 = (position_means.loc[pitching_positions, pitching_stats] * pitching_series.values.reshape(-1,1))\
+        fix_factor_2 = (position_means_g.loc[pitching_positions, pitching_stats] * pitching_series.values.reshape(-1,1))\
                             .sum(axis = 0).values.reshape(1,-1)
-        position_means.loc[pitching_positions, pitching_stats] = position_means.loc[pitching_positions, pitching_stats] - \
+        position_means_g.loc[pitching_positions, pitching_stats] = position_means_g.loc[pitching_positions, pitching_stats] - \
                                                             fix_factor_2
 
-        position_means.loc[batting_positions, pitching_stats] = 0 
-        fix_factor = position_means.loc[batting_positions, batting_stats].mean(axis = 1).values.reshape(-1,1)
-        position_means.loc[batting_positions, batting_stats] = position_means.loc[batting_positions, batting_stats] - \
+        position_means_g.loc[batting_positions, pitching_stats] = 0 
+        fix_factor = position_means_g.loc[batting_positions, batting_stats].mean(axis = 1).values.reshape(-1,1)
+        position_means_g.loc[batting_positions, batting_stats] = position_means_g.loc[batting_positions, batting_stats] - \
                                                             fix_factor 
         
-        fix_factor_2 = (position_means.loc[batting_positions, batting_stats] * batting_series.values.reshape(-1,1)) \
+        fix_factor_2 = (position_means_g.loc[batting_positions, batting_stats] * batting_series.values.reshape(-1,1)) \
                             .sum(axis = 0).values.reshape(1,-1)
-        position_means.loc[batting_positions, batting_stats] = position_means.loc[batting_positions, batting_stats] - \
+        position_means_g.loc[batting_positions, batting_stats] = position_means_g.loc[batting_positions, batting_stats] - \
                                                             fix_factor_2
 
-        #ZR: There should be a simpler/better way to do this right???
+        total_value = g_scores.loc[representative_player_set].sum(axis = 1).sort_values(ascending = False)
+        relative_value = total_value - total_value.min()
+        relative_value_helper_df = pd.DataFrame({'Round' : [i // n_drafters for i in range(n_drafters * n_picks)]
+                                              , 'Value' : relative_value})
+        average_round_value = relative_value_helper_df.groupby('Round')['Value'].mean()
+
+
+    elif get_league_type() == 'NBA':
+        position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
+        position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) 
+        average_round_value = None
+
+
+    position_means = position_means_g / v
+    L_by_position = pd.concat({position : weighted_cov_matrix(positions_exploded.loc[pd.IndexSlice[:,position],:]
+                                                                , position_mean_weights.loc[pd.IndexSlice[:,position]
+                                                                                            ,position_mean_weights.columns[0]]) 
+                                                                for position in base_position_list}
+                                )
+    
+
+  except:
+    position_means = None        
+    L_by_position = np.array([x_scores.cov()])
+
+
 
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
@@ -440,7 +448,8 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'Vom' : vom
           , 'Position-Means' : position_means
           , 'L-by-Position' : L_by_position
-          , 'Positions' : positions}
+          , 'Positions' : positions
+          , 'Average-Round-Value' : average_round_value}
 
   increment_info_key()
 
