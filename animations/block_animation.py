@@ -33,12 +33,10 @@ def make_weekly_df(season_df : pd.DataFrame):
 
 weekly_df = make_weekly_df(pd.read_csv('C:/Users/zacha/Projects/FBBO/data_for_testing/2023-24_complete.csv'))
 
-representative_players = list(weekly_df.groupby('PLAYER_NAME')['PTS'].mean().index[0:156])
+representative_players = list(weekly_df.groupby('PLAYER_NAME')['PTS'].mean().sort_values(ascending = False).index[0:156])
 
 block_averages = weekly_df.groupby('PLAYER_NAME')['BLK'].mean().loc[representative_players].values
 block_values = weekly_df.loc[representative_players]['BLK'].values
-
-
 
 def get_histogram(x,values):
     '''get values in a series bucketed for a histogram display
@@ -67,7 +65,7 @@ block_values_mean = block_values.mean()
 block_averages_std = block_averages.std()
 block_values_std = block_values.std()
 
-x_averages = [z/2 for z in range(-8,17)]
+x_averages = [z/2 for z in range(-5,21)]
 x_values = [z for z in range(0,20)]
 
 y_averages_value_basis = get_histogram(x_values, block_averages_rounded)
@@ -84,11 +82,11 @@ y_averages_2 = get_histogram(x_averages, (block_averages_rounded - block_average
 
 y_values = get_histogram(x_values, block_values_rounded)
 
-class BlockAveragesVis(Scene):
+class BlockZScoreVis(Scene):
 
     def construct(self):
 
-        title = Text('Weekly block rates of top 156 players in 2023').shift(UP * 3)
+        title = Text('Weekly block rates of top 156 players in 2023-24').shift(UP * 3)
         label_0 = Tex('Weekly averages $(m_p)$').shift(UP * 2)
 
         chart = BarChart(values= y_averages_0
@@ -124,3 +122,80 @@ class BlockAveragesVis(Scene):
                   )
 
         self.wait(3)
+
+
+class BlockZScoreSimulation(Scene):
+
+    def construct(self):
+        # Simulate the Block differential using player averages
+        # Randomly select 13 players for Team A
+        teams = np.random.choice(representative_players, size=(100, 25), replace=True)
+
+        # Split into Team A (13 players) and Team B (12 players + 1 remaining)
+        team_a = teams[:, :13]
+        team_b = teams[:, 13:]
+
+        # Get block levels for each player
+        block_levels = weekly_df.groupby('PLAYER_NAME')['BLK'].mean().loc[representative_players]
+
+        for i in range(5):
+
+            # Generate uniform tables
+            team_a_table = self.create_uniform_table(
+                [(str(player), str(np.round(block_levels[player], 2))) for player in team_a[i, :]]
+            )
+
+            team_b_table = self.create_uniform_table(
+                [(str(player), str(np.round(block_levels[player], 2))) for player in team_b[i, :]] + 
+                [('Remaining Player', '')]  # Add extra row to balance height
+            )
+
+            # Positioning tables
+            team_a_table.to_edge(LEFT, buff=1)
+            team_b_table.to_edge(LEFT, buff=4)
+
+            # Team labels
+            team_a_label = Text("Team A", color=BLUE).scale(0.6).next_to(team_a_table, UP)
+            team_b_label = Text("Team B", color=RED).scale(0.6).next_to(team_b_table, UP)
+
+            # Animate table and labels
+            self.add(team_a_label, team_a_table)
+            self.add(team_b_label, team_b_table)
+
+            self.wait(2)
+
+            # Clear previous tables before the next iteration
+            self.clear_mobjects_except([team_a_label, team_b_label])
+
+    def create_uniform_table(self, data):
+        """Creates a table with uniform cell sizes."""
+        cell_widths = [1.9,0.5]
+        cell_height = 0.4
+
+        table_rows = VGroup()
+        for row_data in data:
+            row_group = VGroup()
+            for cell_text, cell_width in zip(row_data, cell_widths):
+                rect = Rectangle(width=cell_width, height=cell_height)
+                text = Text(str(cell_text)).scale(0.2)
+                text.move_to(rect.get_center())
+                row_group.add(VGroup(rect, text))
+            row_group.arrange(RIGHT, buff=0)  # Align columns in a row
+            table_rows.add(row_group)
+
+        table_rows.arrange(DOWN, buff=0)  # Align rows vertically
+        return table_rows
+
+    def clear_mobjects_except(self, keep_objects):
+        """Remove all objects from the scene except the ones in keep_objects."""
+        for mob in self.mobjects:
+            if mob not in keep_objects:
+                self.remove(mob)
+
+#Animations 7A/7B/
+class BlockGScoreSimulation(Scene):
+
+    def construct(self):
+
+        #Simulate the Block differential using player averages. Then zoom in on the top to justify Z-scores 
+        return None

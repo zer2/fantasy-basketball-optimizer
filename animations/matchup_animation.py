@@ -45,7 +45,7 @@ class FantasyBasketballMatchup(Scene):
         actions_b = self.add_summary_row(grid_b, "Total", "724 pts, 240 reb. 159 ast, ...", 4, t2c={'159 ast':YELLOW})
         self.play(actions_a[0], actions_a[1], actions_b[0], actions_b[1])
 
-        self.wait(3)
+        self.wait(30)
 
     def create_grid(self, team_name):
         # Create a grid with four rows and two columns

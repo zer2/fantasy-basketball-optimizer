@@ -1,0 +1,349 @@
+[
+  {
+    "input_text": "DraftVisVoiceOver",
+    "input_data": {
+      "input_text": "DraftVisVoiceOver",
+      "config": {
+        "format": 8,
+        "channels": 1,
+        "rate": 44100,
+        "chunk": 512
+      },
+      "service": "recorder"
+    },
+    "original_audio": "draftvisvoiceover-6560cb45.mp3",
+    "word_boundaries": [
+      {
+        "audio_offset": 2000000,
+        "text_offset": 0,
+        "word_length": 3,
+        "text": " In",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 3000000,
+        "text_offset": 3,
+        "word_length": 8,
+        "text": " Fantasy",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 7200000,
+        "text_offset": 11,
+        "word_length": 12,
+        "text": " Basketball,",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 16000000,
+        "text_offset": 23,
+        "word_length": 4,
+        "text": " you",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 17200000,
+        "text_offset": 27,
+        "word_length": 4,
+        "text": " are",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 18800000,
+        "text_offset": 31,
+        "word_length": 4,
+        "text": " the",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 20200000,
+        "text_offset": 35,
+        "word_length": 8,
+        "text": " manager",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 24200000,
+        "text_offset": 43,
+        "word_length": 3,
+        "text": " of",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 26800000,
+        "text_offset": 46,
+        "word_length": 2,
+        "text": " a",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 28000000,
+        "text_offset": 48,
+        "word_length": 8,
+        "text": " virtual",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 31800000,
+        "text_offset": 56,
+        "word_length": 11,
+        "text": " basketball",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 39200000,
+        "text_offset": 67,
+        "word_length": 5,
+        "text": " team",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 40599999,
+        "text_offset": 72,
+        "word_length": 3,
+        "text": " in",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 42600000,
+        "text_offset": 75,
+        "word_length": 2,
+        "text": " a",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 43600000,
+        "text_offset": 77,
+        "word_length": 7,
+        "text": " league",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 46200000,
+        "text_offset": 84,
+        "word_length": 5,
+        "text": " with",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 49000000,
+        "text_offset": 89,
+        "word_length": 6,
+        "text": " other",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 50000000,
+        "text_offset": 95,
+        "word_length": 8,
+        "text": " virtual",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 54600000,
+        "text_offset": 103,
+        "word_length": 7,
+        "text": " teams.",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 66200000,
+        "text_offset": 110,
+        "word_length": 4,
+        "text": " You",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 67200000,
+        "text_offset": 114,
+        "word_length": 6,
+        "text": " start",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 69600000,
+        "text_offset": 120,
+        "word_length": 3,
+        "text": " by",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 72000000,
+        "text_offset": 123,
+        "word_length": 9,
+        "text": " drafting",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 76200000,
+        "text_offset": 132,
+        "word_length": 5,
+        "text": " your",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 78200000,
+        "text_offset": 137,
+        "word_length": 6,
+        "text": " teams",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 80800000,
+        "text_offset": 143,
+        "word_length": 3,
+        "text": " in",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 83200000,
+        "text_offset": 146,
+        "word_length": 4,
+        "text": " the",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 84200000,
+        "text_offset": 150,
+        "word_length": 8,
+        "text": " snaking",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 88000000,
+        "text_offset": 158,
+        "word_length": 6,
+        "text": " order",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 91000000,
+        "text_offset": 164,
+        "word_length": 5,
+        "text": " like",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 93800000,
+        "text_offset": 169,
+        "word_length": 6,
+        "text": " this.",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 105399999,
+        "text_offset": 175,
+        "word_length": 8,
+        "text": " Usually",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 107200000,
+        "text_offset": 183,
+        "word_length": 5,
+        "text": " this",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 109400000,
+        "text_offset": 188,
+        "word_length": 5,
+        "text": " goes",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 111199999,
+        "text_offset": 193,
+        "word_length": 3,
+        "text": " on",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 113400000,
+        "text_offset": 196,
+        "word_length": 4,
+        "text": " for",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 116199999,
+        "text_offset": 200,
+        "word_length": 3,
+        "text": " 13",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 121199999,
+        "text_offset": 203,
+        "word_length": 3,
+        "text": " or",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 123400000,
+        "text_offset": 206,
+        "word_length": 3,
+        "text": " so",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 125399999,
+        "text_offset": 209,
+        "word_length": 8,
+        "text": " rounds,",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 134200000,
+        "text_offset": 217,
+        "word_length": 9,
+        "text": " allowing",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 135600000,
+        "text_offset": 226,
+        "word_length": 6,
+        "text": " every",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 139400000,
+        "text_offset": 232,
+        "word_length": 8,
+        "text": " manager",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 143800000,
+        "text_offset": 240,
+        "word_length": 3,
+        "text": " to",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 146400000,
+        "text_offset": 243,
+        "word_length": 7,
+        "text": " select",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 148000000,
+        "text_offset": 250,
+        "word_length": 3,
+        "text": " 13",
+        "boundary_type": "Word"
+      },
+      {
+        "audio_offset": 153400000,
+        "text_offset": 253,
+        "word_length": 9,
+        "text": " players.",
+        "boundary_type": "Word"
+      }
+    ],
+    "transcribed_text": " In Fantasy Basketball, you are the manager of a virtual basketball team in a league with other virtual teams. You start by drafting your teams in the snaking order like this. Usually this goes on for 13 or so rounds, allowing every manager to select 13 players.",
+    "final_audio": "draftvisvoiceover-6560cb45.mp3"
+  }
+]

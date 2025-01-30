@@ -154,7 +154,7 @@ class HAgent():
 
             #multiply by two because v naturally adds up to 1
             self.pitching_preference_vector = pitching_preference_vector
-            self.pitching_preference_damper = 0.2
+            self.pitching_preference_damper = 1
 
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []

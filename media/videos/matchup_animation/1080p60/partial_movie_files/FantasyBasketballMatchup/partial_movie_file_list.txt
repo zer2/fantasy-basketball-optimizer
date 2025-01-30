@@ -1,0 +1,12 @@
+# This file is used internally by FFMPEG.
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3529212410_1703996534_223132457.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_538658610_931712332.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_1246351522_4011431566.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_2481498303_3362912576.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_445946002_1183651711.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_14379479_2037269669.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_2444380868_3424878526.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_2214040091_3724951618.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_130544521_2501742955.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_3405471830_3454986595.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/matchup_animation/1080p60/partial_movie_files/FantasyBasketballMatchup/3040924799_696444109_2470212788.mp4'

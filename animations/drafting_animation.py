@@ -1,7 +1,9 @@
 from manim import *
 
+
 class FantasyBasketballDraft(Scene):
     def construct(self):
+
         # Define managers and players
         managers = ["Team A", "Team B", "Team C", "Team D","Team E","Team F","Team G","Team H","Team I","Team J"]
         players = [
@@ -60,7 +62,7 @@ class FantasyBasketballDraft(Scene):
 
 
         # Add "Round N+1" label for the extra row
-        next_round_label = Text(f"Round {num_rounds + 1}", font_size=12)
+        next_round_label = Text(f"Rounds\n4 - 13", font_size=12)
         next_round_label.next_to(additional_grid[0], LEFT, buff=0.2)
         self.play(Write(next_round_label), run_time = 0.1)
 
@@ -99,5 +101,5 @@ class FantasyBasketballDraft(Scene):
 
         # Add indication of more rounds
 
-        self.wait(2)
+        self.wait(5)
 
