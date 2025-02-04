@@ -1,0 +1,8 @@
+# This file is used internally by FFMPEG.
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/1185818338_4022023750_223132457.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/624642324_1410660599_4074762376.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/624642324_1748885153_1380331104.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/624642324_3053927490_3441241917.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/624642324_3540443147_3265536274.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/624642324_2347172278_2666749172.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/480p15/partial_movie_files/ZScoreDefinition/624642324_1141282389_3279254487.mp4'
