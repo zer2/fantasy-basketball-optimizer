@@ -5,7 +5,7 @@ from src.data_retrieval.get_data import get_player_metadata
 from src.helpers.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs.team_subtabs import *
 from src.tabs.candidate_subtabs import *
-from src.helpers.helper_functions import move_forward_one_pick, increment_default_key
+from src.helpers.helper_functions import move_forward_one_pick
 
 import pandas as pd 
 import numpy as np

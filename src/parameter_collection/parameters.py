@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 
+from src.helpers.helper_functions import increment_player_stats_version
+from src.math.process_player_data import process_player_data
+from src.helpers.helper_functions import get_games_per_week
+
 def player_stat_param_popover():
     """Collect information from the user on desired parameters for handling player injuries/uncertainty 
     Specifically three objects, all floats, are added to session_state: 'upsilon','psi', and 'chi'
@@ -16,7 +20,8 @@ def player_stat_param_popover():
                       , key = 'upsilon'
                       , min_value = float(st.session_state.params['options']['upsilon']['min'])
                       , value = float(st.session_state.params['options']['upsilon']['default'])
-                    , max_value = float(st.session_state.params['options']['upsilon']['max']))
+                    , max_value = float(st.session_state.params['options']['upsilon']['max'])
+                    , on_change = increment_player_stats_version)
     upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
                   miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
                   $15\%$ of games instead'''
@@ -47,6 +52,32 @@ def player_stat_param_popover():
     #I don't think we need people to be able to modify the coefficients
     coefficient_series = pd.Series(st.session_state.params['coefficients'])
     st.session_state.conversion_factors = coefficient_series.T    
+
+    #make the upsilon adjustment
+    @st.cache_data(show_spinner = False, ttl = 3600)
+    def make_upsilon_adjustment(_raw_stat_df, upsilon, player_stats_version):
+      _raw_stat_df['Games Played %'] = 1 - ( 1 - _raw_stat_df['Games Played %']) * upsilon 
+
+      counting_statistics = st.session_state.params['counting-statistics'] 
+      volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
+
+      for col in counting_statistics + volume_statistics:
+        _raw_stat_df[col] = _raw_stat_df[col].astype(float) * _raw_stat_df['Games Played %'] * get_games_per_week()
+
+      st.session_state.player_stats = _raw_stat_df
+
+    make_upsilon_adjustment(st.session_state.raw_stat_df, upsilon, st.session_state.player_stats_version)
+
+    st.session_state.info = process_player_data(None
+                            ,st.session_state.player_stats
+                            ,st.session_state.conversion_factors
+                            ,st.session_state.psi
+                            ,st.session_state.chi
+                            ,st.session_state.scoring_format
+                            ,st.session_state.n_drafters
+                            ,st.session_state.n_picks
+                            ,st.session_state.params
+                            ,st.session_state.player_stats_version)
 
 def algorithm_param_popover():
     """Collect information from the user on desired parameters for H-scoring

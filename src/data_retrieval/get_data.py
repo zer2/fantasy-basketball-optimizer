@@ -7,7 +7,7 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
 
@@ -224,20 +224,19 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False, ttl = 3600)
-def get_specified_stats(dataset_name : str
-                     , default_key : int = None) -> pd.DataFrame:
+def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
   Args:
     dataset_name: the name of the dataset to fetch
-    default_key: used for caching. Increments whenever the default dataset is changed, so that this function
-                 gets rerun for sure whenever the default dataset changes
+    league: used as an input rather than taken from session state so that the function re-runs when the league is changed
+            (the names of datasets can be the same across leagues)
 
   Returns:
     Dataframe of fantasy statistics 
   """
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
-  if st.session_state.league in ('NBA','WNBA'):
+  if league in ('NBA','WNBA'):
 
     #current_data, expected_minutes = get_current_season_data()
     #darko_data = get_darko_data(expected_minutes)
@@ -267,16 +266,13 @@ def get_specified_stats(dataset_name : str
     else:
         historical_df = get_historical_data()
         df = historical_df.loc[dataset_name].copy()  
-    #adjust for the display
-    df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
-    df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
-    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
+
     return df.round(3) 
   
-  elif st.session_state.league in ('MLB'):
+  elif league in ('MLB'):
     
     historical_df = get_baseball_historical_data()
 
@@ -285,9 +281,6 @@ def get_specified_stats(dataset_name : str
         df = process_baseball_rotowire_data(raw_df)
     else: 
         df = historical_df.loc[dataset_name].copy()  
-    
-    df[r'Batting Average'] = (df[r'Batting Average'] * 100).round(1)
-    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
@@ -346,16 +339,12 @@ def combine_nba_projections(rotowire_upload
     #Need to include this because not every source projects double doubles, which gets messy
     df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
 
-    df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
-    df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
-    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
-    df[r'Three %'] = (df[r'Three %'] * 100).round(1)
-
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
+    
     return df.round(2) 
 
 

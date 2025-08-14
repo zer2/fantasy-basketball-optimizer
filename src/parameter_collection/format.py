@@ -1,5 +1,4 @@
 import streamlit as st
-from src.helpers.helper_functions import increment_default_key
 
 def format_popover():
     """Collect information from the user on the desired fantasy sport format.
@@ -15,8 +14,7 @@ def format_popover():
             'Which format are you playing?',
             ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
             , key = 'scoring_format'
-            , index = 1
-            , on_change = increment_default_key)
+            , index = 1)
         
     if scoring_format == 'Rotisserie':
         st.caption('Note that H-scores for Rotisserie are experimental and have not been tested')

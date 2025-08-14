@@ -395,15 +395,15 @@ def weighted_cov_matrix(df, weights):
 
 def increment_player_stats_version():
   if st.session_state:
-    st.session_state.player_stats_editable_version += 1
+    st.session_state.player_stats_version += 1
 
 def increment_info_key():
   if st.session_state:
     st.session_state.info_key += 1
 
-def increment_default_key():
-  if st.session_state:
-    st.session_state.player_stats_default_key += 1
+@st.cache_data(show_spinner = False, ttl = 3600)
+def drop_injured_players(_raw_stat_df, injured_players, player_stats_version):
+    return _raw_stat_df.drop(injured_players)
 
 @st.cache_data()
 def get_selections_default(n_picks, n_drafters):

@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 
 from src.tabs.drafting import increment_and_reset_draft
+from src.helpers.helper_functions import get_games_per_week, listify, increment_player_stats_version, drop_injured_players
 
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, combine_nba_projections
 from src.data_retrieval.get_data_baseball import get_baseball_historical_data, combine_baseball_projections
@@ -19,19 +20,37 @@ def player_stats_popover():
       raw_stat_df, dataframe 
     """
 
+    c1, c2 = st.columns([0.6,0.4])
     #ZR: These should probably be classes, like the integrations
 
-    if st.session_state.league == 'NBA':
+    with c1:
 
-        raw_stat_df = get_nba_stats()
-               
-    elif st.session_state.league == 'MLB':
-            
-        raw_stat_df = get_mlb_stats()
+        if st.session_state.league == 'NBA':
 
-    return raw_stat_df
-        
+            raw_stat_df = get_nba_stats()
+                
+        elif st.session_state.league == 'MLB':
+                
+            raw_stat_df = get_mlb_stats()
+
+    with c2: 
+        st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+        default_injury_list = [p for p in st.session_state['injured_players'] \
+                                if (p in raw_stat_df.index) and (not (p in listify(st.session_state.selections_default))) 
+                                ]
+
+        injured_players = st.multiselect('Injured players'
+                                , raw_stat_df.index
+                                , default = default_injury_list
+                                , on_change = increment_player_stats_version
+                                , key = 'injured_players'
+        )
+
+        st.session_state.raw_stat_df = drop_injured_players(raw_stat_df
+                                                            , injured_players
+                                                            , st.session_state.player_stats_version)
     
+
 
 def get_nba_stats():
     """Figures out where to get player stats from, and loads them into a dataframe, specifically for the NBA
@@ -50,6 +69,7 @@ def get_nba_stats():
                             , data_options
                             ,key = 'data_option'
                             , index = 0
+                            , on_change= increment_player_stats_version
     )
 
     if kind_of_dataset == 'Historical':
@@ -64,8 +84,7 @@ def get_nba_stats():
             ,index = 0
             ,on_change = increment_and_reset_draft
         )
-        raw_stats_df = get_specified_stats(dataset_name
-                                            , st.session_state.player_stats_default_key)
+        raw_stats_df = get_specified_stats(dataset_name, st.session_state.league)
                 
     else: 
 
@@ -76,15 +95,18 @@ def get_nba_stats():
             hashtag_slider = st.slider('Hashtag Baseball Weight'
                                     , min_value = 0.0
                                     , value = 1.0
-                                    , max_value = 1.0)
+                                    , max_value = 1.0
+                                    , on_change= increment_player_stats_version)
 
             bbm_slider = st.slider('BBM Weight'
                     , min_value = 0.0
-                    , max_value = 1.0)
+                    , max_value = 1.0
+                    , on_change= increment_player_stats_version)
 
-            bbm_file = st.file_uploader('''Upload Basketball Monster Per Game Stats, as a csv. To get all required columns for 
-                                            projections, you may have to export to excel then save as CSV utf-8.'''
-                                            , type=['csv'])
+            bbm_file = st.file_uploader('''Upload BBM Per Game Stats.
+                                         You may have to export to excel then save as CSV utf-8.'''
+                                            , type=['csv']
+                                            , on_change= increment_player_stats_version)
             if bbm_file is not None:
                 bbm_upload  = pd.read_csv(bbm_file)
             else:
@@ -94,15 +116,18 @@ def get_nba_stats():
             
             darko_slider = st.slider('Darko Weight'
                                         , min_value = 0.0
-                                        , max_value = 1.0)
+                                        , max_value = 1.0
+                                        , on_change= increment_player_stats_version)
 
             rotowire_slider = st.slider('RotoWire Weight'
                             , min_value = 0.0
-                            , max_value = 1.0)
+                            , max_value = 1.0
+                            , on_change= increment_player_stats_version)
 
             
             rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
-                                            , type=['csv'])
+                                            , type=['csv']
+                                            , on_change= increment_player_stats_version)
             if rotowire_file is not None:
                 rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
             else:
@@ -143,6 +168,7 @@ def get_mlb_stats():
                             , data_options
                             ,key = 'data_option'
                             , index = 0
+                            , on_change= increment_player_stats_version
     )
 
     if kind_of_dataset == 'Historical':
@@ -157,8 +183,7 @@ def get_mlb_stats():
             ,index = 0
             ,on_change = increment_and_reset_draft
         )
-        raw_stats_df = get_specified_stats(dataset_name
-                                            , st.session_state.player_stats_default_key)
+        raw_stats_df = get_specified_stats(dataset_name, st.session_state.league)
                 
     else: 
 
@@ -169,19 +194,23 @@ def get_mlb_stats():
             hashtag_slider = st.slider('Hashtag Basketball Weight'
                                     , min_value = 0.0
                                     , value = 1.0
-                                    , max_value = 1.0)
+                                    , max_value = 1.0
+                                    , on_change = increment_player_stats_version)
 
         with c2:
             
             rotowire_slider = st.slider('RotoWire Weight'
                             , min_value = 0.0
-                            , max_value = 1.0)
+                            , max_value = 1.0
+                            , on_change = increment_player_stats_version)
 
             
             rotowire_file_batters = st.file_uploader("Upload RotoWire data for batters, as a csv"
-                                            , type=['csv'])
+                                            , type=['csv']
+                                            , on_change = increment_player_stats_version)
             rotowire_file_pitchers = st.file_uploader("Upload RotoWire data for pitchers, as a csv"
-                            , type=['csv'])
+                            , type=['csv']
+                            , on_change = increment_player_stats_version)
             
             if (rotowire_file_batters is not None):
                 rotowire_upload_batters  = pd.read_csv(rotowire_file_batters).rename(columns = {'K' :  'K.0'})

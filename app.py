@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import yaml
 from src.helpers.helper_functions import  get_position_numbers, listify \
-                                  ,increment_player_stats_version, increment_default_key \
+                                  ,increment_player_stats_version \
                                   ,get_games_per_week, get_ratio_statistics
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
                         get_data_from_snowflake, combine_nba_projections, get_player_metadata, get_yahoo_key_to_name_mapper
@@ -20,13 +20,12 @@ from src.tabs.waivers import make_full_waiver_tab
 from src.tabs.other_tabs import make_about_tab
 from src.parameter_collection.league_settings import league_settings_popover
 from src.parameter_collection.player_stats import player_stats_popover
-from src.parameter_collection.teams_and_autodraft import teams_and_autodraft_popover
 from src.parameter_collection.parameters import player_stat_param_popover, algorithm_param_popover, trade_param_popover
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
 from pandas.api.types import CategoricalDtype
 
-st.write('<style>div.block-container{padding-top:2rem;}</style>', unsafe_allow_html=True)
+st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 
 ### SETUP
 st.set_page_config(
@@ -36,18 +35,15 @@ st.set_page_config(
           , initial_sidebar_state="auto"
           , menu_items=None)
 
+if 'player_stats_version' not in st.session_state:
+    st.session_state.player_stats_version = 0
 
-if 'player_stats_editable' not in st.session_state:
-    st.session_state.player_stats_editable = 0
-
-if 'player_stats_editable_version' not in st.session_state:
-    st.session_state.player_stats_editable_version = 0
-
-if 'player_stats_default_key' not in st.session_state:
-    st.session_state.player_stats_default_key = np.random.randint(100000)
-
-if 'info_key' not in st.session_state:
+if 'info_version' not in st.session_state:
     st.session_state.info_key = 100000
+
+if 'data_source' not in st.session_state:
+    st.session_state.data_source = 'Enter Your Own Data'
+
 
 if 'injured_players' not in st.session_state:
     st.session_state['injured_players'] = set()
@@ -85,22 +81,15 @@ with st.sidebar:
   with st.popover(':small[League Settings]'):
 
     league_settings_popover()
+  
+  with st.popover(':small[Player Stats]').container(height = 500):
 
-  if st.session_state.data_source == 'Enter your own data':
-
-    with st.popover(':small[Teams & Autodraft]'):
-
-       teams_and_autodraft_popover()
-       
+    player_stats = player_stats_popover()
 
   with st.popover(':small[Format & Categories]'):
 
     format_popover()
     
-  with st.popover(':small[Player Stats]'):
-
-    raw_stats_df = player_stats_popover()
-
   with st.popover(':small[Player Stat Parameters]'):
 
     player_stat_param_popover()                                          
@@ -127,137 +116,30 @@ with st.sidebar:
 
 ### Build app 
 
-if st.session_state['mode'] == 'Draft Mode':
-  main_tabs = st.tabs(["⛹️‍♂️ Drafting"
-              ,"📊 Player Info"
-              ,"🥇 Player Scores & Rankings"])
-
-  draft_tab = main_tabs[0]
-  info_tab = main_tabs[1]
-  rank_tab = main_tabs[2]
-
-elif st.session_state['mode'] == 'Auction Mode':
-  main_tabs = st.tabs(["⛹️‍♂️ Auction"
-              ,"📊 Player Info"
-              ,"🥇 Player Scores & Rankings"])
-
-  auction_tab = main_tabs[0]
-  info_tab = main_tabs[1]
-  rank_tab = main_tabs[2]
                 
-elif st.session_state['mode'] == 'Season Mode':
-  main_tabs = st.tabs(["📊 Player Info"
-                  ,"🥇 Player Scores & Rankings"
-                  ,"🏟️ Rosters"
+if st.session_state['mode'] == 'Season Mode':
+  main_tabs = st.tabs(["🏟️ Rosters"
                   ,"⚔️ Matchups"
                   ,"⛹️‍♂️ Waiver Wire & Free Agents"
                   ,"📋 Trading"])
 
-  info_tab = main_tabs[0]
-  rank_tab = main_tabs[1]
-  rosters_tab = main_tabs[2]
-  matchup_tab = main_tabs[3]
-  waiver_tab = main_tabs[4]
-  trade_tab = main_tabs[5]
+  rosters_tab = main_tabs[1]
+  matchup_tab = main_tabs[2]
+  waiver_tab = main_tabs[3]
+  trade_tab = main_tabs[4]
 
-with info_tab:    
+mov = st.session_state.info['Mov']
+vom = st.session_state.info['Vom']
 
-  if st.session_state['schedule']: 
-    stat_tab, injury_tab, games_played_tab = st.tabs([
-                "Player Stats"
-                ,"Injury Status"
-                ,"Game Volume"
-                ])
-  else:
-    stat_tab, injury_tab = st.tabs([
-                    "Player Stats"
-                    ,"Injury Status"])
+v = np.sqrt(mov/vom)  if st.session_state.scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
 
+v = np.array(v/v.sum()).reshape(1,len(v))
 
-  with stat_tab:
-    st.caption(f"Per-game player projections below, from default data source. Edit as you see fit")
+st.session_state.v = v
+st.session_state.z_scores = st.session_state.info['Z-scores']
+st.session_state.g_scores = st.session_state.info['G-scores']
 
-    player_stats_editable = make_data_editor(raw_stats_df
-                                        , key_name = 'player_stats_editable'
-                                        , lock_in_button_str = "Lock in Player Stats")
-    player_stats = player_stats_editable.copy()
-
-    #re-adjust from user inputs
-    counting_statistics = st.session_state.params['counting-statistics'] 
-    volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
-    ratio_statistics = get_ratio_statistics()
-
-    player_stats[ratio_statistics + ['Games Played %']] = player_stats[ratio_statistics + ['Games Played %']]/100
-    #make the upsilon adjustment
-    player_stats['Games Played %'] = 100 - ( 100 - player_stats['Games Played %']) * st.session_state.upsilon 
-
-    for col in counting_statistics + volume_statistics:
-      player_stats[col] = player_stats_editable[col].astype(float) * player_stats['Games Played %']/100 * get_games_per_week()
-
-
-  with injury_tab:
-      st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
-      default_injury_list = [p for p in st.session_state['injured_players'] \
-                              if (p in player_stats.index) and (not (p in listify(st.session_state.selections_default))) 
-                              ]
- 
-      injured_players = st.multiselect('Injured players'
-                              , player_stats.index
-                              , default = default_injury_list
-                              , on_change = increment_player_stats_version)
-      player_stats = player_stats.drop(injured_players)
-
-      st.session_state.player_stats = player_stats
-
-      info = process_player_data(None
-                              ,player_stats
-                              ,st.session_state.conversion_factors
-                              ,st.session_state.upsilon
-                              ,st.session_state.psi
-                              ,st.session_state.chi
-                              ,st.session_state.scoring_format
-                              ,st.session_state.n_drafters
-                              ,st.session_state.n_picks
-                              ,st.session_state.params
-                              ,st.session_state.player_stats_editable_version + st.session_state.player_stats_default_key)
-      st.session_state.info = info #useful for testing
-
-      mov = info['Mov']
-      vom = info['Vom']
-      
-      v = np.sqrt(mov/vom)  if st.session_state.scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
-
-      v = np.array(v/v.sum()).reshape(1,len(v))
-      
-      st.session_state.v = v
-      st.session_state.z_scores = info['Z-scores']
-      st.session_state.g_scores = info['G-scores']
-
-  if st.session_state['schedule']:
-    with games_played_tab: 
-
-      #get schedule: 
-      #get game weeks: with yfpy query.get_game_weeks_by_game_id
-      schedule = st.session_state['schedule'] 
-      week_chosen = st.selectbox('Select a particular fantasy week'
-                                ,list(schedule.keys()))
-      
-      #ZR: Idk why we need to drop duplicates      
-      default_potential_games = schedule[week_chosen].drop_duplicates().reindex(player_stats.index).fillna(3)
-      game_stats = pd.DataFrame({ 'Potential Games' : default_potential_games
-                                  }
-                                  ,index = player_stats.index
-                                    )
-
-      st.caption(f"""Projections for games played below, broken down by number of potential games.
-                    Just for reference, these do not effect projections""")
-                    
-      st.dataframe(game_stats)
-
-with rank_tab:
-  make_full_rank_tab()
-
-H = HAgent(info = info
+H = HAgent(info = st.session_state.info
     , omega = st.session_state.omega
     , gamma = st.session_state.gamma
     , n_picks = st.session_state.n_starters
@@ -274,22 +156,18 @@ if st.session_state['mode'] == 'Draft Mode':
   if 'drafter' not in st.session_state:
     st.session_state.drafter = 0
 
-  with draft_tab:
-
-    if st.session_state.data_source == 'Enter your own data':
-      make_drafting_tab_own_data(H)
-    else:
-      make_drafting_tab_live_data(H)
+  if st.session_state.data_source == 'Enter your own data':
+    make_drafting_tab_own_data(H)
+  else:
+    make_drafting_tab_live_data(H)
     
 if st.session_state['mode'] == 'Auction Mode':
 
-  with auction_tab:
+  if st.session_state.data_source == 'Enter your own data':
 
-    if st.session_state.data_source == 'Enter your own data':
-
-      make_auction_tab_own_data(H)
-    else:
-      make_auction_tab_live_data(H) 
+    make_auction_tab_own_data(H)
+  else:
+    make_auction_tab_live_data(H) 
 
 elif st.session_state['mode'] == 'Season Mode':
 
@@ -326,7 +204,7 @@ elif st.session_state['mode'] == 'Season Mode':
       with right: 
 
         roster_inspection(selections_df.fillna('RP')
-                        , info
+                        , st.session_state.info
                         , st.session_state.omega
                         , st.session_state.gamma
                         , st.session_state.scoring_format
@@ -340,7 +218,7 @@ elif st.session_state['mode'] == 'Season Mode':
       if st.session_state.scoring_format == 'Rotisserie':
         st.write('No matchups for Rotisserie')
       else:
-        make_matchup_matrix(info['X-scores']
+        make_matchup_matrix(st.session_state.info['X-scores']
                         ,selections_df
                         ,st.session_state.scoring_format
                         ,st.session_state.info_key
@@ -379,7 +257,7 @@ elif st.session_state['mode'] == 'Season Mode':
         st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
                   expected game volume for each player based on the NBA's schedule""")
 
-        make_matchup_tab(player_stats
+        make_matchup_tab(st.session_state.player_stats
                         , selections_df
                         , matchup_seat
                         , opponent_seat

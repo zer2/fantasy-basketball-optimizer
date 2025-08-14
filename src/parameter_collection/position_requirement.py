@@ -13,7 +13,6 @@ def position_requirement_popover():
       None 
     """
 
-
     #set default position numbers, based on n_picks
 
     all_position_defaults = st.session_state.params['options']['positions']
@@ -23,8 +22,8 @@ def position_requirement_popover():
     else:
       position_defaults = all_position_defaults[st.session_state.params['options']['n_picks']['default']]
 
-    if st.session_state.mode != 'Season Mode':
-        st.warning('''There is no default position structure for a league with''' + str(st.session_state.n_picks) + \
+      if st.session_state.mode != 'Season Mode':
+        st.warning('''There is no default position structure for a league with ''' + str(st.session_state.n_picks) + \
                 ''' picks. Position structure must be met manually on the Advanced tab.''')
 
     st.caption('The H-scoring algorithm will choose players assuming that its team ultimately need to fit this structure')

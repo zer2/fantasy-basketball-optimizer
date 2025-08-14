@@ -130,7 +130,7 @@ def make_matchup_tab(player_stats
                         ,n_drafters
                         ,n_picks
                         ,st.session_state.params
-                        ,st.session_state.player_stats_editable_version + week_number*100)
+                        ,st.session_state.player_stats_version + week_number*100)
   
   week_specific_x_scores = week_specific_info['X-scores']
 
