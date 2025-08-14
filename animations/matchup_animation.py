@@ -1,4 +1,11 @@
 from manim import *
+import random
+import pandas as pd
+
+season_df = pd.read_csv('C:/Users/zacha/Projects/FBBO/data_for_testing/2023-24_complete.csv')
+representative_players = list(season_df.groupby('PLAYER_NAME')['PTS'].mean().sort_values(ascending = False).index[0:156])
+representative_players_text = ['\n'.join(x.split(' ')[0:2]) for x in representative_players]  
+representative_players_text = [x for x in representative_players_text if (len(x.split('\n')[0]) < 10) & (len(x.split('\n')[1]) < 10)  ]  
 
 class FantasyBasketballMatchup(Scene):
     def construct(self):
@@ -84,3 +91,75 @@ class FantasyBasketballMatchup(Scene):
         stats_text = Text(summary_text, t2c = t2c, font_size=14, disable_ligatures=True).move_to(stats_box.get_center())
 
         return (FadeIn(name_text), FadeIn(stats_text))
+
+class SlotMachineTwoTables(Scene):
+    def construct(self):
+        # Define player names
+        random.shuffle(representative_players_text)  # Shuffle for randomness
+
+        # Slot machine rectangle
+        slot_machine = RoundedRectangle(corner_radius=0.2, width=2, height=2, color=YELLOW)
+        slot_machine.to_edge(LEFT, buff=2)
+
+        # Slot machine lever
+        lever = Line(UP * 0.5, DOWN * 0.5, color=GRAY).next_to(slot_machine, UP, buff=0.2)
+        lever_pivot = Dot(lever.get_start(), color=GRAY)
+
+        # Placeholder for player name
+        slot_text = Text("???", font_size=36).move_to(slot_machine)
+
+        # Create two tables (each with 13 spots)
+        top_table = VGroup(*[Square(side_length=0.7, color=WHITE) for _ in range(13)])
+        bottom_table = VGroup(*[Square(side_length=0.7, color=WHITE) for _ in range(12)] + [Square(side_length=0.7, color=RED)])  # 12 white spots
+
+        # Arrange tables
+        top_table.arrange_in_grid(rows = 2, buff=0).next_to(slot_machine, RIGHT, buff=1).shift(UP * 1.5)
+        bottom_table.arrange_in_grid(rows = 2, buff=0).next_to(slot_machine, RIGHT, buff=1).shift(DOWN * 1.5)
+
+        team_a_label = Text('Team A', color = BLUE).next_to(top_table, UP)
+        team_b_label = Text('Team B', color = GREEN).next_to(bottom_table, UP)
+
+        end_text = Text('Goal: maximize the expected \n value of categories won \n (equivalent to maximizing sum \n of probabilities of winning \n each category)'
+                        ,font_size = 12).next_to(bottom_table, RIGHT)
+
+        # Placeholder for selected player names
+        selected_names = []
+
+        # Add elements to scene
+        self.play(Create(slot_machine), Write(slot_text))
+        self.play(Create(lever), Create(lever_pivot))
+        self.play(Write(team_a_label), Write(team_b_label))
+        self.play(Create(top_table), Create(bottom_table))
+        self.play(Write(end_text))
+
+        # Animation for selecting players
+        for i in range(25): #26
+            # Simulate pulling lever
+            self.play(lever.animate.rotate(-PI/6, about_point=lever_pivot.get_center()), run_time=0.2)
+            self.play(lever.animate.rotate(PI/6, about_point=lever_pivot.get_center()), run_time=0.2)
+
+
+            # Simulate slot spinning with random names
+            for _ in range(10):  # Quick shuffle effect
+                random_name = random.choice(representative_players_text)
+                self.play(Transform(slot_text, Text(random_name, font_size=12).move_to(slot_machine)), run_time=0.1)
+
+            # Select final name
+            selected_player = representative_players_text.pop(0)  # Get player name
+            final_text = Text(selected_player, font_size=12).move_to(slot_machine)
+            self.play(Transform(slot_text, final_text), run_time=0.5)
+
+            # Determine which table to place the player in
+            if i % 2 == 0:
+                # Assign to top table
+                name_text = Text(selected_player, font_size=10).move_to(top_table[int(i/2)])
+            else:
+                j = int(i/2) - 13
+                name_text = Text(selected_player, font_size=10).move_to(bottom_table[j])
+      
+
+            selected_names.append(name_text)
+            self.play(Write(name_text))
+
+        self.wait(2)
+

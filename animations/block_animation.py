@@ -6,6 +6,7 @@ os.chdir('..')
 import pandas as pd
 import numpy as np
 from collections import Counter
+import random 
 
 def make_weekly_df(season_df : pd.DataFrame):
     """Prepares a stat dataframe and a position series for a season"""
@@ -37,6 +38,13 @@ representative_players = list(weekly_df.groupby('PLAYER_NAME')['PTS'].mean().sor
 
 block_averages = weekly_df.groupby('PLAYER_NAME')['BLK'].mean().loc[representative_players].values
 block_values = weekly_df.loc[representative_players]['BLK'].values
+
+# Get block levels for each player
+block_levels = weekly_df.groupby('PLAYER_NAME')['BLK'].mean().loc[representative_players]
+
+block_actual_values = weekly_df.groupby('PLAYER_NAME')['BLK']
+block_actual_values_map = {player : block_actual_values.get_group(player) for player in representative_players}
+
 
 def get_histogram(x,values, interval_size = 0.5, round_normal = True):
     '''get values in a series bucketed for a histogram display
@@ -267,7 +275,7 @@ class BlockZScoreSimulationAnalysis(Scene):
         text, chart, line = self.set_middle_point(text, chart, None, results, hist, 0)
         self.wait(8)
 
-        text, chart, line = self.set_middle_point(text, chart, line, results, hist, 1.77, r"$\approx \frac{1}{2} + \frac{x - \mu}{\sigma}$")
+        text, chart, line = self.set_middle_point(text, chart, line, results, hist, 1.77)
         self.wait(20)
 
         text, chart, line = self.set_middle_point(text, chart, line, results, hist, 1.77,  r"$\approx \frac{1}{2} + \mathord{?} * (x - \mu)$")
@@ -277,9 +285,10 @@ class BlockZScoreSimulationAnalysis(Scene):
         self.wait(50) 
 
         text, chart, line = self.set_middle_point(text, chart, line, results, hist, 1.77,  r"$\approx \frac{x - \mu}{\sigma}$")
+        self.wait(50)
 
 
-    def set_middle_point(self, text, chart, line, values, hist, middle_point, special_string = None):
+    def set_middle_point(self, text, chart, line, values, hist, middle_point, special_string = ""):
         fraction_winning = sum([x < middle_point  + (x == middle_point)/2 for x in values])/len(values)
 
         bar_colors = ['GREEN' if z < middle_point else ('GREEN_A' if z == middle_point else 'WHITE') for z in range(-30,30,2)]
@@ -293,26 +302,14 @@ class BlockZScoreSimulationAnalysis(Scene):
         
         new_line = Line(start=DOWN * 2.2, end=UP * 2.2, color=YELLOW, stroke_width=8).shift((0.2 + middle_point * 0.16) * RIGHT)
 
-        middle_point_str = str(middle_point) if not special_string else (r"$\mu = $ " + str(middle_point)) 
+        middle_point_str = str(middle_point) if not middle_point == 1.77 else (r"$\mu = $ " + str(middle_point)) 
         new_text = Tex("Blocks scored by remaining player: " + middle_point_str + r"\\" \
-                        + 'Probability of victory: ' + str(np.round(fraction_winning * 100,2)) + '\%') \
+                + 'Probability of victory: ' + str(np.round(fraction_winning * 100,2)) + "\% " + special_string) \
                             .next_to(new_chart, DOWN).scale(0.55)
         self.play(ReplacementTransform(line, new_line) if line is not None else Create(new_line)
                   ,ReplacementTransform(chart, new_chart)
                   ,ReplacementTransform(text, new_text))
-        
-        if special_string:
-            self.wait(15)
-
-            super_new_text = Tex("Blocks scored by remaining player: " + str(middle_point) + r"\\" \
-                + 'Probability of victory: ' + str(np.round(fraction_winning * 100,2)) + "\% " + special_string) \
-                    .next_to(new_chart, DOWN).scale(0.55)   
-        
-            self.play(ReplacementTransform(chart, new_chart)
-                  ,ReplacementTransform(new_text, super_new_text))
-            return super_new_text, new_chart, new_line
-        else:
-            return new_text, new_chart, new_line
+        return new_text, new_chart, new_line
 
 
 class SuccessRateComparison(Scene):
@@ -416,7 +413,7 @@ class SuccessRateComparison(Scene):
         self.play(Write(equation_text))
         self.wait(10)
 
-#Animations 7A/7B/
+#Animations 7A/7B
 class BlockGScoreSimulation(Scene):
 
     def construct(self):
@@ -428,12 +425,6 @@ class BlockGScoreSimulation(Scene):
         # Split into Team A (13 players) and Team B (12 players + 1 remaining)
         team_a = teams[:, :13]
         team_b = teams[:, 13:]
-
-        # Get block levels for each player
-        block_levels = weekly_df.groupby('PLAYER_NAME')['BLK'].mean().loc[representative_players]
-
-        block_actual_values = weekly_df.groupby('PLAYER_NAME')['BLK']
-        block_actual_values_map = {player : block_actual_values.get_group(player) for player in representative_players}
 
         results = []
 
@@ -540,3 +531,104 @@ class BlockGScoreSimulation(Scene):
         for mob in self.mobjects:
             if mob not in keep_objects:
                 self.remove(mob)   
+
+
+class DoubleSlotMachine(Scene):
+    def construct(self):
+        # Define player names
+        representative_players_text = {x : '\n'.join(x.split(' ')[0:2]) for x in representative_players if (len(x.split(' ')[0]) < 10) & (len(x.split(' ')[1]) < 10)}
+        player_pile = list(representative_players_text.keys())
+        random.shuffle(player_pile)  # Shuffle for randomness
+
+        # Slot machine rectangle
+        slot_machine = RoundedRectangle(corner_radius=0.2, width=2, height=2, color=YELLOW)
+        slot_machine.to_edge(LEFT, buff=2).shift(UP*1.5)
+
+        # Slot machine lever
+        lever = Line(UP * 0.5, DOWN * 0.5, color=GRAY).next_to(slot_machine, UP, buff=0.2)
+        lever_pivot = Dot(lever.get_start(), color=GRAY)
+
+        # Placeholder for player name
+        slot_text = Text("???", font_size=36).move_to(slot_machine)
+
+        # Slot machine rectangle
+        slot_machine_lower = RoundedRectangle(corner_radius=0.2, width=2, height=2, color=PURPLE)
+        slot_machine_lower.to_edge(LEFT, buff=2).shift(DOWN*2.5)
+
+        # Slot machine lever
+        lever_lower = Line(UP * 0.5, DOWN * 0.5, color=GRAY).next_to(slot_machine_lower, UP, buff=0.2)
+        lever_pivot_lower = Dot(lever_lower.get_start(), color=GRAY)
+
+        # Placeholder for player name
+        slot_text_lower = Text("???", font_size=36).move_to(slot_machine_lower)
+
+        # Create two tables (each with 13 spots)
+        top_table = VGroup(*[Square(side_length=0.7, color=WHITE) for _ in range(13)])
+        bottom_table = VGroup(*[Square(side_length=0.7, color=WHITE) for _ in range(12)] + [Square(side_length=0.7, color=RED)])  # 12 white spots
+
+        # Arrange tables
+        top_table.arrange_in_grid(rows = 2, buff=0).next_to(slot_machine, RIGHT, buff=1).shift(DOWN * 0.5)
+        bottom_table.arrange_in_grid(rows = 2, buff=0).next_to(slot_machine, RIGHT, buff=1).shift(DOWN * 3.5)
+
+        team_a_label = Text('Team A', color = BLUE).next_to(top_table, UP)
+        team_b_label = Text('Team B', color = GREEN).next_to(bottom_table, UP)
+
+        end_text = Text('Goal: maximize the expected \n value of categories won \n (equivalent to maximizing sum \n of probabilities of winning \n each category)'
+                        ,font_size = 12).next_to(bottom_table, RIGHT)
+
+        # Placeholder for selected player names
+        selected_names = []
+
+        # Add elements to scene
+        self.play(Create(slot_machine), Write(slot_text))
+        self.play(Create(lever), Create(lever_pivot))
+        self.play(Create(slot_machine_lower), Write(slot_text_lower))
+        self.play(Create(lever_lower), Create(lever_pivot_lower))
+        self.play(Write(team_a_label), Write(team_b_label))
+        self.play(Create(top_table), Create(bottom_table))
+        self.play(Write(end_text))
+
+        # Animation for selecting players
+        for i in range(26): #26
+            # Simulate pulling lever
+            self.play(lever.animate.rotate(-PI/6, about_point=lever_pivot.get_center()), run_time=0.2)
+            self.play(lever.animate.rotate(PI/6, about_point=lever_pivot.get_center()), run_time=0.2)
+
+            # Simulate slot spinning with random names
+            for _ in range(10):  # Quick shuffle effect
+                random_name = random.choice(player_pile)
+                self.play(Transform(slot_text, Text(random_name, font_size=12).move_to(slot_machine)), run_time=0.1)
+
+            # Select final name
+            selected_player = player_pile.pop(0)  # Get player name
+            selected_player_text = representative_players_text[selected_player]
+
+            final_text = Text(selected_player_text, font_size=12).move_to(slot_machine)
+            self.play(Transform(slot_text, final_text), run_time=0.5)
+
+            #select a week value 
+            self.play(lever_lower.animate.rotate(-PI/6, about_point=lever_pivot.get_center()), run_time=0.2)
+            self.play(lever_lower.animate.rotate(PI/6, about_point=lever_pivot.get_center()), run_time=0.2)    
+
+            for _ in range(10):  # Quick shuffle effect
+                block_values_for_player = block_actual_values_map[selected_player]
+                week = random.randint(1, len(block_values_for_player))
+                block_value = block_values_for_player[week-1]
+
+                block_value_text =  "Week " + str(week) + " 23-24\nBlocks: " + str(int(block_value))
+                self.play(Transform(slot_text_lower, Text(block_value_text, font_size=12).move_to(slot_machine_lower)), run_time=0.1)
+
+            full_text = selected_player_text + '\nBlocks:' + str(int(block_value))
+            # Determine which table to place the player in
+            if i % 2 == 0:
+                # Assign to top table
+                name_text = Text(full_text, font_size=10).move_to(top_table[int(i/2)])
+            else:
+                j = int(i/2) - 13
+                name_text = Text(full_text, font_size=10).move_to(bottom_table[j])
+      
+
+            selected_names.append(name_text)
+            self.play(Write(name_text))
+
+        self.wait(50)

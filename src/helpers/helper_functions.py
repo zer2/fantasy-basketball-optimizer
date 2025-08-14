@@ -162,8 +162,9 @@ def get_position_ranges():
 
                 }
     
-def get_position_indices(position_structure):
+def get_position_indices(params):
    
+    position_structure = get_position_structure()
     flex_info =  position_structure['flex']
     base_position_list = position_structure['base_list']
 

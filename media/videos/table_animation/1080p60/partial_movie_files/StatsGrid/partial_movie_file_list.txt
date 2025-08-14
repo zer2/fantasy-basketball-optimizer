@@ -1,0 +1,11 @@
+# This file is used internally by FFMPEG.
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3529212410_4106135170_223132457.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_356657260_3156665861.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_4133577809_2950739654.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_1693199830_3400635941.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_508666535_601692326.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_4246740830_648164082.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_1826010067_2847474880.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_3551201942_3808931187.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_150657901_3432505314.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/1080p60/partial_movie_files/StatsGrid/3040924799_3456681232_2423805006.mp4'

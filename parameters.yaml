@@ -324,10 +324,7 @@ NBA:
       omega : 1.0
       gamma : 0.4
       n_iterations : 30
-  punting_default_index : 
-    "Head to Head: Most Categories" : 1
-    "Head to Head: Each Category" : 1
-    "Rotisserie": 1
+  punting_default : Moderate punting
   n_games : 82
   n_games_per_week : 3
 WNBA:

@@ -439,6 +439,7 @@ def process_player_data(weekly_df : pd.DataFrame
 
 
 
+
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
@@ -450,7 +451,7 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'L-by-Position' : L_by_position
           , 'Positions' : positions
           , 'Average-Round-Value' : average_round_value}
-
+  
   increment_info_key()
 
   
