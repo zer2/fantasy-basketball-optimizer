@@ -55,7 +55,7 @@ def make_trade_tab(H
               index = 0
             )
           
-          trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat]
+          trade_counterparty_players = counterparty_players_dict[trade_counterparty_seat].values
 
         else: 
           trade_counterparty_players = []
@@ -70,7 +70,7 @@ def make_trade_tab(H
 
       c1, c2 = st.columns(2)
 
-      with c1: 
+      with c2: 
 
         with st.form("trade inspection form"):
 
@@ -80,8 +80,16 @@ def make_trade_tab(H
 
              if len(selected_rows) > 0:
               selected_row = st.session_state.df.iloc[selected_rows[0]]
-              default_party_players = selected_row['Send']
-              default_counterparty_players = selected_row['Receive']
+
+              if all ([x in trade_party_players for x in selected_row['Send']]):
+                default_party_players = selected_row['Send']
+              else:
+                 default_party_players = None
+
+              if all ([x in trade_counterparty_players for x in selected_row['Receive']]):
+                default_counterparty_players = selected_row['Receive']
+              else:
+                 default_counterparty_players = None
 
              else:
               default_party_players = None
@@ -90,12 +98,54 @@ def make_trade_tab(H
              default_party_players = None
              default_counterparty_players = None
 
+          st.markdown("""
+          <style>
+          /* The dropdown lives in a portal; target it globally, not under [data-baseweb="select"] */
+
+          /* (Optional) widen the menu */
+          [data-baseweb="popover"] [data-baseweb="menu"] {
+            width: 520px !important;
+            max-width: none !important;
+          }
+
+          /* Let the menu be tall enough to show many items */
+          [data-baseweb="menu"] {
+            max-height: 65vh !important;
+          }
+
+          /* KEY: make each option variable-height and allow wrapping */
+          [data-baseweb="menu"] [role="option"] {
+            height: auto !important;      /* override fixed item height */
+            min-height: 0 !important;
+            padding-top: 8px !important;  /* give wrapped lines breathing room */
+            padding-bottom: 8px !important;
+            align-items: flex-start !important;
+          }
+
+          /* Unclamp and wrap the actual label inside the option */
+          [data-baseweb="menu"] [role="option"] * {
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            display: block !important;
+            -webkit-line-clamp: unset !important;
+            line-clamp: unset !important;
+          }
+
+          /* (Optional) also let selected chips wrap inside the control */
+          div[data-baseweb="select"] [data-baseweb="tag"] span {
+            white-space: normal !important;
+            overflow-wrap: anywhere !important;
+          }
+          </style>
+          """, unsafe_allow_html=True)
+
           players_sent = st.multiselect(
             'Which players are you trading?'
             ,trade_party_players
             ,default = default_party_players
             )
-            
+
           players_received = st.multiselect(
                 'Which players are you receiving?'
                 ,trade_counterparty_players
@@ -105,7 +155,6 @@ def make_trade_tab(H
 
           st.form_submit_button("Submit", use_container_width = True)
 
-      with c2: 
 
         h_tab, z_tab, g_tab = st.tabs(['H-score','Z-score','G-score'])
 
@@ -142,72 +191,74 @@ def make_trade_tab(H
                               , st.session_state.info_key
                               )
 
-      st.divider()
 
-      if st.session_state.scoring_format == 'Rotisserie':
-        general_value = st.session_state.z_scores.sum(axis = 1)
-        replacement_value = z_scores_unselected.iloc[0].sum() 
-      else:
-        general_value = st.session_state.g_scores.sum(axis = 1)
-        replacement_value = g_scores_unselected.iloc[0].sum()
+      with c1: 
+        if st.session_state.scoring_format == 'Rotisserie':
+          general_value = st.session_state.z_scores.sum(axis = 1)
+          replacement_value = z_scores_unselected.iloc[0].sum() 
+        else:
+          general_value = st.session_state.g_scores.sum(axis = 1)
+          replacement_value = g_scores_unselected.iloc[0].sum()
 
-      #slightly hacky way to make all of the multiselects blue
-      st.markdown("""
-          <style>
-              span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                  background-color: #3580BB; color:white;
-              }
-              span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                  background-color: #3580BB; color:white;
-              }
-              span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                  background-color: #3580BB; color:white;
-              }
-          </style>
-          """, unsafe_allow_html=True)
-
-      trade_filter = st.multiselect('Suggested trades'
-                                  , [(x[0],x[1]) for x in get_combo_params()]
-                                  , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
-                                  , default = [(1,1)])
-        
-      filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
-
-      st.session_state.df = make_trade_suggestion_df(H
-            , player_assignments
-            , trade_party_seat
-            , trade_counterparty_seat
-            , general_value
-            , replacement_value
-            , get_your_differential_threshold()
-            , get_their_differential_threshold()
-            , filtered_combo_params
-            , st.session_state.scoring_format
-            , st.session_state.info_key) 
+        #slightly hacky way to make all of the multiselects blue
+        st.markdown("""
+            <style>
+                span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                    background-color: #3580BB; color:white;
+                }
+                span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                    background-color: #3580BB; color:white;
+                }
+                span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                    background-color: #3580BB; color:white;
+                }
+            </style>
+            """, unsafe_allow_html=True)
       
-      if st.session_state.df is None: 
-        st.markdown('No promising trades found')
-      else:
-        full_dataframe_styled = st.session_state.df.reset_index(drop = True).style.format("{:.2%}"
-                                      , subset = ['Your H-score Differential'
-                                                ,'Their H-score Differential']) \
-                            .map(stat_styler
-                                , middle = 0
-                                , multiplier = 15000
-                                , subset = ['Your H-score Differential'
-                                          ,'Their H-score Differential']
-                            ).set_properties(**{
-                                  'font-size': '12pt',
-                              })
-        st.dataframe(full_dataframe_styled
-                , key = 'trade_suggestions_df'
-                , on_select = 'rerun'
-                , selection_mode = 'single-row'
-                , hide_index = True
-                , column_config={
-                            "Send": st.column_config.ListColumn("Send", width='large')
-                            ,"Receive": st.column_config.ListColumn("Receive", width='large')
-                })
+        st.markdown('Suggested trades. Check the box to analyze the trade')
+
+        trade_filter = st.multiselect('Types of trades to check'
+                                    , [(x[0],x[1]) for x in get_combo_params()]
+                                    , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
+                                    , default = [(1,1)])
+          
+        filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
+
+        st.session_state.df = make_trade_suggestion_df(H
+              , player_assignments
+              , trade_party_seat
+              , trade_counterparty_seat
+              , general_value
+              , replacement_value
+              , get_your_differential_threshold()
+              , get_their_differential_threshold()
+              , filtered_combo_params
+              , st.session_state.scoring_format
+              , st.session_state.info_key) 
+        
+        if st.session_state.df is None: 
+          st.markdown('No promising trades found')
+        else:
+          full_dataframe_styled = st.session_state.df.reset_index(drop = True).style.format("{:.2%}"
+                                        , subset = ['Your Score'
+                                                  ,'Their Score']) \
+                              .map(stat_styler
+                                  , middle = 0
+                                  , multiplier = 15000
+                                  , subset = ['Your Score'
+                                            ,'Their Score']
+                              ).set_properties(**{
+                                    'font-size': '12pt',
+                                })
+          st.dataframe(full_dataframe_styled
+                  , key = 'trade_suggestions_df'
+                  , on_select = 'rerun'
+                  , selection_mode = 'single-row'
+                  , hide_index = True
+                  , column_config={
+                              "Send": st.column_config.ListColumn("Send", width = 'small')
+                              ,"Receive": st.column_config.ListColumn("Receive", width = 'small')
+                  })
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_score_tab(_scores : pd.DataFrame
@@ -255,7 +306,7 @@ def make_trade_score_tab(_scores : pd.DataFrame
   st.dataframe(full_frame_styled
                 , use_container_width = True
                 , height = len(full_frame) * 35 + 38
-                                          )     
+                    )     
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def get_cross_combos(n : int
@@ -364,8 +415,8 @@ def make_combo_df(all_combos : list
 
         new_row = pd.DataFrame({ 'Send' : [my_trade]
                                   ,'Receive' : [their_trade]
-                                  ,'Your H-score Differential' : [your_differential]
-                                  ,'Their H-score Differential' : [their_differential]
+                                  ,'Your Score' : [your_differential]
+                                  ,'Their Score' : [their_differential]
                                   })
         return new_row
       else:
@@ -373,7 +424,7 @@ def make_combo_df(all_combos : list
       
   full_dataframe = pd.concat([process_row(row) for key, row in all_combos.iterrows()])
 
-  full_dataframe = full_dataframe.sort_values('Your H-score Differential', ascending = False)
+  full_dataframe = full_dataframe.sort_values('Your Score', ascending = False)
 
   return full_dataframe
 
@@ -431,8 +482,8 @@ def make_trade_suggestion_df(_H
                   , scoring_format
                   , st.session_state.info_key) 
   
-  my_threshold_criteria = full_dataframe['Your H-score Differential'] > your_differential_threshold
-  their_threshold_criteria = full_dataframe['Their H-score Differential'] > their_differential_threshold
+  my_threshold_criteria = full_dataframe['Your Score'] > your_differential_threshold
+  their_threshold_criteria = full_dataframe['Their Score'] > their_differential_threshold
 
   full_dataframe = full_dataframe[my_threshold_criteria & their_threshold_criteria]
   
