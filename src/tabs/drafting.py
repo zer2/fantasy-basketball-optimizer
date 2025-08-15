@@ -56,11 +56,13 @@ def select_player_from_draft_board(p = None):
   if not p:
     p = st.session_state.selected_player
 
-  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
+  if (st.session_state.row < st.session_state.selections_df.shape[0]):
 
-  st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
-                                                                          ,st.session_state.drafter
-                                                                          ,st.session_state.selections_df.shape[1])
+    st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
+
+    st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
+                                                                            ,st.session_state.drafter
+                                                                            ,st.session_state.selections_df.shape[1])
   
   run_autodraft()
 

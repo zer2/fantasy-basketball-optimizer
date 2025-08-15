@@ -9,7 +9,6 @@ from src.data_retrieval.get_data import get_historical_data, get_specified_stats
                         get_data_from_snowflake, combine_nba_projections, get_player_metadata, get_yahoo_key_to_name_mapper
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
-from src.tabs.ranks import make_full_rank_tab
 from src.tabs.trading import make_trade_tab
 from src.helpers.data_editor import make_data_editor
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
@@ -123,10 +122,10 @@ if st.session_state['mode'] == 'Season Mode':
                   ,"⛹️‍♂️ Waiver Wire & Free Agents"
                   ,"📋 Trading"])
 
-  rosters_tab = main_tabs[1]
-  matchup_tab = main_tabs[2]
-  waiver_tab = main_tabs[3]
-  trade_tab = main_tabs[4]
+  rosters_tab = main_tabs[0]
+  matchup_tab = main_tabs[1]
+  waiver_tab = main_tabs[2]
+  trade_tab = main_tabs[3]
 
 mov = st.session_state.info['Mov']
 vom = st.session_state.info['Vom']
