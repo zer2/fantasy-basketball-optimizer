@@ -13,7 +13,6 @@ from src.tabs.trading import make_trade_tab
 from src.helpers.data_editor import make_data_editor
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
-from src.tabs.matchups import make_matchup_tab, make_matchup_matrix
 from src.tabs.team_subtabs import roster_inspection
 from src.tabs.waivers import make_full_waiver_tab
 from src.tabs.other_tabs import make_about_tab
@@ -115,17 +114,14 @@ with st.sidebar:
 
 ### Build app 
 
-                
 if st.session_state['mode'] == 'Season Mode':
-  main_tabs = st.tabs(["🏟️ Rosters"
-                  ,"⚔️ Matchups"
-                  ,"⛹️‍♂️ Waiver Wire & Free Agents"
-                  ,"📋 Trading"])
+  main_tabs = st.tabs(["⛹️‍♂️ Waiver Wire & Free Agents"
+                  ,"📋 Trading"
+                  ,"🏟️ Rosters"])
 
-  rosters_tab = main_tabs[0]
-  matchup_tab = main_tabs[1]
-  waiver_tab = main_tabs[2]
-  trade_tab = main_tabs[3]
+  waiver_tab = main_tabs[0]
+  trade_tab = main_tabs[1]
+  rosters_tab = main_tabs[2]
 
 mov = st.session_state.info['Mov']
 vom = st.session_state.info['Vom']
@@ -210,70 +206,14 @@ elif st.session_state['mode'] == 'Season Mode':
                         , st.session_state.chi
                         , player_assignments)  
 
-  with matchup_tab:
-
-    if (st.session_state.mode == 'Draft Mode') or not st.session_state.schedule:
-
-      if st.session_state.scoring_format == 'Rotisserie':
-        st.write('No matchups for Rotisserie')
-      else:
-        make_matchup_matrix(st.session_state.info['X-scores']
-                        ,selections_df
-                        ,st.session_state.scoring_format
-                        ,st.session_state.info_key
-                        )
-
-    else:
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-          matchup_seat = st.selectbox(f'Which team do you want to get expected matchup results for?'
-                                            , st.session_state.selections_df.columns
-                                            , index = 0)
-        
-        with c2:
-          matchup_week = st.selectbox(f'For which week?'
-                                    , st.session_state['schedule'].keys()
-                                    , index = 0)
-
-          week_number = int(matchup_week.split(':')[0].split(' ')[1])
-
-          relevant_matchups = st.session_state['matchups'][matchup_seat]
-
-        if week_number in relevant_matchups.keys():
-
-          opponent_seat = relevant_matchups[int(week_number)].teams[1].name.decode('UTF-8')
-
-          st.write(matchup_seat + "'s opponent for week " + str(week_number) + " is " + \
-                  opponent_seat)
-
-        else:
-          with c3: 
-            opponent_seat = st.selectbox(f'Against which team?'
-                                              , [s for s in st.session_state.selections_df.columns if s != matchup_seat]
-                                              , index = 0)
-        st.write("""Predicted win likelihoods for """ + matchup_seat + """ below. Note that these reflect the 
-                  expected game volume for each player based on the NBA's schedule""")
-
-        make_matchup_tab(st.session_state.player_stats
-                        , selections_df
-                        , matchup_seat
-                        , opponent_seat
-                        , matchup_week
-                        , st.session_state.n_picks
-                        , st.session_state.n_drafters
-                        , st.session_state.conversion_factors
-                        , st.session_state.psi
-                        , st.session_state.scoring_format )
-        ######## END TAB
+  
   with waiver_tab:
 
       make_full_waiver_tab(H
                            ,selections_df
                            ,player_assignments
                            ,selection_list)
-
+      
   with trade_tab:
 
     make_trade_tab(H

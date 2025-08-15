@@ -73,7 +73,6 @@ def make_trade_tab(H
 
         with st.form("trade inspection form"):
 
-
           #load up the selected suggested trade if applicable
           if 'trade_suggestions_df' in st.session_state:
              selected_rows = st.session_state.trade_suggestions_df.selection.rows
