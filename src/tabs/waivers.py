@@ -25,7 +25,7 @@ def make_full_waiver_tab(H
   c1, c2 = st.columns([0.5,0.5])
 
   with c1: 
-    waiver_inspection_seat = st.selectbox(f'Which team so you want to drop a player from?'
+    waiver_inspection_seat = st.selectbox(f'Which team do you want to drop a player from?'
         , st.session_state.selections_df.columns
         , index = 0)
 
