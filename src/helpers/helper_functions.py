@@ -248,8 +248,6 @@ def get_combo_params():
   combo_params_df[['N-traded','N-received']] = \
         combo_params_df[['N-traded','N-received']].astype(int)
 
-  combo_params_df['T1'] = combo_params_df['T1']/100
-
   combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
 
   return combo_params
@@ -465,7 +463,6 @@ def get_max_info(N):
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
    
-   print('BOO')
 
    con = get_snowflake_connection(schema)
 
@@ -473,7 +470,7 @@ def get_data_from_snowflake(table_name
 
    return df
 
-@st.cache_resource(ttl = 3600*24)
+@st.cache_resource(ttl = 3600)
 def get_snowflake_connection(schema):
       con = snowflake.connector.connect(
         user=st.secrets['SNOWFLAKE_USER']

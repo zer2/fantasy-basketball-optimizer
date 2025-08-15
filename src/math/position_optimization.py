@@ -227,3 +227,15 @@ def check_all_player_eligibility(players, team_so_far):
                 for player_row in player_rows]
     
     return all_res
+
+def check_team_eligibility(team):
+    #team is a list of position eligibilities
+    if len(team) == 0:
+        return True
+    else:
+        team_so_far_array = get_player_rows(team)
+        try:
+            res = linear_sum_assignment(team_so_far_array, maximize = True)
+            return True
+        except: 
+            return False

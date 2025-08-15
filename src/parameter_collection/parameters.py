@@ -66,7 +66,9 @@ def player_stat_param_popover():
 
       st.session_state.player_stats = _raw_stat_df
 
-    make_upsilon_adjustment(st.session_state.raw_stat_df, upsilon, st.session_state.player_stats_version)
+    make_upsilon_adjustment(st.session_state.raw_stat_df
+                            , upsilon
+                            , st.session_state.player_stats_version)
 
     st.session_state.info = process_player_data(None
                             ,st.session_state.player_stats
@@ -176,8 +178,7 @@ def trade_param_popover():
 
     combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
                                   ,'N-received' : [1,2,3]
-                                  ,'T1' : [0.0,0.0,0.0]
-                                  ,'T2' : [1,0.25,0.1]}
+                                  ,'T' : [2,1,0.5]}
                                   )
 
     st.session_state['combo_params_df'] = st.data_editor(combo_params_default
@@ -186,8 +187,7 @@ def trade_param_popover():
                                                         , column_config={
                                           "N-traded": st.column_config.NumberColumn("N-traded", default=1)
                                           ,"N-received": st.column_config.NumberColumn("N-received", default=1)
-                                          ,"T1": st.column_config.NumberColumn("T1", default=0)
-                                          ,"T2": st.column_config.NumberColumn("T2", default=0)
+                                          ,"T": st.column_config.NumberColumn("T", default=0)
 
                                                                   }
                                                           ) 
@@ -196,9 +196,6 @@ def trade_param_popover():
     combo_params_str =  \
       """Each row is a specification for a kind of trade that will be automatically evaluated. 
       N-traded is the number of players traded from your team, and N-received is the number of 
-      players to receive in the trade. T1 is a threshold of 'targetedness' as shown in the Target
-      column. Only players with the specified targetedness or above will be considered- as a decimal 
-      not a percentage, e.g. 0.02 instead of 2%. T2 is a 
-      threshold of G-score difference (or Z-score for Rotisseries); trades that have general value 
-      differences larger than T2 will not be evaluated"""
+      players to receive in the trade. T is a threshold of G-score difference (or Z-score for 
+      Rotisserie); trades that have general value differences larger than T will not be evaluated"""
     st.caption(combo_params_str)
