@@ -68,93 +68,45 @@ def make_trade_tab(H
       st.markdown('The other team is not full yet!')
     else:
 
-      c1, c2 = st.columns(2)
+      c1, c2 = st.columns([0.4,0.6])
 
-      with c2: 
+      with c1: 
 
-        with st.form("trade inspection form"):
+        #load up the selected suggested trade if applicable
+        if 'trade_suggestions_df' in st.session_state:
+            selected_rows = st.session_state.trade_suggestions_df.selection.rows
 
-          #load up the selected suggested trade if applicable
-          if 'trade_suggestions_df' in st.session_state:
-             selected_rows = st.session_state.trade_suggestions_df.selection.rows
-
-             if len(selected_rows) > 0:
+            if len(selected_rows) > 0:
               selected_row = st.session_state.df.iloc[selected_rows[0]]
 
-              if all ([x in trade_party_players for x in selected_row['Send']]):
+              trade_possible = all ([x in trade_party_players for x in selected_row['Send']]) & \
+                              all ([x in trade_counterparty_players for x in selected_row['Receive']])
+              if trade_possible:
                 default_party_players = selected_row['Send']
-              else:
-                 default_party_players = None
-
-              if all ([x in trade_counterparty_players for x in selected_row['Receive']]):
                 default_counterparty_players = selected_row['Receive']
+
               else:
-                 default_counterparty_players = None
+                  default_party_players = None
+                  default_counterparty_players = None
+                  
+        else:
+            default_party_players = None
+            default_counterparty_players = None
 
-             else:
-              default_party_players = None
-              default_counterparty_players = None
-          else:
-             default_party_players = None
-             default_counterparty_players = None
+        players_sent = st.multiselect(
+          'Which players are you trading?'
+          ,trade_party_players
+          ,default = default_party_players
+          )
 
-          st.markdown("""
-          <style>
-          /* The dropdown lives in a portal; target it globally, not under [data-baseweb="select"] */
+        players_received = st.multiselect(
+              'Which players are you receiving?'
+              ,trade_counterparty_players
+              ,default = default_counterparty_players
 
-          /* (Optional) widen the menu */
-          [data-baseweb="popover"] [data-baseweb="menu"] {
-            width: 520px !important;
-            max-width: none !important;
-          }
+          )
 
-          /* Let the menu be tall enough to show many items */
-          [data-baseweb="menu"] {
-            max-height: 65vh !important;
-          }
-
-          /* KEY: make each option variable-height and allow wrapping */
-          [data-baseweb="menu"] [role="option"] {
-            height: auto !important;      /* override fixed item height */
-            min-height: 0 !important;
-            padding-top: 8px !important;  /* give wrapped lines breathing room */
-            padding-bottom: 8px !important;
-            align-items: flex-start !important;
-          }
-
-          /* Unclamp and wrap the actual label inside the option */
-          [data-baseweb="menu"] [role="option"] * {
-            white-space: normal !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-            display: block !important;
-            -webkit-line-clamp: unset !important;
-            line-clamp: unset !important;
-          }
-
-          /* (Optional) also let selected chips wrap inside the control */
-          div[data-baseweb="select"] [data-baseweb="tag"] span {
-            white-space: normal !important;
-            overflow-wrap: anywhere !important;
-          }
-          </style>
-          """, unsafe_allow_html=True)
-
-          players_sent = st.multiselect(
-            'Which players are you trading?'
-            ,trade_party_players
-            ,default = default_party_players
-            )
-
-          players_received = st.multiselect(
-                'Which players are you receiving?'
-                ,trade_counterparty_players
-                ,default = default_counterparty_players
-
-            )
-
-          st.form_submit_button("Submit", use_container_width = True)
-
+      with c2:
 
         h_tab, z_tab, g_tab = st.tabs(['H-score','Z-score','G-score'])
 
@@ -192,73 +144,85 @@ def make_trade_tab(H
                               )
 
 
-      with c1: 
-        if st.session_state.scoring_format == 'Rotisserie':
-          general_value = st.session_state.z_scores.sum(axis = 1)
-          replacement_value = z_scores_unselected.iloc[0].sum() 
-        else:
-          general_value = st.session_state.g_scores.sum(axis = 1)
-          replacement_value = g_scores_unselected.iloc[0].sum()
+      if st.session_state.scoring_format == 'Rotisserie':
+        general_value = st.session_state.z_scores.sum(axis = 1)
+        replacement_value = z_scores_unselected.iloc[0].sum() 
+      else:
+        general_value = st.session_state.g_scores.sum(axis = 1)
+        replacement_value = g_scores_unselected.iloc[0].sum()
 
-        #slightly hacky way to make all of the multiselects blue
-        st.markdown("""
-            <style>
-                span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
-                    background-color: #3580BB; color:white;
-                }
-                span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
-                    background-color: #3580BB; color:white;
-                }
-                span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
-                    background-color: #3580BB; color:white;
-                }
-            </style>
-            """, unsafe_allow_html=True)
+      #slightly hacky way to make all of the multiselects blue
+      st.markdown("""
+          <style>
+              span[data-baseweb="tag"][aria-label="1 for 1, close by backspace"]{
+                  background-color: #3580BB; color:white;
+              }
+              span[data-baseweb="tag"][aria-label="2 for 2, close by backspace"]{
+                  background-color: #3580BB; color:white;
+              }
+              span[data-baseweb="tag"][aria-label="3 for 3, close by backspace"]{
+                  background-color: #3580BB; color:white;
+              }
+          </style>
+          """, unsafe_allow_html=True)
       
+      st.divider()
+
+      c1, c2 = st.columns([0.5,0.5])
+
+      with c1:
+    
         st.markdown('Suggested trades. Check the box to analyze the trade')
 
-        trade_filter = st.multiselect('Types of trades to check'
+      with c2:
+
+        trade_filter = st.multiselect(''
                                     , [(x[0],x[1]) for x in get_combo_params()]
                                     , format_func = lambda x: str(x[0]) + ' for ' + str(x[1])
                                     , default = [(1,1)])
-          
-        filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
-
-        st.session_state.df = make_trade_suggestion_df(H
-              , player_assignments
-              , trade_party_seat
-              , trade_counterparty_seat
-              , general_value
-              , replacement_value
-              , get_your_differential_threshold()
-              , get_their_differential_threshold()
-              , filtered_combo_params
-              , st.session_state.scoring_format
-              , st.session_state.info_key) 
         
-        if st.session_state.df is None: 
-          st.markdown('No promising trades found')
-        else:
-          full_dataframe_styled = st.session_state.df.reset_index(drop = True).style.format("{:.2%}"
-                                        , subset = ['Your Score'
-                                                  ,'Their Score']) \
-                              .map(stat_styler
-                                  , middle = 0
-                                  , multiplier = 15000
-                                  , subset = ['Your Score'
-                                            ,'Their Score']
-                              ).set_properties(**{
-                                    'font-size': '12pt',
-                                })
-          st.dataframe(full_dataframe_styled
-                  , key = 'trade_suggestions_df'
-                  , on_select = 'rerun'
-                  , selection_mode = 'single-row'
-                  , hide_index = True
-                  , column_config={
-                              "Send": st.column_config.ListColumn("Send", width = 'small')
-                              ,"Receive": st.column_config.ListColumn("Receive", width = 'small')
-                  })
+      filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
+
+      st.session_state.df = make_trade_suggestion_df(H
+            , player_assignments
+            , trade_party_seat
+            , trade_counterparty_seat
+            , general_value
+            , replacement_value
+            , get_your_differential_threshold()
+            , get_their_differential_threshold()
+            , filtered_combo_params
+            , st.session_state.scoring_format
+            , st.session_state.info_key) 
+      
+      if st.session_state.df is None: 
+        st.markdown('No promising trades found')
+      else:
+        full_dataframe_styled = st.session_state.df.reset_index(drop = True).style.format("{:.2%}"
+                                      , subset = ['Your Score'
+                                                ,'Their Score']) \
+                            .map(stat_styler
+                                , middle = 0
+                                , multiplier = 15000
+                                , subset = ['Your Score'
+                                          ,'Their Score']
+                            ).set_properties(**{
+                                  'font-size': '12pt',
+                              })
+        st.dataframe(full_dataframe_styled
+                , key = 'trade_suggestions_df'
+                , on_select = 'rerun'
+                , selection_mode = 'single-row'
+                , hide_index = True
+                , column_config={
+                            "Send": st.column_config.ListColumn("Send", width = 'large')
+                            ,"Receive": st.column_config.ListColumn("Receive", width = 'large')
+                            ,"Your Score": st.column_config.TextColumn("Your Score", width = 'small')
+                            ,"Their Score": st.column_config.TextColumn("Their Score", width = 'small')
+
+                }
+                , use_container_width=True
+)
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_trade_score_tab(_scores : pd.DataFrame
@@ -544,24 +508,33 @@ def make_trade_h_tab(_H
       their_team_post_trade = trade_results[2]['post']
 
       if your_team_pre_trade['H-score'] < your_team_post_trade['H-score']:
-          st.markdown('This trade benefits your team :slightly_smiling_face:')
-      else:
-          st.markdown('This trade does not benefit your team :slightly_frowning_face:')
-      
-      pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
-      pre_to_post.index = ['Pre-trade','Post-trade']
-      pre_to_post_styled = h_percentage_styler(pre_to_post)
-      st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
-    
+        my_emoji = '👍'
+      else: 
+        my_emoji = '👎'
+
       if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
-          st.markdown('This trade benefits their team :slightly_smiling_face:')
+        their_emoji = '👍'
       else:
-          st.markdown('This trade does not benefit ' + their_team + ' :slightly_frowning_face:')
-                  
-      pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
-      pre_to_post.index = ['Pre-trade','Post-trade']
-      pre_to_post_styled = h_percentage_styler(pre_to_post)
-      st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
+        their_emoji = '👎'
+
+      your_team_tab, their_team_tab = st.tabs(['Your Team ' + my_emoji
+                                               ,'Their Team' + their_emoji])
+
+      with your_team_tab:
+        
+        pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
+        pre_to_post.index = ['Pre-trade','Post-trade']
+        pre_to_post_styled = h_percentage_styler(pre_to_post)
+        st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
+
+      with their_team_tab:
+      
+
+                    
+        pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
+        pre_to_post.index = ['Pre-trade','Post-trade']
+        pre_to_post_styled = h_percentage_styler(pre_to_post)
+        st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
 
 #ZR: This should be cachable!
 def analyze_trade(team_1
