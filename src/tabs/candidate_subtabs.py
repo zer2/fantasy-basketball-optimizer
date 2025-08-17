@@ -406,8 +406,9 @@ def make_h_cand_tab(_H
       # 2) Add the numbers for the flex position chart
       # 3) Have the ineligible flex position appear blank (e.g. no guards will be centers)
       # 4) Add titles to the parts
-      # 5) make this programmatic to a row
-      # 6) get rid of the other tabs (will keep them for now for troubleshooting purposes)
+      # 5) Add the G-score total ranking part 
+      # 6) make this programmatic to a row
+      # 7) get rid of the other tabs (will keep them for now for troubleshooting purposes)
       future_diffs = res['Future-Diff']
       with st.popover('experimental', use_container_width= True):
 
