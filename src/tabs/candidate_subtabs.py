@@ -111,14 +111,11 @@ def make_h_cand_tab(_H
                   , index = score.index
                   , columns = get_selected_categories())/v
     
-    
     with placeholder.container():
 
       position_shares_list = [(k, v) for k, v in position_shares.items()]
       position_shares_tab_names = ['Flex- ' + x[0] for x in position_shares_list]
       position_shares_res = [x[1][list(fits_roster.values)] for x in position_shares_list]
-
-
 
       if dynamic_run:
 
@@ -127,7 +124,6 @@ def make_h_cand_tab(_H
           target_tab = all_tabs[0]
           weight_tab = all_tabs[1]
           roster_tab = all_tabs[2]
-
 
         else:
 
@@ -279,7 +275,10 @@ def make_h_cand_tab(_H
 
         with weight_tab:
 
+
           weight_df = weights.loc[score_df.index].dropna()
+
+
           weight_display = score_df.merge(weight_df
                                 , left_index = True
                                 , right_index = True)
@@ -400,15 +399,86 @@ def make_h_cand_tab(_H
 
             st.dataframe(scores_unselected_styled, use_container_width = True)
 
-      with matchup_tab:
+      
+      #ZR: The below needs to get cleaned up massively
+      #some other improvements: 
+      # 1) Add H-score percent winning chances 
+      # 2) Add the numbers for the flex position chart
+      # 3) Have the ineligible flex position appear blank (e.g. no guards will be centers)
+      # 4) Add titles to the parts
+      # 5) make this programmatic to a row
+      # 6) get rid of the other tabs (will keep them for now for troubleshooting purposes)
+      future_diffs = res['Future-Diff']
+      with st.popover('experimental', use_container_width= True):
 
-        if i >= n_iterations-1: 
-          make_cand_matchup_tab(res['CDFs']
-                                , score_df.index
-                                , list(player_assignments.keys())
-                                , draft_seat
-                                , drop_player
-                                , i)
+        my_players = player_assignments[draft_seat]
+        team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum(axis = 1)
+        player = _g_scores.iloc[0]
+
+        if len([player for player in my_players if player == player]) > 0:
+          other_teams_imputed = player + team_so_far - res['Diff'].iloc[0] * _H.original_v #convert to G-score
+        else:
+          other_teams_imputed = player - res['Diff'].iloc[0] * _H.original_v #convert to G-score
+
+        remaining_value_imputed = future_diffs.iloc[0] * _H.original_v - other_teams_imputed
+        remaining_value_imputed['Total'] = remaining_value_imputed.sum()
+
+        if len([player for player in my_players if player == player]) > 0:
+          main_res_dict = {'Team so far' : team_so_far
+                      ,rosters.index[0] : player
+                      ,'Future picks' : remaining_value_imputed}
+        else:
+          main_res_dict = {rosters.index[0] : player
+                      ,'Future picks' : remaining_value_imputed}
+        
+        main_df = pd.DataFrame(main_res_dict).T
+        main_df.loc['Total', : ] = main_df.sum()
+        
+        main_df_styled = static_score_styler(main_df, st.session_state.params['g-score-total-multiplier'])
+
+        st.dataframe(main_df_styled)
+
+        position_share_df = pd.DataFrame({p : s.iloc[0] for p, s in position_shares.items()}).T.fillna(0)
+        positions_styled = position_share_df.style.format("{:.0%}").background_gradient(axis = None) 
+
+        st.write(positions_styled)
+
+        weights_styled = pd.DataFrame(weights.iloc[0]).T.style.format("{:.0%}").background_gradient(axis = None)
+
+        st.dataframe(weights_styled, hide_index = True)
+
+        my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x == x]
+
+        player_list = my_players + [rosters.index[0].split(' ')[1]] + [''] * (rosters.shape[1] - len(my_players) - 1)
+
+        def get_player(row, i):
+
+          if row[0] == -1:
+              return None
+          else:
+            n = list(row).index(i)
+            return player_list[n]
+          
+        rosters = rosters.loc[score_df.index]
+            
+        roster_row = rosters.iloc[0]
+        roster_inverted = [get_player(roster_row, i) for i in range(len(roster_row))] 
+
+        roster_inverted = pd.DataFrame({'Players' : roster_inverted} 
+                                        ,index = get_position_numbers_unwound()
+                                )
+
+        def style_rosters(x):
+            if len(x) ==0:
+              return 'background-color:white'
+            elif x in my_players:
+              return 'background-color: lightgrey; color:black;'
+            else:
+              return 'background-color: lightblue; color:black;'
+            
+        roster_inverted_styled = roster_inverted.T.style.map(style_rosters)
+
+        st.write(roster_inverted_styled, hide_index = True)
 
 @st.fragment()
 def make_cand_matchup_tab(cdfs

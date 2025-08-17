@@ -40,7 +40,7 @@ if 'info_version' not in st.session_state:
     st.session_state.info_key = 100000
 
 if 'data_source' not in st.session_state:
-    st.session_state.data_source = 'Enter Your Own Data'
+    st.session_state.data_source = 'Enter your own data'
 
 
 if 'injured_players' not in st.session_state:
