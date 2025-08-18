@@ -43,6 +43,22 @@ def make_cand_tab(_scores : pd.DataFrame
 
   return scores_unselected
 
+def make_hashable(obj):
+    """Recursively convert obj into a hashable form.
+    - dict  -> frozenset of (key, value)
+    - list  -> frozenset of items
+    - set   -> frozenset of items
+    - tuple -> tuple of items (preserve order)
+    """
+    if isinstance(obj, dict):
+        return frozenset((k, make_hashable(v)) for k, v in obj.items())
+    if isinstance(obj, list):
+        return frozenset(make_hashable(v) for v in obj)
+    if isinstance(obj, set):
+        return frozenset(make_hashable(v) for v in obj)
+    if isinstance(obj, tuple):
+        return tuple(make_hashable(v) for v in obj)
+    
 def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
@@ -71,8 +87,8 @@ def make_h_cand_tab(_H
       DataFrame of stats of unselected players, to use in other tabs
   """
 
-  if (draft_seat, frozenset(player_assignments), n_iterations) in st.session_state.res_cache:
-    res = st.session_state.res_cache[(draft_seat, frozenset(player_assignments), n_iterations)]
+  if (draft_seat, make_hashable(player_assignments), n_iterations) in st.session_state.res_cache:
+    res = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations)]
     iteration_range = range(n_iterations - 1, n_iterations)
     cached_res = True
 
@@ -291,7 +307,9 @@ def make_h_cand_tab(_H
               
               if i == n_iterations - 1:
 
-                st.session_state.res_cache[(draft_seat, frozenset(player_assignments), n_iterations)] = res
+                hashable_player_assignments =  make_hashable(player_assignments)
+
+                st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = res
 
                 st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
                         ,draft_seat = draft_seat
@@ -421,7 +439,8 @@ def make_detailed_view_wrapper():
       rate_df_limited_styled = h_percentage_styler(rate_df_limited)
 
       my_players = player_assignments[draft_seat]
-      team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum(axis = 1)
+      team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum()
+
       player = _g_scores.loc[player_name]
 
       if len([player for player in my_players if player == player]) > 0:
