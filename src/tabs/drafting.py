@@ -137,7 +137,6 @@ def make_drafting_tab_own_data(H):
         with cand_tab:
 
             if st.session_state.run_h_score:
-                st.session_state.run_h_score = False
 
                 make_h_cand_tab(H
                     ,st.session_state.g_scores
@@ -147,6 +146,9 @@ def make_drafting_tab_own_data(H):
                     ,st.session_state.n_iterations
                     ,st.session_state.v
                     ,5)
+                                
+                st.session_state.run_h_score = False
+
             else:
 
                 def run():

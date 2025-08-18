@@ -42,7 +42,6 @@ if 'info_version' not in st.session_state:
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
 
-
 if 'injured_players' not in st.session_state:
     st.session_state['injured_players'] = set()
 
@@ -66,6 +65,9 @@ if 'draft_results' not in st.session_state:
 
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
+
+if 'res_cache' not in st.session_state:
+   st.session_state.res_cache = {}
 
 with open("parameters.yaml", "r") as stream:
   st.session_state.all_params = yaml.safe_load(stream)

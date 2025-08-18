@@ -64,9 +64,9 @@ def player_stat_param_popover():
       for col in counting_statistics + volume_statistics:
         _raw_stat_df[col] = _raw_stat_df[col].astype(float) * _raw_stat_df['Games Played %'] * get_games_per_week()
 
-      st.session_state.player_stats = _raw_stat_df
+      return _raw_stat_df
 
-    make_upsilon_adjustment(st.session_state.raw_stat_df
+    st.session_state.player_stats = make_upsilon_adjustment(st.session_state.raw_stat_df
                             , upsilon
                             , st.session_state.player_stats_version)
 

@@ -683,7 +683,6 @@ class HAgent():
                 
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
-
             res = {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
