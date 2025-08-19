@@ -99,13 +99,13 @@ def get_position_structure():
        return st.session_state.params['position_structure']
     else:
        return { 'base_list' :
-                        ['C','PG','SG','PF','SF']
+                        ['PG','SG','SF','PF','C']
                ,'base' : {'C' : {'full_str' : 'Centers'}
                          ,'PG' :{'full_str' : 'Point Guards'}
                          ,'SG' : {'full_str' : 'Shooting Guards'}
                          ,'PF' : {'full_str' : 'Power Forwards'}
                          ,'SF' : {'full_str' : 'Small Forwards'}}
-               ,'flex_list' : ['Util','G','F']
+               ,'flex_list' : ['G','F','Util']
                ,'flex' : {'Util' : 
                           {'bases' : ['C','PG','SG','PF','SF']
                            ,'full_str' : 'Utilities'

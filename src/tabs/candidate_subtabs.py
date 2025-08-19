@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
-                                styler_a, stat_styler
+                                styler_a, stat_styler, get_position_structure
 from src.math.algorithm_helpers import savor_calculation
 from src.data_retrieval.get_data import get_htb_adp
 from src.math.algorithm_helpers import combinatorial_calculation
@@ -422,7 +422,11 @@ def make_detailed_view_wrapper():
       weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}").background_gradient(axis = None)
 
       position_share_df = pd.DataFrame({p + '-' + str(n_per_position[p]): 
-                                        s.loc[player_name] * n_per_position[p] for p, s in position_shares.items()}).T.fillna(0)
+                                        position_shares[p].loc[player_name] * n_per_position[p] 
+                                        for p in get_position_structure()['flex_list']}
+                                        ).T.fillna(0)
+      
+      position_share_df = position_share_df[get_position_structure()['base_list']]
       position_share_df.loc['Total',:] = position_share_df.sum()
 
       positions_styled = position_share_df.style.format("{:.2f}").background_gradient(axis = None)

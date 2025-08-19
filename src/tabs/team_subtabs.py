@@ -115,6 +115,8 @@ def make_team_h_tab( base_h_score : float
   base_win_rates_formatted = h_percentage_styler(base_win_rates_copy)
   st.dataframe(base_win_rates_formatted, hide_index = True)
   
+
+#ZR: I don't think we need matchups, or the Z-score tab. Can just be G-score
 @st.cache_data(show_spinner = False, ttl = 3600)
 def make_full_team_tab(z_scores : pd.DataFrame
                   ,g_scores : pd.DataFrame
@@ -141,40 +143,20 @@ def make_full_team_tab(z_scores : pd.DataFrame
       None
   """
 
-  if len(my_players) == 0:
-     st.write('This team has no players')
+  if len(my_players) > 0:
 
-  else:
-    z_team_tab, g_team_tab, matchups_tab = st.tabs(["Z-score", "G-score","Matchups"])
+    st.divider()
 
-    with z_team_tab:
+    my_real_players = [x for x in my_players if x != 'RP']
 
-        my_real_players = [x for x in my_players if x != 'RP']
+    st.write('G-score totals of team so far')
 
-        make_team_tab(z_scores
-                      , my_real_players
-                      , n_drafters
-                      , st.session_state.params['z-score-player-multiplier']
-                      , st.session_state.params['z-score-team-multiplier']
-                      , info_key)
-
-    with g_team_tab:
-
-        make_team_tab(g_scores
-                        , my_real_players
-                        , n_drafters
-                        , st.session_state.params['g-score-player-multiplier']
-                        , st.session_state.params['g-score-team-multiplier']
-                        , info_key + 1)    
-
-    with matchups_tab:
-        if base_h_res is not None:
-
-            make_team_matchup_tab(base_h_res['Scores']
-                                    ,base_h_res['CDFs']
-                                    , team_name)
-        else:
-            st.markdown('Team H-score not defined until team is full') 
+    make_team_tab(g_scores
+                    , my_real_players
+                    , n_drafters
+                    , st.session_state.params['g-score-player-multiplier']
+                    , st.session_state.params['g-score-team-multiplier']
+                    , info_key + 1)    
 
 def make_team_matchup_tab(base_h_score
                         , cdfs
