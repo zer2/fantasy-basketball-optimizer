@@ -147,37 +147,6 @@ def make_h_cand_tab(_H
       position_shares_tab_names = ['Flex- ' + x[0] for x in position_shares_list]
       position_shares_res = [x[1][list(fits_roster.values)] for x in position_shares_list]
 
-      if dynamic_run:
-
-        if cash_remaining_per_team:
-          all_tabs = st.tabs(['Targets','Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
-          target_tab = all_tabs[0]
-          weight_tab = all_tabs[1]
-          roster_tab = all_tabs[2]
-
-        else:
-
-          if st.session_state.scoring_format == 'Rotisserie':
-            first_tab = 'Expected Totals'
-          else:
-            first_tab = 'Expected Win Rates'
-
-          all_tabs = st.tabs([first_tab, 'Weights','Rosters'] + position_shares_tab_names + ['Z-scores','G-Scores','Matchups'])
-          rate_tab = all_tabs[0]
-          weight_tab = all_tabs[1]       
-          roster_tab = all_tabs[2]
-
-        position_tabs = all_tabs[3:-3]
-        raw_z_tab = all_tabs[-3]
-        raw_g_tab = all_tabs[-2]
-        matchup_tab = all_tabs[-1]
-
-      else:
-          all_tabs = st.tabs(['Expected Win Rates','Z-scores','G-Scores','Matchups'])
-          rate_tab = all_tabs[0]
-          raw_z_tab = all_tabs[1]       
-          raw_g_tab = all_tabs[2]
-          matchup_tab = all_tabs[3]
 
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
@@ -186,52 +155,49 @@ def make_h_cand_tab(_H
 
       if cash_remaining_per_team:
         
-        with target_tab:
+        if display:
 
-          if display:
+          if sum(fits_roster) == 0:
+            st.error('Illegal roster!')
+            st.stop()
 
-            if sum(fits_roster) == 0:
-              st.error('Illegal roster!')
-              st.stop()
+          rate_df = win_rates.dropna()
+          rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
-            rate_df = win_rates.dropna()
-            rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
+          players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+          total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
-            players_chosen = [x for v in player_assignments.values() for x in v if x == x]
-            total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
+          rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
+                                                          , total_players - len(players_chosen)
+                                                          , total_cash_remaining
+                                                          , st.session_state['streaming_noise_h'])
+          
+          rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
 
-            rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
-                                                            , total_players - len(players_chosen)
-                                                            , total_cash_remaining
-                                                            , st.session_state['streaming_noise_h'])
-            
-            rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
+          comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
+                                        , '$ Value' : generic_player_value.loc[rate_display.index]})
+          
+          comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
 
-            comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
-                                          , '$ Value' : generic_player_value.loc[rate_display.index]})
-            
-            comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
+          comparison_df = comparison_df.sort_values('Your $ Value', ascending = False)
+          score_df = score_df.loc[comparison_df.index]
 
-            comparison_df = comparison_df.sort_values('Your $ Value', ascending = False)
-            score_df = score_df.loc[comparison_df.index]
+          comparison_df = comparison_df.join(rate_df)
 
-            comparison_df = comparison_df.join(rate_df)
+          comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
 
-            comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
-
-            comparison_df_styled = comparison_df.style.format("{:.1f}"
-                                                              , subset = ['Your $ Value', '$ Value','Difference']) \
-                      .map(styler_a
-                          , subset = ['Your $ Value', '$ Value']) \
-                      .background_gradient(axis = None
-                                          ,cmap = 'PiYG'
-                                          ,subset = ['Difference']) \
-                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns)
-            
-            st.dataframe(comparison_df_styled)
+          comparison_df_styled = comparison_df.style.format("{:.1f}"
+                                                            , subset = ['Your $ Value', '$ Value','Difference']) \
+                    .map(styler_a
+                        , subset = ['Your $ Value', '$ Value']) \
+                    .background_gradient(axis = None
+                                        ,cmap = 'PiYG'
+                                        ,subset = ['Difference']) \
+                    .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
+                    .format('{:,.1%}', subset = rate_df.columns)
+          
+          st.dataframe(comparison_df_styled)
       else:
-        with rate_tab:
 
           if display:
 
@@ -341,16 +307,7 @@ def make_h_cand_tab(_H
                 st.caption('''Expected totals are based on standard fantasy point scoring. 
                           One point for last, two points for second last, etc. The baseline 
                           expected total for a category is ''' + str(format_middle))
-                
-
-                
-      #ZR: The below needs to get cleaned up massively
-      #some other improvements: 
-      # 5) Add the G-score total ranking part 
-      # 6) make this programmatic to a row
-      # 7) get rid of the other tabs (will keep them for now for troubleshooting purposes)
-      
-
+                       
 
 def make_detailed_view_wrapper():
   
@@ -391,8 +348,6 @@ def make_detailed_view_wrapper():
       
       player_name = st.session_state.detailed_view_player
       st.html("<span class='big-dialog'></span>")
-
-      c1, c2 = st.columns([0.5,0.5])
 
       player_last_name = player_name.split(' ')[1]
 
@@ -472,6 +427,40 @@ def make_detailed_view_wrapper():
 
       positions_styled = position_share_df.style.format("{:.2f}").background_gradient(axis = None)
 
+      def color_blue(label):
+          return "background-color: lightblue; color:black" if label == player_name else None
+
+      g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
+      g_scores_unselected.loc[:,'Rank'] = range(1, len(g_scores_unselected) + 1)
+      player_location_g = g_scores_unselected.index.get_loc(player_name)
+      g_scores_to_display = pd.DataFrame({'Rank' : g_scores_unselected['Rank']
+                                          ,'Player' : g_scores_unselected.index
+                                          ,'Total' : g_scores_unselected['Total']
+                                          }).set_index('Rank')
+      g_scores_to_display_styled = g_scores_to_display.style.map(stat_styler
+                                                                 , middle = 0.5
+                                                                 , multiplier = 10
+                                                                 , subset = ['Total']
+                                                                 , mode = 'yellow') \
+                                                                  .format("{:.2f}", subset = ['Total']) \
+                                                                  .map(color_blue, subset = ['Player'])
+      
+      player_location_h = score_df.index.get_loc(player_name)
+      score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
+      h_scores_to_display = pd.DataFrame({'Rank' : score_df['Rank']
+                                          ,'Player' : score_df.index
+                                          ,'H-score' : score_df['H-score']
+                                          }).set_index('Rank')
+      h_scores_to_display_styled = h_scores_to_display.style.map(stat_styler
+                                                                 , middle = 0.5
+                                                                 , multiplier = 1000
+                                                                 , subset = ['H-score']
+                                                                 , mode = 'yellow') \
+                                                                  .format("{:.1%}", subset = ['H-score']) \
+                                                                  .map(color_blue, subset = ['Player'])
+
+
+      c1, c2 = st.columns([0.5,0.5])
 
       with c1:
 
@@ -480,6 +469,16 @@ def make_detailed_view_wrapper():
 
         st.markdown('Expected ending H-score')
         st.dataframe(rate_df_limited_styled, hide_index = True)
+
+        c1_1, c1_2 = st.columns([0.5,0.5])
+        
+        with c1_1: 
+          st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
+          st.dataframe(g_scores_to_display_styled, height = 248)
+
+        with c1_2: 
+          st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
+          st.dataframe(h_scores_to_display_styled, height = 248)
 
       with c2:
 

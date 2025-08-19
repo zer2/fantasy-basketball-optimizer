@@ -268,6 +268,8 @@ def make_drafting_tab_live_data(H):
 
                 if len(my_players) < st.session_state.n_starters:
 
+                    st.session_state.g_scores
+
                     make_h_cand_tab(H
                         ,st.session_state.g_scores
                         ,st.session_state.z_scores
