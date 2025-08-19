@@ -243,6 +243,8 @@ def make_h_cand_tab(_H
                       .format(style_format, subset = rate_df.columns) \
                       .map(color_blue, subset = pd.IndexSlice[:,['Player']])
               
+              g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
+              
               st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
                         ,draft_seat = draft_seat
                         ,score_df = score_df
@@ -253,7 +255,8 @@ def make_h_cand_tab(_H
                         ,position_shares = position_shares
                         ,res = res
                         ,_H = _H
-                        ,rosters = rosters)
+                        ,rosters = rosters
+                        ,g_scores_unselected = g_scores_unselected)
               
               st.dataframe(rate_display_styled
                           , key = 'rate_display_' + str(i)
@@ -275,20 +278,25 @@ def make_h_cand_tab(_H
 
                 hashable_player_assignments =  make_hashable(player_assignments)
 
-                st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = res
+                if (draft_seat, hashable_player_assignments, n_iterations) not in res:
 
-                st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
-                        ,draft_seat = draft_seat
-                        ,score_df = score_df
-                        ,win_rates = win_rates
-                        ,_g_scores = _g_scores
-                        ,future_diffs = future_diffs
-                        ,weights = weights
-                        ,position_shares = position_shares
-                        ,res = res
-                        ,_H = _H
-                        ,rosters = rosters
-                        ,rate_display = rate_display)
+                  st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = res
+
+                  g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
+
+                  st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
+                          ,draft_seat = draft_seat
+                          ,score_df = score_df
+                          ,win_rates = win_rates
+                          ,_g_scores = _g_scores
+                          ,future_diffs = future_diffs
+                          ,weights = weights
+                          ,position_shares = position_shares
+                          ,res = res
+                          ,_H = _H
+                          ,rosters = rosters
+                          ,rate_display = rate_display
+                          ,g_scores_unselected = g_scores_unselected)
 
                 st.dataframe(rate_display_styled
                                 , key = 'rate_display'
@@ -339,6 +347,7 @@ def make_detailed_view_wrapper():
       score_df = passed_info['score_df']
       win_rates = passed_info['win_rates']
       _g_scores = passed_info['_g_scores']
+      g_scores_unselected = passed_info['g_scores_unselected']
       future_diffs = passed_info['future_diffs']
       weights = passed_info['weights']
       position_shares = passed_info['position_shares']
@@ -434,7 +443,6 @@ def make_detailed_view_wrapper():
       def color_blue(label):
           return "background-color: lightblue; color:black" if label == player_name else None
 
-      g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
       g_scores_unselected.loc[:,'Rank'] = range(1, len(g_scores_unselected) + 1)
       player_location_g = g_scores_unselected.index.get_loc(player_name)
       g_scores_to_display = pd.DataFrame({'Rank' : g_scores_unselected['Rank']
