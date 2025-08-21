@@ -88,7 +88,7 @@ def make_h_cand_tab(_H
       DataFrame of stats of unselected players, to use in other tabs
   """
 
-  #ZR: This cache should include format too
+  #ZR: This cache should include format too- auction vs draft, and other things
   if (draft_seat, make_hashable(player_assignments), n_iterations) in st.session_state.res_cache:
     cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations)]
     res = cached_info['res']
@@ -549,56 +549,6 @@ def make_main_df_styled(_g_scores
   main_df_styled = static_score_styler(main_df, st.session_state.params['g-score-total-multiplier'])
 
   return main_df_styled
-
-@st.fragment()
-def make_cand_matchup_tab(cdfs
-                          , players
-                          , teams
-                          , draft_seat
-                          , drop_player
-                          , i):
-
-    opponents = [team for team in teams if team != draft_seat]
-    tabs = st.tabs(opponents)
-
-    for opponent_index, tab in zip(range(len(opponents)), tabs):
-      with tab:
-
-        c1, c2 = st.columns([0.2, 0.8])
-
-        with c1: 
-          st.caption('''If scoring type is Most Categories, overall score is probability of winning a matchup. Otherwise, 
-                     it is the average percent of expected points won''')
-          st.caption('''Also note that these scores assume that you will dynamically adapt with remaining picks
-                      based on your algorithm parameter preferences, while your opponent will not. If you want to 
-                     see results as they stand now without any dynamic adaptations, set punting level to "no dynamic adaptation"''')
-        with c2: 
-
-          cdfs_selected = cdfs[opponent_index].loc[players]
-
-          if st.session_state.scoring_format == 'Head to Head: Most Categories':
-
-            #We've already calculated this but it is not retained by the algorithm agent
-            cdfs_expanded = np.expand_dims(cdfs_selected, axis = 2)
-            cdfs_selected.loc[:,'Overall'] = combinatorial_calculation(cdfs_expanded
-                                                                       , 1 - cdfs_expanded)
-
-          else:
-
-            cdfs_selected.loc[:,'Overall'] = cdfs_selected.mean(axis = 1)
-
-
-          cdfs_selected = cdfs_selected[['Overall'] + get_selected_categories()]
-
-          if drop_player is not None:
-
-              cdfs_styled = h_percentage_styler(cdfs_selected.reset_index(), drop_player = drop_player)
-              st.dataframe(cdfs_styled, hide_index = True)
-
-          else:
-              cdfs_styled = h_percentage_styler(cdfs_selected)
-
-              st.dataframe(cdfs_styled)
 
 def get_ranking_views(g_scores_unselected
                       , player_name
