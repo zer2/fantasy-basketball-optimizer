@@ -345,69 +345,47 @@ def make_auction_tab_own_data(H):
 
         st.caption(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(cash_per_team) \
                 + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players')
-              
-        z_cand_tab, g_cand_tab, h_cand_tab = st.tabs(["Z-score", "G-score", "H-score"])
-                
-        with z_cand_tab:
-        
-            make_cand_tab(st.session_state.z_scores
-                            ,selection_list
-                            , st.session_state.params['z-score-player-multiplier']
-                            ,remaining_cash
-                            ,st.session_state.n_drafters * st.session_state.n_picks
-                            ,st.session_state.info_key)
+                              
+        if not st.session_state.have_locked_in:
+            st.markdown('Lock in to run H-score')
 
-        with g_cand_tab:
+        elif len(my_players) == st.session_state.n_picks:
+            st.markdown('Team is complete!')
+                    
+        else:
 
-            make_cand_tab(st.session_state.g_scores
-                            , selection_list
-                            , st.session_state.params['g-score-player-multiplier']
-                            ,remaining_cash
-                            ,st.session_state.n_drafters * st.session_state.n_picks
-                            ,st.session_state.info_key)
+            h_ranks = get_default_h_values(info = st.session_state.info
+                                        , omega = st.session_state.omega
+                                        , gamma = st.session_state.gamma
+                                        , n_picks = st.session_state.n_picks
+                                        , n_drafters = st.session_state.n_drafters
+                                        , n_iterations = st.session_state.n_iterations
+                                        , scoring_format = st.session_state.scoring_format
+                                        , mode = st.session_state.mode
+                                        , psi = st.session_state.psi
+                                        , upsilon = st.session_state.upsilon
+                                        , chi = st.session_state.chi
+                                        , info_key = st.session_state.info)
 
-        with h_cand_tab:
+            h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
+            h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+                                                        , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
+                                                        , remaining_cash
+                                                        , st.session_state['streaming_noise_h'])
+            
+            h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
-            if not st.session_state.have_locked_in:
-                st.markdown('Lock in to run H-score')
-
-            elif len(my_players) == st.session_state.n_picks:
-                st.markdown('Team is complete!')
-                        
-            else:
-
-                h_ranks = get_default_h_values(info = st.session_state.info
-                                            , omega = st.session_state.omega
-                                            , gamma = st.session_state.gamma
-                                            , n_picks = st.session_state.n_picks
-                                            , n_drafters = st.session_state.n_drafters
-                                            , n_iterations = st.session_state.n_iterations
-                                            , scoring_format = st.session_state.scoring_format
-                                            , mode = st.session_state.mode
-                                            , psi = st.session_state.psi
-                                            , upsilon = st.session_state.upsilon
-                                            , chi = st.session_state.chi
-                                            , info_key = st.session_state.info)
-
-                h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-                h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
-                                                            , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
-                                                            , remaining_cash
-                                                            , st.session_state['streaming_noise_h'])
-                
-                h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
-
-                make_h_cand_tab(H
-                    ,st.session_state.g_scores
-                    ,st.session_state.z_scores
-                    ,player_assignments.to_dict()
-                    ,auction_seat
-                    ,st.session_state.n_iterations
-                    ,st.session_state.v
-                    ,5 #display frequency
-                    ,cash_remaining_per_team.to_dict()
-                    ,h_defaults_savor
-                    ,st.session_state.n_drafters * st.session_state.n_picks)
+            make_h_cand_tab(H
+                ,st.session_state.g_scores
+                ,st.session_state.z_scores
+                ,player_assignments.to_dict()
+                ,auction_seat
+                ,st.session_state.n_iterations
+                ,st.session_state.v
+                ,5 #display frequency
+                ,cash_remaining_per_team.to_dict()
+                ,h_defaults_savor
+                ,st.session_state.n_drafters * st.session_state.n_picks)
 
         if len(my_players) >= st.session_state.n_starters:
             base_h_res = get_base_h_score(st.session_state.info

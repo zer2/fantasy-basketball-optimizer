@@ -59,6 +59,7 @@ def make_hashable(obj):
     if isinstance(obj, tuple):
         return tuple(make_hashable(v) for v in obj)
     
+#ZR: Change the name of this
 def make_h_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
@@ -87,6 +88,7 @@ def make_h_cand_tab(_H
       DataFrame of stats of unselected players, to use in other tabs
   """
 
+  #ZR: This cache should include format too
   if (draft_seat, make_hashable(player_assignments), n_iterations) in st.session_state.res_cache:
     cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations)]
     res = cached_info['res']
@@ -171,19 +173,19 @@ def make_h_cand_tab(_H
             
             rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
 
-            comparison_df = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
+            rate_display = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
                                           , '$ Value' : generic_player_value.loc[rate_display.index]})
             
-            comparison_df.loc[:,'Difference'] = comparison_df['Your $ Value'] - comparison_df['$ Value']
+            rate_display.loc[:,'Difference'] = rate_display['Your $ Value'] - rate_display['$ Value']
 
-            comparison_df = comparison_df.sort_values('Your $ Value', ascending = False)
-            score_df = score_df.loc[comparison_df.index]
+            rate_display = rate_display.sort_values('Your $ Value', ascending = False)
+            score_df = score_df.loc[rate_display.index]
 
-            comparison_df = comparison_df.join(rate_df)
+            rate_display = rate_display.join(rate_df)
 
-            comparison_df = comparison_df[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
+            rate_display = rate_display[['Difference','Your $ Value','$ Value'] + list(rate_df.columns)]
 
-            comparison_df_styled = comparison_df.style.format("{:.1f}"
+            rate_display_styled = rate_display.style.format("{:.1f}"
                                                               , subset = ['Your $ Value', '$ Value','Difference']) \
                       .map(styler_a
                           , subset = ['Your $ Value', '$ Value']) \
@@ -193,7 +195,7 @@ def make_h_cand_tab(_H
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
                       .format('{:,.1%}', subset = rate_df.columns)
             
-            st.dataframe(comparison_df_styled)
+            st.dataframe(rate_display_styled)
         else:
 
             if display:
@@ -276,6 +278,14 @@ def make_h_cand_tab(_H
 
           g_df = _g_scores.loc[score.index]
           g_display = score_df.merge(g_df, left_index = True, right_index = True)
+
+          if cash_remaining_per_team is not None:
+              ''' #ZR: Fix this for auctions; make it show the dollar values 
+              g_display.loc[:,'$ Value'] = savor_calculation(g_display['Total']
+                                                          , total_players - len(selection_list)
+                                                          , remaining_cash
+                                                          , st.session_state['streaming_noise'])
+              '''
 
           if drop_player is not None:
 
@@ -491,9 +501,18 @@ def get_roster_assignment_view(player_name : str
 def make_rate_display_styled(rate_display : pd.DataFrame
                               , player_name : str
                               , player_last_name : str):
-
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
-  rate_df_limited_styled = h_percentage_styler(rate_df_limited)
+
+  #ZR: If auction, this should have "Your $ value" and "$ value" with no "H-score". Also it should be colored 
+  if  '$ Value' in rate_display.columns:
+      rate_df_limited_styled = rate_df_limited.style.format("{:.1f}"
+                                              , subset = ['Your $ Value', '$ Value','Difference']) \
+                                          .map(styler_a
+                                              , subset = ['Your $ Value', '$ Value']) \
+                                          .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_selected_categories()) \
+                                          .format('{:,.1%}', subset = get_selected_categories())
+  else: 
+    rate_df_limited_styled = h_percentage_styler(rate_df_limited)
   return rate_df_limited_styled
 
 def make_main_df_styled(_g_scores
