@@ -134,9 +134,6 @@ def make_h_cand_tab(_H
 
     win_rates.columns = get_selected_categories()
 
-    #this represents a run that needs to optimize weights, and so should display weights
-    dynamic_run = weights.iloc[0,0] == weights.iloc[0,0] 
-
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
                   , index = score.index
@@ -227,8 +224,7 @@ def make_h_cand_tab(_H
               else:
                 rate_display = score_df.merge(rate_df, left_index = True, right_index = True)    
                 adp_col = []
-              
-              
+                    
               if drop_player is not None:
                 def color_blue(label):
                     return "background-color: blue; color:white" if label == drop_player else None
@@ -245,18 +241,9 @@ def make_h_cand_tab(_H
                 
                 g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
                 
-                st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
-                          ,draft_seat = draft_seat
-                          ,score_df = score_df
-                          ,win_rates = win_rates
-                          ,_g_scores = _g_scores
-                          ,future_diffs = future_diffs
-                          ,weights = weights
-                          ,position_shares = position_shares
-                          ,res = res
-                          ,_H = _H
-                          ,rosters = rosters
-                          ,g_scores_unselected = g_scores_unselected)
+                rate_display = score_df.merge(win_rates.dropna()
+                              , left_index = True
+                              , right_index = True)
                 
                 st.dataframe(rate_display_styled
                             , key = 'rate_display_' + str(i)
@@ -273,32 +260,8 @@ def make_h_cand_tab(_H
                               , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
                         .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                         .format(style_format, subset = rate_df.columns)
-                
-                hashable_player_assignments =  make_hashable(player_assignments)
-
-                if (draft_seat, hashable_player_assignments, n_iterations) not in res:
-
-                  st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = {'res' : res
-                                                                                                        ,'iteration' : i}
-
-                  g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
-
-                  st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
-                          ,draft_seat = draft_seat
-                          ,score_df = score_df
-                          ,win_rates = win_rates
-                          ,_g_scores = _g_scores
-                          ,future_diffs = future_diffs
-                          ,weights = weights
-                          ,position_shares = position_shares
-                          ,res = res
-                          ,_H = _H
-                          ,rosters = rosters
-                          ,rate_display = rate_display
-                          ,g_scores_unselected = g_scores_unselected
-                          ,iteration = i)
                   
-                  st.dataframe(rate_display_styled
+                st.dataframe(rate_display_styled
                                   , key = 'rate_display'
                                 , use_container_width = True)            
                 
@@ -331,17 +294,48 @@ def make_h_cand_tab(_H
 
             st.dataframe(scores_unselected_styled, use_container_width = True)         
 
+  #save info for the detailed launcher
+  hashable_player_assignments =  make_hashable(player_assignments)
+
+  if (draft_seat, hashable_player_assignments, n_iterations) not in res:
+
+    st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = {'res' : res
+                                                                                          ,'iteration' : i}
+
+    g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
+
+    score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
+
+    if 'ADP' in rate_display.columns:
+      rate_display = rate_display.drop(columns = ['ADP'])
+
+    st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
+            ,draft_seat = draft_seat
+            ,score_df = score_df
+            ,win_rates = win_rates
+            ,_g_scores = _g_scores
+            ,future_diffs = future_diffs
+            ,weights = weights
+            ,position_shares = position_shares
+            ,res = res
+            ,_H = _H
+            ,rosters = rosters
+            ,rate_display = rate_display
+            ,g_scores_unselected = g_scores_unselected
+            ,iteration = i)
+    
   st.markdown(
         """
     <style>
     div[data-testid="stDialog"] div[role="dialog"]:has(.big-dialog) {
-        width: 80vw;
-        height: 80vh;
+        width: 90vw;
+        height: 90vh;
     }
     </style>
     """,
         unsafe_allow_html=True,
-    )       
+    )      
+  
   launch_button = st.button('Launch detailed analysis window', on_click = make_detailed_view)
                        
 
@@ -354,7 +348,7 @@ def make_detailed_view():
     player_assignments = passed_info['player_assignments']
     draft_seat = passed_info['draft_seat']
     score_df = passed_info['score_df']
-    win_rates = passed_info['win_rates']
+    rate_display = passed_info['rate_display']
     _g_scores = passed_info['_g_scores']
     g_scores_unselected = passed_info['g_scores_unselected']
     future_diffs = passed_info['future_diffs']
@@ -364,129 +358,58 @@ def make_detailed_view():
     _H = passed_info['_H']
     rosters = passed_info['rosters']
 
+    my_players = player_assignments[draft_seat]
+
     c1, c2 = st.columns([0.5,0.5])
 
     with c1:
 
-      player_name = st.selectbox('Detailed View Player'
+      player_name = st.selectbox('Candidate player'
                                           ,score_df.index
                                           ,index = 0)
-
-    player_last_name = player_name.split(' ')[1]
-
-    my_players = [x.split(' ')[1] for x in player_assignments[draft_seat] if x == x]
-
-    player_list = my_players + [player_last_name] + [''] * (rosters.shape[1] - len(my_players) - 1)
-
-    def get_player(row, i):
-
-      if row[0] == -1:
-          return None
-      else:
-        n = list(row).index(i)
-        return player_list[n]
       
-    rosters = rosters.loc[score_df.index]
+      player_last_name = player_name.split(' ')[1]
         
-    roster_row = rosters.loc[player_name]
-    roster_inverted = [get_player(roster_row, i) for i in range(len(roster_row))] 
-
-    roster_inverted = pd.DataFrame({'Players' : roster_inverted} 
-                                    ,index = get_position_numbers_unwound()
-                            )
+    n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
+                                                                        ,player_last_name = player_last_name
+                                                                        ,my_players = my_players
+                                                                        ,rosters = rosters)
     
-    roster_unfilled = roster_inverted[roster_inverted['Players'] == '']
-    position_slots = pd.Series(roster_unfilled.index)
-    position_slots = position_slots.str.replace('\d+', '', regex = True)
+    main_df_styled = make_main_df_styled(_g_scores
+                        , player_name
+                        , player_last_name
+                        , my_players
+                        , res
+                        , _H
+                        , future_diffs)
 
-    n_per_position = position_slots.value_counts()
-
-    def style_rosters(x):
-        if len(x) ==0:
-          return 'background-color:white'
-        elif x in my_players:
-          return 'background-color: lightgrey; color:black;'
-        else:
-          return 'background-color: lightblue; color:black;'
-        
-    roster_inverted_styled = roster_inverted.T.style.map(style_rosters)
-
-    rate_display = score_df.merge(win_rates.dropna(), left_index = True, right_index = True)
-
-    rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
-    rate_df_limited_styled = h_percentage_styler(rate_df_limited)
-
-    my_players = player_assignments[draft_seat]
-    team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum()
-
-    player = _g_scores.loc[player_name]
-
-    if len([player for player in my_players if player == player]) > 0:
-      other_teams_imputed = player + team_so_far - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
-    else:
-      other_teams_imputed = player - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
-
-    remaining_value_imputed = future_diffs.loc[player_name] * _H.original_v - other_teams_imputed
-    remaining_value_imputed['Total'] = remaining_value_imputed.sum()
-
-    if len([player for player in my_players if player == player]) > 0:
-      main_res_dict = {'Team so far' : team_so_far
-                  ,player_last_name : player
-                  ,'Future picks' : remaining_value_imputed}
-    else:
-      main_res_dict = {player_last_name : player
-                  ,'Future picks' : remaining_value_imputed}
-    
-    main_df = pd.DataFrame(main_res_dict).T
-    main_df.loc['Total', : ] = main_df.sum()
-    
-    main_df_styled = static_score_styler(main_df, st.session_state.params['g-score-total-multiplier'])
+    rate_df_limited_styled = make_rate_display_styled(rate_display
+                                , player_name
+                                , player_last_name)
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}").background_gradient(axis = None)
-
-    position_share_df = pd.DataFrame({p + '-' + str(n_per_position[p]): 
-                                      position_shares[p].loc[player_name] * n_per_position[p] 
-                                      for p in get_position_structure()['flex_list']}
-                                      ).T.fillna(0)
     
-    position_share_df = position_share_df[get_position_structure()['base_list']]
-    position_share_df.loc['Total',:] = position_share_df.sum()
+    positions_styled = get_positions_styled(n_per_position
+                             , position_shares
+                             , player_name)
 
-    positions_styled = position_share_df.style.format("{:.2f}").background_gradient(axis = None)
-
-    def color_blue(label):
-        return "background-color: lightblue; color:black" if label == player_name else None
-
-    g_scores_unselected.loc[:,'Rank'] = range(1, len(g_scores_unselected) + 1)
-    player_location_g = g_scores_unselected.index.get_loc(player_name)
-    g_scores_to_display = pd.DataFrame({'Rank' : g_scores_unselected['Rank']
-                                        ,'Player' : g_scores_unselected.index
-                                        ,'Total' : g_scores_unselected['Total']
-                                        }).set_index('Rank')
-    g_scores_to_display_styled = g_scores_to_display.style.map(stat_styler
-                                                                , middle = 0.5
-                                                                , multiplier = 10
-                                                                , subset = ['Total']
-                                                                , mode = 'yellow') \
-                                                                .format("{:.2f}", subset = ['Total']) \
-                                                                .map(color_blue, subset = ['Player'])
-    
-    player_location_h = score_df.index.get_loc(player_name)
-    score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
-    h_scores_to_display = pd.DataFrame({'Rank' : score_df['Rank']
-                                        ,'Player' : score_df.index
-                                        ,'H-score' : score_df['H-score']
-                                        }).set_index('Rank')
-    h_scores_to_display_styled = h_scores_to_display.style.map(stat_styler
-                                                                , middle = 0.5
-                                                                , multiplier = 1000
-                                                                , subset = ['H-score']
-                                                                , mode = 'yellow') \
-                                                                .format("{:.1%}", subset = ['H-score']) \
-                                                                .map(color_blue, subset = ['Player'])
-
+    g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h = \
+      get_ranking_views(g_scores_unselected
+                      , player_name
+                      , score_df)
 
     with c1:
+
+      st.markdown('Category weights for future picks')
+      st.dataframe(weights_styled, hide_index = True)
+
+      st.markdown('Flex position allocations for future flex spot picks')
+      st.write(positions_styled)
+
+      st.markdown('Roster assignments for chosen players')
+      st.write(roster_inverted_styled, hide_index = True)
+
+    with c2:
 
       st.dataframe(rate_df_limited_styled, hide_index = True)
 
@@ -503,17 +426,110 @@ def make_detailed_view():
         st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
         st.dataframe(h_scores_to_display_styled, height = 248)
 
-    with c2:
+  
+def get_positions_styled(n_per_position : dict
+                          , position_shares : pd.DataFrame
+                          , player_name : str):
 
-      st.markdown('Category weights for future picks')
-      st.dataframe(weights_styled, hide_index = True)
+  position_share_df = pd.DataFrame({p + '-' + str(n_per_position[p]): 
+                                    position_shares[p].loc[player_name] * n_per_position[p] 
+                                    for p in get_position_structure()['flex_list']}
+                                    ).T.fillna(0)
+  
+  position_share_df = position_share_df[get_position_structure()['base_list']]
+  position_share_df.loc['Total',:] = position_share_df.sum()
 
-      st.markdown('Flex position allocations for future flex spot picks')
-      st.write(positions_styled)
+  return position_share_df.style.format("{:.2f}").background_gradient(axis = None)
+  
+def get_roster_assignment_view(player_name : str
+                                ,player_last_name : str
+                                ,my_players : list[str]
+                                ,rosters : pd.DataFrame):
+  #helper function for make_detailed_view. Creates s one-row dataframe with columns for position slot and 
+  #players already on the team + candidate player in the positions given to them by the algorithm
 
-      st.markdown('Roster assignments for chosen players')
-      st.write(roster_inverted_styled, hide_index = True)
+  def get_player(row
+               , i
+               , player_list):
+    #helper function to get the player indicated by the raw roster number
 
+    if row[0] == -1:
+        return None
+    else:
+      n = list(row).index(i)
+      return player_list[n]
+    
+  def style_rosters(x):
+    if len(x) ==0:
+      return 'background-color:white'
+    elif x in my_players:
+      return 'background-color: lightgrey; color:black;'
+    else:
+      return 'background-color: lightblue; color:black;'
+
+  my_players = [x.split(' ')[1] for x in my_players if x == x]
+
+  player_list = my_players + [player_last_name] + [''] * (rosters.shape[1] - len(my_players) - 1)
+      
+  roster_row = rosters.loc[player_name]
+  roster_inverted = [get_player(roster_row, i, player_list) for i in range(len(roster_row))] 
+
+  roster_inverted = pd.DataFrame({'Players' : roster_inverted} 
+                                  ,index = get_position_numbers_unwound()
+                          )
+  
+  roster_unfilled = roster_inverted[roster_inverted['Players'] == '']
+  position_slots = pd.Series(roster_unfilled.index)
+  position_slots = position_slots.str.replace('\d+', '', regex = True)
+
+  n_per_position = position_slots.value_counts()
+
+  roster_inverted_styled = roster_inverted.T.style.map(style_rosters)
+
+  return n_per_position, roster_inverted_styled
+
+def make_rate_display_styled(rate_display : pd.DataFrame
+                              , player_name : str
+                              , player_last_name : str):
+
+  rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
+  rate_df_limited_styled = h_percentage_styler(rate_df_limited)
+  return rate_df_limited_styled
+
+def make_main_df_styled(_g_scores
+                        , player_name
+                        , player_last_name
+                        , my_players
+                        , res
+                        , _H
+                        , future_diffs):
+
+  team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum()
+
+  player = _g_scores.loc[player_name]
+
+  if len([p for p in my_players if p == p]) > 0:
+    other_teams_imputed = player + team_so_far - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
+  else:
+    other_teams_imputed = player - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
+
+  remaining_value_imputed = future_diffs.loc[player_name] * _H.original_v - other_teams_imputed
+  remaining_value_imputed['Total'] = remaining_value_imputed.sum()
+
+  if len([player for player in my_players if player == player]) > 0:
+    main_res_dict = {'Team so far' : team_so_far
+                ,player_last_name : player
+                ,'Future picks' : remaining_value_imputed}
+  else:
+    main_res_dict = {player_last_name : player
+                ,'Future picks' : remaining_value_imputed}
+  
+  main_df = pd.DataFrame(main_res_dict).T
+  main_df.loc['Total', : ] = main_df.sum()
+  
+  main_df_styled = static_score_styler(main_df, st.session_state.params['g-score-total-multiplier'])
+
+  return main_df_styled
 
 @st.fragment()
 def make_cand_matchup_tab(cdfs
@@ -564,3 +580,38 @@ def make_cand_matchup_tab(cdfs
               cdfs_styled = h_percentage_styler(cdfs_selected)
 
               st.dataframe(cdfs_styled)
+
+def get_ranking_views(g_scores_unselected
+                      , player_name
+                      ,score_df):
+    def color_blue(label):
+        return "background-color: lightblue; color:black" if label == player_name else None
+
+    g_scores_unselected.loc[:,'Rank'] = range(1, len(g_scores_unselected) + 1)
+    player_location_g = g_scores_unselected.index.get_loc(player_name)
+    g_scores_to_display = pd.DataFrame({'Rank' : g_scores_unselected['Rank']
+                                        ,'Player' : g_scores_unselected.index
+                                        ,'Total' : g_scores_unselected['Total']
+                                        }).set_index('Rank')
+    g_scores_to_display_styled = g_scores_to_display.style.map(stat_styler
+                                                                , middle = 0.5
+                                                                , multiplier = 10
+                                                                , subset = ['Total']
+                                                                , mode = 'yellow') \
+                                                                .format("{:.2f}", subset = ['Total']) \
+                                                                .map(color_blue, subset = ['Player'])
+    
+    player_location_h = score_df.index.get_loc(player_name)
+    h_scores_to_display = pd.DataFrame({'Rank' : score_df['Rank']
+                                        ,'Player' : score_df.index
+                                        ,'H-score' : score_df['H-score']
+                                        }).set_index('Rank')
+    h_scores_to_display_styled = h_scores_to_display.style.map(stat_styler
+                                                                , middle = 0.5
+                                                                , multiplier = 1000
+                                                                , subset = ['H-score']
+                                                                , mode = 'yellow') \
+                                                                .format("{:.1%}", subset = ['H-score']) \
+                                                                .map(color_blue, subset = ['Player'])
+    
+    return g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h

@@ -376,7 +376,20 @@ def make_auction_tab_own_data(H):
                         
             else:
 
-                h_ranks_unselected = st.session_state.h_ranks[~st.session_state.h_ranks.index.isin(selection_list)]
+                h_ranks = get_default_h_values(info = st.session_state.info
+                                            , omega = st.session_state.omega
+                                            , gamma = st.session_state.gamma
+                                            , n_picks = st.session_state.n_picks
+                                            , n_drafters = st.session_state.n_drafters
+                                            , n_iterations = st.session_state.n_iterations
+                                            , scoring_format = st.session_state.scoring_format
+                                            , mode = st.session_state.mode
+                                            , psi = st.session_state.psi
+                                            , upsilon = st.session_state.upsilon
+                                            , chi = st.session_state.chi
+                                            , info_key = st.session_state.info)
+
+                h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
                 h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
                                                             , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
                                                             , remaining_cash
@@ -384,17 +397,17 @@ def make_auction_tab_own_data(H):
                 
                 h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
-            make_h_cand_tab(H
-                ,st.session_state.g_scores
-                ,st.session_state.z_scores
-                ,player_assignments.to_dict()
-                ,auction_seat
-                ,st.session_state.n_iterations
-                ,st.session_state.v
-                ,5 #display frequency
-                ,cash_remaining_per_team.to_dict()
-                ,h_defaults_savor
-                ,st.session_state.n_drafters * st.session_state.n_picks)
+                make_h_cand_tab(H
+                    ,st.session_state.g_scores
+                    ,st.session_state.z_scores
+                    ,player_assignments.to_dict()
+                    ,auction_seat
+                    ,st.session_state.n_iterations
+                    ,st.session_state.v
+                    ,5 #display frequency
+                    ,cash_remaining_per_team.to_dict()
+                    ,h_defaults_savor
+                    ,st.session_state.n_drafters * st.session_state.n_picks)
 
         if len(my_players) >= st.session_state.n_starters:
             base_h_res = get_base_h_score(st.session_state.info
@@ -536,3 +549,69 @@ def make_auction_tab_live_data(H):
                     
                 else:
                     st.write('Your team is full')
+
+
+@st.cache_data(show_spinner = False, ttl = 3600)
+def get_default_h_values(info : dict
+                  , omega : float
+                  , gamma : float
+                  , n_picks : int
+                  , n_drafters : int
+                  , n_iterations : int
+                  , scoring_format : str
+                  , mode : str
+                  , psi : float
+                  , upsilon : float
+                  , chi : float
+                  , info_key : int):
+  
+  H = HAgent(info = info
+    , omega = omega
+    , gamma = gamma
+    , n_picks = n_picks
+    , n_drafters = n_drafters
+    , dynamic = n_iterations > 0
+    , scoring_format = scoring_format
+    , chi = chi
+    , team_names = [n for n in range(n_drafters)])
+  
+  if st.session_state['mode'] == 'Auction Mode':
+    cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
+  else:
+    cash_remaining_per_team = None
+
+  generator = H.get_h_scores(player_assignments = {n : [] for n in range(n_drafters)}
+                          , drafter = 0
+                          , cash_remaining_per_team = cash_remaining_per_team)
+
+  for i in range(max(1,n_iterations)):
+    res = next(generator)
+
+  h_res = res['Scores']
+  cdf_estimates = res['Rates']
+    
+  cdf_estimates.columns = get_selected_categories()
+  rate_df = cdf_estimates.loc[h_res.index].dropna()
+
+  h_res = h_res.sort_values(ascending = False)
+
+  h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
+                        ,'Player' : h_res.index
+                        ,'H-score' : h_res.values
+                      })
+
+
+  h_res = h_res.merge(rate_df
+                      , left_on = 'Player'
+                      ,right_index = True)
+  
+  if st.session_state['mode'] == 'Auction Mode':
+
+    h_res.loc[:,'$ Value'] = savor_calculation(h_res['H-score']
+                                                    , n_picks * n_drafters
+                                                    , 200*n_drafters
+                                                    , st.session_state['streaming_noise_h'])
+    
+    h_res = h_res[['Rank','Player','$ Value','H-score'] + get_selected_categories()]
+
+  return h_res
