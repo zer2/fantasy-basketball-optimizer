@@ -6,7 +6,9 @@ from src.helpers.helper_functions import get_position_numbers_unwound, static_sc
 from src.math.algorithm_helpers import savor_calculation
 from src.data_retrieval.get_data import get_htb_adp
 from src.math.algorithm_helpers import combinatorial_calculation
+from src.helpers.helper_functions import listify
 
+'''
 @st.cache_data(show_spinner = True, ttl = 3600)
 def make_cand_tab(_scores : pd.DataFrame
               , selection_list : list[str]
@@ -42,25 +44,44 @@ def make_cand_tab(_scores : pd.DataFrame
   scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
 
   return scores_unselected
+'''
 
 def make_hashable(obj):
-    """Recursively convert obj into a hashable form.
-    - dict  -> frozenset of (key, value)
-    - list  -> frozenset of items
-    - set   -> frozenset of items
-    - tuple -> tuple of items (preserve order)
+    """
+    Recursively convert obj into a hashable, canonical form.
+      - dict  -> tuple(sorted (key_h, value_h) pairs by key)
+      - list  -> frozenset of items (order-insensitive, multiplicity ignored)
+      - set   -> frozenset of items
+      - tuple -> tuple of items (order preserved)
+      - other -> returned as-is (must already be hashable)
     """
     if isinstance(obj, dict):
-        return frozenset((k, make_hashable(v)) for k, v in obj.items())
+        # Sort by key for a canonical order. If keys are not mutually comparable,
+        # fall back to sorting by repr(key).
+        try:
+            items = sorted(obj.items(), key=lambda kv: kv[0])
+        except TypeError:
+            items = sorted(obj.items(), key=lambda kv: repr(kv[0]))
+        return tuple((make_hashable(k), make_hashable(v)) for k, v in items)
+
     if isinstance(obj, list):
         return frozenset(make_hashable(v) for v in obj)
+
     if isinstance(obj, set):
         return frozenset(make_hashable(v) for v in obj)
+
     if isinstance(obj, tuple):
         return tuple(make_hashable(v) for v in obj)
-    
+
+    # Base case: strings, numbers, bools, None, etc.
+    # Base case: strings, numbers, bools, None, etc.
+    if obj == obj:
+       return obj
+    else:
+       return ''
+        
 #ZR: Change the name of this
-def make_h_cand_tab(_H
+def make_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
                     ,player_assignments
@@ -87,6 +108,7 @@ def make_h_cand_tab(_H
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
+
 
   #ZR: This cache should include format too- auction vs draft, and other things
   if (draft_seat, make_hashable(player_assignments), n_iterations) in st.session_state.res_cache:
@@ -280,12 +302,16 @@ def make_h_cand_tab(_H
           g_display = score_df.merge(g_df, left_index = True, right_index = True)
 
           if cash_remaining_per_team is not None:
-              ''' #ZR: Fix this for auctions; make it show the dollar values 
+              selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
+              remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
+
+              g_display = g_display.sort_values('Total', ascending = False)
+
               g_display.loc[:,'$ Value'] = savor_calculation(g_display['Total']
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
-                                                          , st.session_state['streaming_noise'])
-              '''
+                                                          , st.session_state['streaming_noise']) 
+              g_display = g_display.drop(columns = ['H-score'])
 
           if drop_player is not None:
 
@@ -307,7 +333,7 @@ def make_h_cand_tab(_H
   #save info for the detailed launcher
   hashable_player_assignments =  make_hashable(player_assignments)
 
-  if (draft_seat, hashable_player_assignments, n_iterations) not in res:
+  if (draft_seat, hashable_player_assignments, n_iterations) not in st.session_state.res_cache:
 
     st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = {'res' : res
                                                                                           ,'iteration' : i}
@@ -407,6 +433,11 @@ def make_detailed_view():
       get_ranking_views(g_scores_unselected
                       , player_name
                       , score_df)
+    
+
+    #ZR: For an auction, we should not have the H-ranking and G-rankings
+    #at the bottom right. 
+    #Instead, it should be something about 
 
     with c1:
 
@@ -421,7 +452,7 @@ def make_detailed_view():
 
     with c2:
 
-      st.dataframe(rate_df_limited_styled, hide_index = True)
+      st.dataframe(rate_df_limited_styled, hide_index = True, height = 73)
 
       st.markdown('G-score expectations')
       st.dataframe(main_df_styled)
@@ -505,8 +536,9 @@ def make_rate_display_styled(rate_display : pd.DataFrame
 
   #ZR: If auction, this should have "Your $ value" and "$ value" with no "H-score". Also it should be colored 
   if  '$ Value' in rate_display.columns:
+      rate_df_limited = rate_df_limited.drop(columns = ['Difference'])
       rate_df_limited_styled = rate_df_limited.style.format("{:.1f}"
-                                              , subset = ['Your $ Value', '$ Value','Difference']) \
+                                              , subset = ['Your $ Value', '$ Value']) \
                                           .map(styler_a
                                               , subset = ['Your $ Value', '$ Value']) \
                                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_selected_categories()) \

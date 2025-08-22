@@ -134,7 +134,7 @@ def make_drafting_tab_own_data(H):
         #ZR: I feel like we don't need the team tab. This can just be under the main part 
         if st.session_state.run_h_score:
 
-            make_h_cand_tab(H
+            make_cand_tab(H
                 ,st.session_state.g_scores
                 ,st.session_state.z_scores
                 ,player_assignments
@@ -248,7 +248,7 @@ def make_drafting_tab_live_data(H):
 
                 st.session_state.g_scores
 
-                make_h_cand_tab(H
+                make_cand_tab(H
                     ,st.session_state.g_scores
                     ,st.session_state.z_scores
                     ,player_assignments
@@ -375,7 +375,7 @@ def make_auction_tab_own_data(H):
             
             h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
-            make_h_cand_tab(H
+            make_cand_tab(H
                 ,st.session_state.g_scores
                 ,st.session_state.z_scores
                 ,player_assignments.to_dict()
@@ -513,7 +513,7 @@ def make_auction_tab_live_data(H):
 
                 if len(my_players) < st.session_state.n_picks:
 
-                    make_h_cand_tab(H
+                    make_cand_tab(H
                         ,st.session_state.g_scores
                         ,st.session_state.z_scores
                         ,player_assignments.to_dict()

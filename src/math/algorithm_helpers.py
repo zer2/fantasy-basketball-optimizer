@@ -16,7 +16,7 @@ def savor_calculation(raw_values_unselected : pd.Series
     auction value accordingly
 
     Args:
-      raw_values_unselected: raw value by Z-score, G-score, etc. 
+      raw_values_unselected: raw value by Z-score, G-score, etc. Needs to be in descending order
       n_remaining_players: number of players left to be picked
       remaining_cash: amount of cash remaining to spend on players, from all teams
       noise: parameter for the SAVOR function. Controls how noisy we expect player performance to be

@@ -149,8 +149,6 @@ def make_full_team_tab(z_scores : pd.DataFrame
 
     my_real_players = [x for x in my_players if x != 'RP']
 
-    st.write('G-score totals of team so far')
-
     make_team_tab(g_scores
                     , my_real_players
                     , n_drafters
