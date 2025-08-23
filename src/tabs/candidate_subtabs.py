@@ -110,8 +110,8 @@ def make_cand_tab(_H
 
 
   #ZR: This cache should include format too- auction vs draft, and other things
-  if (draft_seat, make_hashable(player_assignments), n_iterations) in st.session_state.res_cache:
-    cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations)]
+  if (draft_seat, make_hashable(player_assignments), n_iterations, st.session_state.mode) in st.session_state.res_cache:
+    cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations, st.session_state.mode)]
     res = cached_info['res']
     iteration_range = range(cached_info['iteration'] - 1, n_iterations)
     cached_res = True
@@ -135,8 +135,9 @@ def make_cand_tab(_H
 
   adps = get_htb_adp()
 
-  selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
-  remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
+  if cash_remaining_per_team:
+    selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
+    remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
   #if n_iterations is 0 we run just once
   for i in iteration_range:
@@ -265,7 +266,7 @@ def make_cand_tab(_H
                         .format(style_format, subset = rate_df.columns) \
                         .map(color_blue, subset = pd.IndexSlice[:,['Player']])
                 
-                g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
+                g_display = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
                 
                 rate_display = score_df.merge(win_rates.dropna()
                               , left_index = True
@@ -331,12 +332,10 @@ def make_cand_tab(_H
   #save info for the detailed launcher
   hashable_player_assignments =  make_hashable(player_assignments)
 
-  if (draft_seat, hashable_player_assignments, n_iterations) not in st.session_state.res_cache:
+  if (draft_seat, hashable_player_assignments, n_iterations, st.session_state.mode) not in st.session_state.res_cache:
 
-    st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations)] = {'res' : res
+    st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations, st.session_state.mode)] = {'res' : res
                                                                                           ,'iteration' : i}
-
-    g_scores_unselected = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
 
     score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
 
@@ -355,8 +354,9 @@ def make_cand_tab(_H
             ,_H = _H
             ,rosters = rosters
             ,rate_display = rate_display
-            ,g_scores_unselected = g_scores_unselected
-            ,iteration = i)
+            ,g_display = g_display
+            ,iteration = i
+            ,cash_remaining_per_team = cash_remaining_per_team)
     
   st.markdown(
         """
@@ -384,13 +384,14 @@ def make_detailed_view():
     score_df = passed_info['score_df']
     rate_display = passed_info['rate_display']
     _g_scores = passed_info['_g_scores']
-    g_scores_unselected = passed_info['g_scores_unselected']
+    g_display = passed_info['g_display']
     future_diffs = passed_info['future_diffs']
     weights = passed_info['weights']
     position_shares = passed_info['position_shares']
     res = passed_info['res']
     _H = passed_info['_H']
     rosters = passed_info['rosters']
+    cash_remaining_per_team = passed_info['cash_remaining_per_team']
 
     my_players = player_assignments[draft_seat]
 
@@ -417,10 +418,6 @@ def make_detailed_view():
                         , _H
                         , future_diffs)
 
-    rate_df_limited_styled = make_rate_display_styled(rate_display
-                                , player_name
-                                , player_last_name)
-
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}").background_gradient(axis = None)
     
     positions_styled = get_positions_styled(n_per_position
@@ -428,7 +425,7 @@ def make_detailed_view():
                              , player_name)
 
     g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h = \
-      get_ranking_views(g_scores_unselected
+      get_ranking_views(g_display
                       , player_name
                       , score_df)
     
@@ -437,6 +434,16 @@ def make_detailed_view():
     #at the bottom right. 
     #Instead, it should be something about the amount remaining I guess? 
     #or just a list of values?
+
+    #maybe a dataframe of
+    #your remaining money
+    #total remaining money 
+    #how many more picks you need to make 
+
+    #bottom left: You have X dollars to select Y more players. Your X dollars is W% of the total 
+    #Z dollars remaining 
+
+    #bottom right: Ranks by total G-score, Your H-score, and default H-score 
 
     with c1:
 
@@ -448,24 +455,59 @@ def make_detailed_view():
 
       st.markdown('Roster assignments for chosen players')
       st.write(roster_inverted_styled, hide_index = True)
+              
 
     with c2:
 
+      rate_df_limited_styled = make_rate_display_styled(rate_display
+                            , player_name
+                            , player_last_name)
       st.dataframe(rate_df_limited_styled, hide_index = True, height = 73)
 
       st.markdown('G-score expectations')
       st.dataframe(main_df_styled)
 
-      c1_1, c1_2 = st.columns([0.5,0.5])
-      
-      with c1_1: 
-        st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
-        st.dataframe(g_scores_to_display_styled, height = 248)
+      if cash_remaining_per_team:
+         
+        remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
+        my_remaining_cash = cash_remaining_per_team[draft_seat]
+        remaining_cash_fraction = int(np.round(my_remaining_cash * 100/remaining_cash))
+        n_my_players = len(my_players)
+         
+        big_value_df = pd.DataFrame({'$ (Your H-score)' : rate_display['Your $ Value']
+                                      ,'$ (Generic H-score)' : rate_display['$ Value']
+                                      ,'$ (G-score)' : g_display['$ Value']}).sort_values('$ (Your H-score)', ascending = False)
+        cols = ['$ (Your H-score)','$ (Generic H-score)','$ (G-score)']
 
-      with c1_2: 
-        st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
-        st.dataframe(h_scores_to_display_styled, height = 248)
+        def color_blue(label):
+          return "background-color: lightblue; color:black" if label == player_name else None
+        
+        big_value_df_styled = big_value_df.reset_index().style.format("{:.1f}", subset = cols) \
+                                                                        .background_gradient(cmap = 'Oranges', subset = cols, axis = None) \
+                                                                        .map(color_blue, subset = 'Player')
+        
+        st.markdown('Player values translated into auction dollars')
+        
+        st.dataframe(big_value_df_styled, hide_index = True, height = 248)
 
+        st.caption(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(st.session_state.cash_per_team) \
+                + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players.' \
+                + ' Your \$' + str(my_remaining_cash) + ' represents ' + str(remaining_cash_fraction) + '\% of the total \$' \
+                + str(remaining_cash) + ' remaining).'
+                )
+
+        
+      else:
+
+        c1_1, c1_2 = st.columns([0.5,0.5])
+        
+        with c1_1: 
+          st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
+          st.dataframe(g_scores_to_display_styled, height = 248)
+
+        with c1_2: 
+          st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
+          st.dataframe(h_scores_to_display_styled, height = 248)
   
 def get_positions_styled(n_per_position : dict
                           , position_shares : pd.DataFrame
@@ -534,14 +576,15 @@ def make_rate_display_styled(rate_display : pd.DataFrame
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
 
   if  '$ Value' in rate_display.columns:
-      rate_df_limited = rate_df_limited.drop(columns = ['Difference'])
-      rate_df_limited_styled = rate_df_limited.style.format("{:.1f}"
-                                              , subset = ['Your $ Value', '$ Value']) \
-                                          .map(styler_a
-                                              , subset = ['Your $ Value', '$ Value']) \
+      st.markdown('Expected win rates if taken at no cost')
+
+      rate_df_limited = rate_df_limited.drop(columns = ['Difference','Your $ Value', '$ Value'])
+      
+      rate_df_limited_styled = rate_df_limited.style \
                                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_selected_categories()) \
                                           .format('{:,.1%}', subset = get_selected_categories())
   else: 
+    st.markdown('Expected win rates if taken')
     rate_df_limited_styled = h_percentage_styler(rate_df_limited)
   return rate_df_limited_styled
 
@@ -580,17 +623,17 @@ def make_main_df_styled(_g_scores
 
   return main_df_styled
 
-def get_ranking_views(g_scores_unselected
+def get_ranking_views(g_display
                       , player_name
                       ,score_df):
     def color_blue(label):
         return "background-color: lightblue; color:black" if label == player_name else None
 
-    g_scores_unselected.loc[:,'Rank'] = range(1, len(g_scores_unselected) + 1)
-    player_location_g = g_scores_unselected.index.get_loc(player_name)
-    g_scores_to_display = pd.DataFrame({'Rank' : g_scores_unselected['Rank']
-                                        ,'Player' : g_scores_unselected.index
-                                        ,'Total' : g_scores_unselected['Total']
+    g_display.loc[:,'Rank'] = range(1, len(g_display) + 1)
+    player_location_g = g_display.index.get_loc(player_name)
+    g_scores_to_display = pd.DataFrame({'Rank' : g_display['Rank']
+                                        ,'Player' : g_display.index
+                                        ,'Total' : g_display['Total']
                                         }).set_index('Rank')
     g_scores_to_display_styled = g_scores_to_display.style.map(stat_styler
                                                                 , middle = 0.5
