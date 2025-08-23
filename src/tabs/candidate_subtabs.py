@@ -80,7 +80,6 @@ def make_hashable(obj):
     else:
        return ''
         
-#ZR: Change the name of this
 def make_cand_tab(_H
                     ,_g_scores
                     ,_z_scores
@@ -135,6 +134,9 @@ def make_cand_tab(_H
   placeholder = st.empty()
 
   adps = get_htb_adp()
+
+  selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
+  remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
   #if n_iterations is 0 we run just once
   for i in iteration_range:
@@ -298,12 +300,9 @@ def make_cand_tab(_H
 
         if display:
 
-          g_df = _g_scores.loc[score.index]
-          g_display = score_df.merge(g_df, left_index = True, right_index = True)
+          g_display = _g_scores.loc[score.index]
 
           if cash_remaining_per_team is not None:
-              selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
-              remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
               g_display = g_display.sort_values('Total', ascending = False)
 
@@ -311,7 +310,6 @@ def make_cand_tab(_H
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
                                                           , st.session_state['streaming_noise']) 
-              g_display = g_display.drop(columns = ['H-score'])
 
           if drop_player is not None:
 
@@ -437,7 +435,8 @@ def make_detailed_view():
 
     #ZR: For an auction, we should not have the H-ranking and G-rankings
     #at the bottom right. 
-    #Instead, it should be something about 
+    #Instead, it should be something about the amount remaining I guess? 
+    #or just a list of values?
 
     with c1:
 
@@ -534,7 +533,6 @@ def make_rate_display_styled(rate_display : pd.DataFrame
                               , player_last_name : str):
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
 
-  #ZR: If auction, this should have "Your $ value" and "$ value" with no "H-score". Also it should be colored 
   if  '$ Value' in rate_display.columns:
       rate_df_limited = rate_df_limited.drop(columns = ['Difference'])
       rate_df_limited_styled = rate_df_limited.style.format("{:.1f}"
