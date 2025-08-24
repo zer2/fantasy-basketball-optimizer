@@ -312,6 +312,18 @@ def make_auction_tab_own_data(H):
             with c2:
               st.warning('Lock in to update candidate display')
 
+            #check that every row is either fully filled out or not filled out 
+            na_counts = auction_selections.isna().sum(axis = 1)
+            na_counts_3 = na_counts == 3
+            na_counts_0 = na_counts == 0
+
+            if not all (na_counts_3 | na_counts_0):
+               st.error('''Some rows are partially filled in. If all rows look filled in, this error may have beeen triggered by 
+                        hitting the 'Lock in' button while still editing a cell, which prevents that cell from being saved. Hit 
+                        'Lock in' again to remove this error''')
+               st.stop()
+
+
         selection_list = auction_selections['Player'].dropna()
 
         total_cash = cash_per_team * st.session_state.n_drafters

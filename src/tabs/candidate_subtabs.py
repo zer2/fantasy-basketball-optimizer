@@ -107,8 +107,6 @@ def make_cand_tab(_H
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
-
-
   #ZR: This cache should include format too- auction vs draft, and other things
   if (draft_seat, make_hashable(player_assignments), n_iterations, st.session_state.mode) in st.session_state.res_cache:
     cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations, st.session_state.mode)]
