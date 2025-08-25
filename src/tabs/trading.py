@@ -86,9 +86,12 @@ def make_trade_tab(H
                 default_counterparty_players = selected_row['Receive']
 
               else:
-                  default_party_players = None
-                  default_counterparty_players = None
-                  
+                default_party_players = None
+                default_counterparty_players = None
+
+            else:
+              default_party_players = None
+              default_counterparty_players = None            
         else:
             default_party_players = None
             default_counterparty_players = None
