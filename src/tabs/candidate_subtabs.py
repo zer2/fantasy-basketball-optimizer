@@ -368,7 +368,9 @@ def make_cand_tab(_H
         unsafe_allow_html=True,
     )      
   
-  launch_button = st.button('Launch detailed analysis window', on_click = make_detailed_view)
+  if drop_player is None:
+
+    launch_button = st.button('Launch detailed analysis window', on_click = make_detailed_view)
                        
 
 @st.dialog('Detailed View')

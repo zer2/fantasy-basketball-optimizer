@@ -683,11 +683,16 @@ class HAgent():
                 
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
+            if expected_future_diff is not None:    
+                future_diff_df = pd.DataFrame(np.squeeze(expected_future_diff), index = result_index, columns = self.x_scores.columns)
+            else:
+                future_diff_df = None
+
             res = {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
-                    ,'Future-Diff' : pd.DataFrame(np.squeeze(expected_future_diff), index = result_index, columns = self.x_scores.columns)
+                    ,'Future-Diff' : future_diff_df
                     ,'Rosters' : pd.DataFrame(rosters, index = result_index)
                     ,'Position-Shares' : {position_code : 
                                                     pd.DataFrame(position_shares_current[position_code].values
