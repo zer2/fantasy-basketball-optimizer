@@ -152,7 +152,7 @@ def get_player_metadata(data_source) -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   df = get_htb_projections(data_source)
+   df = st.session_state.raw_stat_df
 
    return df['Position']
 
@@ -246,26 +246,10 @@ def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
     #elif 'DARKO' in dataset_name:
     #    df = darko_data[dataset_name].copy()
 
-    if 'Hashtag' in dataset_name:
-        df = get_htb_projections()
-    elif 'RotoWire' in dataset_name:
-        if 'rotowire_data' in st.session_state:
-            raw_df = st.session_state.rotowire_data
-            df = process_basketball_rotowire_data(raw_df)
-        else:
-            st.error('Error! No rotowire data found: this should not happen')
-            st.stop()
-    elif 'Basketball Monster' in dataset_name:
-       if 'bbm_data' in st.session_state:
-            raw_df = st.session_state.bbm_data
-            df = process_basketball_monster_data(raw_df
-                                                 , default_projections = get_htb_projections())
-       else:
-            st.error('Error! No Basketball Monster data found: this should not happen')
+    #ZR: For now I think this only gets called with historical data
 
-    else:
-        historical_df = get_historical_data()
-        df = historical_df.loc[dataset_name].copy()  
+    historical_df = get_historical_data()
+    df = historical_df.loc[dataset_name].copy()  
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
@@ -290,6 +274,7 @@ def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
 @st.cache_data()
 def combine_nba_projections(rotowire_upload
                             , bbm_upload
+                            , hashtag_upload
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider 
@@ -297,7 +282,7 @@ def combine_nba_projections(rotowire_upload
                             , integration_source #just for caching purposes
                             ): 
     
-    hashtag_stats = get_htb_projections(integration_source)
+    hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, integration_source).fillna(0)
     rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload, integration_source).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, integration_source)
     darko_stats = None if darko_slider == 0 else get_darko_data(integration_source)
@@ -379,8 +364,55 @@ def process_basketball_rotowire_data(raw_df, integration_source = None):
 
    return raw_df
 
+@st.cache_data()
+def process_basketball_htb_data(htb, integration_source):
+    htb = htb[htb['PLAYER'] != 'PLAYER']
+
+    htb.loc[:,'ADP'] = -1
+
+    fg_split = htb['FG%'].str[0:-1].str.split('(').str[1].str.split('/')
+    ft_split = htb['FT%'].str[0:-1].str.split('(').str[1].str.split('/')
+    three_split = htb['3P%'].str[0:-1].str.split('(').str[1].str.split('/')
+
+    htb.loc[:,'FGM'] = fg_split.str[0] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FGA'] = fg_split.str[1] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FTM'] = ft_split.str[0] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FTA'] = ft_split.str[1] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'3PA'] = three_split.str[1] #the str here is a python hack. Its weird but it works 
+
+    htb.loc[:,'FG%'] = htb.loc[:,'FG%'].str.split('(').str[0].astype(float)
+    htb.loc[:,'FT%'] = htb.loc[:,'FT%'].str.split('(').str[0].astype(float)
+
+    htb.loc[:,'3P%'] = htb.loc[:,'3P%'].str.split('(').str[0].astype(float)
+
+    htb['POS'] = htb['POS'].fillna('NP')
+
+    htb.loc[:,'Games Played %'] = htb['Games Played']/get_n_games()
+
+    htb['Position'] = htb['Position'].str.replace('/',',')
+
+    htb = map_player_names(htb, 'HTB_NAME')
+
+    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+    htb.loc[:,'Assist to TO'] = htb['Assists']/np.clip(htb['Turnovers'],0.1, None)
+    htb.loc[:,'Field Goals Made'] = htb['Field Goal %'] * htb['Field Goal Attempts']
+    htb.loc[:,'Free Throws Made'] = htb['Free Throw %'] * htb['Free Throw Attempts']
+
+    htb = htb.set_index('Player')
+
+    required_columns = st.session_state.params['counting-statistics'] + \
+                        list(st.session_state.params['ratio-statistics'].keys()) + \
+                        [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
+                        st.session_state.params['other-columns'] 
+    
+    htb = htb[list(set(required_columns))]
+
+    return htb
+
 @st.cache_data(ttl = 3600)
 def get_htb_adp():
+   
+   return -1 
    df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
    df = df.rename(columns = st.session_state.params['htb-renamer'])
 
@@ -391,34 +423,6 @@ def get_htb_adp():
 
    df = df[['Player','ADP']]
    return df.set_index('Player')
-
-@st.cache_data(ttl = 3600)
-def get_htb_projections(integration_source):
-
-   raw_df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
-
-   raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
-   raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
-
-   raw_df['Position'] = raw_df['Position'].str.replace('/',',')
-
-   raw_df = map_player_names(raw_df, 'HTB_NAME')
-
-   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
-   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
-   raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
-   raw_df.loc[:,'Free Throws Made'] = raw_df['Free Throw %'] * raw_df['Free Throw Attempts']
-
-   raw_df = raw_df.set_index('Player')
-
-   required_columns = st.session_state.params['counting-statistics'] + \
-                    list(st.session_state.params['ratio-statistics'].keys()) + \
-                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns'] 
-   
-   raw_df = raw_df[list(set(required_columns))]
-
-   return raw_df
 
 @st.cache_data(ttl = 3600)
 def process_basketball_monster_data(raw_df, integration_source = None):

@@ -62,7 +62,7 @@ def get_nba_stats():
       raw_stat_df, dataframe 
     """
 
-    data_options = ['Projection','Historical'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
+    data_options = ['Historical','Projection'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
 
     kind_of_dataset = st.selectbox(
                             'Which kind of dataset do you want to use?'
@@ -92,11 +92,19 @@ def get_nba_stats():
 
         with c1:
 
-            hashtag_slider = st.slider('Hashtag Baseball Weight'
+            hashtag_slider = st.slider('Hashtag Basketball Weight'
                                     , min_value = 0.0
-                                    , value = 1.0
+                                    , value = 0.0
                                     , max_value = 1.0
                                     , on_change= increment_player_stats_version)
+            
+            hashtag_file = st.file_uploader('''Upload Hashtag Basketball stats'''
+                                            , type=['csv']
+                                            , on_change= increment_player_stats_version)
+            if hashtag_file is not None:
+                hashtag_upload  = pd.read_csv(bbm_file)
+            else:
+                hashtag_upload = None
 
             bbm_slider = st.slider('BBM Weight'
                     , min_value = 0.0
@@ -141,8 +149,14 @@ def get_nba_stats():
             st.error('Upload Basketball Monster projection file')
             st.stop()
 
-        raw_stats_df = combine_nba_projections(rotowire_upload
+        if hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
+            st.error('Need to upload a projection file and set a weight to it')
+            st.stop()
+
+        else:
+            raw_stats_df = combine_nba_projections(rotowire_upload
                             , bbm_upload
+                            , hashtag_upload
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider

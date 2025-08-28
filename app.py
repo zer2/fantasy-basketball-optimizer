@@ -36,7 +36,7 @@ st.set_page_config(
 if 'player_stats_version' not in st.session_state:
     st.session_state.player_stats_version = 0
 
-if 'info_version' not in st.session_state:
+if 'info_key' not in st.session_state:
     st.session_state.info_key = 100000
 
 if 'data_source' not in st.session_state:
@@ -82,7 +82,7 @@ with st.sidebar:
 
     league_settings_popover()
   
-  with st.popover(':small[Player Stats]').container(height = 500):
+  with st.popover(':small[Player Stats]').container(height = 400):
 
     player_stats = player_stats_popover()
 

@@ -108,8 +108,10 @@ def make_cand_tab(_H
       DataFrame of stats of unselected players, to use in other tabs
   """
   #ZR: This cache should include format too- auction vs draft, and other things
-  if (draft_seat, make_hashable(player_assignments), n_iterations, st.session_state.mode) in st.session_state.res_cache:
-    cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments), n_iterations, st.session_state.mode)]
+  if (draft_seat, make_hashable(player_assignments) \
+      , n_iterations, st.session_state.mode, st.session_state.info_key) in st.session_state.res_cache:
+    cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments)
+                                              , n_iterations, st.session_state.mode, st.session_state.info_key)]
     res = cached_info['res']
     iteration_range = range(cached_info['iteration'] - 1, n_iterations)
     cached_res = True
@@ -330,9 +332,11 @@ def make_cand_tab(_H
   #save info for the detailed launcher
   hashable_player_assignments =  make_hashable(player_assignments)
 
-  if (draft_seat, hashable_player_assignments, n_iterations, st.session_state.mode) not in st.session_state.res_cache:
+  if (draft_seat, hashable_player_assignments, n_iterations, \
+      st.session_state.mode, st.session_state.info_key) not in st.session_state.res_cache:
 
-    st.session_state.res_cache[(draft_seat, hashable_player_assignments, n_iterations, st.session_state.mode)] = {'res' : res
+    st.session_state.res_cache[(draft_seat, hashable_player_assignments
+                                , n_iterations, st.session_state.mode, st.session_state.info_key)] = {'res' : res
                                                                                           ,'iteration' : i}
 
     score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
