@@ -133,7 +133,7 @@ def make_cand_tab(_H
 
   placeholder = st.empty()
 
-  adps = get_htb_adp()
+  #adps = get_htb_adp()
 
   if cash_remaining_per_team:
     selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
@@ -244,10 +244,13 @@ def make_cand_tab(_H
                 format_middle = 0.5
                 format_multiplier = 300
 
-              if st.session_state.data_option == 'Projection':
+              #not implementing ADP right now
+              if 0 == 1: #st.session_state.data_option == 'Projection':
+                '''
                 rate_display = score_df.merge(adps, left_index = True, right_index = True, how = 'left') \
                                         .merge(rate_df, left_index = True, right_index = True)      
                 adp_col = ['ADP']
+                '''
               else:
                 rate_display = score_df.merge(rate_df, left_index = True, right_index = True)    
                 adp_col = []

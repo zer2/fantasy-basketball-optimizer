@@ -295,8 +295,11 @@ class YahooIntegration(PlatformIntegration):
         except: 
             #If yahoo isn't returning anything, just keep the same dict
             return _self.teams_dict
-        
-        teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
+                
+        if isinstance(teams, list):
+            teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams}
+        elif isinstance(teams, dict):
+            teams_dict = {team.team_id: team.name.decode('UTF-8') for team in teams.values()}
 
         teams_dict = adjust_teams_dict_for_duplicate_names(teams_dict)
 
@@ -346,16 +349,20 @@ class YahooIntegration(PlatformIntegration):
         Returns:
             List of leagues
         """
-        sc = YahooFantasySportsQuery(
-            auth_dir=_self.auth_dir,
-            league_id="", # Shouldn't actually matter what this is since we are retrieving the user's leagues
-            game_code="nba"
-        )
-        LOGGER.info(f"sc: {sc}")
-        leagues = yahoo_helper.get_user_leagues(sc)       
-        
-        # Sort in reverse chronological order
-        sorted_leagues = sorted(leagues, key = lambda league: league.season, reverse=True)
+        #Will fail if the user has no associated leagues
+        try:
+            sc = YahooFantasySportsQuery(
+                auth_dir=_self.auth_dir,
+                league_id="", # Shouldn't actually matter what this is since we are retrieving the user's leagues
+                game_code="nba"
+            )
+            LOGGER.info(f"sc: {sc}")
+            leagues = yahoo_helper.get_user_leagues(sc)       
+            
+            # Sort in reverse chronological order
+            sorted_leagues = sorted(leagues, key = lambda league: league.season, reverse=True)
+        except: 
+            return []
         return sorted_leagues
 
     def _get_players_df(_self
@@ -566,12 +573,11 @@ class YahooIntegration(PlatformIntegration):
             
         #gets to here okay
         #return None, 'Draft has not started yet'
-
             
         draft_result_raw_df = pd.DataFrame([(draft_obj.player_key, draft_obj.team_key) for draft_obj in draft_results \
                                             if len(draft_obj.player_key) > 0]
                                         , columns = ['Player','Team'] )
-        
+                
         #next_team = teams_dict[int(draft_results[len(draft_result_raw_df)].team_key.split('.')[-1])]
         #if next_team != st.session_state.draft_seat:
         #    return None, True
@@ -588,7 +594,9 @@ class YahooIntegration(PlatformIntegration):
         draft_result_raw_df['Team'] = draft_result_raw_df['Team'].str.split('.').str[-1].astype(int)
         draft_result_raw_df['Team'] = ['Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
                                     for team_id in draft_result_raw_df['Team']]
-                        
+        
+        st.write(draft_result_raw_df)
+                                
         #ZR: I am pretty sure we don't need a for loop to do this
         for k, v in draft_result_raw_df.iterrows():
             df.loc[row, v['Team']] = v['PlayerMod']

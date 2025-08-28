@@ -152,9 +152,8 @@ def get_player_metadata(data_source) -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   df = st.session_state.raw_stat_df
-
-   return df['Position']
+   #this is  kind of messed up 
+   return st.session_state.player_metadata
 
 
 @st.cache_data(ttl = '1d') 
@@ -251,6 +250,8 @@ def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
     historical_df = get_historical_data()
     df = historical_df.loc[dataset_name].copy()  
 
+    st.session_state.player_metadata = pd.Series(df['Position'], index = df.index)
+
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
@@ -305,7 +306,7 @@ def combine_nba_projections(rotowire_upload
                         ,'RotoWire' : rotowire_stats
                         ,'BBM' : bbm_stats
                         ,'Darko' : darko_stats}, names = ['Source'])
-            
+                
     new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM','Darko'], all_players], names = ['Source','Player'])
 
     df = df.reindex(new_index)
@@ -322,10 +323,13 @@ def combine_nba_projections(rotowire_upload
                     else x.dropna()[0])
             
     #Need to include this because not every source projects double doubles, which gets messy
-    df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
+    if 'Double Doubles' in df.columns:
+        df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
 
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
+
+    st.session_state.player_metadata = pd.Series(df['Position'], index = df.index)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
@@ -335,7 +339,7 @@ def combine_nba_projections(rotowire_upload
 
 @st.cache_data()
 def process_basketball_rotowire_data(raw_df, integration_source = None):
-   
+      
    raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
    raw_df['FG%'] = raw_df['FG%']/100
    raw_df['FT%'] = raw_df['FT%']/100
@@ -426,14 +430,14 @@ def get_htb_adp():
 
 @st.cache_data(ttl = 3600)
 def process_basketball_monster_data(raw_df, integration_source = None):
-   
+
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
 
    #handling case where there is an extra column that gets interpreted as a missing value
    raw_df = raw_df.loc[:,[c for c in raw_df.columns if 'Unnamed' not in c]]
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
-   raw_df = raw_df.dropna()
+   #raw_df = raw_df.dropna(required_columns)
 
    raw_df = map_player_names(raw_df, 'BBM_NAME')
 
@@ -480,7 +484,7 @@ def map_player_names(df, source_name):
 
    mapper_table = get_data_from_snowflake('PLAYER_MAPPING_VIEW').dropna(subset = [source_name]) \
                                                                   .set_index(source_name)[player_name_column]
-   
+      
    #does not get here
    df['Player'] = df['Player'].map(mapper_table).fillna(df['Player'])
    return df

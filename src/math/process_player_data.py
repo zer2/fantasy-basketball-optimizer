@@ -283,7 +283,7 @@ def process_player_data(weekly_df : pd.DataFrame
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors)
-                
+                    
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params

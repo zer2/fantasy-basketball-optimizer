@@ -61,7 +61,6 @@ def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:
 
 def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[League]:
     """
-    Generates a list of leagues that the user has been a part of
     
     Parameters:
     - sc (object): The YahooFantasySportsQuery object.
@@ -84,7 +83,6 @@ def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[Lea
 
 def get_draft_results(sc: YahooFantasySportsQuery) -> List[League]:
     """
-    Generates a list of leagues that the user has been a part of
     
     Parameters:
     - sc (object): The YahooFantasySportsQuery object.

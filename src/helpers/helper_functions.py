@@ -231,7 +231,7 @@ def get_fixed_player_name(player_name : str
     Returns:
         fixed name string
      """
-        
+            
     if player_name in _player_metadata.index:
         return player_name + ' (' + _player_metadata[player_name] + ')'
     else:
@@ -401,7 +401,8 @@ def increment_info_key():
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def drop_injured_players(_raw_stat_df, injured_players, player_stats_version):
-    return _raw_stat_df.drop(injured_players)
+    res = _raw_stat_df.drop(injured_players)
+    return res
 
 @st.cache_data()
 def get_selections_default(n_picks, n_drafters):

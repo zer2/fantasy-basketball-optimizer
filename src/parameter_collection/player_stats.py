@@ -48,8 +48,7 @@ def player_stats_popover():
 
         st.session_state.raw_stat_df = drop_injured_players(raw_stat_df
                                                             , injured_players
-                                                            , st.session_state.player_stats_version)
-    
+                                                            , st.session_state.player_stats_version)            
 
 
 def get_nba_stats():
@@ -102,7 +101,7 @@ def get_nba_stats():
                                             , type=['csv']
                                             , on_change= increment_player_stats_version)
             if hashtag_file is not None:
-                hashtag_upload  = pd.read_csv(bbm_file)
+                hashtag_upload  = pd.read_csv(hashtag_file)
             else:
                 hashtag_upload = None
 

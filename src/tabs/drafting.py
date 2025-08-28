@@ -451,8 +451,6 @@ def make_auction_tab_live_data(H):
 
         else:
 
-            cand_tab, team_tab = st.tabs(["Candidates","Team"])
-
             cash_per_team = 200
             
             selection_list = st.session_state.draft_results['Player'].dropna()
@@ -491,27 +489,42 @@ def make_auction_tab_live_data(H):
 
             #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
             h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
+                
+            if len(my_players) < st.session_state.n_picks:
 
-            with team_tab:
+                make_cand_tab(H
+                    ,st.session_state.g_scores
+                    ,st.session_state.z_scores
+                    ,player_assignments.to_dict()
+                    ,auction_seat
+                    ,st.session_state.n_iterations
+                    ,st.session_state.v
+                    ,5 #display frequency
+                    ,cash_remaining_per_team.to_dict()
+                    ,h_defaults_savor
+                    ,st.session_state.n_drafters * st.session_state.n_picks)
+                
+            else:
+                st.write('Your team is full')
 
-                if len(my_players) >= st.session_state.n_picks:
+            if len(my_players) >= st.session_state.n_picks:
 
-                    base_h_res = get_base_h_score(st.session_state.info
-                                                    ,st.session_state.omega
-                                                    ,st.session_state.gamma
-                                                    ,st.session_state.n_picks
-                                                    ,st.session_state.n_drafters
-                                                    ,st.session_state.scoring_format
-                                                    ,st.session_state.chi
-                                                    ,player_assignments.to_dict()
-                                                    ,auction_seat
-                                                    ,st.session_state.info_key)
+                base_h_res = get_base_h_score(st.session_state.info
+                                                ,st.session_state.omega
+                                                ,st.session_state.gamma
+                                                ,st.session_state.n_picks
+                                                ,st.session_state.n_drafters
+                                                ,st.session_state.scoring_format
+                                                ,st.session_state.chi
+                                                ,player_assignments.to_dict()
+                                                ,auction_seat
+                                                ,st.session_state.info_key)
 
 
-                else:
-                    base_h_res = None
+            else:
+                base_h_res = None
 
-                make_full_team_tab(st.session_state.z_scores
+            make_full_team_tab(st.session_state.z_scores
                                     ,st.session_state.g_scores
                                     ,my_players
                                     ,st.session_state.n_drafters
@@ -520,26 +533,6 @@ def make_auction_tab_live_data(H):
                                     ,st.session_state.info_key
                                     ,auction_seat
                                     )
-                
-            with cand_tab:
-
-                if len(my_players) < st.session_state.n_picks:
-
-                    make_cand_tab(H
-                        ,st.session_state.g_scores
-                        ,st.session_state.z_scores
-                        ,player_assignments.to_dict()
-                        ,auction_seat
-                        ,st.session_state.n_iterations
-                        ,st.session_state.v
-                        ,5 #display frequency
-                        ,cash_remaining_per_team.to_dict()
-                        ,h_defaults_savor
-                        ,st.session_state.n_drafters * st.session_state.n_picks)
-                    
-                else:
-                    st.write('Your team is full')
-
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def get_default_h_values(info : dict

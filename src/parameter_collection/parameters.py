@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from src.helpers.helper_functions import increment_player_stats_version
+from src.helpers.helper_functions import get_selected_categories, increment_player_stats_version
 from src.math.process_player_data import process_player_data
 from src.helpers.helper_functions import get_games_per_week
 
@@ -62,13 +62,15 @@ def player_stat_param_popover():
       volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
 
       for col in counting_statistics + volume_statistics:
-        _raw_stat_df[col] = _raw_stat_df[col].astype(float) * _raw_stat_df['Games Played %'] * get_games_per_week()
+        if col in _raw_stat_df.columns:
+          _raw_stat_df[col] = _raw_stat_df[col].astype(float) * _raw_stat_df['Games Played %'] * get_games_per_week()
 
       return _raw_stat_df
-
+    
     st.session_state.player_stats = make_upsilon_adjustment(st.session_state.raw_stat_df
                             , upsilon
                             , st.session_state.player_stats_version)
+
 
     st.session_state.info = process_player_data(None
                             ,st.session_state.player_stats
