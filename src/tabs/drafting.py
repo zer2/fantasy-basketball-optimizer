@@ -452,6 +452,7 @@ def make_auction_tab_live_data(H):
         else:
 
             cash_per_team = 200
+            st.session_state.cash_per_team = 200
             
             selection_list = st.session_state.draft_results['Player'].dropna()
             player_assignments = st.session_state.draft_results.dropna()  \
@@ -478,8 +479,21 @@ def make_auction_tab_live_data(H):
 
             my_remaining_cash = cash_remaining_per_team[auction_seat]
 
-            h_ranks_unselected = st.session_state.h_ranks[~st.session_state.h_ranks['Player'].isin(selection_list)]
+            #ZR: I think this could be improved
+            h_ranks = get_default_h_values(info = st.session_state.info
+                                        , omega = st.session_state.omega
+                                        , gamma = st.session_state.gamma
+                                        , n_picks = st.session_state.n_picks
+                                        , n_drafters = st.session_state.n_drafters
+                                        , n_iterations = st.session_state.n_iterations
+                                        , scoring_format = st.session_state.scoring_format
+                                        , mode = st.session_state.mode
+                                        , psi = st.session_state.psi
+                                        , upsilon = st.session_state.upsilon
+                                        , chi = st.session_state.chi
+                                        , info_key = st.session_state.info)
 
+            h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
             h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
                                                             , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
                                                             , remaining_cash

@@ -494,6 +494,8 @@ def make_detailed_view():
                                                                         .map(color_blue, subset = 'Player')
         
         st.markdown('Player values translated into auction dollars')
+
+        #ZR: I think something about overpayment could be helpful for this view
         
         st.dataframe(big_value_df_styled, hide_index = True, height = 248)
 

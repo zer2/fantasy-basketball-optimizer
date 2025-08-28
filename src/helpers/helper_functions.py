@@ -231,7 +231,9 @@ def get_fixed_player_name(player_name : str
     Returns:
         fixed name string
      """
-            
+    if isinstance(player_name, pd.Series):
+       player_name = player_name.values[0] #fix for weird thing with auctions
+
     if player_name in _player_metadata.index:
         return player_name + ' (' + _player_metadata[player_name] + ')'
     else:
