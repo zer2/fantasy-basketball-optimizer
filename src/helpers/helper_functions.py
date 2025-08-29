@@ -272,7 +272,7 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
     Styled dataframe
   """
 
-  agg_columns = [col for col in ['H-score','$ Value','Total'] if col in df.columns]
+  agg_columns = [col for col in ['H-score','$ Value','Original $ Value','Total'] if col in df.columns]
   index_columns = [col for col in ['Rank','Player'] if col in df.columns]
   perc_columns = ['H-score'] if 'H-score' in df.columns else []
 

@@ -384,8 +384,13 @@ def make_auction_tab_own_data(H):
                                                         , st.session_state.n_picks * st.session_state.n_drafters - len(selection_list)
                                                         , remaining_cash
                                                         , st.session_state['streaming_noise_h'])
-            
             h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
+
+            h_original_savor = savor_calculation(h_ranks['H-score']
+                                                        , st.session_state.n_picks * st.session_state.n_drafters
+                                                        , cash_per_team * st.session_state.n_drafters
+                                                        , st.session_state['streaming_noise_h'])
+            h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
 
             make_cand_tab(H
                 ,st.session_state.g_scores
@@ -397,6 +402,7 @@ def make_auction_tab_own_data(H):
                 ,5 #display frequency
                 ,cash_remaining_per_team.to_dict()
                 ,h_defaults_savor
+                ,h_original_savor
                 ,st.session_state.n_drafters * st.session_state.n_picks)
 
         if len(my_players) >= st.session_state.n_starters:
@@ -503,6 +509,12 @@ def make_auction_tab_live_data(H):
 
             #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
             h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
+
+            h_original_savor = savor_calculation(h_ranks['H-score']
+                                                        , st.session_state.n_picks * st.session_state.n_drafters
+                                                        , cash_per_team * st.session_state.n_drafters
+                                                        , st.session_state['streaming_noise_h'])
+            h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
                 
             if len(my_players) < st.session_state.n_picks:
 
@@ -516,6 +528,7 @@ def make_auction_tab_live_data(H):
                     ,5 #display frequency
                     ,cash_remaining_per_team.to_dict()
                     ,h_defaults_savor
+                    ,h_original_savor
                     ,st.session_state.n_drafters * st.session_state.n_picks)
                 
             else:
