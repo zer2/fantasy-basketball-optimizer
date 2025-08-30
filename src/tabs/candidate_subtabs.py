@@ -372,7 +372,8 @@ def make_cand_tab(_H
             ,rate_display = rate_display
             ,g_display = g_display
             ,iteration = i
-            ,cash_remaining_per_team = cash_remaining_per_team)
+            ,cash_remaining_per_team = cash_remaining_per_team
+            ,original_player_value = original_player_value)
     
   st.markdown(
         """
@@ -410,6 +411,7 @@ def make_detailed_view():
     _H = passed_info['_H']
     rosters = passed_info['rosters']
     cash_remaining_per_team = passed_info['cash_remaining_per_team']
+    original_player_value = passed_info['original_player_value']
 
     my_players = player_assignments[draft_seat]
 
@@ -482,10 +484,30 @@ def make_detailed_view():
         n_my_players = len(my_players)
         
         #do something like this
-        #original_value_of_unchosen_players = 
-        #inflation_factor_unchosen_players = remaining_cash)/original_value_of_unchosen_players
-        #write a string like "This player is worth X to you. "
-              
+        original_value_of_unchosen_players = original_player_value.loc[score_df.index].sum()
+        inflation_factor_unchosen_players = remaining_cash/original_value_of_unchosen_players
+
+        inflation_factor_formatted = str(np.round(inflation_factor_unchosen_players * 100,1)) + '%'
+        player_value_inflated = str(int(np.round(rate_display['Your $ Value'].loc[player_name] * inflation_factor_unchosen_players)))
+
+        st.write(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(st.session_state.cash_per_team) \
+                + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players.' \
+                + ' Your \$' + str(my_remaining_cash) + ' represents ' + str(remaining_cash_fraction) + '\% of the total \$' \
+                + str(remaining_cash) + ' remaining'
+                )
+
+        if inflation_factor_unchosen_players > 1:
+          st.write('Based on overspending for previously chosen players, there is less money available than there is' + 
+                   ' original value remaining. The remaining players have original value of ' + \
+                   inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would not be bad to pay' + \
+                   ' up to $' + player_value_inflated + ' for ' + player_last_name
+                                                        )
+        else:
+          st.write('Based on underspending for previously chosen players, there is more money available than there is' + 
+                   ' original value remaining. The remaining players have original value of ' + \
+                   inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would be reasonable to expect' + \
+                   ' as little as $' + player_value_inflated + ' for ' + player_last_name
+                                                        )     
 
     with c2:
 
@@ -518,13 +540,6 @@ def make_detailed_view():
         #ZR: I think something about overpayment could be helpful for this view
         
         st.dataframe(big_value_df_styled, hide_index = True, height = 248)
-
-        st.caption(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(st.session_state.cash_per_team) \
-                + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players.' \
-                + ' Your \$' + str(my_remaining_cash) + ' represents ' + str(remaining_cash_fraction) + '\% of the total \$' \
-                + str(remaining_cash) + ' remaining).'
-                )
-
         
       else:
 
