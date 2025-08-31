@@ -143,7 +143,8 @@ H = HAgent(info = st.session_state.info
     , n_drafters = st.session_state.n_drafters
     , dynamic = st.session_state.n_iterations > 0
     , scoring_format = st.session_state.scoring_format
-    , chi = st.session_state.chi )
+    , chi = st.session_state.chi
+    , team_names = st.session_state.team_names)
 
 if st.session_state['mode'] == 'Draft Mode':
 

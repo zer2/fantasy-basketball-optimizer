@@ -27,11 +27,11 @@ def player_stats_popover():
 
         if st.session_state.league == 'NBA':
 
-            raw_stat_df = get_nba_stats()
+            raw_stat_df, player_metadata = get_nba_stats()
                 
         elif st.session_state.league == 'MLB':
                 
-            raw_stat_df = get_mlb_stats()
+            raw_stat_df, player_metadata = get_mlb_stats()
 
     with c2: 
         st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
@@ -48,7 +48,9 @@ def player_stats_popover():
 
         st.session_state.raw_stat_df = drop_injured_players(raw_stat_df
                                                             , injured_players
-                                                            , st.session_state.player_stats_version)            
+                                                            , st.session_state.player_stats_version)  
+
+        st.session_state.player_metadata = player_metadata          
 
 
 def get_nba_stats():
@@ -83,7 +85,7 @@ def get_nba_stats():
             ,index = 0
             ,on_change = increment_and_reset_draft
         )
-        raw_stats_df = get_specified_stats(dataset_name, st.session_state.league)
+        raw_stats_df, player_metadata = get_specified_stats(dataset_name, st.session_state.league)
                 
     else: 
 
@@ -153,7 +155,7 @@ def get_nba_stats():
             st.stop()
 
         else:
-            raw_stats_df = combine_nba_projections(rotowire_upload
+            raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
                             , bbm_upload
                             , hashtag_upload
                             , hashtag_slider
@@ -162,7 +164,7 @@ def get_nba_stats():
                             , rotowire_slider
                             , st.session_state.data_source)
         
-    return raw_stats_df
+    return raw_stats_df, player_metadata
 
 def get_mlb_stats():
     """Figures out where to get player stats from, and loads them into a dataframe, specifically for the MLB

@@ -250,12 +250,12 @@ def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
     historical_df = get_historical_data()
     df = historical_df.loc[dataset_name].copy()  
 
-    st.session_state.player_metadata = pd.Series(df['Position'], index = df.index)
+    player_metadata = pd.Series(df['Position'], index = df.index)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    return df.round(3) 
+    return df.round(3), player_metadata
   
   elif league in ('MLB'):
     
@@ -329,12 +329,12 @@ def combine_nba_projections(rotowire_upload
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
 
-    st.session_state.player_metadata = pd.Series(df['Position'], index = df.index)
+    player_metadata = pd.Series(df['Position'], index = df.index)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
     
-    return df.round(2) 
+    return df.round(2), player_metadata
 
 
 @st.cache_data()

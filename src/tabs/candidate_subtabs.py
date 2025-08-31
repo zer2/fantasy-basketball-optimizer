@@ -478,36 +478,15 @@ def make_detailed_view():
 
       if cash_remaining_per_team:
 
+
         remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
-        my_remaining_cash = cash_remaining_per_team[draft_seat]
-        remaining_cash_fraction = int(np.round(my_remaining_cash * 100/remaining_cash))
-        n_my_players = len(my_players)
         
-        #do something like this
-        original_value_of_unchosen_players = original_player_value.loc[score_df.index].sum()
-        inflation_factor_unchosen_players = remaining_cash/original_value_of_unchosen_players
-
-        inflation_factor_formatted = str(np.round(inflation_factor_unchosen_players * 100,1)) + '%'
-        player_value_inflated = str(int(np.round(rate_display['Your $ Value'].loc[player_name] * inflation_factor_unchosen_players)))
-
-        st.write(r'You have \$' + str(my_remaining_cash) + r' remaining out of \$' + str(st.session_state.cash_per_team) \
-                + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players.' \
-                + ' Your \$' + str(my_remaining_cash) + ' represents ' + str(remaining_cash_fraction) + '\% of the total \$' \
-                + str(remaining_cash) + ' remaining'
-                )
-
-        if inflation_factor_unchosen_players > 1:
-          st.write('Based on overspending for previously chosen players, there is less money available than there is' + 
-                   ' original value remaining. The remaining players have original value of ' + \
-                   inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would not be bad to pay' + \
-                   ' up to $' + player_value_inflated + ' for ' + player_last_name
-                                                        )
-        else:
-          st.write('Based on underspending for previously chosen players, there is more money available than there is' + 
-                   ' original value remaining. The remaining players have original value of ' + \
-                   inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would be reasonable to expect' + \
-                   ' as little as $' + player_value_inflated + ' for ' + player_last_name
-                                                        )     
+        make_auction_string(original_player_value
+                        , score_df.index
+                        , rate_display
+                        , player_name
+                        , player_last_name
+                        , remaining_cash)
 
     with c2:
 
@@ -520,26 +499,8 @@ def make_detailed_view():
       st.dataframe(main_df_styled)
 
       if cash_remaining_per_team:
-         
 
-         
-        big_value_df = pd.DataFrame({'$ (Your H-score)' : rate_display['Your $ Value']
-                                      ,'$ (H-score)' : rate_display['$ Value']
-                                      ,'$ (G-score)' : g_display['$ Value']}).sort_values('$ (Your H-score)', ascending = False)
-        cols = ['$ (Your H-score)','$ (H-score)','$ (G-score)']
-
-        def color_blue(label):
-          return "background-color: lightblue; color:black" if label == player_name else None
-        
-        big_value_df_styled = big_value_df.reset_index().style.format("{:.1f}", subset = cols) \
-                                                                        .background_gradient(cmap = 'Oranges', subset = cols, axis = None) \
-                                                                        .map(color_blue, subset = 'Player')
-        
-        st.markdown('Player values translated into auction dollars')
-
-        #ZR: I think something about overpayment could be helpful for this view
-        
-        st.dataframe(big_value_df_styled, hide_index = True, height = 248)
+        make_auction_value_df(rate_display, g_display, player_name)
         
       else:
 
@@ -553,6 +514,51 @@ def make_detailed_view():
           st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
           st.dataframe(h_scores_to_display_styled, height = 248)
   
+def make_auction_string(original_player_value
+                        , remaining_player_list
+                        , rate_display
+                        , player_name
+                        , player_last_name
+                         , remaining_cash):
+  #do something like this
+  original_value_of_unchosen_players = original_player_value.loc[remaining_player_list].sum()
+  inflation_factor_unchosen_players = original_value_of_unchosen_players/remaining_cash
+  
+  inflation_factor_formatted = str(np.round(inflation_factor_unchosen_players * 100,1)) + '%'
+  player_value_inflated = str(int(np.round(rate_display['Your $ Value'].loc[player_name] * inflation_factor_unchosen_players)))
+
+  if inflation_factor_unchosen_players > 1:
+    st.write('Based on overspending for previously chosen players, there is less money available than there is' + 
+            ' original value remaining. The remaining players have original value of ' + \
+            inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would not be bad to pay' + \
+            ' up to $' + player_value_inflated + ' for ' + player_last_name
+                                                  )
+  else:
+    st.write('Based on underspending for previously chosen players, there is more money available than there is' + 
+            ' original value remaining. The remaining players have original value of ' + \
+            inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would be reasonable to expect' + \
+            ' as little as $' + player_value_inflated + ' for ' + player_last_name
+                                                  )     
+            
+def make_auction_value_df(rate_display, g_display, player_name):
+  big_value_df = pd.DataFrame({'$ (Your H-score)' : rate_display['Your $ Value']
+                                ,'$ (H-score)' : rate_display['$ Value']
+                                ,'$ (G-score)' : g_display['$ Value']}).sort_values('$ (Your H-score)', ascending = False)
+  cols = ['$ (Your H-score)','$ (H-score)','$ (G-score)']
+
+  def color_blue(label):
+    return "background-color: lightblue; color:black" if label == player_name else None
+  
+  big_value_df_styled = big_value_df.reset_index().style.format("{:.1f}", subset = cols) \
+                                                                  .background_gradient(cmap = 'Oranges', subset = cols, axis = None) \
+                                                                  .map(color_blue, subset = 'Player')
+  
+  st.markdown('Player values translated into auction dollars')
+
+  #ZR: I think something about overpayment could be helpful for this view
+  
+  st.dataframe(big_value_df_styled, hide_index = True, height = 248)
+
 def get_positions_styled(n_per_position : dict
                           , position_shares : pd.DataFrame
                           , player_name : str):

@@ -4,7 +4,6 @@ from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, 
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
 from src.tabs.drafting import increment_and_reset_draft
-from src.data_retrieval.get_data import get_player_metadata
 
 class FantraxIntegration(PlatformIntegration):
 
@@ -86,9 +85,7 @@ class FantraxIntegration(PlatformIntegration):
         else:
             #this is all messed up lol
 
-            player_metadata = get_player_metadata(st.session_state.data_source)
-
-            self.selections_default = self.get_rosters_df(player_metadata)
+            self.selections_default = self.get_rosters_df()
             self.n_drafters = st.session_state.selections_default.shape[1]
             self.n_picks = st.session_state.selections_default.shape[0]
 
@@ -170,12 +167,10 @@ class FantraxIntegration(PlatformIntegration):
         res = api._request("getTeamRosterInfo", teamId=team_id)['tables'][0]['rows']
         return res
     
-    def get_rosters_df(_self
-                       , player_metadata):
+    def get_rosters_df(_self):
         """Get a dataframe with a column per team and cell per player chosen by that team
 
         Args:
-            player_metadata
 
         Returns:
             DataFrame with roster info
@@ -187,7 +182,7 @@ class FantraxIntegration(PlatformIntegration):
             roster = []
             for z in _self.get_team_info(team_id):
                 if 'scorer' in z: 
-                    player = get_fixed_player_name(z['scorer']['name'], player_metadata)
+                    player = get_fixed_player_name(z['scorer']['name'])
                     if z['statusId'] in exclusions:
                         st.session_state['injured_players'].add(player)
                     else:
@@ -204,25 +199,23 @@ class FantraxIntegration(PlatformIntegration):
                 
         return rosters_df
     
-    def get_draft_results(_self
-                          , player_metadata):
+    def get_draft_results(_self):
         """Get a tuple with
         1) a dataframe reflecting the state of the draft, with np.nan in place of undrafted players
                structure is one column per team, one row per pick 
         2) a string representing the status of the draft 
 
         Args:
-            player_metadata
 
         Returns:
             tuple
         """
             
-        rosters_df = _self.get_rosters_df(player_metadata)
+        rosters_df = _self.get_rosters_df()
         
         return rosters_df, 'Success'
     
-    def get_auction_results(_self, league_id, player_metadata):
+    def get_auction_results(_self, league_id):
         #not implemented
         return None
     

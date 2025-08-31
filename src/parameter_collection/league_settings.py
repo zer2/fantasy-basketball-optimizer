@@ -8,7 +8,7 @@ from src.tabs.drafting import increment_and_reset_draft, clear_draft_board
 import pandas as pd
 import numpy as np
 
-from src.data_retrieval.get_data import get_player_metadata, get_yahoo_key_to_name_mapper
+from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
 
 def league_settings_popover():
     """Collect settings for the league and set up a platform integration if necessary
@@ -81,13 +81,14 @@ def league_settings_popover():
             st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
                                                                                     ,st.session_state.integration.division_id) 
             st.session_state.n_drafters = len(st.session_state.team_names)
+
+            st.write(st.session_state.n_drafters)
+            st.write(st.session_state.team_names)
             st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
 
             st.session_state.selections_default = st.session_state.integration.selections_default
 
             st.session_state.selections_df = st.session_state.selections_default
-
-            st.session_state.player_metadata = get_player_metadata(st.session_state.data_source)
 
             st.session_state.yahoo_key_to_name_mapper = get_yahoo_key_to_name_mapper()
 

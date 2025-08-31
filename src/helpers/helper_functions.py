@@ -219,14 +219,12 @@ def get_games_per_week():
 
 #ZR: For efficiency, should make this a series and save it beforehand. The caching wont work
 #The problem is that there might be names that we miss, which would be bad
-def get_fixed_player_name(player_name : str
-                          , _player_metadata) -> str:
+def get_fixed_player_name(player_name : str) -> str:
     
     """Fix player name string to adhere to common standard
 
     Args:
         player_name: string
-        player_metadata
 
     Returns:
         fixed name string
@@ -234,8 +232,9 @@ def get_fixed_player_name(player_name : str
     if isinstance(player_name, pd.Series):
        player_name = player_name.values[0] #fix for weird thing with auctions
 
-    if player_name in _player_metadata.index:
-        return player_name + ' (' + _player_metadata[player_name] + ')'
+    player_metadata = st.session_state.player_metadata
+    if player_name in player_metadata.index:
+        return player_name + ' (' + player_metadata[player_name] + ')'
     else:
         return 'RP'
     

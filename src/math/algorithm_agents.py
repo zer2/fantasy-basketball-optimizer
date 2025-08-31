@@ -49,10 +49,7 @@ class HAgent():
         self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
-        if team_names is not None:
-            self.team_names = team_names
-        else:
-            self.team_names = st.session_state.team_names
+        self.team_names = team_names
 
         #ZR: we really need to fix this later lol. The thing is that the positions table 
         #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
@@ -180,6 +177,7 @@ class HAgent():
             String indicating chosen player
         """
         self.n_drafters = len(player_assignments) #ZR: Kind of a hack, but it helps sometimes when the session state gets messed up
+        self.team_names = list(player_assignments.keys())
         my_players = [p for p in player_assignments[drafter] if p == p]
 
         self.players = my_players #this is a bit of a hack
@@ -1511,6 +1509,7 @@ def get_base_h_score(_info : dict
     , n_drafters = n_drafters
     , dynamic = False
     , scoring_format = scoring_format
-    , chi = chi)
+    , chi = chi
+    , team_names = list(player_assignments.keys()))
 
   return next(H.get_h_scores(player_assignments, team))   

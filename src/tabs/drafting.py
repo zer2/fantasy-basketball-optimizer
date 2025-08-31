@@ -1,7 +1,6 @@
   
 import streamlit as st 
 from pandas.api.types import CategoricalDtype
-from src.data_retrieval.get_data import get_player_metadata
 from src.helpers.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
 from src.tabs.team_subtabs import *
 from src.tabs.candidate_subtabs import *
@@ -182,10 +181,10 @@ def refresh_analysis():
 
     if st.session_state.mode == 'Draft Mode':
 
-        draft_results, error_string = st.session_state.integration.get_draft_results(st.session_state.player_metadata)
+        draft_results, error_string = st.session_state.integration.get_draft_results()
     else:
 
-        draft_results, error_string  = st.session_state.integration.get_auction_results(st.session_state.player_metadata)
+        draft_results, error_string  = st.session_state.integration.get_auction_results()
             
     st.session_state.draft_results = draft_results
 
