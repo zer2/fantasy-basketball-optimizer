@@ -375,41 +375,43 @@ def process_basketball_htb_data(htb, integration_source):
     htb.loc[:,'ADP'] = -1
 
     fg_split = htb['FG%'].str[0:-1].str.split('(').str[1].str.split('/')
-    ft_split = htb['FT%'].str[0:-1].str.split('(').str[1].str.split('/')
-    three_split = htb['3P%'].str[0:-1].str.split('(').str[1].str.split('/')
-
     htb.loc[:,'FGM'] = fg_split.str[0] #the str here is a python hack. Its weird but it works 
     htb.loc[:,'FGA'] = fg_split.str[1] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FG%'] = htb.loc[:,'FG%'].str.split('(').str[0].astype(float)
+
+    ft_split = htb['FT%'].str[0:-1].str.split('(').str[1].str.split('/')
     htb.loc[:,'FTM'] = ft_split.str[0] #the str here is a python hack. Its weird but it works 
     htb.loc[:,'FTA'] = ft_split.str[1] #the str here is a python hack. Its weird but it works 
-    htb.loc[:,'3PA'] = three_split.str[1] #the str here is a python hack. Its weird but it works 
-
-    htb.loc[:,'FG%'] = htb.loc[:,'FG%'].str.split('(').str[0].astype(float)
     htb.loc[:,'FT%'] = htb.loc[:,'FT%'].str.split('(').str[0].astype(float)
 
-    htb.loc[:,'3P%'] = htb.loc[:,'3P%'].str.split('(').str[0].astype(float)
+    if '3P%' in htb.columns:
+        three_split = htb['3P%'].str[0:-1].str.split('(').str[1].str.split('/')
+        htb.loc[:,'3PA'] = three_split.str[1] #the str here is a python hack. Its weird but it works 
+        htb.loc[:,'3P%'] = htb.loc[:,'3P%'].str.split('(').str[0].astype(float)
 
-    htb['POS'] = htb['POS'].fillna('NP')
-
-    htb.loc[:,'Games Played %'] = htb['Games Played']/get_n_games()
-
-    htb['Position'] = htb['Position'].str.replace('/',',')
-
+    htb = htb.rename(columns = st.session_state.params['htb-renamer'])
     htb = map_player_names(htb, 'HTB_NAME')
 
-    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
+    stat_columns = set(st.session_state.params['counting-statistics'] + \
+                        list(st.session_state.params['ratio-statistics'].keys()) + \
+                        [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
+                            )
+    required_numeric_columns = [x for x in stat_columns if x in htb.columns] + ['Games Played']
+    required_other_columns = st.session_state.params['other-columns'] 
+
+    htb[required_numeric_columns] = htb[required_numeric_columns].astype(float)
+
+    htb.loc[:,'Games Played %'] = htb['Games Played']/get_n_games()
+    htb['Position'] = htb['Position'].fillna('NP').str.replace('/',',')
+
+    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe. Might not be necessary for HTB
     htb.loc[:,'Assist to TO'] = htb['Assists']/np.clip(htb['Turnovers'],0.1, None)
     htb.loc[:,'Field Goals Made'] = htb['Field Goal %'] * htb['Field Goal Attempts']
     htb.loc[:,'Free Throws Made'] = htb['Free Throw %'] * htb['Free Throw Attempts']
 
     htb = htb.set_index('Player')
 
-    required_columns = st.session_state.params['counting-statistics'] + \
-                        list(st.session_state.params['ratio-statistics'].keys()) + \
-                        [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                        st.session_state.params['other-columns'] 
-    
-    htb = htb[list(set(required_columns))]
+    htb = htb[list(set(required_numeric_columns + required_other_columns))]
 
     return htb
 

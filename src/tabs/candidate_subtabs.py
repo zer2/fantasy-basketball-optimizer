@@ -478,7 +478,6 @@ def make_detailed_view():
 
       if cash_remaining_per_team:
 
-
         remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
         
         make_auction_string(original_player_value
@@ -507,13 +506,13 @@ def make_detailed_view():
         c1_1, c1_2 = st.columns([0.5,0.5])
         
         with c1_1: 
-          st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
-          st.dataframe(g_scores_to_display_styled, height = 248)
-
-        with c1_2: 
           st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
           st.dataframe(h_scores_to_display_styled, height = 248)
-  
+
+        with c1_2: 
+          st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
+          st.dataframe(g_scores_to_display_styled, height = 248)
+          
 def make_auction_string(original_player_value
                         , remaining_player_list
                         , rate_display
@@ -523,7 +522,7 @@ def make_auction_string(original_player_value
   #do something like this
   original_value_of_unchosen_players = original_player_value.loc[remaining_player_list].sum()
   inflation_factor_unchosen_players = original_value_of_unchosen_players/remaining_cash
-  
+
   inflation_factor_formatted = str(np.round(inflation_factor_unchosen_players * 100,1)) + '%'
   player_value_inflated = str(int(np.round(rate_display['Your $ Value'].loc[player_name] * inflation_factor_unchosen_players)))
 
