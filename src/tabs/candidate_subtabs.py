@@ -34,7 +34,7 @@ def make_cand_tab(_scores : pd.DataFrame
 
   if remaining_cash:
 
-    scores_unselected.loc[:,'$ Value'] = savor_calculation(scores_unselected['Total']
+    scores_unselected.loc[:,'Gnrc. $'] = savor_calculation(scores_unselected['Total']
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
                                                           , st.session_state['streaming_noise'])
@@ -192,31 +192,29 @@ def make_cand_tab(_H
             players_chosen = [x for v in player_assignments.values() for x in v if x == x]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
-            rate_display.loc[:,'$ Value'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
+            rate_display.loc[:,'Your $'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
                                                             , total_players - len(players_chosen)
                                                             , total_cash_remaining
                                                             , st.session_state['streaming_noise_h'])
             
-            rate_display = rate_display[['$ Value','H-score'] + get_selected_categories()]
-
-            rate_display = pd.DataFrame({'Your $ Value' : rate_display['$ Value']
-                                          , '$ Value' : generic_player_value.loc[rate_display.index]
-                                          , 'Original $ Value' : original_player_value.loc[rate_display.index]}
+            rate_display = pd.DataFrame({'Your $' : rate_display['Your $']
+                                          , 'Gnrc. $' : generic_player_value.loc[rate_display.index]
+                                          , 'Orig. $' : original_player_value.loc[rate_display.index]}
                                         )
             
-            rate_display.loc[:,'Difference'] = rate_display['Your $ Value'] - rate_display['$ Value']
+            rate_display.loc[:,'Difference'] = rate_display['Your $'] - rate_display['Gnrc. $']
 
-            rate_display = rate_display.sort_values('Your $ Value', ascending = False)
+            rate_display = rate_display.sort_values('Your $', ascending = False)
             score_df = score_df.loc[rate_display.index]
 
             rate_display = rate_display.join(rate_df)
 
-            rate_display = rate_display[['Difference','Your $ Value','$ Value','Original $ Value'] + list(rate_df.columns)]
+            rate_display = rate_display[['Difference','Your $','Gnrc. $','Orig. $'] + list(rate_df.columns)]
 
             rate_display_styled = rate_display.style.format("{:.1f}"
-                                                              , subset = ['Your $ Value', '$ Value','Difference','Original $ Value']) \
+                                                              , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
                       .map(styler_a
-                          , subset = ['Your $ Value', '$ Value','Original $ Value']) \
+                          , subset = ['Your $', 'Gnrc. $','Orig. $']) \
                       .background_gradient(axis = None
                                           ,cmap = 'PiYG'
                                           ,subset = ['Difference']) \
@@ -313,7 +311,7 @@ def make_cand_tab(_H
 
               g_display = g_display.sort_values('Total', ascending = False)
 
-              g_display.loc[:,'$ Value'] = savor_calculation(g_display['Total']
+              g_display.loc[:,'Gnrc. $'] = savor_calculation(g_display['Total']
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
                                                           , st.session_state['streaming_noise']) 
@@ -324,7 +322,7 @@ def make_cand_tab(_H
                                                           , st.session_state.n_drafters * st.session_state.cash_per_team
                                                           , st.session_state['streaming_noise']) 
               
-              g_display.loc[:,'Original $ Value'] =  g_score_savor.loc[g_display.index]
+              g_display.loc[:,'Orig. $'] =  g_score_savor.loc[g_display.index]
 
           if drop_player is not None:
 
@@ -512,7 +510,7 @@ def make_detailed_view():
         with c1_2: 
           st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
           st.dataframe(g_scores_to_display_styled, height = 248)
-          
+
 def make_auction_string(original_player_value
                         , remaining_player_list
                         , rate_display
@@ -524,7 +522,7 @@ def make_auction_string(original_player_value
   inflation_factor_unchosen_players = original_value_of_unchosen_players/remaining_cash
 
   inflation_factor_formatted = str(np.round(inflation_factor_unchosen_players * 100,1)) + '%'
-  player_value_inflated = str(int(np.round(rate_display['Your $ Value'].loc[player_name] * inflation_factor_unchosen_players)))
+  player_value_inflated = str(int(np.round(rate_display['Your $'].loc[player_name] * inflation_factor_unchosen_players)))
 
   if inflation_factor_unchosen_players > 1:
     st.write('Based on overspending for previously chosen players, there is less money available than there is' + 
@@ -540,9 +538,9 @@ def make_auction_string(original_player_value
                                                   )     
             
 def make_auction_value_df(rate_display, g_display, player_name):
-  big_value_df = pd.DataFrame({'$ (Your H-score)' : rate_display['Your $ Value']
-                                ,'$ (H-score)' : rate_display['$ Value']
-                                ,'$ (G-score)' : g_display['$ Value']}).sort_values('$ (Your H-score)', ascending = False)
+  big_value_df = pd.DataFrame({'$ (Your H-score)' : rate_display['Your $']
+                                ,'$ (H-score)' : rate_display['Gnrc. $']
+                                ,'$ (G-score)' : g_display['Gnrc. $']}).sort_values('$ (Your H-score)', ascending = False)
   cols = ['$ (Your H-score)','$ (H-score)','$ (G-score)']
 
   def color_blue(label):
@@ -624,10 +622,10 @@ def make_rate_display_styled(rate_display : pd.DataFrame
                               , player_last_name : str):
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
 
-  if  '$ Value' in rate_display.columns:
+  if  'Gnrc. $' in rate_display.columns:
       st.markdown('Expected win rates if taken at no cost')
 
-      rate_df_limited = rate_df_limited.drop(columns = ['Difference','Your $ Value', '$ Value', 'Original $ Value'])
+      rate_df_limited = rate_df_limited.drop(columns = ['Difference','Your $', 'Gnrc. $', 'Orig. $'])
       
       rate_df_limited_styled = rate_df_limited.style \
                                           .map(stat_styler, middle = 0.5, multiplier = 300, subset = get_selected_categories()) \

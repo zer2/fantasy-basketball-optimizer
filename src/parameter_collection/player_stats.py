@@ -27,19 +27,24 @@ def player_stats_popover():
 
         if st.session_state.league == 'NBA':
 
-            raw_stat_df, player_metadata = get_nba_stats()
+            stats = get_nba_stats()
                 
         elif st.session_state.league == 'MLB':
                 
-            raw_stat_df, player_metadata = get_mlb_stats()
+            stats = get_mlb_stats()
 
     with c2: 
-        st.caption(f"List of players that you think will be injured for the foreseeable future, and so should be ignored")
+
+        if isinstance(stats, str):
+            st.error(stats)
+            st.stop()
+
+        raw_stat_df, player_metadata = stats
         default_injury_list = [p for p in st.session_state['injured_players'] \
                                 if (p in raw_stat_df.index) and (not (p in listify(st.session_state.selections_default))) 
                                 ]
 
-        injured_players = st.multiselect('Injured players'
+        injured_players = st.multiselect('Which players should be ignored? (e.g. players who are injured long-term)'
                                 , raw_stat_df.index
                                 , default = default_injury_list
                                 , on_change = increment_player_stats_version
@@ -60,7 +65,7 @@ def get_nba_stats():
         None
 
     Returns:
-      raw_stat_df, dataframe 
+      either a tuple of (raw_stat_df, player_metadata) or a string representing an error 
     """
 
     data_options = ['Historical','Projection'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
@@ -99,13 +104,15 @@ def get_nba_stats():
                                     , max_value = 1.0
                                     , on_change= increment_player_stats_version)
             
-            hashtag_file = st.file_uploader('''Upload Hashtag Basketball stats'''
+            hashtag_file = st.file_uploader('''Copy Hashtag Basketball projections into a csv and upload it'''
                                             , type=['csv']
                                             , on_change= increment_player_stats_version)
             if hashtag_file is not None:
                 hashtag_upload  = pd.read_csv(hashtag_file)
             else:
                 hashtag_upload = None
+
+        with c2:
 
             bbm_slider = st.slider('BBM Weight'
                     , min_value = 0.0
@@ -120,39 +127,19 @@ def get_nba_stats():
                 bbm_upload  = pd.read_csv(bbm_file)
             else:
                 bbm_upload = None
-
-        with c2:
             
-            darko_slider = st.slider('Darko Weight'
-                                        , min_value = 0.0
-                                        , max_value = 1.0
-                                        , on_change= increment_player_stats_version)
-
-            rotowire_slider = st.slider('RotoWire Weight'
-                            , min_value = 0.0
-                            , max_value = 1.0
-                            , on_change= increment_player_stats_version)
-
-            
-            rotowire_file = st.file_uploader("Upload RotoWire data, as a csv"
-                                            , type=['csv']
-                                            , on_change= increment_player_stats_version)
-            if rotowire_file is not None:
-                rotowire_upload  = pd.read_csv(rotowire_file, skiprows = 1)
-            else:
-                rotowire_upload = None
-
-            if (rotowire_slider > 0) & (rotowire_upload is None):
-                st.error('Upload RotoWire projection file')
-                st.stop()
+        #no rotowire or darko for now- could revisit in future
+        #DARKO isn't great for pre-season becuase it doesnt understand roster changes
+        #and I dont think rotowire is really used at all
+        darko_slider = 0
+        rotowire_slider = 0   
+        rotowire_upload = None 
 
         if (bbm_slider > 0) & (bbm_upload is None):
-            st.error('Upload Basketball Monster projection file')
-            st.stop()
+            return 'Upload Basketball Monster projection file'
 
         if hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
-            st.error('Need to upload a projection file and set a weight to it')
-            st.stop()
+            return 'Need to upload a projection file and set a weight to it'
 
         else:
             raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
@@ -164,7 +151,7 @@ def get_nba_stats():
                             , rotowire_slider
                             , st.session_state.data_source)
         
-    return raw_stats_df, player_metadata
+    return (raw_stats_df, player_metadata)
 
 def get_mlb_stats():
     """Figures out where to get player stats from, and loads them into a dataframe, specifically for the MLB
@@ -173,7 +160,7 @@ def get_mlb_stats():
         None
 
     Returns:
-      raw_stat_df, dataframe 
+      either a tuple of (raw_stat_df, player_metadata) or a string representing an error 
     """
 
     data_options = ['Projection']

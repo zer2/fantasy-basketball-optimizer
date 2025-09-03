@@ -616,11 +616,11 @@ def get_default_h_values(info : dict
   
   if st.session_state['mode'] == 'Auction Mode':
 
-    h_res.loc[:,'$ Value'] = savor_calculation(h_res['H-score']
+    h_res.loc[:,'Gnrc. $'] = savor_calculation(h_res['H-score']
                                                     , n_picks * n_drafters
                                                     , 200*n_drafters
                                                     , st.session_state['streaming_noise_h'])
     
-    h_res = h_res[['Rank','Player','$ Value','H-score'] + get_selected_categories()]
+    h_res = h_res[['Rank','Player','Gnrc. $','H-score'] + get_selected_categories()]
 
   return h_res
