@@ -6,7 +6,7 @@ from src.helpers.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version \
                                   ,get_games_per_week, get_ratio_statistics
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
-                        get_data_from_snowflake, combine_nba_projections, get_player_metadata, get_yahoo_key_to_name_mapper
+                        get_data_from_snowflake, combine_nba_projections, get_yahoo_key_to_name_mapper
 from src.math.process_player_data import process_player_data
 from src.math.algorithm_agents import HAgent
 from src.tabs.trading import make_trade_tab

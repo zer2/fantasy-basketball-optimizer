@@ -562,7 +562,7 @@ def get_positions_styled(n_per_position : dict
 
   position_share_df = pd.DataFrame({p + '-' + str(n_per_position[p]): 
                                     position_shares[p].loc[player_name] * n_per_position[p] 
-                                    for p in get_position_structure()['flex_list']}
+                                    for p in get_position_structure()['flex_list'] if p in n_per_position.keys()}
                                     ).T.fillna(0)
   
   position_share_df = position_share_df[get_position_structure()['base_list']]

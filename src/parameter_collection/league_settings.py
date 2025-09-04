@@ -82,8 +82,6 @@ def league_settings_popover():
                                                                                     ,st.session_state.integration.division_id) 
             st.session_state.n_drafters = len(st.session_state.team_names)
 
-            st.write(st.session_state.n_drafters)
-            st.write(st.session_state.team_names)
             st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
 
             st.session_state.selections_default = st.session_state.integration.selections_default

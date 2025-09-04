@@ -46,9 +46,11 @@ class HAgent():
         self.omega = omega
         self.gamma = gamma
         self.n_picks = n_picks 
-        self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
+
+        #ZR: do we need this or can we imply it from player_assignments when H score runs?
+        self.n_drafters = n_drafters
         self.team_names = team_names
 
         #ZR: we really need to fix this later lol. The thing is that the positions table 
