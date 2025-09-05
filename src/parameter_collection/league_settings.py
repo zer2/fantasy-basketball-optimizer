@@ -10,6 +10,8 @@ import numpy as np
 
 from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
 
+from src.helpers.helper_functions import get_team_names
+
 def league_settings_popover():
     """Collect settings for the league and set up a platform integration if necessary
 
@@ -78,10 +80,6 @@ def league_settings_popover():
         
             st.session_state.integration.setup()
 
-            st.session_state.team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
-                                                                                    ,st.session_state.integration.division_id) 
-            st.session_state.n_drafters = len(st.session_state.team_names)
-
             st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
 
             st.session_state.selections_default = st.session_state.integration.selections_default
@@ -113,12 +111,13 @@ def league_settings_popover():
                             , hide_index = True
                             , on_change = increment_and_reset_draft)
             
+            #ZR: It would probably be better to access this through a function that accesses team_df
             st.session_state.team_names = list(team_df.iloc[0])
 
             # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
             #Should this just be called if selections_df not in session state?
             st.session_state.selections_default = pd.DataFrame(
-                {team : [np.nan] * st.session_state.n_picks for team in st.session_state.team_names}
+                {team : [np.nan] * st.session_state.n_picks for team in get_team_names()}
                 )
             
             if 'selections_df' not in st.session_state:
@@ -126,7 +125,7 @@ def league_settings_popover():
 
             if (st.session_state['mode'] == 'Draft Mode'):
                 autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
-                    ,options = st.session_state.team_names
+                    ,options = get_team_names()
                     ,key = 'autodrafters'
                     ,default = None)
             

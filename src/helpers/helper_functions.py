@@ -216,6 +216,15 @@ def get_n_games():
 def get_games_per_week():
    if st.session_state:
       return st.session_state.params['n_games_per_week']
+   
+def get_team_names():
+   if st.session_state.data_source == 'Enter your own data':
+      return st.session_state.team_names
+   else:
+      return st.session_state.integration.get_team_names()
+   
+def get_n_drafters():
+   return len(get_team_names())
 
 #ZR: For efficiency, should make this a series and save it beforehand. The caching wont work
 #The problem is that there might be names that we miss, which would be bad
@@ -483,3 +492,4 @@ def get_snowflake_connection(schema):
         )
       return con
       
+  

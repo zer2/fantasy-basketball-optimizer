@@ -3,7 +3,7 @@ import pandas as pd
 
 from src.helpers.helper_functions import get_selected_categories, increment_player_stats_version
 from src.math.process_player_data import process_player_data
-from src.helpers.helper_functions import get_games_per_week
+from src.helpers.helper_functions import get_games_per_week, get_n_drafters
 
 def player_stat_param_popover():
     """Collect information from the user on desired parameters for handling player injuries/uncertainty 
@@ -78,7 +78,7 @@ def player_stat_param_popover():
                             ,st.session_state.psi
                             ,st.session_state.chi
                             ,st.session_state.scoring_format
-                            ,st.session_state.n_drafters
+                            ,get_n_drafters()
                             ,st.session_state.n_picks
                             ,st.session_state.params
                             ,st.session_state.player_stats_version)

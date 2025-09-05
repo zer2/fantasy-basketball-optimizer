@@ -6,7 +6,7 @@ from src.helpers.helper_functions import get_position_numbers_unwound, static_sc
 from src.math.algorithm_helpers import savor_calculation
 from src.data_retrieval.get_data import get_htb_adp
 from src.math.algorithm_helpers import combinatorial_calculation
-from src.helpers.helper_functions import listify
+from src.helpers.helper_functions import listify, get_n_drafters
 
 '''
 @st.cache_data(show_spinner = True, ttl = 3600)
@@ -319,7 +319,7 @@ def make_cand_tab(_H
               #ZR: maybe we don't need to run this every time
               g_score_savor = savor_calculation(_g_scores['Total']
                                                           , total_players 
-                                                          , st.session_state.n_drafters * st.session_state.cash_per_team
+                                                          , get_n_drafters() * st.session_state.cash_per_team
                                                           , st.session_state['streaming_noise']) 
               
               g_display.loc[:,'Orig. $'] =  g_score_savor.loc[g_display.index]

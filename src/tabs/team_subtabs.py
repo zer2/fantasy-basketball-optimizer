@@ -14,6 +14,7 @@ from pathlib import Path
 import gc
 from src.math.algorithm_helpers import combinatorial_calculation
 from src.math.algorithm_agents import get_base_h_score
+from src.helpers.helper_functions import get_team_names
 
 @st.fragment
 def roster_inspection(selections_df, info, omega, gamma, scoring_format, chi, player_assignments):
@@ -176,7 +177,7 @@ def make_team_matchup_tab(base_h_score
 
     cdfs_consolidated = cdfs_consolidated[['MC','EC'] + get_selected_categories()]
 
-    cdfs_consolidated.index = [team for team in st.session_state.team_names if team != team_name]
+    cdfs_consolidated.index = [team for team in get_team_names() if team != team_name]
 
     averages = cdfs_consolidated.mean(axis = 0)
     averages.name = '✨ Average ✨'

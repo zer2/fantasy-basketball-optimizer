@@ -4,7 +4,7 @@ import numpy as np
 import yaml
 from src.helpers.helper_functions import  get_position_numbers, listify \
                                   ,increment_player_stats_version \
-                                  ,get_games_per_week, get_ratio_statistics
+                                  ,get_games_per_week, get_ratio_statistics, get_n_drafters
 from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
                         get_data_from_snowflake, combine_nba_projections, get_yahoo_key_to_name_mapper
 from src.math.process_player_data import process_player_data
@@ -140,7 +140,7 @@ H = HAgent(info = st.session_state.info
     , omega = st.session_state.omega
     , gamma = st.session_state.gamma
     , n_picks = st.session_state.n_starters
-    , n_drafters = st.session_state.n_drafters
+    , n_drafters = get_n_drafters()
     , dynamic = st.session_state.n_iterations > 0
     , scoring_format = st.session_state.scoring_format
     , chi = st.session_state.chi
