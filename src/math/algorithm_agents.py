@@ -62,7 +62,7 @@ class HAgent():
 
         self.collect_info = collect_info
         
-        self.cross_player_var = info['Var']
+        self.w = info['w']
         self.scoring_format = scoring_format
 
         x_scores = info['X-scores']
@@ -420,7 +420,7 @@ class HAgent():
         #is cross_player_var just the diagonal entries of L? 
 
         diff_var = self.n_picks * \
-            (2 * chi +  self.cross_player_var * (self.n_picks - n_their_players)/(self.n_picks))
+            (2 * chi +  self.w * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
     
     def get_value_of_money_auction(self

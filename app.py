@@ -2,20 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import yaml
-from src.helpers.helper_functions import  get_position_numbers, listify \
-                                  ,increment_player_stats_version \
-                                  ,get_games_per_week, get_ratio_statistics, get_n_drafters
-from src.data_retrieval.get_data import get_historical_data, get_specified_stats, \
-                        get_data_from_snowflake, combine_nba_projections, get_yahoo_key_to_name_mapper
-from src.math.process_player_data import process_player_data
+from src.helpers.helper_functions import listify, get_n_drafters
 from src.math.algorithm_agents import HAgent
 from src.tabs.trading import make_trade_tab
-from src.helpers.data_editor import make_data_editor
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
                           ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
 from src.tabs.team_subtabs import roster_inspection
 from src.tabs.waivers import make_full_waiver_tab
-from src.tabs.other_tabs import make_about_tab
 from src.parameter_collection.league_settings import league_settings_popover
 from src.parameter_collection.player_stats import player_stats_popover
 from src.parameter_collection.parameters import player_stat_param_popover, algorithm_param_popover, trade_param_popover
@@ -125,6 +118,7 @@ if st.session_state['mode'] == 'Season Mode':
   trade_tab = main_tabs[1]
   rosters_tab = main_tabs[2]
 
+#ZR: I think this should be cleaned up 
 mov = st.session_state.info['Mov']
 vom = st.session_state.info['Vom']
 
