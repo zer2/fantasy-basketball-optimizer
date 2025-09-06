@@ -8,44 +8,6 @@ from src.data_retrieval.get_data import get_htb_adp
 from src.math.algorithm_helpers import combinatorial_calculation
 from src.helpers.helper_functions import listify, get_n_drafters
 
-'''
-@st.cache_data(show_spinner = True, ttl = 3600)
-def make_cand_tab(_scores : pd.DataFrame
-              , selection_list : list[str]
-              , player_multiplier : float
-              , remaining_cash : int = None 
-              , total_players : int = None 
-              , info_key : int = None) :
-  """Make a tab showing stats for players that have not yet been drafted
-
-  Args:
-      scores: Dataframe of floats, rows by player and columns by category
-      selection_list: list of players that have already been selected
-      player_multiplier: scaling factor to use for color-coded display of player stats
-      remaining_cash: for auction calculation
-      total_players: for auction calculation
-      info_key: for detecting changes
-
-  Returns:
-      DataFrame of stats of unselected players, to use in other tabs
-  """
-
-  scores_unselected = _scores[~_scores.index.isin(selection_list)]
-
-  if remaining_cash:
-
-    scores_unselected.loc[:,'Gnrc. $'] = savor_calculation(scores_unselected['Total']
-                                                          , total_players - len(selection_list)
-                                                          , remaining_cash
-                                                          , st.session_state['streaming_noise'])
-    
-  scores_unselected_styled = static_score_styler(scores_unselected, player_multiplier)
-
-  scores_display = st.dataframe(scores_unselected_styled, use_container_width = True)
-
-  return scores_unselected
-'''
-
 def make_hashable(obj):
     """
     Recursively convert obj into a hashable, canonical form.

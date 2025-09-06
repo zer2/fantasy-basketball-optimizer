@@ -88,6 +88,7 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
         counting_statistics = get_selected_counting_statistics()
         ratio_statistics = get_selected_ratio_statistics()
         
+    #ZR: This should be updated with the ddof = 0 fix
     player_stats = weekly_df.groupby(level = 'Player').agg(['mean','var'])
 
     #counting stats
