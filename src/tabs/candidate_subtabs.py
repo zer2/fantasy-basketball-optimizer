@@ -386,7 +386,7 @@ def make_detailed_view():
       player_last_name = player_name.split(' ')[1]
 
         
-    if len(my_players) < st.session_state.n_picks - 1:
+    if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
       n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
                                                                           ,player_last_name = player_last_name
                                                                           ,my_players = my_players
@@ -430,7 +430,7 @@ def make_detailed_view():
 
     with c1:
 
-      if len(my_players) < st.session_state.n_picks - 1:
+      if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
 
         st.markdown('Category weights for future picks')
         st.dataframe(weights_styled, hide_index = True)
