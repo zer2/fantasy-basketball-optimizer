@@ -1,7 +1,44 @@
 from manim import *
 
+from manim import *
+
+import os
+os.chdir('..') 
+
+import pandas as pd
+import numpy as np
+from collections import Counter
+import random 
+
+def make_weekly_df(season_df : pd.DataFrame):
+    """Prepares a stat dataframe and a position series for a season"""
+
+    cols = ['FTM','FTA','FGM','FGA'
+        ,'PTS','REB','AST','STL','BLK','FG3M','TO']
+
+    season_df['DATE'] = pd.to_datetime(season_df['date'])
+    season_df['WEEK'] = season_df['DATE'].dt.isocalendar()['week']
+
+    #make sure we aren't missing any weeks when a player didn't play
+    weekly_df_index = pd.MultiIndex.from_product([pd.unique(season_df['PLAYER_NAME'])
+                                                 ,pd.unique(season_df['WEEK'])]
+                                                 ,names = ['PLAYER_NAME','WEEK'])
+    weekly_df = season_df.groupby(['PLAYER_NAME','WEEK'])[cols].sum()
+    season_df = pd.DataFrame(weekly_df, index = weekly_df_index ).fillna(0)
+
+    #experimental!!!
+    #season_df = season_df[season_df.sum(axis = 1) > 0]
+    
+    return season_df
+
+#from manim import config
+#config.tex_compiler = "C:/Program Files/MiKTeX/miktex/bin/x64/latex"
+
+weekly_df = make_weekly_df(pd.read_csv('C:/Users/zacha/Projects/FBBO/data_for_testing/2023-24_complete.csv'))
+
 class FantasyBasketballDraft(Scene):
     def construct(self):
+
         # Define managers and players
         managers = ["Team A", "Team B", "Team C", "Team D","Team E","Team F","Team G","Team H","Team I","Team J"]
         players = [
@@ -60,7 +97,7 @@ class FantasyBasketballDraft(Scene):
 
 
         # Add "Round N+1" label for the extra row
-        next_round_label = Text(f"Round {num_rounds + 1}", font_size=12)
+        next_round_label = Text(f"Rounds\n4 - 13", font_size=12)
         next_round_label.next_to(additional_grid[0], LEFT, buff=0.2)
         self.play(Write(next_round_label), run_time = 0.1)
 
@@ -99,5 +136,52 @@ class FantasyBasketballDraft(Scene):
 
         # Add indication of more rounds
 
-        self.wait(2)
+        self.wait(5)
 
+stat_mapper = {'Points' : 'PTS'
+                    ,'Threes' : 'FG3M'
+                    ,'Rebounds' : 'REB'
+                    ,'Assists' : 'AST'
+                    ,'Steals'  : 'STL'
+                    ,'Blocks' : 'BLK'
+                    ,'Turnovers' : 'TO'
+                    ,'Field Goal Attempts' : 'FGA'
+                    ,'Field Goal %' : 'FG_PCT'
+                    ,'Free Throw Attempts' : 'FTA'
+                    ,'Free Throw %'  : 'FT_PCT'
+                    }
+
+
+class PlayerComparison(Scene):
+    def construct(self):
+        player_1_name = 'Jayson Tatum'
+        player_2_name = 'Anthony Davis'
+        player_1_name = 'Giannis Antetokounmpo'
+        player_2_name = 'Thanasis Antetokounmpo'
+
+        relevant_stats = ['Points' ,'Threes' ,'Rebounds' ,'Assists' ,'Steals' 
+                          ,'Blocks' ,'Turnovers','Field Goal Attempts' ,'Field Goal %'
+                          ,'Free Throw Attempts','Free Throw %' ]
+        
+
+        player_1_display = self.get_player_stat_display(player_1_name, relevant_stats).shift(LEFT*3 + DOWN * 0.2)
+        player_2_display = self.get_player_stat_display(player_2_name, relevant_stats).shift(RIGHT*3 + DOWN * 0.2)
+
+        self.play(Create(player_1_display))
+        self.wait(1)
+        self.play(Create(player_2_display))
+        self.wait(50)
+
+    def get_player_stat_display(self, player_name, relevant_stats):
+        player_stats = weekly_df.loc[player_name].mean()
+        player_stats['FG_PCT'] = player_stats['FGM']/player_stats['FGA']
+        player_stats['FT_PCT'] = player_stats['FTM']/player_stats['FTA']
+
+        table = Table([[stat,str(np.round(player_stats[stat_mapper[stat]],2))]for stat in relevant_stats]).scale(0.35)
+        title_subtext = Text('Weekly stats 23-24').next_to(table, UP, buff = 0.05).scale(0.35)
+        title_text = Text(player_name).next_to(title_subtext, UP, buff = 0).scale(0.6)
+
+        display = VGroup(title_text, title_subtext, table)
+
+        return display
+    

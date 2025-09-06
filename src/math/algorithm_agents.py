@@ -46,13 +46,12 @@ class HAgent():
         self.omega = omega
         self.gamma = gamma
         self.n_picks = n_picks 
-        self.n_drafters = n_drafters
         self.dynamic = dynamic
         self.chi = chi
-        if team_names is not None:
-            self.team_names = team_names
-        else:
-            self.team_names = st.session_state.team_names
+
+        #ZR: do we need this or can we imply it from player_assignments when H score runs?
+        self.n_drafters = n_drafters
+        self.team_names = team_names
 
         #ZR: we really need to fix this later lol. The thing is that the positions table 
         #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
@@ -145,6 +144,7 @@ class HAgent():
 
             #if you were to transfer one point of G-score from a batter to a pitcher, what would it look like?
             #start by inverting v: this converts one point of G-score into one point of X-score
+            #ZR: shouldnt this be self.original_v?
             pitching_preference_vector = 1/self.v
             #normalize so that the scores add up to 1 for both hitters and batters
             pitching_preference_vector[self.pitching_stat_indices] = pitching_preference_vector[self.pitching_stat_indices]/ \
@@ -154,7 +154,7 @@ class HAgent():
 
             #multiply by two because v naturally adds up to 1
             self.pitching_preference_vector = pitching_preference_vector
-            self.pitching_preference_damper = 0.2
+            self.pitching_preference_damper = 1
 
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
@@ -179,6 +179,7 @@ class HAgent():
             String indicating chosen player
         """
         self.n_drafters = len(player_assignments) #ZR: Kind of a hack, but it helps sometimes when the session state gets messed up
+        self.team_names = list(player_assignments.keys())
         my_players = [p for p in player_assignments[drafter] if p == p]
 
         self.players = my_players #this is a bit of a hack
@@ -682,10 +683,16 @@ class HAgent():
                 
                 score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
+            if expected_future_diff is not None:    
+                future_diff_df = pd.DataFrame(np.squeeze(expected_future_diff), index = result_index, columns = self.x_scores.columns)
+            else:
+                future_diff_df = None
+
             res = {'Scores' : pd.Series(score, index = result_index)
                     ,'Weights' : pd.DataFrame(category_weights_current, index = result_index, columns = self.x_scores.columns)
                     ,'Rates' : pd.DataFrame(cdf_means, index = result_index, columns = self.x_scores.columns)
                     ,'Diff' : pd.DataFrame(expected_diff_means, index = result_index, columns = self.x_scores.columns)
+                    ,'Future-Diff' : future_diff_df
                     ,'Rosters' : pd.DataFrame(rosters, index = result_index)
                     ,'Position-Shares' : {position_code : 
                                                     pd.DataFrame(position_shares_current[position_code].values
@@ -1504,6 +1511,7 @@ def get_base_h_score(_info : dict
     , n_drafters = n_drafters
     , dynamic = False
     , scoring_format = scoring_format
-    , chi = chi)
+    , chi = chi
+    , team_names = list(player_assignments.keys()))
 
   return next(H.get_h_scores(player_assignments, team))   

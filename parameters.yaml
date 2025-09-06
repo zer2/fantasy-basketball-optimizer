@@ -228,78 +228,78 @@ NBA:
     positions: 
      13:
       base:
-        C : 2
         PG : 1
         SG : 1
-        PF : 1
         SF : 1
+        PF : 1
+        C : 2
       flex: 
-        Util : 3
         G :  2
         F :  2
+        Util : 3
      14: 
       base:
-        C : 2
         PG : 1
         SG : 1
-        PF : 1
         SF : 1
+        PF : 1
+        C : 2
       flex: 
-        Util : 4
         G :  2
         F :  2
+        Util : 4
      15: 
       base:
-        C : 2
         PG : 1
         SG : 1
-        PF : 1
         SF : 1
+        PF : 1
+        C : 2
       flex: 
-        Util : 3
         G :  3
         F :  3
+        Util : 3
      16:
         base :
-          C : 3
           PG : 1
           SG : 1
-          PF : 1
           SF : 1
+          PF : 1
+          C : 3
         flex :
-          Util : 3
           G : 3
           F : 3
+          Util : 3
   position_structure :
     base_list :
-      - C
       - PG
       - SG
-      - PF
       - SF
+      - PF
+      - C
     base:
-      C : 
-        full_str: Centers
       PG : 
         full_str: Point Guards
       SG : 
         full_str: Shooting Guards
-      PF : 
-        full_str: Power Forwards
       SF : 
         full_str: Small Forwards
+      PF : 
+        full_str: Power Forwards
+      C : 
+        full_str: Centers
     flex_list :
-    - Util 
     - G
     - F
+    - Util 
     flex: 
       Util : 
         bases: 
-        - C
         - PG
         - SG
-        - PF
         - SF
+        - PF
+        - C
         full_str: Utilities
       G : 
         bases: 
@@ -308,8 +308,8 @@ NBA:
         full_str: Guards
       F: 
         bases: 
-        - PF
         - SF
+        - PF
         full_str: Forwards
   punting_defaults :
     No dynamic optimization :
@@ -324,10 +324,7 @@ NBA:
       omega : 1.0
       gamma : 0.4
       n_iterations : 30
-  punting_default_index : 
-    "Head to Head: Most Categories" : 1
-    "Head to Head: Each Category" : 1
-    "Rotisserie": 1
+  punting_default : Moderate punting
   n_games : 82
   n_games_per_week : 3
 WNBA:

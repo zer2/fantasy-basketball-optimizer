@@ -718,11 +718,10 @@ def run_season(season_df
                                 , player_averages
                                 , None
                                 , multipliers 
-                                , 0
                                 , 0 
                                 , 0 
                                 , chi
-                                , scoring_format
+                                , st.session_state.scoring_format
                                 , n_drafters
                                 , n_picks
                                 , params

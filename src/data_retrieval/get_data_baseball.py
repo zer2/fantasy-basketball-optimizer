@@ -164,8 +164,6 @@ def combine_baseball_projections(rotowire_upload
                     if np.issubdtype(x.dtype, np.number) \
                     else x.dropna()[0])
     
-    #df[r'Batting Average'] = (df[r'Batting Average'] * 100).round(1)
-
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
 

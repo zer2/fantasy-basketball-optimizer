@@ -12,7 +12,7 @@ from src.platform_integration import yahoo_helper
 from streamlit.logger import get_logger
 from tempfile import mkdtemp
 from yfpy.query import YahooFantasySportsQuery
-from src.data_retrieval.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper, get_player_metadata
+from src.data_retrieval.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
 from src.helpers.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names
 from collections import Counter
 from src.helpers.helper_functions import get_fixed_player_name
@@ -90,8 +90,7 @@ class ESPNIntegration(PlatformIntegration):
               self.team_names = self.get_team_names(self.league_id)
               self.n_drafters = len(self.get_teams_dict(self.league_id)) 
 
-              player_metadata = get_player_metadata(st.session_state.data_source)
-              team_players_df = self.get_rosters_df(self.league_id, player_metadata)
+              team_players_df = self.get_rosters_df(self.league_id)
               self.selections_default = team_players_df
 
               self.n_picks = team_players_df.shape[0]
@@ -125,12 +124,11 @@ class ESPNIntegration(PlatformIntegration):
         return sorted_leagues
 
     @st.cache_data(ttl=3600, show_spinner = "Fetching rosters from your ESPN league. This should take about ten seconds")
-    def get_rosters_df(_self, league_id, player_metadata):
+    def get_rosters_df(_self, league_id):
         """Get a dataframe with a column per team and cell per player chosen by that team
 
         Args:
             league_id: ESPN league id
-            player_metadata
 
         Returns:
             DataFrame with roster info
@@ -143,7 +141,7 @@ class ESPNIntegration(PlatformIntegration):
         teams = league.teams
 
         team_players_dict = {team.team_name :
-                [get_fixed_player_name(player.name, player_metadata) for player in team.roster] 
+                [get_fixed_player_name(player.name) for player in team.roster] 
                               for team in teams}
         
         max_team_size = max([len(x) for x in team_players_dict.values()])
@@ -179,7 +177,7 @@ class ESPNIntegration(PlatformIntegration):
             st.session_state.espn_swid = re.sub('{|}','',espn_swid)
             st.rerun()
 
-    def get_draft_results(_self, player_metadata):
+    def get_draft_results(_self):
         pass
 
     def get_auction_results():

@@ -99,13 +99,13 @@ def get_position_structure():
        return st.session_state.params['position_structure']
     else:
        return { 'base_list' :
-                        ['C','PG','SG','PF','SF']
+                        ['PG','SG','SF','PF','C']
                ,'base' : {'C' : {'full_str' : 'Centers'}
                          ,'PG' :{'full_str' : 'Point Guards'}
                          ,'SG' : {'full_str' : 'Shooting Guards'}
                          ,'PF' : {'full_str' : 'Power Forwards'}
                          ,'SF' : {'full_str' : 'Small Forwards'}}
-               ,'flex_list' : ['Util','G','F']
+               ,'flex_list' : ['G','F','Util']
                ,'flex' : {'Util' : 
                           {'bases' : ['C','PG','SG','PF','SF']
                            ,'full_str' : 'Utilities'
@@ -162,8 +162,9 @@ def get_position_ranges():
 
                 }
     
-def get_position_indices(position_structure):
+def get_position_indices(params):
    
+    position_structure = get_position_structure()
     flex_info =  position_structure['flex']
     base_position_list = position_structure['base_list']
 
@@ -215,24 +216,34 @@ def get_n_games():
 def get_games_per_week():
    if st.session_state:
       return st.session_state.params['n_games_per_week']
+   
+def get_team_names():
+   if st.session_state.data_source == 'Enter your own data':
+      return st.session_state.team_names
+   else:
+      return st.session_state.integration.get_team_names()
+   
+def get_n_drafters():
+   return len(get_team_names())
 
 #ZR: For efficiency, should make this a series and save it beforehand. The caching wont work
 #The problem is that there might be names that we miss, which would be bad
-def get_fixed_player_name(player_name : str
-                          , _player_metadata) -> str:
+def get_fixed_player_name(player_name : str) -> str:
     
     """Fix player name string to adhere to common standard
 
     Args:
         player_name: string
-        player_metadata
 
     Returns:
         fixed name string
      """
-        
-    if player_name in _player_metadata.index:
-        return player_name + ' (' + _player_metadata[player_name] + ')'
+    if isinstance(player_name, pd.Series):
+       player_name = player_name.values[0] #fix for weird thing with auctions
+
+    player_metadata = st.session_state.player_metadata
+    if player_name in player_metadata.index:
+        return player_name + ' (' + player_metadata[player_name] + ')'
     else:
         return 'RP'
     
@@ -246,8 +257,6 @@ def get_combo_params():
   combo_params_df = st.session_state.combo_params_df
   combo_params_df[['N-traded','N-received']] = \
         combo_params_df[['N-traded','N-received']].astype(int)
-
-  combo_params_df['T1'] = combo_params_df['T1']/100
 
   combo_params = tuple(combo_params_df.itertuples(name = None, index = None))
 
@@ -271,7 +280,7 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
     Styled dataframe
   """
 
-  agg_columns = [col for col in ['H-score','$ Value','Total'] if col in df.columns]
+  agg_columns = [col for col in ['H-score','Gnrc. $','Orig. $','Total'] if col in df.columns]
   index_columns = [col for col in ['Rank','Player'] if col in df.columns]
   perc_columns = ['H-score'] if 'H-score' in df.columns else []
 
@@ -394,15 +403,16 @@ def weighted_cov_matrix(df, weights):
 
 def increment_player_stats_version():
   if st.session_state:
-    st.session_state.player_stats_editable_version += 1
+    st.session_state.player_stats_version += 1
 
 def increment_info_key():
   if st.session_state:
     st.session_state.info_key += 1
 
-def increment_default_key():
-  if st.session_state:
-    st.session_state.player_stats_default_key += 1
+@st.cache_data(show_spinner = False, ttl = 3600)
+def drop_injured_players(_raw_stat_df, injured_players, player_stats_version):
+    res = _raw_stat_df.drop(injured_players)
+    return res
 
 @st.cache_data()
 def get_selections_default(n_picks, n_drafters):
@@ -464,7 +474,6 @@ def get_max_info(N):
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
    
-   print('BOO')
 
    con = get_snowflake_connection(schema)
 
@@ -472,7 +481,7 @@ def get_data_from_snowflake(table_name
 
    return df
 
-@st.cache_resource(ttl = 3600*24)
+@st.cache_resource(ttl = 3600)
 def get_snowflake_connection(schema):
       con = snowflake.connector.connect(
         user=st.secrets['SNOWFLAKE_USER']
@@ -483,3 +492,4 @@ def get_snowflake_connection(schema):
         )
       return con
       
+  

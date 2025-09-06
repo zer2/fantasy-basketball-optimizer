@@ -7,7 +7,7 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 from unidecode import unidecode
 
@@ -152,9 +152,8 @@ def get_player_metadata(data_source) -> pd.Series:
       Currently: A series of the form Player Name -> Position
    """
 
-   df = get_htb_projections(data_source)
-
-   return df['Position']
+   #this is  kind of messed up 
+   return st.session_state.player_metadata
 
 
 @st.cache_data(ttl = '1d') 
@@ -224,20 +223,19 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False, ttl = 3600)
-def get_specified_stats(dataset_name : str
-                     , default_key : int = None) -> pd.DataFrame:
+def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
   Args:
     dataset_name: the name of the dataset to fetch
-    default_key: used for caching. Increments whenever the default dataset is changed, so that this function
-                 gets rerun for sure whenever the default dataset changes
+    league: used as an input rather than taken from session state so that the function re-runs when the league is changed
+            (the names of datasets can be the same across leagues)
 
   Returns:
     Dataframe of fantasy statistics 
   """
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
-  if st.session_state.league in ('NBA','WNBA'):
+  if league in ('NBA','WNBA'):
 
     #current_data, expected_minutes = get_current_season_data()
     #darko_data = get_darko_data(expected_minutes)
@@ -247,36 +245,19 @@ def get_specified_stats(dataset_name : str
     #elif 'DARKO' in dataset_name:
     #    df = darko_data[dataset_name].copy()
 
-    if 'Hashtag' in dataset_name:
-        df = get_htb_projections()
-    elif 'RotoWire' in dataset_name:
-        if 'rotowire_data' in st.session_state:
-            raw_df = st.session_state.rotowire_data
-            df = process_basketball_rotowire_data(raw_df)
-        else:
-            st.error('Error! No rotowire data found: this should not happen')
-            st.stop()
-    elif 'Basketball Monster' in dataset_name:
-       if 'bbm_data' in st.session_state:
-            raw_df = st.session_state.bbm_data
-            df = process_basketball_monster_data(raw_df
-                                                 , default_projections = get_htb_projections())
-       else:
-            st.error('Error! No Basketball Monster data found: this should not happen')
+    #ZR: For now I think this only gets called with historical data
 
-    else:
-        historical_df = get_historical_data()
-        df = historical_df.loc[dataset_name].copy()  
-    #adjust for the display
-    df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
-    df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
-    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
+    historical_df = get_historical_data()
+    df = historical_df.loc[dataset_name].copy()  
+
+    player_metadata = pd.Series(df['Position'], index = df.index)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
-    return df.round(3) 
+
+    return df.round(3), player_metadata
   
-  elif st.session_state.league in ('MLB'):
+  elif league in ('MLB'):
     
     historical_df = get_baseball_historical_data()
 
@@ -285,9 +266,6 @@ def get_specified_stats(dataset_name : str
         df = process_baseball_rotowire_data(raw_df)
     else: 
         df = historical_df.loc[dataset_name].copy()  
-    
-    df[r'Batting Average'] = (df[r'Batting Average'] * 100).round(1)
-    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
@@ -297,6 +275,7 @@ def get_specified_stats(dataset_name : str
 @st.cache_data()
 def combine_nba_projections(rotowire_upload
                             , bbm_upload
+                            , hashtag_upload
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider 
@@ -304,7 +283,7 @@ def combine_nba_projections(rotowire_upload
                             , integration_source #just for caching purposes
                             ): 
     
-    hashtag_stats = get_htb_projections(integration_source)
+    hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, integration_source).fillna(0)
     rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload, integration_source).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, integration_source)
     darko_stats = None if darko_slider == 0 else get_darko_data(integration_source)
@@ -327,7 +306,7 @@ def combine_nba_projections(rotowire_upload
                         ,'RotoWire' : rotowire_stats
                         ,'BBM' : bbm_stats
                         ,'Darko' : darko_stats}, names = ['Source'])
-            
+                
     new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM','Darko'], all_players], names = ['Source','Player'])
 
     df = df.reindex(new_index)
@@ -344,24 +323,23 @@ def combine_nba_projections(rotowire_upload
                     else x.dropna()[0])
             
     #Need to include this because not every source projects double doubles, which gets messy
-    df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
-
-    df[r'Free Throw %'] = (df[r'Free Throw %'] * 100).round(1)
-    df[r'Field Goal %'] = (df[r'Field Goal %'] * 100).round(1)
-    df[r'Games Played %'] = (df[r'Games Played %'] * 100).round(1)
-    df[r'Three %'] = (df[r'Three %'] * 100).round(1)
+    if 'Double Doubles' in df.columns:
+        df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
 
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
 
+    player_metadata = pd.Series(df['Position'], index = df.index)
+
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
-    return df.round(2) 
+    
+    return df.round(2), player_metadata
 
 
 @st.cache_data()
 def process_basketball_rotowire_data(raw_df, integration_source = None):
-   
+      
    raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
    raw_df['FG%'] = raw_df['FG%']/100
    raw_df['FT%'] = raw_df['FT%']/100
@@ -390,8 +368,57 @@ def process_basketball_rotowire_data(raw_df, integration_source = None):
 
    return raw_df
 
+@st.cache_data()
+def process_basketball_htb_data(htb, integration_source):
+    htb = htb[htb['PLAYER'] != 'PLAYER']
+
+    htb.loc[:,'ADP'] = -1
+
+    fg_split = htb['FG%'].str[0:-1].str.split('(').str[1].str.split('/')
+    htb.loc[:,'FGM'] = fg_split.str[0] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FGA'] = fg_split.str[1] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FG%'] = htb.loc[:,'FG%'].str.split('(').str[0].astype(float)
+
+    ft_split = htb['FT%'].str[0:-1].str.split('(').str[1].str.split('/')
+    htb.loc[:,'FTM'] = ft_split.str[0] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FTA'] = ft_split.str[1] #the str here is a python hack. Its weird but it works 
+    htb.loc[:,'FT%'] = htb.loc[:,'FT%'].str.split('(').str[0].astype(float)
+
+    if '3P%' in htb.columns:
+        three_split = htb['3P%'].str[0:-1].str.split('(').str[1].str.split('/')
+        htb.loc[:,'3PA'] = three_split.str[1] #the str here is a python hack. Its weird but it works 
+        htb.loc[:,'3P%'] = htb.loc[:,'3P%'].str.split('(').str[0].astype(float)
+
+    htb = htb.rename(columns = st.session_state.params['htb-renamer'])
+    htb = map_player_names(htb, 'HTB_NAME')
+
+    stat_columns = set(st.session_state.params['counting-statistics'] + \
+                        list(st.session_state.params['ratio-statistics'].keys()) + \
+                        [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
+                            )
+    required_numeric_columns = [x for x in stat_columns if x in htb.columns] + ['Games Played']
+    required_other_columns = st.session_state.params['other-columns'] 
+
+    htb[required_numeric_columns] = htb[required_numeric_columns].astype(float)
+
+    htb.loc[:,'Games Played %'] = htb['Games Played']/get_n_games()
+    htb['Position'] = htb['Position'].fillna('NP').str.replace('/',',')
+
+    #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe. Might not be necessary for HTB
+    htb.loc[:,'Assist to TO'] = htb['Assists']/np.clip(htb['Turnovers'],0.1, None)
+    htb.loc[:,'Field Goals Made'] = htb['Field Goal %'] * htb['Field Goal Attempts']
+    htb.loc[:,'Free Throws Made'] = htb['Free Throw %'] * htb['Free Throw Attempts']
+
+    htb = htb.set_index('Player')
+
+    htb = htb[list(set(required_numeric_columns + required_other_columns))]
+
+    return htb
+
 @st.cache_data(ttl = 3600)
 def get_htb_adp():
+   
+   return -1 
    df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
    df = df.rename(columns = st.session_state.params['htb-renamer'])
 
@@ -404,43 +431,15 @@ def get_htb_adp():
    return df.set_index('Player')
 
 @st.cache_data(ttl = 3600)
-def get_htb_projections(integration_source):
-
-   raw_df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
-
-   raw_df = raw_df.rename(columns = st.session_state.params['htb-renamer'])
-   raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
-
-   raw_df['Position'] = raw_df['Position'].str.replace('/',',')
-
-   raw_df = map_player_names(raw_df, 'HTB_NAME')
-
-   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
-   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
-   raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
-   raw_df.loc[:,'Free Throws Made'] = raw_df['Free Throw %'] * raw_df['Free Throw Attempts']
-
-   raw_df = raw_df.set_index('Player')
-
-   required_columns = st.session_state.params['counting-statistics'] + \
-                    list(st.session_state.params['ratio-statistics'].keys()) + \
-                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns'] 
-   
-   raw_df = raw_df[list(set(required_columns))]
-
-   return raw_df
-
-@st.cache_data(ttl = 3600)
 def process_basketball_monster_data(raw_df, integration_source = None):
-   
+
    raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
 
    #handling case where there is an extra column that gets interpreted as a missing value
    raw_df = raw_df.loc[:,[c for c in raw_df.columns if 'Unnamed' not in c]]
    raw_df.loc[:,'Games Played %'] = raw_df['Games Played']/get_n_games()
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
-   raw_df = raw_df.dropna()
+   #raw_df = raw_df.dropna(required_columns)
 
    raw_df = map_player_names(raw_df, 'BBM_NAME')
 
@@ -487,7 +486,7 @@ def map_player_names(df, source_name):
 
    mapper_table = get_data_from_snowflake('PLAYER_MAPPING_VIEW').dropna(subset = [source_name]) \
                                                                   .set_index(source_name)[player_name_column]
-   
+      
    #does not get here
    df['Player'] = df['Player'].map(mapper_table).fillna(df['Player'])
    return df

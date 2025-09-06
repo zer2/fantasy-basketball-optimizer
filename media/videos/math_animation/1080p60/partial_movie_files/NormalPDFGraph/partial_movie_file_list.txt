@@ -1,0 +1,6 @@
+# This file is used internally by FFMPEG.
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/NormalPDFGraph/3529212410_1007431544_223132457.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/NormalPDFGraph/3040924799_1069193521_3175454513.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/NormalPDFGraph/3040924799_2642244948_1903427960.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/NormalPDFGraph/3040924799_2364329938_3378583923.mp4'
+file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/NormalPDFGraph/3040924799_696444109_3192492942.mp4'

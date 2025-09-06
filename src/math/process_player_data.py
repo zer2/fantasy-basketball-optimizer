@@ -88,6 +88,7 @@ def calculate_coefficients_historical(weekly_df : pd.DataFrame
         counting_statistics = get_selected_counting_statistics()
         ratio_statistics = get_selected_ratio_statistics()
         
+    #ZR: This should be updated with the ddof = 0 fix
     player_stats = weekly_df.groupby(level = 'Player').agg(['mean','var'])
 
     #counting stats
@@ -250,7 +251,6 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
 def process_player_data(weekly_df : pd.DataFrame
                         , _player_means : pd.DataFrame
                         , conversion_factors :pd.Series
-                        , upsilon : float
                         , psi : float
                         , chi : float
                         , scoring_format : str
@@ -284,7 +284,7 @@ def process_player_data(weekly_df : pd.DataFrame
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors)
-                
+                    
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
@@ -439,6 +439,7 @@ def process_player_data(weekly_df : pd.DataFrame
 
 
 
+
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
@@ -450,7 +451,7 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'L-by-Position' : L_by_position
           , 'Positions' : positions
           , 'Average-Round-Value' : average_round_value}
-
+  
   increment_info_key()
 
   

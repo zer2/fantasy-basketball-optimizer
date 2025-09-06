@@ -59,9 +59,8 @@ def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:
     roster = sc.get_team_roster_by_week(team_id=team_id)
     return roster
 
-def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[League]:
+def get_league_players(sc: YahooFantasySportsQuery) -> List[League]:
     """
-    Generates a list of leagues that the user has been a part of
     
     Parameters:
     - sc (object): The YahooFantasySportsQuery object.
@@ -72,7 +71,7 @@ def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[Lea
     player_dicts: List[dict[str, Player]] = sc.get_league_players() # type: ignore
 
     player_status_records = [
-            {'Player' : f'{player.name.full} ({player_metadata.get(player.name.full)})'
+            {'Player' : f'{player.name.full} ({st.session_state.player_metadata.get(player.name.full)})'
             ,'Status': player.status
             , 'Eligible Positions' : player.display_position
             , 'Team' : player.editorial_team_abbr
@@ -84,7 +83,6 @@ def get_league_players(sc: YahooFantasySportsQuery, player_metadata) -> List[Lea
 
 def get_draft_results(sc: YahooFantasySportsQuery) -> List[League]:
     """
-    Generates a list of leagues that the user has been a part of
     
     Parameters:
     - sc (object): The YahooFantasySportsQuery object.
