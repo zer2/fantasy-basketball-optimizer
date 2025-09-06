@@ -44,6 +44,7 @@ def player_stats_popover():
                                 if (p in raw_stat_df.index) and (not (p in listify(st.session_state.selections_default))) 
                                 ]
 
+        #ZR: I have seen a bug related to this, where it says that injured_players is also being modified directly in session state
         injured_players = st.multiselect('Which players should be ignored? (e.g. players who are injured long-term)'
                                 , raw_stat_df.index
                                 , default = default_injury_list

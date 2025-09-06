@@ -5,7 +5,6 @@ from src.helpers.helper_functions import get_league_type, get_selected_counting_
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
                                 ,get_ratio_statistics, get_position_numbers
 from src.data_retrieval.get_data import get_correlations, get_max_table
-import os
 import streamlit as st
 import sys
 
@@ -309,6 +308,8 @@ def process_player_data(weekly_df : pd.DataFrame
   v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
   v = v/v.sum()
 
+  w = vom/mov
+  
   g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,chi if scoring_format == 'Rotisserie' else 1)
   z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
@@ -334,8 +335,6 @@ def process_player_data(weekly_df : pd.DataFrame
   x_scores = x_scores.loc[g_scores.index]
 
   positions = _player_means['Position'].str.split(',')
-
-  cross_player_var =  x_scores[0:n_players].var()
                           
   #get position averages, to make sure the covariance matrix measures differences relative to position
   #we need to weight averages to avoid over-counting the players that can take multiple positions
@@ -437,13 +436,10 @@ def process_player_data(weekly_df : pd.DataFrame
     position_means = None        
     L_by_position = np.array([x_scores.cov()])
 
-
-
-
   info = {'G-scores' : g_scores
           ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
-          , 'Var' : cross_player_var
+          , 'w' : w
           , 'Positions' : positions
           , 'Mov' : mov
           , 'Vom' : vom
