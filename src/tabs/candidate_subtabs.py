@@ -384,11 +384,18 @@ def make_detailed_view():
                                           ,index = 0)
       
       player_last_name = player_name.split(' ')[1]
+
         
-    n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
-                                                                        ,player_last_name = player_last_name
-                                                                        ,my_players = my_players
-                                                                        ,rosters = rosters)
+    if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
+      n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
+                                                                          ,player_last_name = player_last_name
+                                                                          ,my_players = my_players
+                                                                          ,rosters = rosters)
+      
+      positions_styled = get_positions_styled(n_per_position
+                              , position_shares
+                              , player_name)
+      
     
     main_df_styled = make_main_df_styled(_g_scores
                         , player_name
@@ -399,10 +406,6 @@ def make_detailed_view():
                         , future_diffs)
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}").background_gradient(axis = None)
-    
-    positions_styled = get_positions_styled(n_per_position
-                             , position_shares
-                             , player_name)
 
     g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h = \
       get_ranking_views(g_display
@@ -427,14 +430,15 @@ def make_detailed_view():
 
     with c1:
 
-      st.markdown('Category weights for future picks')
-      st.dataframe(weights_styled, hide_index = True)
+      if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
 
-      st.markdown('Flex position allocations for future flex spot picks')
-      st.write(positions_styled)
+        st.markdown('Category weights for future picks')
+        st.dataframe(weights_styled, hide_index = True)
+        st.markdown('Flex position allocations for future flex spot picks')
+        st.write(positions_styled)
 
-      st.markdown('Roster assignments for chosen players')
-      st.write(roster_inverted_styled, hide_index = True)
+        st.markdown('Roster assignments for chosen players')
+        st.write(roster_inverted_styled, hide_index = True)
 
       if cash_remaining_per_team:
 
@@ -614,7 +618,11 @@ def make_main_df_styled(_g_scores
   else:
     other_teams_imputed = player - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
 
-  remaining_value_imputed = future_diffs.loc[player_name] * _H.original_v - other_teams_imputed
+  if future_diffs is not None:
+    remaining_value_imputed = future_diffs.loc[player_name] * _H.original_v - other_teams_imputed
+  else:
+    remaining_value_imputed = team_so_far * 0 #this just creates a series of 0s 
+
   remaining_value_imputed['Total'] = remaining_value_imputed.sum()
 
   if len([player for player in my_players if player == player]) > 0:
