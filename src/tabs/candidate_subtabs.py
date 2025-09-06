@@ -313,27 +313,27 @@ def make_cand_tab(_H
                                 , n_iterations, st.session_state.mode, st.session_state.info_key)] = {'res' : res
                                                                                           ,'iteration' : i}
 
-    score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
+  score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
 
-    if 'ADP' in rate_display.columns:
-      rate_display = rate_display.drop(columns = ['ADP'])
+  if 'ADP' in rate_display.columns:
+    rate_display = rate_display.drop(columns = ['ADP'])
 
-    st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
-            ,draft_seat = draft_seat
-            ,score_df = score_df
-            ,win_rates = win_rates
-            ,_g_scores = _g_scores
-            ,future_diffs = future_diffs
-            ,weights = weights
-            ,position_shares = position_shares
-            ,res = res
-            ,_H = _H
-            ,rosters = rosters
-            ,rate_display = rate_display
-            ,g_display = g_display
-            ,iteration = i
-            ,cash_remaining_per_team = cash_remaining_per_team
-            ,original_player_value = original_player_value)
+  st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
+          ,draft_seat = draft_seat
+          ,score_df = score_df
+          ,win_rates = win_rates
+          ,_g_scores = _g_scores
+          ,future_diffs = future_diffs
+          ,weights = weights
+          ,position_shares = position_shares
+          ,res = res
+          ,_H = _H
+          ,rosters = rosters
+          ,rate_display = rate_display
+          ,g_display = g_display
+          ,iteration = i
+          ,cash_remaining_per_team = cash_remaining_per_team
+          ,original_player_value = original_player_value)
     
   st.markdown(
         """
@@ -385,7 +385,6 @@ def make_detailed_view():
       
       player_last_name = player_name.split(' ')[1]
 
-        
     if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
       n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
                                                                           ,player_last_name = player_last_name
@@ -439,6 +438,9 @@ def make_detailed_view():
 
         st.markdown('Roster assignments for chosen players')
         st.write(roster_inverted_styled, hide_index = True)
+
+      else:
+        st.write('Category weights and position allocations not calculated for last player')
 
       if cash_remaining_per_team:
 
