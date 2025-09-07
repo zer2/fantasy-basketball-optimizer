@@ -44,7 +44,6 @@ def make_hashable(obj):
         
 def make_cand_tab(_H
                     ,_g_scores
-                    ,_z_scores
                     ,player_assignments
                     ,draft_seat
                     ,n_iterations
@@ -70,14 +69,16 @@ def make_cand_tab(_H
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
+
   #ZR: This cache should include format too- auction vs draft, and other things
-  if (draft_seat, make_hashable(player_assignments) \
+  if (drop_player is None) and (draft_seat, make_hashable(player_assignments) \
       , n_iterations, st.session_state.mode, st.session_state.info_key) in st.session_state.res_cache:
     cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments)
                                               , n_iterations, st.session_state.mode, st.session_state.info_key)]
     res = cached_info['res']
     iteration_range = range(cached_info['iteration'] - 1, n_iterations)
     cached_res = True
+
 
   else:
     _H = _H.clear_initial_weights()
@@ -232,6 +233,7 @@ def make_cand_tab(_H
                         .format(style_format, subset = rate_df.columns) \
                         .map(color_blue, subset = pd.IndexSlice[:,['Player']])
                 
+
                 g_display = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
                 
                 rate_display = score_df.merge(win_rates.dropna()

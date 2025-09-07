@@ -12,7 +12,7 @@ def calculate_coefficients(player_means : pd.DataFrame
                      , representative_player_set : list
                      , translation_factors : pd.Series
                      ) -> dict:
-    """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for Z-scores and G-scores
+    """calculate the coefficients for each category- \mu,\sigma, and \tau, so we can use them for G-scores
 
     Args:
         player_means: dataframe of fantasy-relevant statistics 
@@ -311,22 +311,15 @@ def process_player_data(weekly_df : pd.DataFrame
   w = vom/mov
   
   g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,chi if scoring_format == 'Rotisserie' else 1)
-  z_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params,  1,0)
   x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
     
   replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)
-  z_scores = games_played_adjustment(z_scores, replacement_games_rate,representative_player_set, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,representative_player_set, params, v = v)
 
   #Replacement players, for the rare case when a player is not found in the database
   x_scores.loc['RP', :] = -1
-  z_scores.loc['RP', :] = -1
   g_scores.loc['RP', :] = -1
-
-  z_scores.insert(loc = 0, column = 'Total', value = z_scores.sum(axis = 1))
-
-  z_scores.sort_values('Total', ascending = False, inplace = True)
 
   g_scores.insert(loc = 0, column = 'Total', value = g_scores.sum(axis = 1))
   g_scores.sort_values('Total', ascending = False, inplace = True)
@@ -437,7 +430,6 @@ def process_player_data(weekly_df : pd.DataFrame
     L_by_position = np.array([x_scores.cov()])
 
   info = {'G-scores' : g_scores
-          ,'Z-scores' : z_scores
           ,'X-scores' : x_scores
           , 'w' : w
           , 'Positions' : positions

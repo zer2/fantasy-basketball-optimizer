@@ -105,7 +105,7 @@ def get_nba_stats():
                                     , max_value = 1.0
                                     , on_change= increment_player_stats_version)
             
-            hashtag_file = st.file_uploader('''Copy Hashtag Basketball projections into a csv and upload it'''
+            hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
                                             , type=['csv']
                                             , on_change= increment_player_stats_version)
             if hashtag_file is not None:
@@ -120,8 +120,7 @@ def get_nba_stats():
                     , max_value = 1.0
                     , on_change= increment_player_stats_version)
 
-            bbm_file = st.file_uploader('''Upload BBM Per Game Stats.
-                                         You may have to export to excel then save as CSV utf-8.'''
+            bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
                                             , type=['csv']
                                             , on_change= increment_player_stats_version)
             if bbm_file is not None:

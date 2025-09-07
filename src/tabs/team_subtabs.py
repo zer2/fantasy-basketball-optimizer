@@ -43,8 +43,7 @@ def roster_inspection(selections_df, info, omega, gamma, scoring_format, chi, pl
 
         base_h_res = None
 
-    make_full_team_tab(st.session_state.z_scores
-                        ,st.session_state.g_scores
+    make_full_team_tab(st.session_state.g_scores
                         ,inspection_players
                         ,st.session_state.n_drafters
                         ,st.session_state.n_picks
@@ -119,8 +118,7 @@ def make_team_h_tab( base_h_score : float
 
 #ZR: I don't think we need matchups, or the Z-score tab. Can just be G-score
 @st.cache_data(show_spinner = False, ttl = 3600)
-def make_full_team_tab(z_scores : pd.DataFrame
-                  ,g_scores : pd.DataFrame
+def make_full_team_tab(g_scores : pd.DataFrame
                   ,my_players : list[str]
                   ,n_drafters : int
                   ,n_picks : int
@@ -131,7 +129,6 @@ def make_full_team_tab(z_scores : pd.DataFrame
   """Make a tab summarizing your team as it currently stands
 
   Args:
-      z_scores: Dataframe of floats, rows by player and columns by category
       g_scores: Dataframe of floats, rows by player and columns by category\
       my_players: list of players on 'your' team
       n_drafters: number of drafters in the relevant league

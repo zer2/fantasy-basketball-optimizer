@@ -11,7 +11,6 @@ import itertools
 def make_trade_tab(H
                    ,selections_df : pd.DataFrame
                    , player_assignments : dict[list]
-                   , z_scores_unselected: pd.DataFrame
                    , g_scores_unselected: pd.DataFrame):
   """Make the full trading tab- ideal destinations, targets, and suggestions
 
@@ -19,7 +18,6 @@ def make_trade_tab(H
     H: H-scoring agent, which can be used to calculate H-score 
     selections_df: The selections df from the rosters page- potentially modified by the user
     player_assignments: Dictionary form of the selections df
-    z_scores_unselected: Z-score dataframe, filtered to only include unselected players
     g_scores_unselected: G-score dataframe, filtered to only include unselected players
 
 )
@@ -111,7 +109,7 @@ def make_trade_tab(H
 
       with c2:
 
-        h_tab, z_tab, g_tab = st.tabs(['H-score','Z-score','G-score'])
+        h_tab, g_tab = st.tabs(['H-score','G-score'])
 
         if (len(players_sent) == 0) | (len(players_received) == 0):
           st.markdown('A trade must include at least one player from each team')
@@ -129,14 +127,6 @@ def make_trade_tab(H
                             , st.session_state.scoring_format
                             , st.session_state.info_key)
 
-          with z_tab:
-            make_trade_score_tab(st.session_state.z_scores 
-                              , players_sent
-                              , players_received 
-                              , st.session_state.params['z-score-player-multiplier']
-                              , st.session_state.params['z-score-team-multiplier']
-                              , st.session_state.info_key
-                              )
           with g_tab:
             make_trade_score_tab(st.session_state.g_scores 
                               , players_sent
@@ -146,13 +136,8 @@ def make_trade_tab(H
                               , st.session_state.info_key
                               )
 
-
-      if st.session_state.scoring_format == 'Rotisserie':
-        general_value = st.session_state.z_scores.sum(axis = 1)
-        replacement_value = z_scores_unselected.iloc[0].sum() 
-      else:
-        general_value = st.session_state.g_scores.sum(axis = 1)
-        replacement_value = g_scores_unselected.iloc[0].sum()
+      general_value = st.session_state.g_scores.sum(axis = 1)
+      replacement_value = g_scores_unselected.iloc[0].sum()
 
       #slightly hacky way to make all of the multiselects blue
       st.markdown("""
