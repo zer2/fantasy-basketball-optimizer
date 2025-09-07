@@ -150,7 +150,7 @@ def make_drafting_tab_own_data(H):
             def run():
                 st.session_state.run_h_score = True
 
-            button = st.button('Run Algorithm', on_click = run)
+            button = st.button('Run algorithm', on_click = run)
 
         if len(my_players) >= st.session_state.n_starters:
             base_h_res = get_base_h_score(st.session_state.info
@@ -361,7 +361,7 @@ def make_auction_tab_own_data(H):
                 + ' to select ' + str(st.session_state.n_picks - n_my_players) + ' of ' + str(st.session_state.n_picks) + ' players')
                               
         if not st.session_state.have_locked_in:
-            st.markdown('Lock in to run H-score')
+            st.markdown('Lock in to run algorithm')
 
         elif len(my_players) == st.session_state.n_picks:
             st.markdown('Team is complete!')
