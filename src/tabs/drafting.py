@@ -137,7 +137,6 @@ def make_drafting_tab_own_data(H):
 
             make_cand_tab(H
                 ,st.session_state.g_scores
-                ,st.session_state.z_scores
                 ,player_assignments
                 ,draft_seat
                 ,st.session_state.n_iterations
@@ -151,7 +150,7 @@ def make_drafting_tab_own_data(H):
             def run():
                 st.session_state.run_h_score = True
 
-            button = st.button('Run H-score', on_click = run)
+            button = st.button('Run Algorithm', on_click = run)
 
         if len(my_players) >= st.session_state.n_starters:
             base_h_res = get_base_h_score(st.session_state.info
@@ -168,8 +167,7 @@ def make_drafting_tab_own_data(H):
         else:
             base_h_res = None
 
-        make_full_team_tab(st.session_state.z_scores
-                        ,st.session_state.g_scores
+        make_full_team_tab(st.session_state.g_scores
                         ,my_players
                         ,n_drafters
                         ,st.session_state.n_starters
@@ -253,7 +251,6 @@ def make_drafting_tab_live_data(H):
 
                 make_cand_tab(H
                     ,st.session_state.g_scores
-                    ,st.session_state.z_scores
                     ,player_assignments
                     ,draft_seat
                     ,st.session_state.n_iterations
@@ -264,8 +261,7 @@ def make_drafting_tab_live_data(H):
                 st.write('You have selected all of your players')
 
             
-            make_full_team_tab(st.session_state.z_scores
-                                ,st.session_state.g_scores
+            make_full_team_tab(st.session_state.g_scores
                                 ,my_players
                                 ,n_drafters
                                 ,st.session_state.n_starters
@@ -400,7 +396,6 @@ def make_auction_tab_own_data(H):
 
             make_cand_tab(H
                 ,st.session_state.g_scores
-                ,st.session_state.z_scores
                 ,player_assignments.to_dict()
                 ,auction_seat
                 ,st.session_state.n_iterations
@@ -426,8 +421,7 @@ def make_auction_tab_own_data(H):
         else:
             base_h_res = None
 
-        make_full_team_tab(st.session_state.z_scores
-                            ,st.session_state.g_scores
+        make_full_team_tab(st.session_state.g_scores
                             ,my_players
                             ,n_drafters
                             ,st.session_state.n_picks
@@ -527,7 +521,6 @@ def make_auction_tab_live_data(H):
 
                 make_cand_tab(H
                     ,st.session_state.g_scores
-                    ,st.session_state.z_scores
                     ,player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
@@ -558,8 +551,7 @@ def make_auction_tab_live_data(H):
             else:
                 base_h_res = None
 
-            make_full_team_tab(st.session_state.z_scores
-                                    ,st.session_state.g_scores
+            make_full_team_tab(st.session_state.g_scores
                                     ,my_players
                                     ,n_drafters
                                     ,st.session_state.n_picks

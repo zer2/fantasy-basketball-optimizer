@@ -41,16 +41,11 @@ def make_full_waiver_tab(H
         #function could take an optional argument for the default player and add them 
         #with the blue highlight everywhere
 
-        waiver_team_stats_z = st.session_state.z_scores[st.session_state.z_scores.index.isin(waiver_players)]
-        waiver_team_stats_z.loc['Total', :] = waiver_team_stats_z.sum(axis = 0)
 
         waiver_team_stats_g = st.session_state.g_scores[st.session_state.g_scores.index.isin(waiver_players)]
         waiver_team_stats_g.loc['Total', :] = waiver_team_stats_g.sum(axis = 0)
 
-        if st.session_state.scoring_format == 'Rotisserie':
-          worst_player = list(st.session_state.z_scores.index[st.session_state.z_scores.index.isin(waiver_players)])[-1]
-        else:
-          worst_player = list(st.session_state.g_scores.index[st.session_state.g_scores.index.isin(waiver_players)])[-1]
+        worst_player = list(st.session_state.g_scores.index[st.session_state.g_scores.index.isin(waiver_players)])[-1]
 
         default_index = list(waiver_players).index(worst_player)
 
@@ -63,12 +58,12 @@ def make_full_waiver_tab(H
   if len(waiver_players) >= st.session_state.n_picks:
         make_cand_tab(H
                 ,st.session_state.g_scores
-                ,st.session_state.g_scores
                 ,player_assignments
                 ,waiver_inspection_seat
                 ,1
                 ,st.session_state.v
                 ,1
+                ,None
                 ,None
                 ,None
                 ,st.session_state.n_picks * st.session_state.n_drafters

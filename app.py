@@ -75,7 +75,7 @@ with st.sidebar:
 
     league_settings_popover()
   
-  with st.popover(':small[Player Stats]').container(height = 400):
+  with st.popover(':small[Player Stats]'):
 
     player_stats = player_stats_popover()
 
@@ -127,7 +127,6 @@ v = np.sqrt(mov/vom)  if st.session_state.scoring_format == 'Rotisserie' else  n
 v = np.array(v/v.sum()).reshape(1,len(v))
 
 st.session_state.v = v
-st.session_state.z_scores = st.session_state.info['Z-scores']
 st.session_state.g_scores = st.session_state.info['G-scores']
 
 H = HAgent(info = st.session_state.info
@@ -190,7 +189,6 @@ elif st.session_state['mode'] == 'Season Mode':
 
       player_assignments = selections_df.to_dict('list')
 
-      z_scores_unselected = st.session_state.z_scores[~st.session_state.z_scores.index.isin(selection_list)]
       g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
 
       with right: 
@@ -216,5 +214,4 @@ elif st.session_state['mode'] == 'Season Mode':
     make_trade_tab(H
                    , selections_df
                    , player_assignments
-                   , z_scores_unselected
                    , g_scores_unselected)              
