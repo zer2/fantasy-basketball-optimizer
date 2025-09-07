@@ -151,7 +151,7 @@ def make_drafting_tab_own_data(H):
             def run():
                 st.session_state.run_h_score = True
 
-            button = st.button('Run H-score', on_click = run)
+            button = st.button('Run Algorithm', on_click = run)
 
         if len(my_players) >= st.session_state.n_starters:
             base_h_res = get_base_h_score(st.session_state.info
