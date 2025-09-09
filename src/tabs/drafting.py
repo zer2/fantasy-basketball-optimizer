@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from src.math.algorithm_helpers import savor_calculation
 from src.helpers.helper_functions import get_team_names
+#from wfork_streamlit_profiler import Profiler
 
 #ZR: We need to add docstrings to these functions. Also, the functions in position_optimization.py
 
@@ -215,7 +216,6 @@ def make_drafting_tab_live_data(H):
 
 @st.fragment 
 def make_auction_tab_own_data(H):
-      
       n_drafters = get_n_drafters()
 
       left, right = st.columns([0.4,0.6])

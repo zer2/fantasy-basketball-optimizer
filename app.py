@@ -11,6 +11,7 @@ from src.parameter_collection.player_stats import player_stats_popover
 from src.parameter_collection.parameters import player_stat_param_popover, algorithm_param_popover, trade_param_popover
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
+from wfork_streamlit_profiler import Profiler
 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 
@@ -56,10 +57,11 @@ if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
 if 'res_cache' not in st.session_state:
-   st.session_state.res_cache = {}
+  st.session_state.res_cache = {}
 
-with open("parameters.yaml", "r") as stream:
-  st.session_state.all_params = yaml.safe_load(stream)
+if 'all_params' not in st.session_state:
+  with open("parameters.yaml", "r") as stream:
+    st.session_state.all_params = yaml.safe_load(stream)
 
 with st.sidebar:
 
@@ -104,17 +106,6 @@ with st.sidebar:
   st.link_button(':small[Paper 3: Roto]', 'https://arxiv.org/abs/2501.00933')
 
 ### Build app 
-
-#ZR: I think this should be cleaned up 
-mov = st.session_state.info['Mov']
-vom = st.session_state.info['Vom']
-
-v = np.sqrt(mov/vom)  if st.session_state.scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
-
-v = np.array(v/v.sum()).reshape(1,len(v))
-
-st.session_state.v = v
-st.session_state.g_scores = st.session_state.info['G-scores']
 
 H = HAgent(info = st.session_state.info
     , omega = st.session_state.omega

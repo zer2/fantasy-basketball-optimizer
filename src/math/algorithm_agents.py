@@ -676,10 +676,6 @@ class HAgent():
             else:
                 expected_diff_means = None
 
-            if self.value_of_money is not None:
-                
-                score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
-
             if expected_future_diff is not None:    
                 future_diff_df = pd.DataFrame(np.squeeze(expected_future_diff), index = result_index, columns = self.x_scores.columns)
             else:

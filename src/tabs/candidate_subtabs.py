@@ -171,6 +171,8 @@ def make_cand_tab(_H
 
             rate_display = rate_display[['Difference','Your $','Gnrc. $','Orig. $'] + list(rate_df.columns)]
 
+            #ZR: should only display the top, say, 50 until we're at the last iteration to save time
+            #ZR: Something about this is inefficient
             rate_display_styled = rate_display.style.format("{:.1f}"
                                                               , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
                       .map(styler_a
@@ -179,7 +181,7 @@ def make_cand_tab(_H
                                           ,cmap = 'PiYG'
                                           ,subset = ['Difference']) \
                       .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns)
+                      .format('{:,.1%}', subset = rate_df.columns)._compute()
             
             st.dataframe(rate_display_styled)
         else:
@@ -228,7 +230,7 @@ def make_cand_tab(_H
                               , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
                         .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                         .format(style_format, subset = rate_df.columns) \
-                        .map(color_blue, subset = pd.IndexSlice[:,['Player']])
+                        .map(color_blue, subset = pd.IndexSlice[:,['Player']])._compute()
                 
 
                 g_display = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
@@ -244,6 +246,7 @@ def make_cand_tab(_H
                             , hide_index = True)
 
               else:
+
                 rate_display_styled = rate_display.style.format("{:.1%}"
                                 ,subset = pd.IndexSlice[:,['H-score']]) \
                                                       .format("{:.1f}"
