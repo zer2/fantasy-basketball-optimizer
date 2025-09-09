@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from scipy.signal import savgol_filter
 from src.helpers.helper_functions import get_league_type, get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
                                 ,get_ratio_statistics, get_position_numbers
@@ -305,8 +304,8 @@ def process_player_data(weekly_df : pd.DataFrame
     
   mov = coefficients.loc[get_selected_categories() , 'Mean of Variances']
   vom = coefficients.loc[get_selected_categories() , 'Variance of Means']
-  v = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
-  v = v/v.sum()
+  v_original = np.sqrt(mov/(mov + vom)) #ZR: This doesn't work for Roto. We need to fix that later
+  v = v_original/v_original.sum()
 
   w = vom/mov
   
@@ -441,7 +440,6 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'Average-Round-Value' : average_round_value}
   
   increment_info_key()
-
   
   st.session_state.rho = get_correlations()
   st.session_state.max_table = get_max_table()

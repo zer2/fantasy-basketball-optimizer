@@ -198,6 +198,6 @@ def trade_param_popover():
     combo_params_str =  \
       """Each row is a specification for a kind of trade that will be automatically evaluated. 
       N-traded is the number of players traded from your team, and N-received is the number of 
-      players to receive in the trade. T is a threshold of G-score difference (or Z-score for 
-      Rotisserie); trades that have general value differences larger than T will not be evaluated"""
+      players to receive in the trade. T is a threshold of G-score difference ; trades that have 
+      general value differences larger than T will not be evaluated"""
     st.caption(combo_params_str)

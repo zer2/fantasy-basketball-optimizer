@@ -2,14 +2,14 @@
 import streamlit as st 
 from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify, move_back_one_pick, move_forward_one_pick, increment_player_stats_version
-from src.tabs.team_subtabs import *
+from src.tabs.season_mode import *
 from src.tabs.candidate_subtabs import *
 from src.helpers.helper_functions import move_forward_one_pick, get_n_drafters
+from src.math.algorithm_agents import HAgent
 
 import pandas as pd 
 import numpy as np
 from src.math.algorithm_helpers import savor_calculation
-from src.math.algorithm_agents import get_base_h_score
 from src.helpers.helper_functions import get_team_names
 
 def run_h_score():
@@ -28,19 +28,6 @@ def clear_draft_board():
   if 'selections_df' in st.session_state:
     st.session_state.selections_df = st.session_state.selections_default
 
-def run_autodraft():
-  
-  if 'selections_df' not in st.session_state:
-    st.session_state.selections_df = st.session_state.selections_default
-
-  team_names = get_team_names()
-
-  while (team_names[st.session_state.drafter] in st.session_state.autodrafters) and (st.session_state.row < st.session_state.n_starters):
-    selection_list = listify(st.session_state.selections_df)
-    g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
-    select_player_from_draft_board(g_scores_unselected.index[0])
-
-#run_autodraft_and_increment
 def increment_and_reset_draft():
     increment_player_stats_version()
     clear_draft_board()
@@ -63,7 +50,6 @@ def select_player_from_draft_board(p = None):
                                                                             ,st.session_state.drafter
                                                                             ,st.session_state.selections_df.shape[1])
   
-  run_autodraft()
 
 def undo_selection():
   st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
@@ -72,7 +58,6 @@ def undo_selection():
   
   st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = np.nan
 
-  run_autodraft()
 
 def clear_board():
   st.session_state.selections_df = st.session_state.selections_default
@@ -89,7 +74,7 @@ def make_drafting_tab_own_data(H):
     with left:
 
         selection_list = listify(st.session_state.selections_df)
-        g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
+        g_scores_unselected = st.session_state.info['G-scores'][~st.session_state.info['G-scores'].index.isin(selection_list)]
 
         with st.form("pick form", border = False):
             st.selectbox('Select Pick ' + str(st.session_state.row) + ' for ' + \
@@ -136,11 +121,10 @@ def make_drafting_tab_own_data(H):
         if st.session_state.run_h_score:
 
             make_cand_tab(H
-                ,st.session_state.g_scores
+                ,st.session_state.info['G-scores']
                 ,player_assignments
                 ,draft_seat
                 ,st.session_state.n_iterations
-                ,st.session_state.v
                 ,5)
                             
             st.session_state.run_h_score = False
@@ -152,28 +136,9 @@ def make_drafting_tab_own_data(H):
 
             button = st.button('Run algorithm', on_click = run)
 
-        if len(my_players) >= st.session_state.n_starters:
-            base_h_res = get_base_h_score(st.session_state.info
-                                            ,st.session_state.omega
-                                            ,st.session_state.gamma
-                                            ,st.session_state.n_starters
-                                            ,n_drafters
-                                            ,st.session_state.scoring_format
-                                            ,st.session_state.chi
-                                            ,player_assignments
-                                            ,draft_seat
-                                            ,st.session_state.info_key)
-
-        else:
-            base_h_res = None
-
-        make_full_team_tab(st.session_state.g_scores
+        make_team_display(st.session_state.info['G-scores']
                         ,my_players
-                        ,n_drafters
-                        ,st.session_state.n_starters
-                        ,base_h_res
                         ,st.session_state.info_key
-                        ,draft_seat
                         )
 
         
@@ -226,48 +191,23 @@ def make_drafting_tab_live_data(H):
             player_assignments = st.session_state.draft_results[0:st.session_state.n_starters].to_dict('list')
 
             my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
-            
-
-            if len(my_players) >= st.session_state.n_starters:
-                base_h_res = get_base_h_score(st.session_state.info
-                                                ,st.session_state.omega
-                                                ,st.session_state.gamma
-                                                ,st.session_state.n_starters
-                                                ,n_drafters
-                                                ,st.session_state.scoring_format
-                                                ,st.session_state.chi
-                                                ,player_assignments
-                                                ,draft_seat
-                                                ,st.session_state.info_key)
-
-            else:
-                base_h_res = None
-                    
-  
                 
             if len(my_players) < st.session_state.n_starters:
 
-                st.session_state.g_scores
-
                 make_cand_tab(H
-                    ,st.session_state.g_scores
+                    ,st.session_state.info['G-scores']
                     ,player_assignments
                     ,draft_seat
                     ,st.session_state.n_iterations
-                    ,st.session_state.v
                     ,5)
                 
             else:
                 st.write('You have selected all of your players')
 
             
-            make_full_team_tab(st.session_state.g_scores
+            make_team_display(st.session_state.info['G-scores']
                                 ,my_players
-                                ,n_drafters
-                                ,st.session_state.n_starters
-                                ,base_h_res
                                 ,st.session_state.info_key
-                                ,draft_seat
                                 )      
 
 
@@ -395,39 +335,19 @@ def make_auction_tab_own_data(H):
             h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
 
             make_cand_tab(H
-                ,st.session_state.g_scores
+                ,st.session_state.info['G-scores']
                 ,player_assignments.to_dict()
                 ,auction_seat
                 ,st.session_state.n_iterations
-                ,st.session_state.v
                 ,5 #display frequency
                 ,cash_remaining_per_team.to_dict()
                 ,h_defaults_savor
                 ,h_original_savor
                 ,n_drafters * st.session_state.n_picks)
 
-        if len(my_players) >= st.session_state.n_starters:
-            base_h_res = get_base_h_score(st.session_state.info
-                                            ,st.session_state.omega
-                                            ,st.session_state.gamma
-                                            ,st.session_state.n_starters
-                                            ,n_drafters
-                                            ,st.session_state.scoring_format
-                                            ,st.session_state.chi
-                                            ,player_assignments.to_dict()
-                                            ,auction_seat
-                                            ,st.session_state.info_key)
-
-        else:
-            base_h_res = None
-
-        make_full_team_tab(st.session_state.g_scores
+        make_team_display(st.session_state.info['G-scores']
                             ,my_players
-                            ,n_drafters
-                            ,st.session_state.n_picks
-                            ,base_h_res
                             ,st.session_state.info_key
-                            ,auction_seat
                             )
 @st.fragment
 def make_auction_tab_live_data(H):
@@ -520,11 +440,10 @@ def make_auction_tab_live_data(H):
             if len(my_players) < st.session_state.n_picks:
 
                 make_cand_tab(H
-                    ,st.session_state.g_scores
+                    ,st.session_state.info['G-scores']
                     ,player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
-                    ,st.session_state.v
                     ,5 #display frequency
                     ,cash_remaining_per_team.to_dict()
                     ,h_defaults_savor
@@ -534,30 +453,9 @@ def make_auction_tab_live_data(H):
             else:
                 st.write('Your team is full')
 
-            if len(my_players) >= st.session_state.n_picks:
-
-                base_h_res = get_base_h_score(st.session_state.info
-                                                ,st.session_state.omega
-                                                ,st.session_state.gamma
-                                                ,st.session_state.n_picks
-                                                ,n_drafters
-                                                ,st.session_state.scoring_format
-                                                ,st.session_state.chi
-                                                ,player_assignments.to_dict()
-                                                ,auction_seat
-                                                ,st.session_state.info_key)
-
-
-            else:
-                base_h_res = None
-
-            make_full_team_tab(st.session_state.g_scores
+            make_team_display(st.session_state.info['G-scores']
                                     ,my_players
-                                    ,n_drafters
-                                    ,st.session_state.n_picks
-                                    ,base_h_res
                                     ,st.session_state.info_key
-                                    ,auction_seat
                                     )
 
 @st.cache_data(show_spinner = False, ttl = 3600)

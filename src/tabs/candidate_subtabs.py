@@ -4,9 +4,7 @@ import numpy as np
 from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
                                 styler_a, stat_styler, get_position_structure
 from src.math.algorithm_helpers import savor_calculation
-from src.data_retrieval.get_data import get_htb_adp
-from src.math.algorithm_helpers import combinatorial_calculation
-from src.helpers.helper_functions import listify, get_n_drafters
+from src.helpers.helper_functions import get_n_drafters
 
 def make_hashable(obj):
     """
@@ -47,7 +45,6 @@ def make_cand_tab(_H
                     ,player_assignments
                     ,draft_seat
                     ,n_iterations
-                    ,v
                     ,display_period : int = 5
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
@@ -128,7 +125,7 @@ def make_cand_tab(_H
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
                   , index = score.index
-                  , columns = get_selected_categories())/v
+                  , columns = get_selected_categories())/_H.v.reshape(1,len(_H.v))
     
     with placeholder.container():
 
