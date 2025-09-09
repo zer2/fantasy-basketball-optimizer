@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, rankdata
-import os
+from scipy.stats import norm
 from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
@@ -9,8 +8,6 @@ import streamlit as st
 from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
                                             ,get_max_info
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
-import datetime
-import scipy
 
 class HAgent():
 
