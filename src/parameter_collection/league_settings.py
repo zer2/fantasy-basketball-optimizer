@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 
 from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
-
 from src.helpers.helper_functions import get_team_names
 
 def league_settings_popover():

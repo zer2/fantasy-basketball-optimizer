@@ -12,6 +12,8 @@ import numpy as np
 from src.math.algorithm_helpers import savor_calculation
 from src.helpers.helper_functions import get_team_names
 
+#ZR: We need to add docstrings to these functions. Also, the functions in position_optimization.py
+
 def run_h_score():
     st.session_state.run_h_score = True
 
