@@ -427,6 +427,7 @@ def process_player_data(weekly_df : pd.DataFrame
   except:
     position_means = None        
     L_by_position = np.array([x_scores.cov()])
+    average_round_value = None
 
   info = {'G-scores' : g_scores
           ,'X-scores' : x_scores

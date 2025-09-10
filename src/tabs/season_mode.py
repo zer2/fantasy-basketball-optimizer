@@ -91,14 +91,11 @@ def roster_inspection(selections_df : pd.DataFrame):
 
     make_team_display(st.session_state.info['G-scores']
                         ,inspection_players
-                        ,st.session_state.info_key
                         )
 
 
-@st.cache_data(show_spinner = False, ttl = 3600)
-def make_team_display(g_scores : pd.DataFrame
+def make_team_display(_g_scores : pd.DataFrame
                   ,my_players : list[str]
-                  ,info_key : int
                   ):
   """Make a table summarizing a team as it currently stands
 
@@ -117,7 +114,7 @@ def make_team_display(g_scores : pd.DataFrame
 
     my_real_players = [x for x in my_players if x != 'RP']
 
-    team_stats = g_scores[g_scores.index.isin(my_real_players)]
+    team_stats = _g_scores[_g_scores.index.isin(my_real_players)]
 
     team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
@@ -133,7 +130,6 @@ def make_team_display(g_scores : pd.DataFrame
     st.dataframe(team_stats_styled
                         , use_container_width = True
                         , height = len(team_stats) * 35 + 38
-                        , key = str(info_key) + '_player_df' 
                                                     )     
     
 @st.fragment

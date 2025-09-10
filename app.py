@@ -11,7 +11,7 @@ from src.parameter_collection.player_stats import player_stats_popover
 from src.parameter_collection.parameters import player_stat_param_popover, algorithm_param_popover, trade_param_popover
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
-#from wfork_streamlit_profiler import Profiler
+from wfork_streamlit_profiler import Profiler
 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 

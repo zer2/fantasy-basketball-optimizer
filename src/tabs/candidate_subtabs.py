@@ -132,7 +132,7 @@ def make_cand_tab(_H
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
-      display = ((i+1) % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
+      display =  (i % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
 
       h_tab, g_tab = st.tabs(['H-score','G-score'])
 
@@ -387,7 +387,7 @@ def make_detailed_view():
       
       player_last_name = player_name.split(' ')[1]
 
-    if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
+    if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1) and (rosters.shape[1] > 0):
       n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
                                                                           ,player_last_name = player_last_name
                                                                           ,my_players = my_players
@@ -431,15 +431,18 @@ def make_detailed_view():
 
     with c1:
 
-      if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
+      if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1):
 
         st.markdown('Category weights for future picks')
         st.dataframe(weights_styled, hide_index = True)
-        st.markdown('Flex position allocations for future flex spot picks')
-        st.write(positions_styled)
 
-        st.markdown('Roster assignments for chosen players')
-        st.write(roster_inverted_styled, hide_index = True)
+        if (rosters.shape[1] > 0):
+          st.markdown('Flex position allocations for future flex spot picks')
+          st.write(positions_styled)
+          st.markdown('Roster assignments for chosen players')
+          st.write(roster_inverted_styled, hide_index = True)
+        else: 
+          st.write('Roster assignments are not calculated when position is not available')
 
       else:
         st.write('Category weights and position allocations not calculated for last player')

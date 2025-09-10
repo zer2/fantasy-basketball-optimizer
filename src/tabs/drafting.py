@@ -15,62 +15,18 @@ from src.helpers.helper_functions import get_team_names
 
 #ZR: We need to add docstrings to these functions. Also, the functions in position_optimization.py
 
-def run_h_score():
-    st.session_state.run_h_score = True
-
-def stop_run_h_score():
-    st.session_state.run_h_score = False
-
-def lock_in():
-   st.session_state.have_locked_in = True
-
-def clear_draft_board():
-  if 'draft_results' in st.session_state:
-    st.session_state.draft_results = None
-
-  if 'selections_df' in st.session_state:
-    st.session_state.selections_df = st.session_state.selections_default
-
-def increment_and_reset_draft():
-    increment_player_stats_version()
-    clear_draft_board()
-
-    st.session_state.live_draft_active = False
-
-    if 'selections_df' in st.session_state:
-        del st.session_state.selections_df
-
-def select_player_from_draft_board(p = None):
-
-  if not p:
-    p = st.session_state.selected_player
-
-  if (st.session_state.row < st.session_state.selections_df.shape[0]):
-
-    st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
-
-    st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
-                                                                            ,st.session_state.drafter
-                                                                            ,st.session_state.selections_df.shape[1])
-  
-
-def undo_selection():
-  st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
-                                    , st.session_state.drafter
-                                    , st.session_state.selections_df.shape[1])
-  
-  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = np.nan
-
-
-def clear_board():
-  st.session_state.selections_df = st.session_state.selections_default
-  st.session_state.drafter = 0
-  st.session_state.row = 0
 
 @st.fragment
 def make_drafting_tab_own_data(H):
+    """Create a page for drafting based on manual input
+    This requires a significantly different UI from drafting based on a live connection, because the user has to enter players
 
-    n_drafters = get_n_drafters()
+    Args:
+        H: H-scoring Agent for performing calculations
+
+    Returns:
+        None
+    """
 
     left, right = st.columns([0.47,0.53])
 
@@ -120,7 +76,6 @@ def make_drafting_tab_own_data(H):
 
         my_players = st.session_state.selections_df[draft_seat].dropna()
 
-        #ZR: I feel like we don't need the team tab. This can just be under the main part 
         if st.session_state.run_h_score:
 
             make_cand_tab(H
@@ -128,7 +83,7 @@ def make_drafting_tab_own_data(H):
                 ,player_assignments
                 ,draft_seat
                 ,st.session_state.n_iterations
-                ,5)
+                ,15)
                             
             st.session_state.run_h_score = False
 
@@ -141,32 +96,20 @@ def make_drafting_tab_own_data(H):
 
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
-                        ,st.session_state.info_key
                         )
 
         
-def refresh_analysis():
 
-    if st.session_state.mode == 'Draft Mode':
-
-        draft_results, error_string = st.session_state.integration.get_draft_results()
-    else:
-
-        draft_results, error_string  = st.session_state.integration.get_auction_results()
-            
-    st.session_state.draft_results = draft_results
-
-    if error_string == 'Success':
-        st.session_state.live_draft_active = True
-    else:
-        if st.session_state.live_draft_active:
-            st.error(error_string)
-            st.stop()
-   
 @st.fragment
 def make_drafting_tab_live_data(H):
+    """Create a page for drafting based on a live connection e.g. from Yaho
 
-    n_drafters = get_n_drafters()
+    Args:
+        H: H-scoring Agent for performing calculations
+
+    Returns:
+        None
+    """
 
     if 'team_names' not in st.session_state:
         st.write('No league info has been passed')
@@ -202,7 +145,7 @@ def make_drafting_tab_live_data(H):
                     ,player_assignments
                     ,draft_seat
                     ,st.session_state.n_iterations
-                    ,5)
+                    ,15)
                 
             else:
                 st.write('You have selected all of your players')
@@ -210,12 +153,20 @@ def make_drafting_tab_live_data(H):
             
             make_team_display(st.session_state.info['G-scores']
                                 ,my_players
-                                ,st.session_state.info_key
                                 )      
 
 
 @st.fragment 
 def make_auction_tab_own_data(H):
+      """Create a page for an aunction based on user input data
+      This is a bit different from drafting because user information about cash needs to be collected
+
+      Args:
+        H: H-scoring Agent for performing calculations
+
+      Returns:
+        None
+      """
       n_drafters = get_n_drafters()
 
       left, right = st.columns([0.4,0.6])
@@ -341,7 +292,7 @@ def make_auction_tab_own_data(H):
                 ,player_assignments.to_dict()
                 ,auction_seat
                 ,st.session_state.n_iterations
-                ,5 #display frequency
+                ,15 #display frequency
                 ,cash_remaining_per_team.to_dict()
                 ,h_defaults_savor
                 ,h_original_savor
@@ -349,11 +300,18 @@ def make_auction_tab_own_data(H):
 
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
-                            ,st.session_state.info_key
                             )
 @st.fragment
 def make_auction_tab_live_data(H):
+    """Create a page for an aunction based on a live connection e.g. from Yahoo
+    This is a bit different from drafting because user information about cash needs to be collected
 
+    Args:
+        H: H-scoring Agent for performing calculations
+
+    Returns:
+        None
+    """
     n_drafters = get_n_drafters()
 
     if 'team_names' not in st.session_state:
@@ -381,6 +339,7 @@ def make_auction_tab_live_data(H):
 
         else:
 
+            #ZR: This is bad
             cash_per_team = 200
             st.session_state.cash_per_team = 200
             
@@ -446,7 +405,7 @@ def make_auction_tab_live_data(H):
                     ,player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
-                    ,5 #display frequency
+                    ,15 #display frequency
                     ,cash_remaining_per_team.to_dict()
                     ,h_defaults_savor
                     ,h_original_savor
@@ -457,7 +416,6 @@ def make_auction_tab_live_data(H):
 
             make_team_display(st.session_state.info['G-scores']
                                     ,my_players
-                                    ,st.session_state.info_key
                                     )
 
 @st.cache_data(show_spinner = False, ttl = 3600)
@@ -524,3 +482,74 @@ def get_default_h_values(info : dict
     h_res = h_res[['Rank','Player','Gnrc. $','H-score'] + get_selected_categories()]
 
   return h_res
+
+
+def run_h_score():
+    st.session_state.run_h_score = True
+
+def stop_run_h_score():
+    st.session_state.run_h_score = False
+
+def lock_in():
+   st.session_state.have_locked_in = True
+
+def clear_draft_board():
+  if 'draft_results' in st.session_state:
+    st.session_state.draft_results = None
+
+  if 'selections_df' in st.session_state:
+    st.session_state.selections_df = st.session_state.selections_default
+
+def increment_and_reset_draft():
+    increment_player_stats_version()
+    clear_draft_board()
+
+    st.session_state.live_draft_active = False
+
+    if 'selections_df' in st.session_state:
+        del st.session_state.selections_df
+
+def select_player_from_draft_board(p = None):
+
+  if not p:
+    p = st.session_state.selected_player
+
+  if (st.session_state.row < st.session_state.selections_df.shape[0]):
+
+    st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = p
+
+    st.session_state.row, st.session_state.drafter = move_forward_one_pick(st.session_state.row
+                                                                            ,st.session_state.drafter
+                                                                            ,st.session_state.selections_df.shape[1])
+  
+
+def undo_selection():
+  st.session_state.row, st.session_state.drafter = move_back_one_pick(st.session_state.row
+                                    , st.session_state.drafter
+                                    , st.session_state.selections_df.shape[1])
+  
+  st.session_state.selections_df.iloc[st.session_state.row, st.session_state.drafter] = np.nan
+
+
+def clear_board():
+  st.session_state.selections_df = st.session_state.selections_default
+  st.session_state.drafter = 0
+  st.session_state.row = 0
+
+def refresh_analysis():
+
+    if st.session_state.mode == 'Draft Mode':
+
+        draft_results, error_string = st.session_state.integration.get_draft_results()
+    else:
+
+        draft_results, error_string  = st.session_state.integration.get_auction_results()
+            
+    st.session_state.draft_results = draft_results
+
+    if error_string == 'Success':
+        st.session_state.live_draft_active = True
+    else:
+        if st.session_state.live_draft_active:
+            st.error(error_string)
+            st.stop()

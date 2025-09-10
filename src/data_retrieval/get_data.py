@@ -138,6 +138,9 @@ def get_historical_data():
 
   full_df['Position'] = full_df['Position'].fillna('NP')
 
+  #ZR: Hack for now because there is an extra OG Anunoby in the reference table
+  full_df = full_df[full_df['Player'] != 'OG Anunoby']
+
   full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
 
   return full_df
