@@ -1,74 +1,13 @@
 import pandas as pd
-from nba_api.stats.endpoints import leaguegamefinder, playergamelogs
 import streamlit as st
-from datetime import datetime
-from nba_api.stats import endpoints as nba_endpoints
 import numpy as np
 import requests
-import os
-import snowflake.connector
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
-from unidecode import unidecode
 
 @st.cache_data()
 def get_yahoo_key_to_name_mapper():
    return get_data_from_snowflake('PLAYER_MAPPING_VIEW')[['YAHOO_PLAYER_ID','PLAYER_NAME']].set_index('YAHOO_PLAYER_ID')
-
-#ZR: This is obviously wrong?
-def get_yahoo_key_to_position_eligibility(season = 2024):
-   return get_data_from_snowflake('YAHOO_ID_TO_NAME_VIEW')
-
-#cache this globally so it doesn't have to be rerun constantly 
-@st.cache_data(ttl = '1d') 
-def get_current_season_data(season : int = 2024) -> tuple:
-  """Get all box scores from the current season and calculate various running averages. Currently 2-week, 4-week, and season to date
-
-  Args:
-      season: int, year of season 
-              defined by the second half of the season. E.g. season that ends in 2024 is 2024
-  Returns:
-      1) Dictionary of structure name of dataset -> dataframe, where the dataframes have fantasy-relevant player statistics
-      2) Series of player -> minutes, calculated as average minutes per game played 
-  """
-
-  #ZR: I believe this function currently does not work 
-           
-  season_str = str(season -1) + '-' + str(season -2000)
-  pgl_df = pd.concat(
-      [
-          playergamelogs.PlayerGameLogs(
-              season_nullable=season_str, season_type_nullable=season_type
-          ).player_game_logs.get_data_frame()
-          for season_type in ["Regular Season"]
-      ]
-  )
-
-                            
-  renamer = st.session_state.params['current-season-api-renamer']
-  pgl_df = pgl_df.rename(columns = renamer)
-
-  expected_minutes_long_term = process_minutes(pgl_df)
-                            
-  pgl_df = pgl_df[list(renamer.values())].fillna(0)  
-
-  four_weeks_ago = datetime.now() - pd.Timedelta(days = 28)
-  two_weeks_ago = datetime.now() - pd.Timedelta(days = 14)
-
-  four_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= four_weeks_ago].drop(columns = ['Game Date'])
-  two_week_subset = pgl_df[pd.to_datetime(pgl_df['Game Date']) >= two_weeks_ago].drop(columns = ['Game Date'])
-  full_subset = pgl_df.drop(columns = ['Game Date'])
-
-  player_metadata = get_player_metadata(st.session_state.data_source)
-
-  season_display_string = str(season - 1) + '-' + str(season)
-
-  data_dict = {season_display_string + ': Four Week Average' : process_game_level_data(four_week_subset, player_metadata)
-               ,season_display_string + ': Two Week Average' : process_game_level_data(two_week_subset, player_metadata)
-               ,season_display_string + ': Season to Date' :  process_game_level_data(full_subset, player_metadata)
-              }
-                              
-  return data_dict, expected_minutes_long_term 
 
 def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
   #helper function which calculates average minutes per player in a dataset
@@ -117,48 +56,8 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
   
   except:
      return pd.DataFrame()
-
-#cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
-@st.cache_data(ttl = '1d') 
-def get_historical_data():  
-  full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
-
-  renamer = st.session_state.params['stat-df-renamer']
-  full_df = full_df.rename(columns = renamer)
-
-  full_df = full_df.apply(pd.to_numeric, errors='ignore')
-
-  #full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
-
-  full_df.loc[:,'Free Throw %'] = full_df.loc[:,'Free Throws Made']/full_df.loc[:,'Free Throw Attempts']
-  full_df.loc[:,'Field Goal %'] = full_df.loc[:,'Field Goals Made']/full_df.loc[:,'Field Goal Attempts']
-  full_df.loc[:,'Three %'] = full_df.loc[:,'Threes']/full_df.loc[:,'Three Attempts']
-
-  full_df.loc[:,'Assist to TO'] = full_df['Assists']/full_df['Turnovers']
-
-  full_df['Position'] = full_df['Position'].fillna('NP')
-
-  #ZR: Hack for now because there is an extra OG Anunoby in the reference table
-  full_df = full_df[full_df['Player'] != 'OG Anunoby']
-
-  full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
-
-  return full_df
-
-@st.cache_data(ttl = 3600) 
-def get_player_metadata(data_source) -> pd.Series:
-   """Get player data from the NBA api
-
-   Args:
-      none
-   Returns:
-      Currently: A series of the form Player Name -> Position
-   """
-
-   #this is  kind of messed up 
-   return st.session_state.player_metadata
-
-
+  
+#ZR: Currently not being used
 @st.cache_data(ttl = '1d') 
 def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
@@ -222,6 +121,32 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
    
   return darko_long_term
 
+#cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
+@st.cache_data(ttl = '1d') 
+def get_historical_data():  
+  full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
+
+  renamer = st.session_state.params['stat-df-renamer']
+  full_df = full_df.rename(columns = renamer)
+
+  full_df = full_df.apply(pd.to_numeric, errors='ignore')
+
+  #full_df['Season'] = (full_df['Season'] - 1).astype(str) + '-' + full_df['Season'].astype(str)
+
+  full_df.loc[:,'Free Throw %'] = full_df.loc[:,'Free Throws Made']/full_df.loc[:,'Free Throw Attempts']
+  full_df.loc[:,'Field Goal %'] = full_df.loc[:,'Field Goals Made']/full_df.loc[:,'Field Goal Attempts']
+  full_df.loc[:,'Three %'] = full_df.loc[:,'Threes']/full_df.loc[:,'Three Attempts']
+
+  full_df.loc[:,'Assist to TO'] = full_df['Assists']/full_df['Turnovers']
+
+  full_df['Position'] = full_df['Position'].fillna('NP')
+
+  #ZR: Hack for now because there is an extra OG Anunoby in the reference table
+  full_df = full_df[full_df['Player'] != 'OG Anunoby']
+
+  full_df = full_df.set_index(['Season','Player']).sort_index().fillna(0)  
+
+  return full_df
 
 #setting show spinner to false prevents flickering
 #data is cached locally so that different users can have different cuts loaded

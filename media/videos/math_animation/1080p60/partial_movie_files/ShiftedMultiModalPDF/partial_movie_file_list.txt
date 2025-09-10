@@ -1,8 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3529212410_913734219_223132457.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3040924799_1228975220_3177734005.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3040924799_4122673595_3094131434.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3040924799_1814310494_1672962901.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3040924799_1060462893_4150943094.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3040924799_3378364993_693181500.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/math_animation/1080p60/partial_movie_files/ShiftedMultiModalPDF/3040924799_3456681232_2986424883.mp4'

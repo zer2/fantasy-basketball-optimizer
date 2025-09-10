@@ -1,1 +1,0 @@
-I am currently in the process of writing a new paper on adapting H-scoring to Rotisserie. Right now, the app uses the algorithm that I have designed for that paper. I will update this section once the paper is finished :) 

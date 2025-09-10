@@ -1,3 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/480p15/partial_movie_files/TableScene2/1185818338_740202869_223132457.mp4'
-file 'file:C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer/media/videos/table_animation/480p15/partial_movie_files/TableScene2/624642324_3456681232_4071145810.mp4'
