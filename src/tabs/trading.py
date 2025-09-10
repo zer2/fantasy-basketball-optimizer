@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd 
-import numpy as np
 from src.helpers.helper_functions import h_percentage_styler, get_selected_categories, \
                                 styler_a, styler_b, styler_c, stat_styler, \
                                 get_your_differential_threshold, get_their_differential_threshold, get_combo_params
@@ -128,7 +127,7 @@ def make_trade_tab(H
                             , st.session_state.info_key)
 
           with g_tab:
-            make_trade_score_tab(st.session_state.g_scores 
+            make_trade_score_tab(st.session_state.info['G-scores'] 
                               , players_sent
                               , players_received 
                               , st.session_state.params['g-score-player-multiplier']
@@ -136,7 +135,7 @@ def make_trade_tab(H
                               , st.session_state.info_key
                               )
 
-      general_value = st.session_state.g_scores.sum(axis = 1)
+      general_value = st.session_state.info['G-scores'].sum(axis = 1)
       replacement_value = g_scores_unselected.iloc[0].sum()
 
       #slightly hacky way to make all of the multiselects blue

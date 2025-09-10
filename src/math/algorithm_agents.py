@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, rankdata
-import os
+from scipy.stats import norm
 from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
@@ -9,8 +8,6 @@ import streamlit as st
 from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
                                             ,get_max_info
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
-import datetime
-import scipy
 
 class HAgent():
 
@@ -678,10 +675,6 @@ class HAgent():
                 expected_diff_means = (expected_future_diff.mean(axis = 2) + diff_means.mean(axis = 2)) / (self.original_v.reshape(1,-1))
             else:
                 expected_diff_means = None
-
-            if self.value_of_money is not None:
-                
-                score = [(self.value_of_money['value'] - s).abs().idxmin()/100 for s in score]
 
             if expected_future_diff is not None:    
                 future_diff_df = pd.DataFrame(np.squeeze(expected_future_diff), index = result_index, columns = self.x_scores.columns)

@@ -4,9 +4,7 @@ import numpy as np
 from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
                                 styler_a, stat_styler, get_position_structure
 from src.math.algorithm_helpers import savor_calculation
-from src.data_retrieval.get_data import get_htb_adp
-from src.math.algorithm_helpers import combinatorial_calculation
-from src.helpers.helper_functions import listify, get_n_drafters
+from src.helpers.helper_functions import get_n_drafters
 
 def make_hashable(obj):
     """
@@ -43,11 +41,10 @@ def make_hashable(obj):
        return ''
         
 def make_cand_tab(_H
-                    ,_g_scores
-                    ,player_assignments
-                    ,draft_seat
-                    ,n_iterations
-                    ,v
+                    ,_g_scores : pd.DataFrame
+                    ,player_assignments : dict[list[str]]
+                    ,draft_seat : str
+                    ,n_iterations : int
                     ,display_period : int = 5
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
@@ -62,19 +59,24 @@ def make_cand_tab(_H
       H:
       player_assignments: dict of who has drafted what player
       draft_seat: seat from which to calculate H-score
-      n_iterations:
-      v:
-      cash_remaining_per_team:
+      n_iterations:number of iterations to run H-scoring for
+      display_period: periodicity of showing current results to the user. Higher period is quicker to execute fully, but the display won't be up-to-date the whole time
+      cash_remaining_per_team: dictionary of team -> amount of cash they have remaining
+      generic_player_value: Series of values calculated based on SAVOR and remaining cash/players 
+      original_player_value: Series of values calculated for all players assuming full cash before any players have been taken
+      total_players: number of players to be drafted
+      drop_player: a player which is considered for being dropped, for a waiver selection
 
   Returns:
-      DataFrame of stats of unselected players, to use in other tabs
+      None
   """
 
-  #ZR: This cache should include format too- auction vs draft, and other things
+  #ZR: would be great to clean up this caching operation somehow
   if (drop_player is None) and (draft_seat, make_hashable(player_assignments) \
-      , n_iterations, st.session_state.mode, st.session_state.info_key) in st.session_state.res_cache:
+      , n_iterations, st.session_state.mode, st.session_state.scoring_format, st.session_state.info_key) in st.session_state.res_cache:
     cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments)
-                                              , n_iterations, st.session_state.mode, st.session_state.info_key)]
+                                              , n_iterations, st.session_state.mode, st.session_state.scoring_format
+                                              , st.session_state.info_key)]
     res = cached_info['res']
     iteration_range = range(cached_info['iteration'] - 1, n_iterations)
     cached_res = True
@@ -96,8 +98,6 @@ def make_cand_tab(_H
     cached_res = False
 
   placeholder = st.empty()
-
-  #adps = get_htb_adp()
 
   if cash_remaining_per_team:
     selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
@@ -128,14 +128,14 @@ def make_cand_tab(_H
     #normalize weights by what we expect from other drafters
     weights = pd.DataFrame(weights
                   , index = score.index
-                  , columns = get_selected_categories())/v
+                  , columns = get_selected_categories())/_H.v.reshape(1,len(_H.v))
     
     with placeholder.container():
 
       score.name = 'H-score'
       score_df = pd.DataFrame(score)
 
-      display = ((i+1) % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
+      display =  (i % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
 
       h_tab, g_tab = st.tabs(['H-score','G-score'])
 
@@ -149,7 +149,20 @@ def make_cand_tab(_H
               st.error('Illegal roster!')
               st.stop()
 
-            rate_df = win_rates.dropna()
+            if st.session_state.scoring_format == 'Rotisserie':
+              e_points = res['Rates'][fits_roster] * (len(player_assignments) -1) + 1
+              rate_df = e_points.loc[score_df.index].dropna()
+              style_format = "{:.1f}"
+              format_middle = (len(player_assignments) -1)/2 + 1
+              format_multiplier = 15 
+
+            else:
+              rate_df = win_rates.loc[score_df.index].dropna()
+              style_format = "{:.1%}"
+              format_middle = 0.5
+              format_multiplier = 300
+
+            #rate_df = win_rates.dropna()
             rate_display = score_df.merge(rate_df, left_index = True, right_index = True)
 
             players_chosen = [x for v in player_assignments.values() for x in v if x == x]
@@ -174,6 +187,7 @@ def make_cand_tab(_H
 
             rate_display = rate_display[['Difference','Your $','Gnrc. $','Orig. $'] + list(rate_df.columns)]
 
+            #ZR: Something about this is inefficient with the streamlit implementation. It slows things down a lot
             rate_display_styled = rate_display.style.format("{:.1f}"
                                                               , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
                       .map(styler_a
@@ -181,10 +195,11 @@ def make_cand_tab(_H
                       .background_gradient(axis = None
                                           ,cmap = 'PiYG'
                                           ,subset = ['Difference']) \
-                      .map(stat_styler, middle = 0.5, multiplier = 300, subset = rate_df.columns) \
-                      .format('{:,.1%}', subset = rate_df.columns)
+                      .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+                      .format(style_format, subset = rate_df.columns)._compute()
             
             st.dataframe(rate_display_styled)
+
         else:
 
             if display:
@@ -208,16 +223,8 @@ def make_cand_tab(_H
                 format_middle = 0.5
                 format_multiplier = 300
 
-              #not implementing ADP right now
-              if 0 == 1: #st.session_state.data_option == 'Projection':
-                '''
-                rate_display = score_df.merge(adps, left_index = True, right_index = True, how = 'left') \
-                                        .merge(rate_df, left_index = True, right_index = True)      
-                adp_col = ['ADP']
-                '''
-              else:
-                rate_display = score_df.merge(rate_df, left_index = True, right_index = True)    
-                adp_col = []
+              rate_display = score_df.merge(rate_df, left_index = True, right_index = True)    
+              adp_col = []
                     
               if drop_player is not None:
                 def color_blue(label):
@@ -231,7 +238,7 @@ def make_cand_tab(_H
                               , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
                         .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                         .format(style_format, subset = rate_df.columns) \
-                        .map(color_blue, subset = pd.IndexSlice[:,['Player']])
+                        .map(color_blue, subset = pd.IndexSlice[:,['Player']])._compute()
                 
 
                 g_display = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
@@ -247,6 +254,7 @@ def make_cand_tab(_H
                             , hide_index = True)
 
               else:
+
                 rate_display_styled = rate_display.style.format("{:.1%}"
                                 ,subset = pd.IndexSlice[:,['H-score']]) \
                                                       .format("{:.1f}"
@@ -309,16 +317,14 @@ def make_cand_tab(_H
   hashable_player_assignments =  make_hashable(player_assignments)
 
   if (draft_seat, hashable_player_assignments, n_iterations, \
-      st.session_state.mode, st.session_state.info_key) not in st.session_state.res_cache:
+      st.session_state.mode, st.session_state.scoring_format, st.session_state.info_key) not in st.session_state.res_cache:
 
     st.session_state.res_cache[(draft_seat, hashable_player_assignments
-                                , n_iterations, st.session_state.mode, st.session_state.info_key)] = {'res' : res
+                                , n_iterations, st.session_state.mode, st.session_state.scoring_format
+                                , st.session_state.info_key)] = {'res' : res
                                                                                           ,'iteration' : i}
 
   score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
-
-  if 'ADP' in rate_display.columns:
-    rate_display = rate_display.drop(columns = ['ADP'])
 
   st.session_state.info_for_detailed_view =  dict(player_assignments = player_assignments
           ,draft_seat = draft_seat
@@ -350,12 +356,32 @@ def make_cand_tab(_H
     )      
   
   if drop_player is None:
+    c1, c2 = st.columns([0.27,0.73])
 
-    launch_button = st.button('Launch detailed analysis window', on_click = make_detailed_view)
-                       
+    with c1:
+      launch_button = st.button('Launch detailed analysis window', on_click = make_detailed_view)
+
+    with c2:
+      if cash_remaining_per_team:
+            make_auction_string(original_player_value 
+                    , score_df.index 
+                    , rate_display 
+                    , remaining_cash)
+            
 
 @st.dialog('Detailed View')
 def make_detailed_view():
+    """   
+    Load up information stored from the main candidate view, and create a view that shows details for individual players
+    I think this is useful for research/understanding what the algorithm is thinking
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
+
     st.html("<span class='big-dialog'></span>")
     st.session_state.run_h_score = True
     
@@ -387,7 +413,7 @@ def make_detailed_view():
       
       player_last_name = player_name.split(' ')[1]
 
-    if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
+    if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1) and (rosters.shape[1] > 0):
       n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
                                                                           ,player_last_name = player_last_name
                                                                           ,my_players = my_players
@@ -413,33 +439,20 @@ def make_detailed_view():
                       , player_name
                       , score_df)
     
-
-    #ZR: For an auction, we should not have the H-ranking and G-rankings
-    #at the bottom right. 
-    #Instead, it should be something about the amount remaining I guess? 
-    #or just a list of values?
-
-    #maybe a dataframe of
-    #your remaining money
-    #total remaining money 
-    #how many more picks you need to make 
-
-    #bottom left: You have X dollars to select Y more players. Your X dollars is W% of the total 
-    #Z dollars remaining 
-
-    #bottom right: Ranks by total G-score, Your H-score, and default H-score 
-
     with c1:
 
-      if len([x for x in my_players if x == x]) < st.session_state.n_picks - 1:
+      if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1):
 
         st.markdown('Category weights for future picks')
         st.dataframe(weights_styled, hide_index = True)
-        st.markdown('Flex position allocations for future flex spot picks')
-        st.write(positions_styled)
 
-        st.markdown('Roster assignments for chosen players')
-        st.write(roster_inverted_styled, hide_index = True)
+        if (rosters.shape[1] > 0):
+          st.markdown('Flex position allocations for future flex spot picks')
+          st.write(positions_styled)
+          st.markdown('Roster assignments for chosen players')
+          st.write(roster_inverted_styled, hide_index = True)
+        else: 
+          st.write('Roster assignments are not calculated when position is not available')
 
       else:
         st.write('Category weights and position allocations not calculated for last player')
@@ -451,9 +464,9 @@ def make_detailed_view():
         make_auction_string(original_player_value
                         , score_df.index
                         , rate_display
+                        , remaining_cash
                         , player_name
-                        , player_last_name
-                        , remaining_cash)
+                        , player_last_name)
 
     with c2:
 
@@ -481,37 +494,71 @@ def make_detailed_view():
           st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
           st.dataframe(g_scores_to_display_styled, height = 248)
 
-def make_auction_string(original_player_value
-                        , remaining_player_list
-                        , rate_display
-                        , player_name
-                        , player_last_name
-                         , remaining_cash):
-  #do something like this
+def make_auction_string(original_player_value : pd.Series
+                        , remaining_player_list : list
+                        , rate_display : pd.DataFrame
+                        , remaining_cash : int
+                        , player_name : str = None
+                        , player_last_name : str = None):
+  """Create a string describing the current auction situation and if there is a candidate player, how much their value is inflated by the situation
+
+  Args:
+      H:
+      original_player_value: Series of values calculated for all players assuming full cash before any players have been taken
+      remaining_player_list : List of players not yet drafted
+      rate_display: Dataframe with added info on player values for you 
+      remaining_cash: total cash remaining for all drafters
+      player_name: full name of candidate player
+      player_last_name: just their last name
+
+  Returns:
+      String describing the auction situation
+  """
+
   original_value_of_unchosen_players = original_player_value.loc[remaining_player_list].sum()
   inflation_factor_unchosen_players = original_value_of_unchosen_players/remaining_cash
 
   inflation_factor_formatted = str(np.round(inflation_factor_unchosen_players * 100,1)) + '%'
-  player_value_inflated = str(int(np.round(rate_display['Your $'].loc[player_name] * inflation_factor_unchosen_players)))
+
+  if player_name is not None:
+    player_value_inflated = str(int(np.round(rate_display['Your $'].loc[player_name] * inflation_factor_unchosen_players)))
 
   if inflation_factor_unchosen_players > 1:
-    st.write('Based on overspending for previously chosen players, there is less money available than there is' + 
-            ' original value remaining. The remaining players have original value of ' + \
-            inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would not be bad to pay' + \
-            ' up to $' + player_value_inflated + ' for ' + player_last_name
-                                                  )
-  else:
-    st.write('Based on underspending for previously chosen players, there is more money available than there is' + 
-            ' original value remaining. The remaining players have original value of ' + \
-            inflation_factor_formatted + ' of their cash-available adjusted values. Therefore, it would be reasonable to expect' + \
-            ' as little as $' + player_value_inflated + ' for ' + player_last_name
-                                                  )     
+    text_1 = 'Based on overspending so far, there is less money available than there is' + \
+            ' original value remaining. The remaining players have original H-score $ value of ' + \
+            inflation_factor_formatted + ' of their generic cash-adjusted values'
             
-def make_auction_value_df(rate_display, g_display, player_name):
-  big_value_df = pd.DataFrame({'$ (Your H-score)' : rate_display['Your $']
-                                ,'$ (H-score)' : rate_display['Gnrc. $']
-                                ,'$ (G-score)' : g_display['Gnrc. $']}).sort_values('$ (Your H-score)', ascending = False)
-  cols = ['$ (Your H-score)','$ (H-score)','$ (G-score)']
+    if player_name is not None:
+      text_2 = '\n\n Multiplying your H-score-based \$ value for ' + player_last_name + ' by that factor suggests that it would be' +\
+               ' reasonable to pay up to $' + player_value_inflated + ' for them' 
+    else: 
+      text_2 = ''
+
+  else:
+    text_1 = 'Based on underspending so far, there is more money available than there is' + \
+            ' original value remaining. The remaining players have original H-score $ value of ' + \
+            inflation_factor_formatted + ' of their generic cash-adjusted values'
+    
+    if player_name is not None:
+      text_2 = '\n\n Multiplying your H-score-based \$ value for ' + player_last_name + ' by that factor suggests that it would be reasonable to expect' +\
+               'as little as $' + player_value_inflated + ' for them' 
+    else: 
+      text_2 = ''
+
+  st.write(text_1 + text_2)                                                  
+            
+def make_auction_value_df(rate_display : pd.DataFrame
+                          , g_display : pd.DataFrame
+                          , player_name : str):
+  #make a dataframe with $ according to your H-score, plus generically from H-score and G-score
+  #ZR: Arguably this should have something about overpayments 
+
+  big_value_df = pd.DataFrame({'Your H$' : rate_display['Your $']
+                                ,'Gnrc. H$' : rate_display['Gnrc. $']
+                                , 'Orig. H$' : rate_display['Orig. $']
+                                ,'Gnrc. G$' : g_display['Gnrc. $']
+                                ,'Orig. G$' : g_display['Orig. $']}).sort_values('Your H$', ascending = False)
+  cols = ['Your H$','Gnrc. H$','Orig. H$','Gnrc. G$','Orig. G$']
 
   def color_blue(label):
     return "background-color: lightblue; color:black" if label == player_name else None
@@ -521,9 +568,6 @@ def make_auction_value_df(rate_display, g_display, player_name):
                                                                   .map(color_blue, subset = 'Player')
   
   st.markdown('Player values translated into auction dollars')
-
-  #ZR: I think something about overpayment could be helpful for this view
-  
   st.dataframe(big_value_df_styled, hide_index = True, height = 248)
 
 def get_positions_styled(n_per_position : dict
@@ -544,8 +588,17 @@ def get_roster_assignment_view(player_name : str
                                 ,player_last_name : str
                                 ,my_players : list[str]
                                 ,rosters : pd.DataFrame):
-  #helper function for make_detailed_view. Creates s one-row dataframe with columns for position slot and 
-  #players already on the team + candidate player in the positions given to them by the algorithm
+  """Creates a one-row dataframe with columns for position slot and players already on the team + candidate player in the positions given to them by the algorithm
+
+  Args:
+      player_name: full name of candidate player
+      player_last_name: just their last name
+      my_players : players already on the team
+      rosters: output from the H-scoring model; dataframe of roster assignments 
+
+  Returns:
+      None
+  """
 
   def get_player(row
                , i
@@ -590,6 +643,16 @@ def get_roster_assignment_view(player_name : str
 def make_rate_display_styled(rate_display : pd.DataFrame
                               , player_name : str
                               , player_last_name : str):
+  """Creates a one-row dataframe with category-level win rates
+
+  Args:
+      rate_display: Dataframe with all category-level expected win rates for all players
+      player_name: full name of candidate player
+      player_last_name: just their last name
+
+  Returns:
+      None
+  """
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
 
   if  'Gnrc. $' in rate_display.columns:
@@ -605,13 +668,28 @@ def make_rate_display_styled(rate_display : pd.DataFrame
     rate_df_limited_styled = h_percentage_styler(rate_df_limited)
   return rate_df_limited_styled
 
-def make_main_df_styled(_g_scores
-                        , player_name
-                        , player_last_name
-                        , my_players
-                        , res
+def make_main_df_styled(_g_scores : pd.DataFrame
+                        , player_name : str
+                        , player_last_name : str
+                        , my_players : list[str]
+                        , res : dict
                         , _H
-                        , future_diffs):
+                        , future_diffs : pd.DataFrame):
+  
+  """Creates a dataframe for current and future expected G-score for the team
+
+  Args:
+      _g_scores: Table of category-level G-scores for all players
+      player_name: full name of candidate player
+      player_last_name: just their last name
+      my_players : players already on the team
+      res: all results from H-scoring
+      H: H-scoring agent
+      future_diffs: expected future G-scores, from res (ZR: might be redundant)
+
+  Returns:
+      None
+  """
 
   team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum()
 
@@ -644,9 +722,19 @@ def make_main_df_styled(_g_scores
 
   return main_df_styled
 
-def get_ranking_views(g_display
-                      , player_name
-                      ,score_df):
+def get_ranking_views(g_display : pd.DataFrame
+                      , player_name : str
+                      ,score_df : pd.DataFrame):
+    """Creates tables for the candidate player's ranking by both H-score and G-score
+
+    Args:
+        g_display: table of g-scores with extra info added for display
+        player_last_name: just their last name
+        score_df: Dataframe with H-scores per player 
+
+    Returns:
+        None
+    """
     def color_blue(label):
         return "background-color: lightblue; color:black" if label == player_name else None
 

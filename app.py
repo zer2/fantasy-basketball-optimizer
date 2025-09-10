@@ -1,20 +1,17 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
 import yaml
-from src.helpers.helper_functions import listify, get_n_drafters
+from src.helpers.helper_functions import get_n_drafters
 from src.math.algorithm_agents import HAgent
-from src.tabs.trading import make_trade_tab
-from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data, make_auction_tab_live_data \
-                          ,make_auction_tab_own_data, increment_and_reset_draft, clear_draft_board
-from src.tabs.team_subtabs import roster_inspection
-from src.tabs.waivers import make_full_waiver_tab
+from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
+                           ,make_auction_tab_live_data ,make_auction_tab_own_data
+from src.tabs.season_mode import make_season_mode_tabs
 from src.parameter_collection.league_settings import league_settings_popover
 from src.parameter_collection.player_stats import player_stats_popover
 from src.parameter_collection.parameters import player_stat_param_popover, algorithm_param_popover, trade_param_popover
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
-from pandas.api.types import CategoricalDtype
+from wfork_streamlit_profiler import Profiler
 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 
@@ -60,10 +57,11 @@ if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
 if 'res_cache' not in st.session_state:
-   st.session_state.res_cache = {}
+  st.session_state.res_cache = {}
 
-with open("parameters.yaml", "r") as stream:
-  st.session_state.all_params = yaml.safe_load(stream)
+if 'all_params' not in st.session_state:
+  with open("parameters.yaml", "r") as stream:
+    st.session_state.all_params = yaml.safe_load(stream)
 
 with st.sidebar:
 
@@ -109,26 +107,6 @@ with st.sidebar:
 
 ### Build app 
 
-if st.session_state['mode'] == 'Season Mode':
-  main_tabs = st.tabs(["⛹️‍♂️ Waiver Wire & Free Agents"
-                  ,"📋 Trading"
-                  ,"🏟️ Rosters"])
-
-  waiver_tab = main_tabs[0]
-  trade_tab = main_tabs[1]
-  rosters_tab = main_tabs[2]
-
-#ZR: I think this should be cleaned up 
-mov = st.session_state.info['Mov']
-vom = st.session_state.info['Vom']
-
-v = np.sqrt(mov/vom)  if st.session_state.scoring_format == 'Rotisserie' else  np.sqrt(mov/(mov + vom))
-
-v = np.array(v/v.sum()).reshape(1,len(v))
-
-st.session_state.v = v
-st.session_state.g_scores = st.session_state.info['G-scores']
-
 H = HAgent(info = st.session_state.info
     , omega = st.session_state.omega
     , gamma = st.session_state.gamma
@@ -158,60 +136,7 @@ if st.session_state['mode'] == 'Auction Mode':
 
     make_auction_tab_own_data(H)
   else:
-    make_auction_tab_live_data(H) 
+    make_auction_tab_live_data(H)      
 
-elif st.session_state['mode'] == 'Season Mode':
-
-  with rosters_tab:
-
-    left, right = st.columns([0.5,0.5])
-      
-    with left:
-
-      st.caption("""Enter which player is on which team below""")
-      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index) + ['RP']
-                                              , ordered=True)
-
-      with st.form('manual_rosters'):
-
-        selections_df = st.data_editor(st.session_state.selections_df.astype(player_category_type)
-                                          , hide_index = True
-                                          , height = st.session_state.n_picks * 35 + 50).fillna('RP')
-        
-        c1, c2 = st.columns([0.2,0.8])
-            
-        with c1: 
-          submit = st.form_submit_button("Lock in")
-        with c2:
-          st.warning('Lock in to update rosters')
-
-      selection_list = listify(selections_df)
-
-      player_assignments = selections_df.to_dict('list')
-
-      g_scores_unselected = st.session_state.g_scores[~st.session_state.g_scores.index.isin(selection_list)]
-
-      with right: 
-
-        roster_inspection(selections_df.fillna('RP')
-                        , st.session_state.info
-                        , st.session_state.omega
-                        , st.session_state.gamma
-                        , st.session_state.scoring_format
-                        , st.session_state.chi
-                        , player_assignments)  
-
-  
-  with waiver_tab:
-
-      make_full_waiver_tab(H
-                           ,selections_df
-                           ,player_assignments
-                           ,selection_list)
-      
-  with trade_tab:
-
-    make_trade_tab(H
-                   , selections_df
-                   , player_assignments
-                   , g_scores_unselected)              
+if st.session_state['mode'] == 'Season Mode':
+  make_season_mode_tabs(H)

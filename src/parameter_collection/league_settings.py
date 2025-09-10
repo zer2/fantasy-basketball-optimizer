@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 
 from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
-
 from src.helpers.helper_functions import get_team_names
 
 def league_settings_popover():
@@ -74,7 +73,7 @@ def league_settings_popover():
             , mode_options
             , index = 0
             , key = 'mode'
-            , on_change = increment_and_reset_draft)
+            , on_change = clear_draft_board)
         
         if not data_source == 'Enter your own data':
         

@@ -155,11 +155,11 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
         position_rewards: Array with a column for each main slots, and a row for each candidate player.
                           Each row represents rewards for positions of future picks  
         team_so_far: List of players already chosen for the team
+        position_shares: dictionary of parameters from the main optimization problem specifying how to allocate flex spots
         scale_down: If True, scale result so that each row adds to 1
 
     Returns:
         Array, one column per position and one row per candidate player. 
-
     """
 
     position_numbers = get_position_numbers()
@@ -185,8 +185,20 @@ def optimize_positions_all_players(candidate_players : list[list[str]]
     
     return rosters, final_positions, flex_shares
 
-def check_single_player_eligibility(player, team_so_far):
-   
+def check_single_player_eligibility(player : list[str]
+                                    , team_so_far : list[list[str]]):
+    """Checks a player to see if they can fit on the team 
+
+    The function works by setting up an optimization problem for assigning players to team positions
+    If the optimization problem for the team + the candidate player is infeasible, the team is not eligible
+    
+    Args:
+        player: Candidate players, as a list of eligible positions. E.g. ['SF','PF']
+        team_so_far: List of players already chosen for the team
+
+    Returns:
+        True if the team is eligible, otherwise False
+    """
     position_numbers = get_position_numbers()
     n_total_picks = sum([v for k, v in position_numbers.items()])
     n_base_positions = len(get_position_structure()['base_list'])
@@ -208,8 +220,20 @@ def check_single_player_eligibility(player, team_so_far):
     else: 
        return False
     
-def check_all_player_eligibility(players, team_so_far):
-   
+def check_all_player_eligibility(players : list[list[str]]
+                                 , team_so_far : list[list[str]]):
+    """Checks all players to see if they can fit on the team 
+
+    The function works by setting up an optimization problem for assigning players to team positions
+    If the optimization problem is infeasible, the team is not eligible
+    
+    Args:
+        players: List of players, which are themselves lists of eligible positions. E.g. [['SF','PF'],['C'],['SF']]
+        team_so_far: List of players already chosen for the team
+
+    Returns:
+        List of booleans, True for players who are eligible and False for those who are not 
+    """
     position_numbers = get_position_numbers()
     n_total_picks = sum([v for k, v in position_numbers.items()])
     n_base_positions = len(get_position_structure()['base_list'])
@@ -229,7 +253,17 @@ def check_all_player_eligibility(players, team_so_far):
     return all_res
 
 def check_team_eligibility(team):
-    #team is a list of position eligibilities
+    """Checks if a full team is eligible 
+
+    The function works by setting up an optimization problem for assigning players to team positions
+    If the optimization problem is infeasible, the team is not eligible
+    
+    Args:
+        team: List of players chosen for the team
+
+    Returns:
+        True if the team is eligible, otherwise False
+    """
     if len(team) == 0:
         return True
     else:
