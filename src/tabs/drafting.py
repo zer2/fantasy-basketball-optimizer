@@ -122,35 +122,37 @@ def make_drafting_tab_live_data(H):
         
         c1.button('Refresh Analysis', on_click = refresh_analysis)
 
-        draft_seat = c2.selectbox(f'Which drafter are you?'
-                , st.session_state.integration.get_team_names(st.session_state.integration.league_id
+        team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
                                                               , st.session_state.integration.division_id)
+        
+        draft_seat = c2.selectbox(f'Which drafter are you?'
+                , team_names
                 , key = 'draft_seat'
                 , on_change = refresh_analysis)
                 
-        if not st.session_state.live_draft_active:
-
-            st.write('Draft has not yet begun')
+        if st.session_state.live_draft_active:
+            player_assignments = st.session_state.draft_results[0:st.session_state.n_starters].to_dict('list')
+            my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
 
         else:
-            
-            player_assignments = st.session_state.draft_results[0:st.session_state.n_starters].to_dict('list')
-
-            my_players = st.session_state.draft_results[st.session_state.draft_seat].dropna()
-                
-            if len(my_players) < st.session_state.n_starters:
-
-                make_cand_tab(H
-                    ,st.session_state.info['G-scores']
-                    ,player_assignments
-                    ,draft_seat
-                    ,st.session_state.n_iterations
-                    ,15)
-                
-            else:
-                st.write('You have selected all of your players')
+            player_assignments = {team : [] for team in team_names}  
+            my_players = []
 
             
+        if len(my_players) < st.session_state.n_starters:
+
+            make_cand_tab(H
+                ,st.session_state.info['G-scores']
+                ,player_assignments
+                ,draft_seat
+                ,st.session_state.n_iterations
+                ,15)
+            
+        else:
+            st.write('You have selected all of your players')
+
+        if st.session_state.live_draft_active:
+
             make_team_display(st.session_state.info['G-scores']
                                 ,my_players
                                 )      
@@ -332,91 +334,97 @@ def make_auction_tab_live_data(H):
             , get_team_names()
             , key = 'auction_seat'
             , on_change = refresh_analysis)
+
+        team_names = get_team_names()
         
         if not st.session_state.live_draft_active:
 
-            st.write('Auction has not begun, or just began. There is sometimes a lag of ~1 minute before data can be fetched')
+            st.write('''Auction has not begun, or just began. There is sometimes a lag of ~1 minute before data can be fetched
+                     from Yahoo, so player selections from the beginning of the auction may not be reflected''')
+            selection_list = []
+            player_assignments = pd.Series({team : [] for team in team_names} ) 
+            cash_spent_per_team = pd.Series()
+            amount_spent = 0
 
         else:
-
-            #ZR: This is bad
-            cash_per_team = 200
-            st.session_state.cash_per_team = 200
-            
             selection_list = st.session_state.draft_results['Player'].dropna()
             player_assignments = st.session_state.draft_results.dropna()  \
                                 .groupby('Team', observed = False)['Player'].apply(list)
             
             cash_spent_per_team = st.session_state.draft_results.dropna().groupby('Team', observed = False)['Cost'].sum()
-            cash_remaining_per_team = cash_per_team - cash_spent_per_team
-
-            total_cash = cash_per_team * n_drafters
-
             amount_spent = st.session_state.draft_results['Cost'].dropna().sum()
 
-            remaining_cash = total_cash - amount_spent
+        #ZR: This is bad
+        cash_per_team = 200
+        st.session_state.cash_per_team = 200
 
-            #this is what needs to get updated
-            for team in get_team_names():
-                if not team in cash_remaining_per_team.index:
-                    cash_remaining_per_team.loc[team] = cash_per_team
+        cash_remaining_per_team = cash_per_team - cash_spent_per_team
 
-                if not team in player_assignments.index:
-                    player_assignments.loc[team] = []
+        total_cash = cash_per_team * n_drafters
 
-            my_players = player_assignments[auction_seat]
+        remaining_cash = total_cash - amount_spent
 
-            #ZR: I think this could be improved
-            h_ranks = get_default_h_values(info = st.session_state.info
-                                        , omega = st.session_state.omega
-                                        , gamma = st.session_state.gamma
-                                        , n_picks = st.session_state.n_picks
-                                        , n_drafters = n_drafters
-                                        , n_iterations = st.session_state.n_iterations
-                                        , scoring_format = st.session_state.scoring_format
-                                        , mode = st.session_state.mode
-                                        , psi = st.session_state.psi
-                                        , upsilon = st.session_state.upsilon
-                                        , chi = st.session_state.chi
-                                        , info_key = st.session_state.info).set_index('Player')
+        #this is what needs to get updated
+        for team in team_names:
+            if not team in cash_remaining_per_team.index:
+                cash_remaining_per_team.loc[team] = cash_per_team
 
-            h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-            h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
-                                                            , st.session_state.n_picks * n_drafters - len(selection_list)
-                                                            , remaining_cash
-                                                            , st.session_state['streaming_noise_h'])
-                                
-            h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected.index)
+            if not team in player_assignments.index:
+                player_assignments.loc[team] = []
 
-            #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
-            #h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
+        my_players = player_assignments[auction_seat]
 
-            h_original_savor = savor_calculation(h_ranks['H-score']
-                                                        , st.session_state.n_picks * n_drafters
-                                                        , cash_per_team * n_drafters
+        #ZR: I think this could be improved
+        h_ranks = get_default_h_values(info = st.session_state.info
+                                    , omega = st.session_state.omega
+                                    , gamma = st.session_state.gamma
+                                    , n_picks = st.session_state.n_picks
+                                    , n_drafters = n_drafters
+                                    , n_iterations = st.session_state.n_iterations
+                                    , scoring_format = st.session_state.scoring_format
+                                    , mode = st.session_state.mode
+                                    , psi = st.session_state.psi
+                                    , upsilon = st.session_state.upsilon
+                                    , chi = st.session_state.chi
+                                    , info_key = st.session_state.info).set_index('Player')
+
+        h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
+        h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+                                                        , st.session_state.n_picks * n_drafters - len(selection_list)
+                                                        , remaining_cash
                                                         , st.session_state['streaming_noise_h'])
+                            
+        h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected.index)
+
+        #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
+        #h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
+
+        h_original_savor = savor_calculation(h_ranks['H-score']
+                                                    , st.session_state.n_picks * n_drafters
+                                                    , cash_per_team * n_drafters
+                                                    , st.session_state['streaming_noise_h'])
+        
+        h_original_savor = pd.Series(h_original_savor.values, index = h_ranks.index)
             
-            h_original_savor = pd.Series(h_original_savor.values, index = h_ranks.index)
-                
-            if len(my_players) < st.session_state.n_picks:
+        if len(my_players) < st.session_state.n_picks:
 
-                make_cand_tab(H
-                    ,st.session_state.info['G-scores']
-                    ,player_assignments.to_dict()
-                    ,auction_seat
-                    ,st.session_state.n_iterations
-                    ,15 #display frequency
-                    ,cash_remaining_per_team.to_dict()
-                    ,h_defaults_savor
-                    ,h_original_savor
-                    ,n_drafters * st.session_state.n_picks)
-                
-            else:
-                st.write('Your team is full')
+            make_cand_tab(H
+                ,st.session_state.info['G-scores']
+                ,player_assignments.to_dict()
+                ,auction_seat
+                ,st.session_state.n_iterations
+                ,15 #display frequency
+                ,cash_remaining_per_team.to_dict()
+                ,h_defaults_savor
+                ,h_original_savor
+                ,n_drafters * st.session_state.n_picks)
+            
+        else:
+            st.write('Your team is full')
 
-            make_team_display(st.session_state.info['G-scores']
-                                    ,my_players
-                                    )
+        make_team_display(st.session_state.info['G-scores']
+                                ,my_players
+                                )
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def get_default_h_values(info : dict
