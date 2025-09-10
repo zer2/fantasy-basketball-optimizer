@@ -125,9 +125,15 @@ def make_drafting_tab_live_data(H):
         team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
                                                               , st.session_state.integration.division_id)
         
+        if 'draft_seat' in st.session_state:
+           default_index = team_names.index(st.session_state.draft_seat)
+        else:
+           default_index = 0
+
         draft_seat = c2.selectbox(f'Which drafter are you?'
                 , team_names
                 , key = 'draft_seat'
+                , index = default_index
                 , on_change = refresh_analysis)
                 
         if st.session_state.live_draft_active:
@@ -232,6 +238,7 @@ def make_auction_tab_own_data(H):
         st.caption(r'\$' + str(remaining_cash) + r' remains out of \$' + str(total_cash) + ' originally available' )
 
       with right: 
+        
         auction_seat = st.selectbox(f'Which team are you?'
             , get_team_names()
             , index = 0)
@@ -330,12 +337,19 @@ def make_auction_tab_live_data(H):
                         , on_click = refresh_analysis)
             
         with c2:
-            auction_seat = st.selectbox(f'Which drafter are you?'
-            , get_team_names()
-            , key = 'auction_seat'
-            , on_change = refresh_analysis)
+            team_names = get_team_names()
 
-        team_names = get_team_names()
+            #ZR: preserve the auction seat in case team_names has changed 
+            if 'auction_seat' in st.session_state:
+                default_index = team_names.index(st.session_state.auction_seat)
+            else:
+                default_index = 0
+
+            auction_seat = st.selectbox(f'Which drafter are you?'
+            , team_names
+            , key = 'auction_seat'
+            , index = default_index
+            , on_change = refresh_analysis)
         
         if not st.session_state.live_draft_active:
 
