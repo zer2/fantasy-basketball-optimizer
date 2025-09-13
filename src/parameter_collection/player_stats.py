@@ -86,7 +86,7 @@ def get_nba_stats():
         unique_datasets_historical = reversed([str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))])
 
         dataset_name = st.selectbox(
-            'Which dataset do you want to default to?'
+            'Which season of data do you want to use?'
             ,unique_datasets_historical
             ,index = 0
             ,on_change = increment_and_reset_draft

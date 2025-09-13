@@ -91,11 +91,13 @@ def roster_inspection(selections_df : pd.DataFrame):
 
     make_team_display(st.session_state.info['G-scores']
                         ,inspection_players
+                        ,st.session_state.info_key
                         )
 
-
+@st.cache_data(ttl = 3600)
 def make_team_display(_g_scores : pd.DataFrame
                   ,my_players : list[str]
+                  ,info_key
                   ):
   """Make a table summarizing a team as it currently stands
 
@@ -110,13 +112,13 @@ def make_team_display(_g_scores : pd.DataFrame
 
   if len(my_players) > 0:
 
-    st.divider()
-
     my_real_players = [x for x in my_players if x != 'RP']
 
     team_stats = _g_scores[_g_scores.index.isin(my_real_players)]
 
     team_stats.loc['Total', :] = team_stats.sum(axis = 0)
+
+    team_stats = team_stats.loc[['Total'] + list(my_players)]
 
     team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
                                                 .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
@@ -124,7 +126,7 @@ def make_team_display(_g_scores : pd.DataFrame
                                                 .map(stat_styler, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
                                                      , multiplier = st.session_state.params['g-score-player-multiplier']) \
                                                 .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()]
-                                                    , multiplier = st.session_state.params['g-score-team-multiplier'])
+                                                    , multiplier = st.session_state.params['g-score-team-multiplier']) \
     
     
     st.dataframe(team_stats_styled
