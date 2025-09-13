@@ -265,7 +265,7 @@ def make_auction_tab_own_data(H):
 
         my_remaining_cash = cash_remaining_per_team[auction_seat]
 
-        candidate_evaluation = st.container(height = 625)
+        candidate_evaluation = st.container(height = 645)
 
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
@@ -429,7 +429,7 @@ def make_auction_tab_live_data(H):
         
         h_original_savor = pd.Series(h_original_savor.values, index = h_ranks.index)
 
-        candidate_evaluation = st.container(height = 625)
+        candidate_evaluation = st.container(height = 645)
 
         make_team_display(st.session_state.info['G-scores']
                         ,my_players

@@ -118,13 +118,15 @@ def make_team_display(_g_scores : pd.DataFrame
 
     team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
+    team_stats = team_stats.loc[['Total'] + list(my_players)]
+
     team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
                                                 .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
                                                 .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
                                                 .map(stat_styler, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
                                                      , multiplier = st.session_state.params['g-score-player-multiplier']) \
                                                 .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()]
-                                                    , multiplier = st.session_state.params['g-score-team-multiplier'])
+                                                    , multiplier = st.session_state.params['g-score-team-multiplier']) \
     
     
     st.dataframe(team_stats_styled

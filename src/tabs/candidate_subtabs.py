@@ -96,8 +96,11 @@ def make_cand_tab(_H
     iteration_range = range(max(1,n_iterations))
 
     cached_res = False
-
-  cand_table_height = 500
+  
+  if (cash_remaining_per_team is not None) and (st.session_state.data_source == 'Enter your own data'):
+    cand_table_height = 505 #more room is needed for the auction string that goes at the bottom
+  else: 
+    cand_table_height = 535
 
   placeholder = st.empty()
 
@@ -357,26 +360,26 @@ def make_cand_tab(_H
 
             
 @st.fragment
-def make_detailed_view(player_assignments
-                       ,draft_seat
-                       ,score_df
-                       ,rate_display
-                       ,_g_scores
-                       ,g_display
-                       ,future_diffs
-                       ,weights
-                       ,position_shares
-                       ,res
+def make_detailed_view(player_assignments : dict[list[str]]
+                       ,draft_seat : str
+                       ,score_df : pd.DataFrame
+                       ,rate_display : pd.DataFrame
+                       ,_g_scores : pd.DataFrame
+                       ,g_display : pd.DataFrame
+                       ,future_diffs : pd.DataFrame
+                       ,weights : pd.DataFrame
+                       ,position_shares : dict[pd.DataFrame]
+                       ,res : dict
                        ,_H
-                       ,rosters
-                       ,cash_remaining_per_team
-                       ,original_player_value):
+                       ,rosters : pd.DataFrame
+                       ,cash_remaining_per_team: dict[int]
+                       ,original_player_value : pd.Series):
     """   
     Load up information stored from the main candidate view, and create a view that shows details for individual players
     I think this is useful for research/understanding what the algorithm is thinking
 
     Args:
-        None
+        Various arguments from the make_cand_tab function. Will change around depending on what is included here
 
     Returns:
         None
@@ -406,7 +409,8 @@ def make_detailed_view(player_assignments
 
         player_name = st.selectbox('Candidate player'
                                             ,score_df.index
-                                            ,index = 0)
+                                            ,index = 0
+                                            ,label_visibility = 'collapsed')
         
         player_last_name = player_name.split(' ')[1]
 
@@ -478,7 +482,6 @@ def make_detailed_view(player_assignments
       if cash_remaining_per_team:
 
         if display_rank_tables:
-          st.markdown('Player values translated into auction dollars')
           make_auction_value_df(rate_display, g_display, player_name)
         else:
           make_auction_value_df(rate_display.loc[[player_name]], g_display.loc[[player_name]], player_name)
@@ -499,12 +502,12 @@ def make_detailed_view(player_assignments
         with c1_1: 
           st.markdown('Rank **' + str(player_location_h + 1) + '** in H-score among available players')
           if display_rank_tables:
-            st.dataframe(h_scores_to_display_styled, height = 248)
+            st.dataframe(h_scores_to_display_styled, height = 158)
 
         with c1_2: 
           st.markdown('Rank **' + str(player_location_g + 1) + '** in Total G-score among available players')
           if display_rank_tables:
-            st.dataframe(g_scores_to_display_styled, height = 248)
+            st.dataframe(g_scores_to_display_styled, height = 158)
 
 def make_auction_string(original_player_value : pd.Series
                         , remaining_player_list : list
@@ -581,7 +584,7 @@ def make_auction_value_df(rate_display : pd.DataFrame
   
   #only set the size of the dataframe when it is not just a single player
   if len(big_value_df) > 1:
-    height = 248
+    height = 218
   else:
     height = None
   st.dataframe(big_value_df_styled, hide_index = True, height = height)
