@@ -71,31 +71,19 @@ def make_cand_tab(_H
       None
   """
 
-  #ZR: would be great to clean up this caching operation somehow
-  if (drop_player is None) and (draft_seat, make_hashable(player_assignments) \
-      , n_iterations, st.session_state.mode, st.session_state.scoring_format, st.session_state.info_key) in st.session_state.res_cache:
-    cached_info = st.session_state.res_cache[(draft_seat, make_hashable(player_assignments)
-                                              , n_iterations, st.session_state.mode, st.session_state.scoring_format
-                                              , st.session_state.info_key)]
-    res = cached_info['res']
-    iteration_range = range(cached_info['iteration'] - 1, n_iterations)
-    cached_res = True
-
-
+  _H = _H.clear_initial_weights()
+          
+  if drop_player is None:
+    generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
   else:
-    _H = _H.clear_initial_weights()
-            
-    if drop_player is None:
-      generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
-    else:
-      from copy import deepcopy 
-      player_assignments = deepcopy(player_assignments)
-      player_assignments[draft_seat] = [player for player in player_assignments[draft_seat] if player != drop_player]
-      generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
-    
-    iteration_range = range(max(1,n_iterations))
+    from copy import deepcopy 
+    player_assignments = deepcopy(player_assignments)
+    player_assignments[draft_seat] = [player for player in player_assignments[draft_seat] if player != drop_player]
+    generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+  
+  iteration_range = range(max(1,n_iterations))
 
-    cached_res = False
+  cached_res = False
   
   if (cash_remaining_per_team is not None) and (st.session_state.data_source == 'Enter your own data'):
     cand_table_height = 505 #more room is needed for the auction string that goes at the bottom
