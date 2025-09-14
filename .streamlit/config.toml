@@ -1,0 +1,10 @@
+[server]
+fileWatcherType = "poll"
+enableStaticServing = true
+staticDirectory = "static"     
+staticUrlPath   = "static"
+
+[theme]
+base="light"
+backgroundColor="white"
+baseFontSize=14

@@ -50,4 +50,4 @@ coverage.xml
 docs/_build/
 
 # Streamlit secrets
-.streamlit/
+.streamlit/secrets.toml
