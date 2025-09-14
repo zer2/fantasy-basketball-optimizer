@@ -130,7 +130,7 @@ def make_cand_tab(_H
 
       display =  (i % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
 
-      h_tab, g_tab, pbp_tab = st.tabs(['H-score','G-score','Player-by-player'])
+      h_tab, g_tab, pbp_tab = st.tabs(['H-score','G-score','Player details'])
 
       with h_tab:
 
