@@ -63,16 +63,11 @@ def make_drafting_tab_own_data(H):
 
     with right:
 
-        non_autodrafters = [i for i,c in zip(range(st.session_state.selections_default.shape[1])
-                                             ,st.session_state.selections_default.columns) 
-                            if c not in st.session_state.autodrafters]
-
         draft_seat = st.selectbox(f'Which drafter are you?'
-            , st.session_state.selections_df.columns
-            , index = 0 if len(non_autodrafters) ==0 else non_autodrafters[0])
+            , st.session_state.selections_df.columns)
 
 
-        candidate_evaluation = st.container(height = 625)
+        candidate_evaluation = st.container(height = 625, border = False)
 
         my_players = st.session_state.selections_df[draft_seat].dropna()
 
@@ -149,7 +144,7 @@ def make_drafting_tab_live_data(H):
             my_players = []
 
             
-        candidate_evaluation = st.container(height = 625)
+        candidate_evaluation = st.container(height = 625, border = False)
 
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
@@ -265,7 +260,7 @@ def make_auction_tab_own_data(H):
 
         my_remaining_cash = cash_remaining_per_team[auction_seat]
 
-        candidate_evaluation = st.container(height = 645)
+        candidate_evaluation = st.container(height = 645, border = False)
 
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
@@ -429,7 +424,7 @@ def make_auction_tab_live_data(H):
         
         h_original_savor = pd.Series(h_original_savor.values, index = h_ranks.index)
 
-        candidate_evaluation = st.container(height = 645)
+        candidate_evaluation = st.container(height = 645, border = False)
 
         make_team_display(st.session_state.info['G-scores']
                         ,my_players

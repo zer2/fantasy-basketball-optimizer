@@ -85,7 +85,7 @@ with st.sidebar:
 
     player_stat_param_popover()                                          
 
-  with st.popover(':small[Algorithm Parameters]').container(height = 300):
+  with st.popover(':small[H-score Parameters]').container(height = 300):
                     
     algorithm_param_popover()
 
@@ -93,7 +93,7 @@ with st.sidebar:
           
     trade_param_popover()
 
-  with st.popover(':small[Position Requirements]'):
+  with st.popover(':small[Position Parameters]'):
 
     position_requirement_popover()
 

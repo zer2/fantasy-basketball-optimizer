@@ -130,7 +130,10 @@ def make_cand_tab(_H
 
       display =  (i % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
 
-      h_tab, g_tab, pbp_tab = st.tabs(['H-score','G-score','Player details'])
+      if st.session_state.mode == 'Season Mode':
+        h_tab, g_tab,  = st.tabs(['H-score','G-score'])
+      else:
+        h_tab, pbp_tab, g_tab,  = st.tabs(['H-score','H-score details','G-score'])
 
       with h_tab:
 
@@ -327,8 +330,10 @@ def make_cand_tab(_H
                     , rate_display 
                     , remaining_cash)
 
-      with pbp_tab:
-        if display:
+      if display and not st.session_state.mode == 'Season Mode':
+          
+        with pbp_tab:
+
           score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
 
           make_detailed_view(player_assignments

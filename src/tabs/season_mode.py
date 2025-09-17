@@ -118,7 +118,7 @@ def make_team_display(_g_scores : pd.DataFrame
 
     team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
-    team_stats = team_stats.loc[['Total'] + list(my_players)]
+    team_stats = team_stats.loc[['Total'] + list(my_real_players)]
 
     team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
                                                 .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
