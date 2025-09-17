@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd 
 from src.helpers.helper_functions import h_percentage_styler, get_selected_categories, \
-                                styler_a, styler_b, styler_c, stat_styler, \
-                                get_your_differential_threshold, get_their_differential_threshold, get_combo_params
+                                styler_a, styler_b, styler_c, stat_styler, get_n_drafters, \
+                                get_your_differential_threshold, get_their_differential_threshold, \
+                                  get_combo_params
+from src.math.algorithm_agents import get_default_h_values
 from src.math.position_optimization import check_team_eligibility
 import itertools
 
@@ -135,8 +137,25 @@ def make_trade_tab(H
                               , st.session_state.info_key
                               )
 
-      general_value = st.session_state.info['G-scores'].sum(axis = 1)
-      replacement_value = g_scores_unselected.iloc[0].sum()
+      #ZR: Could this be switched to H-scores instead? 
+      #general_value = st.session_state.info['G-scores'].sum(axis = 1)
+      #replacement_value = g_scores_unselected.iloc[0].sum()
+
+      default_h_scores = get_default_h_values(info = st.session_state.info
+                                            , omega = st.session_state.omega
+                                            , gamma = st.session_state.gamma
+                                            , n_picks = st.session_state.n_picks
+                                            , n_drafters = get_n_drafters()
+                                            , n_iterations = st.session_state.n_iterations
+                                            , scoring_format = st.session_state.scoring_format
+                                            , mode = st.session_state.mode
+                                            , psi = st.session_state.psi
+                                            , upsilon = st.session_state.upsilon
+                                            , chi = st.session_state.chi
+                                            , info_key = st.session_state.info)
+      general_value = default_h_scores.set_index('Player')['H-score']
+      replacement_value = general_value.iloc[selections_df.shape[0] * selections_df.shape[1]]
+
 
       #slightly hacky way to make all of the multiselects blue
       st.markdown("""
@@ -307,7 +326,7 @@ def get_cross_combos(n : int
       full_dataframe_separated['My Value'] += replacement_value * (m-n)
   
   value_differential = full_dataframe_separated['My Value'] - full_dataframe_separated['Their Value']
-  meets_threshold = abs(value_differential) <= value_threshold
+  meets_threshold = abs(value_differential) <= value_threshold/100 #this is in terms of percentage
   
   return full_dataframe_separated[meets_threshold]
 
@@ -489,39 +508,43 @@ def make_trade_h_tab(_H
                                 , _H
                                 , player_assignments
                                 ,n_iterations)
-      your_team_pre_trade = trade_results[1]['pre']
-      your_team_post_trade = trade_results[1]['post']
-      their_team_pre_trade = trade_results[2]['pre']
-      their_team_post_trade = trade_results[2]['post']
-
-      if your_team_pre_trade['H-score'] < your_team_post_trade['H-score']:
-        my_emoji = '👍'
-      else: 
-        my_emoji = '👎'
-
-      if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
-        their_emoji = '👍'
-      else:
-        their_emoji = '👎'
-
-      your_team_tab, their_team_tab = st.tabs(['Your Team ' + my_emoji
-                                               ,'Their Team' + their_emoji])
-
-      with your_team_tab:
-        
-        pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
-        pre_to_post.index = ['Pre-trade','Post-trade']
-        pre_to_post_styled = h_percentage_styler(pre_to_post)
-        st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
-
-      with their_team_tab:
       
+      if trade_results is None:
+        st.write('Trade is impermissible because it violates position structure for at least one team')
+      else:
+        your_team_pre_trade = trade_results[1]['pre']
+        your_team_post_trade = trade_results[1]['post']
+        their_team_pre_trade = trade_results[2]['pre']
+        their_team_post_trade = trade_results[2]['post']
 
-                    
-        pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
-        pre_to_post.index = ['Pre-trade','Post-trade']
-        pre_to_post_styled = h_percentage_styler(pre_to_post)
-        st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
+        if your_team_pre_trade['H-score'] < your_team_post_trade['H-score']:
+          my_emoji = '👍'
+        else: 
+          my_emoji = '👎'
+
+        if their_team_pre_trade['H-score'] < their_team_post_trade['H-score']:
+          their_emoji = '👍'
+        else:
+          their_emoji = '👎'
+
+        your_team_tab, their_team_tab = st.tabs(['Your Team ' + my_emoji
+                                                ,'Their Team' + their_emoji])
+
+        with your_team_tab:
+          
+          pre_to_post = pd.concat([your_team_pre_trade,your_team_post_trade], axis = 1).T
+          pre_to_post.index = ['Pre-trade','Post-trade']
+          pre_to_post_styled = h_percentage_styler(pre_to_post)
+          st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
+
+        with their_team_tab:
+        
+
+                      
+          pre_to_post = pd.concat([their_team_pre_trade,their_team_post_trade], axis = 1).T
+          pre_to_post.index = ['Pre-trade','Post-trade']
+          pre_to_post_styled = h_percentage_styler(pre_to_post)
+          st.dataframe(pre_to_post_styled, use_container_width = True, height = 108)
 
 #ZR: This should be cachable!
 def analyze_trade(team_1
@@ -565,8 +588,9 @@ def analyze_trade(team_1
     post_trade_assignments[team_2] = post_trade_team_2
 
     #do the same for the second team
-    team_2_positions = st.session_state.info['Positions'].loc[post_trade_team_1]
+    team_2_positions = st.session_state.info['Positions'].loc[post_trade_team_2]
     team_2_eligible = check_team_eligibility(team_2_positions)
+
     if not team_2_eligible:
        return None
 

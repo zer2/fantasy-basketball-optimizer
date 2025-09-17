@@ -161,3 +161,68 @@ def calculate_tipping_points(x : np.array) -> np.array:
         final_probabilities = final_probabilities/2 + tie_probabilities/2
 
     return final_probabilities
+
+@st.cache_data(show_spinner = False, ttl = 3600)
+def get_default_h_values(info : dict
+                  , omega : float
+                  , gamma : float
+                  , n_picks : int
+                  , n_drafters : int
+                  , n_iterations : int
+                  , scoring_format : str
+                  , mode : str
+                  , psi : float
+                  , upsilon : float
+                  , chi : float
+                  , info_key : int):
+  
+  H = HAgent(info = info
+    , omega = omega
+    , gamma = gamma
+    , n_picks = n_picks
+    , n_drafters = n_drafters
+    , dynamic = n_iterations > 0
+    , scoring_format = scoring_format
+    , chi = chi
+    , team_names = [n for n in range(n_drafters)])
+  
+  if st.session_state['mode'] == 'Auction Mode':
+    cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
+  else:
+    cash_remaining_per_team = None
+
+  generator = H.get_h_scores(player_assignments = {n : [] for n in range(n_drafters)}
+                          , drafter = 0
+                          , cash_remaining_per_team = cash_remaining_per_team)
+
+  for i in range(max(1,n_iterations)):
+    res = next(generator)
+
+  h_res = res['Scores']
+  cdf_estimates = res['Rates']
+    
+  cdf_estimates.columns = get_selected_categories()
+  rate_df = cdf_estimates.loc[h_res.index].dropna()
+
+  h_res = h_res.sort_values(ascending = False)
+
+  h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
+                        ,'Player' : h_res.index
+                        ,'H-score' : h_res.values
+                      })
+
+
+  h_res = h_res.merge(rate_df
+                      , left_on = 'Player'
+                      ,right_index = True)
+  
+  if st.session_state['mode'] == 'Auction Mode':
+
+    h_res.loc[:,'Gnrc. $'] = savor_calculation(h_res['H-score']
+                                                    , n_picks * n_drafters
+                                                    , 200*n_drafters
+                                                    , st.session_state['streaming_noise_h'])
+    
+    h_res = h_res[['Rank','Player','Gnrc. $','H-score'] + get_selected_categories()]
+
+  return h_res

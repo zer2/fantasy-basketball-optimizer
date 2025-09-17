@@ -180,7 +180,7 @@ def trade_param_popover():
 
     combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
                                   ,'N-received' : [1,2,3]
-                                  ,'T' : [2,1,0.5]}
+                                  ,'T' : [10,5,4]}
                                   )
 
     st.session_state['combo_params_df'] = st.data_editor(combo_params_default
@@ -198,6 +198,6 @@ def trade_param_popover():
     combo_params_str =  \
       """Each row is a specification for a kind of trade that will be automatically evaluated. 
       N-traded is the number of players traded from your team, and N-received is the number of 
-      players to receive in the trade. T is a threshold of G-score difference ; trades that have 
+      players to receive in the trade. T is a threshold of H-score percent difference; trades that have 
       general value differences larger than T will not be evaluated"""
     st.caption(combo_params_str)
