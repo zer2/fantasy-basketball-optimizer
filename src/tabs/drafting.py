@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from src.helpers.helper_functions import get_team_names
 from src.math.algorithm_agents import get_default_h_values
+from src.math.algorithm_helpers import auction_value_adjuster
 
 #from wfork_streamlit_profiler import Profiler
 
@@ -291,16 +292,16 @@ def make_auction_tab_own_data(H):
                                             , info_key = st.session_state.info)
 
                 h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-                h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+                h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
                                                             , st.session_state.n_picks * n_drafters - len(selection_list)
                                                             , remaining_cash
-                                                            , st.session_state['streaming_noise_h'])
+                                                            , st.session_state['streaming_noise'])
                 h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
-                h_original_savor = savor_calculation(h_ranks['H-score']
+                h_original_savor = auction_value_adjuster(h_ranks['H-score']
                                                             , st.session_state.n_picks * n_drafters
                                                             , cash_per_team * n_drafters
-                                                            , st.session_state['streaming_noise_h'])
+                                                            , st.session_state['streaming_noise'])
                 h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
 
                 make_cand_tab(H
@@ -408,20 +409,20 @@ def make_auction_tab_live_data(H):
                                     , info_key = st.session_state.info).set_index('Player')
 
         h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-        h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+        h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
                                                         , st.session_state.n_picks * n_drafters - len(selection_list)
                                                         , remaining_cash
-                                                        , st.session_state['streaming_noise_h'])
+                                                        , st.session_state['streaming_noise'])
                             
         h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected.index)
 
         #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
         #h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
 
-        h_original_savor = savor_calculation(h_ranks['H-score']
+        h_original_savor = auction_value_adjuster(h_ranks['H-score']
                                                     , st.session_state.n_picks * n_drafters
                                                     , cash_per_team * n_drafters
-                                                    , st.session_state['streaming_noise_h'])
+                                                    , st.session_state['streaming_noise'])
         
         h_original_savor = pd.Series(h_original_savor.values, index = h_ranks.index)
 

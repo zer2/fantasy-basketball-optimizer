@@ -1,5 +1,5 @@
 from src.math.algorithm_agents import HAgent
-from src.math.algorithm_helpers import savor_calculation, combinatorial_calculation, calculate_tipping_points
+from src.math.algorithm_helpers import auction_value_adjuster, savor_calculation, combinatorial_calculation, calculate_tipping_points
 from streamlit.testing.v1 import AppTest
 import numpy as np 
 import pandas as pd
@@ -209,18 +209,14 @@ def check_gradient_2(c, func, del_func):
     assert (abs(all_del_real_normalized - all_res_normalized) < 0.001).all()
 
 def test_savor_calculation():
-    raw_values_unselected = pd.Series([1,2,3,4,5]).sort_values(ascending = False)
-    n_remaining_players = 3
-    remaining_cash = 10
+    values = pd.Series([1,2,3,4,5]).sort_values(ascending = False)
     noise = 2
 
-    savor_result = savor_calculation(raw_values_unselected
-                    , n_remaining_players
-                    , remaining_cash
-                    , noise = 1)
+    #calculate the result by theory 
+    savor_result = savor_calculation(values
+                    , noise)
 
-    replacement_level = raw_values_unselected.iloc[n_remaining_players]
-
+    #calculate the result with simulation
     replacement_ev = np.mean(np.clip(np.random.normal(scale = noise
                                                         , size = 100000)
                                     ,0,None))
@@ -231,8 +227,8 @@ def test_savor_calculation():
                                                         , size = 100000)
                             ,0,None))
 
-    player_net_evs = np.clip(np.array([estimate_player_value(x - replacement_level) - replacement_ev \
-                            for x in raw_values_unselected])
+    player_net_evs = np.clip(np.array([estimate_player_value(x) - replacement_ev \
+                            for x in values])
                             ,0,None)
 
     regularized_player_net_evs = player_net_evs/player_net_evs.sum()

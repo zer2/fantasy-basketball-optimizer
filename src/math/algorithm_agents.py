@@ -8,7 +8,7 @@ import streamlit as st
 from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
                                             ,get_max_info
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
-from src.math.algorithm_helpers import savor_calculation
+from src.math.algorithm_helpers import auction_value_adjuster
 
 class HAgent():
 
@@ -1563,14 +1563,5 @@ def get_default_h_values(info : dict
   h_res = h_res.merge(rate_df
                       , left_on = 'Player'
                       ,right_index = True)
-  
-  if st.session_state['mode'] == 'Auction Mode':
-
-    h_res.loc[:,'Gnrc. $'] = savor_calculation(h_res['H-score']
-                                                    , n_picks * n_drafters
-                                                    , 200*n_drafters
-                                                    , st.session_state['streaming_noise_h'])
-    
-    h_res = h_res[['Rank','Player','Gnrc. $','H-score'] + get_selected_categories()]
 
   return h_res

@@ -48,7 +48,22 @@ def player_stat_param_popover():
                     Uncertainty in season-long means is higher than uncertainty week-over-week 
                     '''
     st.caption(chi_str)
-  
+
+    if st.session_state['mode'] == 'Auction Mode':
+
+      streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
+                                , key = 'streaming_noise'
+                                , value = float(st.session_state.params['options']['S']['default'])
+                                , min_value = float(st.session_state.params['options']['S']['min'])
+                                , max_value = float(st.session_state.params['options']['S']['max'])
+                              )
+      stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. It roughly represents the 
+                            standard deviation of dollar values expected for players during the 
+                            season. When it is high, more long-term performance noise is expected, 
+                            making low-value players more heavily down-weighted due to the possibility 
+                            that they drop below streaming-level value'''
+      st.caption(stream_noise_str)         
+
     #I don't think we need people to be able to modify the coefficients
     coefficient_series = pd.Series(st.session_state.params['coefficients'])
     st.session_state.conversion_factors = coefficient_series.T    
@@ -125,29 +140,6 @@ def algorithm_param_popover():
                               , max_value = st.session_state.params['options']['n_iterations']['max'])
     n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
     st.caption(n_iterations_str)
-
-    if st.session_state['mode'] == 'Auction Mode':
-
-      streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
-                                , key = 'streaming_noise'
-                                , value = 1.0
-                                , min_value = 0.0
-                                , max_value = None)
-      stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. When it is high, 
-                            more long-term performance noise is expected, making low-value 
-                            players more heavily down-weighted due to the possibility that
-                            they drop below  streaming-level value'''
-      st.caption(stream_noise_str)         
-
-      streaming_noise_h = st.number_input(r'Select an $H_{\sigma}$ value'
-                    , key = 'streaming_noise_h'
-                    , value = 0.1
-                    , min_value = 0.0
-                    , max_value = None)
-
-      stream_noise_str_h = r'''$H_{\sigma}$ controls the SAVOR algorithm for H-scores''' 
-      st.caption(stream_noise_str_h)      
-
     
 def trade_param_popover():
     """Collect information from the user on desired parameters for trade evaluation
