@@ -6,7 +6,8 @@ nav:
   - G-scores : gscores.md
   - H-scores : hscores.md
   - Rotisserie : roto.md
-  - Auctions : auctions.md 
+  - Draft Mode : drafts.md
+  - Auction Mode : auctions.md 
   - Season Mode : season.md
 theme: 
   name : material

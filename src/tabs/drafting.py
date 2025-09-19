@@ -32,6 +32,7 @@ def make_drafting_tab_own_data(H):
     with left:
 
         selection_list = listify(st.session_state.selections_df)
+        
         g_scores_unselected = st.session_state.info['G-scores'][~st.session_state.info['G-scores'].index.isin(selection_list)]
 
         with st.form("pick form", border = False):

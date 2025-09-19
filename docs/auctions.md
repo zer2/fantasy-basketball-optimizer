@@ -4,9 +4,27 @@ Auction drafting is more complicated than snake drafting because auction drafter
 
 Still, quantitative analysis can be helpful in the auction context. In particular, it can be used to benchmark player values in terms of auction dollars. 
 
-This website implements some basic methods for converting G-scores and H-scores into dollar values. It also makes an adjustment to player values that is unique to the auction context called SAVOR.
+The auction mode of this website implements some basic methods for converting G-scores and H-scores into dollar values. It also makes an adjustment to player values that is unique to the auction context called SAVOR.
 
-## Dollar conversions 
+## Using auction mode 
+
+When the selected mode is 'auction', the website will provide analysis for either synthetic or live auctions. 
+
+### Manual entry 
+
+![](img/mauction.png)
+
+Player selection information can be entered into the editable table. Analysis will not begin until the 'Lock in' button is pressed; this is to allow for multiple updates without running H-scoring every time. 
+
+### Live connection 
+
+For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. 
+
+![](img/notbegun.png)
+
+Once the 'Auction has not yet begun' message is gone, information is being received from Yahoo. 
+
+## Quantifying auction value
 
 A well-known heuristic for quantifying auction value is described in many places including [this article from rotowire](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). For reference, it is
 
@@ -18,7 +36,7 @@ A well-known heuristic for quantifying auction value is described in many places
 
 This process ensures both that players' dollar values proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
 
-The website uses this process to quantify player value in a few ways.
+Auction mode uses this process to quantify player value in a few ways.
 
 ### Converting G-score value to dollar value 
 
@@ -53,7 +71,7 @@ For generic values, the underlying step 1 estimates are not changed, but the ste
 
 H-scoring is also run with with the updated context for the drafter in question. Those monetary estimates become 'Your $' after refinement through the auction value heuristic. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. 
 
-## The SAVOR adjustment 
+### The SAVOR adjustment 
 
 After the previously described processing for H-score and G-score dollar values, the website makes an additional adjustment called SAVOR. It is reflected in all of the displayed dollar values. 
 
@@ -64,3 +82,4 @@ Details of the mathematical model behind the SAVOR adjustment are included in th
 ![alt text](img/savorinput.png)
 
 SAVOR takes an input parameter, $S_{\sigma}$. It controls the degree to which players are expected to move up and down across the season according to the SAVOR model. Its default value is sourced by vibes- different values may be just as or more reasonable. 
+

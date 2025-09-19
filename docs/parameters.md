@@ -22,7 +22,7 @@ For Rotisserie leagues, an additional parameter called χ is required.
 
 ![](img/chi.png)
 
-χ controls the estimate of uncertainty in pre-season projections. See the [relevant section on Rotisserie](roto.md/#period-to-period-variance) for more detail. 
+χ controls the estimate of uncertainty in pre-season projections. See the [relevant section on Rotisserie](roto.md/#variance-in-player-performances) for more detail. 
 
 ## Auction noise
 

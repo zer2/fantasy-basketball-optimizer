@@ -99,11 +99,8 @@ with st.sidebar:
 
   st.write("---")
 
-  st.caption('Algorithm sources:')
+  st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
-  st.link_button(":small[Paper 1: G-scores]", 'https://arxiv.org/abs/2307.02188')
-  st.link_button(':small[Paper 2: H-scores]', 'https://arxiv.org/abs/2409.09884')
-  st.link_button(':small[Paper 3: Roto]', 'https://arxiv.org/abs/2501.00933')
 
 ### Build app 
 

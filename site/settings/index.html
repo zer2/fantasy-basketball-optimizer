@@ -272,6 +272,48 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="League settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fantasy-sport" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fantasy sport
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data integration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other info
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -280,6 +322,30 @@
       Player statistics
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Player statistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#historical" class="md-nav__link">
+    <span class="md-ellipsis">
+      Historical
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Projection
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -400,7 +466,7 @@
   
   
   <span class="md-ellipsis">
-    Auction values
+    Auctions
     
   </span>
   
@@ -417,12 +483,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../trading/" class="md-nav__link">
+      <a href="../season/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Trading
+    Season Mode
     
   </span>
   
@@ -465,6 +531,48 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="League settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fantasy-sport" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fantasy sport
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data integration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other info
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -473,6 +581,30 @@
       Player statistics
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Player statistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#historical" class="md-nav__link">
+    <span class="md-ellipsis">
+      Historical
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Projection
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -502,9 +634,57 @@
 
 
 <h1 id="settings">Settings</h1>
+<p>Settings are available for live connections to fantasy providers, customizable projection uploads, and adapting to different kinds of scoring. They are accessible via the left sidebar.</p>
 <h2 id="league-settings">League settings</h2>
+<p><img alt="" src="../img/lsettings.png" /></p>
+<h3 id="fantasy-sport">Fantasy sport</h3>
+<p>For now, this will just be NBA. MLB or WNBA may be added in the future</p>
+<h3 id="data-integration">Data integration</h3>
+<p>The default option for getting data on drafting situation/teams is entering it manually. </p>
+<p>There is also an option for integrating with a fantasy provider, which allows the website to be used with real fantasy occuring on those platforms. The website will show analysis based on the integrated league. It will never make a pick or take any action itself. </p>
+<p>The three platforms currently supported are: </p>
+<p><strong>Yahoo</strong>: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when Yahoo is selected.</p>
+<p><img alt="" src="../img/yahoopop.png" /></p>
+<p>Once the connection is established, relevant leagues will show up, if any. Mock drafts can also be connected to via manually copy-pasting the code for the mock draft.</p>
+<p><img alt="" src="../img/yahoosettings.png" /></p>
+<p><strong>Fantrax</strong>: support exists both for pulling existing teams during the season, and for integrating with drafts. However this only works with public drafts. </p>
+<p><img alt="" src="../img/fantraxsettings.png" /></p>
+<p><strong>ESPN</strong>: support only exists for pulling existing teams during the season. Unfortunately, ESPN has no API for draft access. To authenticate to pull a team, a web plug-in is needed. The instructions are on the pop-up generated when ESPN is selected. </p>
+<p><img alt="" src="../img/espnpop.png" /></p>
+<h3 id="mode">Mode</h3>
+<p><img alt="alt text" src="../img/mode.png" /></p>
+<p>There are three available modes. </p>
+<p><strong>Draft mode</strong>: for standard drafts. When drafted players are input manually, only snake drafts are naturally supported. If the drafted players are being pulled via an integration, the website will continually evaluate the best prospects regardless of draft position, so any drafting order will work fine. </p>
+<p><strong>Auction mode</strong>: for auction drafts. Users must specify that they are doing an auction for either manual entry or platform integration.</p>
+<p><strong>Season mode</strong>: for leagues where teams have already been built. Season mode allows for the inspection of potential free agents, and also includes a trading module. </p>
+<h3 id="other-info">Other info</h3>
+<p>If draft data is being input manually, the number of drafters, the number of picks per drafter, and the team names of the drafters are also inputs. </p>
 <h2 id="player-statistics">Player statistics</h2>
+<p>Player statistics are an input to the algorithms implemented by the website. They can be sourced either from old seasons or forward-looking projections.</p>
+<h3 id="historical">Historical</h3>
+<p><img alt="alt text" src="../img/historical.png" /></p>
+<p>Historical data is available going all the way back to the 1984-85 season, though for any season before 2000-01 player positions will not be available. </p>
+<figure>
+<p><img alt="alt text" src="../img/1984-85.png" /></p>
+<figcaption>
+<p>H-scores for the 1984-85 season, Each Category. NP means no position</p>
+</figcaption>
+</figure>
+<p>Historical data cannot be used when integrated with a fantasy platform, because platforms do not run leagues based on past seasons.  </p>
+<h3 id="projection">Projection</h3>
+<p>The other option is to use a projection for future performance. </p>
+<p><img alt="alt text" src="../img/projections.png" /></p>
+<p>As of now, two kinds of projections are supported: those created by Hashtag Basketball, and Basketball Monster. Both of these projections are paid products, so they cannot be provided through the website. Instead, they must be purchased and uploaded. They can both be uploaded and then mixed according to the chosen weights, if desired. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. This setup is future-proofing for additional projection sources in the future.</p>
+<p>For HTB, there is no native download option for projections. The projections must be copy pasted into an Excel file and saved as a CSV.</p>
+<p>For BBM, there is a download option, but only the XLSX download option works. Download it, copy out the projections into Excel, and save them as a CSV UTF-8.</p>
+<p>Either kind of projection can be manually edited to change projections if desired. </p>
+<p>Also: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. </p>
 <h2 id="formats-categories">Formats &amp; categories</h2>
+<p><img alt="alt text" src="../img/formats.png" /></p>
+<p>The website supports the three common category formats for fantasy basketball: H2H Each Category, H2H Most Categories, and Rotisserie. It does not have native support any additional variants, like using a specific category as a tiebreaker. </p>
+<p>It also supports any combination of categories, across the default nine categories and several alternative options.</p>
+<p><img alt="alt text" src="../img/categories.png" /></p>
+<p>For the alternative categories, when using projections, make sure to include them when sourcing the projections. </p>
 
 
 
@@ -557,6 +737,8 @@
     
     
       <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>

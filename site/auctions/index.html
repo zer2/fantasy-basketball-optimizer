@@ -12,7 +12,7 @@
         <link rel="prev" href="../roto/">
       
       
-        <link rel="next" href="../trading/">
+        <link rel="next" href="../season/">
       
       
       <link rel="icon" href="../img/favicon.ico">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Auction values - FBBO Methods & Documentation</title>
+        <title>Auctions - FBBO Methods & Documentation</title>
       
     
     
@@ -61,6 +61,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#auctions" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -93,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Auction values
+              Auctions
             
           </span>
         </div>
@@ -327,18 +332,94 @@
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Auctions
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
-    Auction values
+    Auctions
     
   </span>
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dollar-conversions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dollar conversions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dollar conversions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#converting-g-score-value-to-dollar-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting G-score value to dollar value
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#converting-h-score-value-to-dollar-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting H-score value to dollar value
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-savor-adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      The SAVOR adjustment
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -351,12 +432,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../trading/" class="md-nav__link">
+      <a href="../season/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Trading
+    Season Mode
     
   </span>
   
@@ -383,6 +464,58 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dollar-conversions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dollar conversions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dollar conversions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#converting-g-score-value-to-dollar-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting G-score value to dollar value
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#converting-h-score-value-to-dollar-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting H-score value to dollar value
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-savor-adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      The SAVOR adjustment
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -398,9 +531,53 @@
 
 
 
-  <h1>Auction values</h1>
-
-
+<h1 id="auctions">Auctions</h1>
+<p>Auction drafting is more complicated than snake drafting because auction drafters need to decide how much to bid on players, not just which players to take. This level of complexity makes strategizing perfectly for an auction even more impossible than it is for a snake draft. </p>
+<p>Still, quantitative analysis can be helpful in the auction context. In particular, it can be used to benchmark player values in terms of auction dollars. </p>
+<p>This website implements some basic methods for converting G-scores and H-scores into dollar values. It also makes an adjustment to player values that is unique to the auction context called SAVOR.</p>
+<h2 id="dollar-conversions">Dollar conversions</h2>
+<p>A well-known heuristic for quantifying auction value is described in many places including <a href="https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393">this article from rotowire</a>. For reference, it is</p>
+<ol>
+<li>Calculate the replacement-level score. That is, if 156 players will be chosen, the 157th-highest score is the replacement value</li>
+<li>Adjust all scores by subtracting out the replacement-level value. If this would make a score go below zero, set it to zero instead</li>
+<li>Calculate the sum of scores above replacement. This is the total amount of real value available in the auction</li>
+<li>Divide the total number of dollars available by the total amount of real value available. This yields a conversion rate from score above replacement to dollars</li>
+<li>Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value</li>
+</ol>
+<p>This process ensures both that players' dollar values proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. </p>
+<p>The website uses this process to quantify player value in a few ways.</p>
+<h3 id="converting-g-score-value-to-dollar-value">Converting G-score value to dollar value</h3>
+<p>Two kinds of dollar values are presented for G-scores</p>
+<figure>
+<p><img alt="" src="../img/gdollars.png" /></p>
+<figcaption>
+<p>G-score-based $ values in a synthetic draft context</p>
+</figcaption>
+</figure>
+<p>'Orig. $' value, or original value, is the same as the auction value heuristic described above. Original values do not change during auctions, and can be helpful as objective benchmarks that quantify how good deals are in the abstract. </p>
+<p>'Gnrc. $' value, or generic value, is a variant which is recomputed as players are taken and the amount of available money decreases. For example if two players out of 156 have been taken for $200 total, those two players are removed from the list, the replacement-level value becomes the 155th-highest score, and 200 dollars are removed from the amount of total dollars available. The same process as for original value is then applied using the modified inputs. Generic value may be useful strategically because it reflects whether other managers have been under- or over-spending. E.g. if managers have been underspending, it implicitly takes into account the fact that some managers have excess money and will be able to pay more for remaining players. </p>
+<h3 id="converting-h-score-value-to-dollar-value">Converting H-score value to dollar value</h3>
+<p>H-scores are probabilities, not general values. They are converted into dollar values with two steps</p>
+<ol>
+<li>It is estimated how much money it would take to improve winning chances by the same amount as taking the player</li>
+<li>Those monetary estimates are refined into dollar values with the auction value heuristic as described previously</li>
+</ol>
+<figure>
+<p><img alt="alt text" src="../img/hdollars.png" /></p>
+<figcaption>
+<p>H-score-based $ values in a synthetic draft context</p>
+</figcaption>
+</figure>
+<p>The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. </p>
+<p>Like for G-scores, the original values are processed once with the auction value heuristic and stay the same throughout the auction. </p>
+<p>For generic values, the underlying step 1 estimates are not changed, but the step 2 process is adjusted for the number of players remaining etc. That is, if a player was estimated to be worth $30 originally, that number will continue to be plugged in as a value to the auction value heuristic process. The auction value heuristic process will be slightly different because players have been taken and cash has been spent. </p>
+<p>H-scoring is also run with with the updated context for the drafter in question. Those monetary estimates become 'Your $' after refinement through the auction value heuristic. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. </p>
+<h2 id="the-savor-adjustment">The SAVOR adjustment</h2>
+<p>After the previously described processing for H-score and G-score dollar values, the website makes an additional adjustment called SAVOR. It is reflected in all of the displayed dollar values. </p>
+<p>SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the fact that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valuable than their alternatives. This is a known concept in the fantasy basketball community- for example it is referenced in this <a href="https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/">reddit thread</a>.</p>
+<p>Details of the mathematical model behind the SAVOR adjustment are included in the appendix of <a href="https://arxiv.org/abs/2307.02188v4">an old version of the first paper</a>. It was removed from the most recent version because it was not topical. </p>
+<p><img alt="alt text" src="../img/savorinput.png" /></p>
+<p>SAVOR takes an input parameter, <span class="arithmatex">\(S_{\sigma}\)</span>. It controls the degree to which players are expected to move up and down across the season according to the SAVOR model. Its default value is sourced by vibes- different values may be just as or more reasonable. </p>
 
 
 
@@ -453,6 +630,8 @@
     
     
       <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
       
     
   </body>
