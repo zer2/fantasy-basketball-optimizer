@@ -172,7 +172,7 @@ def trade_param_popover():
 
     combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
                                   ,'N-received' : [1,2,3]
-                                  ,'T' : [10,5,4]}
+                                  ,'T' : [3,3,3]}
                                   )
 
     st.session_state['combo_params_df'] = st.data_editor(combo_params_default

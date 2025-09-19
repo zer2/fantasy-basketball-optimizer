@@ -43,7 +43,7 @@ def league_settings_popover():
 
         league = st.selectbox(
                 'Which fantasy sport are you playing?',
-                ('NBA','MLB') #WNBA excluded for now
+                ('NBA') #WNBA and MLB excluded for now
                 , index = 0
                 , key = 'league'
                 , on_change = increment_and_reset_draft
