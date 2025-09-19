@@ -1,0 +1,852 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../gscores/">
+      
+      
+        <link rel="next" href="../roto/">
+      
+      
+      <link rel="icon" href="../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.19">
+    
+    
+      
+        <title>H-scores - FBBO Methods & Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.7e37652d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#h-scores" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="FBBO Methods &amp; Documentation" class="md-header__button md-logo" aria-label="FBBO Methods & Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FBBO Methods & Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              H-scores
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="FBBO Methods &amp; Documentation" class="md-nav__button md-logo" aria-label="FBBO Methods & Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FBBO Methods & Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Settings
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Parameters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gscores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    G-scores
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    H-scores
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    H-scores
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#parameter-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameter inputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameter inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#punting-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Punting parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#number-of-iterations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Number of iterations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-score-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-score table
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="H-score table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#category-level-h-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Category-level H-scores
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overall-h-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overall H-scores
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#most-categories-scoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Most Categories scoring
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-score-details-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-score details tab
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="H-score details tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expectations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expectations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Future strategy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-scoring-tendencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-scoring tendencies
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Limitations
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Rotisserie
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auctions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Auctions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../season/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Season Mode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#parameter-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameter inputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameter inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#punting-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Punting parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#number-of-iterations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Number of iterations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-score-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-score table
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="H-score table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#category-level-h-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Category-level H-scores
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overall-h-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overall H-scores
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#most-categories-scoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Most Categories scoring
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-score-details-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-score details tab
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="H-score details tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expectations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expectations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Future strategy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h-scoring-tendencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-scoring tendencies
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Limitations
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="h-scores">H-scores</h1>
+<p>H-scoring is a framework introduced in <a href="https://arxiv.org/abs/2409.09884">the second paper</a> for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring.</p>
+<p>The website includes a module which performs the H-score algorithm programatically. </p>
+<h2 id="parameter-inputs">Parameter inputs</h2>
+<p>The H-scoring algorithm has a few <a href="../parameters/#h-score-parameters">input parameters</a> which are configurable by the user. </p>
+<h3 id="punting-parameters">Punting parameters</h3>
+<figure>
+<p><img alt="alt text" src="../img/puntcontrol.png" /></p>
+<figcaption>
+<p>The punting parameters, available through Algorithm Parameters</p>
+</figcaption>
+</figure>
+<p>These two parameters control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. </p>
+<h3 id="number-of-iterations">Number of iterations</h3>
+<figure>
+<p><img alt="alt text" src="../img/iterations.png" /></p>
+<figcaption>
+<p>The number of iterations parameter, available through Algorithm Parameters </p>
+</figcaption>
+</figure>
+<p>The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  </p>
+<p>When the website runs H-scoring, it shows the current results after the first iteration, once every fifteen iterations after that, and after the last iteration. </p>
+<h2 id="h-score-table">H-score table</h2>
+<p>The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. </p>
+<figure>
+<p><img alt="" src="../img/hec.png" /></p>
+<figcaption>
+<p>Top Each Category H-scores for the first pick, 2024-25 season</p>
+</figcaption>
+</figure>
+<h3 id="category-level-h-scores">Category-level H-scores</h3>
+<p>Category-level H-scores are an in important part of the H-scoring process. Unlike with G-scores, they are <em>not direct reflections of the candidate player's characteristics</em>. Instead, they show what the H-scoring algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates that expectation based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.</p>
+<p>Because other factors are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For early picks, the most important factor is the strategy for future draft picks. For example, Shai Gilgeous-Alexander's row above for the first pick in the draft shows a very low probability of winning the Rebound category, despite SGA being a decent rebounder himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing rebounds with future picks.</p>
+<p>In later draft rounds, the importance of previously chosen players increases and the importance of the strategy for future picks decreases. Also, the strategy for future picks tends to become more stable across players, since the direction of the team is already decided. So categorical H-scores tend to become consistent across players. </p>
+<figure>
+<p><img alt="alt text" src="../img/hec2.png" /></p>
+<figcaption>
+<p>Top H-scores for a round seven pick in a mock draft, with relatively stable scores across categories. Each Categories, 2024-25</p>
+</figcaption>
+</figure>
+<h3 id="overall-h-scores">Overall H-scores</h3>
+<p>The overall H-score is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. It is based on the category-level H-scores. For Each Categories scoring, it is defined as the average expected win rate across categories.</p>
+<p>Using the overall H-score to rank players incorporates the strategic concept that player value is dependant on 'build'. For example, Giannis Antetokounmpo typically is rated poorly according to quantitative metrics, because he is dragged down by poor Free Throw shooting. H-scoring sees that it can build a team around him that leans into his strengths, by punting the Free Throw category and prioritizing others. He therefore ends up ranked significantly higher by H-score than he would by pure G-score. </p>
+<h3 id="most-categories-scoring">Most Categories scoring</h3>
+<p>For Most Categories, the average expected win rate is a poor proxy for success. A team that wins five out of nine categories 100% of the time and always loses the others is better for that format than one that wins each category 60% of the time, despite having a lower average expected win rate (56% vs 60%). For that reason, switching the format to Most Categories switches the definition of the overall H-score to the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).</p>
+<figure>
+<p><img alt="alt text" src="../img/hmc.png" /></p>
+<figcaption>
+<p>Top Most Category H-scores for the first pick, 2024-25 season</p>
+</figcaption>
+</figure>
+<p>The table above is based on the same dataset as the Each Category version. The numbers, and the order of players, are different because they use the Most Categories objective instead of the Each Category objective. With Most Categories scoring, the algorithm is even more incentivized to punt, and tends to do so to a more extreme degree. Players that benefit strongly from punting like Giannis also end up ranking better (third instead of fifth).</p>
+<h2 id="h-score-details-tab">H-score details tab</h2>
+<p>The main H-score table gives only indirect insight into the strategies that H-scoring wants to use with each candidate player. The H-score details tab explains the strategy for individual players more directly. It is broken down into two parts: expectations, and future strategy.</p>
+<h3 id="expectations">Expectations</h3>
+<figure>
+<p><img alt="alt text" src="../img/hexp.png" /></p>
+<figcaption>
+<p>Expectations for a team with Giannis as the first pick based on Dyson Daniels as the second, Each Category 2024-25</p>
+</figcaption>
+</figure>
+<p>The first row is the same as that from the main H-scoring table, included for convenience. The second breaks down the team into components, in terms of G-scores. The future pick totals are large in the case above because there are still many picks to be made. </p>
+<p>The ranks show how the candidate player ranks as a pick in this situation, both by H-score and G-score. This can also be seen through the H-score or G-score main tables, and is also included here as a convenience. </p>
+<p>One might note that the G-score expectations do not always align perfectly with the expected win rates. This happens because the H-scoring algorithm is implicitly trying to update its expectations for other teams based on players that have been taken or will soon be taken. Other teams may end up being stronger or weaker than '0', potentially leading to cases where a positive G-score is expected to have a below 50% win rate or vice versa. </p>
+<h3 id="future-strategy">Future strategy</h3>
+<p>The future strategy tab shows H-scoring's strategy for future picks.</p>
+<figure>
+<p><img alt="alt text" src="../img/hstrat.png" /></p>
+<figcaption>
+<p>Strategies for future draft picks based on having Giannis and Dyson Daniels already, Each Category 2024-25</p>
+</figcaption>
+</figure>
+<p>The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks (details are in the paper). One might note that in the case above, the weight for Free Throws is surprisingly high, despite the obvious fact that the algorithm is deprioritizing the category heavily. The reason for this is that in general, H-scoring does not think it needs to adjust weights all that much in order to skew the available candidates to the categories it wants (again, details are in the paper). </p>
+<p>The flex position allocations show how the algorithm expects to use its flex spots, which can take players of multiple positions. This is relevant because the algorithm understands that different positions have different statistical tendencies. In the example above, the algorithm is leaning heavily on taking Power Forwards and Centers with its flex spots, likely because they tend to have poor Free Throw rates, and that synergizes with the strategy of punting Free Throws. </p>
+<p>The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. </p>
+<h2 id="h-scoring-tendencies">H-scoring tendencies</h2>
+<p>The H-scoring algorithm does not take explicit instructions on overall strategy. However, it "learns" some general strategy based on its understanding of the problem </p>
+<figure>
+<p><img alt="alt text" src="../img/HistEC.png" /></p>
+<figcaption>
+<p>Image from the paper</p>
+</figcaption>
+</figure>
+<p>This image from the paper shows how the H-scoring algorithm generally performs on a category level. It shows that H-scoring often punts categories, though the punts are not always total. It often preserves some chance of winning punted categories. For the categories it does not punt, it tries to be highly competitive in them without going overboard, which may be a wasteful allocation of resources. </p>
+<h2 id="limitations">Limitations</h2>
+<p>H-scoring has numerous limitations. Some of the most major are </p>
+<ul>
+<li>The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates</li>
+<li>H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category</li>
+<li>H-scoring's model for what sorts of players will be available in the future is simplified, and may miss individual players with exceptional profiles</li>
+<li>H-scoring does not take into account the effect of streaming players, trading, etc. These all may add additional strategic considerations </li>
+</ul>
+<p>For a full accounting, see the paper. </p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
