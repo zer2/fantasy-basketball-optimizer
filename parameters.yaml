@@ -225,6 +225,10 @@ NBA:
     n_iterations : 
       min : 0
       max: 10000
+    S: 
+      default : 10
+      min : 0
+      max : 200
     positions: 
      13:
       base:
@@ -495,6 +499,10 @@ WNBA:
       default : 30
       min : 10
       max: 10000
+    S: 
+      default : 10
+      min : 0
+      max : 200
     positions: 
      9: 
       base:
@@ -858,6 +866,10 @@ MLB:
       default : 30
       min : 10
       max: 10000
+    S: 
+      default : 10
+      min : 0
+      max : 200
     positions: 
      25:
       base:

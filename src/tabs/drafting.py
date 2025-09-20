@@ -9,8 +9,10 @@ from src.math.algorithm_agents import HAgent
 
 import pandas as pd 
 import numpy as np
-from src.math.algorithm_helpers import savor_calculation
 from src.helpers.helper_functions import get_team_names
+from src.math.algorithm_agents import get_default_h_values
+from src.math.algorithm_helpers import auction_value_adjuster
+
 #from wfork_streamlit_profiler import Profiler
 
 @st.fragment
@@ -30,6 +32,7 @@ def make_drafting_tab_own_data(H):
     with left:
 
         selection_list = listify(st.session_state.selections_df)
+        
         g_scores_unselected = st.session_state.info['G-scores'][~st.session_state.info['G-scores'].index.isin(selection_list)]
 
         with st.form("pick form", border = False):
@@ -63,16 +66,11 @@ def make_drafting_tab_own_data(H):
 
     with right:
 
-        non_autodrafters = [i for i,c in zip(range(st.session_state.selections_default.shape[1])
-                                             ,st.session_state.selections_default.columns) 
-                            if c not in st.session_state.autodrafters]
-
         draft_seat = st.selectbox(f'Which drafter are you?'
-            , st.session_state.selections_df.columns
-            , index = 0 if len(non_autodrafters) ==0 else non_autodrafters[0])
+            , st.session_state.selections_df.columns)
 
 
-        candidate_evaluation = st.container(height = 625)
+        candidate_evaluation = st.container(height = 625, border = False)
 
         my_players = st.session_state.selections_df[draft_seat].dropna()
 
@@ -149,7 +147,7 @@ def make_drafting_tab_live_data(H):
             my_players = []
 
             
-        candidate_evaluation = st.container(height = 625)
+        candidate_evaluation = st.container(height = 625, border = False)
 
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
@@ -265,7 +263,7 @@ def make_auction_tab_own_data(H):
 
         my_remaining_cash = cash_remaining_per_team[auction_seat]
 
-        candidate_evaluation = st.container(height = 645)
+        candidate_evaluation = st.container(height = 645, border = False)
 
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
@@ -295,16 +293,16 @@ def make_auction_tab_own_data(H):
                                             , info_key = st.session_state.info)
 
                 h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-                h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+                h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
                                                             , st.session_state.n_picks * n_drafters - len(selection_list)
                                                             , remaining_cash
-                                                            , st.session_state['streaming_noise_h'])
+                                                            , st.session_state['streaming_noise'])
                 h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
-                h_original_savor = savor_calculation(h_ranks['H-score']
+                h_original_savor = auction_value_adjuster(h_ranks['H-score']
                                                             , st.session_state.n_picks * n_drafters
                                                             , cash_per_team * n_drafters
-                                                            , st.session_state['streaming_noise_h'])
+                                                            , st.session_state['streaming_noise'])
                 h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
 
                 make_cand_tab(H
@@ -412,24 +410,24 @@ def make_auction_tab_live_data(H):
                                     , info_key = st.session_state.info).set_index('Player')
 
         h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-        h_defaults_savor = savor_calculation(h_ranks_unselected['H-score']
+        h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
                                                         , st.session_state.n_picks * n_drafters - len(selection_list)
                                                         , remaining_cash
-                                                        , st.session_state['streaming_noise_h'])
+                                                        , st.session_state['streaming_noise'])
                             
         h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected.index)
 
         #For when the rank page gets out of synch with the number of drafters and therefore the amount of cash available
         #h_defaults_savor = h_defaults_savor * np.sum([v for k, v in cash_remaining_per_team.items()])/h_defaults_savor.sum()
 
-        h_original_savor = savor_calculation(h_ranks['H-score']
+        h_original_savor = auction_value_adjuster(h_ranks['H-score']
                                                     , st.session_state.n_picks * n_drafters
                                                     , cash_per_team * n_drafters
-                                                    , st.session_state['streaming_noise_h'])
+                                                    , st.session_state['streaming_noise'])
         
         h_original_savor = pd.Series(h_original_savor.values, index = h_ranks.index)
 
-        candidate_evaluation = st.container(height = 645)
+        candidate_evaluation = st.container(height = 645, border = False)
 
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
@@ -452,73 +450,6 @@ def make_auction_tab_live_data(H):
                 
             else:
                 st.write('Your team is full')
-
-
-
-@st.cache_data(show_spinner = False, ttl = 3600)
-def get_default_h_values(info : dict
-                  , omega : float
-                  , gamma : float
-                  , n_picks : int
-                  , n_drafters : int
-                  , n_iterations : int
-                  , scoring_format : str
-                  , mode : str
-                  , psi : float
-                  , upsilon : float
-                  , chi : float
-                  , info_key : int):
-  
-  H = HAgent(info = info
-    , omega = omega
-    , gamma = gamma
-    , n_picks = n_picks
-    , n_drafters = n_drafters
-    , dynamic = n_iterations > 0
-    , scoring_format = scoring_format
-    , chi = chi
-    , team_names = [n for n in range(n_drafters)])
-  
-  if st.session_state['mode'] == 'Auction Mode':
-    cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
-  else:
-    cash_remaining_per_team = None
-
-  generator = H.get_h_scores(player_assignments = {n : [] for n in range(n_drafters)}
-                          , drafter = 0
-                          , cash_remaining_per_team = cash_remaining_per_team)
-
-  for i in range(max(1,n_iterations)):
-    res = next(generator)
-
-  h_res = res['Scores']
-  cdf_estimates = res['Rates']
-    
-  cdf_estimates.columns = get_selected_categories()
-  rate_df = cdf_estimates.loc[h_res.index].dropna()
-
-  h_res = h_res.sort_values(ascending = False)
-
-  h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
-                        ,'Player' : h_res.index
-                        ,'H-score' : h_res.values
-                      })
-
-
-  h_res = h_res.merge(rate_df
-                      , left_on = 'Player'
-                      ,right_index = True)
-  
-  if st.session_state['mode'] == 'Auction Mode':
-
-    h_res.loc[:,'Gnrc. $'] = savor_calculation(h_res['H-score']
-                                                    , n_picks * n_drafters
-                                                    , 200*n_drafters
-                                                    , st.session_state['streaming_noise_h'])
-    
-    h_res = h_res[['Rank','Player','Gnrc. $','H-score'] + get_selected_categories()]
-
-  return h_res
 
 
 def run_h_score():

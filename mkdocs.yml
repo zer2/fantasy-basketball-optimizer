@@ -1,0 +1,20 @@
+site_name: FBBO Methods & Documentation
+nav:
+  - Home: index.md
+  - Settings : settings.md
+  - Parameters : parameters.md
+  - G-scores : gscores.md
+  - H-scores : hscores.md
+  - Rotisserie : roto.md
+  - Draft Mode : drafts.md
+  - Auction Mode : auctions.md 
+  - Season Mode : season.md
+theme: 
+  name : material
+  favicon: img/favicon.ico
+markdown_extensions:
+  - pymdownx.blocks.caption
+  - pymdownx.arithmatex:
+      generic: true
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js

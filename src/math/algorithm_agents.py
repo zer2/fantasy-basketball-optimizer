@@ -8,6 +8,7 @@ import streamlit as st
 from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
                                             ,get_max_info
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
+from src.math.algorithm_helpers import auction_value_adjuster
 
 class HAgent():
 
@@ -1508,3 +1509,59 @@ def get_base_h_score(_info : dict
     , team_names = list(player_assignments.keys()))
 
   return next(H.get_h_scores(player_assignments, team))   
+
+@st.cache_data(show_spinner = False, ttl = 3600)
+def get_default_h_values(info : dict
+                  , omega : float
+                  , gamma : float
+                  , n_picks : int
+                  , n_drafters : int
+                  , n_iterations : int
+                  , scoring_format : str
+                  , mode : str
+                  , psi : float
+                  , upsilon : float
+                  , chi : float
+                  , info_key : int):
+  
+  H = HAgent(info = info
+    , omega = omega
+    , gamma = gamma
+    , n_picks = n_picks
+    , n_drafters = n_drafters
+    , dynamic = n_iterations > 0
+    , scoring_format = scoring_format
+    , chi = chi
+    , team_names = [n for n in range(n_drafters)])
+  
+  if st.session_state['mode'] == 'Auction Mode':
+    cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
+  else:
+    cash_remaining_per_team = None
+
+  generator = H.get_h_scores(player_assignments = {n : [] for n in range(n_drafters)}
+                          , drafter = 0
+                          , cash_remaining_per_team = cash_remaining_per_team)
+
+  for i in range(max(1,n_iterations)):
+    res = next(generator)
+
+  h_res = res['Scores']
+  cdf_estimates = res['Rates']
+    
+  cdf_estimates.columns = get_selected_categories()
+  rate_df = cdf_estimates.loc[h_res.index].dropna()
+
+  h_res = h_res.sort_values(ascending = False)
+
+  h_res = pd.DataFrame({'Rank' : np.arange(len(h_res)) + 1
+                        ,'Player' : h_res.index
+                        ,'H-score' : h_res.values
+                      })
+
+
+  h_res = h_res.merge(rate_df
+                      , left_on = 'Player'
+                      ,right_index = True)
+
+  return h_res

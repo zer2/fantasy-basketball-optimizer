@@ -6,17 +6,17 @@ from itertools import combinations
 from src.helpers.helper_functions import get_selected_categories
 import numexpr as ne
 
-def savor_calculation(raw_values_unselected : pd.Series
-                    , n_remaining_players : int
-                    , remaining_cash : int
-                    , noise = 1) -> pd.Series:
+def auction_value_adjuster(raw_values_unselected : pd.Series
+                            ,n_remaining_players : int
+                             ,remaining_cash : int
+                             ,noise : float) -> pd.Series:
     """Calculate SAVOR- Streaming-adjusted value over replacement
 
     SAVOR estimates the probability that a player will be replaced by a streamer, and adjusts 
     auction value accordingly
 
     Args:
-      raw_values_unselected: raw value by Z-score, G-score, etc. Needs to be in descending order
+      raw_values_unselected: raw value by G-score, H-score, etc.
       n_remaining_players: number of players left to be picked
       remaining_cash: amount of cash remaining to spend on players, from all teams
       noise: parameter for the SAVOR function. Controls how noisy we expect player performance to be
@@ -25,20 +25,62 @@ def savor_calculation(raw_values_unselected : pd.Series
     Returns:
       Series, SAVOR 
     """
+    dollar_values = dollar_scale_adjustment(raw_values_unselected
+                             ,remaining_cash
+                             ,n_remaining_players)
+    savor_adjusted_values = savor_calculation(dollar_values,noise)
+    return savor_adjusted_values
+
+def dollar_scale_adjustment(raw_values_unselected : pd.Series
+                             ,remaining_cash : int
+                             ,n_remaining_players : int) -> pd.Series:
+    """Calculate SAVOR- Streaming-adjusted value over replacement
+
+    SAVOR estimates the probability that a player will be replaced by a streamer, and adjusts 
+    auction value accordingly
+
+    Args:
+      raw_values_unselected: raw value by G-score, H-score, etc.
+      n_remaining_players: number of players left to be picked
+      remaining_cash: amount of cash remaining to spend on players, from all teams
+
+    Returns:
+      Series, SAVOR 
+    """
+
+    raw_values_unselected = raw_values_unselected.sort_values(ascending = False)
 
     replacement_value = raw_values_unselected.iloc[n_remaining_players]
     value_above_replacement = np.clip(raw_values_unselected - replacement_value,0,None)
-
-    probability_of_non_streaming = norm.cdf(value_above_replacement/noise)
-    adjustment_factor = (noise)/(2 * np.pi)**(0.5) * (1 - np.exp((-value_above_replacement**2)/(2 * noise**2)))
-    adjusted_value = value_above_replacement * probability_of_non_streaming - adjustment_factor
-
-    remaining_value = adjusted_value.iloc[0:n_remaining_players].sum()
+    remaining_value = value_above_replacement.iloc[0:n_remaining_players].sum()
     dollar_per_value = remaining_cash/remaining_value
+    dollar_value = value_above_replacement * dollar_per_value
+    return dollar_value
 
-    savor = adjusted_value * dollar_per_value
+def savor_calculation(dollar_value : pd.Series
+                    , noise : float) -> pd.Series:
+    """Calculate SAVOR- Streaming-adjusted value over replacement
 
-    return savor 
+    SAVOR estimates the probability that a player will be replaced by a streamer, and adjusts 
+    auction value accordingly
+
+    Args:
+      dollar_value : Series of values representing unadjusted dollar values for an auction
+      noise: parameter for the SAVOR function. Controls how noisy we expect player performance to be
+             and therefore how likely it is a player will be replaced by a streamer
+
+    Returns:
+      Series, SAVOR 
+    """
+
+
+    probability_of_non_streaming = norm.cdf(dollar_value/noise)
+    adjustment_factor = (noise)/(2 * np.pi)**(0.5) * (1 - np.exp((-dollar_value**2)/(2 * noise**2)))
+    adjusted_value = dollar_value * probability_of_non_streaming - adjustment_factor
+
+    adjusted_value_rescaled = adjusted_value * dollar_value.sum()/adjusted_value.sum()
+
+    return adjusted_value_rescaled 
 
 def combinatorial_calculation(c : np.array
                               , c_comp : np.array
@@ -161,3 +203,4 @@ def calculate_tipping_points(x : np.array) -> np.array:
         final_probabilities = final_probabilities/2 + tie_probabilities/2
 
     return final_probabilities
+

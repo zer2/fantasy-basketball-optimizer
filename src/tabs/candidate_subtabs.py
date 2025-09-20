@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
                                 styler_a, stat_styler, get_position_structure
-from src.math.algorithm_helpers import savor_calculation
+from src.math.algorithm_helpers import auction_value_adjuster
 from src.helpers.helper_functions import get_n_drafters
 
 def make_hashable(obj):
@@ -130,7 +130,10 @@ def make_cand_tab(_H
 
       display =  (i % display_period == 0) or (i == n_iterations - 1) or (n_iterations <= 1)
 
-      h_tab, g_tab, pbp_tab = st.tabs(['H-score','G-score','Player-by-player'])
+      if st.session_state.mode == 'Season Mode':
+        h_tab, g_tab,  = st.tabs(['H-score','G-score'])
+      else:
+        h_tab, pbp_tab, g_tab,  = st.tabs(['H-score','H-score details','G-score'])
 
       with h_tab:
 
@@ -161,17 +164,17 @@ def make_cand_tab(_H
             players_chosen = [x for v in player_assignments.values() for x in v if x == x]
             total_cash_remaining = np.sum([v for k, v in cash_remaining_per_team.items()])
 
-            rate_display.loc[:,'Your $'] = savor_calculation(score_df.sort_values(by = 'H-score',ascending = False)
+            rate_display.loc[:,'Your $'] = auction_value_adjuster(score_df['H-score']
                                                             , total_players - len(players_chosen)
                                                             , total_cash_remaining
-                                                            , st.session_state['streaming_noise_h'])
+                                                            , st.session_state['streaming_noise'])
             
             rate_display = pd.DataFrame({'Your $' : rate_display['Your $']
                                           , 'Gnrc. $' : generic_player_value.loc[rate_display.index]
                                           , 'Orig. $' : original_player_value.loc[rate_display.index]}
                                         )
             
-            rate_display.loc[:,'Difference'] = rate_display['Your $'] - rate_display['Gnrc. $']
+            rate_display.loc[:,'Difference'] = (rate_display['Your $'] - rate_display['Gnrc. $']).round(1)
 
             rate_display = rate_display.sort_values('Your $', ascending = False)
             score_df = score_df.loc[rate_display.index]
@@ -193,7 +196,8 @@ def make_cand_tab(_H
             
             st.dataframe(rate_display_styled
                          , hide_index = True
-                         , height = cand_table_height)
+                         , height = cand_table_height
+                         , use_container_width = True)
             
             make_auction_string(original_player_value 
                     , score_df.index 
@@ -285,13 +289,13 @@ def make_cand_tab(_H
 
               g_display = g_display.sort_values('Total', ascending = False)
 
-              g_display.loc[:,'Gnrc. $'] = savor_calculation(g_display['Total']
+              g_display.loc[:,'Gnrc. $'] = auction_value_adjuster(g_display['Total']
                                                           , total_players - len(selection_list)
                                                           , remaining_cash
                                                           , st.session_state['streaming_noise']) 
               
               #ZR: maybe we don't need to run this every time
-              g_score_savor = savor_calculation(_g_scores['Total']
+              g_score_savor = auction_value_adjuster(_g_scores['Total']
                                                           , total_players 
                                                           , get_n_drafters() * st.session_state.cash_per_team
                                                           , st.session_state['streaming_noise']) 
@@ -327,8 +331,10 @@ def make_cand_tab(_H
                     , rate_display 
                     , remaining_cash)
 
-      with pbp_tab:
-        if display:
+      if display and not st.session_state.mode == 'Season Mode':
+          
+        with pbp_tab:
+
           score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
 
           make_detailed_view(player_assignments

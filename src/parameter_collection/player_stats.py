@@ -115,7 +115,7 @@ def get_nba_stats():
 
         with c2:
 
-            bbm_slider = st.slider('BBM Weight'
+            bbm_slider = st.slider('Basketball Monster Weight'
                     , min_value = 0.0
                     , max_value = 1.0
                     , on_change= increment_player_stats_version)

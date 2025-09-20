@@ -19,9 +19,9 @@ def league_settings_popover():
     If the user wants to integrate with a platform, also add 'integration' to session state
 
     Second column:
-    Allows the user to set the total number of teams, name them, and assign autodrafters to them if necessary
+    Allows the user to set the total number of teams and name them
     This function also creates a default dataframe for team selections 
-    Adds four main objects to session state: 'n_drafters','n_picks', 'autodrafters', and 'selections_df' (the
+    Adds three main objects to session state: 'n_drafters','n_picks', and 'selections_df' (the
     aforementioned default dataframe)
     For convenience, 'team_names' is also saved so that the selections_df doesn't need to be loaded every time 
     team names are checked
@@ -43,7 +43,7 @@ def league_settings_popover():
 
         league = st.selectbox(
                 'Which fantasy sport are you playing?',
-                ('NBA','MLB') #WNBA excluded for now
+                ('NBA') #WNBA and MLB excluded for now
                 , index = 0
                 , key = 'league'
                 , on_change = increment_and_reset_draft
@@ -121,10 +121,3 @@ def league_settings_popover():
             
             if 'selections_df' not in st.session_state:
                 st.session_state.selections_df = st.session_state.selections_default 
-
-            if (st.session_state['mode'] == 'Draft Mode'):
-                autodrafters = st.multiselect('''Which drafter(s) should be automated with an auto-drafter?'''
-                    ,options = get_team_names()
-                    ,key = 'autodrafters'
-                    ,default = None)
-            

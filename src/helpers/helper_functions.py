@@ -488,5 +488,4 @@ def get_snowflake_connection(schema):
         ,schema = schema
         )
       return con
-      
-  
+    

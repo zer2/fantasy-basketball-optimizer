@@ -85,7 +85,7 @@ with st.sidebar:
 
     player_stat_param_popover()                                          
 
-  with st.popover(':small[Algorithm Parameters]').container(height = 300):
+  with st.popover(':small[H-score Parameters]').container(height = 300):
                     
     algorithm_param_popover()
 
@@ -93,17 +93,14 @@ with st.sidebar:
           
     trade_param_popover()
 
-  with st.popover(':small[Position Requirements]'):
+  with st.popover(':small[Position Parameters]'):
 
     position_requirement_popover()
 
   st.write("---")
 
-  st.caption('Algorithm sources:')
+  st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
-  st.link_button(":small[Paper 1: G-scores]", 'https://arxiv.org/abs/2307.02188')
-  st.link_button(':small[Paper 2: H-scores]', 'https://arxiv.org/abs/2409.09884')
-  st.link_button(':small[Paper 3: Roto]', 'https://arxiv.org/abs/2501.00933')
 
 ### Build app 
 
