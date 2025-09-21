@@ -218,7 +218,8 @@ def get_team_names():
    if st.session_state.data_source == 'Enter your own data':
       return st.session_state.team_names
    else:
-      return st.session_state.integration.get_team_names()
+      return st.session_state.integration.get_team_names(st.session_state.integration.league_id
+                                                          , st.session_state.integration.division_id)
    
 def get_n_drafters():
    return len(get_team_names())
