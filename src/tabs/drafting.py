@@ -124,8 +124,7 @@ def make_drafting_tab_live_data(H):
         
         c1.button('Refresh Analysis', on_click = refresh_analysis)
 
-        team_names = st.session_state.integration.get_team_names(st.session_state.integration.league_id
-                                                              , st.session_state.integration.division_id)
+        team_names = get_team_names()
         
         if 'draft_seat' in st.session_state:
            default_index = team_names.index(st.session_state.draft_seat)
@@ -211,6 +210,8 @@ def make_auction_tab_own_data(H):
                         , hide_index = True
                         , use_container_width = True
                         )
+            
+
             
             c1, c2 = st.columns([0.2,0.8])
             
