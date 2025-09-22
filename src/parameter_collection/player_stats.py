@@ -86,7 +86,7 @@ def get_nba_stats():
         unique_datasets_historical = reversed([str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))])
 
         dataset_name = st.selectbox(
-            'Which season of data do you want to use?'
+            'Whic3h season of data do you want to use?'
             ,unique_datasets_historical
             ,index = 0
             ,on_change = increment_and_reset_draft
@@ -99,52 +99,66 @@ def get_nba_stats():
 
         with c1:
 
+            if 'htb_slider_default_value' not in st.session_state:
+                st.session_state.htb_slider_default_value = 0.0
+
             hashtag_slider = st.slider('Hashtag Basketball Weight'
                                     , min_value = 0.0
-                                    , value = 0.0
                                     , max_value = 1.0
-                                    , on_change= increment_player_stats_version)
+                                    , value = st.session_state.htb_slider_default_value
+                                    , on_change= increment_player_stats_version
+                                    , key = 'hashtag_widget')
+            
+            st.session_state.hashtag_slider_default_value = hashtag_slider
             
             hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
                                             , type=['csv']
                                             , on_change= increment_player_stats_version)
             if hashtag_file is not None:
-                hashtag_upload  = pd.read_csv(hashtag_file)
-            else:
-                hashtag_upload = None
+                st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)
 
         with c2:
+
+            if 'bbm_slider_default_value' not in st.session_state:
+                st.session_state.bbm_slider_default_value = 0.0
 
             bbm_slider = st.slider('Basketball Monster Weight'
                     , min_value = 0.0
                     , max_value = 1.0
-                    , on_change= increment_player_stats_version)
+                    , value = st.session_state.bbm_slider_default_value
+                    , on_change= increment_player_stats_version
+                    , key = 'bbm_widget')
+            
+            st.session_state.bbm_slider_default_value = bbm_slider
 
             bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
                                             , type=['csv']
                                             , on_change= increment_player_stats_version)
             if bbm_file is not None:
-                bbm_upload  = pd.read_csv(bbm_file)
-            else:
-                bbm_upload = None
+                st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
             
         #no rotowire or darko for now- could revisit in future
-        #DARKO isn't great for pre-season becuase it doesnt understand roster changes
+        #DARKO isn't great becuase it doesnt have GP or Position by itself
         #and I dont think rotowire is really used at all
         darko_slider = 0
         rotowire_slider = 0   
         rotowire_upload = None 
 
-        if (bbm_slider > 0) & (bbm_upload is None):
+        if (hashtag_slider > 0) & ('htb' not in st.session_state.datasets):
+            return 'Upload HTB projection file'
+        
+        elif (bbm_slider > 0) & ('bbm' not in st.session_state.datasets):
             return 'Upload Basketball Monster projection file'
-
-        if hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
+        
+        elif hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
             return 'Need to upload a projection file and set a weight to it'
 
         else:
+
+
             raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
-                            , bbm_upload
-                            , hashtag_upload
+                            , st.session_state.datasets.get('bbm')
+                            , st.session_state.datasets.get('htb')
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider
