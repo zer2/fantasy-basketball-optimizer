@@ -134,6 +134,8 @@ def get_nba_stats():
                 if bbm_file is not None:
                     st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
                 
+            submit_button = st.form_submit_button('Lock in')
+
             #no rotowire or darko for now- could revisit in future
             #DARKO isn't great becuase it doesnt have GP or Position by itself
             #and I dont think rotowire is really used at all
@@ -152,7 +154,6 @@ def get_nba_stats():
 
             else:
 
-
                 raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
                                 , st.session_state.datasets.get('bbm')
                                 , st.session_state.datasets.get('htb')
@@ -162,7 +163,8 @@ def get_nba_stats():
                                 , rotowire_slider
                                 , st.session_state.data_source)
                 
-            submit_button = st.form_submit_button('Lock in', on_click = increment_player_stats_version)
+            if submit_button: 
+                increment_player_stats_version()
         
     return (raw_stats_df, player_metadata)
 
