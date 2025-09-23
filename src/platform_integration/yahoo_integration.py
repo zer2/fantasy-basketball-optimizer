@@ -2,9 +2,9 @@ import streamlit as st
 from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.tabs.drafting import clear_draft_board, increment_and_reset_draft
+from src.tabs.drafting import increment_and_reset_draft
 from typing import Callable, List, Optional
-from yfpy.models import League, Team, Roster
+from yfpy.models import League, Roster
 
 from requests.auth import HTTPBasicAuth
 from src.platform_integration import yahoo_helper

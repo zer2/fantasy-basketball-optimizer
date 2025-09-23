@@ -112,6 +112,8 @@ def make_team_display(_g_scores : pd.DataFrame
 
   if len(my_players) > 0:
 
+    st.divider()
+
     my_real_players = [x for x in my_players if x != 'RP']
 
     team_stats = _g_scores[_g_scores.index.isin(my_real_players)]

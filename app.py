@@ -32,6 +32,9 @@ if 'info_key' not in st.session_state:
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
 
+if 'datasets' not in st.session_state:
+   st.session_state.datasets = {}
+
 if 'injured_players' not in st.session_state:
     st.session_state['injured_players'] = set()
 

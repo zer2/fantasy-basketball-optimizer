@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
-import numexpr as ne
-from datetime import datetime
 from functools import reduce 
 from unidecode import unidecode
 import snowflake.connector

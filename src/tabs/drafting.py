@@ -5,7 +5,6 @@ from src.helpers.helper_functions import listify, move_back_one_pick, move_forwa
 from src.tabs.season_mode import *
 from src.tabs.candidate_subtabs import *
 from src.helpers.helper_functions import move_forward_one_pick, get_n_drafters
-from src.math.algorithm_agents import HAgent
 
 import pandas as pd 
 import numpy as np

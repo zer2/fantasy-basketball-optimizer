@@ -19,7 +19,6 @@ def player_stats_popover():
     Returns:
       raw_stat_df, dataframe 
     """
-
     c1, c2 = st.columns([0.6,0.4])
     #ZR: These should probably be classes, like the integrations
 
@@ -95,61 +94,77 @@ def get_nba_stats():
                 
     else: 
 
-        c1, c2 = st.columns(2)
+        with st.form('Projections Form'):
 
-        with c1:
+            c1, c2 = st.columns(2)
 
-            hashtag_slider = st.slider('Hashtag Basketball Weight'
-                                    , min_value = 0.0
-                                    , value = 0.0
-                                    , max_value = 1.0
-                                    , on_change= increment_player_stats_version)
+            with c1:
+
+                if 'htb_slider_default_value' not in st.session_state:
+                    st.session_state.htb_slider_default_value = 0.0
+
+                hashtag_slider = st.slider('Hashtag Basketball Weight'
+                                        , min_value = 0.0
+                                        , max_value = 1.0
+                                        , value = st.session_state.htb_slider_default_value
+                                        , key = 'hashtag_widget')
+                
+                st.session_state.htb_slider_default_value = hashtag_slider
+                
+                hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
+                                                , type=['csv'])
+                if hashtag_file is not None:
+                    st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)
+
+            with c2:
+
+                if 'bbm_slider_default_value' not in st.session_state:
+                    st.session_state.bbm_slider_default_value = 0.0
+
+                bbm_slider = st.slider('Basketball Monster Weight'
+                        , min_value = 0.0
+                        , max_value = 1.0
+                        , value = st.session_state.bbm_slider_default_value
+                        , key = 'bbm_widget')
+                
+                st.session_state.bbm_slider_default_value = bbm_slider
+
+                bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
+                                                , type=['csv'])
+                if bbm_file is not None:
+                    st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
+                
+            submit_button = st.form_submit_button('Lock in')
+
+            #no rotowire or darko for now- could revisit in future
+            #DARKO isn't great becuase it doesnt have GP or Position by itself
+            #and I dont think rotowire is really used at all
+            darko_slider = 0
+            rotowire_slider = 0   
+            rotowire_upload = None 
+
+            if (hashtag_slider > 0) & ('htb' not in st.session_state.datasets):
+                return 'Upload HTB projection file'
             
-            hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
-                                            , type=['csv']
-                                            , on_change= increment_player_stats_version)
-            if hashtag_file is not None:
-                hashtag_upload  = pd.read_csv(hashtag_file)
-            else:
-                hashtag_upload = None
-
-        with c2:
-
-            bbm_slider = st.slider('Basketball Monster Weight'
-                    , min_value = 0.0
-                    , max_value = 1.0
-                    , on_change= increment_player_stats_version)
-
-            bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
-                                            , type=['csv']
-                                            , on_change= increment_player_stats_version)
-            if bbm_file is not None:
-                bbm_upload  = pd.read_csv(bbm_file)
-            else:
-                bbm_upload = None
+            elif (bbm_slider > 0) & ('bbm' not in st.session_state.datasets):
+                return 'Upload Basketball Monster projection file'
             
-        #no rotowire or darko for now- could revisit in future
-        #DARKO isn't great for pre-season becuase it doesnt understand roster changes
-        #and I dont think rotowire is really used at all
-        darko_slider = 0
-        rotowire_slider = 0   
-        rotowire_upload = None 
+            elif hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
+                return 'Need to upload a projection file and set a weight to it'
 
-        if (bbm_slider > 0) & (bbm_upload is None):
-            return 'Upload Basketball Monster projection file'
+            else:
 
-        if hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
-            return 'Need to upload a projection file and set a weight to it'
-
-        else:
-            raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
-                            , bbm_upload
-                            , hashtag_upload
-                            , hashtag_slider
-                            , bbm_slider
-                            , darko_slider
-                            , rotowire_slider
-                            , st.session_state.data_source)
+                raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
+                                , st.session_state.datasets.get('bbm')
+                                , st.session_state.datasets.get('htb')
+                                , hashtag_slider
+                                , bbm_slider
+                                , darko_slider
+                                , rotowire_slider
+                                , st.session_state.data_source)
+                
+            if submit_button: 
+                increment_player_stats_version()
         
     return (raw_stats_df, player_metadata)
 
