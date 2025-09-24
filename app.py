@@ -76,7 +76,7 @@ with st.sidebar:
 
     league_settings_popover()
   
-  with st.popover(':small[Player Stats]'):
+  with st.popover(':small[Player Stats]').container(width = 3000):
 
     player_stats = player_stats_popover()
 
