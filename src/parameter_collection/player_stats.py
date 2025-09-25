@@ -19,43 +19,55 @@ def player_stats_popover():
     Returns:
       raw_stat_df, dataframe 
     """
-    c1, c2 = st.columns([0.6,0.4])
-    #ZR: These should probably be classes, like the integrations
 
-    with c1:
+    with st.form('Player stat form'):
+        c1, c2 = st.columns([0.72,0.28])
+        #ZR: These should probably be classes, like the integrations
 
-        if st.session_state.league == 'NBA':
+        with c1:
 
-            stats = get_nba_stats()
-                
-        elif st.session_state.league == 'MLB':
-                
-            stats = get_mlb_stats()
+            if st.session_state.league == 'NBA':
 
-    with c2: 
+                stats = get_nba_stats()
+                    
+            elif st.session_state.league == 'MLB':
+                    
+                stats = get_mlb_stats()
 
-        if isinstance(stats, str):
-            st.error(stats)
-            st.stop()
+        with c2: 
 
-        raw_stat_df, player_metadata = stats
-        default_injury_list = [p for p in st.session_state['injured_players'] \
-                                if (p in raw_stat_df.index) and (not (p in listify(st.session_state.selections_default))) 
-                                ]
+            if isinstance(stats, str):
+                st.error(stats)
+                st.stop()
 
-        #ZR: I have seen a bug related to this, where it says that injured_players is also being modified directly in session state
-        injured_players = st.multiselect('Which players should be ignored? (e.g. players who are injured long-term)'
-                                , raw_stat_df.index
-                                , default = default_injury_list
-                                , on_change = increment_player_stats_version
-                                , key = 'injured_players'
-        )
+            raw_stat_df, player_metadata = stats
+            default_injury_list = [p for p in st.session_state['injured_players'] \
+                                    if (p in raw_stat_df.index) and (not (p in listify(st.session_state.selections_default))) 
+                                    ]
 
-        st.session_state.raw_stat_df = drop_injured_players(raw_stat_df
-                                                            , injured_players
-                                                            , st.session_state.player_stats_version)  
+            #ZR: I have seen a bug related to this, where it says that injured_players is also being modified directly in session state
+            injured_players = st.multiselect('Which players should be ignored? (e.g. players who are injured long-term)'
+                                    , raw_stat_df.index
+                                    , default = default_injury_list
+                                    , key = 'injured_players'
+            )
 
-        st.session_state.player_metadata = player_metadata          
+            st.session_state.raw_stat_df = drop_injured_players(raw_stat_df
+                                                                , injured_players
+                                                                , st.session_state.player_stats_version)  
+
+            st.session_state.player_metadata = player_metadata   
+
+
+            for i in range(7):
+                st.write("")
+
+            submit_button = st.form_submit_button('Lock in & process', icon = '🔓')
+
+            st.warning('Changes will not be reflected until this button is pressed')
+
+
+        
 
 
 def get_nba_stats():
@@ -68,14 +80,13 @@ def get_nba_stats():
       either a tuple of (raw_stat_df, player_metadata) or a string representing an error 
     """
 
-    data_options = ['Historical','Projection'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
+    data_options = ['Projection','Historical'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
 
     kind_of_dataset = st.selectbox(
                             'Which kind of dataset do you want to use?'
                             , data_options
                             ,key = 'data_option'
                             , index = 0
-                            , on_change= increment_player_stats_version
     )
 
     if kind_of_dataset == 'Historical':
@@ -94,78 +105,97 @@ def get_nba_stats():
                 
     else: 
 
-        with st.form('Projections Form'):
+        c1, c2, c3, c4 = st.columns(4)
 
-            c1, c2 = st.columns(2)
+        with c1:
 
-            with c1:
+            if 'espn_slider_default_value' not in st.session_state:
+                st.session_state.espn_slider_default_value = 0.5
 
-                if 'htb_slider_default_value' not in st.session_state:
-                    st.session_state.htb_slider_default_value = 0.0
-
-                hashtag_slider = st.slider('Hashtag Basketball Weight'
-                                        , min_value = 0.0
-                                        , max_value = 1.0
-                                        , value = st.session_state.htb_slider_default_value
-                                        , key = 'hashtag_widget')
-                
-                st.session_state.htb_slider_default_value = hashtag_slider
-                
-                hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
-                                                , type=['csv'])
-                if hashtag_file is not None:
-                    st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)
-
-            with c2:
-
-                if 'bbm_slider_default_value' not in st.session_state:
-                    st.session_state.bbm_slider_default_value = 0.0
-
-                bbm_slider = st.slider('Basketball Monster Weight'
-                        , min_value = 0.0
-                        , max_value = 1.0
-                        , value = st.session_state.bbm_slider_default_value
-                        , key = 'bbm_widget')
-                
-                st.session_state.bbm_slider_default_value = bbm_slider
-
-                bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
-                                                , type=['csv'])
-                if bbm_file is not None:
-                    st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
-                
-            submit_button = st.form_submit_button('Lock in')
-
-            #no rotowire or darko for now- could revisit in future
-            #DARKO isn't great becuase it doesnt have GP or Position by itself
-            #and I dont think rotowire is really used at all
-            darko_slider = 0
-            rotowire_slider = 0   
-            rotowire_upload = None 
-
-            if (hashtag_slider > 0) & ('htb' not in st.session_state.datasets):
-                return 'Upload HTB projection file'
+            espn_slider = st.slider('ESPN Weight'
+                                    , min_value = 0.0
+                                    , max_value = 1.0
+                                    , value = st.session_state.espn_slider_default_value
+                                    , key = 'espn_widget')
             
-            elif (bbm_slider > 0) & ('bbm' not in st.session_state.datasets):
-                return 'Upload Basketball Monster projection file'
+            st.session_state.espn_slider_default_value = espn_slider
+
+        with c2:
+
+            if 'htb_slider_default_value' not in st.session_state:
+                st.session_state.htb_slider_default_value = 0.0
+
+            hashtag_slider = st.slider('Hashtag Weight'
+                                    , min_value = 0.0
+                                    , max_value = 1.0
+                                    , value = st.session_state.htb_slider_default_value
+                                    , key = 'hashtag_widget')
             
-            elif hashtag_slider + bbm_slider + darko_slider + rotowire_slider == 0:
-                return 'Need to upload a projection file and set a weight to it'
+            st.session_state.htb_slider_default_value = hashtag_slider
+            
+            hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
+                                            , type=['csv'])
+            if hashtag_file is not None:
+                st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)
 
-            else:
+        with c3:
 
-                raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
-                                , st.session_state.datasets.get('bbm')
-                                , st.session_state.datasets.get('htb')
-                                , hashtag_slider
-                                , bbm_slider
-                                , darko_slider
-                                , rotowire_slider
-                                , st.session_state.data_source)
-                
-            if submit_button: 
-                increment_player_stats_version()
+            if 'darko_slider_default_value' not in st.session_state:
+                st.session_state.darko_slider_default_value = 0.5
+
+            darko_slider = st.slider('DARKO Weight'
+                                    , min_value = 0.0
+                                    , max_value = 1.0
+                                    , value = st.session_state.darko_slider_default_value
+                                    , key = 'darko_widget')
+            
+            st.session_state.darko_slider_default_value = darko_slider
+
+        with c4:
+
+            if 'bbm_slider_default_value' not in st.session_state:
+                st.session_state.bbm_slider_default_value = 0.0
+
+            bbm_slider = st.slider('BBM Weight'
+                    , min_value = 0.0
+                    , max_value = 1.0
+                    , value = st.session_state.bbm_slider_default_value
+                    , key = 'bbm_widget')
+            
+            st.session_state.bbm_slider_default_value = bbm_slider
+
+            bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
+                                            , type=['csv'])
+            if bbm_file is not None:
+                st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
+            
+        #no rotowire or darko for now- could revisit in future
+        #DARKO isn't great becuase it doesnt have GP or Position by itself
+        #and I dont think rotowire is really used at all
+        darko_slider = 0
+        rotowire_slider = 0   
+        rotowire_upload = None 
+
+        if (hashtag_slider > 0) & ('htb' not in st.session_state.datasets):
+            return 'Upload HTB projection file'
         
+        elif (bbm_slider > 0) & ('bbm' not in st.session_state.datasets):
+            return 'Upload Basketball Monster projection file'
+        
+        elif hashtag_slider + bbm_slider + darko_slider + espn_slider == 0:
+            return 'Need to upload a projection file and set a weight to it'
+
+        else:
+
+            raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
+                            , st.session_state.datasets.get('bbm')
+                            , st.session_state.datasets.get('htb')
+                            , hashtag_slider
+                            , bbm_slider
+                            , darko_slider
+                            , espn_slider
+                            , st.session_state.data_source)
+                
     return (raw_stats_df, player_metadata)
 
 def get_mlb_stats():

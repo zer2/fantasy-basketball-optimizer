@@ -57,7 +57,19 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
   except:
      return pd.DataFrame()
   
-#ZR: Currently not being used
+@st.cache_data(ttl = '1d')
+def get_espn_projections(integration_source = None):
+  espn_df = get_data_from_snowflake('ESPN_PROJECTION_VIEW')
+  renamer = st.session_state.params['espn-renamer']
+  espn_df = espn_df.rename(columns = renamer)
+
+  espn_df = map_player_names(espn_df, 'ESPN_NAME')
+  espn_df.loc[:,'Games Played %'] = espn_df['Games Played']/get_n_games()
+
+  espn_df = espn_df.set_index('Player')
+
+  return espn_df
+
 @st.cache_data(ttl = '1d') 
 def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
@@ -74,13 +86,12 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   
   darko_df = map_player_names(darko_df, 'DARKO_NAME')
 
-  darko_df['Position'] = 'NP'
   darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
 
   #ZR: This should be simplified. We don't need to do this multiple times
-  extra_info = get_data_from_snowflake('HTB_PROJECTION_TABLE')[['PLAYER','MPG','GP']]
-  extra_info.loc[:,'GP'] = extra_info['GP']/get_n_games()
-  extra_info.columns = ['Player','Minutes','Games Played %']
+  extra_info = get_data_from_snowflake('ESPN_PROJECTION_TABLE')[['ESPN_NAME','MINUTES_PLAYED','GAMES_PLAYED','POSITION']]
+  extra_info.loc[:,'GAMES_PLAYED'] = extra_info['GAMES_PLAYED']/get_n_games()
+  extra_info.columns = ['Player','Minutes','Games Played %','Position']
 
   extra_info = map_player_names(extra_info, 'BBM_NAME')
 
@@ -207,39 +218,33 @@ def combine_nba_projections(rotowire_upload
                             , hashtag_slider
                             , bbm_slider
                             , darko_slider 
-                            , rotowire_slider
+                            , espn_slider
                             , integration_source #just for caching purposes
                             ): 
     
     hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, integration_source).fillna(0)
-    rotowire_stats = None if rotowire_upload is None else process_basketball_rotowire_data(rotowire_upload, integration_source).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, integration_source)
     darko_stats = None if darko_slider == 0 else get_darko_data(integration_source)
-
-    hashtag_weight = [hashtag_slider] 
-    rotowire_weight = [rotowire_slider] if rotowire_upload is not None else []
-    bbm_weight = [bbm_slider] if bbm_upload is not None else []
-    darko_weight = [darko_slider] if darko_slider > 0 else []
-
-    weights = hashtag_weight + rotowire_weight + bbm_weight + darko_weight
+    espn_stats = None if espn_slider ==0 else get_espn_projections(integration_source)
 
     all_players = set(
                   ([] if hashtag_stats is None else [p for p in hashtag_stats.index]) + \
-                  ([] if rotowire_stats is None else [p for p in rotowire_stats.index]) + \
+                  ([] if espn_stats is None else [p for p in espn_stats.index]) + \
                   ([] if bbm_stats is None else [p for p in bbm_stats.index]) + \
                   ([] if darko_stats is None else [p for p in darko_stats.index])
                   )
         
     df =  pd.concat({'HTB' : hashtag_stats 
-                        ,'RotoWire' : rotowire_stats
                         ,'BBM' : bbm_stats
-                        ,'Darko' : darko_stats}, names = ['Source'])
+                        ,'Darko' : darko_stats
+                        ,'ESPN' : espn_stats
+                      }, names = ['Source'])
                 
-    new_index = pd.MultiIndex.from_product([['HTB','RotoWire','BBM','Darko'], all_players], names = ['Source','Player'])
+    new_index = pd.MultiIndex.from_product([['HTB','BBM','Darko','ESPN'], all_players], names = ['Source','Player'])
 
     df = df.reindex(new_index)
     
-    weights = [hashtag_slider, rotowire_slider, bbm_slider, darko_slider]
+    weights = [hashtag_slider, bbm_slider, darko_slider, espn_slider]
 
     player_ineligible = (df.isna().groupby('Player').sum() == 4).sum(axis = 1) > 0
     inelegible_players = player_ineligible.index[player_ineligible]

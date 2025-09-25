@@ -150,6 +150,21 @@ NBA:
     3PA : Three Attempts
     DD: Double Doubles
     POS : Position
+  espn-renamer:
+    ESPN_NAME : Player
+    GAMES_PLAYED : Games Played
+    POINTS : Points
+    REBOUNDS : Rebounds
+    ASSISTS : Assists
+    STEALS : Steals
+    THREES : Threes
+    BLOCKS : Blocks
+    TURNOVERS : Turnovers
+    FREE_THROW_ATTEMPTS : Free Throw Attempts
+    FREE_THROW_PERCENT : Free Throw %
+    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
+    FIELD_GOAL_PERCENT : Field Goal %
+    POSITION : Position
   stat-df-renamer:
     SEASON : Season
     NBA_PLAYER_NAME : Player
