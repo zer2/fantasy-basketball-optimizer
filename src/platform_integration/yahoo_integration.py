@@ -535,11 +535,7 @@ class YahooIntegration(PlatformIntegration):
 
         _self.n_drafters = n_drafters #ZR: hack, this is bad 
 
-        #return None, 'Draft has not started yet'
-
         teams_dict = _self.get_teams_dict(_self.league_id)
-
-        #return None, 'Draft has not started yet'
 
         all_team_ids = [draft_obj.team_key.split('.')[-1] for draft_obj in draft_results[0:n_drafters]]
 
@@ -573,10 +569,9 @@ class YahooIntegration(PlatformIntegration):
         #    return None, True
 
         #return None, 'Draft has not started yet'
-    
         player_codes = draft_result_raw_df['Player'].str.split('.').str[-1].astype(int).values
         draft_result_raw_df['Player'] = ['RP' if x not in mapper_table.index else mapper_table.loc[x].values[0] for x in player_codes]
-        
+
         #return None, 'Draft has not started yet'
 
         draft_result_raw_df['PlayerMod'] = [get_fixed_player_name(x) for x in draft_result_raw_df['Player'].astype(str)]

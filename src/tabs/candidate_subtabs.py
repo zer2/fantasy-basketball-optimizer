@@ -408,7 +408,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
                                             ,score_df.index
                                             ,index = 0
                                             ,label_visibility = 'collapsed'
-                                            ,key = 'candidate_player')
+                                            ,key = 'candidate_player' + str(iteration))
         
         player_last_name = player_name.split(' ')[1]
 
@@ -476,7 +476,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
 
       if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1):
 
-        st.markdown('G-score expectations')
+        st.markdown('G-score expectations (difference vs. other teams)')
         st.dataframe(main_df_styled)
 
       if cash_remaining_per_team:
@@ -598,7 +598,7 @@ def get_positions_styled(n_per_position : dict
                                     for p in get_position_structure()['flex_list'] if p in n_per_position.keys()}
                                     ).T.fillna(0)
   
-  position_share_df = position_share_df[get_position_structure()['base_list']]
+  position_share_df = position_share_df[[p for p in get_position_structure()['base_list'] if p in position_share_df.index]]
   position_share_df.loc['Total',:] = position_share_df.sum()
 
   return position_share_df.style.format("{:.2f}").background_gradient(axis = None)
@@ -710,13 +710,17 @@ def make_main_df_styled(_g_scores : pd.DataFrame
       None
   """
 
-  total_diff = res['Diff'].loc[player_name] * _H.original_v
+  player = _g_scores.loc[player_name].drop('Total')
+  total_diff = res['Diff'].loc[player_name] * _H.original_v 
   future_diff = res['Future-Diff'].loc[player_name] * _H.original_v
   current_diff = total_diff - future_diff
 
+  total_diff_plus_player = total_diff + player
+
   main_res_dict = {'Current diff' : current_diff
+                ,player_last_name : player
                 ,'Future player diff' : future_diff
-                ,'Total diff' : total_diff}
+                ,'Total diff' : total_diff_plus_player}
   
   main_df = pd.DataFrame(main_res_dict).T
   main_df.loc[:,'Total'] = main_df.sum(axis = 1)
