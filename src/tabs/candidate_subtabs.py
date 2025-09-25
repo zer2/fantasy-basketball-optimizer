@@ -350,7 +350,8 @@ def make_cand_tab(_H
                        ,_H
                        ,rosters
                        ,cash_remaining_per_team
-                       ,original_player_value) 
+                       ,original_player_value
+                       ,i) 
 
             
 @st.fragment
@@ -367,7 +368,8 @@ def make_detailed_view(player_assignments : dict[list[str]]
                        ,_H
                        ,rosters : pd.DataFrame
                        ,cash_remaining_per_team: dict[int]
-                       ,original_player_value : pd.Series):
+                       ,original_player_value : pd.Series
+                       ,iteration : int):
     """   
     Load up information stored from the main candidate view, and create a view that shows details for individual players
     I think this is useful for research/understanding what the algorithm is thinking
@@ -386,7 +388,8 @@ def make_detailed_view(player_assignments : dict[list[str]]
       player_name = st.selectbox('Candidate player'
                                           ,score_df.index
                                           ,index = 0
-                                          ,label_visibility = 'collapsed')
+                                          ,label_visibility = 'collapsed'
+                                          ,key = 'candidate_player_detailed' + str(iteration))
       
       player_last_name = player_name.split(' ')[1]
 
@@ -404,7 +407,8 @@ def make_detailed_view(player_assignments : dict[list[str]]
         player_name = st.selectbox('Candidate player'
                                             ,score_df.index
                                             ,index = 0
-                                            ,label_visibility = 'collapsed')
+                                            ,label_visibility = 'collapsed'
+                                            ,key = 'candidate_player')
         
         player_last_name = player_name.split(' ')[1]
 
@@ -419,13 +423,13 @@ def make_detailed_view(player_assignments : dict[list[str]]
                               , player_name)
       
     
-    main_df_styled = make_main_df_styled(_g_scores
-                        , player_name
-                        , player_last_name
-                        , my_players
-                        , res
-                        , _H
-                        , future_diffs)
+      main_df_styled = make_main_df_styled(_g_scores
+                          , player_name
+                          , player_last_name
+                          , my_players
+                          , res
+                          , _H
+                          , future_diffs)
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}").background_gradient(axis = None)
 
@@ -470,8 +474,10 @@ def make_detailed_view(player_assignments : dict[list[str]]
                             , player_last_name)
       st.dataframe(rate_df_limited_styled, hide_index = True, height = 73)
 
-      st.markdown('G-score expectations')
-      st.dataframe(main_df_styled)
+      if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1):
+
+        st.markdown('G-score expectations')
+        st.dataframe(main_df_styled)
 
       if cash_remaining_per_team:
 
@@ -704,32 +710,16 @@ def make_main_df_styled(_g_scores : pd.DataFrame
       None
   """
 
-  team_so_far = _g_scores[_g_scores.index.isin(my_players)].sum()
+  total_diff = res['Diff'].loc[player_name] * _H.original_v
+  future_diff = res['Future-Diff'].loc[player_name] * _H.original_v
+  current_diff = total_diff - future_diff
 
-  player = _g_scores.loc[player_name]
-
-  if len([p for p in my_players if p == p]) > 0:
-    other_teams_imputed = player + team_so_far - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
-  else:
-    other_teams_imputed = player - res['Diff'].loc[player_name] * _H.original_v #convert to G-score
-
-  if future_diffs is not None:
-    remaining_value_imputed = future_diffs.loc[player_name] * _H.original_v - other_teams_imputed
-  else:
-    remaining_value_imputed = team_so_far * 0 #this just creates a series of 0s 
-
-  remaining_value_imputed['Total'] = remaining_value_imputed.sum()
-
-  if len([player for player in my_players if player == player]) > 0:
-    main_res_dict = {'Team so far' : team_so_far
-                ,player_last_name : player
-                ,'Future picks' : remaining_value_imputed}
-  else:
-    main_res_dict = {player_last_name : player
-                ,'Future picks' : remaining_value_imputed}
+  main_res_dict = {'Current diff' : current_diff
+                ,'Future player diff' : future_diff
+                ,'Total diff' : total_diff}
   
   main_df = pd.DataFrame(main_res_dict).T
-  main_df.loc['Total', : ] = main_df.sum()
+  main_df.loc[:,'Total'] = main_df.sum(axis = 1)
   
   main_df_styled = static_score_styler(main_df, st.session_state.params['g-score-total-multiplier'])
 
