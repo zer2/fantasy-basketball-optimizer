@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 import requests
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type
+from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 
 @st.cache_data()
@@ -117,10 +117,6 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   darko_long_term.loc[:,'Field Goal Attempts'] = darko_long_term.loc[:,'Field Goal Attempts/100'] * posessions_per_game
   darko_long_term.loc[:,'Assist to TO'] = darko_long_term.loc[:,'Assists']/darko_long_term.loc[:,'Turnovers']
 
-  darko_long_term.loc[:,'Def Rebounds'] = np.nan
-  darko_long_term.loc[:,'Off Rebounds'] = np.nan
-  darko_long_term.loc[:,'Double Doubles'] = np.nan
-
   required_columns = st.session_state.params['counting-statistics'] + \
                     list(st.session_state.params['ratio-statistics'].keys()) + \
                     [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
@@ -221,6 +217,7 @@ def combine_nba_projections(rotowire_upload
                             , espn_slider
                             , integration_source #just for caching purposes
                             ): 
+  
     
     hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, integration_source).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, integration_source)
@@ -233,13 +230,13 @@ def combine_nba_projections(rotowire_upload
                   ([] if bbm_stats is None else [p for p in bbm_stats.index]) + \
                   ([] if darko_stats is None else [p for p in darko_stats.index])
                   )
-        
+            
     df =  pd.concat({'HTB' : hashtag_stats 
                         ,'BBM' : bbm_stats
                         ,'Darko' : darko_stats
                         ,'ESPN' : espn_stats
                       }, names = ['Source'])
-                
+                    
     new_index = pd.MultiIndex.from_product([['HTB','BBM','Darko','ESPN'], all_players], names = ['Source','Player'])
 
     df = df.reindex(new_index)

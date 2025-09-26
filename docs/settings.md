@@ -68,8 +68,6 @@ Also: be careful to download projections for all players instead of just the top
 
 Projections are combined between different sources by taking weighted means according to the provided weights. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. 
 
-When using projections, specific players can be ignored by manually adding them to the list on the right. This can be used to remove players who have long-term injuries and are not relevant to fantasy but are still included in projections. 
-
 ### Historical 
 
 Historical data is available for manual entry drafts. 

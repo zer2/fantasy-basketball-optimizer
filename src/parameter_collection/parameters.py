@@ -44,8 +44,9 @@ def player_stat_param_popover():
         , min_value = float(st.session_state.params['options']['chi']['min'])
         , max_value = float(st.session_state.params['options']['chi']['max']))
 
-    chi_str = r'''The relative variance compared to week-to-week variance to use for Rotisserie. 
-                    Uncertainty in season-long means is higher than uncertainty week-over-week 
+    chi_str = r'''The estimated variance in season-long projections relative to empirical week-to-week variance. 
+                    for Rotisserie. E.g. if $\chi$ is 0.6, variance is effectively 60% of the week-to-week variance
+                    observed value in previous seasons. 
                     '''
     st.caption(chi_str)
 
