@@ -18,11 +18,11 @@ The second factor, ψ, controls an adjustment for replacement players. It is ass
 
 ### Chi factor 
 
-An additional parameter called χ controls the estimate of uncertainty in pre-season projections.
+For Rotisserie leagues, an additional parameter called χ is required.
 
 ![](img/chi.png)
 
- See the [relevant section on Rotisserie](roto.md/#variance-in-player-performances) for more detail. It is most important in Rotisserie, but is also an added source of variance for head-to-head formats. 
+χ controls the estimate of uncertainty in pre-season projections. See the [relevant section on Rotisserie](roto.md/#variance-in-player-performances) for more detail. 
 
 ## Auction noise
 

@@ -283,7 +283,7 @@ def process_player_data(weekly_df : pd.DataFrame
                                                   , _player_means.index
                                                   , conversion_factors)
     
-  beta_weight = chi if scoring_format == 'Rotisserie' else 1 + chi
+  beta_weight = chi if scoring_format == 'Rotisserie' else 1
                     
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order

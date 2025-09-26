@@ -45,10 +45,8 @@ def player_stat_param_popover():
         , max_value = float(st.session_state.params['options']['chi']['max']))
 
     chi_str = r'''The estimated variance in season-long projections relative to empirical week-to-week variance. 
-                    E.g. if $\chi$ is 0.6, forward-looking week-to-week variance is effectively 160% of the 
-                    empirical value. For Rotisserie, it is effectively 60% because there is no 
-                    week-to-week variance. For historical seasons, $\chi = 0$ makes sense because there is no 
-                    uncertainty in season-long forecasts 
+                    for Rotisserie. E.g. if $\chi$ is 0.6, variance is effectively 60% of the week-to-week variance
+                    observed value in previous seasons. 
                     '''
     st.caption(chi_str)
 
@@ -84,7 +82,7 @@ def player_stat_param_popover():
           _raw_stat_df[col] = _raw_stat_df[col].astype(float) * _raw_stat_df['Games Played %'] * get_games_per_week()
 
       return _raw_stat_df
-        
+    
     st.session_state.player_stats = make_upsilon_adjustment(st.session_state.raw_stat_df
                             , upsilon
                             , st.session_state.player_stats_version)
