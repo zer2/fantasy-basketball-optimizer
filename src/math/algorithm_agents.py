@@ -673,7 +673,7 @@ class HAgent():
             cdf_means = cdf_estimates.mean(axis = 2)
 
             if expected_future_diff is not None:
-                expected_diff_means = (expected_future_diff.mean(axis = 2) + diff_means.mean(axis = 2)) / (self.original_v.reshape(1,-1))
+                expected_diff_means = (expected_future_diff.mean(axis = 2) + diff_means.mean(axis = 2))
             else:
                 expected_diff_means = None
 

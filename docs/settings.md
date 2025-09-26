@@ -52,9 +52,27 @@ If draft data is being input manually, the number of drafters, the number of pic
 
 ## Player statistics 
 
-Player statistics are an input to the algorithms implemented by the website. They can be sourced either from old seasons or forward-looking projections.
+Player statistics are an input to the algorithms implemented by the website. They can be sourced either from forward-looking projections or previous NBA seasons.
+
+### Projection
+
+The default for player statistics is to use forward-looking projections. 
+
+![](img/projections.png)
+
+The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. 
+
+Two additional kinds of forecasts are also available: those created by Hashtag Basketball, and Basketball Monster (BBM). Both of these projections are paid products, so they cannot be provided through the website. Instead, they must be purchased and uploaded. For HTB, there is no native download option for projections. The projections must be copy pasted into an Excel file and saved as a CSV. For BBM, there is a download option, but only the XLSX download option works. Download it, copy out the projections into Excel, and save them as a CSV UTF-8. Either kind of projection can be manually edited to change projections if desired. 
+
+Also: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. 
+
+Projections are combined between different sources by taking weighted means according to the provided weights. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. 
+
+When using projections, specific players can be ignored by manually adding them to the list on the right. This can be used to remove players who have long-term injuries and are not relevant to fantasy but are still included in projections. 
 
 ### Historical 
+
+Historical data is available for manual entry drafts. 
 
 ![alt text](img/historical.png)
 
@@ -67,22 +85,6 @@ H-scores for the 1984-85 season, Each Category. NP means no position
 
 Historical data cannot be used when integrated with a fantasy platform, because platforms do not run leagues based on past seasons.  
 
-### Projection
-
-The other option is to use a projection for future performance. 
-
-![alt text](img/projections.png)
-
-As of now, two kinds of projections are supported: those created by Hashtag Basketball, and Basketball Monster. Both of these projections are paid products, so they cannot be provided through the website. Instead, they must be purchased and uploaded. They can both be uploaded and then mixed according to the chosen weights, if desired. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. This setup is future-proofing for additional projection sources in the future.
-
-For HTB, there is no native download option for projections. The projections must be copy pasted into an Excel file and saved as a CSV.
-
-For BBM, there is a download option, but only the XLSX download option works. Download it, copy out the projections into Excel, and save them as a CSV UTF-8.
-
-Either kind of projection can be manually edited to change projections if desired. 
-
-Also: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. 
-
 ## Formats & categories
 
 ![alt text](img/formats.png)
@@ -93,4 +95,4 @@ It also supports any combination of categories, across the default nine categori
 
 ![alt text](img/categories.png)
 
-For the alternative categories, when using projections, make sure to include them when sourcing the projections. 
+For the alternative categories, when using projections, make sure to include them when sourcing the projections. ESPN and DARKO do not forecast them so all of the weight will be from Hashtag or BBM projections. 
