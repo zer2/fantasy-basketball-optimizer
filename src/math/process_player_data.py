@@ -282,12 +282,14 @@ def process_player_data(weekly_df : pd.DataFrame
     coefficients_first_order = calculate_coefficients(_player_means
                                                   , _player_means.index
                                                   , conversion_factors)
+    
+  beta_weight = chi if scoring_format == 'Rotisserie' else 1 + chi
                     
   g_scores_first_order =  calculate_scores_from_coefficients(_player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
-                                                          , chi if scoring_format == 'Rotisserie' else 1)
+                                                          , beta_weight)
     
   first_order_score = g_scores_first_order.sum(axis = 1)
   representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
@@ -309,8 +311,8 @@ def process_player_data(weekly_df : pd.DataFrame
 
   w = vom/mov
   
-  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,chi if scoring_format == 'Rotisserie' else 1)
-  x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,1)
+  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,beta_weight)
+  x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,beta_weight)
     
   replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)

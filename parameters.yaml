@@ -186,7 +186,7 @@ NBA:
     POSITION_LIST : Position
     GAMES_PLAYED_PERCENT : Games Played %
   darko-renamer:
-    NBA_PLAYER_NAME : Player
+    PLAYER_NAME : Player
     POINTS_PER_HUNDRED : Points/100
     REBOUNDS_PER_HUNDRED  : Rebounds/100
     ASSISTS_PER_HUNDRED  : Assists/100

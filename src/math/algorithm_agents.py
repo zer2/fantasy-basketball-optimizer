@@ -45,7 +45,6 @@ class HAgent():
         self.gamma = gamma
         self.n_picks = n_picks 
         self.dynamic = dynamic
-        self.chi = chi
 
         #ZR: do we need this or can we imply it from player_assignments when H score runs?
         self.n_drafters = n_drafters
@@ -413,12 +412,11 @@ class HAgent():
         """
         #diff_var should just include the player-to-player variance. maybe? and 
 
-        chi = self.chi if self.scoring_format == 'Rotisserie' else 1
-
         #is cross_player_var just the diagonal entries of L? 
 
+        #this is in units of X-score
         diff_var = self.n_picks * \
-            (2 * chi +  self.w * (self.n_picks - n_their_players)/(self.n_picks))
+            (2 +  self.w * (self.n_picks - n_their_players)/(self.n_picks))
         return diff_var
     
     def get_value_of_money_auction(self

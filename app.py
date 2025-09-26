@@ -86,7 +86,7 @@ with st.sidebar:
     
   with st.popover(':small[Player Stat Parameters]'):
 
-    player_stat_param_popover()                                          
+    player_stat_param_popover()      
 
   with st.popover(':small[H-score Parameters]').container(height = 300):
                     
