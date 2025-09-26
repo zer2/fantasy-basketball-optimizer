@@ -685,12 +685,11 @@
 <p>Player statistics are an input to the algorithms implemented by the website. They can be sourced either from forward-looking projections or previous NBA seasons.</p>
 <h3 id="projection">Projection</h3>
 <p>The default for player statistics is to use forward-looking projections. </p>
-<p><img alt="" src="../img/projections.png" /></p>
+<p><img alt="" src="image.png" /></p>
 <p>The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. </p>
 <p>Two additional kinds of forecasts are also available: those created by Hashtag Basketball, and Basketball Monster (BBM). Both of these projections are paid products, so they cannot be provided through the website. Instead, they must be purchased and uploaded. For HTB, there is no native download option for projections. The projections must be copy pasted into an Excel file and saved as a CSV. For BBM, there is a download option, but only the XLSX download option works. Download it, copy out the projections into Excel, and save them as a CSV UTF-8. Either kind of projection can be manually edited to change projections if desired. </p>
 <p>Also: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. </p>
 <p>Projections are combined between different sources by taking weighted means according to the provided weights. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. </p>
-<p>When using projections, specific players can be ignored by manually adding them to the list on the right. This can be used to remove players who have long-term injuries and are not relevant to fantasy but are still included in projections. </p>
 <h3 id="historical">Historical</h3>
 <p>Historical data is available for manual entry drafts. </p>
 <p><img alt="alt text" src="../img/historical.png" /></p>
