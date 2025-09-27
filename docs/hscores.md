@@ -114,9 +114,8 @@ This image from the paper shows how the H-scoring algorithm generally performs o
 
 H-scoring has numerous limitations. Some of the most major are 
 
+- H-scoring is reliant on a single set of projections which may differ from the beliefs of other managers. Assuming its projections are correct, the algorithm can become overconfident and assess its own team as being so strong that the only way to improve it is to "un-punt" a category. This can lead to late round picks which run counter to the build of a team. 
 - The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates
 - H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
-- H-scoring's model for what sorts of players will be available in the future is simplified, and may miss individual players with exceptional profiles
+- H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles
 - H-scoring does not take into account the effect of streaming players, trading, etc. These all may add additional strategic considerations 
-
-For a full accounting, see the paper. 
