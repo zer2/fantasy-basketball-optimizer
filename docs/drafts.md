@@ -31,4 +31,3 @@ With a live connection, draft selections are provided by the platform. The entir
 ![](img/livedraft.png)
 
 The 'Refresh Analysis' button fetches new information on draft picks from the platform and re-runs H-scoring. 
-
