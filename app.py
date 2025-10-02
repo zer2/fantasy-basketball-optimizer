@@ -84,7 +84,7 @@ with st.sidebar:
 
     format_popover()
     
-  with st.popover(':small[Player Stat Parameters]'):
+  with st.popover(':small[Player Stat Parameters]').container(height = 300):
 
     player_stat_param_popover()      
 
