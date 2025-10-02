@@ -50,6 +50,18 @@ def player_stat_param_popover():
                     '''
     st.caption(chi_str)
 
+    aleph = st.number_input(r'Select a $\alef$ value'
+        , key = 'aleph'
+        , value = float(st.session_state.params['options']['aleph']['default'])
+        , min_value = float(st.session_state.params['options']['aleph']['min'])
+        , max_value = float(st.session_state.params['options']['aleph']['max']))
+
+    aleph_str = r'''Extra correlation between volume-based categories for Rotisserie, to account for the fact that some managers 
+                  will be more or less active. E.g. if $\alef$ is 0.1 and the correlation between blocks and points is 30%, 
+                  the correlation will be considered 40% instead. 
+                    '''
+    st.caption(aleph_str)
+
     if st.session_state['mode'] == 'Auction Mode':
 
       streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'

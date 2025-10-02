@@ -5,8 +5,8 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
-                                            ,get_max_info
+from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories \
+                                            ,get_max_info, get_correlations
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 from src.math.algorithm_helpers import auction_value_adjuster
 
@@ -87,11 +87,12 @@ class HAgent():
             v = np.sqrt(mov/vom)  
 
             categories = x_scores.columns
-            rho = np.array(get_rho().set_index('Category').loc[categories, categories])
+            rho = np.array(get_correlations().loc[categories, categories])
 
             #ZR: This next line is not necessary is it?
             np.fill_diagonal(rho, 1)
             self.rho = np.expand_dims(rho, 0)
+
 
             if self.n_drafters <= 21:
                 self.max_ev, self.max_var = get_max_info(self.n_drafters - 1)
