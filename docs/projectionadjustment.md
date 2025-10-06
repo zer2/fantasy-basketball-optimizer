@@ -10,19 +10,21 @@ The papers assume that player projections are all known and agreed upon by all t
 
 An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first. 
 
-Say that $w_c$ is the algorithm's naive guess at how likely it is to win category $c$, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
+Say that $w$ is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
 
 $$
-w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w_c \right) - \frac{n}{2}}{ n^2} \right) }{1 + \frac{\beth}{ n^2}}
+w^* = \left[ I + \frac{\beth}{ n^2}  \right]^{-1} \left[ w + \frac{\beth}{2n} \right]
 $$
 
-Where $n$ is the number of categories and $\beth$ is a parameter- more in that in the justification.
+Where $n$ is the number of categories and $\beth$ is a parameter. The intuition on what this expression is doing is not immediately clear, but some intuition can be gleaned from the justification in the following section. 
 
 These corrected win rates are then used to reverse engineer an adjusted expectation of the team's current strength, like so: 
 
 $$
-x^*_d = \text{CDF}^{-1} \left( w^*_d \right)
+x^* = \text{CDF}^{-1} \left( w^* \right)
 $$
+
+This way, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. 
 
 ## Justification 
 
@@ -85,19 +87,36 @@ $$
 w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{ n^2} \right) }{1 + \frac{\beth}{ n^2}}
 $$
 
-We don't actually have the other values of $w^*_c$ immediately, but we can approximate them with $w_c$. That makes the final formula 
+This expression is the best for gleaning intution behind the adjustment. When the average win rate is high, a larger quantity is subtracted out from all the win rates. If the win rates are all 50%, the numerator becomes $\frac{1}{2} - \frac{\beth}{2n}$, cancelling with the denominator and keeping win rates constant. Higher values of $\beth$ increase the importance of the distortion term and decrease the importance of the original win rate.
+
+While being relatively interpretable, this expression unfortunately cannot be used directly because all of the $w^*_c$ values are unknowns. Some linear algebra is required with the vector forms of $w$ and $w^*$. 
+
+With $J$ as matrix with $0$ on all diagonals and $1$ on all non-diagonals, the equation can be written 
 
 $$
-w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w_c \right) - \frac{n}{2}}{ n^2} \right) }{1 + \frac{\beth}{ n^2}}
+w^* = \frac{w - \frac{\beth J w^*}{n^2} + \frac{\beth}{2n}}{1 + \frac{\beth}{ n^2}}
 $$
 
-
-## Small additional adjustment
-
-The methodology outlined above has a factor of 
+Or 
 
 $$
-\left(\frac{ \sum_{c \neq d}  \left( w^_c \right) - \frac{n}{2}}{ n^2} \right)
+\left( 1 + \frac{\beth}{ n^2}\right) I w^* = w - \frac{\beth J w^*}{n^2} + \frac{\beth}{2n}
 $$
 
-This essentially measures how confident the algorithm is in the team's strength before a punting adjustment is made. Technically this changes for each candidate player, but we don't want it to, since that would mean "punishing" players for being strong without a punting strategy. Instead, the website takes the max value across all candidate players for each category.
+Isolating $w^*$ yields 
+
+$$
+\left[ \left( 1 + \frac{\beth}{ n^2}\right) I + \frac{\beth}{ n^2}  J \right] w^* = w + \frac{\beth}{2n}
+$$
+
+The $J$ can be simplified out 
+
+$$
+\left[ I + \frac{\beth}{ n^2}  \right] w^* = w + \frac{\beth}{2n}
+$$
+
+Finally, the matrix can be inverted for an expression for $w^*$
+
+$$
+w^* = \left[ I + \frac{\beth}{ n^2}  \right]^{-1} \left[ w + \frac{\beth}{2n} \right]
+$$

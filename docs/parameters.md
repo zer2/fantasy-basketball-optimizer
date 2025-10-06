@@ -24,13 +24,19 @@ For Rotisserie leagues, an additional parameter called χ is required.
 
 χ controls the estimate of uncertainty in pre-season projections. See the [relevant section on Rotisserie](roto.md/#variance-in-player-performances) for more detail. 
 
-## Auction noise
+### Auction noise
 
 For auction drafts, an additional parameter called $S_\sigma$ is required.
 
 ![](img/savorinput.png)
 
 $S_\sigma$ quantifies the standard deviation of dollar values for players throughout a season, which is important for the [SAVOR adjustment](auctions.md/#the-savor-adjustment). Roughly speaking it controls the degree to which low-level players are down-weighted for potentially beocoming irrelevant. 
+
+### Bayesian strength adjustment
+
+![](img/beth.png)
+
+The $\beta$ parameter controls the influence of the [Bayesian strength adjustment](projectionadjustment.md/). Higher values of $\beta$ more aggressively regress the strength of the team towards the average. 
 
 ## H-score parameters
 

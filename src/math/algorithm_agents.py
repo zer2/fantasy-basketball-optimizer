@@ -157,8 +157,12 @@ class HAgent():
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
+        transformation_matrix = np.identity(self.n_categories) + \
+            np.full(shape = (self.n_categories, self.n_categories)
+                    ,fill_value = st.session_state.beth/self.n_categories**2)
+        self.transformation_matrix_inverted = np.linalg.inv(transformation_matrix)
 
-
+        self.transformation_addition_constant = st.session_state.beth/(2*self.n_categories)
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -201,17 +205,15 @@ class HAgent():
         #ZR: do the bayesian adjustment factor here 
         #EXPERIMENTAL
         if len(my_players) > 0:
+
             cdf_estimates_original = norm.cdf((diff_means + x_scores_available_array).mean(axis = 2)
                                             , scale = np.sqrt(diff_vars.mean(axis = 2)))
-            
-            above_expected_factor = (cdf_estimates_original.sum(axis = 1).reshape(-1,1) - cdf_estimates_original - self.n_categories/2) \
-                                            /self.n_categories**2 
-                    
-            above_expected_factor = above_expected_factor.max(axis = 0)
 
-            cdf_estimates_mod = (cdf_estimates_original - st.session_state.beth * above_expected_factor) \
-                                    / (1 + st.session_state.beth / self.n_categories**2)
-            
+            cdf_estimates_mod = np.einsum( 'ij,ai -> aj'
+                                          , self.transformation_matrix_inverted
+                                          , cdf_estimates_original + self.transformation_addition_constant
+                                        )
+
             corrected_strength = norm.ppf(cdf_estimates_mod, scale = np.sqrt(diff_vars.mean(axis = 2)))
             x_scores_available_mod = corrected_strength - diff_means.mean(axis = 2)
             x_scores_available_array = np.expand_dims(np.array(x_scores_available_mod), axis = 2)
