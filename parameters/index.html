@@ -315,17 +315,26 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
+          <li class="md-nav__item">
   <a href="#auction-noise" class="md-nav__link">
     <span class="md-ellipsis">
       Auction noise
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bayesian-strength-adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bayesian strength adjustment
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -496,6 +505,28 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../projectionadjustment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Projection Adjustment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -550,17 +581,26 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
+          <li class="md-nav__item">
   <a href="#auction-noise" class="md-nav__link">
     <span class="md-ellipsis">
       Auction noise
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bayesian-strength-adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bayesian strength adjustment
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -620,10 +660,13 @@
 <p>For Rotisserie leagues, an additional parameter called χ is required.</p>
 <p><img alt="" src="../img/chi.png" /></p>
 <p>χ controls the estimate of uncertainty in pre-season projections. See the <a href="../roto/#variance-in-player-performances">relevant section on Rotisserie</a> for more detail. </p>
-<h2 id="auction-noise">Auction noise</h2>
+<h3 id="auction-noise">Auction noise</h3>
 <p>For auction drafts, an additional parameter called <span class="arithmatex">\(S_\sigma\)</span> is required.</p>
 <p><img alt="" src="../img/savorinput.png" /></p>
 <p><span class="arithmatex">\(S_\sigma\)</span> quantifies the standard deviation of dollar values for players throughout a season, which is important for the <a href="../auctions/#the-savor-adjustment">SAVOR adjustment</a>. Roughly speaking it controls the degree to which low-level players are down-weighted for potentially beocoming irrelevant. </p>
+<h3 id="bayesian-strength-adjustment">Bayesian strength adjustment</h3>
+<p><img alt="" src="../img/beth.png" /></p>
+<p>The <span class="arithmatex">\(\beta\)</span> parameter controls the influence of the <a href="../projectionadjustment/">Bayesian strength adjustment</a>. Higher values of <span class="arithmatex">\(\beta\)</span> more aggressively regress the strength of the team towards the average. </p>
 <h2 id="h-score-parameters">H-score parameters</h2>
 <p><img alt="" src="../img/puntcontrol.png" /></p>
 <p><img alt="" src="../img/iterations.png" /></p>
