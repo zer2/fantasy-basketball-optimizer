@@ -8,6 +8,8 @@ The papers assume that player projections are all known and agreed upon by all t
 
 ## The adjustment 
 
+An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first. 
+
 Say that $w_c$ is the algorithm's naive guess at how likely it is to win category $c$, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
 
 $$
@@ -90,7 +92,7 @@ w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w_c \right) - \fr
 $$
 
 
-## Small additional adjustment 
+## Small additional adjustment
 
 The methodology outlined above has a factor of 
 
