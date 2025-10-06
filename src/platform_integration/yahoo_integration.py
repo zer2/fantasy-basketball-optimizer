@@ -649,4 +649,4 @@ class YahooIntegration(PlatformIntegration):
         return _self.n_picks
     
     def get_team_names(self, league_id = None, division_id = None):
-        return list(self.get_teams_dict(self.league_id).values())
+        return list([str(x) for x in self.get_teams_dict(self.league_id).values()])

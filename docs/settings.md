@@ -24,6 +24,8 @@ The three platforms currently supported are:
 
 Once the connection is established, relevant leagues will show up, if any. Mock drafts can also be connected to via manually copy-pasting the code for the mock draft.
 
+FYI there is a bug in the wrapper used for connecting to the Yahoo API, which crashes the app when a drafter has a name that is a pure number. 
+
 ![](img/yahoosettings.png)
 
 **Fantrax**: support exists both for pulling existing teams during the season, and for integrating with drafts. However this only works with public drafts. 
