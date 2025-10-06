@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 import requests
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
+from src.helpers.helper_functions import get_counting_statistics, get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 
 @st.cache_data()
@@ -15,12 +15,6 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
   agg = pgl_df.groupby('Player')['MIN'].mean()
   agg.name = 'Minutes'
   return agg
-
-def get_correlations():
-   if get_league_type() == 'NBA':
-    return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
-   elif get_league_type() == 'MLB':
-    return pd.read_csv('src/data_retrieval/baseball_correlations.csv')
    
 def get_max_table():
     return pd.read_csv('src/data_retrieval/max_table.csv')

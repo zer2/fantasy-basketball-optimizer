@@ -5,8 +5,8 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories, get_rho \
-                                            ,get_max_info
+from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories \
+                                            ,get_max_info, get_correlations
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 from src.math.algorithm_helpers import auction_value_adjuster
 
@@ -87,11 +87,12 @@ class HAgent():
             v = np.sqrt(mov/vom)  
 
             categories = x_scores.columns
-            rho = np.array(get_rho().set_index('Category').loc[categories, categories])
+            rho = np.array(get_correlations().loc[categories, categories])
 
             #ZR: This next line is not necessary is it?
             np.fill_diagonal(rho, 1)
             self.rho = np.expand_dims(rho, 0)
+
 
             if self.n_drafters <= 21:
                 self.max_ev, self.max_var = get_max_info(self.n_drafters - 1)
@@ -156,8 +157,12 @@ class HAgent():
         self.all_res_list = [] #for tracking decisions made during testing
         self.players = []
 
+        transformation_matrix = np.identity(self.n_categories) + \
+            np.full(shape = (self.n_categories, self.n_categories)
+                    ,fill_value = st.session_state.beth/self.n_categories**2)
+        self.transformation_matrix_inverted = np.linalg.inv(transformation_matrix)
 
-
+        self.transformation_addition_constant = st.session_state.beth/(2*self.n_categories)
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -196,6 +201,23 @@ class HAgent():
                                         , cash_remaining_per_team
         )
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
+
+        #ZR: do the bayesian adjustment factor here 
+        #EXPERIMENTAL
+        if len(my_players) > 0:
+
+            cdf_estimates_original = norm.cdf((diff_means + x_scores_available_array).mean(axis = 2)
+                                            , scale = np.sqrt(diff_vars.mean(axis = 2)))
+
+            cdf_estimates_mod = np.einsum( 'ij,ai -> aj'
+                                          , self.transformation_matrix_inverted
+                                          , cdf_estimates_original + self.transformation_addition_constant
+                                        )
+
+            corrected_strength = norm.ppf(cdf_estimates_mod, scale = np.sqrt(diff_vars.mean(axis = 2)))
+            x_scores_available_mod = corrected_strength - diff_means.mean(axis = 2)
+            x_scores_available_array = np.expand_dims(np.array(x_scores_available_mod), axis = 2)
+        #EXPERIMENTAL
 
         default_weights = self.v.T.reshape(1,self.n_categories,1)
 
@@ -343,7 +365,6 @@ class HAgent():
                         , replacement_value_by_category)
         else:
             self.value_of_money = None
-
 
         return diff_means, diff_vars, sigma_2_m
 

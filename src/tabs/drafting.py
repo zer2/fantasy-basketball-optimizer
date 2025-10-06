@@ -55,7 +55,7 @@ def make_drafting_tab_own_data(H):
                 st.form_submit_button("Clear draft board"
                                         , on_click = clear_board
                                         , use_container_width = True)
-            
+                            
         player_assignments = st.session_state.selections_df[0:st.session_state.n_starters].to_dict('list')
 
         st.dataframe(st.session_state.selections_df
@@ -466,7 +466,7 @@ def clear_draft_board():
     st.session_state.draft_results = None
 
   if 'selections_df' in st.session_state:
-    st.session_state.selections_df = st.session_state.selections_default
+    st.session_state.selections_df = st.session_state.selections_default.copy()
 
 def increment_and_reset_draft():
     increment_player_stats_version()
@@ -500,7 +500,7 @@ def undo_selection():
 
 
 def clear_board():
-  st.session_state.selections_df = st.session_state.selections_default
+  clear_draft_board()
   st.session_state.drafter = 0
   st.session_state.row = 0
 

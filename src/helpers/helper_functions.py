@@ -450,11 +450,26 @@ def get_league_type():
    else:
       return  'NBA'
    
-def get_rho():
-   if st.session_state:
-      return st.session_state.rho
-   else:
-      return pd.read_csv('src/data_retrieval/basketball_correlations.csv')
+def get_correlations():
+   if get_league_type() == 'NBA':
+    rho =  pd.read_csv('src/data_retrieval/basketball_correlations.csv').set_index('Category')
+   elif get_league_type() == 'MLB':
+    rho = pd.read_csv('src/data_retrieval/baseball_correlations.csv').set_index('Category')
+
+   counting_stats = get_counting_statistics()
+
+   #make the aleph adjustment
+   rho.loc[counting_stats, counting_stats] = np.clip(rho.loc[counting_stats, counting_stats] + st.session_state.aleph,-1,1)
+
+   negative_stats = st.session_state.params['negative-statistics']
+   rho.loc[:,negative_stats] = - rho.loc[:,negative_stats]
+   rho.loc[negative_stats,:] = - rho.loc[negative_stats,:]
+
+   rho_values = rho.values
+   np.fill_diagonal(rho_values, 1)
+   rho = pd.DataFrame(rho_values, index = rho.index, columns = rho.index)
+
+   return rho
    
 def get_max_info(N):
    if st.session_state:

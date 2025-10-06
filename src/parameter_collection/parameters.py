@@ -50,6 +50,31 @@ def player_stat_param_popover():
                     '''
     st.caption(chi_str)
 
+    aleph = st.number_input(r'Select a $\alef$ value'
+        , key = 'aleph'
+        , value = float(st.session_state.params['options']['aleph']['default'])
+        , min_value = float(st.session_state.params['options']['aleph']['min'])
+        , max_value = float(st.session_state.params['options']['aleph']['max']))
+
+    aleph_str = r'''Extra correlation between volume-based categories for Rotisserie, to account for the fact that some managers 
+                  will be more or less active. E.g. if $\alef$ is 0.1 and the correlation between blocks and points is 30%, 
+                  the correlation will be considered 40% instead. 
+                    '''
+    st.caption(aleph_str)
+
+    beth = st.number_input(r'Select a $\beth$ value'
+        , key = 'beth'
+        , value = float(st.session_state.params['options']['beth']['default'])
+        , min_value = float(st.session_state.params['options']['beth']['min'])
+        , max_value = None)
+
+    beth_str = r'''Controls the degree to which projections of your team are adjusted downwards to the average, 
+                    based on the Bayesian thinking that projections should be shrunk towards a prior. Higher values 
+                    apply more distortion. See the documentation for details.
+                    '''
+    st.caption(beth_str)
+
+
     if st.session_state['mode'] == 'Auction Mode':
 
       streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'

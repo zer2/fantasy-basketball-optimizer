@@ -3,7 +3,7 @@ import numpy as np
 from src.helpers.helper_functions import get_league_type, get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
                                 ,get_ratio_statistics, get_position_numbers
-from src.data_retrieval.get_data import get_correlations, get_max_table
+from src.data_retrieval.get_data import get_max_table
 import streamlit as st
 import sys
 
@@ -444,7 +444,6 @@ def process_player_data(weekly_df : pd.DataFrame
   
   increment_info_key()
   
-  st.session_state.rho = get_correlations()
   st.session_state.max_table = get_max_table()
 
   return info
