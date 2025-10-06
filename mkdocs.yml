@@ -9,6 +9,7 @@ nav:
   - Draft Mode : drafts.md
   - Auction Mode : auctions.md 
   - Season Mode : season.md
+  - Projection Adjustment : projectionadjustment.md
 theme: 
   name : material
   favicon: img/favicon.ico

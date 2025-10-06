@@ -198,6 +198,24 @@ class HAgent():
         )
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis = 2)
 
+        #ZR: do the bayesian adjustment factor here 
+        #EXPERIMENTAL
+        cdf_estimates_original = norm.cdf((diff_means + x_scores_available_array).mean(axis = 2)
+                                          , scale = np.sqrt(diff_vars.mean(axis = 2)))
+        
+        above_expected_factor = (cdf_estimates_original.sum(axis = 1).reshape(-1,1) - cdf_estimates_original - self.n_categories/2) \
+                                        /self.n_categories**2 
+                
+        above_expected_factor = above_expected_factor.max(axis = 0)
+
+        cdf_estimates_mod = (cdf_estimates_original - st.session_state.beth * above_expected_factor) \
+                                / (1 + st.session_state.beth / self.n_categories**2)
+        
+        corrected_strength = norm.ppf(cdf_estimates_mod, scale = np.sqrt(diff_vars.mean(axis = 2)))
+        x_scores_available_mod = corrected_strength - diff_means.mean(axis = 2)
+        x_scores_available_array = np.expand_dims(np.array(x_scores_available_mod), axis = 2)
+        #EXPERIMENTAL
+
         default_weights = self.v.T.reshape(1,self.n_categories,1)
 
         if self.scoring_format == 'Rotisserie':
@@ -344,7 +362,6 @@ class HAgent():
                         , replacement_value_by_category)
         else:
             self.value_of_money = None
-
 
         return diff_means, diff_vars, sigma_2_m
 

@@ -62,6 +62,19 @@ def player_stat_param_popover():
                     '''
     st.caption(aleph_str)
 
+    beth = st.number_input(r'Select a $\beth$ value'
+        , key = 'beth'
+        , value = float(st.session_state.params['options']['beth']['default'])
+        , min_value = float(st.session_state.params['options']['beth']['min'])
+        , max_value = None)
+
+    beth_str = r'''Controls the degree to which projections of your team are adjusted downwards to the average, 
+                    based on the Bayesian thinking that projections should be shrunk towards a prior. Higher values 
+                    apply more distortion. See the documentation for details.
+                    '''
+    st.caption(beth_str)
+
+
     if st.session_state['mode'] == 'Auction Mode':
 
       streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'

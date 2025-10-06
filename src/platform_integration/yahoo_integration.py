@@ -577,7 +577,7 @@ class YahooIntegration(PlatformIntegration):
         draft_result_raw_df['PlayerMod'] = [get_fixed_player_name(x) for x in draft_result_raw_df['Player'].astype(str)]
         
         draft_result_raw_df['Team'] = draft_result_raw_df['Team'].str.split('.').str[-1].astype(int)
-        draft_result_raw_df['Team'] = ['Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
+        draft_result_raw_df['Team'] = ['Drafter ' + str(team_id) if int(team_id) not in teams_dict else teams_dict[int(team_id)]
                                     for team_id in draft_result_raw_df['Team']]
                                         
         #ZR: I am pretty sure we don't need a for loop to do this
