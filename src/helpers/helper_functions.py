@@ -301,7 +301,7 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
                             .map(stat_styler
                                  , subset = pd.IndexSlice[:,colored_total_column]
                                  , multiplier = total_multiplier
-                                 , mode = 'yellow'
+                                 , mode = 'secondary'
                                  , middle = total_middle
                                  )
   return df_styled
@@ -337,7 +337,7 @@ def h_percentage_styler(df : pd.DataFrame
      df_styled = df_styled.map(color_blue , subset = pd.IndexSlice[:,['Player']])
   return df_styled
 
-def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode = 'rgb') -> str:
+def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode = 'primary') -> str:
   """Styler function used for coloring stat values red/green with varying intensities 
 
   Args:
@@ -352,7 +352,7 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
     cl = st.session_state.theme['backgroundColor']
     return 'background-color:' + cl + ';color:' + cl + 'white'
   
-  if mode == 'rgb':
+  if mode == 'primary':
 
 
       if st.session_state.theme['base'] == 'dark':
@@ -371,16 +371,16 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
         else:
           rgb = (255, 255 - intensity, 255 - intensity)
 
-  elif mode == 'yellow': 
+  elif mode == 'secondary': 
 
     if st.session_state.theme['base'] == 'dark':
       intensity = min(int(abs((value-middle)*multiplier)), 215)
 
       if (value - middle)*multiplier > 0:
-        rgb = (40 + + int(intensity/3), 40 + + int(intensity/3),40)
+        rgb = (40 + + int(intensity/6), 40 + + int(intensity/6),40)
 
       else:
-        rgb = (40 + int(intensity/2),40 + int(intensity/6),40)
+        rgb = (40 + int(intensity/4),40 + int(intensity/12),40)
 
     else:
       intensity = min(int(abs((value-middle)*multiplier)), 255)
@@ -389,6 +389,25 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
         rgb = (255,255 , 255 - intensity)
       else:
         rgb = (255,255 - intensity,255)
+
+  elif mode == 'tertiary': 
+     
+    if st.session_state.theme['base'] == 'dark':
+      intensity = min(int(abs((value-middle)*multiplier)), 100)
+
+      if (value - middle)*multiplier > 0:
+        rgb = (40,40, 140 + intensity)
+
+      else:
+        rgb = (40,40, 140 - intensity)
+
+    else:
+      intensity = min(int(abs((value-middle)*multiplier)), 100)
+
+      if (value - middle)*multiplier > 0:
+        rgb = (100 - intensity, 100 - intensity , 255)
+      else:
+        rgb = (100 + intensity, 100 + intensity, 255)
 
   bgc = '#%02x%02x%02x' % rgb
 

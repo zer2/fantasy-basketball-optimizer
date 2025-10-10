@@ -188,7 +188,7 @@ def make_cand_tab(_H
                                                               , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
                       .map(styler_a
                           , subset = ['Your $', 'Gnrc. $','Orig. $']) \
-                      .map(stat_styler, middle = format_middle, multiplier = 3, subset = ['Difference'], mode = 'yellow') \
+                      .map(stat_styler, middle = format_middle, multiplier = 6, subset = ['Difference'], mode = 'secondary') \
                       .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                       .format(style_format, subset = rate_df.columns)._compute()
             
@@ -429,7 +429,11 @@ def make_detailed_view(player_assignments : dict[list[str]]
                           , _H
                           , future_diffs)
 
-    weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}").background_gradient(axis = None)
+    weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}") \
+                        .map(stat_styler
+                             , middle = 1
+                             , multiplier = 600
+                             , mode = 'tertiary')
 
     g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h = \
       get_ranking_views(g_display
@@ -444,8 +448,12 @@ def make_detailed_view(player_assignments : dict[list[str]]
         st.dataframe(weights_styled, hide_index = True)
 
         if (rosters.shape[1] > 0):
-          st.markdown('Flex position allocations for future flex spot picks')
-          st.write(positions_styled)
+
+          #positions_styled becomes None when there are no more flex allocations
+          if positions_styled is not None:
+            st.markdown('Flex position allocations for future flex spot picks')
+            st.write(positions_styled)
+
           st.markdown('Roster assignments for chosen players')
           st.write(roster_inverted_styled, hide_index = True)
         else: 
@@ -590,16 +598,21 @@ def make_auction_value_df(rate_display : pd.DataFrame
 def get_positions_styled(n_per_position : dict
                           , position_shares : pd.DataFrame
                           , player_name : str):
-
+  
   position_share_df = pd.DataFrame({p + '-' + str(n_per_position[p]): 
                                     position_shares[p].loc[player_name] * n_per_position[p] 
                                     for p in get_position_structure()['flex_list'] if p in n_per_position.keys()}
                                     ).T.fillna(0)
-  
-  position_share_df = position_share_df[[p for p in get_position_structure()['base_list'] if p in position_share_df.index]]
-  position_share_df.loc['Total',:] = position_share_df.sum()
 
-  return position_share_df.style.format("{:.2f}").background_gradient(axis = None)
+  #position_share_df = position_share_df[:,[p for p in get_position_structure()['base_list'] if p in position_share_df.columns]]
+
+  if len(position_share_df) > 0:
+    position_share_df.loc['Total',:] = position_share_df.sum()
+    return position_share_df.style.format("{:.2f}").background_gradient(axis = None)
+  
+  else: 
+
+    return None
   
 def get_roster_assignment_view(player_name : str
                                 ,player_last_name : str
@@ -753,7 +766,7 @@ def get_ranking_views(g_display : pd.DataFrame
                                                                 , middle = 0.5
                                                                 , multiplier = 10
                                                                 , subset = ['Total']
-                                                                , mode = 'yellow') \
+                                                                , mode = 'secondary') \
                                                                 .format("{:.2f}", subset = ['Total']) \
                                                                 .map(color_blue, subset = ['Player'])
     
@@ -766,7 +779,7 @@ def get_ranking_views(g_display : pd.DataFrame
                                                                 , middle = 0.5
                                                                 , multiplier = 1000
                                                                 , subset = ['H-score']
-                                                                , mode = 'yellow') \
+                                                                , mode = 'secondary') \
                                                                 .format("{:.1%}", subset = ['H-score']) \
                                                                 .map(color_blue, subset = ['Player'])
     
