@@ -188,9 +188,7 @@ def make_cand_tab(_H
                                                               , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
                       .map(styler_a
                           , subset = ['Your $', 'Gnrc. $','Orig. $']) \
-                      .background_gradient(axis = None
-                                          ,cmap = 'PiYG'
-                                          ,subset = ['Difference']) \
+                      .map(stat_styler, middle = format_middle, multiplier = 3, subset = ['Difference'], mode = 'yellow') \
                       .map(stat_styler, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                       .format(style_format, subset = rate_df.columns)._compute()
             

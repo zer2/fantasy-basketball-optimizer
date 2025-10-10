@@ -349,37 +349,68 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
   """
          
   if value != value:
-    return f"background-color:white;color:white" 
+    cl = st.session_state.theme['backgroundColor']
+    return 'background-color:' + cl + ';color:' + cl + 'white'
   
   if mode == 'rgb':
 
-    intensity = min(int(abs((value-middle)*multiplier)), 255)
 
-    if (value - middle)*multiplier > 0:
-      rgb = (255 -  intensity,255 , 255 -  intensity)
-    else:
-      rgb = (255, 255 - intensity, 255 - intensity)
+      if st.session_state.theme['base'] == 'dark':
+        intensity = min(int(abs((value-middle)*multiplier)), 215)
+
+        if (value - middle)*multiplier > 0:
+          rgb = (40 ,40 + int(intensity/3) , 40 + int(intensity/3))
+        else:
+          rgb = (40  + int(intensity/3),40,40 + int(intensity/3))
         
+      else:
+        intensity = min(int(abs((value-middle)*multiplier)), 255)
+
+        if (value - middle)*multiplier > 0:
+          rgb = (255 -  intensity,255 , 255 -  intensity)
+        else:
+          rgb = (255, 255 - intensity, 255 - intensity)
+
   elif mode == 'yellow': 
 
-    intensity = min(int(abs((value-middle)*multiplier)), 255)
+    if st.session_state.theme['base'] == 'dark':
+      intensity = min(int(abs((value-middle)*multiplier)), 215)
 
-    if (value - middle)*multiplier > 0:
-      rgb = (255,255 , 255 - intensity)
+      if (value - middle)*multiplier > 0:
+        rgb = (40 + + int(intensity/3), 40 + + int(intensity/3),40)
+
+      else:
+        rgb = (40 + int(intensity/2),40 + int(intensity/6),40)
+
     else:
-      rgb = (255,255 - intensity,255)
+      intensity = min(int(abs((value-middle)*multiplier)), 255)
+
+      if (value - middle)*multiplier > 0:
+        rgb = (255,255 , 255 - intensity)
+      else:
+        rgb = (255,255 - intensity,255)
 
   bgc = '#%02x%02x%02x' % rgb
 
   #formula adapted from
   #https://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
   darkness_value = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114
-  tc = 'black' if darkness_value > 150 else 'white'
+
+  if st.session_state.theme['base'] == 'dark':
+    tc = st.session_state.theme['fadedText60']
+  else:
+    tc = 'black' if darkness_value > 150 else 'white'
 
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
 
 def styler_a(value : float) -> str:
-    return f"background-color: grey; color:white;" 
+    if st.session_state.theme['base'] == 'dark':
+      background_color = str(st.session_state.theme['secondaryBackgroundColor'])
+      color = str(st.session_state.theme['fadedText60'])
+    else:
+      background_color = 'grey'
+      color = 'white'
+    return "background-color: " + background_color + "; color:" + color +";" 
 
 def styler_b(value : float) -> str:
     return f"background-color: lightgrey; color:black;" 

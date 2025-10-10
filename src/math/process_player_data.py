@@ -272,6 +272,7 @@ def process_player_data(weekly_df : pd.DataFrame
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
+  
   n_players = n_drafters * n_picks
 
   if weekly_df is not None:

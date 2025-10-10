@@ -1,4 +1,4 @@
-site_name: FBBO Methods & Documentation
+site_name: FSO Methods & Documentation
 nav:
   - Home: index.md
   - Settings : settings.md
