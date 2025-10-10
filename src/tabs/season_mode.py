@@ -92,12 +92,14 @@ def roster_inspection(selections_df : pd.DataFrame):
     make_team_display(st.session_state.info['G-scores']
                         ,inspection_players
                         ,st.session_state.info_key
+                        ,st.session_state.theme['base']
                         )
 
 @st.cache_data(ttl = 3600)
 def make_team_display(_g_scores : pd.DataFrame
                   ,my_players : list[str]
                   ,info_key
+                  ,mode #only used to avoid caching the wrong display
                   ):
   """Make a table summarizing a team as it currently stands
 

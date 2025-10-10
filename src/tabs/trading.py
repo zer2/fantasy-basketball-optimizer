@@ -261,9 +261,9 @@ def make_trade_score_tab(_scores : pd.DataFrame
   full_frame = pd.concat([sent_stats,received_stats])
   full_frame.loc['Total Difference', :] = received_stats.loc['Total Received', :] - sent_stats.loc['Total Sent', :]
 
-  full_frame_styled = full_frame.style.format("{:.2f}").map(styler_a, subset = pd.IndexSlice[['Total Difference']
+  full_frame_styled = full_frame.style.format("{:.2f}").map(styler_b, subset = pd.IndexSlice[['Total Difference']
                                                                                     , ['Total']]) \
-                                              .map(styler_b, subset = pd.IndexSlice[players_sent + players_received
+                                              .map(styler_a, subset = pd.IndexSlice[players_sent + players_received
                                                                                     , ['Total']]) \
                                               .map(styler_c, subset = pd.IndexSlice[['Total Sent','Total Received']
                                                                                 , ['Total'] + get_selected_categories()]) \
@@ -390,8 +390,8 @@ def make_combo_df(all_combos : list
                                   })
         return new_row
       else:
-        return pd.DataFrame()
-      
+        return pd.DataFrame(columns = ['Send','Receive','Your Score','Their Score'])
+          
   full_dataframe = pd.concat([process_row(row) for key, row in all_combos.iterrows()])
 
   full_dataframe = full_dataframe.sort_values('Your Score', ascending = False)
@@ -581,6 +581,7 @@ def analyze_trade(team_1
 
     #immediately return None if the first team is ineligible based on position
     team_1_positions = st.session_state.info['Positions'].loc[post_trade_team_1]
+
     team_1_eligible = check_team_eligibility(team_1_positions)
     if not team_1_eligible:
        return None
@@ -590,7 +591,7 @@ def analyze_trade(team_1
     #do the same for the second team
     team_2_positions = st.session_state.info['Positions'].loc[post_trade_team_2]
     team_2_eligible = check_team_eligibility(team_2_positions)
-
+    
     if not team_2_eligible:
        return None
 

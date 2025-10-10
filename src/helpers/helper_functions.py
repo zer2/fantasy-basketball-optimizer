@@ -279,6 +279,7 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
   agg_columns = [col for col in ['H-score','Gnrc. $','Orig. $','Total'] if col in df.columns]
   index_columns = [col for col in ['Rank','Player'] if col in df.columns]
   perc_columns = ['H-score'] if 'H-score' in df.columns else []
+  total_rows = [r for r in ['Total diff','Total'] if r in df.index]
 
   colored_total_column = ['Total'] if (('H-score' in df.columns) and ('Total' in df.columns)) else []
 
@@ -295,6 +296,8 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
                                 , subset = pd.IndexSlice[:,perc_columns] ) \
                             .map(styler_a
                                 ,subset = pd.IndexSlice[:,agg_columns]) \
+                            .map(styler_b
+                                ,subset = pd.IndexSlice[total_rows,agg_columns]) \
                             .map(stat_styler
                               , subset = pd.IndexSlice[:,get_selected_categories()]
                               , multiplier = multiplier) \
@@ -348,9 +351,12 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
     String describing format for a pandas styler object
   """
          
-  if value != value:
-    cl = st.session_state.theme['backgroundColor']
-    return 'background-color:' + cl + ';color:' + cl + 'white'
+  if value == -999:
+    if st.session_state.theme['base'] == 'dark':
+      cl ="#3C3C3E"
+    else:
+      cl = "#F6F6F6"
+    return 'background-color:' + cl + ';color:' + cl + ';'
   
   if mode == 'primary':
 
@@ -396,18 +402,14 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
       intensity = min(int(abs((value-middle)*multiplier)), 100)
 
       if (value - middle)*multiplier > 0:
-        rgb = (40,40, 140 + intensity)
-
+        rgb = (40, 40, 50 + intensity)
       else:
-        rgb = (40,40, 140 - intensity)
+        rgb = (40, 40, 50 -int(intensity/10))
+
 
     else:
-      intensity = min(int(abs((value-middle)*multiplier)), 100)
-
-      if (value - middle)*multiplier > 0:
-        rgb = (100 - intensity, 100 - intensity , 255)
-      else:
-        rgb = (100 + intensity, 100 + intensity, 255)
+      intensity = int(np.clip(abs((value-middle)*multiplier),0,100))
+      rgb = (255 - intensity, 255 - intensity , 255)
 
   bgc = '#%02x%02x%02x' % rgb
 
@@ -424,7 +426,7 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
 
 def styler_a(value : float) -> str:
     if st.session_state.theme['base'] == 'dark':
-      background_color = str(st.session_state.theme['secondaryBackgroundColor'])
+      background_color = '#101015'
       color = str(st.session_state.theme['fadedText60'])
     else:
       background_color = 'grey'
@@ -432,10 +434,49 @@ def styler_a(value : float) -> str:
     return "background-color: " + background_color + "; color:" + color +";" 
 
 def styler_b(value : float) -> str:
-    return f"background-color: lightgrey; color:black;" 
+    if st.session_state.theme['base'] == 'dark':
+      background_color = '#09090b'
+      color = str(st.session_state.theme['fadedText60'])
+    else:
+      background_color = 'lightgrey'
+      color = 'black'
+    return "background-color: " + background_color + "; color:" + color +";" 
 
 def styler_c(value : float) -> str:
-    return f"background-color: darkgrey; color:black;" 
+    if st.session_state.theme['base'] == 'dark':
+      background_color = '#424249'
+      color = str(st.session_state.theme['fadedText60'])
+    else:
+      background_color = 'darkgrey'
+      color = 'black'
+    return "background-color: " + background_color + "; color:" + color +";" 
+
+def style_rosters(x, my_players):
+    
+    if st.session_state.theme['base'] == 'dark':
+      if len(x) ==0:
+        return 'background-color:#333339'
+      elif x in my_players:
+        rgb = (40,40 ,80)
+        bgc = '#%02x%02x%02x' % rgb
+        return 'background-color:' + bgc + '; color:' + str(st.session_state.theme['fadedText60']) + ';'
+      else:
+        rgb = (40,40 ,120)
+        bgc = '#%02x%02x%02x' % rgb
+        return 'background-color:' + bgc + '; color:' + str(st.session_state.theme['fadedText60']) + ';'
+    else:
+      if len(x) ==0:
+        bgc = "#F8F8F8"
+        return 'background-color:' + bgc
+      elif x in my_players:
+        rgb = (220,220 ,255)
+        bgc = '#%02x%02x%02x' % rgb
+        return 'background-color:' + bgc + '; color:black;'
+      else:
+        rgb = (175,175 ,255)
+        bgc = '#%02x%02x%02x' % rgb
+        return 'background-color:' + bgc + '; color:black;'
+
 
 def rotate(l, n):
   #rotate list l by n positions 

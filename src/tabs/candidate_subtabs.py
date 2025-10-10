@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
-                                styler_a, stat_styler, get_position_structure
+                                styler_a, stat_styler, get_position_structure, style_rosters
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.helpers.helper_functions import get_n_drafters
 
@@ -431,8 +431,8 @@ def make_detailed_view(player_assignments : dict[list[str]]
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}") \
                         .map(stat_styler
-                             , middle = 1
-                             , multiplier = 600
+                             , middle = 0.9
+                             , multiplier = 500
                              , mode = 'tertiary')
 
     g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h = \
@@ -453,9 +453,12 @@ def make_detailed_view(player_assignments : dict[list[str]]
           if positions_styled is not None:
             st.markdown('Flex position allocations for future flex spot picks')
             st.write(positions_styled)
-
+            
           st.markdown('Roster assignments for chosen players')
           st.write(roster_inverted_styled, hide_index = True)
+
+
+
         else: 
           st.write('Roster assignments are not calculated when position is not available')
 
@@ -602,13 +605,18 @@ def get_positions_styled(n_per_position : dict
   position_share_df = pd.DataFrame({p + '-' + str(n_per_position[p]): 
                                     position_shares[p].loc[player_name] * n_per_position[p] 
                                     for p in get_position_structure()['flex_list'] if p in n_per_position.keys()}
-                                    ).T.fillna(0)
+                                    ).T
 
-  #position_share_df = position_share_df[:,[p for p in get_position_structure()['base_list'] if p in position_share_df.columns]]
+  #this line is to make sure the columns are lined up in the normal way
+  position_share_df = position_share_df[[p for p in get_position_structure()['base_list'] if p in position_share_df.columns]]
 
   if len(position_share_df) > 0:
     position_share_df.loc['Total',:] = position_share_df.sum()
-    return position_share_df.style.format("{:.2f}").background_gradient(axis = None)
+
+    #-999 is a hack to encode 'missing info' for the stat_styler function. None doesn't work for some reason
+    return position_share_df.fillna(-999).style.format("{:.2f}") \
+                            .map(stat_styler, middle = 0, multiplier = 50, mode = 'tertiary') \
+
   
   else: 
 
@@ -641,14 +649,6 @@ def get_roster_assignment_view(player_name : str
       n = list(row).index(i)
       return player_list[n]
     
-  def style_rosters(x):
-    if len(x) ==0:
-      return 'background-color:white'
-    elif x in my_players:
-      return 'background-color: lightgrey; color:black;'
-    else:
-      return 'background-color: lightblue; color:black;'
-
   my_players = [x.split(' ')[1] for x in my_players if x == x]
 
   player_list = my_players + [player_last_name] + [''] * (rosters.shape[1] - len(my_players) - 1)
@@ -666,7 +666,7 @@ def get_roster_assignment_view(player_name : str
 
   n_per_position = position_slots.value_counts()
 
-  roster_inverted_styled = roster_inverted.T.style.map(style_rosters)
+  roster_inverted_styled = roster_inverted.T.style.map(style_rosters, my_players = my_players)
 
   return n_per_position, roster_inverted_styled
 
