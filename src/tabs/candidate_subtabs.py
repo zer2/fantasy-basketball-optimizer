@@ -588,7 +588,11 @@ def make_auction_value_df(rate_display : pd.DataFrame
     return "background-color: lightblue; color:black" if label == player_name else None
   
   big_value_df_styled = big_value_df.reset_index().style.format("{:.1f}", subset = cols) \
-                                                                  .background_gradient(cmap = 'Oranges', subset = cols, axis = None) \
+                                                                  .map(stat_styler
+                                                                       , middle = int(big_value_df.mean(axis = None))
+                                                                       , multiplier = 5
+                                                                       , mode = 'secondary'
+                                                                       , subset = cols) \
                                                                   .map(color_blue, subset = 'Player')
   
   #only set the size of the dataframe when it is not just a single player

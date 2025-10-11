@@ -353,7 +353,7 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
          
   if value == -999:
     if st.session_state.theme['base'] == 'dark':
-      cl ="#3C3C3E"
+      cl ="#8D8D9E"
     else:
       cl = "#F6F6F6"
     return 'background-color:' + cl + ';color:' + cl + ';'
@@ -362,12 +362,12 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
 
 
       if st.session_state.theme['base'] == 'dark':
-        intensity = min(int(abs((value-middle)*multiplier)), 215)
+        intensity = min(int(abs((value-middle)*multiplier)* 0.8), 165)
 
         if (value - middle)*multiplier > 0:
-          rgb = (40 ,40 + int(intensity/3) , 40 + int(intensity/3))
+          rgb = (90 ,90 + intensity, 90 + intensity)
         else:
-          rgb = (40  + int(intensity/3),40,40 + int(intensity/3))
+          rgb = (90  + intensity,90,90 + intensity)
         
       else:
         intensity = min(int(abs((value-middle)*multiplier)), 255)
@@ -380,13 +380,13 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
   elif mode == 'secondary': 
 
     if st.session_state.theme['base'] == 'dark':
-      intensity = min(int(abs((value-middle)*multiplier)), 215)
+      intensity = min(int(abs((value-middle)*multiplier)), 150)
 
       if (value - middle)*multiplier > 0:
-        rgb = (40 + + int(intensity/6), 40 + + int(intensity/6),40)
+        rgb = (130 + int(2 * intensity/3), 130 + int(2 * intensity/3),130)
 
       else:
-        rgb = (40 + int(intensity/4),40 + int(intensity/12),40)
+        rgb = (130 + int(intensity),130 + int(intensity/3),130)
 
     else:
       intensity = min(int(abs((value-middle)*multiplier)), 255)
@@ -402,9 +402,9 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
       intensity = min(int(abs((value-middle)*multiplier)), 100)
 
       if (value - middle)*multiplier > 0:
-        rgb = (40, 40, 50 + intensity)
+        rgb = (100, 100, 110 + intensity)
       else:
-        rgb = (40, 40, 50 -int(intensity/10))
+        rgb = (100, 100, 110 -int(intensity/10))
 
 
     else:
@@ -422,12 +422,14 @@ def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode
   else:
     tc = 'black' if darkness_value > 150 else 'white'
 
+  tc = 'black' if darkness_value > 150 else 'white'
+
   return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
 
 def styler_a(value : float) -> str:
     if st.session_state.theme['base'] == 'dark':
-      background_color = '#101015'
-      color = str(st.session_state.theme['fadedText60'])
+      background_color = "#2a2a33"
+      color = 'white'
     else:
       background_color = 'grey'
       color = 'white'
@@ -435,8 +437,8 @@ def styler_a(value : float) -> str:
 
 def styler_b(value : float) -> str:
     if st.session_state.theme['base'] == 'dark':
-      background_color = '#09090b'
-      color = str(st.session_state.theme['fadedText60'])
+      background_color = "#38384A"
+      color = 'white'
     else:
       background_color = 'lightgrey'
       color = 'black'
@@ -444,8 +446,8 @@ def styler_b(value : float) -> str:
 
 def styler_c(value : float) -> str:
     if st.session_state.theme['base'] == 'dark':
-      background_color = '#424249'
-      color = str(st.session_state.theme['fadedText60'])
+      background_color = "#252536"
+      color = 'white'
     else:
       background_color = 'darkgrey'
       color = 'black'
@@ -455,15 +457,15 @@ def style_rosters(x, my_players):
     
     if st.session_state.theme['base'] == 'dark':
       if len(x) ==0:
-        return 'background-color:#333339'
+        return 'background-color:#888899'
       elif x in my_players:
-        rgb = (40,40 ,80)
+        rgb = (90,90 ,150)
         bgc = '#%02x%02x%02x' % rgb
-        return 'background-color:' + bgc + '; color:' + str(st.session_state.theme['fadedText60']) + ';'
+        return 'background-color:' + bgc + '; color:white;'
       else:
-        rgb = (40,40 ,120)
+        rgb = (100,100 ,240)
         bgc = '#%02x%02x%02x' % rgb
-        return 'background-color:' + bgc + '; color:' + str(st.session_state.theme['fadedText60']) + ';'
+        return 'background-color:' + bgc + '; color:white;'
     else:
       if len(x) ==0:
         bgc = "#F8F8F8"
