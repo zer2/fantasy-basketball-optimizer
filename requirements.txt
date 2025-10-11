@@ -17,3 +17,4 @@ schedule
 unidecode
 fantraxapi
 espn_api
+st-theme

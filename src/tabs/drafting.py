@@ -76,6 +76,7 @@ def make_drafting_tab_own_data(H):
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
                         ,st.session_state.info_key
+                        ,st.session_state.theme['base']
                         )
 
         with candidate_evaluation:
@@ -150,6 +151,7 @@ def make_drafting_tab_live_data(H):
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
                         ,st.session_state.info_key
+                        ,st.session_state.theme['base']
                         )
 
         with candidate_evaluation:
@@ -268,6 +270,7 @@ def make_auction_tab_own_data(H):
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
                             ,st.session_state.info_key
+                            ,st.session_state.theme['base']
                             )     
 
         with candidate_evaluation:   
@@ -432,6 +435,7 @@ def make_auction_tab_live_data(H):
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
                         ,st.session_state.info_key
+                        ,st.session_state.theme['base']
                         )
             
         with candidate_evaluation:

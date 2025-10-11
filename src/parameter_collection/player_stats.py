@@ -33,7 +33,7 @@ def player_stats_popover():
     default_injury_list = [p for p in st.session_state['injured_players'] \
                                 if (p in raw_stat_df.index) and (not (p in listify(st.session_state.selections_default))) 
                                 ]
-
+    
     st.session_state.raw_stat_df = drop_injured_players(raw_stat_df
                                                         , default_injury_list
                                                         , st.session_state.player_stats_version)  
@@ -174,6 +174,7 @@ def get_nba_stats():
                      st.error('Weights are all 0')
                      st.stop()
 
+        
         raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
                         , st.session_state.datasets.get('bbm')
                         , st.session_state.datasets.get('htb')
