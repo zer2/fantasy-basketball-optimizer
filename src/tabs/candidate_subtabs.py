@@ -229,8 +229,13 @@ def make_cand_tab(_H
               adp_col = []
                     
               if drop_player is not None:
-                def color_blue(label):
-                    return "background-color: blue; color:white" if label == drop_player else None
+
+                if st.session_state.theme['base'] == 'dark':
+                  def color_blue(label):
+                      return "background-color: #444466; color:white" if label == drop_player else None
+                else:
+                  def color_blue(label):
+                      return "background-color: blue; color:white" if label == drop_player else None
                 
                 rate_display_styled = rate_display.reset_index().style.format("{:.1%}"
                                 ,subset = pd.IndexSlice[:,['H-score']]) \
@@ -584,8 +589,12 @@ def make_auction_value_df(rate_display : pd.DataFrame
                                 ,'Orig. G$' : g_display['Orig. $']}).sort_values('Your H$', ascending = False)
   cols = ['Your H$','Gnrc. H$','Orig. H$','Gnrc. G$','Orig. G$']
 
-  def color_blue(label):
-    return "background-color: lightblue; color:black" if label == player_name else None
+  if st.session_state.theme['base'] == 'dark':
+    def color_blue(label):
+        return "background-color: #444466; color:white" if label == player_name else None
+  else:
+    def color_blue(label):
+        return "background-color: blue; color:white" if label == player_name else None
   
   big_value_df_styled = big_value_df.reset_index().style.format("{:.1f}", subset = cols) \
                                                                   .map(stat_styler
@@ -757,8 +766,12 @@ def get_ranking_views(g_display : pd.DataFrame
     Returns:
         None
     """
-    def color_blue(label):
-        return "background-color: lightblue; color:black" if label == player_name else None
+    if st.session_state.theme['base'] == 'dark':
+      def color_blue(label):
+          return "background-color: #444466; color:white" if label == player_name else None
+    else:
+      def color_blue(label):
+          return "background-color: blue; color:white" if label == player_name else None
 
     g_display.loc[:,'Rank'] = range(1, len(g_display) + 1)
     player_location_g = g_display.index.get_loc(player_name)
@@ -767,8 +780,8 @@ def get_ranking_views(g_display : pd.DataFrame
                                         ,'Total' : g_display['Total']
                                         }).set_index('Rank')
     g_scores_to_display_styled = g_scores_to_display.style.map(stat_styler
-                                                                , middle = 0.5
-                                                                , multiplier = 10
+                                                                , middle = 0
+                                                                , multiplier = 20
                                                                 , subset = ['Total']
                                                                 , mode = 'secondary') \
                                                                 .format("{:.2f}", subset = ['Total']) \
@@ -781,7 +794,7 @@ def get_ranking_views(g_display : pd.DataFrame
                                         }).set_index('Rank')
     h_scores_to_display_styled = h_scores_to_display.style.map(stat_styler
                                                                 , middle = 0.5
-                                                                , multiplier = 1000
+                                                                , multiplier = 2000
                                                                 , subset = ['H-score']
                                                                 , mode = 'secondary') \
                                                                 .format("{:.1%}", subset = ['H-score']) \
