@@ -157,7 +157,6 @@ def get_nba_stats():
             with c5: 
             
                 submit_button = st.form_submit_button('Lock in & process'
-                                                        , icon = '🔓'
                                                         , on_click = increment_player_stats_version)
 
                 st.warning('Changes will not be reflected until this button is pressed')

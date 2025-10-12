@@ -11,7 +11,7 @@ from src.parameter_collection.player_stats import player_stats_popover
 from src.parameter_collection.parameters import player_stat_param_popover, algorithm_param_popover, trade_param_popover
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
-#from wfork_streamlit_profiler import Profiler
+from wfork_streamlit_profiler import Profiler
 import streamlit.components.v1 as components
 from streamlit_theme import st_theme
 
@@ -19,7 +19,6 @@ from streamlit_theme import st_theme
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 
 st.session_state.theme = st_theme()
-
 
 ### SETUP
 st.set_page_config(
@@ -82,7 +81,7 @@ with st.sidebar:
 
     league_settings_popover()
   
-  with st.popover(':small[Player Stats]'):
+  with st.popover(':small[Player Stats]').container(height = 500):
 
     player_stats = player_stats_popover()
 

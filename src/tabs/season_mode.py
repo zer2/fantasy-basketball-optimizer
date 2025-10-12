@@ -1,12 +1,11 @@
 import streamlit as st
 import pandas as pd 
 from src.helpers.helper_functions import get_selected_categories, \
-                                styler_a, styler_b, styler_c, stat_styler
+                                styler_a, styler_b, styler_c, stat_styler_primary
 from src.tabs.trading import make_trade_tab
 from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify
 from src.tabs.candidate_subtabs import make_cand_tab
-
 
 def make_season_mode_tabs(H):
   """Create the season mode display, which has three tabs: waiver players, trades, and rosters 
@@ -127,9 +126,9 @@ def make_team_display(_g_scores : pd.DataFrame
     team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
                                                 .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
                                                 .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
-                                                .map(stat_styler, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
+                                                .map(stat_styler_primary, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
                                                      , multiplier = st.session_state.params['g-score-player-multiplier']) \
-                                                .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()]
+                                                .applymap(stat_styler_primary, subset = pd.IndexSlice['Total', get_selected_categories()]
                                                     , multiplier = st.session_state.params['g-score-team-multiplier']) \
     
     
@@ -193,7 +192,7 @@ def make_full_waiver_tab(H
                 ,player_assignments
                 ,waiver_inspection_seat
                 ,1
-                ,1
+                ,[1]
                 ,None
                 ,None
                 ,None

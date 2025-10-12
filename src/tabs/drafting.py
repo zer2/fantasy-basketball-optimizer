@@ -12,8 +12,6 @@ from src.helpers.helper_functions import get_team_names
 from src.math.algorithm_agents import get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
 
-#from wfork_streamlit_profiler import Profiler
-
 @st.fragment
 def make_drafting_tab_own_data(H):
     """Create a page for drafting based on manual input
@@ -25,7 +23,6 @@ def make_drafting_tab_own_data(H):
     Returns:
         None
     """
-
     left, right = st.columns([0.47,0.53])
 
     with left:
@@ -69,7 +66,7 @@ def make_drafting_tab_own_data(H):
             , st.session_state.selections_df.columns)
 
 
-        candidate_evaluation = st.container(height = 625, border = False)
+    with left:
 
         my_players = st.session_state.selections_df[draft_seat].dropna()
 
@@ -78,27 +75,26 @@ def make_drafting_tab_own_data(H):
                         ,st.session_state.info_key
                         ,st.session_state.theme['base']
                         )
+    with right:
 
-        with candidate_evaluation:
-            if st.session_state.run_h_score:
-                if len(my_players) < st.session_state.n_starters:
-                    make_cand_tab(H
-                        ,st.session_state.info['G-scores']
-                        ,player_assignments
-                        ,draft_seat
-                        ,st.session_state.n_iterations
-                        ,15)
-                    st.session_state.run_h_score = False
-                else:
-                    st.write('You have selected all of your players')    
-                  
-
+        if st.session_state.run_h_score:
+            if len(my_players) < st.session_state.n_starters:
+                make_cand_tab(H
+                    ,st.session_state.info['G-scores']
+                    ,player_assignments
+                    ,draft_seat
+                    ,st.session_state.n_iterations)
+                st.session_state.run_h_score = False
             else:
+                st.write('You have selected all of your players')    
+            
 
-                def run():
-                    st.session_state.run_h_score = True
+        else:
 
-                button = st.button('Run algorithm', on_click = run)
+            def run():
+                st.session_state.run_h_score = True
+
+            button = st.button('Run algorithm', on_click = run)
 
         
 
@@ -161,8 +157,7 @@ def make_drafting_tab_live_data(H):
                     ,st.session_state.info['G-scores']
                     ,player_assignments
                     ,draft_seat
-                    ,st.session_state.n_iterations
-                    ,15)
+                    ,st.session_state.n_iterations)
                 
             else:
                 st.write('You have selected all of your players')    
@@ -261,63 +256,60 @@ def make_auction_tab_own_data(H):
             player_assignments.loc[team] = []
 
         my_players = player_assignments[auction_seat]
-        n_my_players = len(my_players)
-
-        my_remaining_cash = cash_remaining_per_team[auction_seat]
-
-        candidate_evaluation = st.container(height = 645, border = False)
+    
+      with left: 
 
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
                             ,st.session_state.info_key
                             ,st.session_state.theme['base']
                             )     
+      with right:
 
-        with candidate_evaluation:   
-            if not st.session_state.have_locked_in:
-                st.markdown('Lock in to run algorithm')
+        if not st.session_state.have_locked_in:
+            st.markdown('Lock in to run algorithm')
 
-            elif len(my_players) == st.session_state.n_picks:
-                st.markdown('Team is complete!')
-                        
-            else:
+        elif len(my_players) == st.session_state.n_picks:
+            st.markdown('Team is complete!')
+                    
+        else:
 
-                h_ranks = get_default_h_values(info = st.session_state.info
-                                            , omega = st.session_state.omega
-                                            , gamma = st.session_state.gamma
-                                            , n_picks = st.session_state.n_picks
-                                            , n_drafters = n_drafters
-                                            , n_iterations = st.session_state.n_iterations
-                                            , scoring_format = st.session_state.scoring_format
-                                            , mode = st.session_state.mode
-                                            , psi = st.session_state.psi
-                                            , upsilon = st.session_state.upsilon
-                                            , chi = st.session_state.chi
-                                            , info_key = st.session_state.info)
+            h_ranks = get_default_h_values(info = st.session_state.info
+                                        , omega = st.session_state.omega
+                                        , gamma = st.session_state.gamma
+                                        , n_picks = st.session_state.n_picks
+                                        , n_drafters = n_drafters
+                                        , n_iterations = st.session_state.n_iterations
+                                        , scoring_format = st.session_state.scoring_format
+                                        , mode = st.session_state.mode
+                                        , psi = st.session_state.psi
+                                        , upsilon = st.session_state.upsilon
+                                        , chi = st.session_state.chi
+                                        , info_key = st.session_state.info)
 
-                h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
-                h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
-                                                            , st.session_state.n_picks * n_drafters - len(selection_list)
-                                                            , remaining_cash
-                                                            , st.session_state['streaming_noise'])
-                h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
+            h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
+            h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
+                                                        , st.session_state.n_picks * n_drafters - len(selection_list)
+                                                        , remaining_cash
+                                                        , st.session_state['streaming_noise'])
+            h_defaults_savor = pd.Series(h_defaults_savor.values, index = h_ranks_unselected['Player'])
 
-                h_original_savor = auction_value_adjuster(h_ranks['H-score']
-                                                            , st.session_state.n_picks * n_drafters
-                                                            , cash_per_team * n_drafters
-                                                            , st.session_state['streaming_noise'])
-                h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
+            h_original_savor = auction_value_adjuster(h_ranks['H-score']
+                                                        , st.session_state.n_picks * n_drafters
+                                                        , cash_per_team * n_drafters
+                                                        , st.session_state['streaming_noise'])
+            h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
 
-                make_cand_tab(H
-                    ,st.session_state.info['G-scores']
-                    ,player_assignments.to_dict()
-                    ,auction_seat
-                    ,st.session_state.n_iterations
-                    ,15 #display frequency
-                    ,cash_remaining_per_team.to_dict()
-                    ,h_defaults_savor
-                    ,h_original_savor
-                    ,n_drafters * st.session_state.n_picks)
+            make_cand_tab(H
+                ,st.session_state.info['G-scores']
+                ,player_assignments.to_dict()
+                ,auction_seat
+                ,st.session_state.n_iterations
+                ,[4,16,29]
+                ,cash_remaining_per_team.to_dict()
+                ,h_defaults_savor
+                ,h_original_savor
+                ,n_drafters * st.session_state.n_picks)
 
 
 @st.fragment
@@ -446,7 +438,6 @@ def make_auction_tab_live_data(H):
                     ,player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
-                    ,15 #display frequency
                     ,cash_remaining_per_team.to_dict()
                     ,h_defaults_savor
                     ,h_original_savor
