@@ -92,7 +92,7 @@ def make_cand_tab(_H
 
   placeholder = st.empty()
 
-  if cash_remaining_per_team:
+  if cash_remaining_per_team is not None:
     selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
     remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
@@ -136,7 +136,7 @@ def make_cand_tab(_H
 
       with h_tab:
 
-        if cash_remaining_per_team:
+        if cash_remaining_per_team is not None:
           
           if display:
 
@@ -465,8 +465,9 @@ def make_detailed_view(player_assignments : dict[list[str]]
       else:
         st.write('Category weights and position allocations not calculated for last player')
 
-      if display_rank_tables:
+      if display_rank_tables and cash_remaining_per_team:
           selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
+
           remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
           if len(selection_list) > 0:

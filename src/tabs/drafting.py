@@ -123,7 +123,7 @@ def make_drafting_tab_live_data(H):
 
         team_names = get_team_names()
         
-        if 'draft_seat' in st.session_state:
+        if ('draft_seat' in st.session_state) and (st.session_state.draft_seat in list(team_names.index)):
            default_index = team_names.index(st.session_state.draft_seat)
         else:
            default_index = 0
@@ -439,6 +439,7 @@ def make_auction_tab_live_data(H):
                     ,player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
+                    ,[4,16,29]
                     ,cash_remaining_per_team.to_dict()
                     ,h_defaults_savor
                     ,h_original_savor
