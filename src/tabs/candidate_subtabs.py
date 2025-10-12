@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd 
 import numpy as np
 from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
-                                styler_a, stat_styler_primary, stat_styler_secondary, stat_styler_tertiary, color_blue, \
-                                get_position_structure, style_rosters
+                                get_position_structure
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.helpers.helper_functions import get_n_drafters
 
@@ -73,6 +72,8 @@ def make_cand_tab(_H
   """
 
   _H = _H.clear_initial_weights()
+
+  styler = st.session_state.styler
           
   if drop_player is None:
     generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
@@ -184,10 +185,10 @@ def make_cand_tab(_H
             #ZR: Something about this is inefficient with the streamlit implementation. It slows things down a lot
             rate_display_styled = rate_display.reset_index().style.format("{:.1f}"
                                                               , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
-                      .map(styler_a
+                      .map(styler.styler_a
                           , subset = ['Your $', 'Gnrc. $','Orig. $']) \
-                      .map(stat_styler_secondary, middle = format_middle, multiplier = 6, subset = ['Difference']) \
-                      .map(stat_styler_primary, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+                      .map(styler.stat_styler_secondary, middle = format_middle, multiplier = 6, subset = ['Difference']) \
+                      .map(styler.stat_styler_primary, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                       .format(style_format, subset = rate_df.columns)._compute()
             
             st.dataframe(rate_display_styled
@@ -232,11 +233,11 @@ def make_cand_tab(_H
                                 ,subset = pd.IndexSlice[:,['H-score']]) \
                                                       .format("{:.1f}"
                                 ,subset = pd.IndexSlice[:,adp_col]) \
-                        .map(styler_a
+                        .map(styler.styler_a
                               , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
-                        .map(stat_styler_primary, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+                        .map(styler.stat_styler_primary, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                         .format(style_format, subset = rate_df.columns) \
-                        .map(color_blue, subset = pd.IndexSlice[:,['Player']], target = drop_player)._compute()
+                        .map(styler.color_blue, subset = pd.IndexSlice[:,['Player']], target = drop_player)._compute()
                 
 
                 g_display = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
@@ -258,9 +259,12 @@ def make_cand_tab(_H
                                 ,subset = pd.IndexSlice[:,['H-score']]) \
                                                       .format("{:.1f}"
                                 ,subset = pd.IndexSlice[:,adp_col]) \
-                        .map(styler_a
+                        .map(styler.styler_a
                               , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
-                        .map(stat_styler_primary, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
+                        .map(styler.stat_styler_primary
+                             , middle = format_middle
+                             , multiplier = format_multiplier
+                             , subset = rate_df.columns) \
                         .format(style_format, subset = rate_df.columns)
                   
                 st.dataframe(rate_display_styled
@@ -303,7 +307,7 @@ def make_cand_tab(_H
                                               , st.session_state.params['g-score-player-multiplier']
                                               , st.session_state.params['g-score-total-multiplier'])
             
-            scores_unselected_styled = scores_unselected_styled.map(color_blue
+            scores_unselected_styled = scores_unselected_styled.map(styler.color_blue
                                                                     , subset = pd.IndexSlice[:,['Player']]
                                                                     , target = drop_player)
             st.dataframe(scores_unselected_styled
@@ -375,7 +379,6 @@ def make_detailed_view(player_assignments : dict[list[str]]
     Returns:
         None
     """
-
     my_players = player_assignments[draft_seat]
 
     if st.session_state.data_source == 'Enter your own data':
@@ -427,7 +430,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
                           , future_diffs)
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}") \
-                        .map(stat_styler_tertiary
+                        .map(st.session_state.styler.stat_styler_tertiary
                              , middle = 0.9
                              , multiplier = 500)
 
@@ -572,6 +575,7 @@ def make_auction_value_df(rate_display : pd.DataFrame
                           , player_name : str):
   #make a dataframe with $ according to your H-score, plus generically from H-score and G-score
   #ZR: Arguably this should have something about overpayments 
+  styler = st.session_state.styler
 
   big_value_df = pd.DataFrame({'Your H$' : rate_display['Your $']
                                 ,'Gnrc. H$' : rate_display['Gnrc. $']
@@ -581,11 +585,11 @@ def make_auction_value_df(rate_display : pd.DataFrame
   cols = ['Your H$','Gnrc. H$','Orig. H$','Gnrc. G$','Orig. G$']
   
   big_value_df_styled = big_value_df.reset_index().style.format("{:.1f}", subset = cols) \
-                                                                  .map(stat_styler_secondary
+                                                                  .map(styler.stat_styler_secondary
                                                                        , middle = int(big_value_df.mean(axis = None))
                                                                        , multiplier = 5
                                                                        , subset = cols) \
-                                                                  .map(color_blue, subset = 'Player', target = player_name)
+                                                                  .map(styler.color_blue, subset = 'Player', target = player_name)
   
   #only set the size of the dataframe when it is not just a single player
   if len(big_value_df) > 1:
@@ -611,7 +615,7 @@ def get_positions_styled(n_per_position : dict
 
     #-999 is a hack to encode 'missing info' for the stat_styler function. None doesn't work for some reason
     return position_share_df.fillna(-999).style.format("{:.2f}") \
-                            .map(stat_styler_tertiary, middle = 0, multiplier = 50) \
+                            .map(st.session_state.styler.stat_styler_tertiary, middle = 0, multiplier = 50) \
 
   
   else: 
@@ -662,7 +666,8 @@ def get_roster_assignment_view(player_name : str
 
   n_per_position = position_slots.value_counts()
 
-  roster_inverted_styled = roster_inverted.T.style.map(style_rosters, my_players = my_players)
+  roster_inverted_styled = roster_inverted.T.style.map(st.session_state.styler.style_rosters
+                                                       , my_players = my_players)
 
   return n_per_position, roster_inverted_styled
 
@@ -687,7 +692,10 @@ def make_rate_display_styled(rate_display : pd.DataFrame
       rate_df_limited = rate_df_limited.drop(columns = ['Difference','Your $', 'Gnrc. $', 'Orig. $'])
       
       rate_df_limited_styled = rate_df_limited.style \
-                                          .map(stat_styler_primary, middle = 0.5, multiplier = 300, subset = get_selected_categories()) \
+                                          .map(st.session_state.styler.stat_style_primary
+                                              , middle = 0.5
+                                              , multiplier = 300
+                                              , subset = get_selected_categories()) \
                                           .format('{:,.1%}', subset = get_selected_categories())
   else: 
     st.markdown('Expected win rates if taken')
@@ -749,6 +757,7 @@ def get_ranking_views(g_display : pd.DataFrame
     Returns:
         None
     """
+    styler = st.session_state.styler
 
     g_display.loc[:,'Rank'] = range(1, len(g_display) + 1)
     player_location_g = g_display.index.get_loc(player_name)
@@ -756,23 +765,23 @@ def get_ranking_views(g_display : pd.DataFrame
                                         ,'Player' : g_display.index
                                         ,'Total' : g_display['Total']
                                         }).set_index('Rank')
-    g_scores_to_display_styled = g_scores_to_display.style.map(stat_styler_secondary
+    g_scores_to_display_styled = g_scores_to_display.style.map(styler.stat_styler_secondary
                                                                 , middle = 0
                                                                 , multiplier = 20
                                                                 , subset = ['Total']) \
                                                                 .format("{:.2f}", subset = ['Total']) \
-                                                                .map(color_blue, subset = ['Player'], target = player_name)
+                                                                .map(styler.color_blue, subset = ['Player'], target = player_name)
     
     player_location_h = score_df.index.get_loc(player_name)
     h_scores_to_display = pd.DataFrame({'Rank' : score_df['Rank']
                                         ,'Player' : score_df.index
                                         ,'H-score' : score_df['H-score']
                                         }).set_index('Rank')
-    h_scores_to_display_styled = h_scores_to_display.style.map(stat_styler_secondary
+    h_scores_to_display_styled = h_scores_to_display.style.map(styler.stat_styler_secondary
                                                                 , middle = 0.5
                                                                 , multiplier = 2000
                                                                 , subset = ['H-score']) \
                                                                 .format("{:.1%}", subset = ['H-score']) \
-                                                                .map(color_blue, subset = ['Player'], target = player_name)
+                                                                .map(styler.color_blue, subset = ['Player'], target = player_name)
     
     return g_scores_to_display_styled, h_scores_to_display_styled, player_location_g, player_location_h

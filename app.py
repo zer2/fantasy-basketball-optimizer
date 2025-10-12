@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import yaml
 from src.helpers.helper_functions import get_n_drafters
+from src.helpers.stylers import DarkStyler, LightStyler
 from src.math.algorithm_agents import HAgent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
                            ,make_auction_tab_live_data ,make_auction_tab_own_data
@@ -15,10 +16,13 @@ from wfork_streamlit_profiler import Profiler
 import streamlit.components.v1 as components
 from streamlit_theme import st_theme
 
+
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 
+#load up the theme and make a styler based on the theme 
 st.session_state.theme = st_theme()
+st.session_state.styler = DarkStyler() if st.session_state.theme['base'] == 'dark' else LightStyler()
 
 ### SETUP
 st.set_page_config(
@@ -81,7 +85,7 @@ with st.sidebar:
 
     league_settings_popover()
   
-  with st.popover(':small[Player Stats]').container(height = 500):
+  with st.popover(':small[Player Stats]'):
 
     player_stats = player_stats_popover()
 

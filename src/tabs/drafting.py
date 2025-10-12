@@ -23,6 +23,7 @@ def make_drafting_tab_own_data(H):
     Returns:
         None
     """
+    
     left, right = st.columns([0.47,0.53])
 
     with left:

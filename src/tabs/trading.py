@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import h_percentage_styler, get_selected_categories, \
-                                styler_a, styler_b, styler_c, stat_styler_primary, get_n_drafters, \
+from src.helpers.helper_functions import h_percentage_styler, get_selected_categories, get_n_drafters, \
                                 get_your_differential_threshold, get_their_differential_threshold, \
                                   get_combo_params
 from src.math.algorithm_agents import get_default_h_values
@@ -207,7 +206,7 @@ def make_trade_tab(H
         full_dataframe_styled = st.session_state.df.reset_index(drop = True).style.format("{:.2%}"
                                       , subset = ['Your Score'
                                                 ,'Their Score']) \
-                            .map(stat_styler_primary
+                            .map(st.session_state.styler.stat_styler_primary
                                 , middle = 0
                                 , multiplier = 15000
                                 , subset = ['Your Score'
@@ -260,17 +259,19 @@ def make_trade_score_tab(_scores : pd.DataFrame
 
   full_frame = pd.concat([sent_stats,received_stats])
   full_frame.loc['Total Difference', :] = received_stats.loc['Total Received', :] - sent_stats.loc['Total Sent', :]
+  
+  styler = st.session_state.styler
 
-  full_frame_styled = full_frame.style.format("{:.2f}").map(styler_b, subset = pd.IndexSlice[['Total Difference']
+  full_frame_styled = full_frame.style.format("{:.2f}").map(styler.styler_b, subset = pd.IndexSlice[['Total Difference']
                                                                                     , ['Total']]) \
-                                              .map(styler_a, subset = pd.IndexSlice[players_sent + players_received
+                                              .map(styler.styler_a, subset = pd.IndexSlice[players_sent + players_received
                                                                                     , ['Total']]) \
-                                              .map(styler_c, subset = pd.IndexSlice[['Total Sent','Total Received']
+                                              .map(styler.styler_c, subset = pd.IndexSlice[['Total Sent','Total Received']
                                                                                 , ['Total'] + get_selected_categories()]) \
-                                              .map(stat_styler_primary, subset = pd.IndexSlice[players_sent + players_received
+                                              .map(styler.stat_styler_primary, subset = pd.IndexSlice[players_sent + players_received
                                                                                   , get_selected_categories()]
                                                                                   , multiplier = player_multiplier) \
-                                              .map(stat_styler_primary, subset = pd.IndexSlice[['Total Difference']
+                                              .map(styler.stat_styler_primary, subset = pd.IndexSlice[['Total Difference']
                                                                                   , get_selected_categories()]
                                                                                   , multiplier = player_multiplier)  
   st.dataframe(full_frame_styled
