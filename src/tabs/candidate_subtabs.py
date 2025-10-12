@@ -196,10 +196,11 @@ def make_cand_tab(_H
                          , height = cand_table_height
                          , use_container_width = True)
             
-            make_auction_string(original_player_value 
-                    , score_df.index 
-                    , rate_display 
-                    , remaining_cash)
+            if len(selection_list) > 0:
+              make_auction_string(original_player_value 
+                      , score_df.index 
+                      , rate_display 
+                      , remaining_cash)
 
         else:
 
@@ -324,7 +325,7 @@ def make_cand_tab(_H
                          , use_container_width = True
                          , height = cand_table_height)  
             
-          if cash_remaining_per_team is not None:
+          if (cash_remaining_per_team is not None) and (len(selection_list) > 0):
               make_auction_string(original_player_value 
                     , score_df.index 
                     , None 
@@ -464,16 +465,17 @@ def make_detailed_view(player_assignments : dict[list[str]]
       else:
         st.write('Category weights and position allocations not calculated for last player')
 
-      if cash_remaining_per_team and display_rank_tables:
+      if display_rank_tables:
+          selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
+          remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
-        remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
-        
-        make_auction_string(original_player_value
-                        , score_df.index
-                        , rate_display
-                        , remaining_cash
-                        , player_name
-                        , player_last_name)
+          if len(selection_list) > 0:
+            make_auction_string(original_player_value
+                    , score_df.index
+                    , rate_display
+                    , remaining_cash
+                    , player_name
+                    , player_last_name)
 
     with c2:
 
@@ -496,12 +498,14 @@ def make_detailed_view(player_assignments : dict[list[str]]
 
           remaining_cash = sum(cash for team, cash in cash_remaining_per_team.items())
 
-          make_auction_string(original_player_value
-                  , score_df.index
-                  , rate_display
-                  , remaining_cash
-                  , player_name
-                  , player_last_name)
+          selection_list =  [p for t in player_assignments.values() for p in t if p ==p]
+          if len(selection_list) > 0:
+            make_auction_string(original_player_value
+                    , score_df.index
+                    , rate_display
+                    , remaining_cash
+                    , player_name
+                    , player_last_name)
 
       else:
 
@@ -692,7 +696,7 @@ def make_rate_display_styled(rate_display : pd.DataFrame
       rate_df_limited = rate_df_limited.drop(columns = ['Difference','Your $', 'Gnrc. $', 'Orig. $'])
       
       rate_df_limited_styled = rate_df_limited.style \
-                                          .map(st.session_state.styler.stat_style_primary
+                                          .map(st.session_state.styler.stat_styler_primary
                                               , middle = 0.5
                                               , multiplier = 300
                                               , subset = get_selected_categories()) \
