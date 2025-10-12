@@ -339,9 +339,7 @@ def h_percentage_styler(df : pd.DataFrame
                               , subset = get_selected_categories())
   
   if drop_player is not None:
-     def color_blue(label):
-          return "background-color: blue; color:white" if label == drop_player else None
-     df_styled = df_styled.map(color_blue , subset = pd.IndexSlice[:,['Player']])
+     df_styled = df_styled.map(styler.color_blue , subset = pd.IndexSlice[:,['Player']], target = drop_player)
   return df_styled
 
 def rotate(l, n):

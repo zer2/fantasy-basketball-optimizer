@@ -6,37 +6,71 @@ class Styler(ABC):
 
     @abstractmethod
     def styler_a(self, value : float) -> str:
+        #used for overall H-scores and G-scores
         pass
 
     @abstractmethod
     def styler_b(self, value : float) -> str:
+        #used for totals of totals, e.g. total G-scores
         pass
 
     @abstractmethod
     def styler_c(self, value : float) -> str:
+        #used for the G-score totals of slates of players to be traded
         pass
 
     @abstractmethod
     def style_rosters(self, x: str, my_players : list[str]) -> str:
+        #apply styling for the rosters row, which shows position allocations for the candidate player and previously chosen players
         pass
 
     @abstractmethod
     def color_blue(self, label : str, target : str) -> str:
+        #highlights one of the index values blue to make it obvious that the row is for the player in question
         pass
 
     @abstractmethod
     def stat_styler_primary(self, value : float, multiplier : float, middle : float) -> str:
+        """style category-level characteristics 
+
+        Args:
+            value: value of the cell
+            multiplier: degree to which intensity of color scales relative to input value 
+            middle: value that should map to the default color, in the middle of the positive and negative color scales
+        Returns:
+            String describing format for a pandas styler object
+        """
         pass
 
     @abstractmethod
     def stat_styler_secondary(self, value : float, multiplier : float, middle : float) -> str:
+        """Style overall totals or differences 
+
+        Args:
+            value: value of the cell
+            multiplier: degree to which intensity of color scales relative to input value 
+            middle: value that should map to the default color, in the middle of the positive and negative color scales
+        Returns:
+            String describing format for a pandas styler object
+        """
         pass
 
     @abstractmethod
-    def stat_styler_secondary(self, value : float, multiplier : float, middle : float) -> str:
+    def stat_styler_tertiary(self, value : float, multiplier : float, middle : float) -> str:
+        """style algorithm decisions, like category-level weights 
+
+        Args:
+            value: value of the cell
+            multiplier: degree to which intensity of color scales relative to input value 
+            middle: value that should map to the default color. 
+                    in dark mode, values below this threshold have a smaller marginal effect on color 
+        Returns:
+            String describing format for a pandas styler object
+        """
         pass
 
 class DarkStyler(Styler):
+    #for dark mode
          
     def styler_a(self, value : float) -> str:
         return "background-color:#2a2a33;color:white;" 
@@ -63,23 +97,16 @@ class DarkStyler(Styler):
         return "background-color: #444466; color:white" if label == target else None
     
     def stat_styler_primary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
-        """Styler function used for coloring stat values blue/magenta with varying intensities
-        For dark mode, the default is for the color to be dark, and light increases with more extrme values 
-
-        Args:
-        value: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
-        multiplier: degree to which intensity of color scales relative to input value 
-        middle: value that should map to pure white 
-        Returns:
-        String describing format for a pandas styler object
-        """
-            
+        #For dark mode, the default is for the color to be dark, and light increases with more extrme values 
+        #color scheme is blue for positive and magenta for negative 
+    
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
         
-        intensity = min(int(abs((value-middle)*multiplier)* 0.8), 165)
+        raw_intensity = (value-middle)*multiplier
+        intensity = min(int(abs(raw_intensity)), 165)
 
-        if (value - middle)*multiplier > 0:
+        if raw_intensity > 0:
             rgb = (90 ,90 + intensity, 90 + intensity)
         else:
             rgb = (90  + intensity,90,90 + intensity)
@@ -87,22 +114,16 @@ class DarkStyler(Styler):
         return final_formatter(rgb)
 
     def stat_styler_secondary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
-        """Styler function used for coloring stat values yellow/orange with varying intensities 
-
-        Args:
-            value: any value 
-            multiplier: degree to which intensity of color scales relative to input value 
-            middle: value that should map to pure white 
-        Returns:
-            String describing format for a pandas styler object
-        """
+        #For dark mode, the default is for the color to be dark, and light increases with more extrme values 
+        #color scheme is yellow for positive and orange for negative 
                 
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
         
-        intensity = min(int(abs((value-middle)*multiplier)), 150)
+        raw_intensity = (value-middle)*multiplier
+        intensity = min(int(abs(raw_intensity)), 255)
 
-        if (value - middle)*multiplier > 0:
+        if raw_intensity > 0:
             rgb = (130 + int(2 * intensity/3), 130 + int(2 * intensity/3),130)
 
         else:
@@ -113,15 +134,11 @@ class DarkStyler(Styler):
 
         
     def stat_styler_tertiary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
-        """Styler function used for coloring stat values blue with varying intensities 
+        #For dark mode, the default is for the color to be dark, and light increases with more extrme values 
+        #color scheme is varying shades of blue. 
 
-        Args:
-            value: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
-            multiplier: degree to which intensity of color scales relative to input value 
-            middle: value that should map to pure white 
-        Returns:
-            String describing format for a pandas styler object
-        """
+        #Values below the 'middle' have their intensities minimized, so that proper contrast can be drawn 
+        #from values at and above the middle while unusually lower values are still visually distinct
                 
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
@@ -162,23 +179,16 @@ class LightStyler(Styler):
         return "background-color: blue; color:white" if label == target else None
         
     def stat_styler_primary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
-        """Styler function used for coloring stat values blue/magenta with varying intensities
-        For dark mode, the default is for the color to be dark, and light increases with more extrme values 
-
-        Args:
-            value: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
-            multiplier: degree to which intensity of color scales relative to input value 
-            middle: value that should map to pure white 
-        Returns:
-            String describing format for a pandas styler object
-        """
+        #For light mode, the default is pure white and color is generated with subtraction
+        #positive values are green and negative values are red
                 
         if value == -999:
             return 'background-color:#F6F6F6;color:#F6F6F6;'
         
-        intensity = min(int(abs((value-middle)*multiplier)), 255)
+        raw_intensity = (value-middle)*multiplier
+        intensity = min(int(abs(raw_intensity)), 255)
 
-        if (value - middle)*multiplier > 0:
+        if raw_intensity > 0:
             rgb = (255 -  intensity,255 , 255 -  intensity)
         else:
             rgb = (255, 255 - intensity, 255 - intensity)
@@ -186,22 +196,16 @@ class LightStyler(Styler):
         return final_formatter(rgb)
     
     def stat_styler_secondary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
-        """Styler function used for coloring stat values yellow/orange with varying intensities 
-
-        Args:
-        value: any value 
-        multiplier: degree to which intensity of color scales relative to input value 
-        middle: value that should map to pure white 
-        Returns:
-        String describing format for a pandas styler object
-        """
+        #For light mode, the default is pure white and color is generated with subtraction
+        #positive values are yellow and negative values are purple 
             
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
         
-        intensity = min(int(abs((value-middle)*multiplier)), 255)
+        raw_intensity = (value-middle)*multiplier
+        intensity = min(int(abs(raw_intensity)), 255)
 
-        if (value - middle)*multiplier > 0:
+        if raw_intensity > 0:
             rgb = (255,255 , 255 - intensity)
         else:
             rgb = (255,255 - intensity,255)
@@ -210,15 +214,8 @@ class LightStyler(Styler):
 
 
     def stat_styler_tertiary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
-        """Styler function used for coloring stat values red/green with varying intensities 
-
-        Args:
-        value: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
-        multiplier: degree to which intensity of color scales relative to input value 
-        middle: value that should map to pure white 
-        Returns:
-        String describing format for a pandas styler object
-        """
+        #For light mode, the default is for the color to be light, and color created by subtraction for extreme values
+        #color scheme is varying shades of blue. 
             
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
