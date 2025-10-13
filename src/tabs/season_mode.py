@@ -90,7 +90,7 @@ def roster_inspection(selections_df : pd.DataFrame):
     make_team_display(st.session_state.info['G-scores']
                         ,inspection_players
                         ,st.session_state.info_key
-                        ,st.session_state.theme['base']
+                        ,st.session_state.base
                         )
 
 @st.cache_data(ttl = 3600)
@@ -192,7 +192,6 @@ def make_full_waiver_tab(H
                 ,player_assignments
                 ,waiver_inspection_seat
                 ,1
-                ,[1]
                 ,None
                 ,None
                 ,None

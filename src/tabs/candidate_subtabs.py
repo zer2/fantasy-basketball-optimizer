@@ -45,7 +45,6 @@ def make_cand_tab(_H
                     ,player_assignments : dict[list[str]]
                     ,draft_seat : str
                     ,n_iterations : int
-                    ,display_schedule : list[int] = [4,16,29]
                     ,cash_remaining_per_team : dict[int] = None
                     ,generic_player_value : pd.Series = None
                     ,original_player_value : pd.Series = None
@@ -84,7 +83,15 @@ def make_cand_tab(_H
     generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
   
   iteration_range = range(max(1,n_iterations))
-  
+
+  # The display doesn't show for every iteration because showing results is computationally expensive
+  # Display starts at 3 so the algorithm has had some time to adjust parameters at least a bit
+  # The periodicity of displays is higher for large numbers of iterations to cut down on the high processing time
+  if n_iterations <100: 
+    display_schedule = set(np.arange(3, n_iterations, 13)).union({n_iterations})
+  else:
+    display_schedule = set(np.arange(3, n_iterations, 50)).union({n_iterations})
+
   if (cash_remaining_per_team is not None) and (st.session_state.data_source == 'Enter your own data'):
     cand_table_height = 505 #more room is needed for the auction string that goes at the bottom
   else: 

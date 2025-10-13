@@ -74,7 +74,7 @@ def make_drafting_tab_own_data(H):
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
                         ,st.session_state.info_key
-                        ,st.session_state.theme['base']
+                        ,st.session_state.base
                         )
     with right:
 
@@ -148,7 +148,7 @@ def make_drafting_tab_live_data(H):
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
                         ,st.session_state.info_key
-                        ,st.session_state.theme['base']
+                        ,st.session_state.base
                         )
 
         with candidate_evaluation:
@@ -263,7 +263,7 @@ def make_auction_tab_own_data(H):
         make_team_display(st.session_state.info['G-scores']
                             ,my_players
                             ,st.session_state.info_key
-                            ,st.session_state.theme['base']
+                            ,st.session_state.base
                             )     
       with right:
 
@@ -306,7 +306,6 @@ def make_auction_tab_own_data(H):
                 ,player_assignments.to_dict()
                 ,auction_seat
                 ,st.session_state.n_iterations
-                ,[4,16,29]
                 ,cash_remaining_per_team.to_dict()
                 ,h_defaults_savor
                 ,h_original_savor
@@ -428,7 +427,7 @@ def make_auction_tab_live_data(H):
         make_team_display(st.session_state.info['G-scores']
                         ,my_players
                         ,st.session_state.info_key
-                        ,st.session_state.theme['base']
+                        ,st.session_state.base
                         )
             
         with candidate_evaluation:
@@ -439,7 +438,6 @@ def make_auction_tab_live_data(H):
                     ,player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
-                    ,[4,16,29]
                     ,cash_remaining_per_team.to_dict()
                     ,h_defaults_savor
                     ,h_original_savor
