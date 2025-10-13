@@ -43,6 +43,8 @@ def position_requirement_popover():
 
       with left_position_col:
 
+        st.write('Base positions')
+
         for position_code, position_info in st.session_state.params['position_structure']['base'].items():
 
           st.number_input(position_info['full_str']
@@ -52,6 +54,8 @@ def position_requirement_popover():
                         )
         
       with right_position_col:
+
+        st.write('Flex positions')
 
         for position_code, position_info in st.session_state.params['position_structure']['flex'].items():
 
