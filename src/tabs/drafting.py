@@ -11,7 +11,7 @@ import numpy as np
 from src.helpers.helper_functions import get_team_names
 from src.math.algorithm_agents import get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
-from wfork_streamlit_profiler import Profiler
+#from wfork_streamlit_profiler import Profiler
 
 @st.fragment
 def make_drafting_tab_own_data(H):
