@@ -110,7 +110,7 @@ with st.sidebar:
           
     trade_param_popover()
 
-  with st.popover(':small[Position Parameters]'):
+  with st.popover(':small[Position Parameters]').container(height = 400):
 
     position_requirement_popover()
 

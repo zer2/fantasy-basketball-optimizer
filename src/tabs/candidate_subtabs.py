@@ -88,9 +88,9 @@ def make_cand_tab(_H
   # Display starts at 3 so the algorithm has had some time to adjust parameters at least a bit
   # The periodicity of displays is higher for large numbers of iterations to cut down on the high processing time
   if n_iterations <100: 
-    display_schedule = set(np.arange(3, n_iterations, 13)).union({n_iterations})
+    display_schedule = set(np.arange(0, n_iterations, 15)).union({n_iterations -1})
   else:
-    display_schedule = set(np.arange(3, n_iterations, 50)).union({n_iterations})
+    display_schedule = set(np.arange(0, n_iterations, 50)).union({n_iterations - 1})
 
   if (cash_remaining_per_team is not None) and (st.session_state.data_source == 'Enter your own data'):
     cand_table_height = 505 #more room is needed for the auction string that goes at the bottom
@@ -107,46 +107,46 @@ def make_cand_tab(_H
   for i in iteration_range:
 
     res = next(generator)
-      
-    rosters = res['Rosters']
 
-    if rosters.shape[1] > 0:
-      fits_roster = rosters.loc[:,0] >= 0
-    else:
-      fits_roster = pd.Series([True] * len(res['Scores']), index = res['Scores'].index)
+    display = i in display_schedule
 
-    rosters = rosters[list(fits_roster.values)]
-    score = res['Scores'][fits_roster]
-    weights = res['Weights'][fits_roster]
-    win_rates = res['Rates'][fits_roster]
-    position_shares = res['Position-Shares']
-    future_diffs = res['Future-Diff']
+    if display:
 
-    win_rates.columns = get_selected_categories()
+      rosters = res['Rosters']
 
-    #normalize weights by what we expect from other drafters
-    weights = pd.DataFrame(weights
-                  , index = score.index
-                  , columns = get_selected_categories())/_H.v.reshape(1,len(_H.v))
-    
-    with placeholder.container():
-
-      score.name = 'H-score'
-      score_df = pd.DataFrame(score)
-
-      display = i in display_schedule
-
-      if st.session_state.mode == 'Season Mode':
-        h_tab, g_tab,  = st.tabs(['H-score','G-score'])
+      if rosters.shape[1] > 0:
+        fits_roster = rosters.loc[:,0] >= 0
       else:
-        h_tab, pbp_tab, g_tab,  = st.tabs(['H-score','H-score details','G-score'])
+        fits_roster = pd.Series([True] * len(res['Scores']), index = res['Scores'].index)
 
-      with h_tab:
+      rosters = rosters[list(fits_roster.values)]
+      score = res['Scores'][fits_roster]
+      weights = res['Weights'][fits_roster]
+      win_rates = res['Rates'][fits_roster]
+      position_shares = res['Position-Shares']
+      future_diffs = res['Future-Diff']
 
-        if cash_remaining_per_team is not None:
-          
-          if display:
+      win_rates.columns = get_selected_categories()
 
+      #normalize weights by what we expect from other drafters
+      weights = pd.DataFrame(weights
+                    , index = score.index
+                    , columns = get_selected_categories())/_H.v.reshape(1,len(_H.v))
+      
+      with placeholder.container():
+
+        score.name = 'H-score'
+        score_df = pd.DataFrame(score)          
+
+        if st.session_state.mode == 'Season Mode':
+          h_tab, g_tab,  = st.tabs(['H-score','G-score'])
+        else:
+          h_tab, pbp_tab, g_tab,  = st.tabs(['H-score','H-score details','G-score'])
+
+        with h_tab:
+
+          if cash_remaining_per_team is not None:
+            
             if sum(fits_roster) == 0:
               st.error('Illegal roster!')
               st.stop()
@@ -183,6 +183,7 @@ def make_cand_tab(_H
             rate_display.loc[:,'Difference'] = (rate_display['Your $'] - rate_display['Gnrc. $']).round(1)
 
             rate_display = rate_display.sort_values('Your $', ascending = False)
+
             score_df = score_df.loc[rate_display.index]
 
             rate_display = rate_display.join(rate_df)
@@ -199,9 +200,9 @@ def make_cand_tab(_H
                       .format(style_format, subset = rate_df.columns)._compute()
             
             st.dataframe(rate_display_styled
-                         , hide_index = True
-                         , height = cand_table_height
-                         , use_container_width = True)
+                        , hide_index = True
+                        , height = cand_table_height
+                        , use_container_width = True)
             
             if len(selection_list) > 0:
               make_auction_string(original_player_value 
@@ -209,11 +210,13 @@ def make_cand_tab(_H
                       , rate_display 
                       , remaining_cash)
 
-        else:
-
-            if display:
+          else:
 
               score_df = score_df.sort_values('H-score',ascending = False)
+
+              #limit the outputs if H-scoring is not finished
+              if i < n_iterations - 1:
+                score_df = score_df.iloc[0:30]
 
               if sum(fits_roster) == 0:
                 st.error('Illegal roster!')
@@ -270,9 +273,9 @@ def make_cand_tab(_H
                         .map(styler.styler_a
                               , subset = pd.IndexSlice[:,['H-score'] + adp_col]) \
                         .map(styler.stat_styler_primary
-                             , middle = format_middle
-                             , multiplier = format_multiplier
-                             , subset = rate_df.columns) \
+                            , middle = format_middle
+                            , multiplier = format_multiplier
+                            , subset = rate_df.columns) \
                         .format(style_format, subset = rate_df.columns)
                   
                 st.dataframe(rate_display_styled
@@ -285,80 +288,80 @@ def make_cand_tab(_H
                   st.caption('''Expected totals are based on standard fantasy point scoring. 
                             One point for last, two points for second last, etc. The baseline 
                             expected total for a category is ''' + str(format_middle))
-      with g_tab:
+        with g_tab:
 
-        if i == min(display_schedule): #this only needs to run once 
+          if i in (min(display_schedule), max(display_schedule)): #this only needs to run once 
 
-          g_display = _g_scores.loc[score.index]
+            g_display = _g_scores.loc[score_df.index]
 
-          if cash_remaining_per_team is not None:
+            if cash_remaining_per_team is not None:
 
-              g_display = g_display.sort_values('Total', ascending = False)
+                g_display = g_display.sort_values('Total', ascending = False)
 
-              g_display.loc[:,'Gnrc. $'] = auction_value_adjuster(g_display['Total']
-                                                          , total_players - len(selection_list)
-                                                          , remaining_cash
-                                                          , st.session_state['streaming_noise']) 
+                g_display.loc[:,'Gnrc. $'] = auction_value_adjuster(g_display['Total']
+                                                            , total_players - len(selection_list)
+                                                            , remaining_cash
+                                                            , st.session_state['streaming_noise']) 
+                
+                #ZR: maybe we don't need to run this every time
+                g_score_savor = auction_value_adjuster(_g_scores['Total']
+                                                            , total_players 
+                                                            , get_n_drafters() * st.session_state.cash_per_team
+                                                            , st.session_state['streaming_noise']) 
+                
+                g_display.loc[:,'Orig. $'] =  g_score_savor.loc[g_display.index]
+
+
+            if drop_player is not None:
+
+              scores_unselected_styled = static_score_styler(g_display.reset_index()
+                                                , st.session_state.params['g-score-player-multiplier']
+                                                , st.session_state.params['g-score-total-multiplier'])
               
-              #ZR: maybe we don't need to run this every time
-              g_score_savor = auction_value_adjuster(_g_scores['Total']
-                                                          , total_players 
-                                                          , get_n_drafters() * st.session_state.cash_per_team
-                                                          , st.session_state['streaming_noise']) 
+              scores_unselected_styled = scores_unselected_styled.map(styler.color_blue
+                                                                      , subset = pd.IndexSlice[:,['Player']]
+                                                                      , target = drop_player)
+              st.dataframe(scores_unselected_styled
+                          , use_container_width = True
+                          , hide_index = True
+                          , height = cand_table_height)
+      
+            else:
+              scores_unselected_styled = static_score_styler(g_display
+                                                , st.session_state.params['g-score-player-multiplier']
+                                                , st.session_state.params['g-score-total-multiplier'])
+
+              st.dataframe(scores_unselected_styled
+                          , use_container_width = True
+                          , height = cand_table_height)  
               
-              g_display.loc[:,'Orig. $'] =  g_score_savor.loc[g_display.index]
+            if (cash_remaining_per_team is not None) and (len(selection_list) > 0):
+                make_auction_string(original_player_value 
+                      , score_df.index 
+                      , None 
+                      , remaining_cash)
 
-
-          if drop_player is not None:
-
-            scores_unselected_styled = static_score_styler(g_display.reset_index()
-                                              , st.session_state.params['g-score-player-multiplier']
-                                              , st.session_state.params['g-score-total-multiplier'])
+        if not st.session_state.mode == 'Season Mode':
             
-            scores_unselected_styled = scores_unselected_styled.map(styler.color_blue
-                                                                    , subset = pd.IndexSlice[:,['Player']]
-                                                                    , target = drop_player)
-            st.dataframe(scores_unselected_styled
-                         , use_container_width = True
-                         , hide_index = True
-                         , height = cand_table_height)
-    
-          else:
-            scores_unselected_styled = static_score_styler(g_display
-                                              , st.session_state.params['g-score-player-multiplier']
-                                              , st.session_state.params['g-score-total-multiplier'])
+          with pbp_tab:
 
-            st.dataframe(scores_unselected_styled
-                         , use_container_width = True
-                         , height = cand_table_height)  
-            
-          if (cash_remaining_per_team is not None) and (len(selection_list) > 0):
-              make_auction_string(original_player_value 
-                    , score_df.index 
-                    , None 
-                    , remaining_cash)
+            score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
 
-      if display and not st.session_state.mode == 'Season Mode':
-          
-        with pbp_tab:
-
-          score_df.loc[:,'Rank'] = range(1, len(score_df) + 1)
-
-          make_detailed_view(player_assignments
-                       ,draft_seat
-                       ,score_df
-                       ,rate_display
-                       ,_g_scores
-                       ,g_display
-                       ,future_diffs
-                       ,weights
-                       ,position_shares
-                       ,res
-                       ,_H
-                       ,rosters
-                       ,cash_remaining_per_team
-                       ,original_player_value
-                       ,i) 
+            make_detailed_view(player_assignments
+                        ,draft_seat
+                        ,score_df
+                        ,rate_display
+                        ,_g_scores
+                        ,g_display
+                        ,future_diffs
+                        ,weights
+                        ,position_shares
+                        ,res
+                        ,_H
+                        ,rosters
+                        ,cash_remaining_per_team
+                        ,original_player_value
+                        ,i) 
 
             
 @st.fragment

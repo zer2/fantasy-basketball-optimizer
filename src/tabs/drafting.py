@@ -11,6 +11,7 @@ import numpy as np
 from src.helpers.helper_functions import get_team_names
 from src.math.algorithm_agents import get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
+from wfork_streamlit_profiler import Profiler
 
 @st.fragment
 def make_drafting_tab_own_data(H):
@@ -23,7 +24,6 @@ def make_drafting_tab_own_data(H):
     Returns:
         None
     """
-    
     left, right = st.columns([0.47,0.53])
 
     with left:
@@ -286,7 +286,7 @@ def make_auction_tab_own_data(H):
                                         , psi = st.session_state.psi
                                         , upsilon = st.session_state.upsilon
                                         , chi = st.session_state.chi
-                                        , info_key = st.session_state.info)
+                                        , info_key = st.session_state.info_key)
 
             h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
             h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
@@ -402,7 +402,7 @@ def make_auction_tab_live_data(H):
                                     , psi = st.session_state.psi
                                     , upsilon = st.session_state.upsilon
                                     , chi = st.session_state.chi
-                                    , info_key = st.session_state.info).set_index('Player')
+                                    , info_key = st.session_state.info_key).set_index('Player')
 
         h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
         h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']

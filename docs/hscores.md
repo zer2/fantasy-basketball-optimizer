@@ -26,8 +26,6 @@ The number of iterations parameter, available through Algorithm Parameters
 
 The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  
 
-When the website runs H-scoring, it shows the current results after the first iteration, once every fifteen iterations after that, and after the last iteration. 
-
 ## H-score table
 
 The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. 
@@ -36,6 +34,8 @@ The H-score table for candidate evaluation lists players in order of their H-sco
 /// caption
 Top Each Category H-scores for the first pick, 2024-25 season
 ///
+
+The table is refreshed once every fifteen iterations as the algorithm runs. Only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. This is to cut down on visual rendering time. 
 
 ### Category-level H-scores
 
