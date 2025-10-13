@@ -764,7 +764,6 @@
 </figcaption>
 </figure>
 <p>The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  </p>
-<p>When the website runs H-scoring, it shows the current results after the first iteration, once every fifteen iterations after that, and after the last iteration. </p>
 <h2 id="h-score-table">H-score table</h2>
 <p>The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. </p>
 <figure>
@@ -773,6 +772,7 @@
 <p>Top Each Category H-scores for the first pick, 2024-25 season</p>
 </figcaption>
 </figure>
+<p>H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is refreshed once every fifteen iterations. Also, only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. </p>
 <h3 id="category-level-h-scores">Category-level H-scores</h3>
 <p>Category-level H-scores are an in important part of the H-scoring process. Unlike with G-scores, they are <em>not direct reflections of the candidate player's characteristics</em>. Instead, they show what the H-scoring algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates that expectation based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.</p>
 <p>Because other factors are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For early picks, the most important factor is the strategy for future draft picks. For example, Shai Gilgeous-Alexander's row above for the first pick in the draft shows a very low probability of winning the Rebound category, despite SGA being a decent rebounder himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing rebounds with future picks.</p>

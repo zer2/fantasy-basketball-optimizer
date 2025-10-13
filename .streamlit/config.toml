@@ -3,6 +3,7 @@ fileWatcherType = "poll"
 enableStaticServing = true
 staticDirectory = "static"     
 staticUrlPath   = "static"
+runOnSave=True
 
 [theme]
 baseFontSize=14

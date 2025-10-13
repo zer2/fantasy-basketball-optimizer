@@ -35,7 +35,7 @@ The H-score table for candidate evaluation lists players in order of their H-sco
 Top Each Category H-scores for the first pick, 2024-25 season
 ///
 
-The table is refreshed once every fifteen iterations as the algorithm runs. Only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. This is to cut down on visual rendering time. 
+H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is refreshed once every fifteen iterations. Also, only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. 
 
 ### Category-level H-scores
 
