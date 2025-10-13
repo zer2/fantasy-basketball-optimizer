@@ -290,21 +290,22 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
 
   df = df[index_columns + agg_columns + get_selected_categories()]
 
+  styler = st.session_state.styler
+
   df_styled = df.style.format("{:.2f}"
                               , subset = pd.IndexSlice[:,agg_columns + get_selected_categories()]) \
                               .format("{:.1%}"
                                 , subset = pd.IndexSlice[:,perc_columns] ) \
-                            .map(styler_a
+                            .map(styler.styler_a
                                 ,subset = pd.IndexSlice[:,agg_columns]) \
-                            .map(styler_b
+                            .map(styler.styler_b
                                 ,subset = pd.IndexSlice[total_rows,agg_columns]) \
-                            .map(stat_styler
+                            .map(styler.stat_styler_primary
                               , subset = pd.IndexSlice[:,get_selected_categories()]
                               , multiplier = multiplier) \
-                            .map(stat_styler
+                            .map(styler.stat_styler_secondary
                                  , subset = pd.IndexSlice[:,colored_total_column]
                                  , multiplier = total_multiplier
-                                 , mode = 'secondary'
                                  , middle = total_middle
                                  )
   return df_styled
@@ -323,162 +324,24 @@ def h_percentage_styler(df : pd.DataFrame
   """
   perc_column = 'H-score' if 'H-score' in df.columns else 'Overall'
 
+  styler = st.session_state.styler
+
   df_styled = df.style.format("{:.2%}"
                                 , subset = pd.IndexSlice[:,[perc_column]] ) \
                           .format("{:.1%}"
                                 , subset = pd.IndexSlice[:,get_selected_categories()]) \
-                          .map(styler_a
+                          .map(styler.styler_a
                                 , subset = pd.IndexSlice[:,[perc_column]]) \
-                          .map(stat_styler
+                          .map(styler.stat_styler_primary
                               , middle = middle
                               , multiplier = multiplier
                               , subset = get_selected_categories())
   
   if drop_player is not None:
-     def color_blue(label):
-          return "background-color: blue; color:white" if label == drop_player else None
-     df_styled = df_styled.map(color_blue , subset = pd.IndexSlice[:,['Player']])
+     df_styled = df_styled.map(styler.color_blue
+                               , subset = pd.IndexSlice[:,['Player']]
+                               , target = drop_player)
   return df_styled
-
-def stat_styler(value : float, multiplier : float = 50, middle : float = 0, mode = 'primary') -> str:
-  """Styler function used for coloring stat values red/green with varying intensities 
-
-  Args:
-    value: DataFrame of shape (n,9) representing probabilities of winning each of the 9 categories 
-    multiplier: degree to which intensity of color scales relative to input value 
-    middle: value that should map to pure white 
-  Returns:
-    String describing format for a pandas styler object
-  """
-         
-  if value == -999:
-    if st.session_state.theme['base'] == 'dark':
-      cl ="#8D8D9E"
-    else:
-      cl = "#F6F6F6"
-    return 'background-color:' + cl + ';color:' + cl + ';'
-  
-  if mode == 'primary':
-
-
-      if st.session_state.theme['base'] == 'dark':
-        intensity = min(int(abs((value-middle)*multiplier)* 0.8), 165)
-
-        if (value - middle)*multiplier > 0:
-          rgb = (90 ,90 + intensity, 90 + intensity)
-        else:
-          rgb = (90  + intensity,90,90 + intensity)
-        
-      else:
-        intensity = min(int(abs((value-middle)*multiplier)), 255)
-
-        if (value - middle)*multiplier > 0:
-          rgb = (255 -  intensity,255 , 255 -  intensity)
-        else:
-          rgb = (255, 255 - intensity, 255 - intensity)
-
-  elif mode == 'secondary': 
-
-    if st.session_state.theme['base'] == 'dark':
-      intensity = min(int(abs((value-middle)*multiplier)), 150)
-
-      if (value - middle)*multiplier > 0:
-        rgb = (130 + int(2 * intensity/3), 130 + int(2 * intensity/3),130)
-
-      else:
-        rgb = (130 + int(intensity),130 + int(intensity/3),130)
-
-    else:
-      intensity = min(int(abs((value-middle)*multiplier)), 255)
-
-      if (value - middle)*multiplier > 0:
-        rgb = (255,255 , 255 - intensity)
-      else:
-        rgb = (255,255 - intensity,255)
-
-  elif mode == 'tertiary': 
-     
-    if st.session_state.theme['base'] == 'dark':
-      intensity = min(int(abs((value-middle)*multiplier)), 100)
-
-      if (value - middle)*multiplier > 0:
-        rgb = (100, 100, 110 + intensity)
-      else:
-        rgb = (100, 100, 110 -int(intensity/10))
-
-
-    else:
-      intensity = int(np.clip(abs((value-middle)*multiplier),0,100))
-      rgb = (255 - intensity, 255 - intensity , 255)
-
-  bgc = '#%02x%02x%02x' % rgb
-
-  #formula adapted from
-  #https://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
-  darkness_value = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114
-
-  if st.session_state.theme['base'] == 'dark':
-    tc = st.session_state.theme['fadedText60']
-  else:
-    tc = 'black' if darkness_value > 150 else 'white'
-
-  tc = 'black' if darkness_value > 150 else 'white'
-
-  return f"background-color: " + str(bgc) + ";color:" + tc + ";" 
-
-def styler_a(value : float) -> str:
-    if st.session_state.theme['base'] == 'dark':
-      background_color = "#2a2a33"
-      color = 'white'
-    else:
-      background_color = 'grey'
-      color = 'white'
-    return "background-color: " + background_color + "; color:" + color +";" 
-
-def styler_b(value : float) -> str:
-    if st.session_state.theme['base'] == 'dark':
-      background_color = "#38384A"
-      color = 'white'
-    else:
-      background_color = 'lightgrey'
-      color = 'black'
-    return "background-color: " + background_color + "; color:" + color +";" 
-
-def styler_c(value : float) -> str:
-    if st.session_state.theme['base'] == 'dark':
-      background_color = "#252536"
-      color = 'white'
-    else:
-      background_color = 'darkgrey'
-      color = 'black'
-    return "background-color: " + background_color + "; color:" + color +";" 
-
-def style_rosters(x, my_players):
-    
-    if st.session_state.theme['base'] == 'dark':
-      if len(x) ==0:
-        return 'background-color:#888899'
-      elif x in my_players:
-        rgb = (90,90 ,150)
-        bgc = '#%02x%02x%02x' % rgb
-        return 'background-color:' + bgc + '; color:white;'
-      else:
-        rgb = (100,100 ,240)
-        bgc = '#%02x%02x%02x' % rgb
-        return 'background-color:' + bgc + '; color:white;'
-    else:
-      if len(x) ==0:
-        bgc = "#F8F8F8"
-        return 'background-color:' + bgc
-      elif x in my_players:
-        rgb = (220,220 ,255)
-        bgc = '#%02x%02x%02x' % rgb
-        return 'background-color:' + bgc + '; color:black;'
-      else:
-        rgb = (175,175 ,255)
-        bgc = '#%02x%02x%02x' % rgb
-        return 'background-color:' + bgc + '; color:black;'
-
 
 def rotate(l, n):
   #rotate list l by n positions 

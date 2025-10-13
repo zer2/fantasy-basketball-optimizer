@@ -57,6 +57,7 @@ def get_nba_stats():
       either a tuple of (raw_stat_df, player_metadata) or a string representing an error 
     """
 
+
     with st.form('Player stat form'):
 
         data_options = ['Projection','Historical'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
@@ -111,8 +112,23 @@ def get_nba_stats():
                                         , key = 'hashtag_widget')
                 
                 st.session_state.htb_slider_default_value = hashtag_slider
+
+                st.html(
+                """
+                <style>
+
+                [data-testid='stFileUploaderDropzoneInstructions'] > div > span {
+                display: none;
+                }
+
+                [data-testid='stFileUploaderDropzoneInstructions'] > div::before {
+                content: '';
+                }
+                </style>
+                """
+                )
                 
-                hashtag_file = st.file_uploader('''Copy HTB projections into a csv and upload it'''
+                hashtag_file = st.file_uploader('Copy HTB projections into a csv and upload it'
                                                 , type=['csv'])
                 if hashtag_file is not None:
                     st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)
@@ -143,7 +159,7 @@ def get_nba_stats():
                 
                 st.session_state.bbm_slider_default_value = bbm_slider
 
-                bbm_file = st.file_uploader('''Export BBM per-game stats to excel then save as CSV utf-8.'''
+                bbm_file = st.file_uploader('''Export per-game stats to excel then save as CSV utf-8.'''
                                                 , type=['csv'])
                 if bbm_file is not None:
                     st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
@@ -157,7 +173,6 @@ def get_nba_stats():
             with c5: 
             
                 submit_button = st.form_submit_button('Lock in & process'
-                                                        , icon = '🔓'
                                                         , on_click = increment_player_stats_version)
 
                 st.warning('Changes will not be reflected until this button is pressed')

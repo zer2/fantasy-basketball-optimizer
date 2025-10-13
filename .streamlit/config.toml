@@ -5,6 +5,4 @@ staticDirectory = "static"
 staticUrlPath   = "static"
 
 [theme]
-base="light"
-backgroundColor="white"
 baseFontSize=14

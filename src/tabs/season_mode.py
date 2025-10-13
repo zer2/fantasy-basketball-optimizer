@@ -1,12 +1,10 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_selected_categories, \
-                                styler_a, styler_b, styler_c, stat_styler
+from src.helpers.helper_functions import get_selected_categories
 from src.tabs.trading import make_trade_tab
 from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify
 from src.tabs.candidate_subtabs import make_cand_tab
-
 
 def make_season_mode_tabs(H):
   """Create the season mode display, which has three tabs: waiver players, trades, and rosters 
@@ -92,7 +90,7 @@ def roster_inspection(selections_df : pd.DataFrame):
     make_team_display(st.session_state.info['G-scores']
                         ,inspection_players
                         ,st.session_state.info_key
-                        ,st.session_state.theme['base']
+                        ,st.session_state.base
                         )
 
 @st.cache_data(ttl = 3600)
@@ -123,13 +121,14 @@ def make_team_display(_g_scores : pd.DataFrame
     team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
     team_stats = team_stats.loc[['Total'] + list(my_real_players)]
+    styler = st.session_state.styler
 
-    team_stats_styled = team_stats.style.format("{:.2f}").map(styler_a) \
-                                                .map(styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
-                                                .map(styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
-                                                .map(stat_styler, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
+    team_stats_styled = team_stats.style.format("{:.2f}").map(styler.styler_a) \
+                                                .map(styler.styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
+                                                .map(styler.styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
+                                                .map(styler.stat_styler_primary, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
                                                      , multiplier = st.session_state.params['g-score-player-multiplier']) \
-                                                .applymap(stat_styler, subset = pd.IndexSlice['Total', get_selected_categories()]
+                                                .applymap(styler.stat_styler_primary, subset = pd.IndexSlice['Total', get_selected_categories()]
                                                     , multiplier = st.session_state.params['g-score-team-multiplier']) \
     
     
@@ -192,7 +191,6 @@ def make_full_waiver_tab(H
                 ,st.session_state.info['G-scores']
                 ,player_assignments
                 ,waiver_inspection_seat
-                ,1
                 ,1
                 ,None
                 ,None
