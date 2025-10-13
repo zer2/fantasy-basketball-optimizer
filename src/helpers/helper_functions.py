@@ -5,7 +5,6 @@ from functools import reduce
 from unidecode import unidecode
 import snowflake.connector
 import os 
-from functools import partial
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
@@ -339,7 +338,9 @@ def h_percentage_styler(df : pd.DataFrame
                               , subset = get_selected_categories())
   
   if drop_player is not None:
-     df_styled = df_styled.map(styler.color_blue , subset = pd.IndexSlice[:,['Player']], target = drop_player)
+     df_styled = df_styled.map(styler.color_blue
+                               , subset = pd.IndexSlice[:,['Player']]
+                               , target = drop_player)
   return df_styled
 
 def rotate(l, n):
