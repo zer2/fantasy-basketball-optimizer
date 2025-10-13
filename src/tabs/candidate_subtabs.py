@@ -287,7 +287,7 @@ def make_cand_tab(_H
                             expected total for a category is ''' + str(format_middle))
       with g_tab:
 
-        if i == 0: #this only needs to run once 
+        if i == min(display_schedule): #this only needs to run once 
 
           g_display = _g_scores.loc[score.index]
 
