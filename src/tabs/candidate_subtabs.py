@@ -774,6 +774,8 @@ def get_ranking_views(g_display : pd.DataFrame
     """
     styler = st.session_state.styler
 
+    g_display = g_display.sort_values('Total', ascending = False)
+
     g_display.loc[:,'Rank'] = range(1, len(g_display) + 1)
     player_location_g = g_display.index.get_loc(player_name)
     g_scores_to_display = pd.DataFrame({'Rank' : g_display['Rank']
