@@ -57,33 +57,31 @@ def get_nba_stats():
       either a tuple of (raw_stat_df, player_metadata) or a string representing an error 
     """
 
+    data_options = ['Projection','Historical'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
 
-    with st.form('Player stat form'):
+    kind_of_dataset = st.selectbox(
+                            'Which kind of dataset do you want to use?'
+                            , data_options
+                            ,key = 'data_option'
+                            , index = 0
+    )
 
-        data_options = ['Projection','Historical'] if st.session_state.data_source == 'Enter your own data' else ['Projection']
+    if kind_of_dataset == 'Historical':
+            
+        historical_df = get_historical_data()
 
-        kind_of_dataset = st.selectbox(
-                                'Which kind of dataset do you want to use?'
-                                , data_options
-                                ,key = 'data_option'
-                                , index = 0
+        unique_datasets_historical = reversed([str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))])
+
+        dataset_name = st.selectbox(
+            'Which season of data do you want to use?'
+            ,unique_datasets_historical
+            ,index = 0
+            ,on_change = increment_and_reset_draft
         )
+        raw_stats_df, player_metadata = get_specified_stats(dataset_name, st.session_state.league)
 
-        if kind_of_dataset == 'Historical':
-                
-            historical_df = get_historical_data()
-
-            unique_datasets_historical = reversed([str(x) for x in pd.unique(historical_df.index.get_level_values('Season'))])
-
-            dataset_name = st.selectbox(
-                'Which season of data do you want to use?'
-                ,unique_datasets_historical
-                ,index = 0
-                ,on_change = increment_and_reset_draft
-            )
-            raw_stats_df, player_metadata = get_specified_stats(dataset_name, st.session_state.league)
-                    
-        else: 
+    else:
+        with st.form('Player stat form'):
 
             c1, c2, c3, c4, c5 = st.columns(5)
 
@@ -199,7 +197,7 @@ def get_nba_stats():
                         , espn_slider
                         , st.session_state.data_source)
             
-        return (raw_stats_df, player_metadata)
+    return (raw_stats_df, player_metadata)
 
 def get_mlb_stats():
     """Figures out where to get player stats from, and loads them into a dataframe, specifically for the MLB
