@@ -64,6 +64,7 @@ def get_nba_stats():
                             , data_options
                             ,key = 'data_option'
                             , index = 0
+                            , on_change= increment_and_reset_draft
     )
 
     if kind_of_dataset == 'Historical':
@@ -187,7 +188,6 @@ def get_nba_stats():
                      st.error('Weights are all 0')
                      st.stop()
 
-        
         raw_stats_df, player_metadata = combine_nba_projections(rotowire_upload
                         , st.session_state.datasets.get('bbm')
                         , st.session_state.datasets.get('htb')
