@@ -15,6 +15,7 @@ from src.parameter_collection.format import format_popover
 #from wfork_streamlit_profiler import Profiler
 import streamlit.components.v1 as components
 from streamlit_theme import st_theme
+import numpy
 
 
 #this reduces the padding at the top of the website, which is excessive otherwise 
@@ -28,11 +29,13 @@ st.set_page_config(
           , initial_sidebar_state="auto"
           , menu_items=None)
 
+#the randints are a hack, to address a known issue with streamlit. The keys and the caches can get out of synch
+#see here: https://discuss.streamlit.io/t/st-session-state-values-are-reset-on-page-reload-but-st-cache-values-are-not/18059
 if 'player_stats_version' not in st.session_state:
-    st.session_state.player_stats_version = 0
+    st.session_state.player_stats_version = 0 + np.random.randint(0,10000, size = 1) * 1000
 
 if 'info_key' not in st.session_state:
-    st.session_state.info_key = 100000
+    st.session_state.info_key = 100000 + np.random.randint(0,10000, size = 1) * 1000
 
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
