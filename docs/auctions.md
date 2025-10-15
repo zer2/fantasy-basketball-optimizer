@@ -63,7 +63,7 @@ H-scores are probabilities, not general values. They are converted into dollar v
 H-score-based $ values in a synthetic draft context
 ///
 
-The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. 
+The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. The lack of context also means that they are imprecise approximations of real player value.
 
 Like for G-scores, the original values are processed once with the auction value heuristic and stay the same throughout the auction. 
 
