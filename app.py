@@ -93,7 +93,9 @@ with st.sidebar:
 
     league_settings_popover()
   
-  with st.popover(':small[Player Stats]'):
+  #explicitly setting the heights helps to avoid a Streamlit bug
+  #https://github.com/streamlit/streamlit/issues/8934
+  with st.popover(':small[Player Stats]').container(height = 300):
 
     player_stats = player_stats_popover()
 
