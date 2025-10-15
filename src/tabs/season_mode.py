@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_selected_categories
+from src.helpers.helper_functions import get_selected_categories, get_n_drafters
 from src.tabs.trading import make_trade_tab
 from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify
@@ -195,5 +195,5 @@ def make_full_waiver_tab(H
                 ,None
                 ,None
                 ,None
-                ,st.session_state.n_picks * st.session_state.n_drafters
+                ,st.session_state.n_picks * get_n_drafters()
                 ,drop_player)
