@@ -409,7 +409,7 @@ def map_player_names(df, source_name):
       player_name_column = 'PLAYER_NAME'
 
    #Only change player name if it is necessary. E.g. if the data source and platform are both ESPN, no mapping is necessary
-   if player_name_column == source_name:
+   if player_name_column != source_name:
 
     mapper_table = get_data_from_snowflake('PLAYER_MAPPING_VIEW').dropna(subset = [source_name]) \
                                                                     .set_index(source_name)[player_name_column]
