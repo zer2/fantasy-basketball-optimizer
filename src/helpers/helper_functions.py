@@ -450,12 +450,6 @@ def get_data_from_snowflake(table_name
 
 @st.cache_resource(ttl = 3600)
 def get_snowflake_connection(schema):
-      con = snowflake.connector.connect(
-        user=st.secrets['SNOWFLAKE_USER']
-        ,password=st.secrets['SNOWFLAKE_PASSWORD']
-        ,account='aib52055.us-east-1'
-        ,database = 'FANTASYOPTIMIZER'
-        ,schema = schema
-        )
+      con = st.connection("snowflake")
       return con
     
