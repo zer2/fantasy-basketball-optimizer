@@ -65,6 +65,7 @@ class ESPNIntegration(PlatformIntegration):
         Returns:
             None
         """
+        
         if ('espn_s2' not in st.session_state) or ('espn_swid' not in st.session_state):
             self.get_espn_credentials()
         else:
@@ -90,7 +91,7 @@ class ESPNIntegration(PlatformIntegration):
               self.team_names = self.get_team_names(self.league_id)
               self.n_drafters = len(self.get_teams_dict(self.league_id)) 
 
-              team_players_df = self.get_rosters_df(self.league_id)
+              team_players_df = self.get_rosters_df(self.league_id, st.session_state.player_stats_version)
               self.selections_default = team_players_df
 
               self.n_picks = team_players_df.shape[0]
@@ -123,8 +124,8 @@ class ESPNIntegration(PlatformIntegration):
         sorted_leagues = sorted(leagues, key = lambda league: league['metaData']['entry']['seasonId'], reverse=True)
         return sorted_leagues
 
-    @st.cache_data(ttl=3600, show_spinner = "Fetching rosters from your ESPN league. This should take about ten seconds")
-    def get_rosters_df(_self, league_id):
+    #@st.cache_data(ttl=3600, show_spinner = "Fetching rosters from your ESPN league. This should take about ten seconds")
+    def get_rosters_df(_self, league_id, player_stats_version):
         """Get a dataframe with a column per team and cell per player chosen by that team
 
         Args:
@@ -137,13 +138,13 @@ class ESPNIntegration(PlatformIntegration):
                         , year = _self.year
                         , espn_s2= st.session_state.espn_s2
                         , swid=st.session_state.espn_swid)
-        
+                
         teams = league.teams
 
         team_players_dict = {team.team_name :
                 [get_fixed_player_name(player.name) for player in team.roster] 
                               for team in teams}
-        
+                
         max_team_size = max([len(x) for x in team_players_dict.values()])
 
         players_df = pd.DataFrame()

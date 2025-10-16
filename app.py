@@ -17,7 +17,6 @@ import streamlit.components.v1 as components
 from streamlit_theme import st_theme
 import numpy
 
-
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
 
