@@ -112,7 +112,7 @@ class YahooIntegration(PlatformIntegration):
 
         if (st.session_state.mode == 'Season Mode'):
 
-              team_players_df = self.get_rosters_df(self.league_id)
+              team_players_df = self.get_rosters_df(self.league_id, st.session_state.player_stats_version)
               self.n_drafters = team_players_df.shape[1]
               self.n_picks = team_players_df.shape[0]
               self.selections_default = team_players_df
@@ -246,7 +246,8 @@ class YahooIntegration(PlatformIntegration):
 
     @st.cache_data(ttl=3600, show_spinner = False)
     def get_rosters_df(_self
-                       , league_id: str) -> pd.DataFrame:
+                       , league_id: str
+                       , player_stats_version) -> pd.DataFrame:
         """Get a dataframe with a column per team and cell per player chosen by that team
 
         Args:

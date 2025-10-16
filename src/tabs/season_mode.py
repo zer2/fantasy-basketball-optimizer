@@ -32,10 +32,23 @@ def make_season_mode_tabs(H):
       st.caption("""Enter which player is on which team below""")
       player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index) + ['RP']
                                                 , ordered=True)
-
+      
       with st.form('manual_rosters'):
 
-        selections_df = st.data_editor(st.session_state.selections_df.astype(player_category_type)
+        #ZR: This is a hack. For some reason the get_rosters_df function does not cache properly, 
+        #so we have to call it again without caching. 
+        #This is important because with new datasets entered the player set can change and more 
+        #players may be recognized with positions. If the roster_df is not updated based on the 
+        #new position information it gets messed up
+        #Maybe the long-term way to fix this is tying positions only to the platform integration. 
+        #I believe this would make it unnecessary to update the position list 
+        if st.session_state.data_source == 'Enter your own data':
+          rosters = st.session_state.selections_df
+        else:
+          rosters = st.session_state.integration.get_rosters_df(st.session_state.integration.league_id
+                                                                , st.session_state.player_stats_version)
+
+        selections_df = st.data_editor(rosters.astype(player_category_type)
                                             , hide_index = True
                                             , height = st.session_state.n_picks * 35 + 50
                                             , key = 'selections_df_edited').fillna('RP')
