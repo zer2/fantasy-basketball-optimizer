@@ -342,7 +342,7 @@ def make_auction_tab_live_data(H):
             team_names = get_team_names()
 
             #ZR: preserve the auction seat in case team_names has changed 
-            if 'auction_seat' in st.session_state:
+            if 'auction_seat' in st.session_state and (st.session_state.auction_seat in team_names):
                 default_index = team_names.index(st.session_state.auction_seat)
             else:
                 default_index = 0
