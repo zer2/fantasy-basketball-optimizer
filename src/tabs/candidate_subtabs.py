@@ -114,7 +114,8 @@ def make_cand_tab(_H
 
       rosters = res['Rosters']
 
-      if rosters.shape[1] > 0:
+      #check for roster fit only if the algorithm is being run with positions, since otherwise this is irrelevant
+      if st.session_state.info['Position-Means'] is not None:
         fits_roster = rosters.loc[:,0] >= 0
       else:
         fits_roster = pd.Series([True] * len(res['Scores']), index = res['Scores'].index)
@@ -147,7 +148,7 @@ def make_cand_tab(_H
 
           if cash_remaining_per_team is not None:
             
-            if sum(fits_roster) == 0:
+            if (sum(fits_roster) == 0):
               st.error('Illegal roster!')
               st.stop()
 
@@ -432,13 +433,13 @@ def make_detailed_view(player_assignments : dict[list[str]]
                               , player_name)
       
     
-      main_df_styled = make_main_df_styled(_g_scores
-                          , player_name
-                          , player_last_name
-                          , my_players
-                          , res
-                          , _H
-                          , future_diffs)
+    main_df_styled = make_main_df_styled(_g_scores
+                        , player_name
+                        , player_last_name
+                        , my_players
+                        , res
+                        , _H
+                        , future_diffs)
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}") \
                         .map(st.session_state.styler.stat_styler_tertiary
@@ -742,15 +743,22 @@ def make_main_df_styled(_g_scores : pd.DataFrame
 
   player = _g_scores.loc[player_name].drop('Total')
   total_diff = res['Diff'].loc[player_name] * _H.original_v 
-  future_diff = res['Future-Diff'].loc[player_name] * _H.original_v
-  current_diff = total_diff - future_diff
 
   total_diff_plus_player = total_diff + player
 
-  main_res_dict = {'Current diff' : current_diff
-                ,player_last_name : player
-                ,'Future player diff' : future_diff
-                ,'Total diff' : total_diff_plus_player}
+  if res['Future-Diff'] is None:
+
+    main_res_dict = {'Current diff' : total_diff
+                  ,player_last_name : player
+                  ,'Total diff' : total_diff_plus_player}
+  else:
+    future_diff = res['Future-Diff'].loc[player_name] * _H.original_v
+    current_diff = total_diff - future_diff
+
+    main_res_dict = {'Current diff' : current_diff
+                  ,player_last_name : player
+                  ,'Future player diff' : future_diff
+                  ,'Total diff' : total_diff_plus_player}
   
   main_df = pd.DataFrame(main_res_dict).T
   main_df.loc[:,'Total'] = main_df.sum(axis = 1)

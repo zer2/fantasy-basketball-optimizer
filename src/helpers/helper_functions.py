@@ -450,6 +450,6 @@ def get_data_from_snowflake(table_name
 
 @st.cache_resource(ttl = 3600)
 def get_snowflake_connection(schema):
-      con = st.connection("snowflake")
+      con = st.connection("snowflake", ttl = 3600)
       return con
     
