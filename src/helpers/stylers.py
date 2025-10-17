@@ -85,11 +85,11 @@ class DarkStyler(Styler):
         if len(x) ==0:
             return 'background-color:#888899'
         elif x in my_players:
-            rgb = (90,90 ,150)
+            rgb = (70,70 ,150)
             bgc = '#%02x%02x%02x' % rgb
             return 'background-color:' + bgc + '; color:white;'
         else:
-            rgb = (100,100 ,240)
+            rgb = (90,90 ,240)
             bgc = '#%02x%02x%02x' % rgb
             return 'background-color:' + bgc + '; color:white;'
     
@@ -131,8 +131,6 @@ class DarkStyler(Styler):
 
         return final_formatter(rgb)
     
-
-        
     def stat_styler_tertiary(self, value : float, multiplier : float = 50, middle : float = 0) -> str:
         #For dark mode, the default is for the color to be dark, and light increases with more extrme values 
         #color scheme is varying shades of blue. 
@@ -143,12 +141,13 @@ class DarkStyler(Styler):
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
         
-        intensity = min(int(abs((value-middle)*multiplier)), 100)
+        raw_intensity = int(abs((value-middle)*multiplier))
+        intensity = min(raw_intensity, 185)
 
-        if (value - middle)*multiplier > 0:
-            rgb = (100, 100, 110 + intensity)
+        if raw_intensity > 0:
+            rgb = (60, 60, 70 + intensity)
         else:
-            rgb = (100, 100, 110 -int(intensity/10))
+            rgb = (60, 60, 70 -int(intensity/20))
 
         return final_formatter(rgb)
     
