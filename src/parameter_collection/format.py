@@ -32,6 +32,6 @@ def format_popover():
         #this is not directly changing player stats, but it changes which categories are relevant for them
         st.form_submit_button('Lock in & process', on_click=increment_player_stats_version)
         
-    if len(categories) == 0:
-        st.error('Select at least one category')
+    if len(categories) <= 1:
+        st.error('Select at least two categories')
         st.stop()
