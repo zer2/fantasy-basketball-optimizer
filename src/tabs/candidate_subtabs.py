@@ -196,7 +196,7 @@ def make_cand_tab(_H
                                                               , subset = ['Your $', 'Gnrc. $','Difference','Orig. $']) \
                       .map(styler.styler_a
                           , subset = ['Your $', 'Gnrc. $','Orig. $']) \
-                      .map(styler.stat_styler_secondary, middle = format_middle, multiplier = 6, subset = ['Difference']) \
+                      .map(styler.stat_styler_secondary, middle = 0, multiplier = 6, subset = ['Difference']) \
                       .map(styler.stat_styler_primary, middle = format_middle, multiplier = format_multiplier, subset = rate_df.columns) \
                       .format(style_format, subset = rate_df.columns)._compute()
             
@@ -702,20 +702,34 @@ def make_rate_display_styled(rate_display : pd.DataFrame
   """
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
 
+  if st.session_state.scoring_format == 'Rotisserie':
+      style_format = "{:.1f}"
+      format_middle = (get_n_drafters()-1)/2 + 1
+      format_multiplier = 15 
+  else: 
+      style_format = "{:.1%}"
+      format_middle = 0.5
+      format_multiplier = 300
+
   if  'Gnrc. $' in rate_display.columns:
       st.markdown('Expected win rates if taken at no cost')
-
       rate_df_limited = rate_df_limited.drop(columns = ['Difference','Your $', 'Gnrc. $', 'Orig. $'])
-      
-      rate_df_limited_styled = rate_df_limited.style \
-                                          .map(st.session_state.styler.stat_styler_primary
-                                              , middle = 0.5
-                                              , multiplier = 300
-                                              , subset = get_selected_categories()) \
-                                          .format('{:,.1%}', subset = get_selected_categories())
+      h_score_col = [] #H-score not shown for auctions
   else: 
-    st.markdown('Expected win rates if taken')
-    rate_df_limited_styled = h_percentage_styler(rate_df_limited)
+      st.markdown('Expected win rates if taken')
+      h_score_col = ['H-score']
+
+  styler = st.session_state.styler
+
+  rate_df_limited_styled = rate_df_limited.style.format("{:.1%}",subset = pd.IndexSlice[:,h_score_col]) \
+              .format(style_format, subset = get_selected_categories()) \
+              .map(styler.styler_a, subset = pd.IndexSlice[:,h_score_col]) \
+              .map(styler.stat_styler_primary
+                    , middle = format_middle
+                    , multiplier = format_multiplier
+                    , subset = get_selected_categories()) \
+
+
   return rate_df_limited_styled
 
 def make_main_df_styled(_g_scores : pd.DataFrame
