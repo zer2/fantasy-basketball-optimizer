@@ -88,6 +88,16 @@ def league_settings_popover():
             st.session_state.yahoo_key_to_name_mapper = get_yahoo_key_to_name_mapper()
 
     if st.session_state.data_source == 'Enter your own data':
+
+        with c1: 
+
+            if st.session_state.mode == 'Draft Mode':
+                st.toggle('Toggle third round reversal'
+                          , key = 'third_round_reversal'
+                          , on_change= clear_draft_board)
+            else:
+                st.session_state.third_round_reveral = False
+                
         with c2: 
 
             n_drafters = st.number_input(r'How many drafters are in your league?'

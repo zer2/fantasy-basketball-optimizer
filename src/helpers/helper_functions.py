@@ -372,8 +372,21 @@ def get_selections_default(n_picks, n_drafters):
             {'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)}
             )
       
-def move_forward_one_pick(row, drafter, n):
-    if row % 2 == 1:
+def move_forward_one_pick(row: int, drafter: int, n: int):
+    
+    if st.session_state.third_round_reversal:
+
+      #implement the actual third round reversal
+      if (row == 1 and drafter == 0):
+         return 2, n - 1
+      
+      #the orders are switched for all future rounds 
+      odd_row = (row % 2 == 1)  if row < 2 else (row % 2 == 0) 
+
+    else:
+      odd_row = (row % 2 == 1) 
+    
+    if odd_row:
       if drafter == 0:
         row = row + 1
       else:
@@ -386,8 +399,21 @@ def move_forward_one_pick(row, drafter, n):
 
     return row, drafter 
 
-def move_back_one_pick(row, drafter, n):
-    if row % 2 == 1:
+def move_back_one_pick(row: int, drafter: int, n: int):
+    
+    if st.session_state.third_round_reversal:
+
+      #reverse the actual third round reversal
+      if (row == 2 and drafter == n-1):
+         return 1, 0
+      
+      #the orders are switched for all future rounds 
+      odd_row = (row % 2 == 1)  if row < 2 else (row % 2 == 0) 
+
+    else:
+      odd_row = (row % 2 == 1) 
+
+    if odd_row:
       if drafter == (n-1):
         row = row - 1
       else:
