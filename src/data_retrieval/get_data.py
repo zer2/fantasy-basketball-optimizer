@@ -84,7 +84,7 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
 
   #ZR: This should be simplified. We don't need to do this multiple times
   extra_info = get_data_from_snowflake('ESPN_PROJECTION_TABLE')[['ESPN_NAME','MINUTES_PLAYED','GAMES_PLAYED','POSITION']]
-  extra_info.loc[:,'GAMES_PLAYED'] = extra_info['GAMES_PLAYED']/get_n_games()
+  extra_info.loc[:,'GAMES_PLAYED'] = extra_info['GAMES_PLAYED'].astype(float)/get_n_games()
   extra_info.columns = ['Player','Minutes','Games Played %','Position']
 
   extra_info = map_player_names(extra_info, 'BBM_NAME')

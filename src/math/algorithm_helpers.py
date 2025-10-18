@@ -28,6 +28,7 @@ def auction_value_adjuster(raw_values_unselected : pd.Series
     dollar_values = dollar_scale_adjustment(raw_values_unselected
                              ,remaining_cash
                              ,n_remaining_players)
+    
     savor_adjusted_values = savor_calculation(dollar_values,noise)
     return savor_adjusted_values
 
@@ -72,15 +73,18 @@ def savor_calculation(dollar_value : pd.Series
     Returns:
       Series, SAVOR 
     """
+    #no need for any calculations if there is no noise
+    if noise == 0: 
+        return dollar_value
+    else:
 
+        probability_of_non_streaming = norm.cdf(dollar_value/noise)
+        adjustment_factor = (noise)/(2 * np.pi)**(0.5) * (1 - np.exp((-dollar_value**2)/(2 * noise**2)))
+        adjusted_value = dollar_value * probability_of_non_streaming - adjustment_factor
 
-    probability_of_non_streaming = norm.cdf(dollar_value/noise)
-    adjustment_factor = (noise)/(2 * np.pi)**(0.5) * (1 - np.exp((-dollar_value**2)/(2 * noise**2)))
-    adjusted_value = dollar_value * probability_of_non_streaming - adjustment_factor
+        adjusted_value_rescaled = adjusted_value * dollar_value.sum()/adjusted_value.sum()
 
-    adjusted_value_rescaled = adjusted_value * dollar_value.sum()/adjusted_value.sum()
-
-    return adjusted_value_rescaled 
+        return adjusted_value_rescaled 
 
 def combinatorial_calculation(c : np.array
                               , c_comp : np.array
