@@ -21,7 +21,6 @@ class HAgent():
                  , dynamic : bool
                  , scoring_format : str
                  , beth : float = 0 
-                 , positions : pd.Series = None
                  , collect_info : bool = False
                     ):
         """Initializes an H-score agent, which can calculate H-scores based on given info 
@@ -47,19 +46,11 @@ class HAgent():
         self.n_picks = n_picks 
         self.dynamic = dynamic
         self.n_drafters = n_drafters
-
-        #ZR: we really need to fix this later lol. The thing is that the positions table 
-        #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
-        if positions is None:
-            self.positions = info['Positions']
-        else:
-            self.positions = positions
-
         self.collect_info = collect_info
-        
-        self.w = info['w']
         self.scoring_format = scoring_format
 
+        self.positions = info['Positions']
+        self.w = info['w']
         x_scores = info['X-scores']
 
         self.n_categories = x_scores.shape[1]

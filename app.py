@@ -150,7 +150,6 @@ if st.session_state['mode'] == 'Draft Mode':
 if st.session_state['mode'] == 'Auction Mode':
 
   if st.session_state.data_source == 'Enter your own data':
-
     make_auction_tab_own_data(H)
   else:
     make_auction_tab_live_data(H)      

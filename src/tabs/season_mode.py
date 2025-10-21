@@ -42,6 +42,8 @@ def make_season_mode_tabs(H):
         #new position information it gets messed up
         #Maybe the long-term way to fix this is tying positions only to the platform integration. 
         #I believe this would make it unnecessary to update the position list 
+
+        #ZR: This should become a helper function 
         if st.session_state.data_source == 'Enter your own data':
           rosters = st.session_state.selections_df
         else:
