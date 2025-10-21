@@ -11,7 +11,6 @@ import numpy as np
 from src.helpers.helper_functions import get_team_names
 from src.math.algorithm_agents import get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
-#from wfork_streamlit_profiler import Profiler
 
 @st.fragment
 def make_drafting_tab_own_data(H):
@@ -24,6 +23,7 @@ def make_drafting_tab_own_data(H):
     Returns:
         None
     """
+
     left, right = st.columns([0.47,0.53])
 
     with left:
@@ -208,8 +208,6 @@ def make_auction_tab_own_data(H):
                         , use_container_width = True
                         )
             
-
-            
             c1, c2 = st.columns([0.2,0.8])
             
             with c1: 
@@ -281,11 +279,8 @@ def make_auction_tab_own_data(H):
                                         , n_picks = st.session_state.n_picks
                                         , n_drafters = n_drafters
                                         , n_iterations = st.session_state.n_iterations
+                                        , beth = st.session_state.beth
                                         , scoring_format = st.session_state.scoring_format
-                                        , mode = st.session_state.mode
-                                        , psi = st.session_state.psi
-                                        , upsilon = st.session_state.upsilon
-                                        , chi = st.session_state.chi
                                         , info_key = st.session_state.info_key)
 
             h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
@@ -397,11 +392,8 @@ def make_auction_tab_live_data(H):
                                     , n_picks = st.session_state.n_picks
                                     , n_drafters = n_drafters
                                     , n_iterations = st.session_state.n_iterations
+                                    , beth = st.session_state.beth
                                     , scoring_format = st.session_state.scoring_format
-                                    , mode = st.session_state.mode
-                                    , psi = st.session_state.psi
-                                    , upsilon = st.session_state.upsilon
-                                    , chi = st.session_state.chi
                                     , info_key = st.session_state.info_key).set_index('Player')
 
         h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]

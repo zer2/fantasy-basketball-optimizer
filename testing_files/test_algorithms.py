@@ -18,9 +18,9 @@ def test_x_mu_gradients():
         , beta = at.number_input('beta').value
         , n_picks = at.number_input('n_picks').value
         , n_drafters = at.number_input('n_drafters').value
+        , beth = at.number_input('beth').value
         , scoring_format = 'Head to Head: Most Categories'
-        , dynamic = True
-        , chi = None)
+        , dynamic = True)
 
     c_list = [
             np.array([1/8] * 8 + [0]).reshape(1,9)
@@ -71,9 +71,9 @@ def test_objective_gradients():
         , beta = at.number_input('beta').value
         , n_picks = at.number_input('n_picks').value
         , n_drafters = at.number_input('n_drafters').value
+        , beth = at.number_input('beth').value
         , scoring_format = 'Rotisserie'
-        , dynamic = True
-        , chi = 0.6)
+        , dynamic = True)
 
     #we're ok failing the c
 

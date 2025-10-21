@@ -12,6 +12,12 @@ def get_categories():
 
 def get_selected_volume_statistics():
    return [st.session_state['params']['ratio-statistics'][x]['volume-statistic'] for x in get_selected_ratio_statistics()] 
+
+def get_pitcher_stats():
+   if st.session_state:
+    return st.session_state.params['pitcher_stats']
+   else:
+    return ['Wins','Saves','Strikeouts','ERA','WHIP','Innings Pitched','Quality Starts','Holds','Saves and Holds','K/9','K/BB']
     
 def get_counting_statistics():
     #convenience function to get the list of categories used for fantasy basketball

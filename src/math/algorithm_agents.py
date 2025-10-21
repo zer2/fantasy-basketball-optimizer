@@ -5,8 +5,8 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights, get_selected_categories \
-                                            ,get_max_info, get_correlations
+from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights \
+                                            , get_selected_categories, get_max_info, get_correlations, get_pitcher_stats
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 from src.math.algorithm_helpers import auction_value_adjuster
 
@@ -20,11 +20,9 @@ class HAgent():
                  , n_drafters : int
                  , dynamic : bool
                  , scoring_format : str
-                 , chi : float
-                 , fudge_factor : float = 1
+                 , beth : float = 0 
                  , positions : pd.Series = None
                  , collect_info : bool = False
-                 , team_names : list = None
                     ):
         """Initializes an H-score agent, which can calculate H-scores based on given info 
 
@@ -34,9 +32,12 @@ class HAgent():
             gamma: float, parameter as described in the paper
             n_picks: int, number of picks each drafter gets 
             n_drafters : int, number of drafters
-            scoring_format
-
+            dynamic : bool set to False if the algorithm is not supposed to iterate 
+            scoring_format : EC, MC, or Roto
+            beth: float, parameter as described in the documentation
             positions: Series of format {'LeBron James' -> ['PF', 'C']}
+            collect_info
+
         Returns:
             None
 
@@ -45,10 +46,7 @@ class HAgent():
         self.gamma = gamma
         self.n_picks = n_picks 
         self.dynamic = dynamic
-
-        #ZR: do we need this or can we imply it from player_assignments when H score runs?
         self.n_drafters = n_drafters
-        self.team_names = team_names
 
         #ZR: we really need to fix this later lol. The thing is that the positions table 
         #in snowflake for 2011 is slightly messed up for JR smith and we need to fix it
@@ -76,8 +74,6 @@ class HAgent():
 
         L_weights = get_L_weights().values.reshape(1,-1,1,1)
         self.L = (L_by_position * L_weights).sum(axis = 1) #ZR: This should weight by base position options 
-
-        self.fudge_factor = fudge_factor
 
         mov = info['Mov']
         vom = info['Vom']
@@ -125,7 +121,7 @@ class HAgent():
 
         if get_league_type() == 'MLB':
             cats = x_scores.columns
-            self.pitching_stat_indices = [i for i in range(len(cats)) if cats[i] in st.session_state.params['pitcher_stats']]
+            self.pitching_stat_indices = [i for i in range(len(cats)) if cats[i] in get_pitcher_stats()]
             self.batting_stat_indices = [i for i in range(len(cats)) if i not in self.pitching_stat_indices]
 
             self.pitching_L = self.L[:,self.pitching_stat_indices][:,:,self.pitching_stat_indices]
@@ -159,10 +155,10 @@ class HAgent():
 
         transformation_matrix = np.identity(self.n_categories) + \
             np.full(shape = (self.n_categories, self.n_categories)
-                    ,fill_value = st.session_state.beth/self.n_categories**2)
+                    ,fill_value = beth/self.n_categories**2)
         self.transformation_matrix_inverted = np.linalg.inv(transformation_matrix)
 
-        self.transformation_addition_constant = st.session_state.beth/(2*self.n_categories)
+        self.transformation_addition_constant = beth/(2*self.n_categories)
 
     def get_h_scores(self
                   , player_assignments : dict[list[str]]
@@ -181,7 +177,6 @@ class HAgent():
             String indicating chosen player
         """
         self.n_drafters = len(player_assignments) #ZR: Kind of a hack, but it helps sometimes when the session state gets messed up
-        self.team_names = list(player_assignments.keys())
         my_players = [p for p in player_assignments[drafter] if p == p]
 
         self.players = my_players #this is a bit of a hack
@@ -282,6 +277,7 @@ class HAgent():
         Returns:
             Series of form {cat : expected value of opposing teams for the cat}
         """
+        team_names = list(player_assignments.keys())
 
         my_players = [p for p in player_assignments[drafter] if p == p]
 
@@ -319,7 +315,7 @@ class HAgent():
                                             , len(my_players) - len(player_assignments[team])
                                             , category_value_per_dollar
                                             , replacement_value_by_category) for team \
-                                        in self.team_names if team != drafter]
+                                        in team_names if team != drafter]
             ).T
 
         else: 
@@ -329,7 +325,7 @@ class HAgent():
 
             other_team_sums = np.vstack(
                 [self.get_opposing_team_means(player_assignments[team], mean_extra_players, len(my_players)) for team \
-                                        in self.team_names if team != drafter]
+                                        in team_names if team != drafter]
             ).T
 
             diff_means = x_self_sum.reshape(1,self.n_categories,1) - \
@@ -337,7 +333,7 @@ class HAgent():
 
         diff_vars = np.vstack(
             [self.get_diff_var(len([p for p in player_assignments[team] if p == p])) for team \
-                                    in self.team_names if team != drafter]
+                                    in team_names if team != drafter]
         ).T
 
         #make order statistics adjustment for Roto 
@@ -763,12 +759,11 @@ class HAgent():
             #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
             L = self.L
 
-
-            if st.session_state.league == 'NBA':
+            if get_league_type() == 'NBA':
                 expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L, self.v) + position_mu
                 del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L, self.v)
 
-            elif st.session_state.league == 'MLB':
+            elif get_league_type() == 'MLB':
 
                 #ZR: This works for now, but should be careful about it 
                 pitching_share = future_position_array[:, -2:].sum(axis = 1).reshape(-1,1,1)
@@ -1497,7 +1492,7 @@ def get_base_h_score(_info : dict
                 , n_picks : int
                 , n_drafters : int
                 , scoring_format : str
-                , chi : float
+                , beth : float
                 , player_assignments : dict[list[str]]
                 , team : str
                 , info_key : int):
@@ -1523,9 +1518,8 @@ def get_base_h_score(_info : dict
     , n_picks = n_picks
     , n_drafters = n_drafters
     , dynamic = False
-    , scoring_format = scoring_format
-    , chi = chi
-    , team_names = list(player_assignments.keys()))
+    , beth = beth
+    , scoring_format = scoring_format)
 
   return next(H.get_h_scores(player_assignments, team))   
 
@@ -1536,11 +1530,8 @@ def get_default_h_values(info : dict
                   , n_picks : int
                   , n_drafters : int
                   , n_iterations : int
+                  , beth : float
                   , scoring_format : str
-                  , mode : str
-                  , psi : float
-                  , upsilon : float
-                  , chi : float
                   , info_key : int):
   
   H = HAgent(info = info
@@ -1549,9 +1540,8 @@ def get_default_h_values(info : dict
     , n_picks = n_picks
     , n_drafters = n_drafters
     , dynamic = n_iterations > 0
-    , scoring_format = scoring_format
-    , chi = chi
-    , team_names = [n for n in range(n_drafters)])
+    , beth = beth
+    , scoring_format = scoring_format)
   
   if st.session_state['mode'] == 'Auction Mode':
     cash_remaining_per_team = {n : 200 for n in range(n_drafters)}

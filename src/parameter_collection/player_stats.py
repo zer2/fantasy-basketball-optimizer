@@ -127,7 +127,7 @@ def get_nba_stats():
                 """
                 )
                 
-                hashtag_file = st.file_uploader('Copy HTB projections into a csv and upload it'
+                hashtag_file = st.file_uploader('Copy average stats into a csv w/ utf-8 encoding and upload.'
                                                 , type=['csv'])
                 if hashtag_file is not None:
                     st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)

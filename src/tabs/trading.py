@@ -146,11 +146,8 @@ def make_trade_tab(H
                                             , n_picks = st.session_state.n_picks
                                             , n_drafters = get_n_drafters()
                                             , n_iterations = st.session_state.n_iterations
+                                            , beth = st.session_state.beth
                                             , scoring_format = st.session_state.scoring_format
-                                            , mode = st.session_state.mode
-                                            , psi = st.session_state.psi
-                                            , upsilon = st.session_state.upsilon
-                                            , chi = st.session_state.chi
                                             , info_key = st.session_state.info)
       general_value = default_h_scores.set_index('Player')['H-score']
       replacement_value = general_value.iloc[selections_df.shape[0] * selections_df.shape[1]]
