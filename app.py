@@ -7,9 +7,9 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "2")
 import streamlit as st
 import numpy as np
 import yaml
-from src.helpers.helper_functions import get_data_from_session_state, get_n_drafters, initialize_selections_df
+from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_data_key, get_n_drafters, get_scoring_format, initialize_selections_df, store_dataset_in_session_state, using_manual_entry
 from src.helpers.stylers import DarkStyler, LightStyler
-from src.math.algorithm_agents import HAgent
+from src.math.algorithm_agents import build_h_agent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
                            ,make_auction_tab_live_data ,make_auction_tab_own_data
 from src.tabs.season_mode import make_season_mode_tabs
@@ -36,26 +36,17 @@ st.set_page_config(
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
 
-if 'datasets' not in st.session_state:
-   st.session_state.datasets = {}
+if 'stat_options_key' not in st.session_state:
+    st.session_state.stat_options_key = gen_key()
 
 if 'injured_players' not in st.session_state:
     st.session_state['injured_players'] = set()
-
-if 'schedule' not in st.session_state:
-    st.session_state['schedule'] = {}
-
-if 'mode' not in st.session_state:
-    st.session_state['mode'] = 'Draft Mode'
 
 if 'have_locked_in' not in st.session_state:
   st.session_state.have_locked_in = False
 
 if 'live_draft_active' not in st.session_state:
     st.session_state.live_draft_active = False
-
-if 'yahoo_league_id' not in st.session_state:
-    st.session_state.yahoo_league_id = None
 
 if 'draft_results' not in st.session_state:
     st.session_state.draft_results = None
@@ -119,15 +110,18 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
-### Build app 
-H = HAgent(info = get_data_from_session_state('info')
-    , omega = st.session_state.omega
-    , gamma = st.session_state.gamma
-    , n_picks = st.session_state.n_starters
-    , n_drafters = get_n_drafters()
-    , dynamic = st.session_state.n_iterations > 0
-    , beth = st.session_state.beth
-    , scoring_format = st.session_state.scoring_format)
+H, key = build_h_agent(get_data_key('info')
+                  ,st.session_state.omega
+                  ,st.session_state.gamma
+                  ,st.session_state.n_starters
+                  ,get_n_drafters()
+                  ,st.session_state.beth
+                  ,get_scoring_format()
+                  ,st.session_state.n_iterations > 0)
+store_dataset_in_session_state(H, 'H',key)
+
+if using_manual_entry():
+  initialize_selections_df()
 
 if st.session_state['mode'] == 'Draft Mode':
 
@@ -137,18 +131,17 @@ if st.session_state['mode'] == 'Draft Mode':
   if 'drafter' not in st.session_state:
     st.session_state.drafter = 0
 
-  if st.session_state.data_source == 'Enter your own data':
-    initialize_selections_df()
-    make_drafting_tab_own_data(H)
+  if using_manual_entry():
+    make_drafting_tab_own_data()
   else:
-    make_drafting_tab_live_data(H)
+    make_drafting_tab_live_data()
     
 if st.session_state['mode'] == 'Auction Mode':
 
-  if st.session_state.data_source == 'Enter your own data':
-    make_auction_tab_own_data(H)
+  if using_manual_entry():
+    make_auction_tab_own_data()
   else:
-    make_auction_tab_live_data(H)      
+    make_auction_tab_live_data()      
 
 if st.session_state['mode'] == 'Season Mode':
-  make_season_mode_tabs(H)
+  make_season_mode_tabs()

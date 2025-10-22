@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 from src.tabs.drafting import increment_and_reset_draft
-from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_raw_dataset, get_selections_default, listify \
+from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_data_key, get_league_type, get_raw_dataset, get_selections_default, listify \
                                             , drop_injured_players, get_player_name_column, store_dataset_in_session_state
 from src.data_retrieval.get_data import get_historical_data, get_specified_historical_stats, combine_nba_projections
 from src.data_retrieval.get_data_baseball import get_baseball_historical_data, combine_baseball_projections
@@ -20,11 +20,11 @@ def player_stats_popover():
       None
     """
 
-    if st.session_state.league == 'NBA':
+    if get_league_type() == 'NBA':
 
         get_nba_stats()
             
-    elif st.session_state.league == 'MLB':
+    elif get_league_type() == 'MLB':
             
         get_mlb_stats()
 
@@ -33,8 +33,8 @@ def player_stats_popover():
                                 ]
     
     player_stats_v0_key = get_data_key('player_stats_v0')
-    drop_injured_players(player_stats_v0_key, default_injury_list)
-
+    df, key = drop_injured_players(player_stats_v0_key, default_injury_list)
+    store_dataset_in_session_state(df ,'player_stats_v1', key)
     
 def get_nba_stats():
     """Figures out where to get player stats from, and loads them into a dataframe, specifically for the NBA
@@ -68,7 +68,8 @@ def get_nba_stats():
             ,index = 0
             ,on_change = increment_and_reset_draft
         )
-        get_specified_historical_stats(dataset_name, st.session_state.league)
+        df, key = get_specified_historical_stats(dataset_name, get_league_type())
+        store_dataset_in_session_state(df, 'player_stats_v0', key)
 
     else:
         with st.form('Player stat form'):
@@ -119,7 +120,7 @@ def get_nba_stats():
                 hashtag_file = st.file_uploader('Copy average stats into a csv w/ utf-8 encoding and upload.'
                                                 , type=['csv'])
                 if hashtag_file is not None:
-                    st.session_state.datasets['htb']  = pd.read_csv(hashtag_file)
+                    store_dataset_in_session_state(pd.read_csv(hashtag_file),'HTB','')
 
             with c3:
 
@@ -149,8 +150,11 @@ def get_nba_stats():
 
                 bbm_file = st.file_uploader('''Export per-game stats to excel then save as CSV utf-8.'''
                                                 , type=['csv'])
+                
                 if bbm_file is not None:
-                    st.session_state.datasets['bbm']  = pd.read_csv(bbm_file)
+                    #there is no need for a key to the BBM file, since combine_nba_projections is always run when this 
+                    #form is submitted
+                    store_dataset_in_session_state(pd.read_csv(bbm_file),'BBM','')
                 
             #no rotowire or darko for now- could revisit in future
             #DARKO isn't great becuase it doesnt have GP or Position by itself
@@ -159,17 +163,22 @@ def get_nba_stats():
             rotowire_upload = None 
             
             with c5: 
+
+                def process_stat_options():
+                    increment_and_reset_draft()
+                    st.session_state.stat_options_key = gen_key()
             
+                #ZR: this should also run the combine_nba_projections function on click. 
                 submit_button = st.form_submit_button('Lock in & process'
-                                                        , on_click = increment_and_reset_draft)
+                                                        , on_click = process_stat_options)
 
                 st.warning('Changes will not be reflected until this button is pressed')
 
-                if (hashtag_slider > 0) & ('htb' not in st.session_state.datasets):
+                if (hashtag_slider > 0) & ('HTB' not in st.session_state.data_dictionary):
                     st.error('Upload HTB projection file')
                     st.stop()
                     
-                elif (bbm_slider > 0) & ('bbm' not in st.session_state.datasets):
+                elif (bbm_slider > 0) & ('BBM' not in st.session_state.data_dictionary):
                      st.error('Upload Basketball Monster projection file')
                      st.stop()
                 
@@ -177,14 +186,14 @@ def get_nba_stats():
                      st.error('Weights are all 0')
                      st.stop()
 
-        combine_nba_projections(
-                        get_raw_dataset('bbm')
-                        , get_raw_dataset('htb')
-                        , hashtag_slider
+        df, key = combine_nba_projections(
+                        hashtag_slider
                         , bbm_slider
                         , darko_slider
                         , espn_slider
-                        , get_player_name_column())
+                        , get_player_name_column()
+                        , st.session_state.stat_options_key)
+        store_dataset_in_session_state(df, 'player_stats_v0',key)
             
 
 def get_mlb_stats():
@@ -218,7 +227,7 @@ def get_mlb_stats():
             ,index = 0
             ,on_change = increment_and_reset_draft
         )
-        raw_stats_df = get_specified_historical_stats(dataset_name, st.session_state.league)
+        raw_stats_df = get_specified_historical_stats(dataset_name, get_league_type())
                 
     else: 
 

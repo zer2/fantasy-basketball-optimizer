@@ -90,9 +90,10 @@ def player_stat_param_popover():
                             that they drop below streaming-level value'''
       st.caption(stream_noise_str)         
     
-    make_upsilon_adjustment(get_data_key('player_stats_v1'), upsilon)
-    
-    process_player_data(None
+    df, key = make_upsilon_adjustment(get_data_key('player_stats_v1'), upsilon)
+    store_dataset_in_session_state(df, 'player_stats_v2', key)
+
+    info, key = process_player_data(None
                           ,get_data_key('player_stats_v2')
                           ,st.session_state.psi
                           ,st.session_state.chi
@@ -101,6 +102,7 @@ def player_stat_param_popover():
                           ,get_n_picks()
                           ,params
                           ,get_selected_categories())
+    store_dataset_in_session_state(info, 'info', key)
     
 def algorithm_param_popover():
     """Collect information from the user on desired parameters for H-scoring

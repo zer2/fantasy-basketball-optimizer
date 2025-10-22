@@ -5,7 +5,7 @@ import numpy as np
 import requests
 import os
 import snowflake.connector
-from src.helpers.helper_functions import get_n_games, get_data_from_snowflake, store_dataset_in_session_state
+from src.helpers.helper_functions import gen_key, get_n_games, get_data_from_snowflake, store_dataset_in_session_state
 from unidecode import unidecode
 
 
@@ -170,4 +170,4 @@ def combine_baseball_projections(rotowire_upload
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    store_dataset_in_session_state(df, 'player_stats_v0')
+    return df, gen_key()

@@ -301,17 +301,23 @@ need to make player_stats_v0 get updated more correctly, and add metadata
 add all of the things from info as a dict (they get updated together)
 
 '''
-def store_dataset_in_session_state(df, dataset_name):
-    
-    key = str(uuid.uuid4())
-    st.session_state.data_dictionary[dataset_name] = {'key' : key
-                                                      ,'data' : df}
+def gen_key():
+    return str(uuid.uuid4())
+
+def store_dataset_in_session_state(df, dataset_name, key):
+    #check if updating the dataset is necessary. It isn't if the key has not changed
+    if not ((dataset_name in st.session_state.data_dictionary) and (st.session_state.data_dictionary == key)):
+      st.session_state.data_dictionary[dataset_name] = {'key' : key
+                                                        ,'data' : df}
     
 def get_data_key(dataset_name):
    return st.session_state.data_dictionary[dataset_name]['key']
 
 def get_data_from_session_state(dataset_name):
-   return st.session_state.data_dictionary[dataset_name]['data']
+   if dataset_name in st.session_state.data_dictionary:
+    return st.session_state.data_dictionary[dataset_name]['data']
+   else:
+    return None
 
 @st.cache_data(ttl = 3600)
 def get_fixed_player_name(player_name : str, info_key : str) -> str:
@@ -449,7 +455,7 @@ def make_upsilon_adjustment(raw_stat_key, upsilon):
     if col in player_stats_v1.columns:
       player_stats_v1[col] = player_stats_v1[col].astype(float) * player_stats_v1['Games Played %'] * get_games_per_week()
 
-  store_dataset_in_session_state(player_stats_v1, 'player_stats_v2')
+  return player_stats_v1, gen_key()
 
 def rotate(l, n):
   #rotate list l by n positions 
@@ -465,7 +471,7 @@ def weighted_cov_matrix(df, weights):
 def drop_injured_players(player_stats_v0_key, injured_players):
     player_stats_v0 = get_data_from_session_state('player_stats_v0')
     res = player_stats_v0.drop(injured_players)
-    store_dataset_in_session_state(res ,'player_stats_v1')
+    return res, gen_key()
 
 def get_conversion_factors():
     #I don't think we need people to be able to modify the coefficients
@@ -542,10 +548,14 @@ def get_raw_dataset(dataset_name):
     return None
 
 def get_league_type():
-   if st.session_state:
-      return st.session_state.league
-   else:
-      return  'NBA'
+  if st.session_state:
+    return st.session_state.league
+  else:
+    return  'NBA'
+   
+def get_scoring_format():
+  if st.session_state:
+     return st.session_state.scoring_format
    
 def get_correlations():
    if get_league_type() == 'NBA':

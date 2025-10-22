@@ -1,7 +1,7 @@
 from functools import cache, lru_cache
 import pandas as pd
 import numpy as np
-from src.helpers.helper_functions import get_conversion_factors, get_data_from_session_state, get_league_type, get_params \
+from src.helpers.helper_functions import gen_key, get_conversion_factors, get_data_from_session_state, get_league_type, get_params \
                                 , get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
                                 ,get_position_structure, store_dataset_in_session_state, weighted_cov_matrix, get_counting_statistics\
                                 ,get_ratio_statistics, get_position_numbers
@@ -442,4 +442,4 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'Positions' : positions
           , 'Average-Round-Value' : average_round_value}
   
-  store_dataset_in_session_state(info, 'info')
+  return info, gen_key()

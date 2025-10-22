@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 import requests
-from src.helpers.helper_functions import get_params, get_n_games, get_data_from_snowflake, get_league_type, store_dataset_in_session_state
+from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_params, get_n_games, get_data_from_snowflake, get_league_type, store_dataset_in_session_state
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 
 @st.cache_data(ttl = '1d')
@@ -170,7 +170,7 @@ def get_specified_historical_stats(dataset_name : str, league : str) -> pd.DataF
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    store_dataset_in_session_state(df, 'player_stats_v0')
+    return df, gen_key()
   
   elif league in ('MLB'):
     
@@ -185,18 +185,19 @@ def get_specified_historical_stats(dataset_name : str, league : str) -> pd.DataF
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    store_dataset_in_session_state(df, 'player_stats_v0')
+    return df, gen_key()
   
 #ZR: BBM upload and HTB upload should have keys attached
 @st.cache_data(ttl = '1d')
-def combine_nba_projections(bbm_upload : pd.DataFrame
-                            , hashtag_upload : pd.DataFrame
-                            , hashtag_slider : float
+def combine_nba_projections(hashtag_slider : float
                             , bbm_slider : float
                             , darko_slider : float
                             , espn_slider : float
                             , player_name_column : str
+                            , player_stat_key : str
                             ): 
+    hashtag_upload = get_data_from_session_state('HTB')
+    bbm_upload = get_data_from_session_state('BBM')
       
     hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, player_name_column).fillna(0)
     bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, player_name_column)
@@ -241,7 +242,7 @@ def combine_nba_projections(bbm_upload : pd.DataFrame
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
     
-    store_dataset_in_session_state(df, 'player_stats_v0')
+    return df, gen_key()
 
 
 @st.cache_data()

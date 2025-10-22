@@ -5,7 +5,7 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_data_from_session_state, get_league_type, get_mode, get_position_structure, get_position_indices, get_L_weights \
+from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_league_type, get_mode, get_position_structure, get_position_indices, get_L_weights \
                                             , get_selected_categories, get_max_info, get_correlations, get_pitcher_stats
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 from src.math.algorithm_helpers import auction_value_adjuster
@@ -1475,44 +1475,25 @@ class AdamOptimizer:
 
         return update 
     
-#ZR: This should be a method of the H-score class
-@st.cache_data(show_spinner = False, ttl = 3600)
-def get_base_h_score(_info : dict
-                , omega : float
-                , gamma : float
-                , n_picks : int
-                , n_drafters : int
-                , scoring_format : str
-                , beth : float
-                , player_assignments : dict[list[str]]
-                , team : str
-                , info_key : int):
-  """Calculate your team's H-score
+@st.cache_resource()
+def build_h_agent(info_key
+                  ,omega
+                  ,gamma
+                  ,n_starters
+                  ,n_drafters
+                  ,beth
+                  ,scoring_format
+                  ,dynamic):
+  H = HAgent(info = get_data_from_session_state('info')
+      , omega = omega
+      , gamma = gamma
+      , n_picks = n_starters
+      , n_drafters = n_drafters
+      , dynamic = dynamic
+      , beth = beth
+      , scoring_format = scoring_format)
 
-  Args:
-    info: dictionary with info related to player statistics etc. 
-    omega: float, parameter as described in the paper
-    gamma: float, parameter as described in the paper
-    n_picks: int, number of picks each drafter gets 
-    n_drafters: int, number of drafters
-    scoring_format: 
-    player_assignments : player assignment dictionary
-    team: name of team to evaluate
-
-  Returns:
-      None
-  """
-
-  H = HAgent(info = _info
-    , omega = omega
-    , gamma = gamma
-    , n_picks = n_picks
-    , n_drafters = n_drafters
-    , dynamic = False
-    , beth = beth
-    , scoring_format = scoring_format)
-
-  return next(H.get_h_scores(player_assignments, team))   
+  return H, gen_key()
 
 @st.cache_data(show_spinner = False, ttl = 3600)
 def get_default_h_values(info_key : str
@@ -1525,7 +1506,7 @@ def get_default_h_values(info_key : str
                   , scoring_format : str):
   
   info = get_data_from_session_state('info')
-  
+
   H = HAgent(info = info
     , omega = omega
     , gamma = gamma

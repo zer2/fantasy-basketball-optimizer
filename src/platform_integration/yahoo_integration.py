@@ -1,5 +1,5 @@
 import streamlit as st
-from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_selections_default, get_selections_default_manual
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_mode, get_selections_default, get_selections_default_manual
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
 from src.tabs.drafting import increment_and_reset_draft
@@ -110,7 +110,7 @@ class YahooIntegration(PlatformIntegration):
 
         st.write('Player info successfully retrieved from yahoo fantasy! 🥳')
 
-        if (st.session_state.mode == 'Season Mode'):
+        if (get_mode() == 'Season Mode'):
 
               team_players_df = self.get_rosters_df(self.league_id)
               self.n_drafters = team_players_df.shape[1]

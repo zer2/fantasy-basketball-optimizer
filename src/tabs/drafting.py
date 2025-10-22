@@ -13,7 +13,7 @@ from src.math.algorithm_agents import get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
 
 @st.fragment
-def make_drafting_tab_own_data(H):
+def make_drafting_tab_own_data():
     """Create a page for drafting based on manual input
     This requires a significantly different UI from drafting based on a live connection, because the user has to enter players
 
@@ -82,9 +82,7 @@ def make_drafting_tab_own_data(H):
 
         if st.session_state.run_h_score:
             if len(my_players) < st.session_state.n_starters:
-                make_cand_tab(H
-                    ,info_key
-                    ,player_assignments
+                make_cand_tab(player_assignments
                     ,draft_seat
                     ,st.session_state.n_iterations)
                 st.session_state.run_h_score = False
@@ -102,7 +100,7 @@ def make_drafting_tab_own_data(H):
         
 
 @st.fragment
-def make_drafting_tab_live_data(H):
+def make_drafting_tab_live_data():
     """Create a page for drafting based on a live connection e.g. from Yaho
 
     Args:
@@ -156,9 +154,7 @@ def make_drafting_tab_live_data(H):
         with candidate_evaluation:
             if len(my_players) < st.session_state.n_starters:
 
-                make_cand_tab(H
-                    ,info_key
-                    ,player_assignments
+                make_cand_tab(player_assignments
                     ,draft_seat
                     ,st.session_state.n_iterations)
                 
@@ -167,7 +163,7 @@ def make_drafting_tab_live_data(H):
 
 
 @st.fragment 
-def make_auction_tab_own_data(H):
+def make_auction_tab_own_data():
       """Create a page for an aunction based on user input data
       This is a bit different from drafting because user information about cash needs to be collected
 
@@ -180,7 +176,6 @@ def make_auction_tab_own_data(H):
       n_drafters = get_n_drafters()
       n_picks = get_n_picks()
       info_key = get_data_key('info')
-      info = get_data_from_session_state('info')
 
       left, right = st.columns([0.4,0.6])
 
@@ -286,7 +281,7 @@ def make_auction_tab_own_data(H):
                                         , n_drafters = n_drafters
                                         , n_iterations = st.session_state.n_iterations
                                         , beth = st.session_state.beth
-                                        , scoring_format = st.session_state.scoring_format)
+                                        , scoring_format = get_scoring_format())
 
             h_ranks_unselected = h_ranks[~h_ranks.index.isin(selection_list)]
             h_defaults_savor = auction_value_adjuster(h_ranks_unselected['H-score']
@@ -301,9 +296,7 @@ def make_auction_tab_own_data(H):
                                                         , st.session_state['streaming_noise'])
             h_original_savor = pd.Series(h_original_savor.values, index = h_ranks_unselected['Player'])
 
-            make_cand_tab(H
-                ,info_key
-                ,player_assignments.to_dict()
+            make_cand_tab(player_assignments.to_dict()
                 ,auction_seat
                 ,st.session_state.n_iterations
                 ,cash_remaining_per_team.to_dict()
@@ -313,7 +306,7 @@ def make_auction_tab_own_data(H):
 
 
 @st.fragment
-def make_auction_tab_live_data(H):
+def make_auction_tab_live_data():
     """Create a page for an aunction based on a live connection e.g. from Yahoo
     This is a bit different from drafting because user information about cash needs to be collected
 
@@ -431,9 +424,7 @@ def make_auction_tab_live_data(H):
         with candidate_evaluation:
             if len(my_players) < n_picks:
 
-                make_cand_tab(H
-                    ,info_key
-                    ,player_assignments.to_dict()
+                make_cand_tab(player_assignments.to_dict()
                     ,auction_seat
                     ,st.session_state.n_iterations
                     ,cash_remaining_per_team.to_dict()
@@ -498,7 +489,7 @@ def clear_board():
 
 def refresh_analysis():
 
-    if st.session_state.mode == 'Draft Mode':
+    if get_mode() == 'Draft Mode':
 
         draft_results, error_string = st.session_state.integration.get_draft_results()
     else:

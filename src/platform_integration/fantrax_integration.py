@@ -1,6 +1,6 @@
 from fantraxapi import FantraxAPI
 import streamlit as st
-from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_selections_default, get_fixed_player_name, get_selections_default_manual
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_mode, get_selections_default, get_fixed_player_name, get_selections_default_manual
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
 from src.tabs.drafting import increment_and_reset_draft
@@ -79,7 +79,7 @@ class FantraxIntegration(PlatformIntegration):
         self.n_drafters = len(self.team_names)
         self.n_picks = self.get_n_picks(self.league_id)
 
-        if (st.session_state.mode == 'Draft Mode'):
+        if (get_mode() == 'Draft Mode'):
             self.selections_default = get_selections_default_manual(self.n_picks
                                                             ,self.n_drafters)
         else:
@@ -88,9 +88,6 @@ class FantraxIntegration(PlatformIntegration):
             self.selections_default = self.get_rosters_df()
             self.n_drafters = st.session_state.selections_default.shape[1]
             self.n_picks = st.session_state.selections_default.shape[0]
-
-            st.session_state['schedule'] = None
-            st.session_state['matchups'] = None
 
         st.write('Team info successfully retrieved from fantrax! :partying_face:')
 
@@ -176,7 +173,7 @@ class FantraxIntegration(PlatformIntegration):
             DataFrame with roster info
         """
     
-        exclusions = ('3') if st.session_state.mode == 'Season Mode' else ()
+        exclusions = ('3') if get_mode() == 'Season Mode' else ()
 
         def get_rosters(team_id):
             roster = []

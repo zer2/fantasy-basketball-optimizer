@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_n_picks, get_params, get_styler, h_percentage_styler, get_selected_categories, get_n_drafters, \
+from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_n_picks, get_params, get_scoring_format, get_styler, h_percentage_styler, get_selected_categories, get_n_drafters, \
                                 get_your_differential_threshold, get_their_differential_threshold, \
                                   get_combo_params
 from src.math.algorithm_agents import get_default_h_values
@@ -9,17 +9,14 @@ import itertools
 
 @st.fragment
 def make_trade_tab(H
-                   ,selections_df : pd.DataFrame
-                   , player_assignments : dict[list]
-                   , g_scores_unselected: pd.DataFrame):
+                   , selections_df : pd.DataFrame
+                   , player_assignments : dict[list]):
   """Make the full trading tab- ideal destinations, targets, and suggestions
 
   Args:
     H: H-scoring agent, which can be used to calculate H-score 
     selections_df: The selections df from the rosters page- potentially modified by the user
     player_assignments: Dictionary form of the selections df
-    g_scores_unselected: G-score dataframe, filtered to only include unselected players
-
 )
   Returns:
       None
@@ -27,6 +24,7 @@ def make_trade_tab(H
   n_drafters = get_n_drafters()
   n_picks = get_n_picks()
   info_key = get_data_key('info')
+  h_key = get_data_key('H')
   
   c1, c2 = st.columns([0.5,0.5])
 
@@ -120,15 +118,13 @@ def make_trade_tab(H
         else:
 
           with h_tab:
-            make_trade_h_tab(H
+            make_trade_h_tab(h_key
                             , player_assignments 
                             , st.session_state.n_iterations 
                             , trade_party_seat
                             , players_sent
                             , trade_counterparty_seat
-                            , players_received
-                            , st.session_state.scoring_format
-                            , info_key)
+                            , players_received)
 
           with g_tab:
             params = get_params()
@@ -138,7 +134,6 @@ def make_trade_tab(H
                               , players_received 
                               , params['g-score-player-multiplier']
                               , params['g-score-team-multiplier']
-                              , info_key
                               )
 
       #ZR: Could this be switched to H-scores instead? 
@@ -152,7 +147,7 @@ def make_trade_tab(H
                                             , n_drafters = n_drafters
                                             , n_iterations = st.session_state.n_iterations
                                             , beth = st.session_state.beth
-                                            , scoring_format = st.session_state.scoring_format)
+                                            , scoring_format = get_scoring_format())
       general_value = default_h_scores.set_index('Player')['H-score']
       replacement_value = general_value.iloc[selections_df.shape[0] * selections_df.shape[1]]
 
@@ -189,7 +184,7 @@ def make_trade_tab(H
         
       filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
 
-      st.session_state.df = make_trade_suggestion_df(H
+      st.session_state.df = make_trade_suggestion_df(h_key
             , player_assignments
             , trade_party_seat
             , trade_counterparty_seat
@@ -198,7 +193,7 @@ def make_trade_tab(H
             , get_your_differential_threshold()
             , get_their_differential_threshold()
             , filtered_combo_params
-            , st.session_state.scoring_format
+            , get_scoring_format()
             , get_data_key('info')) 
       
       if st.session_state.df is None: 
@@ -231,12 +226,11 @@ def make_trade_tab(H
 )
 
 @st.cache_data(show_spinner = False, ttl = 3600)
-def make_trade_score_tab(_scores : pd.DataFrame
+def make_trade_score_tab(info_key : str
               , players_sent : list[str]
               , players_received : list[str]
               , player_multiplier : float
               , team_multiplier : float
-              , info_key : int
               ) -> None:
   """Make a tab summarizing a trade by total scores
 
@@ -251,11 +245,12 @@ def make_trade_score_tab(_scores : pd.DataFrame
   Returns:
       None
   """
+  scores = get_data_from_session_state('info')['G-scores']
 
-  sent_stats = _scores[_scores.index.isin(players_sent)]
+  sent_stats = scores[scores.index.isin(players_sent)]
   sent_stats.loc['Total Sent', :] = sent_stats.sum(axis = 0)
 
-  received_stats = _scores[_scores.index.isin(players_received)]
+  received_stats = scores[scores.index.isin(players_received)]
   received_stats.loc['Total Received', :] = received_stats.sum(axis = 0)
 
   full_frame = pd.concat([sent_stats,received_stats])
@@ -341,26 +336,27 @@ def get_combos(players_with_weight : list[tuple]
   return player_combos_with_total_weight
 
 @st.cache_data(show_spinner = False, ttl = 3600)
-def make_combo_df(all_combos : list
+def make_combo_df(n_key : str
+                  ,info_key : str
+                  , all_combos : list
                   , my_team : str
                   , their_team : str
-                  , _H
-                  , player_assignments : dict[list[str]]
-                  , scoring_format : str
-                  , info_key) -> pd.DataFrame:
+                  , player_assignments : dict[list[str]]) -> pd.DataFrame:
   """Makes a dataframe of all trade possibilities according to specifications
 
   Args:
+    h_key: represents the H Agent
+    info_key: represents the algorithms info 
     combos: list of trades to try. These are tuples where the first specifies players to send, and the second to receive 
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
-    _H: H-scoring agent, which can be used to calculate H-score 
     player_assignments: 
     scoring_format: Name of format. Included as input because it is an input to H
             and the cache should be re-calculated when format changes
   Returns:
       None
   """
+  H = get_data_from_session_state('H')
   
   def process_row(row):
       
@@ -372,7 +368,7 @@ def make_combo_df(all_combos : list
                                 , my_trade
                                 , their_team
                                 , their_trade
-                                , _H
+                                , H
                                 , player_assignments
                                 , 1)
       
@@ -403,7 +399,7 @@ def make_combo_df(all_combos : list
 @st.cache_data(show_spinner = """Finding suggested trades. How long this will take depends on 
                                   the trade parameters"""
                , ttl = 3600)
-def make_trade_suggestion_df(_H
+def make_trade_suggestion_df(h_key : str
                   , player_assignments : dict[list[str]]
                   , my_team : str
                   , their_team : str
@@ -417,8 +413,8 @@ def make_trade_suggestion_df(_H
   """Shows automatic trade suggestions 
 
   Args:
-    _H: H-scoring agent, which can be used to calculate H-score 
-    player_assignments: 
+    h_key: represents the H Agent
+    player_assignments: dictionary of which players are on which teams 
     my_players: initial list of players on your team
     their_players: initial list of players on other team 
     general_values : series representing general values, for filtering purposes
@@ -434,8 +430,9 @@ def make_trade_suggestion_df(_H
       None
   """
   info_key = get_data_key('info')
+  H = get_data_from_session_state('H')
 
-  my_candidates, their_candidates = identify_trade_candidates(_H, my_team, their_team, player_assignments)
+  my_candidates, their_candidates = identify_trade_candidates(H, my_team, their_team, player_assignments)
   
   all_combos = pd.concat([get_cross_combos(n
                                 , m
@@ -447,13 +444,12 @@ def make_trade_suggestion_df(_H
                                 , info_key) for n,m,vt in combo_params])
   
 
-  full_dataframe = make_combo_df(all_combos
+  full_dataframe = make_combo_df(h_key
+                  , info_key
+                  , all_combos
                   , my_team
                   , their_team
-                  , _H
-                  , player_assignments 
-                  , scoring_format
-                  , info_key) 
+                  , player_assignments) 
   
   my_threshold_criteria = full_dataframe['Your Score'] > your_differential_threshold
   their_threshold_criteria = full_dataframe['Their Score'] > their_differential_threshold
@@ -468,19 +464,17 @@ def make_trade_suggestion_df(_H
     return None
 
 @st.cache_data(show_spinner = False, ttl = 3600)
-def make_trade_h_tab(_H
+def make_trade_h_tab(h_key
                   , player_assignments : dict[list[str]]
                   , n_iterations : int
                   , my_team : str
                   , my_trade : list[str]
                   , their_team : str
-                  , their_trade : list[str]
-                  , scoring_format : str
-                  , info_key : int):
+                  , their_trade : list[str]):
   """show the results of a potential trade
 
   Args:
-    _H: H-scoring agent, which can be used to calculate H-score 
+    h_key: Represents the h-scoring agent 
     player_assignments: 
     n_iterations: int, number of gradient descent steps
     my_trade: player(s) to be traded from your team
@@ -490,11 +484,12 @@ def make_trade_h_tab(_H
     their_team_name: name of counterparty team
     scoring_format: Name of format. Included as input because it it an input to H
             and the cache should be re-calculated when format changes
-    info_key: for detecting changes
 )
   Returns:
       None
   """
+  H = get_data_from_session_state('H')
+
   my_trade_len = len(my_trade)
   their_trade_len = len(their_trade)
 
@@ -508,7 +503,7 @@ def make_trade_h_tab(_H
                                 , my_trade
                                 , their_team
                                 , their_trade
-                                , _H
+                                , H
                                 , player_assignments
                                 ,n_iterations)
       
@@ -641,7 +636,7 @@ def analyze_trade(team_1
 
     return results_dict
 
-def identify_trade_candidates(_H
+def identify_trade_candidates(H
                               , my_team : str
                               , their_team : str
                               , player_assignments : dict):
@@ -666,7 +661,7 @@ def identify_trade_candidates(_H
 
   my_values_to_me = pd.Series([analyze_trade_value(player
                                       , my_team
-                                      , _H
+                                      , H
                                       , player_assignments) for player in my_players
                     ]
                     , index = my_players)
@@ -674,7 +669,7 @@ def identify_trade_candidates(_H
 
   their_values_to_me = pd.Series([analyze_trade_value(player
                                       , my_team
-                                      , _H
+                                      , H
                                       , player_assignments) for player in their_players
                     ]
                     , index = their_players)
@@ -683,7 +678,7 @@ def identify_trade_candidates(_H
 
   my_values_to_them = pd.Series([analyze_trade_value(player
                                       , their_team
-                                      , _H
+                                      , H
                                       , player_assignments) for player in my_players
                     ]
                     , index = my_players)
@@ -691,7 +686,7 @@ def identify_trade_candidates(_H
 
   their_values_to_them = pd.Series([analyze_trade_value(player
                                       , their_team
-                                      , _H
+                                      , H
                                       , player_assignments) for player in their_players
                     ]
                     , index = their_players)

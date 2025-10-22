@@ -1,5 +1,5 @@
 import streamlit as st
-from src.helpers.helper_functions import  get_n_picks, get_params, get_position_numbers
+from src.helpers.helper_functions import  get_mode, get_n_picks, get_params, get_position_numbers
 
 def position_requirement_popover():
     """Allows the user to prescribe the position structure for teams to follow
@@ -28,7 +28,7 @@ def position_requirement_popover():
       else:
         position_defaults = all_position_defaults[params['options']['n_picks']['default']]
 
-        if st.session_state.mode != 'Season Mode':
+        if get_mode() != 'Season Mode':
           st.warning('''There is no default position structure for a league with ''' + str(n_picks) + \
                   ''' picks. Position structure must be met manually on the Advanced tab.''')
 
@@ -77,7 +77,7 @@ def position_requirement_popover():
 
       implied_n_picks = sum(n for n in get_position_numbers().values()) + st.session_state.n_bench
       
-      if (implied_n_picks != get_n_picks()) & (st.session_state.mode != 'Season Mode'):
+      if (implied_n_picks != get_n_picks()) & (get_mode() != 'Season Mode'):
         st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(n_picks) + \
                 ' picks per manager. Adjust the position slots before proceeding')
         st.stop()

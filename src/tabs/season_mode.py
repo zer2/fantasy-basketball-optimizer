@@ -6,7 +6,7 @@ from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify
 from src.tabs.candidate_subtabs import make_cand_tab
 
-def make_season_mode_tabs(H):
+def make_season_mode_tabs():
   """Create the season mode display, which has three tabs: waiver players, trades, and rosters 
 
   Args:
@@ -16,6 +16,7 @@ def make_season_mode_tabs(H):
       None
   """
   info = get_data_from_session_state('info')
+  H = get_data_from_session_state('H')
 
   main_tabs = st.tabs(["⛹️‍♂️ Waiver Wire & Free Agents"
                   ,"📋 Trading"
@@ -72,8 +73,7 @@ def make_season_mode_tabs(H):
 
     make_trade_tab(H
                    , selections_df
-                   , player_assignments
-                   , g_scores_unselected)         
+                   , player_assignments)         
     
 @st.fragment
 def roster_inspection(selections_df : pd.DataFrame):
@@ -196,9 +196,7 @@ def make_full_waiver_tab(H
         )
 
   if len(waiver_players) >= n_picks:
-        make_cand_tab(H
-                ,info_key
-                ,player_assignments
+        make_cand_tab(player_assignments
                 ,waiver_inspection_seat
                 ,1
                 ,None
