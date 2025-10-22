@@ -1,7 +1,13 @@
+import os
+os.environ.setdefault("OMP_NUM_THREADS", "2")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "2")
+os.environ.setdefault("MKL_NUM_THREADS", "2")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "2")
+
 import streamlit as st
 import numpy as np
 import yaml
-from src.helpers.helper_functions import get_n_drafters
+from src.helpers.helper_functions import get_data_from_session_state, get_n_drafters, initialize_selections_df
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.math.algorithm_agents import HAgent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
@@ -15,7 +21,6 @@ from src.parameter_collection.format import format_popover
 #from wfork_streamlit_profiler import Profiler
 import streamlit.components.v1 as components
 from streamlit_theme import st_theme
-import numpy
 
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
@@ -27,14 +32,6 @@ st.set_page_config(
           , page_title = 'Fantasy Sports Optimization'
           , initial_sidebar_state="auto"
           , menu_items=None)
-
-#the randints are a hack, to address a known issue with streamlit. The keys and the caches can get out of synch
-#see here: https://discuss.streamlit.io/t/st-session-state-values-are-reset-on-page-reload-but-st-cache-values-are-not/18059
-if 'player_stats_version' not in st.session_state:
-    st.session_state.player_stats_version = 0 + np.random.randint(0,10000, size = 1) * 1000
-
-if 'info_key' not in st.session_state:
-    st.session_state.info_key = 100000 + np.random.randint(0,10000, size = 1) * 1000
 
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
@@ -66,8 +63,8 @@ if 'draft_results' not in st.session_state:
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
-if 'res_cache' not in st.session_state:
-  st.session_state.res_cache = {}
+if 'data_dictionary' not in st.session_state:
+  st.session_state.data_dictionary = {}
 
 if 'all_params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
@@ -96,7 +93,7 @@ with st.sidebar:
   #https://github.com/streamlit/streamlit/issues/8934
   with st.popover(':small[Player Stats]').container(height = 300):
 
-    player_stats = player_stats_popover()
+    player_stats_popover()
 
   with st.popover(':small[Format & Categories]'):
 
@@ -122,10 +119,8 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
-
 ### Build app 
-
-H = HAgent(info = st.session_state.info
+H = HAgent(info = get_data_from_session_state('info')
     , omega = st.session_state.omega
     , gamma = st.session_state.gamma
     , n_picks = st.session_state.n_starters
@@ -143,6 +138,7 @@ if st.session_state['mode'] == 'Draft Mode':
     st.session_state.drafter = 0
 
   if st.session_state.data_source == 'Enter your own data':
+    initialize_selections_df()
     make_drafting_tab_own_data(H)
   else:
     make_drafting_tab_live_data(H)

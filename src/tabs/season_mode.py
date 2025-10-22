@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_selected_categories, get_n_drafters
+from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_n_picks, get_params, get_selected_categories, get_n_drafters, get_rosters_df, get_styler, get_team_names
 from src.tabs.trading import make_trade_tab
 from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify
@@ -15,6 +15,8 @@ def make_season_mode_tabs(H):
   Returns:
       None
   """
+  info = get_data_from_session_state('info')
+
   main_tabs = st.tabs(["⛹️‍♂️ Waiver Wire & Free Agents"
                   ,"📋 Trading"
                   ,"🏟️ Rosters"])
@@ -30,29 +32,17 @@ def make_season_mode_tabs(H):
     with left:
 
       st.caption("""Enter which player is on which team below""")
-      player_category_type = CategoricalDtype(categories=list(st.session_state.player_stats.index) + ['RP']
+      player_category_type = CategoricalDtype(categories=list(get_data_from_session_state('player_stats_v2').index) + ['RP']
                                                 , ordered=True)
       
       with st.form('manual_rosters'):
 
-        #ZR: This is a hack. For some reason the get_rosters_df function does not cache properly, 
-        #so we have to call it again without caching. 
-        #This is important because with new datasets entered the player set can change and more 
-        #players may be recognized with positions. If the roster_df is not updated based on the 
-        #new position information it gets messed up
-        #Maybe the long-term way to fix this is tying positions only to the platform integration. 
-        #I believe this would make it unnecessary to update the position list 
-
         #ZR: This should become a helper function 
-        if st.session_state.data_source == 'Enter your own data':
-          rosters = st.session_state.selections_df
-        else:
-          rosters = st.session_state.integration.get_rosters_df(st.session_state.integration.league_id
-                                                                , st.session_state.player_stats_version)
+        rosters = get_rosters_df()
 
         selections_df = st.data_editor(rosters.astype(player_category_type)
                                             , hide_index = True
-                                            , height = st.session_state.n_picks * 35 + 50
+                                            , height = get_n_picks() * 35 + 50
                                             , key = 'selections_df_edited').fillna('RP')
         
         c1, c2 = st.columns([0.2,0.8])
@@ -66,7 +56,7 @@ def make_season_mode_tabs(H):
 
         player_assignments = selections_df.to_dict('list')
 
-        g_scores_unselected = st.session_state.info['G-scores'][~st.session_state.info['G-scores'].index.isin(selection_list)]
+        g_scores_unselected = info['G-scores'][~info['G-scores'].index.isin(selection_list)]
 
       with right: 
 
@@ -102,16 +92,14 @@ def roster_inspection(selections_df : pd.DataFrame):
 
     inspection_players = selections_df[roster_inspection_seat].dropna()
 
-    make_team_display(st.session_state.info['G-scores']
+    make_team_display(get_data_key('info')
                         ,inspection_players
-                        ,st.session_state.info_key
                         ,st.session_state.base
                         )
 
 @st.cache_data(ttl = 3600)
-def make_team_display(_g_scores : pd.DataFrame
+def make_team_display(info_key
                   ,my_players : list[str]
-                  ,info_key
                   ,mode #only used to avoid caching the wrong display
                   ):
   """Make a table summarizing a team as it currently stands
@@ -124,6 +112,7 @@ def make_team_display(_g_scores : pd.DataFrame
   Returns:
       None
   """
+  g_scores = get_data_from_session_state('info')['G-scores']
 
   if len(my_players) > 0:
 
@@ -131,20 +120,22 @@ def make_team_display(_g_scores : pd.DataFrame
 
     my_real_players = [x for x in my_players if x != 'RP']
 
-    team_stats = _g_scores[_g_scores.index.isin(my_real_players)]
+    team_stats = g_scores[g_scores.index.isin(my_real_players)]
 
     team_stats.loc['Total', :] = team_stats.sum(axis = 0)
 
     team_stats = team_stats.loc[['Total'] + list(my_real_players)]
-    styler = st.session_state.styler
+
+    styler = get_styler()
+    params = get_params()
 
     team_stats_styled = team_stats.style.format("{:.2f}").map(styler.styler_a) \
                                                 .map(styler.styler_c, subset = pd.IndexSlice[['Total'], get_selected_categories()]) \
                                                 .map(styler.styler_b, subset = pd.IndexSlice[['Total'], ['Total']]) \
                                                 .map(styler.stat_styler_primary, subset = pd.IndexSlice[my_real_players, get_selected_categories()]
-                                                     , multiplier = st.session_state.params['g-score-player-multiplier']) \
+                                                     , multiplier = params['g-score-player-multiplier']) \
                                                 .applymap(styler.stat_styler_primary, subset = pd.IndexSlice['Total', get_selected_categories()]
-                                                    , multiplier = st.session_state.params['g-score-team-multiplier']) \
+                                                    , multiplier = params['g-score-team-multiplier']) \
     
     
     st.dataframe(team_stats_styled
@@ -167,18 +158,21 @@ def make_full_waiver_tab(H
   Returns:
       DataFrame of stats of unselected players, to use in other tabs
   """
-  
+  n_picks = get_n_picks()
+  info = get_data_from_session_state('info')
+  info_key = get_data_key('info')
+
   c1, c2 = st.columns([0.5,0.5])
 
   with c1: 
     waiver_inspection_seat = st.selectbox(f'Which team do you want to drop a player from?'
-        , st.session_state.selections_df.columns
+        , get_team_names()
         , index = 0)
 
   with c2: 
       waiver_players = [x for x in selections_df[waiver_inspection_seat] if x != 'RP']
 
-      if len(waiver_players) < st.session_state.n_picks:
+      if len(waiver_players) < n_picks:
           st.markdown("""This team is not full yet!""")
 
       else:
@@ -188,10 +182,10 @@ def make_full_waiver_tab(H
         #with the blue highlight everywhere
 
 
-        waiver_team_stats_g = st.session_state.info['G-scores'][st.session_state.info['G-scores'].index.isin(waiver_players)]
+        waiver_team_stats_g = info['G-scores'][info['G-scores'].index.isin(waiver_players)]
         waiver_team_stats_g.loc['Total', :] = waiver_team_stats_g.sum(axis = 0)
 
-        worst_player = list(st.session_state.info['G-scores'].index[st.session_state.info['G-scores'].index.isin(waiver_players)])[-1]
+        worst_player = list(info['G-scores'].index[info['G-scores'].index.isin(waiver_players)])[-1]
 
         default_index = list(waiver_players).index(worst_player)
 
@@ -201,14 +195,14 @@ def make_full_waiver_tab(H
           ,index = default_index
         )
 
-  if len(waiver_players) >= st.session_state.n_picks:
+  if len(waiver_players) >= n_picks:
         make_cand_tab(H
-                ,st.session_state.info['G-scores']
+                ,info_key
                 ,player_assignments
                 ,waiver_inspection_seat
                 ,1
                 ,None
                 ,None
                 ,None
-                ,st.session_state.n_picks * get_n_drafters()
+                ,n_picks * get_n_drafters()
                 ,drop_player)

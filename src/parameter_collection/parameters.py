@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 
-from src.helpers.helper_functions import get_selected_categories, increment_player_stats_version
+from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_mode, get_n_picks, get_params, get_selected_categories, store_dataset_in_session_state
 from src.math.process_player_data import process_player_data
-from src.helpers.helper_functions import get_games_per_week, get_n_drafters
+from src.helpers.helper_functions import make_upsilon_adjustment, get_n_drafters
 
 def player_stat_param_popover():
     """Collect information from the user on desired parameters for handling player injuries/uncertainty 
@@ -15,13 +15,13 @@ def player_stat_param_popover():
     Returns:
       None 
     """
+    params = get_params()
     
     upsilon = st.number_input(r'Select a $\upsilon$ value'
                       , key = 'upsilon'
-                      , min_value = float(st.session_state.params['options']['upsilon']['min'])
-                      , value = float(st.session_state.params['options']['upsilon']['default'])
-                    , max_value = float(st.session_state.params['options']['upsilon']['max'])
-                    , on_change = increment_player_stats_version)
+                      , min_value = float(params['options']['upsilon']['min'])
+                      , value = float(params['options']['upsilon']['default'])
+                    , max_value = float(params['options']['upsilon']['max']))
     upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
                   miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
                   $15\%$ of games instead'''
@@ -30,9 +30,9 @@ def player_stat_param_popover():
 
     psi = st.number_input(r'Select a $\psi$ value'
                       , key = 'psi'
-                      , min_value = float(st.session_state.params['options']['psi']['min'])
-                      , value = float(st.session_state.params['options']['psi']['default'])
-                    , max_value = float(st.session_state.params['options']['psi']['max']))
+                      , min_value = float(params['options']['psi']['min'])
+                      , value = float(params['options']['psi']['default'])
+                    , max_value = float(params['options']['psi']['max']))
     psi_str = r'''It it assumed that of the games a player will miss, 
                   they are replaced by a replacement-level player for $\psi \%$ of them'''
   
@@ -40,9 +40,9 @@ def player_stat_param_popover():
 
     chi = st.number_input(r'Select a $\chi$ value'
         , key = 'chi'
-        , value = float(st.session_state.params['options']['chi']['default'])
-        , min_value = float(st.session_state.params['options']['chi']['min'])
-        , max_value = float(st.session_state.params['options']['chi']['max']))
+        , value = float(params['options']['chi']['default'])
+        , min_value = float(params['options']['chi']['min'])
+        , max_value = float(params['options']['chi']['max']))
 
     chi_str = r'''The estimated variance in season-long projections relative to empirical week-to-week variance. 
                     for Rotisserie. E.g. if $\chi$ is 0.6, variance is effectively 60% of the week-to-week variance
@@ -52,9 +52,9 @@ def player_stat_param_popover():
 
     aleph = st.number_input(r'Select a $\alef$ value'
         , key = 'aleph'
-        , value = float(st.session_state.params['options']['aleph']['default'])
-        , min_value = float(st.session_state.params['options']['aleph']['min'])
-        , max_value = float(st.session_state.params['options']['aleph']['max']))
+        , value = float(params['options']['aleph']['default'])
+        , min_value = float(params['options']['aleph']['min'])
+        , max_value = float(params['options']['aleph']['max']))
 
     aleph_str = r'''Extra correlation between volume-based categories for Rotisserie, to account for the fact that some managers 
                   will be more or less active. E.g. if $\alef$ is 0.1 and the correlation between blocks and points is 30%, 
@@ -64,8 +64,8 @@ def player_stat_param_popover():
 
     beth = st.number_input(r'Select a $\beth$ value'
         , key = 'beth'
-        , value = float(st.session_state.params['options']['beth']['default'])
-        , min_value = float(st.session_state.params['options']['beth']['min'])
+        , value = float(params['options']['beth']['default'])
+        , min_value = float(params['options']['beth']['min'])
         , max_value = None)
 
     beth_str = r'''Controls the degree to which projections of your team are adjusted downwards to the average, 
@@ -75,13 +75,13 @@ def player_stat_param_popover():
     st.caption(beth_str)
 
 
-    if st.session_state['mode'] == 'Auction Mode':
+    if get_mode() == 'Auction Mode':
 
       streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
                                 , key = 'streaming_noise'
-                                , value = float(st.session_state.params['options']['S']['default'])
-                                , min_value = float(st.session_state.params['options']['S']['min'])
-                                , max_value = float(st.session_state.params['options']['S']['max'])
+                                , value = float(params['options']['S']['default'])
+                                , min_value = float(params['options']['S']['min'])
+                                , max_value = float(params['options']['S']['max'])
                               )
       stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. It roughly represents the 
                             standard deviation of dollar values expected for players during the 
@@ -89,41 +89,19 @@ def player_stat_param_popover():
                             making low-value players more heavily down-weighted due to the possibility 
                             that they drop below streaming-level value'''
       st.caption(stream_noise_str)         
-
-    #I don't think we need people to be able to modify the coefficients
-    coefficient_series = pd.Series(st.session_state.params['coefficients'])
-    st.session_state.conversion_factors = coefficient_series.T    
-
-    #make the upsilon adjustment
-    @st.cache_data(show_spinner = False, ttl = 3600)
-    def make_upsilon_adjustment(_raw_stat_df, upsilon, player_stats_version):
-      _raw_stat_df['Games Played %'] = 1 - ( 1 - _raw_stat_df['Games Played %']) * upsilon 
-
-      counting_statistics = st.session_state.params['counting-statistics'] 
-      volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
-
-      for col in counting_statistics + volume_statistics:
-        if col in _raw_stat_df.columns:
-          _raw_stat_df[col] = _raw_stat_df[col].astype(float) * _raw_stat_df['Games Played %'] * get_games_per_week()
-
-      return _raw_stat_df
     
-    st.session_state.player_stats = make_upsilon_adjustment(st.session_state.raw_stat_df
-                            , upsilon
-                            , st.session_state.player_stats_version)
-
-
-    st.session_state.info = process_player_data(None
-                            ,st.session_state.player_stats
-                            ,st.session_state.conversion_factors
-                            ,st.session_state.psi
-                            ,st.session_state.chi
-                            ,st.session_state.scoring_format
-                            ,get_n_drafters()
-                            ,st.session_state.n_picks
-                            ,st.session_state.params
-                            ,st.session_state.player_stats_version)
-
+    make_upsilon_adjustment(get_data_key('player_stats_v1'), upsilon)
+    
+    process_player_data(None
+                          ,get_data_key('player_stats_v2')
+                          ,st.session_state.psi
+                          ,st.session_state.chi
+                          ,st.session_state.scoring_format
+                          ,get_n_drafters()
+                          ,get_n_picks()
+                          ,params
+                          ,get_selected_categories())
+    
 def algorithm_param_popover():
     """Collect information from the user on desired parameters for H-scoring
     Adds three objects, all floats, to session_state: 'omega', 'gamma', and 'n_iterations'. 
@@ -135,15 +113,17 @@ def algorithm_param_popover():
     Returns:
       None 
     """
-    punting_default = st.session_state.params['punting_default']
+    params = get_params()
 
-    punting_levels = st.session_state.params['punting_defaults']
+    punting_default = params['punting_default']
+
+    punting_levels = params['punting_defaults']
 
     omega = st.number_input(r'Select a $\omega$ value'
                           , key = 'omega'
                           , value = punting_levels[punting_default]['omega']
-                          , min_value = float(st.session_state.params['options']['omega']['min'])
-                          , max_value = float(st.session_state.params['options']['omega']['max']))
+                          , min_value = float(params['options']['omega']['min'])
+                          , max_value = float(params['options']['omega']['max']))
     omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
                     it quantifies how much better the optimal player choice will be compared to the player that would be 
                     chosen with baseline weights'''
@@ -152,8 +132,8 @@ def algorithm_param_popover():
     gamma = st.number_input(r'Select a $\gamma$ value'
                           , key = 'gamma'
                           , value = punting_levels[punting_default]['gamma']
-                          , min_value = float(st.session_state.params['options']['gamma']['min'])
-                          , max_value = float(st.session_state.params['options']['gamma']['max']))
+                          , min_value = float(params['options']['gamma']['min'])
+                          , max_value = float(params['options']['gamma']['max']))
     gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
             tune it if you want. Higher values imply that the algorithm will have to give up more general value to find the
             players that  work best for its strategy'''
@@ -162,8 +142,8 @@ def algorithm_param_popover():
     n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
                               , key = 'n_iterations'
                               , value = punting_levels[punting_default]['n_iterations']
-                              , min_value = st.session_state.params['options']['n_iterations']['min']
-                              , max_value = st.session_state.params['options']['n_iterations']['max'])
+                              , min_value = params['options']['n_iterations']['min']
+                              , max_value = params['options']['n_iterations']['max'])
     n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
     st.caption(n_iterations_str)
     

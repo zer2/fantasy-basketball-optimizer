@@ -5,7 +5,7 @@ from itertools import combinations
 from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from src.math.process_player_data import get_category_level_rv
 import streamlit as st 
-from src.helpers.helper_functions import get_league_type, get_position_structure, get_position_indices, get_L_weights \
+from src.helpers.helper_functions import get_data_from_session_state, get_league_type, get_mode, get_position_structure, get_position_indices, get_L_weights \
                                             , get_selected_categories, get_max_info, get_correlations, get_pitcher_stats
 from src.math.position_optimization import optimize_positions_all_players, check_single_player_eligibility, check_all_player_eligibility
 from src.math.algorithm_helpers import auction_value_adjuster
@@ -1515,15 +1515,16 @@ def get_base_h_score(_info : dict
   return next(H.get_h_scores(player_assignments, team))   
 
 @st.cache_data(show_spinner = False, ttl = 3600)
-def get_default_h_values(info : dict
+def get_default_h_values(info_key : str
                   , omega : float
                   , gamma : float
                   , n_picks : int
                   , n_drafters : int
                   , n_iterations : int
                   , beth : float
-                  , scoring_format : str
-                  , info_key : int):
+                  , scoring_format : str):
+  
+  info = get_data_from_session_state('info')
   
   H = HAgent(info = info
     , omega = omega
@@ -1534,7 +1535,7 @@ def get_default_h_values(info : dict
     , beth = beth
     , scoring_format = scoring_format)
   
-  if st.session_state['mode'] == 'Auction Mode':
+  if get_mode() == 'Auction Mode':
     cash_remaining_per_team = {n : 200 for n in range(n_drafters)}
   else:
     cash_remaining_per_team = None

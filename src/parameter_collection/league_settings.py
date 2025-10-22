@@ -8,8 +8,7 @@ from src.tabs.drafting import increment_and_reset_draft, clear_draft_board
 import pandas as pd
 import numpy as np
 
-from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
-from src.helpers.helper_functions import get_team_names
+from src.helpers.helper_functions import get_mode, get_n_picks, get_params, get_selections_default, get_team_names, set_params, using_manual_entry
 
 def league_settings_popover():
     """Collect settings for the league and set up a platform integration if necessary
@@ -34,7 +33,7 @@ def league_settings_popover():
     """
 
     #no need for second column if there is no integration
-    if st.session_state.data_source == 'Enter your own data':
+    if using_manual_entry():
         c1, c2 = st.columns([0.5,0.5])
     else:
         c1 = st.container()
@@ -49,7 +48,8 @@ def league_settings_popover():
                 , on_change = increment_and_reset_draft
                 )
             
-        st.session_state.params = st.session_state.all_params[league]
+        set_params(league)
+        params = get_params()
 
         integrations = {integration.get_description_string() : integration for integration in \
                         [YahooIntegration(), FantraxIntegration(), ESPNIntegration()]}
@@ -61,7 +61,7 @@ def league_settings_popover():
         , on_change = increment_and_reset_draft
         , index = 0)
 
-        if st.session_state.data_source == 'Enter your own data':
+        if using_manual_entry():
             mode_options = ('Draft Mode', 'Auction Mode','Season Mode')      
 
         else:
@@ -79,55 +79,46 @@ def league_settings_popover():
         
             st.session_state.integration.setup()
 
-            st.session_state.n_picks = st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
 
-            st.session_state.selections_default = st.session_state.integration.selections_default
 
-            st.session_state.selections_df = st.session_state.selections_default
 
-            st.session_state.yahoo_key_to_name_mapper = get_yahoo_key_to_name_mapper()
-
-    if st.session_state.data_source == 'Enter your own data':
+    if using_manual_entry():
 
         with c1: 
 
-            if st.session_state.mode == 'Draft Mode':
+            if get_mode() == 'Draft Mode':
                 st.toggle('Toggle third round reversal'
                           , key = 'third_round_reversal'
                           , on_change= clear_draft_board)
             else:
-                st.session_state.third_round_reveral = False
+                st.session_state.third_round_reversal = False
                 
         with c2: 
 
             n_drafters = st.number_input(r'How many drafters are in your league?'
                                         , key = 'n_drafters'
-                                        , min_value = st.session_state.params['options']['n_drafters']['min']
-                                        , value = st.session_state.params['options']['n_drafters']['default']
+                                        , min_value = params['options']['n_drafters']['min']
+                                        , value = params['options']['n_drafters']['default']
                                         , on_change = clear_draft_board
                                         )
 
             n_picks = st.number_input(r'How many players will each drafter choose?'
                             , key = 'n_picks'
-                            , min_value = st.session_state.params['options']['n_picks']['min']
-                            , value = st.session_state.params['options']['n_picks']['default']
+                            , min_value = params['options']['n_picks']['min']
+                            , value = params['options']['n_picks']['default']
                             , on_change = clear_draft_board)
                                     
-
             st.write('Enter team names here:')
 
             team_df = st.data_editor(pd.DataFrame({'Team ' + str(i) : ['Drafter ' + str(i)] for i in range(n_drafters)})
                             , hide_index = True
+                            , key = 'team_name_df'
                             , on_change = increment_and_reset_draft)
-            
-            #ZR: It would probably be better to access this through a function that accesses team_df
             st.session_state.team_names = list(team_df.iloc[0])
 
-            # perhaps the dataframe should be uneditable, and users just get to enter the next players picked? With an undo button?
-            #Should this just be called if selections_df not in session state?
             st.session_state.selections_default = pd.DataFrame(
-                {team : [np.nan] * st.session_state.n_picks for team in get_team_names()}
+                {team : [np.nan] * get_n_picks() for team in get_team_names()}
                 )
             
-            if 'selections_df' not in st.session_state:
-                st.session_state.selections_df = st.session_state.selections_default 
+    else: 
+        st.session_state.third_round_reversal = False

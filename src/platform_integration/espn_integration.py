@@ -1,5 +1,5 @@
 import streamlit as st
-from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
 from src.tabs.drafting import clear_draft_board, increment_and_reset_draft
@@ -12,7 +12,6 @@ from src.platform_integration import yahoo_helper
 from streamlit.logger import get_logger
 from tempfile import mkdtemp
 from yfpy.query import YahooFantasySportsQuery
-from src.data_retrieval.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
 from src.helpers.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names
 from collections import Counter
 from src.helpers.helper_functions import get_fixed_player_name
@@ -91,7 +90,7 @@ class ESPNIntegration(PlatformIntegration):
               self.team_names = self.get_team_names(self.league_id)
               self.n_drafters = len(self.get_teams_dict(self.league_id)) 
 
-              team_players_df = self.get_rosters_df(self.league_id, st.session_state.player_stats_version)
+              team_players_df = self.get_rosters_df(self.league_id)
               self.selections_default = team_players_df
 
               self.n_picks = team_players_df.shape[0]
@@ -124,8 +123,7 @@ class ESPNIntegration(PlatformIntegration):
         sorted_leagues = sorted(leagues, key = lambda league: league['metaData']['entry']['seasonId'], reverse=True)
         return sorted_leagues
 
-    #@st.cache_data(ttl=3600, show_spinner = "Fetching rosters from your ESPN league. This should take about ten seconds")
-    def get_rosters_df(_self, league_id, player_stats_version):
+    def get_rosters_df(self, league_id):
         """Get a dataframe with a column per team and cell per player chosen by that team
 
         Args:
@@ -135,14 +133,14 @@ class ESPNIntegration(PlatformIntegration):
             DataFrame with roster info
         """
         league = League(league_id = league_id.split(':')[1]
-                        , year = _self.year
+                        , year = self.year
                         , espn_s2= st.session_state.espn_s2
                         , swid=st.session_state.espn_swid)
                 
         teams = league.teams
 
         team_players_dict = {team.team_name :
-                [get_fixed_player_name(player.name) for player in team.roster] 
+                [get_fixed_player_name(player.name, get_data_key('info')) for player in team.roster] 
                               for team in teams}
                 
         max_team_size = max([len(x) for x in team_players_dict.values()])

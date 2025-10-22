@@ -3,8 +3,29 @@ import pandas as pd
 import streamlit as st
 from functools import reduce 
 from unidecode import unidecode
-import snowflake.connector
 import os 
+import uuid
+
+def using_manual_entry():
+  return st.session_state.data_source == 'Enter your own data'
+
+def get_mode():
+   return st.session_state.mode
+
+def set_params(league):
+   st.session_state.params = st.session_state.all_params[league]
+
+def get_params():
+  if st.session_state:
+    return st.session_state.params
+  else:
+     return None
+  
+def get_styler():
+  if st.session_state:
+    return st.session_state.styler
+  else: 
+    return None
 
 def get_categories():
     #convenience function to get the list of categories used for fantasy basketball
@@ -191,6 +212,16 @@ def adjust_teams_dict_for_duplicate_names(teams_dict):
 
     return teams_dict
 
+def initialize_selections_df():
+  if 'selections_df' not in st.session_state:
+      st.session_state.selections_df = get_selections_default()
+
+def get_selected_players():
+  if 'selections_df' in st.session_state:
+    return listify(st.session_state.selections_df)
+  else: 
+    return []
+
 def get_L_weights() -> pd.Series:
    #calculate a default weighting for L
    #this assumes that all flex positions are weighted evenly among their bases 
@@ -219,7 +250,7 @@ def get_games_per_week():
       return st.session_state.params['n_games_per_week']
    
 def get_team_names():
-   if st.session_state.data_source == 'Enter your own data':
+   if using_manual_entry():
       return st.session_state.team_names
    else:
       return st.session_state.integration.get_team_names(st.session_state.integration.league_id
@@ -228,9 +259,62 @@ def get_team_names():
 def get_n_drafters():
    return len(get_team_names())
 
-#ZR: For efficiency, should make this a series and save it beforehand. The caching wont work
-#The problem is that there might be names that we miss, which would be bad
-def get_fixed_player_name(player_name : str) -> str:
+def get_rosters_df():
+  if using_manual_entry():
+    return st.session_state.selections_df
+  else:
+    return st.session_state.integration.get_rosters_df(st.session_state.integration.league_id)
+  
+def get_n_picks():
+  if using_manual_entry():
+    return st.session_state.n_picks
+  else:
+    return st.session_state.integration.get_n_picks(st.session_state.integration.league_id)
+
+def get_selections_default():
+   if using_manual_entry():
+    return st.session_state.selections_default
+   else: #ZR: Is this even necessary? I don't think the default selections df gets used at all with a live connection
+    return st.session_state.integration.selections_default
+  
+def get_player_name_column():
+   if 'integration' in st.session_state:
+      return st.session_state.integration.get_player_name_column()
+   else:
+      return 'PLAYER_NAME'
+   
+
+'''
+Dataframe storage
+
+Small dataframes that are unique to individual user sessions are stored in session state. 
+Each of the dataframes is associated with a randomly generated key, so that the key can be checked
+for hashing instead of the entire dataframe 
+
+Dataframes included with this:
+player_stats_v0: dataframe of raw stats, before dropping injured players
+player_stats_v1: dataframe of raw stats, after dropping injured players but before the upsilon adjustment
+player_stats_v2: dataframe after dropping injured players
+
+need to make player_stats_v0 get updated more correctly, and add metadata
+
+add all of the things from info as a dict (they get updated together)
+
+'''
+def store_dataset_in_session_state(df, dataset_name):
+    
+    key = str(uuid.uuid4())
+    st.session_state.data_dictionary[dataset_name] = {'key' : key
+                                                      ,'data' : df}
+    
+def get_data_key(dataset_name):
+   return st.session_state.data_dictionary[dataset_name]['key']
+
+def get_data_from_session_state(dataset_name):
+   return st.session_state.data_dictionary[dataset_name]['data']
+
+@st.cache_data(ttl = 3600)
+def get_fixed_player_name(player_name : str, info_key : str) -> str:
     
     """Fix player name string to adhere to common standard
 
@@ -243,9 +327,11 @@ def get_fixed_player_name(player_name : str) -> str:
     if isinstance(player_name, pd.Series):
        player_name = player_name.values[0] #fix for weird thing with auctions
 
-    player_metadata = st.session_state.player_metadata
-    if player_name in player_metadata.index:
-        return player_name + ' (' + player_metadata[player_name] + ')'
+    positions = get_data_from_session_state('info')['Positions'].copy()
+    positions.index = [x.split(' (')[0] for x in positions.index]
+
+    if player_name in positions.index:
+        return player_name + ' (' + ','.join(positions[player_name]) + ')'
     else:
         return 'RP'
     
@@ -296,7 +382,7 @@ def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier 
 
   df = df[index_columns + agg_columns + get_selected_categories()]
 
-  styler = st.session_state.styler
+  styler = get_styler()
 
   df_styled = df.style.format("{:.2f}"
                               , subset = pd.IndexSlice[:,agg_columns + get_selected_categories()]) \
@@ -349,6 +435,22 @@ def h_percentage_styler(df : pd.DataFrame
                                , target = drop_player)
   return df_styled
 
+#make the upsilon adjustment
+@st.cache_data(show_spinner = False, ttl = 3600)
+def make_upsilon_adjustment(raw_stat_key, upsilon):
+  player_stats_v1 = get_data_from_session_state('player_stats_v1')
+
+  player_stats_v1['Games Played %'] = 1 - ( 1 - player_stats_v1['Games Played %']) * upsilon 
+
+  counting_statistics = get_params()['counting-statistics'] 
+  volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in get_params()['ratio-statistics'].values()]
+
+  for col in counting_statistics + volume_statistics:
+    if col in player_stats_v1.columns:
+      player_stats_v1[col] = player_stats_v1[col].astype(float) * player_stats_v1['Games Played %'] * get_games_per_week()
+
+  store_dataset_in_session_state(player_stats_v1, 'player_stats_v2')
+
 def rotate(l, n):
   #rotate list l by n positions 
   return l[-n:] + l[:-n]
@@ -359,21 +461,19 @@ def weighted_cov_matrix(df, weights):
     weighted_cov = np.dot(weights * deviations.T, deviations) / weights.sum()
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
 
-def increment_player_stats_version():
-  if st.session_state:
-    st.session_state.player_stats_version += 1
-
-def increment_info_key():
-  if st.session_state:
-    st.session_state.info_key += 1
-
 @st.cache_data(show_spinner = False, ttl = 3600)
-def drop_injured_players(_raw_stat_df, injured_players, player_stats_version):
-    res = _raw_stat_df.drop(injured_players)
-    return res
+def drop_injured_players(player_stats_v0_key, injured_players):
+    player_stats_v0 = get_data_from_session_state('player_stats_v0')
+    res = player_stats_v0.drop(injured_players)
+    store_dataset_in_session_state(res ,'player_stats_v1')
+
+def get_conversion_factors():
+    #I don't think we need people to be able to modify the coefficients
+    coefficient_series = pd.Series(get_params()['coefficients'])
+    return coefficient_series.T    
 
 @st.cache_data()
-def get_selections_default(n_picks, n_drafters):
+def get_selections_default_manual(n_picks, n_drafters):
    return pd.DataFrame(
             {'Drafter ' + str(n+1) : [None] * n_picks for n in range(n_drafters)}
             )
@@ -432,6 +532,15 @@ def move_back_one_pick(row: int, drafter: int, n: int):
 
     return row, drafter 
 
+#get a raw dataset that has been uploaded from the user. 
+#just retrieving it from the dataset dictionary stored in session state, so long as there is a session state
+#nos sure what this should do if there is not a session state 
+def get_raw_dataset(dataset_name):
+  if st.session_state:
+    st.session_state.datasets.get(dataset_name)
+  else:
+    return None
+
 def get_league_type():
    if st.session_state:
       return st.session_state.league
@@ -459,21 +568,19 @@ def get_correlations():
 
    return rho
    
+@st.cache_data()
 def get_max_info(N):
-   if st.session_state:
-      max_table  = st.session_state.max_table
-   else:
-      max_table = pd.read_csv('src/data_retrieval/max_table.csv')
+
+   max_table = pd.read_csv('src/data_retrieval/max_table.csv')
 
    info = max_table.set_index('N').loc[N]
 
    return info['EV(X)'],info['VAR(X)'] 
    
-@st.cache_data()
+@st.cache_data(ttl = '1d')
 def get_data_from_snowflake(table_name
                             , schema = 'FANTASYBASKETBALLOPTIMIZER'):
    
-
    con = get_snowflake_connection(schema)
 
    df = con.cursor().execute('SELECT * FROM ' + table_name).fetch_pandas_all()

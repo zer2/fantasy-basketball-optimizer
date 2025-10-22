@@ -70,9 +70,10 @@ def get_league_players(sc: YahooFantasySportsQuery) -> List[League]:
     """
     player_dicts: List[dict[str, Player]] = sc.get_league_players() # type: ignore
 
+    #ZR: AXY I think this code never gets called and is irrelevant. So I am not fixing it for now
+
     player_status_records = [
-            {'Player' : f'{player.name.full} ({st.session_state.player_metadata.get(player.name.full)})'
-            ,'Status': player.status
+            {'Status': player.status
             , 'Eligible Positions' : player.display_position
             , 'Team' : player.editorial_team_abbr
             , 'ID' : player.player_id

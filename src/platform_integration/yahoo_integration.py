@@ -1,5 +1,5 @@
 import streamlit as st
-from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_selections_default
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_selections_default, get_selections_default_manual
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
 from src.tabs.drafting import increment_and_reset_draft
@@ -11,7 +11,7 @@ from src.platform_integration import yahoo_helper
 from streamlit.logger import get_logger
 from tempfile import mkdtemp
 from yfpy.query import YahooFantasySportsQuery
-from src.data_retrieval.get_data import get_nba_schedule, get_yahoo_key_to_name_mapper
+from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
 from src.helpers.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names, get_fixed_player_name
 from collections import Counter
 
@@ -112,7 +112,7 @@ class YahooIntegration(PlatformIntegration):
 
         if (st.session_state.mode == 'Season Mode'):
 
-              team_players_df = self.get_rosters_df(self.league_id, st.session_state.player_stats_version)
+              team_players_df = self.get_rosters_df(self.league_id)
               self.n_drafters = team_players_df.shape[1]
               self.n_picks = team_players_df.shape[0]
               self.selections_default = team_players_df
@@ -139,8 +139,7 @@ class YahooIntegration(PlatformIntegration):
             self.n_drafters = len(self.get_teams_dict(self.league_id))
             self.team_names = list(self.get_teams_dict(self.league_id).values())
             self.n_picks = 13 #ZR: fix this
-            self.selections_default = get_selections_default(self.n_picks,self.n_drafters
-            )
+            self.selections_default = get_selections_default_manual(self.n_picks,self.n_drafters)
     
     @st.dialog("Authenticate with Yahoo")
     def get_yahoo_access_token(_self) -> Optional[str]:
@@ -244,10 +243,8 @@ class YahooIntegration(PlatformIntegration):
     def clean_up_access_token(_self):
         shutil.rmtree(_self.auth_dir)
 
-    @st.cache_data(ttl=3600, show_spinner = False)
     def get_rosters_df(_self
-                       , league_id: str
-                       , player_stats_version) -> pd.DataFrame:
+                       , league_id: str) -> pd.DataFrame:
         """Get a dataframe with a column per team and cell per player chosen by that team
 
         Args:
@@ -383,9 +380,11 @@ class YahooIntegration(PlatformIntegration):
 
         for team_id, roster in rosters_dict.items():
 
+            info_key = get_data_key('info')
+
             team_name = teams_dict[team_id]
             relevant_player_names = [
-                get_fixed_player_name(player_id_mapper.loc[player.player_id].values[0]) #Appending position after player name
+                get_fixed_player_name(player_id_mapper.loc[player.player_id].values[0], info_key) #Appending position after player name
                 for player in roster.players 
                 if 
                     player.selected_position.position not in ('IL', 'IL+')
@@ -395,7 +394,7 @@ class YahooIntegration(PlatformIntegration):
             for player in roster.players:
                 if player.selected_position.position in ('IL', 'IL+'):
                     st.session_state['injured_players'].add( \
-                                get_fixed_player_name(player_id_mapper.loc[player.player_id].values[0])
+                                get_fixed_player_name(player_id_mapper.loc[player.player_id].values[0], info_key)
                                                             )
 
             if len(relevant_player_names) > max_team_size:
@@ -466,36 +465,6 @@ class YahooIntegration(PlatformIntegration):
                             for team_id, team_name in teams.items()}
         return matchups
 
-    @st.cache_resource(ttl=3600)
-    def get_yahoo_schedule(_self
-                           ,league_id: str) -> dict[int, str]:
-        #get numbers of games played per week by each team. Currently not being used
-
-        yahoo_weeks = _self.get_yahoo_weeks(league_id)
-        nba_schedule = get_nba_schedule()
-
-        league_players = _self.get_player_statuses(league_id
-                                                , )
-        
-        league_players = league_players.set_index('Player')
-
-        week_dict = {}
-        for game_week in yahoo_weeks: 
-            teams_playing_list = []
-            for date in pd.date_range(game_week.start, game_week.end, freq = '1D'): 
-                date_formatted = date.strftime("%m/%d/%Y %H:%M:%S")
-                if date_formatted in nba_schedule:  
-                    teams_playing = nba_schedule[date_formatted]
-                    teams_playing_list = teams_playing_list + teams_playing
-
-            game_counts = Counter(teams_playing_list)
-            week_str = 'Week ' + str(game_week.display_name) + ': ' + \
-                                        str(game_week.start) + ' to ' + \
-                                        str(game_week.end)
-            week_dict[week_str] = league_players['Team'].map(game_counts)
-
-        return week_dict
-
     def get_draft_results(_self):
         
         """Get a tuple with
@@ -518,7 +487,7 @@ class YahooIntegration(PlatformIntegration):
 
         #here ok
 
-        mapper_table = st.session_state.yahoo_key_to_name_mapper
+        mapper_table = get_yahoo_key_to_name_mapper()
 
         try:
             draft_results = sc.get_league_draft_results()
@@ -575,7 +544,7 @@ class YahooIntegration(PlatformIntegration):
 
         #return None, 'Draft has not started yet'
 
-        draft_result_raw_df['PlayerMod'] = [get_fixed_player_name(x) for x in draft_result_raw_df['Player'].astype(str)]
+        draft_result_raw_df['PlayerMod'] = [get_fixed_player_name(x, get_data_key('info')) for x in draft_result_raw_df['Player'].astype(str)]
         
         draft_result_raw_df['Team'] = draft_result_raw_df['Team'].str.split('.').str[-1].astype(int)
         draft_result_raw_df['Team'] = ['Drafter ' + str(team_id) if int(team_id) not in teams_dict else teams_dict[int(team_id)]
@@ -634,7 +603,7 @@ class YahooIntegration(PlatformIntegration):
             team_id = draft_obj.team_key.split('.')[-1]
             team_name = 'Drafter ' + team_id if int(team_id) not in teams_dict else teams_dict[int(team_id)]
 
-            drafted_player_mod = get_fixed_player_name(drafted_player)
+            drafted_player_mod = get_fixed_player_name(drafted_player, get_data_key('info'))
 
             row = pd.Series({'Player' : drafted_player_mod
                                 ,'Cost' : draft_obj.cost
