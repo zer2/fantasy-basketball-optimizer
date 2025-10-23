@@ -7,7 +7,7 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "2")
 import streamlit as st
 import numpy as np
 import yaml
-from src.helpers.helper_functions import gen_key, get_data_key, get_n_drafters, get_n_starters, get_scoring_format \
+from src.helpers.helper_functions import gen_key, get_data_key, get_mode, get_n_drafters, get_n_starters, get_scoring_format, set_draft_position \
                                       , store_dataset_in_session_state, using_manual_entry
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.math.algorithm_agents import build_h_agent
@@ -121,10 +121,10 @@ H, key = build_h_agent(get_data_key('info')
                   ,st.session_state.n_iterations > 0)
 store_dataset_in_session_state(H, 'H',key)
 
-if st.session_state['mode'] == 'Draft Mode':
+if get_mode() == 'Draft Mode':
 
   if 'draft_position' not in st.session_state:
-    st.session_state.draft_position = {'row' : 0, 'drafter' : 0}
+    set_draft_position(0,0)
 
   if using_manual_entry():
     update_player_data()
@@ -132,7 +132,7 @@ if st.session_state['mode'] == 'Draft Mode':
   else:
     make_drafting_tab_live_data()
     
-if st.session_state['mode'] == 'Auction Mode':
+elif get_mode() == 'Auction Mode':
 
   if using_manual_entry():
     update_player_data()
@@ -140,5 +140,6 @@ if st.session_state['mode'] == 'Auction Mode':
   else:
     make_auction_tab_live_data()      
 
-if st.session_state['mode'] == 'Season Mode':
+elif get_mode() == 'Season Mode':
+  
   make_season_mode_tabs()
