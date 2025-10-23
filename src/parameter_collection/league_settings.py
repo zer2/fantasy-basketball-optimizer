@@ -4,7 +4,7 @@ from src.platform_integration.fantrax_integration import FantraxIntegration
 from src.platform_integration.yahoo_integration import YahooIntegration
 from src.platform_integration.espn_integration import ESPNIntegration
 
-from src.tabs.drafting import increment_and_reset_draft, clear_draft_board
+from src.tabs.drafting import clear_draft_board
 import pandas as pd
 import numpy as np
 
@@ -45,7 +45,7 @@ def league_settings_popover():
                 ('NBA') #WNBA and MLB excluded for now
                 , index = 0
                 , key = 'league'
-                , on_change = increment_and_reset_draft
+                , on_change = clear_draft_board
                 )
             
         set_params(league)
@@ -58,7 +58,6 @@ def league_settings_popover():
         'Do you want to integrate with a fantasy platform?'
         , ['Enter your own data'] + list(integrations.keys())
         , key = 'data_source'
-        , on_change = increment_and_reset_draft
         , index = 0)
 
         if using_manual_entry():
@@ -113,7 +112,7 @@ def league_settings_popover():
             team_df = st.data_editor(pd.DataFrame({'Team ' + str(i) : ['Drafter ' + str(i)] for i in range(n_drafters)})
                             , hide_index = True
                             , key = 'team_name_df'
-                            , on_change = increment_and_reset_draft)
+                            , on_change = clear_draft_board)
             st.session_state.team_names = list(team_df.iloc[0])
 
             st.session_state.selections_default = pd.DataFrame(

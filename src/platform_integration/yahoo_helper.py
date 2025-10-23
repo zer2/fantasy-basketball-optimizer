@@ -44,6 +44,18 @@ def get_teams(sc: YahooFantasySportsQuery) -> List[Team]:
     """
 
     teams = sc.get_league_teams()
+    if len(teams) < 10:
+        extra_teams = range(len(teams), 11)
+
+        class Team():
+
+            def __init__(self, name, team_id):
+                self.name = name
+                self.team_id = team_id
+
+        for team in extra_teams:
+            teams[team] = Team(str(team).encode(), team)
+            
     return teams
 
 def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:

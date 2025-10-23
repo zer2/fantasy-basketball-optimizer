@@ -7,11 +7,12 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "2")
 import streamlit as st
 import numpy as np
 import yaml
-from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_data_key, get_n_drafters, get_scoring_format, initialize_selections_df, store_dataset_in_session_state, using_manual_entry
+from src.helpers.helper_functions import gen_key, get_data_key, get_n_drafters, get_n_starters, get_scoring_format \
+                                      , store_dataset_in_session_state, using_manual_entry
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.math.algorithm_agents import build_h_agent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
-                           ,make_auction_tab_live_data ,make_auction_tab_own_data
+                           ,make_auction_tab_live_data ,make_auction_tab_own_data, update_player_data
 from src.tabs.season_mode import make_season_mode_tabs
 from src.parameter_collection.league_settings import league_settings_popover
 from src.parameter_collection.player_stats import player_stats_popover
@@ -113,25 +114,20 @@ with st.sidebar:
 H, key = build_h_agent(get_data_key('info')
                   ,st.session_state.omega
                   ,st.session_state.gamma
-                  ,st.session_state.n_starters
+                  ,get_n_starters()
                   ,get_n_drafters()
                   ,st.session_state.beth
                   ,get_scoring_format()
                   ,st.session_state.n_iterations > 0)
 store_dataset_in_session_state(H, 'H',key)
 
-if using_manual_entry():
-  initialize_selections_df()
-
 if st.session_state['mode'] == 'Draft Mode':
 
-  if 'row' not in st.session_state:
-    st.session_state.row = 0
-
-  if 'drafter' not in st.session_state:
-    st.session_state.drafter = 0
+  if 'draft_position' not in st.session_state:
+    st.session_state.draft_position = {'row' : 0, 'drafter' : 0}
 
   if using_manual_entry():
+    update_player_data()
     make_drafting_tab_own_data()
   else:
     make_drafting_tab_live_data()
@@ -139,6 +135,7 @@ if st.session_state['mode'] == 'Draft Mode':
 if st.session_state['mode'] == 'Auction Mode':
 
   if using_manual_entry():
+    update_player_data()
     make_auction_tab_own_data()
   else:
     make_auction_tab_live_data()      

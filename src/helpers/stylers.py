@@ -1,5 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
+import pandas as pd
+
+from src.helpers.helper_functions import get_selected_categories, get_styler
 
 class Styler(ABC):
     #Define the functions needed for styling. 
@@ -237,3 +240,80 @@ def final_formatter(rgb : tuple) ->str:
 
 
   
+#ZR: Ideally this should merge with the h percentage styler, so it can handle anything
+def static_score_styler(df : pd.DataFrame, multiplier : float, total_multiplier : float = None) -> pd.DataFrame:
+  """Helper function for styling tables of Z or G scores
+
+  Args:
+    df: DataFrame with columns per category and total. Additional columns optional
+    
+  Returns:
+    Styled dataframe
+  """
+
+  agg_columns = [col for col in ['H-score','Gnrc. $','Orig. $','Total'] if col in df.columns]
+  index_columns = [col for col in ['Rank','Player'] if col in df.columns]
+  perc_columns = ['H-score'] if 'H-score' in df.columns else []
+  total_rows = [r for r in ['Total diff','Total'] if r in df.index]
+
+  colored_total_column = ['Total'] if (('H-score' in df.columns) and ('Total' in df.columns)) else []
+
+  if colored_total_column:
+    total_middle = df[colored_total_column[0]].nlargest(10).iloc[-1]
+  else:
+    total_middle = 0
+
+  df = df[index_columns + agg_columns + get_selected_categories()]
+
+  styler = get_styler()
+
+  df_styled = df.style.format("{:.2f}"
+                              , subset = pd.IndexSlice[:,agg_columns + get_selected_categories()]) \
+                              .format("{:.1%}"
+                                , subset = pd.IndexSlice[:,perc_columns] ) \
+                            .map(styler.styler_a
+                                ,subset = pd.IndexSlice[:,agg_columns]) \
+                            .map(styler.styler_b
+                                ,subset = pd.IndexSlice[total_rows,agg_columns]) \
+                            .map(styler.stat_styler_primary
+                              , subset = pd.IndexSlice[:,get_selected_categories()]
+                              , multiplier = multiplier) \
+                            .map(styler.stat_styler_secondary
+                                 , subset = pd.IndexSlice[:,colored_total_column]
+                                 , multiplier = total_multiplier
+                                 , middle = total_middle
+                                 )
+  return df_styled
+
+def h_percentage_styler(df : pd.DataFrame
+                        , middle : float = 0.5
+                        , multiplier : float = 300
+                        , drop_player = None) -> pd.DataFrame:
+  """Helper function for styling tables of H-score results
+
+  Args:
+    df: DataFrame with columns per category and overall H-score. Additional columns optional
+        Values are ratios between 0 and 1
+  Returns:
+    Styled dataframe
+  """
+  perc_column = 'H-score' if 'H-score' in df.columns else 'Overall'
+
+  styler = get_styler()
+
+  df_styled = df.style.format("{:.2%}"
+                                , subset = pd.IndexSlice[:,[perc_column]] ) \
+                          .format("{:.1%}"
+                                , subset = pd.IndexSlice[:,get_selected_categories()]) \
+                          .map(styler.styler_a
+                                , subset = pd.IndexSlice[:,[perc_column]]) \
+                          .map(styler.stat_styler_primary
+                              , middle = middle
+                              , multiplier = multiplier
+                              , subset = get_selected_categories())
+  
+  if drop_player is not None:
+     df_styled = df_styled.map(styler.color_blue
+                               , subset = pd.IndexSlice[:,['Player']]
+                               , target = drop_player)
+  return df_styled

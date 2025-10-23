@@ -81,5 +81,3 @@ def position_requirement_popover():
         st.error('This structure has ' + str(implied_n_picks) + ' position slots, but your league has ' + str(n_picks) + \
                 ' picks per manager. Adjust the position slots before proceeding')
         st.stop()
-
-      st.session_state.n_starters = n_picks - st.session_state.n_bench

@@ -2,7 +2,6 @@ import streamlit as st
 from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_mode, get_selections_default, get_selections_default_manual
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.tabs.drafting import increment_and_reset_draft
 from typing import Callable, List, Optional
 from yfpy.models import League, Roster
 
@@ -24,6 +23,8 @@ import streamlit as st
 import time
 
 import numpy as np
+
+from src.tabs.drafting import clear_draft_board
 
 LOGGER = get_logger(__name__)
 
@@ -84,7 +85,7 @@ class YahooIntegration(PlatformIntegration):
             options=user_leagues,
             format_func=get_league_labels,
             index=None,
-            on_change = increment_and_reset_draft
+            on_change = clear_draft_board
           )
 
           if yahoo_league is not None:
@@ -100,7 +101,7 @@ class YahooIntegration(PlatformIntegration):
                                ,min_value = 0
                                ,value = None
                                ,key = 'yahoo_league_id'
-                               , on_change = increment_and_reset_draft)
+                               , on_change = clear_draft_board)
                if self.league_id is not None:
                 self.team_names = self.get_team_names(self.league_id)
                 self.n_drafters = len(self.get_teams_dict(self.league_id)) 
@@ -260,7 +261,7 @@ class YahooIntegration(PlatformIntegration):
 
         return players_df
 
-    @st.cache_data(ttl=300, show_spinner = False)
+    @st.cache_data(ttl=60, show_spinner = False)
     def get_teams_dict(_self
                        , league_id: str) -> dict[int, str]:
         """Get a dictionary relating the names of teams to their associated IDs

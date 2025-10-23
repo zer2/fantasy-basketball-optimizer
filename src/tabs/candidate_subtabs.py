@@ -2,8 +2,10 @@ from pkgutil import get_data
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helpers.helper_functions import get_data_from_session_state, get_mode, get_n_picks, get_params, get_position_numbers_unwound, get_scoring_format, get_styler, static_score_styler, h_percentage_styler, get_selected_categories, \
-                                get_position_structure, using_manual_entry
+from src.helpers.helper_functions import get_cash_per_team, get_data_from_session_state, get_mode, get_n_picks, get_params \
+                                      , get_position_numbers_unwound, get_scoring_format, get_streaming_noise, get_styler \
+                                      , get_selected_categories, get_position_structure, using_manual_entry
+from src.helpers.stylers import static_score_styler
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.helpers.helper_functions import get_n_drafters
 
@@ -175,7 +177,7 @@ def make_cand_tab(player_assignments : dict[list[str]]
             rate_display.loc[:,'Your $'] = auction_value_adjuster(score_df['H-score']
                                                             , total_players - len(players_chosen)
                                                             , total_cash_remaining
-                                                            , st.session_state['streaming_noise'])
+                                                            , get_streaming_noise())
             
             rate_display = pd.DataFrame({'Your $' : rate_display['Your $']
                                           , 'Gnrc. $' : generic_player_value.loc[rate_display.index]
@@ -299,17 +301,18 @@ def make_cand_tab(player_assignments : dict[list[str]]
             if cash_remaining_per_team is not None:
 
                 g_display = g_display.sort_values('Total', ascending = False)
+                streaming_noise = get_streaming_noise()
 
                 g_display.loc[:,'Gnrc. $'] = auction_value_adjuster(g_display['Total']
                                                             , total_players - len(selection_list)
                                                             , remaining_cash
-                                                            , st.session_state['streaming_noise']) 
+                                                            , streaming_noise) 
                 
                 #ZR: maybe we don't need to run this every time
                 g_score_savor = auction_value_adjuster(g_scores['Total']
                                                             , total_players 
-                                                            , get_n_drafters() * st.session_state.cash_per_team
-                                                            , st.session_state['streaming_noise']) 
+                                                            , get_n_drafters() * get_cash_per_team()
+                                                            , streaming_noise) 
                 
                 g_display.loc[:,'Orig. $'] =  g_score_savor.loc[g_display.index]
 
@@ -395,7 +398,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
     my_players = player_assignments[draft_seat]
     n_picks = get_n_picks()
 
-    if st.session_state.data_source == 'Enter your own data':
+    if using_manual_entry():
 
       player_name = st.selectbox('Candidate player'
                                           ,score_df.index

@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_n_picks, get_params, get_scoring_format, get_styler, h_percentage_styler, get_selected_categories, get_n_drafters, \
-                                get_your_differential_threshold, get_their_differential_threshold, \
-                                  get_combo_params
+from src.helpers.helper_functions import get_beth, get_data_from_session_state, get_data_key, get_gamma, get_n_iterations, get_n_picks, get_omega, get_params\
+                              , get_scoring_format, get_styler, get_combo_params, get_selected_categories \
+                              , get_n_drafters, get_your_differential_threshold, get_their_differential_threshold
+from src.helpers.stylers import h_percentage_styler
 from src.math.algorithm_agents import get_default_h_values
 from src.math.position_optimization import check_team_eligibility
 import itertools
@@ -76,7 +77,7 @@ def make_trade_tab(H
             selected_rows = st.session_state.trade_suggestions_df.selection.rows
 
             if len(selected_rows) > 0:
-              selected_row = st.session_state.df.iloc[selected_rows[0]]
+              selected_row = st.session_state.trade_suggestion_df.iloc[selected_rows[0]]
 
               trade_possible = all ([x in trade_party_players for x in selected_row['Send']]) & \
                               all ([x in trade_counterparty_players for x in selected_row['Receive']])
@@ -120,7 +121,7 @@ def make_trade_tab(H
           with h_tab:
             make_trade_h_tab(h_key
                             , player_assignments 
-                            , st.session_state.n_iterations 
+                            , get_n_iterations()
                             , trade_party_seat
                             , players_sent
                             , trade_counterparty_seat
@@ -136,17 +137,13 @@ def make_trade_tab(H
                               , params['g-score-team-multiplier']
                               )
 
-      #ZR: Could this be switched to H-scores instead? 
-      #general_value = st.session_state.info['G-scores'].sum(axis = 1)
-      #replacement_value = g_scores_unselected.iloc[0].sum()
-
       default_h_scores = get_default_h_values(info_key = info_key
-                                            , omega = st.session_state.omega
-                                            , gamma = st.session_state.gamma
+                                            , omega = get_omega()
+                                            , gamma = get_gamma()
                                             , n_picks = n_picks
                                             , n_drafters = n_drafters
-                                            , n_iterations = st.session_state.n_iterations
-                                            , beth = st.session_state.beth
+                                            , n_iterations = get_n_iterations()
+                                            , beth = get_beth()
                                             , scoring_format = get_scoring_format())
       general_value = default_h_scores.set_index('Player')['H-score']
       replacement_value = general_value.iloc[selections_df.shape[0] * selections_df.shape[1]]
@@ -184,7 +181,7 @@ def make_trade_tab(H
         
       filtered_combo_params = [x for x in get_combo_params() if (x[0],x[1]) in trade_filter]
 
-      st.session_state.df = make_trade_suggestion_df(h_key
+      st.session_state.trade_suggestion_df = make_trade_suggestion_df(h_key
             , player_assignments
             , trade_party_seat
             , trade_counterparty_seat
@@ -196,10 +193,10 @@ def make_trade_tab(H
             , get_scoring_format()
             , get_data_key('info')) 
       
-      if st.session_state.df is None: 
+      if st.session_state.trade_suggestion_df is None: 
         st.markdown('No promising trades found')
       else:
-        full_dataframe_styled = st.session_state.df.reset_index(drop = True).style.format("{:.2%}"
+        full_dataframe_styled = st.session_state.trade_suggestion_df.reset_index(drop = True).style.format("{:.2%}"
                                       , subset = ['Your Score'
                                                 ,'Their Score']) \
                             .map(get_styler().stat_styler_primary

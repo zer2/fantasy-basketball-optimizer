@@ -3,7 +3,7 @@ import streamlit as st
 from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_mode, get_selections_default, get_fixed_player_name, get_selections_default_manual
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
-from src.tabs.drafting import increment_and_reset_draft
+from src.tabs.drafting import clear_draft_board
 
 class FantraxIntegration(PlatformIntegration):
 
@@ -55,7 +55,7 @@ class FantraxIntegration(PlatformIntegration):
         self.league_id = st.text_input(
             label='Which league ID should player data be pulled from? (Find league ID after /league/ in your draft room URL)'
             ,value = None
-            ,on_change = increment_and_reset_draft
+            ,on_change = clear_draft_board
           )    
         
         if self.league_id is None:
@@ -69,7 +69,7 @@ class FantraxIntegration(PlatformIntegration):
             else:
                 division = st.selectbox(label = 'Which division are you in?'
                                         ,options = list(division_dict.keys())
-                                        , on_change = increment_and_reset_draft)
+                                        , on_change = clear_draft_board)
                 
                 self.division_id = division_dict[division]
                 

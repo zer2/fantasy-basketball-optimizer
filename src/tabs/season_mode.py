@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_n_picks, get_params, get_selected_categories, get_n_drafters, get_rosters_df, get_styler, get_team_names
+from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_n_picks, get_params, get_selected_categories, get_n_drafters, get_rosters_df, get_style_base, get_styler, get_team_names
 from src.tabs.trading import make_trade_tab
 from pandas.api.types import CategoricalDtype
 from src.helpers.helper_functions import listify
@@ -94,7 +94,7 @@ def roster_inspection(selections_df : pd.DataFrame):
 
     make_team_display(get_data_key('info')
                         ,inspection_players
-                        ,st.session_state.base
+                        ,get_style_base()
                         )
 
 @st.cache_data(ttl = 3600)

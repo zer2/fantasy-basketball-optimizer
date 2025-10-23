@@ -4,9 +4,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from src.tabs.drafting import increment_and_reset_draft
-from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_data_key, get_league_type, get_raw_dataset, get_selections_default, listify \
-                                            , drop_injured_players, get_player_name_column, store_dataset_in_session_state
+from src.math.process_player_data import drop_injured_players
+from src.tabs.drafting import clear_draft_board
+from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_data_key, get_league_type \
+                                            , get_selections_default, listify \
+                                            , get_player_name_column, store_dataset_in_session_state
 from src.data_retrieval.get_data import get_historical_data, get_specified_historical_stats, combine_nba_projections
 from src.data_retrieval.get_data_baseball import get_baseball_historical_data, combine_baseball_projections
 
@@ -53,7 +55,7 @@ def get_nba_stats():
                             , data_options
                             ,key = 'data_option'
                             , index = 0
-                            , on_change= increment_and_reset_draft
+                            , on_change= clear_draft_board
     )
 
     if kind_of_dataset == 'Historical':
@@ -66,7 +68,7 @@ def get_nba_stats():
             'Which season of data do you want to use?'
             ,unique_datasets_historical
             ,index = 0
-            ,on_change = increment_and_reset_draft
+            ,on_change = clear_draft_board
         )
         df, key = get_specified_historical_stats(dataset_name, get_league_type())
         store_dataset_in_session_state(df, 'player_stats_v0', key)
@@ -165,12 +167,11 @@ def get_nba_stats():
             with c5: 
 
                 def process_stat_options():
-                    increment_and_reset_draft()
+                    clear_draft_board()
+                    #making a key manually to indicate to future functions that something has changed after form submit 
                     st.session_state.stat_options_key = gen_key()
             
-                #ZR: this should also run the combine_nba_projections function on click. 
-                submit_button = st.form_submit_button('Lock in & process'
-                                                        , on_click = process_stat_options)
+                st.form_submit_button('Lock in & process', on_click = process_stat_options)
 
                 st.warning('Changes will not be reflected until this button is pressed')
 
@@ -225,7 +226,7 @@ def get_mlb_stats():
             'Which dataset do you want to default to?'
             ,unique_datasets_historical
             ,index = 0
-            ,on_change = increment_and_reset_draft
+            ,on_change = clear_draft_board
         )
         raw_stats_df = get_specified_historical_stats(dataset_name, get_league_type())
                 

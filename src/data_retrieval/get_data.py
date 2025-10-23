@@ -84,7 +84,7 @@ def get_darko_data(player_name_column : str) -> dict[pd.DataFrame]:
   extra_info.loc[:,'GAMES_PLAYED'] = extra_info['GAMES_PLAYED'].astype(float)/get_n_games()
   extra_info.columns = ['Player','Minutes','Games Played %','Position']
 
-  extra_info = map_player_names(extra_info, 'BBM_NAME', player_name_column)
+  extra_info = map_player_names(extra_info, 'ESPN_NAME', player_name_column)
 
   extra_info = extra_info.set_index('Player')
 
@@ -118,6 +118,7 @@ def get_darko_data(player_name_column : str) -> dict[pd.DataFrame]:
   required_columns =[x for x in required_columns if x in darko_long_term.columns]
       
   darko_long_term = darko_long_term[list(set(required_columns))]
+
    
   return darko_long_term
 
@@ -188,7 +189,7 @@ def get_specified_historical_stats(dataset_name : str, league : str) -> pd.DataF
     return df, gen_key()
   
 #ZR: BBM upload and HTB upload should have keys attached
-@st.cache_data(ttl = '1d')
+#@st.cache_data(ttl = '1d')
 def combine_nba_projections(hashtag_slider : float
                             , bbm_slider : float
                             , darko_slider : float
@@ -210,28 +211,28 @@ def combine_nba_projections(hashtag_slider : float
                   ([] if bbm_stats is None else [p for p in bbm_stats.index]) + \
                   ([] if darko_stats is None else [p for p in darko_stats.index])
                   )
-            
+                
     df =  pd.concat({'HTB' : hashtag_stats 
                         ,'BBM' : bbm_stats
                         ,'Darko' : darko_stats
                         ,'ESPN' : espn_stats
                       }, names = ['Source'])
-                    
+     
     new_index = pd.MultiIndex.from_product([['HTB','BBM','Darko','ESPN'], all_players], names = ['Source','Player'])
 
     df = df.reindex(new_index)
-    
+
     weights = [hashtag_slider, bbm_slider, darko_slider, espn_slider]
 
     player_ineligible = (df.isna().groupby('Player').sum() == 4).sum(axis = 1) > 0
     inelegible_players = player_ineligible.index[player_ineligible]
     df = df[~df.index.get_level_values('Player').isin(inelegible_players)]
-    
+
     df = df.groupby('Player') \
                 .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
                     if np.issubdtype(x.dtype, np.number) \
                     else x.dropna()[0])
-            
+     
     #Need to include this because not every source projects double doubles, which gets messy
     if 'Double Doubles' in df.columns:
         df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
@@ -245,7 +246,6 @@ def combine_nba_projections(hashtag_slider : float
     return df, gen_key()
 
 
-@st.cache_data()
 def process_basketball_htb_data(htb : pd.DataFrame, player_name_column : str):
     htb = htb[htb['PLAYER'] != 'PLAYER']
 
@@ -299,7 +299,6 @@ def get_htb_adp():
    
    return -1 
 
-@st.cache_data()
 def process_basketball_monster_data(raw_df : pd.DataFrame
                                     , player_name_column : str):
 
