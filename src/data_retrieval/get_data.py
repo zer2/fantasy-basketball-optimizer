@@ -189,7 +189,7 @@ def get_specified_historical_stats(dataset_name : str, league : str) -> pd.DataF
     return df, gen_key()
   
 #ZR: BBM upload and HTB upload should have keys attached
-#@st.cache_data(ttl = '1d')
+@st.cache_data(ttl = '1d')
 def combine_nba_projections(hashtag_slider : float
                             , bbm_slider : float
                             , darko_slider : float

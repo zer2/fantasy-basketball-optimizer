@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd 
-from src.helpers.helper_functions import get_beth, get_data_from_session_state, get_data_key, get_gamma, get_n_iterations, get_n_picks, get_omega, get_params\
+import itertools
+
+from src.helpers.helper_functions import get_beth, get_data_from_session_state, get_data_key \
+                              , get_gamma, get_n_iterations, get_n_picks, get_omega, get_params\
                               , get_scoring_format, get_styler, get_combo_params, get_selected_categories \
                               , get_n_drafters, get_your_differential_threshold, get_their_differential_threshold
 from src.helpers.stylers import h_percentage_styler
 from src.math.algorithm_agents import get_default_h_values
 from src.math.position_optimization import check_team_eligibility
-import itertools
 
 @st.fragment
 def make_trade_tab(H

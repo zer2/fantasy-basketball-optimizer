@@ -1,14 +1,9 @@
-import os
-os.environ.setdefault("OMP_NUM_THREADS", "2")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "2")
-os.environ.setdefault("MKL_NUM_THREADS", "2")
-os.environ.setdefault("NUMEXPR_NUM_THREADS", "2")
-
 import streamlit as st
-import numpy as np
 import yaml
-from src.helpers.helper_functions import gen_key, get_data_key, get_mode, get_n_drafters, get_n_starters, get_scoring_format, set_draft_position \
-                                      , store_dataset_in_session_state, using_manual_entry
+
+from src.helpers.helper_functions import gen_key, get_beth, get_data_key, get_gamma, get_mode, get_n_drafters, get_n_iterations \
+                                      , get_n_starters, get_omega, get_scoring_format, initialize_selections_df \
+                                      , set_draft_position, store_dataset_in_session_state, using_manual_entry
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.math.algorithm_agents import build_h_agent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
@@ -20,8 +15,8 @@ from src.parameter_collection.parameters import player_stat_param_popover, algor
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
 #from wfork_streamlit_profiler import Profiler
-import streamlit.components.v1 as components
 from streamlit_theme import st_theme
+
 
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
@@ -112,14 +107,18 @@ with st.sidebar:
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
 H, key = build_h_agent(get_data_key('info')
-                  ,st.session_state.omega
-                  ,st.session_state.gamma
+                  ,get_omega()
+                  ,get_gamma()
                   ,get_n_starters()
                   ,get_n_drafters()
-                  ,st.session_state.beth
+                  ,get_beth()
                   ,get_scoring_format()
-                  ,st.session_state.n_iterations > 0)
+                  ,get_n_iterations() > 0)
 store_dataset_in_session_state(H, 'H',key)
+
+if using_manual_entry():
+  initialize_selections_df()
+  update_player_data()
 
 if get_mode() == 'Draft Mode':
 
@@ -127,7 +126,6 @@ if get_mode() == 'Draft Mode':
     set_draft_position(0,0)
 
   if using_manual_entry():
-    update_player_data()
     make_drafting_tab_own_data()
   else:
     make_drafting_tab_live_data()
@@ -135,11 +133,10 @@ if get_mode() == 'Draft Mode':
 elif get_mode() == 'Auction Mode':
 
   if using_manual_entry():
-    update_player_data()
     make_auction_tab_own_data()
   else:
     make_auction_tab_live_data()      
 
 elif get_mode() == 'Season Mode':
-  
+
   make_season_mode_tabs()

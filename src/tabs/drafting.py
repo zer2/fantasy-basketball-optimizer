@@ -1,21 +1,27 @@
   
 import streamlit as st 
-from pandas.api.types import CategoricalDtype
-from src.helpers.helper_functions import get_beth, get_chi, get_data_from_session_state, get_data_key, get_default_draft_seat_index, get_draft_position \
-                                            , get_gamma, get_n_iterations, get_n_starters \
-                                            , get_omega, get_psi, get_selected_players, get_selections_df, get_style_base, h_score_is_running \
-                                            , initialize_selections_df, modify_selections_df, move_back_one_pick, move_forward_one_pick \
-                                            , get_n_drafters, remove_selections_df, run_h_score, set_draft_position, stop_run_h_score, store_dataset_in_session_state
-from src.math import process_player_data
-from src.tabs.season_mode import *
-from src.tabs.candidate_subtabs import *
-
 import pandas as pd 
+from pandas.api.types import CategoricalDtype
+from src.math import process_player_data
 import numpy as np
-from src.helpers.helper_functions import get_team_names
+
+from src.tabs.season_mode import make_team_display
+from src.tabs.candidate_subtabs import make_cand_tab
+from src.helpers.helper_functions import get_beth, get_chi, get_data_from_session_state, get_data_key \
+                                            , get_default_draft_seat_index, get_draft_position \
+                                            , get_gamma, get_n_iterations, get_n_picks, get_n_starters \
+                                            , get_omega, get_psi, get_selected_players, get_selections_df \
+                                            , get_style_base, h_score_is_running \
+                                            , modify_selections_df, move_back_one_pick, move_forward_one_pick \
+                                            , get_n_drafters, remove_selections_df, run_h_score, set_draft_position \
+                                            , stop_run_h_score, store_dataset_in_session_state, get_team_names \
+                                            , get_n_picks, get_streaming_noise, get_scoring_format, get_params \
+                                            , get_selected_categories, get_mode
+
 from src.math.algorithm_agents import get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.math.process_player_data import process_player_data
+#from wfork_streamlit_profiler import Profiler
 
 @st.fragment
 def make_drafting_tab_own_data():
@@ -29,13 +35,11 @@ def make_drafting_tab_own_data():
         None
     """
 
-
     info = get_data_from_session_state('info')
     info_key = get_data_key('info')
 
     left, right = st.columns([0.47,0.53])
 
-    initialize_selections_df()
     selections_df = get_selections_df()
 
     with left:
@@ -101,10 +105,9 @@ def make_drafting_tab_own_data():
             else:
                 st.write('You have selected all of your players')    
             
-
         else:
 
-            button = st.button('Run algorithm', on_click = run_h_score)
+            st.button('Run algorithm', on_click = run_h_score)
 
         
 

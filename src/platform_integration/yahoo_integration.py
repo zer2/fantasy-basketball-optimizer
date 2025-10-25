@@ -12,7 +12,6 @@ from tempfile import mkdtemp
 from yfpy.query import YahooFantasySportsQuery
 from src.data_retrieval.get_data import get_yahoo_key_to_name_mapper
 from src.helpers.helper_functions import move_forward_one_pick, adjust_teams_dict_for_duplicate_names, get_fixed_player_name
-from collections import Counter
 
 import json
 import os

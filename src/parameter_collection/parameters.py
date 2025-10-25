@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-from src.helpers.helper_functions import get_data_from_session_state, get_data_key, get_mode, get_n_picks, get_params, get_scoring_format, get_selected_categories, store_dataset_in_session_state
-from src.math.process_player_data import make_upsilon_adjustment, process_player_data
-from src.helpers.helper_functions import get_n_drafters
+from src.helpers.helper_functions import get_data_key, get_mode, get_params, store_dataset_in_session_state
+from src.math.process_player_data import make_upsilon_adjustment
 
 def player_stat_param_popover():
     """Collect information from the user on desired parameters for handling player injuries/uncertainty 
@@ -92,17 +91,6 @@ def player_stat_param_popover():
     
     df, key = make_upsilon_adjustment(get_data_key('player_stats_v1'), upsilon)
     store_dataset_in_session_state(df, 'player_stats_v2', key)
-
-    info, key = process_player_data(None
-                          ,get_data_key('player_stats_v2')
-                          ,st.session_state.psi
-                          ,st.session_state.chi
-                          ,get_scoring_format()
-                          ,get_n_drafters()
-                          ,get_n_picks()
-                          ,params
-                          ,get_selected_categories())
-    store_dataset_in_session_state(info, 'info', key)
     
 def algorithm_param_popover():
     """Collect information from the user on desired parameters for H-scoring

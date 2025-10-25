@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from functools import reduce 
-from unidecode import unidecode
 import os 
 import uuid
 

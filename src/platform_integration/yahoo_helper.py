@@ -1,9 +1,8 @@
 from typing import List
 from yfpy.models import League, Team, Roster, Player
 from yfpy.query import YahooFantasySportsQuery
-import streamlit as st
 from streamlit.logger import get_logger
-import pandas as pd
+
 LOGGER = get_logger(__name__)
 
 def get_user_leagues(sc: YahooFantasySportsQuery) -> List[League]:
@@ -55,7 +54,7 @@ def get_teams(sc: YahooFantasySportsQuery) -> List[Team]:
 
         for team in extra_teams:
             teams[team] = Team(str(team).encode(), team)
-            
+
     return teams
 
 def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:

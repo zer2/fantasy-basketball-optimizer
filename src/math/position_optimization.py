@@ -1,8 +1,8 @@
 import numpy as np
-from scipy.optimize import linear_sum_assignment
-from src.helpers.helper_functions import get_position_structure, get_position_numbers, get_position_ranges, get_position_indices
-import streamlit as st
 import pandas as pd 
+from scipy.optimize import linear_sum_assignment
+
+from src.helpers.helper_functions import get_position_structure, get_position_numbers, get_position_ranges, get_position_indices
 
 def get_future_player_rows(position_rewards):
     """Takes an array of rewards by simplified position (5 columns) and translates them to rewards per slot (13) by player"""

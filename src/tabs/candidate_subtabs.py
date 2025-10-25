@@ -1,7 +1,7 @@
-from pkgutil import get_data
 import streamlit as st
 import pandas as pd 
 import numpy as np
+
 from src.helpers.helper_functions import get_cash_per_team, get_data_from_session_state, get_mode, get_n_picks, get_params \
                                       , get_position_numbers_unwound, get_scoring_format, get_streaming_noise, get_styler \
                                       , get_selected_categories, get_position_structure, using_manual_entry
@@ -472,7 +472,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
             st.write(positions_styled)
             
           st.markdown('Roster assignments for chosen players')
-          st.write(roster_inverted_styled, hide_index = True)
+          st.dataframe(roster_inverted_styled, hide_index = True)
 
 
 
