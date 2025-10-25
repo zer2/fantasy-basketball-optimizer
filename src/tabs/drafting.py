@@ -18,7 +18,7 @@ from src.helpers.helper_functions import get_beth, get_chi, get_data_from_sessio
                                             , get_n_picks, get_streaming_noise, get_scoring_format, get_params \
                                             , get_selected_categories, get_mode
 
-from src.math.algorithm_agents import get_default_h_values
+from src.math.algorithm_agents import build_h_agent, get_default_h_values
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.math.process_player_data import process_player_data
 #from wfork_streamlit_profiler import Profiler
@@ -121,7 +121,7 @@ def make_drafting_tab_live_data():
     Returns:
         None
     """
-    update_player_data()
+    update_data_and_info()
     info_key = get_data_key('info')
 
     if 'team_names' not in st.session_state:
@@ -324,7 +324,7 @@ def make_auction_tab_live_data():
     Returns:
         None
     """
-    update_player_data()
+    update_data_and_info()
 
     n_drafters = get_n_drafters()
     n_picks = get_n_picks()
@@ -499,7 +499,7 @@ def refresh_analysis():
 #this function calls process_player_data and updates the result into session state
 #process_player_data will be stored in the cache most of the time, but sometimes n_picks or n_drafters 
 #can change if there is a live connection
-def update_player_data():
+def update_data_and_info():
     info, key = process_player_data(None
                           ,get_data_key('player_stats_v2')
                           ,get_psi()
@@ -510,3 +510,13 @@ def update_player_data():
                           ,get_params()
                           ,get_selected_categories())
     store_dataset_in_session_state(info, 'info', key)
+
+    H, key = build_h_agent(get_data_key('info')
+                    ,get_omega()
+                    ,get_gamma()
+                    ,get_n_starters()
+                    ,get_n_drafters()
+                    ,get_beth()
+                    ,get_scoring_format()
+                    ,get_n_iterations() > 0)
+    store_dataset_in_session_state(H, 'H',key)
