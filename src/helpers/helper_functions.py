@@ -4,6 +4,7 @@ import streamlit as st
 from functools import reduce 
 import os 
 import uuid
+import snowflake.connector
 
 '''Getters 
 Getter functions are used for getting various inputs instead of direct access through session state or otherwise
@@ -494,7 +495,13 @@ def get_data_from_snowflake(table_name
 
 @st.cache_resource(ttl = 3600)
 def get_snowflake_connection(schema):
-      con = st.connection("snowflake", ttl = 3600)
+      con = snowflake.connector.connect(
+            account=os.getenv("SNOWFLAKE_ACCOUNT"),
+            user=os.getenv("SNOWFLAKE_USER"),
+            password=os.getenv("SNOWFLAKE_PASSWORD"),
+            database=os.getenv("SNOWFLAKE_DATABASE"),
+            schema=os.getenv("SNOWFLAKE_SCHEMA"),
+      )      
       return con
 
 '''
