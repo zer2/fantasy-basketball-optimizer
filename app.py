@@ -1,5 +1,6 @@
 import streamlit as st
 import yaml
+import os 
 
 from src.helpers.helper_functions import gen_key, get_beth, get_data_key, get_gamma, get_mode, get_n_drafters, get_n_iterations \
                                       , get_n_starters, get_omega, get_scoring_format, initialize_selections_df \
@@ -16,7 +17,6 @@ from src.parameter_collection.position_requirement import position_requirement_p
 from src.parameter_collection.format import format_popover
 #from wfork_streamlit_profiler import Profiler
 from streamlit_theme import st_theme
-
 
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
