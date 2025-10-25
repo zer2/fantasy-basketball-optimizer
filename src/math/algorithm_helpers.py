@@ -3,7 +3,6 @@ from scipy.stats import norm
 import numpy as np
 import streamlit as st
 from itertools import combinations
-from src.helpers.helper_functions import get_selected_categories
 import numexpr as ne
 
 def auction_value_adjuster(raw_values_unselected : pd.Series

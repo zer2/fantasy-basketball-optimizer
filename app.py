@@ -1,11 +1,13 @@
 import streamlit as st
-import numpy as np
 import yaml
-from src.helpers.helper_functions import get_n_drafters
+
+from src.helpers.helper_functions import gen_key, get_beth, get_data_key, get_gamma, get_mode, get_n_drafters, get_n_iterations \
+                                      , get_n_starters, get_omega, get_scoring_format, initialize_selections_df \
+                                      , set_draft_position, store_dataset_in_session_state, using_manual_entry
 from src.helpers.stylers import DarkStyler, LightStyler
-from src.math.algorithm_agents import HAgent
+from src.math.algorithm_agents import build_h_agent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
-                           ,make_auction_tab_live_data ,make_auction_tab_own_data
+                           ,make_auction_tab_live_data ,make_auction_tab_own_data, update_player_data
 from src.tabs.season_mode import make_season_mode_tabs
 from src.parameter_collection.league_settings import league_settings_popover
 from src.parameter_collection.player_stats import player_stats_popover
@@ -13,9 +15,8 @@ from src.parameter_collection.parameters import player_stat_param_popover, algor
 from src.parameter_collection.position_requirement import position_requirement_popover
 from src.parameter_collection.format import format_popover
 #from wfork_streamlit_profiler import Profiler
-import streamlit.components.v1 as components
 from streamlit_theme import st_theme
-import numpy
+
 
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
@@ -28,28 +29,14 @@ st.set_page_config(
           , initial_sidebar_state="auto"
           , menu_items=None)
 
-#the randints are a hack, to address a known issue with streamlit. The keys and the caches can get out of synch
-#see here: https://discuss.streamlit.io/t/st-session-state-values-are-reset-on-page-reload-but-st-cache-values-are-not/18059
-if 'player_stats_version' not in st.session_state:
-    st.session_state.player_stats_version = 0 + np.random.randint(0,10000, size = 1) * 1000
-
-if 'info_key' not in st.session_state:
-    st.session_state.info_key = 100000 + np.random.randint(0,10000, size = 1) * 1000
-
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
 
-if 'datasets' not in st.session_state:
-   st.session_state.datasets = {}
+if 'stat_options_key' not in st.session_state:
+    st.session_state.stat_options_key = gen_key()
 
 if 'injured_players' not in st.session_state:
     st.session_state['injured_players'] = set()
-
-if 'schedule' not in st.session_state:
-    st.session_state['schedule'] = {}
-
-if 'mode' not in st.session_state:
-    st.session_state['mode'] = 'Draft Mode'
 
 if 'have_locked_in' not in st.session_state:
   st.session_state.have_locked_in = False
@@ -57,17 +44,14 @@ if 'have_locked_in' not in st.session_state:
 if 'live_draft_active' not in st.session_state:
     st.session_state.live_draft_active = False
 
-if 'yahoo_league_id' not in st.session_state:
-    st.session_state.yahoo_league_id = None
-
 if 'draft_results' not in st.session_state:
     st.session_state.draft_results = None
 
 if 'run_h_score' not in st.session_state:
     st.session_state.run_h_score = False
 
-if 'res_cache' not in st.session_state:
-  st.session_state.res_cache = {}
+if 'data_dictionary' not in st.session_state:
+  st.session_state.data_dictionary = {}
 
 if 'all_params' not in st.session_state:
   with open("parameters.yaml", "r") as stream:
@@ -96,7 +80,7 @@ with st.sidebar:
   #https://github.com/streamlit/streamlit/issues/8934
   with st.popover(':small[Player Stats]').container(height = 300):
 
-    player_stats = player_stats_popover()
+    player_stats_popover()
 
   with st.popover(':small[Format & Categories]'):
 
@@ -122,39 +106,37 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
+H, key = build_h_agent(get_data_key('info')
+                  ,get_omega()
+                  ,get_gamma()
+                  ,get_n_starters()
+                  ,get_n_drafters()
+                  ,get_beth()
+                  ,get_scoring_format()
+                  ,get_n_iterations() > 0)
+store_dataset_in_session_state(H, 'H',key)
 
-### Build app 
+if using_manual_entry():
+  initialize_selections_df()
+  update_player_data()
 
-H = HAgent(info = st.session_state.info
-    , omega = st.session_state.omega
-    , gamma = st.session_state.gamma
-    , n_picks = st.session_state.n_starters
-    , n_drafters = get_n_drafters()
-    , dynamic = st.session_state.n_iterations > 0
-    , scoring_format = st.session_state.scoring_format
-    , chi = st.session_state.chi
-    , team_names = st.session_state.team_names)
+if get_mode() == 'Draft Mode':
 
-if st.session_state['mode'] == 'Draft Mode':
+  if 'draft_position' not in st.session_state:
+    set_draft_position(0,0)
 
-  if 'row' not in st.session_state:
-    st.session_state.row = 0
-
-  if 'drafter' not in st.session_state:
-    st.session_state.drafter = 0
-
-  if st.session_state.data_source == 'Enter your own data':
-    make_drafting_tab_own_data(H)
+  if using_manual_entry():
+    make_drafting_tab_own_data()
   else:
-    make_drafting_tab_live_data(H)
+    make_drafting_tab_live_data()
     
-if st.session_state['mode'] == 'Auction Mode':
+elif get_mode() == 'Auction Mode':
 
-  if st.session_state.data_source == 'Enter your own data':
-
-    make_auction_tab_own_data(H)
+  if using_manual_entry():
+    make_auction_tab_own_data()
   else:
-    make_auction_tab_live_data(H)      
+    make_auction_tab_live_data()      
 
-if st.session_state['mode'] == 'Season Mode':
-  make_season_mode_tabs(H)
+elif get_mode() == 'Season Mode':
+
+  make_season_mode_tabs()

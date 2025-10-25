@@ -1,9 +1,8 @@
 from typing import List
 from yfpy.models import League, Team, Roster, Player
 from yfpy.query import YahooFantasySportsQuery
-import streamlit as st
 from streamlit.logger import get_logger
-import pandas as pd
+
 LOGGER = get_logger(__name__)
 
 def get_user_leagues(sc: YahooFantasySportsQuery) -> List[League]:
@@ -44,6 +43,18 @@ def get_teams(sc: YahooFantasySportsQuery) -> List[Team]:
     """
 
     teams = sc.get_league_teams()
+    if len(teams) < 10:
+        extra_teams = range(len(teams), 11)
+
+        class Team():
+
+            def __init__(self, name, team_id):
+                self.name = name
+                self.team_id = team_id
+
+        for team in extra_teams:
+            teams[team] = Team(str(team).encode(), team)
+
     return teams
 
 def get_team_roster(sc: YahooFantasySportsQuery, team_id: int) -> Roster:
@@ -70,9 +81,10 @@ def get_league_players(sc: YahooFantasySportsQuery) -> List[League]:
     """
     player_dicts: List[dict[str, Player]] = sc.get_league_players() # type: ignore
 
+    #ZR: AXY I think this code never gets called and is irrelevant. So I am not fixing it for now
+
     player_status_records = [
-            {'Player' : f'{player.name.full} ({st.session_state.player_metadata.get(player.name.full)})'
-            ,'Status': player.status
+            {'Status': player.status
             , 'Eligible Positions' : player.display_position
             , 'Team' : player.editorial_team_abbr
             , 'ID' : player.player_id

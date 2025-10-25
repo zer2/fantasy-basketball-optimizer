@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
-from src.helpers.helper_functions import get_league_type, get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
-                                ,get_position_structure, weighted_cov_matrix, increment_info_key, get_counting_statistics\
-                                ,get_ratio_statistics, get_position_numbers
-from src.data_retrieval.get_data import get_max_table
 import streamlit as st
 import sys
+
+from src.helpers.helper_functions import gen_key, get_conversion_factors, get_data_from_session_state, get_games_per_week \
+                                , get_selected_counting_statistics, get_selected_ratio_statistics, get_selected_categories\
+                                ,get_position_structure, weighted_cov_matrix, get_counting_statistics\
+                                ,get_ratio_statistics, get_position_numbers, get_league_type, get_params 
+
 
 def calculate_coefficients(player_means : pd.DataFrame
                      , representative_player_set : list
@@ -25,9 +27,7 @@ def calculate_coefficients(player_means : pd.DataFrame
 
     counting_statistics = get_selected_counting_statistics()
     ratio_statistics = get_selected_ratio_statistics()
-
-    #ZR: We should really have a 'get_position_structure' equivalent function for this 
-    params = st.session_state['params']
+    params = get_params()
 
     #counting stats
     var_of_means = player_means.loc[representative_player_set,counting_statistics].var(axis = 0)
@@ -245,55 +245,56 @@ def get_category_level_rv(rv : float, v : pd.Series, params : dict = None):
    
    return value_by_category
 
-@st.cache_data(show_spinner = False, ttl = 3600)
+#ZR: For this to get run when n_drafters changes, it needs to be run within the drafting fragment
+@st.cache_data(ttl = 3600)
 def process_player_data(weekly_df : pd.DataFrame
-                        , _player_means : pd.DataFrame
-                        , conversion_factors :pd.Series
+                        , player_stat_key : str
                         , psi : float
                         , chi : float
                         , scoring_format : str
                         , n_drafters : int
-                        , n_picks : int
+                        , n_starters : int
                         , params : dict
-                        , player_stats_key
+                        , categories : list[str]
                         , coefficient_exploration_mode = False
                         ) -> dict:
   """Based on player stats and parameters, do all calculations to set up for running algorithms
 
   Args:
       weekly_df: Dataframe of fantasy-relevant statistics at the weekly level 
-      player_means: Dataframe of player means
-      conversion_factors: Conversion factors for /sigma^2 to /tau^2. Needed if weekly_df is None
+      player_stat_key: key for version number of player stats. Used to check if player stats has changed
       psi: parameter scaling the influence of no_play rate
       nu: parameter scaling the influence of category means in covariance calculation
       n_drafters: number of drafters
-      n_picks: number of picks per drafter
-      player_stats_key: key for version number of player stats. Used to check if player stats has changed
+      n_starters: number of picks per drafter
   Returns:
       Info dictionary with many pieces of information relevant to the algorithm 
   """
   
-  n_players = n_drafters * n_picks
+  n_players = n_drafters * n_starters
+  player_means = get_data_from_session_state('player_stats_v2')
+
+  conversion_factors = get_conversion_factors()
 
   if weekly_df is not None:
     coefficients_first_order = calculate_coefficients_historical(weekly_df
                                                 , pd.unique(weekly_df.index.get_level_values('Player'))
                                                 , params)
   else:
-    coefficients_first_order = calculate_coefficients(_player_means
-                                                  , _player_means.index
+    coefficients_first_order = calculate_coefficients(player_means
+                                                  , player_means.index
                                                   , conversion_factors)
     
   beta_weight = chi if scoring_format == 'Rotisserie' else 1
                     
-  g_scores_first_order =  calculate_scores_from_coefficients(_player_means
+  g_scores_first_order =  calculate_scores_from_coefficients(player_means
                                                           , coefficients_first_order
                                                           , params
                                                           , 1
                                                           , beta_weight)
     
   first_order_score = g_scores_first_order.sum(axis = 1)
-  representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_picks * n_drafters]
+  representative_player_set = first_order_score.sort_values(ascending = False).index[0:n_starters * n_drafters]
 
   if weekly_df is not None:
     coefficients = calculate_coefficients_historical(weekly_df
@@ -301,7 +302,7 @@ def process_player_data(weekly_df : pd.DataFrame
                                                 , params
                                                 , coefficient_exploration_mode)
   else:
-    coefficients = calculate_coefficients(_player_means
+    coefficients = calculate_coefficients(player_means
                                                   , representative_player_set
                                                   , conversion_factors)
     
@@ -312,10 +313,10 @@ def process_player_data(weekly_df : pd.DataFrame
 
   w = vom/mov
   
-  g_scores = calculate_scores_from_coefficients(_player_means, coefficients, params, 1,beta_weight)
-  x_scores =  calculate_scores_from_coefficients(_player_means, coefficients, params, 0,beta_weight)
+  g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1,beta_weight)
+  x_scores =  calculate_scores_from_coefficients(player_means, coefficients, params, 0,beta_weight)
     
-  replacement_games_rate = (1- _player_means['Games Played %']/100) * psi
+  replacement_games_rate = (1- player_means['Games Played %']/100) * psi
   g_scores = games_played_adjustment(g_scores, replacement_games_rate,representative_player_set, params)
   x_scores = games_played_adjustment(x_scores, replacement_games_rate,representative_player_set, params, v = v)
 
@@ -329,7 +330,7 @@ def process_player_data(weekly_df : pd.DataFrame
   #need to fix this later for Roto
   x_scores = x_scores.loc[g_scores.index]
 
-  positions = _player_means['Position'].str.split(',')
+  positions = player_means['Position'].str.split(',')
                           
   #get position averages, to make sure the covariance matrix measures differences relative to position
   #we need to weight averages to avoid over-counting the players that can take multiple positions
@@ -408,7 +409,7 @@ def process_player_data(weekly_df : pd.DataFrame
 
         total_value = g_scores.loc[representative_player_set].sum(axis = 1).sort_values(ascending = False)
         relative_value = total_value - total_value.min()
-        relative_value_helper_df = pd.DataFrame({'Round' : [i // n_drafters for i in range(n_drafters * n_picks)]
+        relative_value_helper_df = pd.DataFrame({'Round' : [i // n_drafters for i in range(n_drafters * n_starters)]
                                               , 'Value' : relative_value})
         average_round_value = relative_value_helper_df.groupby('Round')['Value'].mean()
 
@@ -443,8 +444,30 @@ def process_player_data(weekly_df : pd.DataFrame
           , 'Positions' : positions
           , 'Average-Round-Value' : average_round_value}
   
-  increment_info_key()
-  
-  st.session_state.max_table = get_max_table()
+  return info, gen_key()
 
-  return info
+#make the upsilon adjustment
+@st.cache_data(show_spinner = False, ttl = 3600)
+def make_upsilon_adjustment(raw_stat_key, upsilon):
+  player_stats_v1 = get_data_from_session_state('player_stats_v1')
+
+  player_stats_v1['Games Played %'] = 1 - ( 1 - player_stats_v1['Games Played %']) * upsilon 
+
+  counting_statistics = get_params()['counting-statistics'] 
+  volume_statistics = [ratio_stat_info['volume-statistic'] for ratio_stat_info in get_params()['ratio-statistics'].values()]
+
+  for col in counting_statistics + volume_statistics:
+    if col in player_stats_v1.columns:
+      player_stats_v1[col] = player_stats_v1[col].astype(float) * player_stats_v1['Games Played %'] * get_games_per_week()
+
+  return player_stats_v1, gen_key()
+
+
+@st.cache_data(show_spinner = False, ttl = 3600)
+def drop_injured_players(player_stats_v0_key, injured_players):
+    player_stats_v0 = get_data_from_session_state('player_stats_v0')
+    res = player_stats_v0.drop(injured_players)
+    return res, gen_key()
+
+
+

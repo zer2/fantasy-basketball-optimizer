@@ -2,10 +2,10 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 import requests
-from src.helpers.helper_functions import get_counting_statistics, get_n_games, get_data_from_snowflake, get_league_type, increment_player_stats_version
+from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_params, get_n_games, get_data_from_snowflake, get_league_type, store_dataset_in_session_state
 from src.data_retrieval.get_data_baseball import process_baseball_rotowire_data, get_baseball_historical_data
 
-@st.cache_data()
+@st.cache_data(ttl = '1d')
 def get_yahoo_key_to_name_mapper():
    return get_data_from_snowflake('PLAYER_MAPPING_VIEW')[['YAHOO_PLAYER_ID','PLAYER_NAME']].set_index('YAHOO_PLAYER_ID')
 
@@ -15,9 +15,6 @@ def process_minutes(pgl_df: pd.DataFrame) -> pd.Series:
   agg = pgl_df.groupby('Player')['MIN'].mean()
   agg.name = 'Minutes'
   return agg
-   
-def get_max_table():
-    return pd.read_csv('src/data_retrieval/max_table.csv')
 
 #no need to cache this since it only gets re-run when current_season_data is refreshed
 def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataFrame:
@@ -52,12 +49,12 @@ def process_game_level_data(df : pd.DataFrame, metadata : pd.Series) -> pd.DataF
      return pd.DataFrame()
   
 @st.cache_data(ttl = '1d')
-def get_espn_projections(integration_source = None):
+def get_espn_projections(player_name_column : str):
   espn_df = get_data_from_snowflake('ESPN_PROJECTION_VIEW')
-  renamer = st.session_state.params['espn-renamer']
+  renamer = get_params()['espn-renamer']
   espn_df = espn_df.rename(columns = renamer)
 
-  espn_df = map_player_names(espn_df, 'ESPN_NAME')
+  espn_df = map_player_names(espn_df, 'ESPN_NAME', player_name_column)
   espn_df.loc[:,'Games Played %'] = espn_df['Games Played']/get_n_games()
 
   espn_df = espn_df.set_index('Player')
@@ -65,7 +62,7 @@ def get_espn_projections(integration_source = None):
   return espn_df
 
 @st.cache_data(ttl = '1d') 
-def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
+def get_darko_data(player_name_column : str) -> dict[pd.DataFrame]:
   """Get DARKO predictions from stored CSV files
 
   Args:
@@ -74,11 +71,11 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
       Dictionary, {'DARKO-L' : DARKO-L dataframe, 'DARKO-S' : DARKO-S dataframe}
   """
   darko_df = get_data_from_snowflake('DARKO_VIEW')
-  renamer = st.session_state.params['darko-renamer']
+  renamer = get_params()['darko-renamer']
   darko_df = darko_df.rename(columns = renamer)
   darko_df = darko_df.apply(pd.to_numeric, errors='ignore')
   
-  darko_df = map_player_names(darko_df, 'DARKO_NAME')
+  darko_df = map_player_names(darko_df, 'DARKO_NAME', player_name_column)
 
   darko_df = darko_df.set_index(['Player']).sort_index().fillna(0)  
 
@@ -87,7 +84,7 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   extra_info.loc[:,'GAMES_PLAYED'] = extra_info['GAMES_PLAYED'].astype(float)/get_n_games()
   extra_info.columns = ['Player','Minutes','Games Played %','Position']
 
-  extra_info = map_player_names(extra_info, 'BBM_NAME')
+  extra_info = map_player_names(extra_info, 'ESPN_NAME', player_name_column)
 
   extra_info = extra_info.set_index('Player')
 
@@ -111,14 +108,17 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
   darko_long_term.loc[:,'Field Goal Attempts'] = darko_long_term.loc[:,'Field Goal Attempts/100'] * posessions_per_game
   darko_long_term.loc[:,'Assist to TO'] = darko_long_term.loc[:,'Assists']/darko_long_term.loc[:,'Turnovers']
 
-  required_columns = st.session_state.params['counting-statistics'] + \
-                    list(st.session_state.params['ratio-statistics'].keys()) + \
-                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns']
+  params = get_params()
+
+  required_columns = params['counting-statistics'] + \
+                    list(params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in params['ratio-statistics'].values()] + \
+                    params['other-columns']
      
   required_columns =[x for x in required_columns if x in darko_long_term.columns]
       
   darko_long_term = darko_long_term[list(set(required_columns))]
+
    
   return darko_long_term
 
@@ -127,7 +127,7 @@ def get_darko_data(integration_source = None) -> dict[pd.DataFrame]:
 def get_historical_data():  
   full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW_2')
 
-  renamer = st.session_state.params['stat-df-renamer']
+  renamer = get_params()['stat-df-renamer']
   full_df = full_df.rename(columns = renamer)
 
   full_df = full_df.apply(pd.to_numeric, errors='ignore')
@@ -150,9 +150,8 @@ def get_historical_data():
   return full_df
 
 #setting show spinner to false prevents flickering
-#data is cached locally so that different users can have different cuts loaded
 @st.cache_data(show_spinner = False, ttl = 3600)
-def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
+def get_specified_historical_stats(dataset_name : str, league : str) -> pd.DataFrame:
   """fetch the data subset which will be used for the algorithms
   Args:
     dataset_name: the name of the dataset to fetch
@@ -160,31 +159,19 @@ def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
             (the names of datasets can be the same across leagues)
 
   Returns:
-    Dataframe of fantasy statistics 
+    None
   """
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
   if league in ('NBA','WNBA'):
 
-    #current_data, expected_minutes = get_current_season_data()
-    #darko_data = get_darko_data(expected_minutes)
-
-    #if dataset_name in list(current_data.keys()):
-    #    df = current_data[dataset_name].copy()
-    #elif 'DARKO' in dataset_name:
-    #    df = darko_data[dataset_name].copy()
-
-    #ZR: For now I think this only gets called with historical data
-
     historical_df = get_historical_data()
     df = historical_df.loc[dataset_name].copy()  
-
-    player_metadata = pd.Series(df['Position'], index = df.index)
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    return df.round(3), player_metadata
+    return df, gen_key()
   
   elif league in ('MLB'):
     
@@ -199,24 +186,24 @@ def get_specified_stats(dataset_name : str, league : str) -> pd.DataFrame:
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
-    return df.round(2) 
+    return df, gen_key()
   
-@st.cache_data()
-def combine_nba_projections(rotowire_upload
-                            , bbm_upload
-                            , hashtag_upload
-                            , hashtag_slider
-                            , bbm_slider
-                            , darko_slider 
-                            , espn_slider
-                            , integration_source #just for caching purposes
+#ZR: BBM upload and HTB upload should have keys attached
+@st.cache_data(ttl = '1d')
+def combine_nba_projections(hashtag_slider : float
+                            , bbm_slider : float
+                            , darko_slider : float
+                            , espn_slider : float
+                            , player_name_column : str
+                            , player_stat_key : str
                             ): 
-  
-    
-    hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, integration_source).fillna(0)
-    bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, integration_source)
-    darko_stats = None if darko_slider == 0 else get_darko_data(integration_source)
-    espn_stats = None if espn_slider ==0 else get_espn_projections(integration_source)
+    hashtag_upload = get_data_from_session_state('HTB')
+    bbm_upload = get_data_from_session_state('BBM')
+      
+    hashtag_stats = None if hashtag_upload is None else process_basketball_htb_data(hashtag_upload, player_name_column).fillna(0)
+    bbm_stats = None if bbm_upload is None else process_basketball_monster_data(bbm_upload, player_name_column)
+    darko_stats = None if darko_slider == 0 else get_darko_data(player_name_column)
+    espn_stats = None if espn_slider ==0 else get_espn_projections(player_name_column)
 
     all_players = set(
                   ([] if hashtag_stats is None else [p for p in hashtag_stats.index]) + \
@@ -224,28 +211,28 @@ def combine_nba_projections(rotowire_upload
                   ([] if bbm_stats is None else [p for p in bbm_stats.index]) + \
                   ([] if darko_stats is None else [p for p in darko_stats.index])
                   )
-            
+                
     df =  pd.concat({'HTB' : hashtag_stats 
                         ,'BBM' : bbm_stats
                         ,'Darko' : darko_stats
                         ,'ESPN' : espn_stats
                       }, names = ['Source'])
-                    
+     
     new_index = pd.MultiIndex.from_product([['HTB','BBM','Darko','ESPN'], all_players], names = ['Source','Player'])
 
     df = df.reindex(new_index)
-    
+
     weights = [hashtag_slider, bbm_slider, darko_slider, espn_slider]
 
     player_ineligible = (df.isna().groupby('Player').sum() == 4).sum(axis = 1) > 0
     inelegible_players = player_ineligible.index[player_ineligible]
     df = df[~df.index.get_level_values('Player').isin(inelegible_players)]
-    
+
     df = df.groupby('Player') \
                 .agg(lambda x: np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights = weights) \
                     if np.issubdtype(x.dtype, np.number) \
                     else x.dropna()[0])
-            
+     
     #Need to include this because not every source projects double doubles, which gets messy
     if 'Double Doubles' in df.columns:
         df['Double Doubles'] = [float(x) for x in df['Double Doubles']]
@@ -253,47 +240,13 @@ def combine_nba_projections(rotowire_upload
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)
 
-    player_metadata = pd.Series(df['Position'], index = df.index)
-
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
     
-    return df.round(2), player_metadata
+    return df, gen_key()
 
 
-@st.cache_data()
-def process_basketball_rotowire_data(raw_df, integration_source = None):
-      
-   raw_df.loc[:,'Games Played %'] = raw_df['G']/get_n_games()
-   raw_df['FG%'] = raw_df['FG%']/100
-   raw_df['FT%'] = raw_df['FT%']/100
-   raw_df['3P%'] = raw_df['3P%']/100
-   raw_df.loc[:,'Pos'] = raw_df.loc[:,'Pos'].map(st.session_state.params['rotowire-position-adjuster'])
-
-   raw_df = raw_df.rename(columns = st.session_state.params['rotowire-renamer'])
-   
-   raw_df = raw_df.set_index('Player')
-
-   #Rotowire doesn't forecast double doubles
-   raw_df.loc[:,'Double Doubles'] = np.nan
-
-   #Rotowire sometimes predicts Turnovers to be exactly 0, which is why we have this failsafe
-   raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
-   raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
-
-   required_columns = st.session_state.params['counting-statistics'] + \
-                    list(st.session_state.params['ratio-statistics'].keys()) + \
-                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns']
-   
-   required_columns =[x for x in required_columns if x in raw_df.columns]
-      
-   raw_df = raw_df[list(set(required_columns))]
-
-   return raw_df
-
-@st.cache_data()
-def process_basketball_htb_data(htb, integration_source):
+def process_basketball_htb_data(htb : pd.DataFrame, player_name_column : str):
     htb = htb[htb['PLAYER'] != 'PLAYER']
 
     htb.loc[:,'ADP'] = -1
@@ -313,15 +266,17 @@ def process_basketball_htb_data(htb, integration_source):
         htb.loc[:,'3PA'] = three_split.str[1] #the str here is a python hack. Its weird but it works 
         htb.loc[:,'3P%'] = htb.loc[:,'3P%'].str.split('(').str[0].astype(float)
 
-    htb = htb.rename(columns = st.session_state.params['htb-renamer'])
-    htb = map_player_names(htb, 'HTB_NAME')
+    params = get_params()
 
-    stat_columns = set(st.session_state.params['counting-statistics'] + \
-                        list(st.session_state.params['ratio-statistics'].keys()) + \
-                        [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()]
+    htb = htb.rename(columns = params['htb-renamer'])
+    htb = map_player_names(htb, 'HTB_NAME', player_name_column)
+
+    stat_columns = set(params['counting-statistics'] + \
+                        list(params['ratio-statistics'].keys()) + \
+                        [ratio_stat_info['volume-statistic'] for ratio_stat_info in params['ratio-statistics'].values()]
                             )
     required_numeric_columns = [x for x in stat_columns if x in htb.columns] + ['Games Played']
-    required_other_columns = st.session_state.params['other-columns'] 
+    required_other_columns = params['other-columns'] 
 
     htb[required_numeric_columns] = htb[required_numeric_columns].astype(float)
 
@@ -343,21 +298,11 @@ def process_basketball_htb_data(htb, integration_source):
 def get_htb_adp():
    
    return -1 
-   df = get_data_from_snowflake('HTB_PROJECTION_TABLE')
-   df = df.rename(columns = st.session_state.params['htb-renamer'])
 
-   df = map_player_names(df, 'HTB_NAME')
-   df['Position'] = df['Position'].str.replace('/',',')
+def process_basketball_monster_data(raw_df : pd.DataFrame
+                                    , player_name_column : str):
 
-   df['Player'] = df['Player'] + ' (' + df['Position'] + ')'
-
-   df = df[['Player','ADP']]
-   return df.set_index('Player')
-
-@st.cache_data(ttl = 3600)
-def process_basketball_monster_data(raw_df, integration_source = None):
-
-   raw_df = raw_df.rename(columns = st.session_state.params['bbm-renamer'])
+   raw_df = raw_df.rename(columns = get_params()['bbm-renamer'])
 
    #handling case where there is an extra column that gets interpreted as a missing value
    raw_df = raw_df.loc[:,[c for c in raw_df.columns if 'Unnamed' not in c]]
@@ -365,7 +310,7 @@ def process_basketball_monster_data(raw_df, integration_source = None):
    raw_df['Position'] = raw_df['Position'].str.replace('/',',')
    #raw_df = raw_df.dropna(required_columns)
 
-   raw_df = map_player_names(raw_df, 'BBM_NAME')
+   raw_df = map_player_names(raw_df, 'BBM_NAME', player_name_column)
 
    raw_df = raw_df.set_index('Player')
 
@@ -373,10 +318,12 @@ def process_basketball_monster_data(raw_df, integration_source = None):
    raw_df.loc[:,'Assist to TO'] = raw_df['Assists']/np.clip(raw_df['Turnovers'],0.1, None)
    raw_df.loc[:,'Field Goals Made'] = raw_df['Field Goal %'] * raw_df['Field Goal Attempts']
 
-   required_columns = st.session_state.params['counting-statistics'] + \
-                    list(st.session_state.params['ratio-statistics'].keys()) + \
-                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in st.session_state.params['ratio-statistics'].values()] + \
-                    st.session_state.params['other-columns']
+   params = get_params()
+
+   required_columns = params['counting-statistics'] + \
+                    list(params['ratio-statistics'].keys()) + \
+                    [ratio_stat_info['volume-statistic'] for ratio_stat_info in params['ratio-statistics'].values()] + \
+                    params['other-columns']
    
    required_columns =[x for x in required_columns if x in raw_df.columns]
 
@@ -385,28 +332,9 @@ def process_basketball_monster_data(raw_df, integration_source = None):
    return raw_df
 
 
-
-@st.cache_data(show_spinner = False)
-def get_nba_schedule():
-    nba_schedule = requests.get(st.session_state.params['schedule-url']).json()
-    game_dates = nba_schedule['leagueSchedule']['gameDates']
-
-    def get_all_teams_playing(game_date):
-         return [game['homeTeam']['teamTricode'] for game in game_date['games']] + \
-                [game['awayTeam']['teamTricode'] for game in game_date['games']]
-
-    teams_playing = { game_date['gameDate'] : get_all_teams_playing(game_date)
-                            for game_date in game_dates
-    }
-
-    return teams_playing
-
-def map_player_names(df, source_name):
-
-   if 'integration' in st.session_state:
-      player_name_column = st.session_state.integration.get_player_name_column()
-   else:
-      player_name_column = 'PLAYER_NAME'
+def map_player_names(df
+                     , source_name : str
+                     , player_name_column : str):
 
    #Only change player name if it is necessary. E.g. if the data source and platform are both ESPN, no mapping is necessary
    if player_name_column != source_name:
@@ -417,3 +345,4 @@ def map_player_names(df, source_name):
     df['Player'] = df['Player'].map(mapper_table).fillna(df['Player'])
 
    return df
+

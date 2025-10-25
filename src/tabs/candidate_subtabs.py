@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd 
 import numpy as np
-from src.helpers.helper_functions import get_position_numbers_unwound, static_score_styler, h_percentage_styler, get_selected_categories, \
-                                get_position_structure
+
+from src.helpers.helper_functions import get_cash_per_team, get_data_from_session_state, get_mode, get_n_picks, get_params \
+                                      , get_position_numbers_unwound, get_scoring_format, get_streaming_noise, get_styler \
+                                      , get_selected_categories, get_position_structure, using_manual_entry
+from src.helpers.stylers import static_score_styler
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.helpers.helper_functions import get_n_drafters
 
@@ -40,9 +43,7 @@ def make_hashable(obj):
     else:
        return ''
         
-def make_cand_tab(_H
-                    ,_g_scores : pd.DataFrame
-                    ,player_assignments : dict[list[str]]
+def make_cand_tab(player_assignments : dict[list[str]]
                     ,draft_seat : str
                     ,n_iterations : int
                     ,cash_remaining_per_team : dict[int] = None
@@ -69,18 +70,20 @@ def make_cand_tab(_H
   Returns:
       None
   """
+  H = get_data_from_session_state('H')
+  H = H.clear_initial_weights()
 
-  _H = _H.clear_initial_weights()
-
-  styler = st.session_state.styler
+  styler = get_styler()
+  params = get_params()
+  g_scores = get_data_from_session_state('info')['G-scores']
           
   if drop_player is None:
-    generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+    generator = H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
   else:
     from copy import deepcopy 
     player_assignments = deepcopy(player_assignments)
     player_assignments[draft_seat] = [player for player in player_assignments[draft_seat] if player != drop_player]
-    generator = _H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
+    generator = H.get_h_scores(player_assignments, draft_seat, cash_remaining_per_team)
   
   iteration_range = range(max(1,n_iterations))
 
@@ -92,7 +95,7 @@ def make_cand_tab(_H
   else:
     display_schedule = set(np.arange(0, n_iterations, 50)).union({n_iterations - 1})
 
-  if (cash_remaining_per_team is not None) and (st.session_state.data_source == 'Enter your own data'):
+  if (cash_remaining_per_team is not None) and using_manual_entry():
     cand_table_height = 505 #more room is needed for the auction string that goes at the bottom
   else: 
     cand_table_height = 535
@@ -115,7 +118,7 @@ def make_cand_tab(_H
       rosters = res['Rosters']
 
       #check for roster fit only if the algorithm is being run with positions, since otherwise this is irrelevant
-      if st.session_state.info['Position-Means'] is not None:
+      if get_data_from_session_state('info')['Position-Means'] is not None:
         fits_roster = rosters.loc[:,0] >= 0
       else:
         fits_roster = pd.Series([True] * len(res['Scores']), index = res['Scores'].index)
@@ -132,14 +135,14 @@ def make_cand_tab(_H
       #normalize weights by what we expect from other drafters
       weights = pd.DataFrame(weights
                     , index = score.index
-                    , columns = get_selected_categories())/_H.v.reshape(1,len(_H.v))
+                    , columns = get_selected_categories())/H.v.reshape(1,len(H.v))
       
       with placeholder.container():
 
         score.name = 'H-score'
         score_df = pd.DataFrame(score)          
 
-        if st.session_state.mode == 'Season Mode':
+        if get_mode() == 'Season Mode':
           h_tab, g_tab,  = st.tabs(['H-score','G-score'])
         else:
           h_tab, pbp_tab, g_tab,  = st.tabs(['H-score','H-score details','G-score'])
@@ -152,7 +155,7 @@ def make_cand_tab(_H
               st.error('Illegal roster!')
               st.stop()
 
-            if st.session_state.scoring_format == 'Rotisserie':
+            if get_scoring_format() == 'Rotisserie':
               e_points = res['Rates'][fits_roster] * (len(player_assignments) -1) + 1
               rate_df = e_points.loc[score_df.index].dropna()
               style_format = "{:.1f}"
@@ -174,7 +177,7 @@ def make_cand_tab(_H
             rate_display.loc[:,'Your $'] = auction_value_adjuster(score_df['H-score']
                                                             , total_players - len(players_chosen)
                                                             , total_cash_remaining
-                                                            , st.session_state['streaming_noise'])
+                                                            , get_streaming_noise())
             
             rate_display = pd.DataFrame({'Your $' : rate_display['Your $']
                                           , 'Gnrc. $' : generic_player_value.loc[rate_display.index]
@@ -223,7 +226,7 @@ def make_cand_tab(_H
                 st.error('Illegal roster!')
                 st.stop()
 
-              if st.session_state.scoring_format == 'Rotisserie':
+              if get_scoring_format() == 'Rotisserie':
                 e_points = res['Rates'][fits_roster] * (len(player_assignments) -1) + 1
                 rate_df = e_points.loc[score_df.index].dropna()
                 style_format = "{:.1f}"
@@ -252,7 +255,7 @@ def make_cand_tab(_H
                         .map(styler.color_blue, subset = pd.IndexSlice[:,['Player']], target = drop_player)._compute()
                 
 
-                g_display = _g_scores[_g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
+                g_display = g_scores[g_scores.index.isin(score_df.index)].sort_values('Total', ascending = False)
                 
                 rate_display = score_df.merge(win_rates.dropna()
                               , left_index = True
@@ -284,7 +287,7 @@ def make_cand_tab(_H
                                 , use_container_width = True
                                 , height = cand_table_height)            
                 
-              if st.session_state.scoring_format == 'Rotisserie':
+              if get_scoring_format() == 'Rotisserie':
 
                   st.caption('''Expected totals are based on standard fantasy point scoring. 
                             One point for last, two points for second last, etc. The baseline 
@@ -293,22 +296,23 @@ def make_cand_tab(_H
 
           if i in (min(display_schedule), max(display_schedule)): #this only needs to run once 
 
-            g_display = _g_scores.loc[score_df.index]
+            g_display = g_scores.loc[score_df.index]
 
             if cash_remaining_per_team is not None:
 
                 g_display = g_display.sort_values('Total', ascending = False)
+                streaming_noise = get_streaming_noise()
 
                 g_display.loc[:,'Gnrc. $'] = auction_value_adjuster(g_display['Total']
                                                             , total_players - len(selection_list)
                                                             , remaining_cash
-                                                            , st.session_state['streaming_noise']) 
+                                                            , streaming_noise) 
                 
                 #ZR: maybe we don't need to run this every time
-                g_score_savor = auction_value_adjuster(_g_scores['Total']
+                g_score_savor = auction_value_adjuster(g_scores['Total']
                                                             , total_players 
-                                                            , get_n_drafters() * st.session_state.cash_per_team
-                                                            , st.session_state['streaming_noise']) 
+                                                            , get_n_drafters() * get_cash_per_team()
+                                                            , streaming_noise) 
                 
                 g_display.loc[:,'Orig. $'] =  g_score_savor.loc[g_display.index]
 
@@ -316,8 +320,8 @@ def make_cand_tab(_H
             if drop_player is not None:
 
               scores_unselected_styled = static_score_styler(g_display.reset_index()
-                                                , st.session_state.params['g-score-player-multiplier']
-                                                , st.session_state.params['g-score-total-multiplier'])
+                                                , params['g-score-player-multiplier']
+                                                , params['g-score-total-multiplier'])
               
               scores_unselected_styled = scores_unselected_styled.map(styler.color_blue
                                                                       , subset = pd.IndexSlice[:,['Player']]
@@ -329,8 +333,8 @@ def make_cand_tab(_H
       
             else:
               scores_unselected_styled = static_score_styler(g_display
-                                                , st.session_state.params['g-score-player-multiplier']
-                                                , st.session_state.params['g-score-total-multiplier'])
+                                                , params['g-score-player-multiplier']
+                                                , params['g-score-total-multiplier'])
 
               st.dataframe(scores_unselected_styled
                           , use_container_width = True
@@ -342,7 +346,7 @@ def make_cand_tab(_H
                       , None 
                       , remaining_cash)
 
-        if not st.session_state.mode == 'Season Mode':
+        if not get_mode() == 'Season Mode':
             
           with pbp_tab:
 
@@ -352,13 +356,13 @@ def make_cand_tab(_H
                         ,draft_seat
                         ,score_df
                         ,rate_display
-                        ,_g_scores
+                        ,g_scores
                         ,g_display
                         ,future_diffs
                         ,weights
                         ,position_shares
                         ,res
-                        ,_H
+                        ,H
                         ,rosters
                         ,cash_remaining_per_team
                         ,original_player_value
@@ -370,13 +374,13 @@ def make_detailed_view(player_assignments : dict[list[str]]
                        ,draft_seat : str
                        ,score_df : pd.DataFrame
                        ,rate_display : pd.DataFrame
-                       ,_g_scores : pd.DataFrame
+                       ,g_scores : pd.DataFrame
                        ,g_display : pd.DataFrame
                        ,future_diffs : pd.DataFrame
                        ,weights : pd.DataFrame
                        ,position_shares : dict[pd.DataFrame]
                        ,res : dict
-                       ,_H
+                       ,H
                        ,rosters : pd.DataFrame
                        ,cash_remaining_per_team: dict[int]
                        ,original_player_value : pd.Series
@@ -392,8 +396,9 @@ def make_detailed_view(player_assignments : dict[list[str]]
         None
     """
     my_players = player_assignments[draft_seat]
+    n_picks = get_n_picks()
 
-    if st.session_state.data_source == 'Enter your own data':
+    if using_manual_entry():
 
       player_name = st.selectbox('Candidate player'
                                           ,score_df.index
@@ -422,7 +427,8 @@ def make_detailed_view(player_assignments : dict[list[str]]
         
         player_last_name = player_name.split(' ')[1]
 
-    if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1) and (rosters.shape[1] > 0):
+
+    if (len([x for x in my_players if x == x]) < n_picks- 1) and (rosters.shape[1] > 0):
       n_per_position, roster_inverted_styled = get_roster_assignment_view(player_name = player_name
                                                                           ,player_last_name = player_last_name
                                                                           ,my_players = my_players
@@ -433,16 +439,16 @@ def make_detailed_view(player_assignments : dict[list[str]]
                               , player_name)
       
     
-    main_df_styled = make_main_df_styled(_g_scores
+    main_df_styled = make_main_df_styled(g_scores
                         , player_name
                         , player_last_name
                         , my_players
                         , res
-                        , _H
+                        , H
                         , future_diffs)
 
     weights_styled = pd.DataFrame(weights.loc[player_name]).T.style.format("{:.0%}") \
-                        .map(st.session_state.styler.stat_styler_tertiary
+                        .map(get_styler().stat_styler_tertiary
                              , middle = 0.9
                              , multiplier = 500)
 
@@ -453,7 +459,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
     
     with c1:
 
-      if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1):
+      if (len([x for x in my_players if x == x]) < n_picks - 1):
 
         st.markdown('Category weights for future picks')
         st.dataframe(weights_styled, hide_index = True)
@@ -466,7 +472,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
             st.write(positions_styled)
             
           st.markdown('Roster assignments for chosen players')
-          st.write(roster_inverted_styled, hide_index = True)
+          st.dataframe(roster_inverted_styled, hide_index = True)
 
 
 
@@ -496,7 +502,7 @@ def make_detailed_view(player_assignments : dict[list[str]]
                             , player_last_name)
       st.dataframe(rate_df_limited_styled, hide_index = True, height = 73)
 
-      if (len([x for x in my_players if x == x]) < st.session_state.n_picks - 1):
+      if (len([x for x in my_players if x == x]) < n_picks - 1):
 
         st.markdown('G-score expectations (difference vs. other teams)')
         st.dataframe(main_df_styled)
@@ -591,7 +597,7 @@ def make_auction_value_df(rate_display : pd.DataFrame
                           , player_name : str):
   #make a dataframe with $ according to your H-score, plus generically from H-score and G-score
   #ZR: Arguably this should have something about overpayments 
-  styler = st.session_state.styler
+  styler = get_styler()
 
   big_value_df = pd.DataFrame({'Your H$' : rate_display['Your $']
                                 ,'Gnrc. H$' : rate_display['Gnrc. $']
@@ -631,7 +637,7 @@ def get_positions_styled(n_per_position : dict
 
     #-999 is a hack to encode 'missing info' for the stat_styler function. None doesn't work for some reason
     return position_share_df.fillna(-999).style.format("{:.2f}") \
-                            .map(st.session_state.styler.stat_styler_tertiary, middle = 0, multiplier = 50) \
+                            .map(get_styler().stat_styler_tertiary, middle = 0, multiplier = 50) \
 
   
   else: 
@@ -682,7 +688,7 @@ def get_roster_assignment_view(player_name : str
 
   n_per_position = position_slots.value_counts()
 
-  roster_inverted_styled = roster_inverted.T.style.map(st.session_state.styler.style_rosters
+  roster_inverted_styled = roster_inverted.T.style.map(get_styler().style_rosters
                                                        , my_players = my_players)
 
   return n_per_position, roster_inverted_styled
@@ -702,7 +708,7 @@ def make_rate_display_styled(rate_display : pd.DataFrame
   """
   rate_df_limited = pd.DataFrame({player_last_name : rate_display.loc[player_name]}).T
 
-  if st.session_state.scoring_format == 'Rotisserie':
+  if get_scoring_format() == 'Rotisserie':
       style_format = "{:.1f}"
       format_middle = (get_n_drafters()-1)/2 + 1
       format_multiplier = 15 
@@ -719,7 +725,7 @@ def make_rate_display_styled(rate_display : pd.DataFrame
       st.markdown('Expected win rates if taken')
       h_score_col = ['H-score']
 
-  styler = st.session_state.styler
+  styler = get_styler()
 
   rate_df_limited_styled = rate_df_limited.style.format("{:.1%}",subset = pd.IndexSlice[:,h_score_col]) \
               .format(style_format, subset = get_selected_categories()) \
@@ -737,7 +743,7 @@ def make_main_df_styled(_g_scores : pd.DataFrame
                         , player_last_name : str
                         , my_players : list[str]
                         , res : dict
-                        , _H
+                        , H
                         , future_diffs : pd.DataFrame):
   
   """Creates a dataframe for current and future expected G-score for the team
@@ -756,7 +762,7 @@ def make_main_df_styled(_g_scores : pd.DataFrame
   """
 
   player = _g_scores.loc[player_name].drop('Total')
-  total_diff = res['Diff'].loc[player_name] * _H.original_v 
+  total_diff = res['Diff'].loc[player_name] * H.original_v 
 
   total_diff_plus_player = total_diff + player
 
@@ -766,7 +772,7 @@ def make_main_df_styled(_g_scores : pd.DataFrame
                   ,player_last_name : player
                   ,'Total diff' : total_diff_plus_player}
   else:
-    future_diff = res['Future-Diff'].loc[player_name] * _H.original_v
+    future_diff = res['Future-Diff'].loc[player_name] * H.original_v
     current_diff = total_diff - future_diff
 
     main_res_dict = {'Current diff' : current_diff
@@ -777,7 +783,7 @@ def make_main_df_styled(_g_scores : pd.DataFrame
   main_df = pd.DataFrame(main_res_dict).T
   main_df.loc[:,'Total'] = main_df.sum(axis = 1)
   
-  main_df_styled = static_score_styler(main_df, st.session_state.params['g-score-total-multiplier'])
+  main_df_styled = static_score_styler(main_df, get_params()['g-score-total-multiplier'])
 
   return main_df_styled
 
@@ -794,7 +800,7 @@ def get_ranking_views(g_display : pd.DataFrame
     Returns:
         None
     """
-    styler = st.session_state.styler
+    styler = get_styler()
 
     g_display = g_display.sort_values('Total', ascending = False)
 
