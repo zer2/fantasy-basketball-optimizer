@@ -7,7 +7,7 @@ from src.helpers.helper_functions import gen_key, get_beth, get_data_key, get_ga
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.math.algorithm_agents import build_h_agent
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
-                           ,make_auction_tab_live_data ,make_auction_tab_own_data, update_player_data
+                           ,make_auction_tab_live_data ,make_auction_tab_own_data, update_data_and_info
 from src.tabs.season_mode import make_season_mode_tabs
 from src.parameter_collection.league_settings import league_settings_popover
 from src.parameter_collection.player_stats import player_stats_popover
@@ -106,19 +106,9 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
-H, key = build_h_agent(get_data_key('info')
-                  ,get_omega()
-                  ,get_gamma()
-                  ,get_n_starters()
-                  ,get_n_drafters()
-                  ,get_beth()
-                  ,get_scoring_format()
-                  ,get_n_iterations() > 0)
-store_dataset_in_session_state(H, 'H',key)
-
 if using_manual_entry():
   initialize_selections_df()
-  update_player_data()
+  update_data_and_info()
 
 if get_mode() == 'Draft Mode':
 
