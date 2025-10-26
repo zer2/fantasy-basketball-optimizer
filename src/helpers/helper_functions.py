@@ -107,7 +107,7 @@ def get_games_per_week():
    
 def get_selections_default():
    if using_manual_entry():
-    return st.session_state.selections_default
+    return st.session_state.selections_default.copy()
    else:
     return st.session_state.integration.selections_default
   
@@ -563,7 +563,6 @@ def get_fixed_player_name(player_name : str, info_key : str) -> str:
     if player_name in positions.index:
         return player_name + ' (' + ','.join(positions[player_name]) + ')'
     else:
-        st.write(player_name)
         return 'RP'
 
 def get_combo_params():
