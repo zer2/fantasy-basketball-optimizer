@@ -11,7 +11,7 @@ from src.helpers.helper_functions import get_beth, get_chi, get_data_from_sessio
                                             , get_default_draft_seat_index, get_draft_position \
                                             , get_gamma, get_n_iterations, get_n_picks, get_n_starters \
                                             , get_omega, get_psi, get_selected_players, get_selections_df \
-                                            , get_style_base, h_score_is_running \
+                                            , get_style_base, h_score_is_running, initialize_selections_df \
                                             , modify_selections_df, move_back_one_pick, move_forward_one_pick \
                                             , get_n_drafters, remove_selections_df, run_h_score, set_draft_position \
                                             , stop_run_h_score, store_dataset_in_session_state, get_team_names \
@@ -449,6 +449,7 @@ def clear_draft_board():
     st.session_state.draft_results = None
 
   remove_selections_df()
+  initialize_selections_df()
 
   st.session_state.live_draft_active = False
 
