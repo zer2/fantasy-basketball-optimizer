@@ -1,4 +1,4 @@
-[The FSO website](https://fantasy-basketball-optimizer-y9jt7t3ypmiejsyjkeayx6.streamlit.app/) aims to implement the category-based fantasy basketball optimization methods described in my three papers on fantasy basketball. See the [documentation here](https://zer2.github.io/fantasy-basketball-optimizer/).
+[The FSO website](https://fantasy-basketball-optimizer-35667048953.us-east1.run.app/) aims to implement the category-based fantasy basketball optimization methods described in my three papers on fantasy basketball. See the [documentation here](https://zer2.github.io/fantasy-basketball-optimizer/).
 
 If you are unfamiliar with fantasy basketball, here are some potentially useful links:
 - [*General intro*](https://dunkorthree.com/how-fantasy-basketball-work/)
