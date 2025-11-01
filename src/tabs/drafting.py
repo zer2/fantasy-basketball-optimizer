@@ -448,7 +448,7 @@ def clear_draft_board():
   if 'draft_results' in st.session_state:
     st.session_state.draft_results = None
 
-  st.session_state.selections_df = get_selections_default()
+  del st.session_state.selections_df
 
   st.session_state.live_draft_active = False
 

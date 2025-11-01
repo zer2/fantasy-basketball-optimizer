@@ -103,8 +103,9 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
+initialize_selections_df()
+
 if using_manual_entry():
-  initialize_selections_df()
   update_data_and_info()
 
 if get_mode() == 'Draft Mode':
