@@ -1,4 +1,4 @@
-# Adjusting the projections with a Bayesian prior 
+# Adjusting projections with a Bayesian prior 
 
 H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
 

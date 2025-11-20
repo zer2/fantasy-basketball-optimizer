@@ -26,6 +26,6 @@ Because of the reliance on existing projections and the simplifications invoked,
 
 ## The website 
 
-The central purpose of the website is to apply the methods of the papers to drafts and auctions. It makes a few practical adjustments from the methods described in the papers, particularly [adjusting implicit projections during drafts](projectionadjustment.md). It also provides some related analyses for leagues that are already underway via 'Season Mode'.
+The central purpose of the website is to apply the methods of the papers to drafts and auctions. It makes a few practical adjustments from the methods described in the papers, particularly [adjusting implicit projections during drafts](projectionadjustment.md). It also provides some related analyses for leagues that are already underway via ["Season Mode"](season.md).
 
 Source code is available [here](https://github.com/zer2/fantasy-basketball-optimizer).
