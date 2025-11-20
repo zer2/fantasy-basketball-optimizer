@@ -201,6 +201,19 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="." class="md-nav__link md-nav__link--active">
         
   
@@ -212,6 +225,52 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction-to-category-based-fantasy-basketball" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction to category-based fantasy basketball
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-papers" class="md-nav__link">
+    <span class="md-ellipsis">
+      The papers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-website" class="md-nav__link">
+    <span class="md-ellipsis">
+      The website
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -435,6 +494,41 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction-to-category-based-fantasy-basketball" class="md-nav__link">
+    <span class="md-ellipsis">
+      Introduction to category-based fantasy basketball
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-papers" class="md-nav__link">
+    <span class="md-ellipsis">
+      The papers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-website" class="md-nav__link">
+    <span class="md-ellipsis">
+      The website
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -457,8 +551,16 @@
 <li><a href="https://arxiv.org/abs/2501.00933">Optimizing for Rotisserie fantasy basketball</a></li>
 </ul>
 <p>The methods are designed for category leagues (not points leagues). </p>
-<p>Broadly, the papers formulate fantasy basketball as a math problem, and provide methods for selecting players based on that formulation. The methods take projections of player performance as an input. They also invoke many simplifications, which are handy both because real fantasy basketball is extremely complex, and because perfect mathematical solutions are not always easy. Because of the reliance on existing projections and the simplifications invoked, these methods should in no way be considered the end-all-be-all or truly "optimal" in any sense. They are just one potential starting point. </p>
-<p>The website is mostly designed for drafts and auctions. It also provides some related analyses for leagues that are already underway via 'Season Mode'.</p>
+<h2 id="introduction-to-category-based-fantasy-basketball">Introduction to category-based fantasy basketball</h2>
+<p>In fantasy leagues, "managers" draft teams of real players before the season begins. E.g. I might take Victor Wembanyama with my first pick, then you take Nikola Jokic, someone else takes Luka Doncic, and so on. At the end of the draft everyone has a 13-player team. </p>
+<p>The most common format of fantasy basketball pits teams against each other on a weekly basis during the season. Matchups are scored based on statistical categories such as blocks and rebounds. For each category, the team whose players accumulated more of that category during the week earns a point. </p>
+<p>This differs from point-based formats, which are more common for other fantasy sports like fantasy football. Points-based leagues assign point values directly to scoring categories, e.g. two points for a block, one point for a rebound, et cetera. </p>
+<p>Point-based leagues have an element of simplicity, because there is a clear translation between a player's production and their value. The same cannot be said for category leagues. The simple mechanic of scoring based on categories introduces a wealth of complicated strategy and math. </p>
+<h2 id="the-papers">The papers</h2>
+<p>Broadly, the papers formulate category-based fantasy basketball as a math problem, and provide methods for selecting players based on that formulation. The methods take projections of player performance as an input. They also invoke many simplifications, which are handy both because real fantasy basketball is extremely complex, and because perfect mathematical solutions are not always easy. </p>
+<p>Because of the reliance on existing projections and the simplifications invoked, these methods should in no way be considered the end-all-be-all or truly "optimal" in any sense. They represent one potential starting point. </p>
+<h2 id="the-website">The website</h2>
+<p>The central purpose of the website is to apply the methods of the papers to drafts and auctions. It makes a few practical adjustments from the methods described in the papers, particularly <a href="projectionadjustment/">adjusting implicit projections during drafts</a>. It also provides some related analyses for leagues that are already underway via <a href="season/">"Season Mode"</a>.</p>
 <p>Source code is available <a href="https://github.com/zer2/fantasy-basketball-optimizer">here</a>.</p>
 
 
