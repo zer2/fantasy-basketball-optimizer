@@ -60,7 +60,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#fso-website-documentation" class="md-skip">
+        <a href="#website-documentation" class="md-skip">
           Skip to content
         </a>
       
@@ -543,22 +543,24 @@
 
 
 
-<h1 id="fso-website-documentation">FSO website documentation</h1>
-<p><a href="https://fantasy-basketball-optimizer-y9jt7t3ypmiejsyjkeayx6.streamlit.app/">The FSO Website</a> implements the methods described in these papers: </p>
+<h1 id="website-documentation">Website documentation</h1>
+<p>This is documentation for a <a href="https://fantasy-basketball-optimizer-y9jt7t3ypmiejsyjkeayx6.streamlit.app/">website</a> which applies algorithms to category-based fantasy basketball. The algorithms are described in these papers: </p>
 <ul>
 <li><a href="https://arxiv.org/abs/2307.02188">Improving algorithms for fantasy basketball</a></li>
 <li><a href="https://arxiv.org/abs/2409.09884">Dynamic algorithms for fantasy basketball</a></li>
 <li><a href="https://arxiv.org/abs/2501.00933">Optimizing for Rotisserie fantasy basketball</a></li>
 </ul>
-<p>The methods are designed for category leagues (not points leagues). </p>
+<p>Please note that these algorithms are based on a simplified model of fantasy basketball, and there is no guarantee that using them will lead to success. Don't expect to automatically win your league with the algorithms or even to have a better shot than anyone else. There are many practical issues in real fantasy basketball which the algorithms do not account for, potentially rendering the algorithms' suggestions suboptimal in certain situations. The intent of the papers is to start exploring the math underlying fantasy basketball, and the intent of the website is to offer a window into that math.  I only hope that exploring the website/the papers will be fun and interesting :smile:. </p>
 <h2 id="introduction-to-category-based-fantasy-basketball">Introduction to category-based fantasy basketball</h2>
 <p>In fantasy leagues, "managers" draft teams of real players before the season begins. E.g. I might take Victor Wembanyama with my first pick, then you take Nikola Jokic, someone else takes Luka Doncic, and so on. At the end of the draft everyone has a 13-player team. </p>
-<p>The most common format of fantasy basketball pits teams against each other on a weekly basis during the season. Matchups are scored based on statistical categories such as blocks and rebounds. For each category, the team whose players accumulated more of that category during the week earns a point. </p>
-<p>This differs from point-based formats, which are more common for other fantasy sports like fantasy football. Points-based leagues assign point values directly to scoring categories, e.g. two points for a block, one point for a rebound, et cetera. </p>
-<p>Point-based leagues have an element of simplicity, because there is a clear translation between a player's production and their value. The same cannot be said for category leagues. The simple mechanic of scoring based on categories introduces a wealth of complicated strategy and math. </p>
+<p>Throughout the season, teams accumulate statistics based on their real players' performances. E.g. if Wembanyama gets 7 blocks in a game, I get 7 blocks, and if Jokic scores 20 points, you get 20 points. </p>
+<p>In category-based leagues, which most fantasy basketball leagues are, the important thing is winning individual categories. So if my team gets 100 blocks and your team gets 10 blocks, I get a "fantasy point" for winning blocks. If your team gets 300 points and my team gets 299 points, you get an equivalent fantasy point for that; the margin is irrelevant. Generally these match-ups occur on a weekly basis across eight or nine statistical categories, and each team keeps all the fantasy points they win throughout the season. </p>
+<p>Based on that scoring mechanism, what is the best way to choose players during a draft? This is a fascinating question which has no simple answer. Trying to do the best we can is the motivating force behind the papers. </p>
 <h2 id="the-papers">The papers</h2>
-<p>Broadly, the papers formulate category-based fantasy basketball as a math problem, and provide methods for selecting players based on that formulation. The methods take projections of player performance as an input. They also invoke many simplifications, which are handy both because real fantasy basketball is extremely complex, and because perfect mathematical solutions are not always easy. </p>
-<p>Because of the reliance on existing projections and the simplifications invoked, these methods should in no way be considered the end-all-be-all or truly "optimal" in any sense. They represent one potential starting point. </p>
+<p>Broadly, the papers formulate category-based fantasy basketball as a math problem, and provide methods for selecting players based on that formulation. The methods take projections of player performance as an input. </p>
+<p>The <a href="https://arxiv.org/abs/2307.02188">first paper</a> looks at so-called "static" systems, which try to evaluate players in a vacuum. It makes the simplification of assuming that all players except the one being chosen will be selected randomly, which is a strong assumption, but one that lines up well with the traditional metric of Z-scores. The paper describes an improvement upon Z-scores called G-scores, which are used on the website for describing player values statically. See also the <a href="gscores/">G-score</a> section of documentation. </p>
+<p>The <a href="https://arxiv.org/abs/2409.09884">second paper</a> considers the task of picking players based on context. The trickiest part of this is that the best player to select depends on players that will be selected in the future, which cannot be known for certain. The solution is an algorithm called H-scoring which simultaneously optimizes for a player and a heuristic approach to future draft picks. See also the <a href="hscores/">H-score</a> section of documentation. </p>
+<p>The <a href="https://arxiv.org/abs/2501.00933">third paper</a> attacks the trickiest format, Rotisserie or "Roto". Instead of weekly matchups, Roto has one season-long scoring period in which all managers compete against all other managers. Winning a Roto league requires accumulating the most fantasy points in that one scoring period. The approach of the paper is to model all teams' fantasy point totals as correlated Normal distributions, and use estimates of their order statistics to calculate the probability of ending up with the most fantasy points. See also the <a href="roto/">Roto</a> section of documentation. </p>
 <h2 id="the-website">The website</h2>
 <p>The central purpose of the website is to apply the methods of the papers to drafts and auctions. It makes a few practical adjustments from the methods described in the papers, particularly <a href="projectionadjustment/">adjusting implicit projections during drafts</a>. It also provides some related analyses for leagues that are already underway via <a href="season/">"Season Mode"</a>.</p>
 <p>Source code is available <a href="https://github.com/zer2/fantasy-basketball-optimizer">here</a>.</p>
