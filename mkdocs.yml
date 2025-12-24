@@ -1,4 +1,4 @@
-site_name: FSO Methods & Documentation
+site_name: Fantasy Basketball Optimization, Methods & Documentation
 nav:
   - Home: index.md
   - Settings : settings.md
@@ -17,5 +17,9 @@ markdown_extensions:
   - pymdownx.blocks.caption
   - pymdownx.arithmatex:
       generic: true
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js

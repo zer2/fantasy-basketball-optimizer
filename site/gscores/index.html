@@ -20,7 +20,7 @@
     
     
       
-        <title>G-scores - FSO Methods & Documentation</title>
+        <title>G-scores - Fantasy Basketball Optimization, Methods & Documentation</title>
       
     
     
@@ -78,7 +78,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="FSO Methods &amp; Documentation" class="md-header__button md-logo" aria-label="FSO Methods & Documentation" data-md-component="logo">
+    <a href=".." title="Fantasy Basketball Optimization, Methods &amp; Documentation" class="md-header__button md-logo" aria-label="Fantasy Basketball Optimization, Methods & Documentation" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -92,7 +92,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            FSO Methods & Documentation
+            Fantasy Basketball Optimization, Methods & Documentation
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -176,13 +176,13 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="FSO Methods &amp; Documentation" class="md-nav__button md-logo" aria-label="FSO Methods & Documentation" data-md-component="logo">
+    <a href=".." title="Fantasy Basketball Optimization, Methods &amp; Documentation" class="md-nav__button md-logo" aria-label="Fantasy Basketball Optimization, Methods & Documentation" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    FSO Methods & Documentation
+    Fantasy Basketball Optimization, Methods & Documentation
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -324,6 +324,48 @@
       Team table
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#justification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Justification
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Justification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-are-z-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      What are Z-scores?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#justifying-z-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Justifying Z-scores
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extending-to-g-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extending to G-scores
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -521,6 +563,48 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#justification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Justification
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Justification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-are-z-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      What are Z-scores?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#justifying-z-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Justifying Z-scores
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extending-to-g-scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extending to G-scores
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#calculation" class="md-nav__link">
     <span class="md-ellipsis">
       Calculation
@@ -547,16 +631,57 @@
 
 <h1 id="g-scores">G-scores</h1>
 <p>It is well-understood that player value in category leagues is dependent on context. No single number, independent of circumstances around team, opposition, etc. can ever fully define a player's value. However, that has not stopped fantasy enthusiasts from designing and applying so-called 'static' ranking systems. Despite their limitations in theory, they are useful in practice because they are simple and convenient. One ought not let the perfect get in the way of the good. </p>
-<p>The website uses G-scores as a measure of static value. G-scores are a variant of the traditional Z-score metric, as described in my <a href="https://arxiv.org/abs/2307.02188">first paper</a>. Briefly, they extend Z-scores, which account for player-to-player variance, to account for variance in player performances as well. G-scores can be shown to be approximately optimal for the contrived case of all other players being chosen randomly, which is as reasonable an assumption as any when context cannot be taken into account. They down-weights volatile categories like steals and turnovers relative to Z-scores. </p>
-<p>While limited in terms of flexibility, G-scores may be helpful for understanding a player's strength and weaknesses, seeing how they relate to other players, and ballparking their overall value. </p>
+<p>The website uses G-scores as a measure of static value. G-scores are a variant of the traditional Z-score metric, as described in my <a href="https://arxiv.org/abs/2307.02188">first paper</a>. See also the <a href="#justification">justification section of this page</a> for a relatively simple explanation. </p>
 <h2 id="g-score-table">G-score table</h2>
 <p><img alt="alt text" src="../img/gcand.png" /></p>
 <p>During auctions and drafts, a tab will be available with the G-score table for available players. The G-score table shows available players ordered by total G-score during drafts and auctions. It includes the categorical components of G-scores as well.</p>
 <h2 id="team-table">Team table</h2>
 <p><img alt="alt text" src="../img/gteam.png" /></p>
 <p>The team table shows the G-scores of players already chosen for a team, and their totals. The totals show how the team is doing in general, though one should keep in mind that non-turnover categories tend to have high values during early rounds because only the strongest players are being taken. </p>
+<h2 id="justification">Justification</h2>
+<h3 id="what-are-z-scores">What are Z-scores?</h3>
+<p>Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. </p>
+<p>You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by <span class="arithmatex">\(\mu\)</span> and dividing by the standard deviation (how “spread out” the distribution is) signified by <span class="arithmatex">\(\sigma\)</span>. Mathematically, <span class="arithmatex">\(Z(x) = \frac{x - \mu}{\sigma}\)</span>.</p>
+<p>Z-scores in the fantasy context are essentially the same thing, with a few minor modifications. They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. </p>
+<h3 id="justifying-z-scores">Justifying Z-scores</h3>
+<p>Consider this problem: <strong>Team one has <span class="arithmatex">\(N-1\)</span> players randomly selected from a pool of players, and team two has <span class="arithmatex">\(N\)</span> players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform at exactly their long term mean for a week?</strong></p>
+<p>The difference in category score between two teams tells us which team is winning the category and by how much. By randomly selecting the <span class="arithmatex">\(2N -1\)</span> random players many times, we can get a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with <span class="arithmatex">\(N=12\)</span></p>
+<video controls width="100%">
+  <source src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/73c3acaa-20c9-4a61-907a-ee0de2ff7e3b" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+<p>You may notice that the result looks a lot like a Bell curve even though the raw block numbers look nothing like a Bell curve. This happens because of the surprising "Central Limit Theorem", which says that when adding a bunch of random numbers together, their sum always ends up looking a lot like a Bell curve. </p>
+<p>The mean and standard deviation of the Bell curves for category differences can be calculated via probability theory. Including the unchosen player with category average <span class="arithmatex">\(m_p\)</span>
+- The mean is <span class="arithmatex">\(m_\mu - m_p\)</span>
+- The standard deviation is <span class="arithmatex">\(\sqrt{2N-1} * m_\sigma\)</span> (The square root in the formula comes from the fact that <span class="arithmatex">\(STD(X + Y) = \sqrt{STD(X)^2 + STD(Y)^2}\)</span> where <span class="arithmatex">\(STD(X)\)</span> is the standard deviation of <span class="arithmatex">\(X\)</span>)</p>
+<p>When the category difference is below zero, team one will win the category</p>
+<p>The probability of this happening can be calculated using something called a cumulative distribution function. <span class="arithmatex">\(CDF(x) =\)</span> the probability that a particular distribution will be less than <span class="arithmatex">\(x\)</span>. We can use <span class="arithmatex">\(CDF(0)\)</span>, then, to calculate the probability that the category difference is below zero and team one wins. </p>
+<p>The <span class="arithmatex">\(CDF\)</span> of the Bell curve is well known. The details of how to apply it to this case are somewhat complicated, but we can cut to the chase and give an approximate formula </p>
+<div class="arithmatex">\[
+CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{\pi}}* \frac{- \mu }{ \sigma} \right]
+\]</div>
+<p>We already know <span class="arithmatex">\(\mu\)</span> and <span class="arithmatex">\(\sigma\)</span> for the standard statistics. Substituting them in yields</p>
+<div class="arithmatex">\[
+CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p – m_\mu}{m_\sigma} \right]
+\]</div>
+<p>Hey look, that's the Z-score! We can see that an extra point of Z-score translates into an increased probability of winning the category in a consistent way. </p>
+<h3 id="extending-to-g-scores">Extending to G-scores</h3>
+<p>To justify Z-scores, we assumed that each player would perform precisely at their long-term mean. But that was a bad assumption, because players don't perform consistently week-to-week. We can improve the question by assuming that players are chosen randomly and their performances are chosen randomly too. </p>
+<p>Below, see how metrics for blocks change when we look at every weekly performance of the top <span class="arithmatex">\(156\)</span> players, instead of just their averages </p>
+<video controls width="100%">
+  <source src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab41db2a-99f2-45b1-8c05-d755c014b30f" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+<p>Although the mean remains the same, the standard deviation gets larger. This makes sense, because week-to-week "noise" adds more volatility, which is reflected in the additional <span class="arithmatex">\(m_\tau\)</span> term. Note that the new standard deviation is <span class="arithmatex">\(\sqrt{m_\sigma^2 + m_\tau^2}\)</span> rather than <span class="arithmatex">\(m_\sigma + m_\tau\)</span> because of how standard deviation aggregates across multiple variables, as discussed previously</p>
+<p>Also keep in mind that for Rotisserie, the uncertainty is in season-long performance, rather than week-by-week variance. </p>
+<p>G-scores are what we get when we substitute in the new standard deviation. they are </p>
+<div class="arithmatex">\[
+\frac{m_p – m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
+\]</div>
 <h2 id="calculation">Calculation</h2>
-<p>The coefficients for G-scores used by the website were calculated based on real historical data, as shown in <a href="https://arxiv.org/abs/2307.02188">the paper</a>. One should not that real week-to-week variance in historical data is not necessarily the same thing as forecasted variance for future weeks, so the week-to-week variance factor may be too strong or too weak in practice. </p>
+<p>The coefficients for G-scores used by the website were calculated based on real historical data, as shown in the paper. One should not that real week-to-week variance in historical data is not necessarily the same thing as forecasted variance for future weeks, so the week-to-week variance factor may be too strong or too weak in practice. </p>
 
 
 
