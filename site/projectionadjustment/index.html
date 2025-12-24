@@ -60,7 +60,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adjusting-the-projections-with-a-bayesian-prior" class="md-skip">
+        <a href="#adjusting-projections-with-a-bayesian-prior" class="md-skip">
           Skip to content
         </a>
       
@@ -525,7 +525,7 @@
 
 
 
-<h1 id="adjusting-the-projections-with-a-bayesian-prior">Adjusting the projections with a Bayesian prior</h1>
+<h1 id="adjusting-projections-with-a-bayesian-prior">Adjusting projections with a Bayesian prior</h1>
 <p>H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. </p>
 <p>This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. </p>
 <p>The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that I've added a module specifically to address it. </p>

@@ -687,7 +687,7 @@
 <p>H-score-based $ values in a synthetic draft context</p>
 </figcaption>
 </figure>
-<p>The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. </p>
+<p>The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. The lack of context also means that they are imprecise approximations of real player value.</p>
 <p>Like for G-scores, the original values are processed once with the auction value heuristic and stay the same throughout the auction. </p>
 <p>For generic values, the underlying step 1 estimates are not changed, but the step 2 process is adjusted for the number of players remaining etc. That is, if a player was estimated to be worth $30 originally, that number will continue to be plugged in as a value to the auction value heuristic process. The auction value heuristic process will be slightly different because players have been taken and cash has been spent. </p>
 <p>H-scoring is also run with with the updated context for the drafter in question. Those monetary estimates become 'Your $' after refinement through the auction value heuristic. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. </p>

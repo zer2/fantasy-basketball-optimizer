@@ -2,6 +2,10 @@
 
 The Rotisserie format is significantly different from the two Head-to-Head formats, necessitating some adaptations.
 
+One simple way in which Rotisserie is different from the other formats is that its scoring period is a full season, instead of a week. That changes the way we need to think of period-to-period uncertainty. 
+
+The other difference is that Rotisserie requires winning against many managers simultaneously. This adds a layer of complication to the H-scoring algorithm. 
+
 ## Variance in player performances
 
 Variance in player performances is a key input to the G-score calculation. That means week-to-week variance in the case of Head-to-Head, and uncertainty in season-long performance in the case of Rotisserie. The same quantity is also relevant to H-scoring. While week-to-week variance is relatively simple to estimate based on historical data, pre-season uncertainty is harder to quantify and not studied thoroughly. That creates an issue for using G-scores for Rotisserie in practice.
