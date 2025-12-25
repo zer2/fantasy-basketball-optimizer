@@ -1,4 +1,4 @@
-site_name: Fantasy Basketball Optimization, Methods & Documentation
+site_name: Fantasy Basketball Optimization
 nav:
   - Home: index.md
   - Settings : settings.md
