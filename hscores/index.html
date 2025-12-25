@@ -431,6 +431,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#h-scoring-tendencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-scoring tendencies
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#optimization" class="md-nav__link">
     <span class="md-ellipsis">
       Optimization
@@ -478,15 +487,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#h-scoring-tendencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      H-scoring tendencies
-    </span>
-  </a>
   
 </li>
       
@@ -743,6 +743,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#h-scoring-tendencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      H-scoring tendencies
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#optimization" class="md-nav__link">
     <span class="md-ellipsis">
       Optimization
@@ -790,15 +799,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#h-scoring-tendencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      H-scoring tendencies
-    </span>
-  </a>
   
 </li>
       
@@ -903,8 +903,17 @@
 <p>The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks. One might note that in the case above, the weight for Free Throws is surprisingly high, despite the obvious fact that the algorithm is deprioritizing the category heavily. The reason for this is that in general, H-scoring does not think it needs to adjust weights all that much in order to skew the available candidates to the categories it wants. </p>
 <p>The flex position allocations show how the algorithm expects to use its flex spots, which can take players of multiple positions. This is relevant because the algorithm understands that different positions have different statistical tendencies. In the example above, the algorithm is leaning heavily on taking Power Forwards and Centers with its flex spots, likely because they tend to have poor Free Throw rates, and that synergizes with the strategy of punting Free Throws. </p>
 <p>The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. </p>
+<h2 id="h-scoring-tendencies">H-scoring tendencies</h2>
+<p>The traditional fantasy basketball strategy is to punt some categories and compete in others. The H-scoring algorithm tends to behave the same way. </p>
+<figure>
+<p><img alt="alt text" src="../img/HistEC.png" /></p>
+<figcaption>
+<p>Image from the paper</p>
+</figcaption>
+</figure>
+<p>This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories. For the categories it did not punt, it tried to be highly competitive in them without going overboard. </p>
 <h2 id="optimization">Optimization</h2>
-<p>Warning- this section is a bit mathy <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
+<p>Warning- mathy section <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
 <p>H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. </p>
 <p>The gradient of a function is derivative over multiple dimensions. As an extremely simple example, the gradient of <span class="arithmatex">\(x - 3y\)</span> is <span class="arithmatex">\(1\)</span> in the x direction and <span class="arithmatex">\(-3\)</span> in the y direction. The gradient gives a hint at which direction the function can be minimized or maximized. The idea of gradient descent is to step in the direction of the gradient (or the opposite direction) to try to find a point which minimizes or maximizes the function. </p>
 <p><iframe
@@ -959,20 +968,11 @@
 <p>A Normal distribution, from Wikipedia </p>
 </figcaption>
 </figure>
-<p>This makes intuitive sense and connects with general fantasy basketball strategies. If a team is already bad at a category, it might make sense to abandon that category and punt it, since the team is likely to lose it anyway. That creates a snowball effect- the team gets worse and worse at the category. If a team is extremely strong in a category, it doesn't need the extra help there, and prioritizing it is not important. That does not create a snowball effect, since as the team gets weaker in the category, H-scoring starts to prioritize it more. That means the algorithm is incentivized to put categories into one of two buckets- punting, or competing without going overboard. These are the two traditional approaches to categories in fantasy basketball.</p>
+<p>This makes intuitive sense and explains why the algorithm behaves like it does, punting some categories and trying to compete in others without going overboard. If a team is already bad at a category, it might make sense to abandon that category and punt it, since the team is likely to lose it anyway. That creates a snowball effect- the team gets worse and worse at the category. If a team is extremely strong in a category, it doesn't need the extra help there, and prioritizing it is not important. That does not create a snowball effect, since as the team gets weaker in the category, H-scoring starts to prioritize it more. That means the algorithm is incentivized to put categories into one of two buckets- punting, or competing without going overboard.</p>
 <h3 id="outer-level-objective-function">Outer-level objective function</h3>
 <p>The outer-level objective function is the function that the algorithm is trying to directly maximize. For H-scoring, it is the overall H-score. </p>
 <p>For Each Category, the objective function is just the sum of probabilities of winning each category. That is relatively simple to optimize, since the overall gradient is just the sum of all the individual gradients.</p>
 <p>For Most Categories scoring, the objective function is the probability of winning a majority of categories, which is more complicated. Fortunately, this operation turns out to be differentiable, so it can be optimized via gradient descent. The gradient is the same as for Each Categories except multiplied by a 'tipping point' probability, which is the likelihood that any given category will end up being decisive. </p>
-<h2 id="h-scoring-tendencies">H-scoring tendencies</h2>
-<p>The H-scoring algorithm does not take explicit instructions on overall strategy. However, it "learns" the strategy of punting some categories and balancing others based on its understanding of the problem, as expected. </p>
-<figure>
-<p><img alt="alt text" src="../img/HistEC.png" /></p>
-<figcaption>
-<p>Image from the paper</p>
-</figcaption>
-</figure>
-<p>This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories (this behavior makes intuitive sense- a more detailed discussion is in the paper). For the categories it did not punt, it tried to be highly competitive in them without going overboard. </p>
 <h2 id="limitations">Limitations</h2>
 <p>H-scoring has numerous limitations. Some of the most major are </p>
 <ul>

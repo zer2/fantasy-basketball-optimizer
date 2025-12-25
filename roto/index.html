@@ -363,13 +363,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#adapting-h-scores" class="md-nav__link">
+  <a href="#h-scores" class="md-nav__link">
     <span class="md-ellipsis">
-      Adapting H-scores
+      H-scores
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Adapting H-scores">
+    <nav class="md-nav" aria-label="H-scores">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -536,13 +536,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#adapting-h-scores" class="md-nav__link">
+  <a href="#h-scores" class="md-nav__link">
     <span class="md-ellipsis">
-      Adapting H-scores
+      H-scores
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Adapting H-scores">
+    <nav class="md-nav" aria-label="H-scores">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -596,13 +596,12 @@
 <h1 id="rotisserie">Rotisserie</h1>
 <p>The Rotisserie format is significantly different from the two Head-to-Head formats, necessitating some adaptations.</p>
 <p>One simple way in which Rotisserie is different from the other formats is that its scoring period is a full season, instead of a week. That changes the way we need to think of period-to-period uncertainty. </p>
-<p>The other difference is that Rotisserie requires winning against many managers simultaneously. This adds a layer of complication to the H-scoring algorithm. </p>
+<p>The other difference is that Rotisserie requires winning against many managers simultaneously, which adds a layer of complication for H-scoring. An objective function to plug into H-scoring for Rotisserie is described in the <a href="https://arxiv.org/abs/2501.00933">third paper</a>. See the <a href="#brief-math">brief math section</a> below for a brief explanation of the paper.</p>
 <h2 id="variance-in-player-performances">Variance in player performances</h2>
 <p>Variance in player performances is a key input to the G-score calculation. That means week-to-week variance in the case of Head-to-Head, and uncertainty in season-long performance in the case of Rotisserie. The same quantity is also relevant to H-scoring. While week-to-week variance is relatively simple to estimate based on historical data, pre-season uncertainty is harder to quantify and not studied thoroughly. That creates an issue for using G-scores for Rotisserie in practice.</p>
 <p>The website's way of handling this is to use scaled week-to-week variance as a proxy for seasonal uncertainty. The χ factor, which defaults to 60%, controls the degree of scaling. It is one of the <a href="../parameters/#chi-factor">input parameters</a>.</p>
 <p>More technically: the assumption is that the variance over the ~20 weeks in a season will be χ times the week-to-week variance times 20. If week-to-week variance was the only source of variance, χ would be effectively 22%. It is likely higher than that before the season, because there is uncertainty about rotations, playing time, offseason improvements, etc. 60% is an estimate with essentially no justification, it can be changed as desired. </p>
-<h2 id="adapting-h-scores">Adapting H-scores</h2>
-<p>The H-scoring algorithm for Rotisserie is described in the <a href="https://arxiv.org/abs/2501.00933">third paper</a>. It provides an objective function for the format which represents the probability of winning an entire Rotisserie league. See the <a href="#justification">brief math section</a> below for a brief explanation of the paper.</p>
+<h2 id="h-scores">H-scores</h2>
 <h3 id="website-interface">Website interface</h3>
 <p>Because Rotisserie is based on fantasy point totals instead of individual match-up victory probabilities, the H-score display for Rotisserie shows expected category totals instead of average matchup winning probabilities. </p>
 <figure>
@@ -624,6 +623,7 @@
 </figure>
 <p>For the most part, the algorithm aims to be moderately strong in all categories. It does tend to deprioritize volatile categories like Turnovers, though only slightly. It wants to win them, it is just banking on some degree of luck to win those categories, instead of investing heavily in them. It chooses to bank on luck in those categories because they are more volatile than the others, and therefore a small amount of luck will go a longer way.</p>
 <h3 id="brief-math">Brief math</h3>
+<p>Warning- math <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
 <p>The logic behind the Rotisserie algorithm is too complicated to go into fully here</p>
 <figure>
 <p><img alt="" src="../img/roto_equations.png" /></p>
@@ -635,9 +635,8 @@
 <p>Say that a team will score <span class="arithmatex">\(Z\)</span> fantasy points. The expected fantasy point total for an arbitrary opponent algebraically must then be <span class="arithmatex">\(\frac{P-Z}{|O|}\)</span> where <span class="arithmatex">\(P\)</span> is the total points up for grabs, and <span class="arithmatex">\(|O|\)</span> is the number of opponents. </p>
 <p>Say also that the standard deviation of total fantasy points for an arbitrary opponent is known, and can be used to estimate how much better the best opponent will do than the average opponent. Call that value <span class="arithmatex">\(L\)</span>. </p>
 <p>Then, for a given <span class="arithmatex">\(Z\)</span>, the expected difference between the team and its strongest opponent is <span class="arithmatex">\(Z - \frac{P-Z}{|O|} - L\)</span>, or <span class="arithmatex">\(\frac{Z(|O| - 1)}{|O|} - \frac{P}{|O|} - L\)</span>. The overall expected value is <span class="arithmatex">\(\frac{E(Z)(|O| - 1)}{|O|} - \frac{P}{|O|} - L\)</span></p>
-<p>With some additional math, we can come up with a standard deviation for the difference. Then, we can use the Normal CDF to calculate the probability of the difference being positive, which is the team's victory probability. </p>
-<p>This framework provides some intution for why the Rotisserie algorithm tries not to punt categories. The expected value of the difference is generally negative, because it compares the team to its luckiest opponent. The CDF of a negative value of a Normal distiribution will be much higher if the standard deviation is high, since that increases the probability of abberant values. Therefore, the algorithm prefers to have a highly volatile fantasy point total. </p>
-<p>The thing about punting is that it decreases volatility. It increases confidence in the end result by determining that one category will be lost, and others will likely be won. A balanced team is more volatile, because it could do badly in everything or well in anything. That's the kind of volatility needed to have a strong chance of winning in Rotisserie. </p>
+<p>With some additional math, we can come up with a standard deviation for the difference. Then, we can use the Normal CDF to calculate the probability of the difference being positive, which is the team's victory probability. That provides an outer-level objective function for H-scoring. </p>
+<p>This framework provides some intution for why the Rotisserie algorithm tries not to punt categories. The expected value of the difference is generally negative, because it compares the team to its luckiest opponent. The CDF of a negative value of a Normal distiribution will be much higher if the standard deviation is high, since that increases the probability of abberant values. Therefore, the algorithm prefers to have a highly volatile fantasy point total. Punting decreases volatility. It increases confidence in the end result by determining that one category will be lost, and others will likely be won. A balanced team is more volatile, because it could do badly in everything or well in anything. That's the kind of volatility needed to have a strong chance of winning in Rotisserie. </p>
 
 
 
