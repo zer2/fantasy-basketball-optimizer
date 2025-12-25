@@ -4,7 +4,7 @@ The Rotisserie format is significantly different from the two Head-to-Head forma
 
 One simple way in which Rotisserie is different from the other formats is that its scoring period is a full season, instead of a week. That changes the way we need to think of period-to-period uncertainty. 
 
-The other difference is that Rotisserie requires winning against many managers simultaneously. This adds a layer of complication to the H-scoring algorithm. 
+The other difference is that Rotisserie requires winning against many managers simultaneously, which adds a layer of complication for H-scoring. An objective function to plug into H-scoring for Rotisserie is described in the [third paper](https://arxiv.org/abs/2501.00933). See the [brief math section](#brief-math) below for a brief explanation of the paper.
 
 ## Variance in player performances
 
@@ -14,9 +14,7 @@ The website's way of handling this is to use scaled week-to-week variance as a p
 
 More technically: the assumption is that the variance over the ~20 weeks in a season will be χ times the week-to-week variance times 20. If week-to-week variance was the only source of variance, χ would be effectively 22%. It is likely higher than that before the season, because there is uncertainty about rotations, playing time, offseason improvements, etc. 60% is an estimate with essentially no justification, it can be changed as desired. 
 
-## Adapting H-scores
-
-The H-scoring algorithm for Rotisserie is described in the [third paper](https://arxiv.org/abs/2501.00933). It provides an objective function for the format which represents the probability of winning an entire Rotisserie league. See the [brief math section](#justification) below for a brief explanation of the paper.
+## H-scores
 
 ### Website interface
 
@@ -46,6 +44,8 @@ For the most part, the algorithm aims to be moderately strong in all categories.
 
 ### Brief math
 
+Warning- math :rotating_light: :abacus: 
+
 The logic behind the Rotisserie algorithm is too complicated to go into fully here
 
 ![](img/roto_equations.png)
@@ -61,8 +61,6 @@ Say also that the standard deviation of total fantasy points for an arbitrary op
 
 Then, for a given $Z$, the expected difference between the team and its strongest opponent is $Z - \frac{P-Z}{|O|} - L$, or $\frac{Z(|O| - 1)}{|O|} - \frac{P}{|O|} - L$. The overall expected value is $\frac{E(Z)(|O| - 1)}{|O|} - \frac{P}{|O|} - L$
 
-With some additional math, we can come up with a standard deviation for the difference. Then, we can use the Normal CDF to calculate the probability of the difference being positive, which is the team's victory probability. 
+With some additional math, we can come up with a standard deviation for the difference. Then, we can use the Normal CDF to calculate the probability of the difference being positive, which is the team's victory probability. That provides an outer-level objective function for H-scoring. 
 
-This framework provides some intution for why the Rotisserie algorithm tries not to punt categories. The expected value of the difference is generally negative, because it compares the team to its luckiest opponent. The CDF of a negative value of a Normal distiribution will be much higher if the standard deviation is high, since that increases the probability of abberant values. Therefore, the algorithm prefers to have a highly volatile fantasy point total. 
-
-The thing about punting is that it decreases volatility. It increases confidence in the end result by determining that one category will be lost, and others will likely be won. A balanced team is more volatile, because it could do badly in everything or well in anything. That's the kind of volatility needed to have a strong chance of winning in Rotisserie. 
+This framework provides some intution for why the Rotisserie algorithm tries not to punt categories. The expected value of the difference is generally negative, because it compares the team to its luckiest opponent. The CDF of a negative value of a Normal distiribution will be much higher if the standard deviation is high, since that increases the probability of abberant values. Therefore, the algorithm prefers to have a highly volatile fantasy point total. Punting decreases volatility. It increases confidence in the end result by determining that one category will be lost, and others will likely be won. A balanced team is more volatile, because it could do badly in everything or well in anything. That's the kind of volatility needed to have a strong chance of winning in Rotisserie. 
