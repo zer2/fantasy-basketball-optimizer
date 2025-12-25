@@ -18,6 +18,8 @@ The team table shows the G-scores of players already chosen for a team, and thei
 
 ## Justification 
 
+Warning- math :rotating_light: :abacus: 
+
 ### What are Z-scores? 
 
 Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. 

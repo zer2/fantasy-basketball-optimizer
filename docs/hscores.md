@@ -101,9 +101,20 @@ The flex position allocations show how the algorithm expects to use its flex spo
 
 The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. 
 
+## H-scoring tendencies
+
+The traditional fantasy basketball strategy is to punt some categories and compete in others. The H-scoring algorithm tends to behave the same way. 
+
+![alt text](img/HistEC.png)
+/// caption
+Image from the paper
+///
+
+This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories. For the categories it did not punt, it tried to be highly competitive in them without going overboard. 
+
 ## Optimization
 
-Warning- this section is a bit mathy :rotating_light: :abacus: 
+Warning- mathy section :rotating_light: :abacus: 
 
 H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. 
 
@@ -172,7 +183,7 @@ That means that the algorithm implicitly "cares" about categories according to a
 A Normal distribution, from Wikipedia 
 ///
 
-This makes intuitive sense and connects with general fantasy basketball strategies. If a team is already bad at a category, it might make sense to abandon that category and punt it, since the team is likely to lose it anyway. That creates a snowball effect- the team gets worse and worse at the category. If a team is extremely strong in a category, it doesn't need the extra help there, and prioritizing it is not important. That does not create a snowball effect, since as the team gets weaker in the category, H-scoring starts to prioritize it more. That means the algorithm is incentivized to put categories into one of two buckets- punting, or competing without going overboard. These are the two traditional approaches to categories in fantasy basketball.
+This makes intuitive sense and explains why the algorithm behaves like it does, punting some categories and trying to compete in others without going overboard. If a team is already bad at a category, it might make sense to abandon that category and punt it, since the team is likely to lose it anyway. That creates a snowball effect- the team gets worse and worse at the category. If a team is extremely strong in a category, it doesn't need the extra help there, and prioritizing it is not important. That does not create a snowball effect, since as the team gets weaker in the category, H-scoring starts to prioritize it more. That means the algorithm is incentivized to put categories into one of two buckets- punting, or competing without going overboard.
 
 ### Outer-level objective function
 
@@ -181,17 +192,6 @@ The outer-level objective function is the function that the algorithm is trying 
 For Each Category, the objective function is just the sum of probabilities of winning each category. That is relatively simple to optimize, since the overall gradient is just the sum of all the individual gradients.
 
 For Most Categories scoring, the objective function is the probability of winning a majority of categories, which is more complicated. Fortunately, this operation turns out to be differentiable, so it can be optimized via gradient descent. The gradient is the same as for Each Categories except multiplied by a 'tipping point' probability, which is the likelihood that any given category will end up being decisive. 
-
-## H-scoring tendencies
-
-The H-scoring algorithm does not take explicit instructions on overall strategy. However, it "learns" the strategy of punting some categories and balancing others based on its understanding of the problem, as expected. 
-
-![alt text](img/HistEC.png)
-/// caption
-Image from the paper
-///
-
-This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories (this behavior makes intuitive sense- a more detailed discussion is in the paper). For the categories it did not punt, it tried to be highly competitive in them without going overboard. 
 
 ## Limitations
 
