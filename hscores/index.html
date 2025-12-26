@@ -338,30 +338,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Parameter inputs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#punting-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Punting parameters
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#number-of-iterations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Number of iterations
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -650,30 +626,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Parameter inputs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#punting-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Punting parameters
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#number-of-iterations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Number of iterations
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -828,25 +780,11 @@
 
 
 <h1 id="h-scores">H-scores</h1>
-<p>H-scoring is a framework introduced in <a href="https://arxiv.org/abs/2409.09884">the second paper</a> for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. See the <a href="#optimization">optimization section</a> for some mathematical detail on how it does that, without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. </p>
+<p>H-scoring is a framework introduced in <a href="https://arxiv.org/abs/2409.09884">the second paper</a> for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the concept of punting (strategicially sacrificing categories). See the <a href="#optimization">optimization section</a> for some mathematical detail on how it does that without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. </p>
 <p>The website includes a module which performs the H-score algorithm programatically. </p>
 <h2 id="parameter-inputs">Parameter inputs</h2>
-<p>The H-scoring algorithm has a few <a href="../parameters/#h-score-parameters">input parameters</a> which are configurable by the user. </p>
-<h3 id="punting-parameters">Punting parameters</h3>
-<figure>
-<p><img alt="alt text" src="../img/puntcontrol.png" /></p>
-<figcaption>
-<p>The punting parameters, available through Algorithm Parameters</p>
-</figcaption>
-</figure>
-<p>These two parameters control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts (strategicially sacrifices categories) more. The default values were configured based on what worked well in testing. </p>
-<h3 id="number-of-iterations">Number of iterations</h3>
-<figure>
-<p><img alt="alt text" src="../img/iterations.png" /></p>
-<figcaption>
-<p>The number of iterations parameter, available through Algorithm Parameters </p>
-</figcaption>
-</figure>
+<p>The H-scoring algorithm has three <a href="../parameters/#h-score-parameters">input parameters</a>: <span class="arithmatex">\(\omega\)</span>, <span class="arithmatex">\(\gamma\)</span>, and the number of iterations which are configurable by the user.</p>
+<p><span class="arithmatex">\(\omega\)</span> and <span class="arithmatex">\(\gamma\)</span> control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. </p>
 <p>The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  </p>
 <h2 id="h-score-table">H-score table</h2>
 <p>The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. </p>
@@ -913,7 +851,7 @@
 </figure>
 <p>This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories. For the categories it did not punt, it tried to be highly competitive in them without going overboard. </p>
 <h2 id="optimization">Optimization</h2>
-<p>Warning- mathy section <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
+<p>Warning- math <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
 <p>H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. </p>
 <p>The gradient of a function is derivative over multiple dimensions. As an extremely simple example, the gradient of <span class="arithmatex">\(x - 3y\)</span> is <span class="arithmatex">\(1\)</span> in the x direction and <span class="arithmatex">\(-3\)</span> in the y direction. The gradient gives a hint at which direction the function can be minimized or maximized. The idea of gradient descent is to step in the direction of the gradient (or the opposite direction) to try to find a point which minimizes or maximizes the function. </p>
 <p><iframe
