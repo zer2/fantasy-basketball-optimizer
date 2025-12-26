@@ -1,28 +1,14 @@
 # H-scores
 
-H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. See the [optimization section](#optimization) for some mathematical detail on how it does that, without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. 
+H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the concept of punting (strategicially sacrificing categories). See the [optimization section](#optimization) for some mathematical detail on how it does that without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. 
 
 The website includes a module which performs the H-score algorithm programatically. 
 
 ## Parameter inputs 
 
-The H-scoring algorithm has a few [input parameters](parameters.md/#h-score-parameters) which are configurable by the user. 
+The H-scoring algorithm has three [input parameters](parameters.md/#h-score-parameters): $\omega$, $\gamma$, and the number of iterations which are configurable by the user.
 
-### Punting parameters 
-
-![alt text](img/puntcontrol.png)
-/// caption
-The punting parameters, available through Algorithm Parameters
-///
-
-These two parameters control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts (strategicially sacrifices categories) more. The default values were configured based on what worked well in testing. 
-
-### Number of iterations
-
-![alt text](img/iterations.png)
-/// caption
-The number of iterations parameter, available through Algorithm Parameters 
-///
+$\omega$ and $\gamma$ control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. 
 
 The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  
 
@@ -114,7 +100,7 @@ This image from the paper shows how the H-scoring algorithm actually performed o
 
 ## Optimization
 
-Warning- mathy section :rotating_light: :abacus: 
+Warning- math :rotating_light: :abacus: 
 
 H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. 
 

@@ -1,4 +1,4 @@
-# Auctions 
+# Auction Mode
 
 Auction drafting is more complicated than snake drafting because auction drafters need to decide how much to bid on players, not just which players to take. This level of complexity makes strategizing perfectly for an auction even more impossible than it is for a snake draft. 
 

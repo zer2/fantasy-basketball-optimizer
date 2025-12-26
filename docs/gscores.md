@@ -24,7 +24,7 @@ Warning- math :rotating_light: :abacus:
 
 Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. 
 
-You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$.
+In a stats 101 class, Z-scores are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$.
 
 Z-scores in the fantasy context are essentially the same thing, with a few minor modifications. They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. 
 
@@ -32,7 +32,7 @@ Z-scores in the fantasy context are essentially the same thing, with a few minor
 
 Consider this problem: **Team one has $N-1$ players randomly selected from a pool of players, and team two has $N$ players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform at exactly their long term mean for a week?**
 
-The difference in category score between two teams tells us which team is winning the category and by how much. By randomly selecting the $2N -1$ random players many times, we can get a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with $N=12$
+The difference in category score between two teams indicates which team is winning the category and by how much. Randomly selecting the $2N -1$ random players many times gives a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with $N=12$
 
 <video controls width="100%">
   <source src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/73c3acaa-20c9-4a61-907a-ee0de2ff7e3b" type="video/mp4">
@@ -47,7 +47,7 @@ The mean and standard deviation of the Bell curves for category differences can 
 
 When the category difference is below zero, team one will win the category
 
-The probability of this happening can be calculated using something called a cumulative distribution function. $CDF(x) =$ the probability that a particular distribution will be less than $x$. We can use $CDF(0)$, then, to calculate the probability that the category difference is below zero and team one wins. 
+The probability of this happening can be calculated using something called a cumulative distribution function. $CDF(x) =$ the probability that a particular distribution will be less than or equal to $x$. $CDF(0)$, then, is the probability that the category difference is below zero and team one wins (ignoring ties). 
 
 The $CDF$ of the Bell curve is well known. The details of how to apply it to this case are somewhat complicated, but we can cut to the chase and give an approximate formula 
 
@@ -55,19 +55,19 @@ $$
 CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{\pi}}* \frac{- \mu }{ \sigma} \right]
 $$
 
-We already know $\mu$ and $\sigma$ for the standard statistics. Substituting them in yields
+$\mu$ and $\sigma$ for the standard statistics are already known. Substituting them in yields
 
 $$
 CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p – m_\mu}{m_\sigma} \right]
 $$
 
-Hey look, that's the Z-score! We can see that an extra point of Z-score translates into an increased probability of winning the category in a consistent way. 
+Hey look, that's the Z-score! this equation shows that an extra point of Z-score translates into an increased probability of winning the category in a consistent way. 
 
 ### Extending to G-scores
 
-To justify Z-scores, we assumed that each player would perform precisely at their long-term mean. But that was a bad assumption, because players don't perform consistently week-to-week. We can improve the question by assuming that players are chosen randomly and their performances are chosen randomly too. 
+To justify Z-scores, it was assumed that each player would perform precisely at their long-term mean. But that was a bad assumption, because players don't perform consistently week-to-week. The question can be improved by assuming that players are chosen randomly and their performances are chosen randomly too. 
 
-Below, see how metrics for blocks change when we look at every weekly performance of the top $156$ players, instead of just their averages 
+Below, see how metrics for blocks change when weekly performance of the top $156$ players are sampled, instead of just their averages 
 
 <video controls width="100%">
   <source src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab41db2a-99f2-45b1-8c05-d755c014b30f" type="video/mp4">
@@ -78,7 +78,7 @@ Although the mean remains the same, the standard deviation gets larger. This mak
 
 Also keep in mind that for Rotisserie, the uncertainty is in season-long performance, rather than week-by-week variance. 
 
-G-scores are what we get when we substitute in the new standard deviation. they are 
+Substituting the new standard deviation into the Z-score equation creates G-scores. they are 
 
 $$
 \frac{m_p – m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 

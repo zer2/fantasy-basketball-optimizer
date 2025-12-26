@@ -8,40 +8,6 @@ from src.helpers.helper_functions import get_cash_per_team, get_data_from_sessio
 from src.helpers.stylers import static_score_styler
 from src.math.algorithm_helpers import auction_value_adjuster
 from src.helpers.helper_functions import get_n_drafters
-
-def make_hashable(obj):
-    """
-    Recursively convert obj into a hashable, canonical form.
-      - dict  -> tuple(sorted (key_h, value_h) pairs by key)
-      - list  -> frozenset of items (order-insensitive, multiplicity ignored)
-      - set   -> frozenset of items
-      - tuple -> tuple of items (order preserved)
-      - other -> returned as-is (must already be hashable)
-    """
-    if isinstance(obj, dict):
-        # Sort by key for a canonical order. If keys are not mutually comparable,
-        # fall back to sorting by repr(key).
-        try:
-            items = sorted(obj.items(), key=lambda kv: kv[0])
-        except TypeError:
-            items = sorted(obj.items(), key=lambda kv: repr(kv[0]))
-        return tuple((make_hashable(k), make_hashable(v)) for k, v in items)
-
-    if isinstance(obj, list):
-        return frozenset(make_hashable(v) for v in obj)
-
-    if isinstance(obj, set):
-        return frozenset(make_hashable(v) for v in obj)
-
-    if isinstance(obj, tuple):
-        return tuple(make_hashable(v) for v in obj)
-
-    # Base case: strings, numbers, bools, None, etc.
-    # Base case: strings, numbers, bools, None, etc.
-    if obj == obj:
-       return obj
-    else:
-       return ''
         
 def make_cand_tab(player_assignments : dict[list[str]]
                     ,draft_seat : str
@@ -88,7 +54,6 @@ def make_cand_tab(player_assignments : dict[list[str]]
   iteration_range = range(max(1,n_iterations))
 
   # The display doesn't show for every iteration because showing results is computationally expensive
-  # Display starts at 3 so the algorithm has had some time to adjust parameters at least a bit
   # The periodicity of displays is higher for large numbers of iterations to cut down on the high processing time
   if n_iterations <100: 
     display_schedule = set(np.arange(0, n_iterations, 15)).union({n_iterations -1})

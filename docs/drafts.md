@@ -1,4 +1,4 @@
-# Drafts
+# Draft Mode
 
 H-scores and G-scores are designed directly for drafts, so they can be applied to drafts without modification.
 
