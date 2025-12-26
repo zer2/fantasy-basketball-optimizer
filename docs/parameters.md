@@ -12,9 +12,9 @@ Typically, player valuations are presented in two ways: per-game values and seas
 
 ![alt text](img/injury.png)
 
-The first factor, υ, scales injury rates on a spectrum between per-game value and season total values. For example if υ is 0.4 and a player is expected to be injured 10% of the time, that injury rate is adjusted to 4%, and the player's volume projections are multiplied by 96%. A υ of 0 is equivalent to per-game totals, and a υ of 1 is equivalent to season total projections. The argument for setting υ to 1 is that the correct expected value of real player production fully accounts for the probability of injury. The counter-argument is that teams need to be somewhat lucky to have any shot at competing for a championship, so it makes sense for them to strategize with the assumption that their injury luck is reasonably good. The default value for υ is 1, equivalent to season total values.
+The first factor, υ, scales injury rates on a spectrum between per-game value and season total values. For example if υ is $0.4$ and a player is expected to be injured 10% of the time, that injury rate is adjusted to 4%, and the player's volume projections are multiplied by 96%. A υ of $0$ is equivalent to per-game totals, and a υ of 1 is equivalent to season total projections. The argument for setting υ to $1$ is that the correct expected value of real player production fully accounts for the probability of injury. The counter-argument is that teams need to be somewhat lucky to have any shot at competing for a championship, so it makes sense for them to strategize with the assumption that their injury luck is reasonably good. The default value for υ is $1$, equivalent to season total values.
 
-The second factor, ψ, controls an adjustment for replacement players. It is assumed that when a player misses a game, they will be replaced by a replacement-level player for that game ψ of the time, and that is incorporated into projections after they have been adjusted for injury rates. A replacement-level player has the total G-score value of the Nth-highest player, spread across categories, where N is the number of players in the league.  So continuing the previous example, if ψ is 0.75, then 3% times a replacement player's value is added to the player's projection. The right value for ψ depends on a league's IR rules and how active managers will be in replacing their injured player. It defaults to 0.8.
+The second factor, ψ, controls an adjustment for replacement players. It is assumed that when a player misses a game, they will be replaced by a replacement-level player for that game ψ of the time, and that is incorporated into projections after they have been adjusted for injury rates. A replacement-level player has the total G-score value of the $N$th-highest player, spread across categories, where $N$ is the number of players in the league.  So continuing the previous example, if ψ is $0.75$, then 3% times a replacement player's value is added to the player's projection. The right value for ψ depends on a league's IR rules and how active managers will be in replacing their injured player. It defaults to $0.8$.
 
 ### Chi factor 
 
@@ -30,13 +30,13 @@ For auction drafts, an additional parameter called $S_\sigma$ is required.
 
 ![](img/savorinput.png)
 
-$S_\sigma$ quantifies the standard deviation of dollar values for players throughout a season, which is important for the [SAVOR adjustment](auctions.md/#the-savor-adjustment). Roughly speaking it controls the degree to which low-level players are down-weighted for potentially beocoming irrelevant. 
+$S_\sigma$ quantifies the standard deviation of dollar values for players throughout a season, which is important for the [SAVOR adjustment](auctions.md/#the-savor-adjustment). Roughly speaking it controls the degree to which low-level players are down-weighted for potentially becoming irrelevant. 
 
 ### Bayesian strength adjustment
 
 ![](img/beth.png)
 
-The $\beta$ parameter controls the influence of the [Bayesian strength adjustment](projectionadjustment.md/). Higher values of $\beta$ more aggressively regress the strength of the team towards the average. 
+The $\beth$ parameter controls the influence of the [Bayesian strength adjustment](projectionadjustment.md/). Higher values of $\beth$ more aggressively regress the strength of the team towards the average. 
 
 ## H-score parameters
 
