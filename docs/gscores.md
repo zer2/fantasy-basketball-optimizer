@@ -26,7 +26,7 @@ Fantasy basketball has a standard way of quantifying player value across categor
 
 In a stats 101 class, Z-scores are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$.
 
-Z-scores in the fantasy context are essentially the same thing, with a few minor modifications. They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. 
+Z-scores in the fantasy context are essentially the same thing, with a few minor modifications (specifically for the percentage categories, which are more complicated. See the paper for details). They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. 
 
 ### Justifying Z-scores
 
@@ -84,6 +84,26 @@ $$
 \frac{m_p – m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
 $$
 
-## Calculation
+### Calculation logic
 
-The coefficients for G-scores used by the website were calculated based on real historical data, as shown in the paper. One should not that real week-to-week variance in historical data is not necessarily the same thing as forecasted variance for future weeks, so the week-to-week variance factor may be too strong or too weak in practice. 
+The definitions of Z-score and G-score are based off a highly idealized version of fantasy basketball, and some thought is needed to calculate them appropriately for a real league. 
+
+One of the inputs needed for the scoring process is a player pool. Using the entire pool of NBA players is a sensible starting point, but significantly flawed because most NBA players do not produce enough to be fantasy relevant. The approach of the website is to calculate scores based on the entire playing pool, then use the top players from that calculation as the player pool for the scores it ultimately calculates. This ensures that parameters like $m_\sigma$ are calculated based on players that are somewhat likely to be in real leagues. 
+
+Based on the proxy for the real pool of players and forecasts for their performances, it is easy to calculate player-to-player variance. Week-to-week variance cannot be inferred from forecasts, and instead has to be calculated historically. The website uses historical conversion factors from player-to-player variance to week-to-week variance. 
+
+## Limitations 
+
+G-scores are fundamentally limited because they do not adapt to drafting circumstances. Drafting based purely on total G-score, or any static metric, is a flawed approach. 
+
+With that said, it is worth listing out some of their limitations explicitly 
+
+- Total G-scores have no mechanism for balancing out teams across categories. Drafting purely by G-score can lead to teams which dominate in a small number of categories, and struggle with the rest. 
+
+- G-scores cannot encode dynamic strategies like "punting" weak categories 
+
+- G-scores do not account for positional needs. Drafting purely by G-score can lead to teams which are imlabanced across positions
+
+- G-scores are defined based on a projected set of relevant players, which may be inaccurate 
+
+- There are some small assumptions used in the papers to align the G-score definition with the traditional definition of Z-scores. Relaxing these assumptions would lead to slightly different results

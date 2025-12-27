@@ -338,30 +338,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Parameter inputs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#punting-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Punting parameters
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#number-of-iterations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Number of iterations
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -427,15 +403,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#h-scoring-tendencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      H-scoring tendencies
-    </span>
-  </a>
   
 </li>
       
@@ -650,30 +617,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Parameter inputs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#punting-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Punting parameters
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#number-of-iterations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Number of iterations
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -739,15 +682,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#h-scoring-tendencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      H-scoring tendencies
-    </span>
-  </a>
   
 </li>
       
@@ -828,25 +762,11 @@
 
 
 <h1 id="h-scores">H-scores</h1>
-<p>H-scoring is a framework introduced in <a href="https://arxiv.org/abs/2409.09884">the second paper</a> for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. See the <a href="#optimization">optimization section</a> for some mathematical detail on how it does that, without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. </p>
+<p>H-scoring is a framework introduced in <a href="https://arxiv.org/abs/2409.09884">the second paper</a> for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, particularly the concept of punting (strategicially sacrificing) some categories and over-performing in the rest. See the <a href="#optimization">optimization section</a> for some mathematical detail on how it does that without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. </p>
 <p>The website includes a module which performs the H-score algorithm programatically. </p>
 <h2 id="parameter-inputs">Parameter inputs</h2>
-<p>The H-scoring algorithm has a few <a href="../parameters/#h-score-parameters">input parameters</a> which are configurable by the user. </p>
-<h3 id="punting-parameters">Punting parameters</h3>
-<figure>
-<p><img alt="alt text" src="../img/puntcontrol.png" /></p>
-<figcaption>
-<p>The punting parameters, available through Algorithm Parameters</p>
-</figcaption>
-</figure>
-<p>These two parameters control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts (strategicially sacrifices categories) more. The default values were configured based on what worked well in testing. </p>
-<h3 id="number-of-iterations">Number of iterations</h3>
-<figure>
-<p><img alt="alt text" src="../img/iterations.png" /></p>
-<figcaption>
-<p>The number of iterations parameter, available through Algorithm Parameters </p>
-</figcaption>
-</figure>
+<p>The H-scoring algorithm has three <a href="../parameters/#h-score-parameters">input parameters</a>: <span class="arithmatex">\(\omega\)</span>, <span class="arithmatex">\(\gamma\)</span>, and the number of iterations which are configurable by the user.</p>
+<p><span class="arithmatex">\(\omega\)</span> and <span class="arithmatex">\(\gamma\)</span> control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. </p>
 <p>The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  </p>
 <h2 id="h-score-table">H-score table</h2>
 <p>The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. </p>
@@ -857,7 +777,7 @@
 </figcaption>
 </figure>
 <p>H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is refreshed once every fifteen iterations. Also, only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. </p>
-<p>One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because he has strong value only with the strategy of sacrificing the Free Throw % category. The H-scoring algorithm is able to account for this and show a more realistic value for Giannis. </p>
+<p>One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately. </p>
 <h3 id="category-level-h-scores">Category-level H-scores</h3>
 <p>Category-level H-scores are an in important part of the H-scoring process. Unlike with G-scores, they are <em>not direct reflections of the candidate player's characteristics</em>. Instead, they show what the H-scoring algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates those expectations based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.</p>
 <p>Because other factors are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For early picks, the most important factor is the strategy for future draft picks. For example, Shai Gilgeous-Alexander's row above for the first pick in the draft shows a very low probability of winning the Rebound category, despite SGA being a decent rebounder himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing rebounds with future picks.</p>
@@ -866,6 +786,13 @@
 <p><img alt="alt text" src="../img/hec2.png" /></p>
 <figcaption>
 <p>Top H-scores for a round seven pick in a mock draft, with relatively stable scores across categories. Each Categories, 2024-25</p>
+</figcaption>
+</figure>
+<p>Most of the time, the algorithm punts one or two categories, reflected by low H-scores in those categories. For the categories it does not punt, it tries to be above average without going overboard. </p>
+<figure>
+<p><img alt="alt text" src="../img/HistEC.png" /></p>
+<figcaption>
+<p>This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It largely either punted categories or tried to be competitive in them</p>
 </figcaption>
 </figure>
 <h3 id="overall-h-scores">Overall H-scores</h3>
@@ -903,18 +830,9 @@
 <p>The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks. One might note that in the case above, the weight for Free Throws is surprisingly high, despite the obvious fact that the algorithm is deprioritizing the category heavily. The reason for this is that in general, H-scoring does not think it needs to adjust weights all that much in order to skew the available candidates to the categories it wants. </p>
 <p>The flex position allocations show how the algorithm expects to use its flex spots, which can take players of multiple positions. This is relevant because the algorithm understands that different positions have different statistical tendencies. In the example above, the algorithm is leaning heavily on taking Power Forwards and Centers with its flex spots, likely because they tend to have poor Free Throw rates, and that synergizes with the strategy of punting Free Throws. </p>
 <p>The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. </p>
-<h2 id="h-scoring-tendencies">H-scoring tendencies</h2>
-<p>The traditional fantasy basketball strategy is to punt some categories and compete in others. The H-scoring algorithm tends to behave the same way. </p>
-<figure>
-<p><img alt="alt text" src="../img/HistEC.png" /></p>
-<figcaption>
-<p>Image from the paper</p>
-</figcaption>
-</figure>
-<p>This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories. For the categories it did not punt, it tried to be highly competitive in them without going overboard. </p>
 <h2 id="optimization">Optimization</h2>
-<p>Warning- mathy section <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
-<p>H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. </p>
+<p>Warning- math <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
+<p>H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. The properties of the underlying function which H-scoring performs gradient descent on is what teaches it the strategy of punting some categories and competing in others. </p>
 <p>The gradient of a function is derivative over multiple dimensions. As an extremely simple example, the gradient of <span class="arithmatex">\(x - 3y\)</span> is <span class="arithmatex">\(1\)</span> in the x direction and <span class="arithmatex">\(-3\)</span> in the y direction. The gradient gives a hint at which direction the function can be minimized or maximized. The idea of gradient descent is to step in the direction of the gradient (or the opposite direction) to try to find a point which minimizes or maximizes the function. </p>
 <p><iframe
   width="100%"
@@ -929,14 +847,19 @@
 <p>In order for gradient descent to work, the function to be mazimized or minimized must be differentiable. This motivates the structure of the model behind H-scoring. </p>
 <p>Roughly, the function for H-scoring has three components: category strength expectations, category-level victory probabilities, and the outer-level objective function. The decisions made by the algorithm impact the category strength expectations, which in turn impact category-level victory probabilities, which in turn impact the outer-level objective function. The total gradient relative to an input decision is the gradient of all three steps relative to the previous, multiplied together.</p>
 <h3 id="category-strength-expectations-weights">Category strength expectations: weights</h3>
-<p>The heart of the H-scoring algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being equal in terms of total G-score. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on weighted preference for categories. The math behind this is quite complicated... </p>
+<p>The heart of the H-scoring algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being equal in terms of total G-score. It assumes that it will choose the best player available based on its choice of category weights. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on the category weights. The math behind this is quite complicated... </p>
 <figure>
 <p><img alt="alt text" src="../img/crazyformula.png" /></p>
 <figcaption>
 <p>Disgusting! </p>
 </figcaption>
 </figure>
-<p>But the basic intuition is simple. The more weight it assigns a category, the higher its team's expected value for that category will be. This allows the algorithm to understand that it can prioritize or deprioritize categories with future picks. </p>
+<p>But the basic intuition is that there are two mechanisms at play</p>
+<ul>
+<li>The more weight the algorithm assigns a category, the higher its picks's expected value for that category will be</li>
+<li>The more specific kind of player the algorithm is looking for, the more overall value needs to be sacrificed to find that kind of player</li>
+</ul>
+<p>This allows the algorithm to understand that it can prioritize or deprioritize categories with future picks, with some cost to overall value. </p>
 <h3 id="category-strength-expectations-position-allocation">Category strength expectations: position allocation</h3>
 <p>The algorithm can also influence expected category strengths by deciding how it expects to divvy up future draft slots in terms of positions. </p>
 <p>Position allocations are binary, and therefore their effects cannot be differentiated. In order to avoid costly mized-integer optimization, H-scoring treats position allocation as a small sub-problem and solves it independently. Before each round of gradient descent, the algorithm estimates how much it wants a player of each position with future picks, by multiplying the gradients relative to categories (which encode how much the algorithm has to gain from improving in those categories) by the average value of a player of that position. It assumes flex spots are slightly more valuable than the best base position. The algorithm is then allowed to assign previously chosen players to various slots, to free up future position slots for the positions it wants to take players in. </p>

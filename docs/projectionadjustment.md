@@ -1,12 +1,12 @@
 # Adjusting projections with a Bayesian prior 
 
-Warning- math :rotating_light: :abacus: 
-
 H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
 
 This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. 
 
-The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that I've added a module specifically to address it. 
+The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. 
+
+Warning- math :rotating_light: :abacus: 
 
 ## The adjustment 
 
@@ -26,14 +26,14 @@ $$
 x^* = \text{CDF}^{-1} \left( w^* \right)
 $$
 
-This way, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. 
+Since this adjustment is made before any gradient descent is performed, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. 
 
 ## Justification 
 
-Say that we have prior expectations that 
+Say that there are prior expectations that 
 
-- Our average win rate across all categories is approximately 50%, with Normally distributed error. 
-- Our guesses for how often we will win a category are unbiased, but have some Normally distributed error. 
+- The team's average win rate across all categories is approximately 50%, with Normally distributed error. 
+- H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error. 
 
 This information provides a Bayesian framework for re-calculating adjusted category-level win rates. 
 
@@ -50,19 +50,19 @@ $$
 \phi \left( \frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)
 $$
 
-Multiplying them together yeilds 
+Multiplying them together yields 
 
 $$
 \left[ \prod_c \phi \left(\frac{w^*_c - w_c}{\epsilon_a} \right) \right] \left[ \phi \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n } \right) \right]
 $$
 
-We are only interested in what has the maximal likelihood, not what that likelihood is. So it is fine to convert this to log odds, which are 
+The important thing is what has the maximal likelihood, not what that likelihood is. So it is fine to convert this to log odds, which are 
 
 $$
 \left[ \sum_c \left(\frac{w^*_c - w_c}{\epsilon_a} \right)^2 \right] +  \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)^2 
 $$
 
-To optimize this, we set the derivative to zero. Applying the chain rule for category d- 
+To optimize this, the derivative is set to zero. Applying the chain rule for category d results in
 
 $$
 0 = 2 \left(\frac{w^*_d - w_d}{\epsilon_a} \right) \frac{1}{\epsilon_a} + 2 \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}
