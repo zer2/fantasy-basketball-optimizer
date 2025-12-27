@@ -364,15 +364,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#calculation-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Calculation logic
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#calculation" class="md-nav__link">
+  <a href="#limitations" class="md-nav__link">
     <span class="md-ellipsis">
-      Calculation
+      Limitations
     </span>
   </a>
   
@@ -599,15 +608,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#calculation-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Calculation logic
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#calculation" class="md-nav__link">
+  <a href="#limitations" class="md-nav__link">
     <span class="md-ellipsis">
-      Calculation
+      Limitations
     </span>
   </a>
   
@@ -642,11 +660,11 @@
 <p>Warning- math <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
 <h3 id="what-are-z-scores">What are Z-scores?</h3>
 <p>Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. </p>
-<p>You may have come across Z-scores in a stats 101 class. In that context, they are what happens to a set of numbers after subtracting the mean (average) signified by <span class="arithmatex">\(\mu\)</span> and dividing by the standard deviation (how “spread out” the distribution is) signified by <span class="arithmatex">\(\sigma\)</span>. Mathematically, <span class="arithmatex">\(Z(x) = \frac{x - \mu}{\sigma}\)</span>.</p>
-<p>Z-scores in the fantasy context are essentially the same thing, with a few minor modifications. They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. </p>
+<p>In a stats 101 class, Z-scores are what happens to a set of numbers after subtracting the mean (average) signified by <span class="arithmatex">\(\mu\)</span> and dividing by the standard deviation (how “spread out” the distribution is) signified by <span class="arithmatex">\(\sigma\)</span>. Mathematically, <span class="arithmatex">\(Z(x) = \frac{x - \mu}{\sigma}\)</span>.</p>
+<p>Z-scores in the fantasy context are essentially the same thing, with a few minor modifications (specifically for the percentage categories, which are more complicated. See the paper for details). They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. </p>
 <h3 id="justifying-z-scores">Justifying Z-scores</h3>
 <p>Consider this problem: <strong>Team one has <span class="arithmatex">\(N-1\)</span> players randomly selected from a pool of players, and team two has <span class="arithmatex">\(N\)</span> players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform at exactly their long term mean for a week?</strong></p>
-<p>The difference in category score between two teams tells us which team is winning the category and by how much. By randomly selecting the <span class="arithmatex">\(2N -1\)</span> random players many times, we can get a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with <span class="arithmatex">\(N=12\)</span></p>
+<p>The difference in category score between two teams indicates which team is winning the category and by how much. Randomly selecting the <span class="arithmatex">\(2N -1\)</span> random players many times gives a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with <span class="arithmatex">\(N=12\)</span></p>
 <video controls width="100%">
   <source src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/73c3acaa-20c9-4a61-907a-ee0de2ff7e3b" type="video/mp4">
   Your browser does not support the video tag.
@@ -657,19 +675,19 @@
 - The mean is <span class="arithmatex">\(m_\mu - m_p\)</span>
 - The standard deviation is <span class="arithmatex">\(\sqrt{2N-1} * m_\sigma\)</span> (The square root in the formula comes from the fact that <span class="arithmatex">\(STD(X + Y) = \sqrt{STD(X)^2 + STD(Y)^2}\)</span> where <span class="arithmatex">\(STD(X)\)</span> is the standard deviation of <span class="arithmatex">\(X\)</span>)</p>
 <p>When the category difference is below zero, team one will win the category</p>
-<p>The probability of this happening can be calculated using something called a cumulative distribution function. <span class="arithmatex">\(CDF(x) =\)</span> the probability that a particular distribution will be less than <span class="arithmatex">\(x\)</span>. We can use <span class="arithmatex">\(CDF(0)\)</span>, then, to calculate the probability that the category difference is below zero and team one wins. </p>
+<p>The probability of this happening can be calculated using something called a cumulative distribution function. <span class="arithmatex">\(CDF(x) =\)</span> the probability that a particular distribution will be less than or equal to <span class="arithmatex">\(x\)</span>. <span class="arithmatex">\(CDF(0)\)</span>, then, is the probability that the category difference is below zero and team one wins (ignoring ties). </p>
 <p>The <span class="arithmatex">\(CDF\)</span> of the Bell curve is well known. The details of how to apply it to this case are somewhat complicated, but we can cut to the chase and give an approximate formula </p>
 <div class="arithmatex">\[
 CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{\pi}}* \frac{- \mu }{ \sigma} \right]
 \]</div>
-<p>We already know <span class="arithmatex">\(\mu\)</span> and <span class="arithmatex">\(\sigma\)</span> for the standard statistics. Substituting them in yields</p>
+<p><span class="arithmatex">\(\mu\)</span> and <span class="arithmatex">\(\sigma\)</span> for the standard statistics are already known. Substituting them in yields</p>
 <div class="arithmatex">\[
 CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p – m_\mu}{m_\sigma} \right]
 \]</div>
-<p>Hey look, that's the Z-score! We can see that an extra point of Z-score translates into an increased probability of winning the category in a consistent way. </p>
+<p>Hey look, that's the Z-score! this equation shows that an extra point of Z-score translates into an increased probability of winning the category in a consistent way. </p>
 <h3 id="extending-to-g-scores">Extending to G-scores</h3>
-<p>To justify Z-scores, we assumed that each player would perform precisely at their long-term mean. But that was a bad assumption, because players don't perform consistently week-to-week. We can improve the question by assuming that players are chosen randomly and their performances are chosen randomly too. </p>
-<p>Below, see how metrics for blocks change when we look at every weekly performance of the top <span class="arithmatex">\(156\)</span> players, instead of just their averages </p>
+<p>To justify Z-scores, it was assumed that each player would perform precisely at their long-term mean. But that was a bad assumption, because players don't perform consistently week-to-week. The question can be improved by assuming that players are chosen randomly and their performances are chosen randomly too. </p>
+<p>Below, see how metrics for blocks change when weekly performance of the top <span class="arithmatex">\(156\)</span> players are sampled, instead of just their averages </p>
 <video controls width="100%">
   <source src="https://github.com/zer2/Fantasy-Basketball--in-progress-/assets/17816840/ab41db2a-99f2-45b1-8c05-d755c014b30f" type="video/mp4">
   Your browser does not support the video tag.
@@ -677,12 +695,34 @@ CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p – m_\mu}
 
 <p>Although the mean remains the same, the standard deviation gets larger. This makes sense, because week-to-week "noise" adds more volatility, which is reflected in the additional <span class="arithmatex">\(m_\tau\)</span> term. Note that the new standard deviation is <span class="arithmatex">\(\sqrt{m_\sigma^2 + m_\tau^2}\)</span> rather than <span class="arithmatex">\(m_\sigma + m_\tau\)</span> because of how standard deviation aggregates across multiple variables, as discussed previously</p>
 <p>Also keep in mind that for Rotisserie, the uncertainty is in season-long performance, rather than week-by-week variance. </p>
-<p>G-scores are what we get when we substitute in the new standard deviation. they are </p>
+<p>Substituting the new standard deviation into the Z-score equation creates G-scores. they are </p>
 <div class="arithmatex">\[
 \frac{m_p – m_\mu}{\sqrt{m_\sigma^2 + m_\tau^2}} 
 \]</div>
-<h2 id="calculation">Calculation</h2>
-<p>The coefficients for G-scores used by the website were calculated based on real historical data, as shown in the paper. One should not that real week-to-week variance in historical data is not necessarily the same thing as forecasted variance for future weeks, so the week-to-week variance factor may be too strong or too weak in practice. </p>
+<h3 id="calculation-logic">Calculation logic</h3>
+<p>The definitions of Z-score and G-score are based off a highly idealized version of fantasy basketball, and some thought is needed to calculate them appropriately for a real league. </p>
+<p>One of the inputs needed for the scoring process is a player pool. Using the entire pool of NBA players is a sensible starting point, but significantly flawed because most NBA players do not produce enough to be fantasy relevant. The approach of the website is to calculate scores based on the entire playing pool, then use the top players from that calculation as the player pool for the scores it ultimately calculates. This ensures that parameters like <span class="arithmatex">\(m_\sigma\)</span> are calculated based on players that are somewhat likely to be in real leagues. </p>
+<p>Based on the proxy for the real pool of players and forecasts for their performances, it is easy to calculate player-to-player variance. Week-to-week variance cannot be inferred from forecasts, and instead has to be calculated historically. The website uses historical conversion factors from player-to-player variance to week-to-week variance. </p>
+<h2 id="limitations">Limitations</h2>
+<p>G-scores are fundamentally limited because they do not adapt to drafting circumstances. Drafting based purely on total G-score, or any static metric, is a flawed approach. </p>
+<p>With that said, it is worth listing out some of their limitations explicitly </p>
+<ul>
+<li>
+<p>Total G-scores have no mechanism for balancing out teams across categories. Drafting purely by G-score can lead to teams which dominate in a small number of categories, and struggle with the rest. </p>
+</li>
+<li>
+<p>G-scores cannot encode dynamic strategies like "punting" weak categories </p>
+</li>
+<li>
+<p>G-scores do not account for positional needs. Drafting purely by G-score can lead to teams which are imlabanced across positions</p>
+</li>
+<li>
+<p>G-scores are defined based on a projected set of relevant players, which may be inaccurate </p>
+</li>
+<li>
+<p>There are some small assumptions used in the papers to align the G-score definition with the traditional definition of Z-scores. Relaxing these assumptions would lead to slightly different results</p>
+</li>
+</ul>
 
 
 

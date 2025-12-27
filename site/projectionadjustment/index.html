@@ -526,10 +526,10 @@
 
 
 <h1 id="adjusting-projections-with-a-bayesian-prior">Adjusting projections with a Bayesian prior</h1>
-<p>Warning- math <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
 <p>H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. </p>
 <p>This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. </p>
-<p>The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that I've added a module specifically to address it. </p>
+<p>The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. </p>
+<p>Warning- math <img alt="🚨" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6a8.svg" title=":rotating_light:" /> <img alt="🧮" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f9ee.svg" title=":abacus:" /> </p>
 <h2 id="the-adjustment">The adjustment</h2>
 <p>An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first. </p>
 <p>Say that <span class="arithmatex">\(w\)</span> is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as</p>
@@ -541,12 +541,12 @@ w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]
 <div class="arithmatex">\[
 x^* = \text{CDF}^{-1} \left( w^* \right)
 \]</div>
-<p>This way, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. </p>
+<p>Since this adjustment is made before any gradient descent is performed, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. </p>
 <h2 id="justification">Justification</h2>
-<p>Say that we have prior expectations that </p>
+<p>Say that there are prior expectations that </p>
 <ul>
-<li>Our average win rate across all categories is approximately 50%, with Normally distributed error. </li>
-<li>Our guesses for how often we will win a category are unbiased, but have some Normally distributed error. </li>
+<li>The team's average win rate across all categories is approximately 50%, with Normally distributed error. </li>
+<li>H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error. </li>
 </ul>
 <p>This information provides a Bayesian framework for re-calculating adjusted category-level win rates. </p>
 <p>By Bayes' rule, the probability of a certain set of category win rates being correct is proportional to its likelihood time the prior. In this case, the likelihood is </p>
@@ -558,15 +558,15 @@ x^* = \text{CDF}^{-1} \left( w^* \right)
 \phi \left( \frac{\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{n}}{\epsilon_b} \right) = 
 \phi \left( \frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)
 \]</div>
-<p>Multiplying them together yeilds </p>
+<p>Multiplying them together yields </p>
 <div class="arithmatex">\[
 \left[ \prod_c \phi \left(\frac{w^*_c - w_c}{\epsilon_a} \right) \right] \left[ \phi \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n } \right) \right]
 \]</div>
-<p>We are only interested in what has the maximal likelihood, not what that likelihood is. So it is fine to convert this to log odds, which are </p>
+<p>The important thing is what has the maximal likelihood, not what that likelihood is. So it is fine to convert this to log odds, which are </p>
 <div class="arithmatex">\[
 \left[ \sum_c \left(\frac{w^*_c - w_c}{\epsilon_a} \right)^2 \right] +  \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)^2 
 \]</div>
-<p>To optimize this, we set the derivative to zero. Applying the chain rule for category d- </p>
+<p>To optimize this, the derivative is set to zero. Applying the chain rule for category d results in</p>
 <div class="arithmatex">\[
 0 = 2 \left(\frac{w^*_d - w_d}{\epsilon_a} \right) \frac{1}{\epsilon_a} + 2 \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}
 \]</div>

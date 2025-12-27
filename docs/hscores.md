@@ -1,6 +1,6 @@
 # H-scores
 
-H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the concept of punting (strategicially sacrificing categories). See the [optimization section](#optimization) for some mathematical detail on how it does that without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. 
+H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, particularly the concept of punting (strategicially sacrificing) some categories and over-performing in the rest. See the [optimization section](#optimization) for some mathematical detail on how it does that without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. 
 
 The website includes a module which performs the H-score algorithm programatically. 
 
@@ -23,7 +23,7 @@ Top Each Category H-scores for the first pick, 2024-25 season
 
 H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is refreshed once every fifteen iterations. Also, only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. 
 
-One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because he has strong value only with the strategy of sacrificing the Free Throw % category. The H-scoring algorithm is able to account for this and show a more realistic value for Giannis. 
+One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately. 
 
 ### Category-level H-scores
 
@@ -36,6 +36,13 @@ In later draft rounds, the importance of previously chosen players increases and
 ![alt text](img/hec2.png)
 /// caption
 Top H-scores for a round seven pick in a mock draft, with relatively stable scores across categories. Each Categories, 2024-25
+///
+
+Most of the time, the algorithm punts one or two categories, reflected by low H-scores in those categories. For the categories it does not punt, it tries to be above average without going overboard. 
+
+![alt text](img/HistEC.png)
+/// caption
+This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It largely either punted categories or tried to be competitive in them
 ///
 
 ### Overall H-scores
@@ -87,22 +94,11 @@ The flex position allocations show how the algorithm expects to use its flex spo
 
 The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. 
 
-## H-scoring tendencies
-
-The traditional fantasy basketball strategy is to punt some categories and compete in others. The H-scoring algorithm tends to behave the same way. 
-
-![alt text](img/HistEC.png)
-/// caption
-Image from the paper
-///
-
-This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It shows that H-scoring often punted categories, though the punts were not always total. It often preserved some chance of winning punted categories. For the categories it did not punt, it tried to be highly competitive in them without going overboard. 
-
 ## Optimization
 
 Warning- math :rotating_light: :abacus: 
 
-H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. 
+H-scoring needs some way of making decisions about category prioritization and position allocation. It makes these decisions through an optimization process, specifically gradient descent. Each iteration of the algorithm is an iteration of gradient descent. The properties of the underlying function which H-scoring performs gradient descent on is what teaches it the strategy of punting some categories and competing in others. 
 
 The gradient of a function is derivative over multiple dimensions. As an extremely simple example, the gradient of $x - 3y$ is $1$ in the x direction and $-3$ in the y direction. The gradient gives a hint at which direction the function can be minimized or maximized. The idea of gradient descent is to step in the direction of the gradient (or the opposite direction) to try to find a point which minimizes or maximizes the function. 
 
@@ -122,14 +118,19 @@ Roughly, the function for H-scoring has three components: category strength expe
 
 ### Category strength expectations: weights 
 
-The heart of the H-scoring algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being equal in terms of total G-score. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on weighted preference for categories. The math behind this is quite complicated... 
+The heart of the H-scoring algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being equal in terms of total G-score. It assumes that it will choose the best player available based on its choice of category weights. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on the category weights. The math behind this is quite complicated... 
 
 ![alt text](img/crazyformula.png)
 /// caption
 Disgusting! 
 ///
 
-But the basic intuition is simple. The more weight it assigns a category, the higher its team's expected value for that category will be. This allows the algorithm to understand that it can prioritize or deprioritize categories with future picks. 
+But the basic intuition is that there are two mechanisms at play
+
+- The more weight the algorithm assigns a category, the higher its picks's expected value for that category will be
+- The more specific kind of player the algorithm is looking for, the more overall value needs to be sacrificed to find that kind of player
+
+This allows the algorithm to understand that it can prioritize or deprioritize categories with future picks, with some cost to overall value. 
 
 ### Category strength expectations: position allocation 
 
@@ -184,7 +185,7 @@ For Most Categories scoring, the objective function is the probability of winnin
 H-scoring has numerous limitations. Some of the most major are 
 
 - H-scoring is reliant on a single set of projections which may differ from the beliefs of other managers. Assuming its projections are correct, the algorithm can become overconfident and assess its own team as being so strong that the only way to improve it is to "un-punt" a category. This can lead to late round picks which run counter to the build of a team. The website does have a way to mitigate this, to a degree- see [the page on the Bayesian strength adjustment](projectionadjustment.md/)
-- The optimization process for H-scoring only considers one strategy profile. It does not consider how robust players are to different strategy profiles, which may be relevant because circumstances can change during a draft, and the algorithm might switch strategies drastically. 
+- The optimization process for H-scoring only considers one strategy profile. It does not consider how robust players are to different strategy profiles, which may be relevant because circumstances can change during a draft, and the algorithm might switch strategies drastically
 - The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates
 - H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
 - H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles
