@@ -4,17 +4,17 @@ This is documentation for a [website](https://fantasy-basketball-optimizer-y9jt7
 - [Dynamic algorithms for fantasy basketball](https://arxiv.org/abs/2409.09884)
 - [Optimizing for Rotisserie fantasy basketball](https://arxiv.org/abs/2501.00933)
 
-Please note that these algorithms are based on a simplified model of fantasy basketball, ignoring many practical considerations, and there is no guarantee that using them will lead to success. Don't expect to automatically win your league with the algorithms or even to have a better shot than anyone else. The intent of the papers is just to start exploring the math underlying fantasy basketball, and the intent of the website is to have fun playing around with that math :smile: 
+Please note that these algorithms are based on a simplified model of fantasy basketball, ignoring many practical considerations, and there is no guarantee that using them will lead to success. Don't expect to automatically win your league with the algorithms or even to have a better shot than anyone else. The intent of the papers is just to start exploring the math underlying fantasy basketball, and the intent of the website is to have fun playing around with that math :smile:. 
 
 Source code is available [here](https://github.com/zer2/fantasy-basketball-optimizer).
 
-## Category-based fantasy basketball
+## A gentle introduction to category-based fantasy basketball
 
 In fantasy leagues, "managers" draft teams of real players before the season begins. E.g. I take Victor Wembanyama with my first pick, then you take Nikola Jokic, someone else takes Luka Doncic, and so on. At the end of the draft everyone has a 13-player team. 
 
 Throughout the season, teams accumulate statistics based on their real players' performances. E.g. if I have Wembanyama on my team and he gets four blocks in a game, then my team gets four blocks. 
 
-In category-based leagues, which most fantasy basketball leagues are, the important thing is winning individual categories. Having more of a category means you win it, e.g. if my team gets 50 blocks and your team gets 30 blocks, I get a "fantasy point" for winning blocks. All of the tracked categories, usually eight or nine in total, are scored this way. Generally opponents are rotated weekly, and teams try to accumulate as many fantasy points as they can across all the opponents they face throughout a season.
+In category-based leagues, which most fantasy basketball leagues are, the important thing is winning individual categories. There are usually eight or nine categories. Most categories are won by the team that gets more of them, e.g. if my team gets 50 blocks and your team gets 30 blocks, I get a "fantasy point" for winning blocks. 
 
 This simple scoring system belies deceptively tricky mathematics. There is no obvious way to compare the values of categories to each other, making it difficult to quantitatively decide which player is best to take. The motivating force behind the papers is untangling this conundrum and applying rigor to the process of evaluating players. 
 
@@ -26,7 +26,7 @@ The [first paper](https://arxiv.org/abs/2307.02188) looks at so-called "static" 
 
 The [second paper](https://arxiv.org/abs/2409.09884) discusses how to evaluate players with full context taken into account. The most difficult aspect of context to incorporate is selections from later draft rounds, because nobody can be exactly sure which players will be taken by which manager in the future. The paper's solution is an algorithm called H-scoring which optimizes a heuristic approach to future draft picks for each candidate player. Players can then be ranked according to how well the team would be expected to perform if they were taken, given the appropriate follow-up in later draft rounds. H-scores are the default way to evaluate players on the website. See also the [H-score](hscores.md) section of documentation. 
 
-The [third paper](https://arxiv.org/abs/2501.00933) approaches the trickiest format, Rotisserie or "Roto". Instead of weekly matchups, Roto has one season-long scoring period in which all managers compete against all other managers. The manager who wins the most fantasy points in that one scoring period wins the league. Since this format is so different, adapting H-scoring to it requires another layer of mathematical scaffolding. See also the [Roto](roto.md) section of documentation. 
+The [third paper](https://arxiv.org/abs/2501.00933) approaches the Rotisserie or "Roto" format. Since this format is so different from the others, adapting H-scoring to it requires another layer of mathematical scaffolding. See also the [Roto](roto.md) section of documentation. 
 
 ## Extensions
 

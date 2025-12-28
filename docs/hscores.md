@@ -1,8 +1,8 @@
 # H-scores
 
-H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy in terms of category weightings and position allocations, and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, particularly the concept of punting (strategicially sacrificing) some categories and over-performing in the rest. See the [optimization section](#optimization) for some mathematical detail on how it does that without the academic rigor of the paper. Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. 
+H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the idea of punting (strategicially sacrificing) some categories and over-performing in the rest. It also understands how to work around position requirements, which enforce that e.g. a team must have at least one point guard. See the [optimization section](#optimization) for some mathematical detail on how it works without the academic rigor of the paper. 
 
-The website includes a module which performs the H-score algorithm programatically. 
+Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. H-scores are featured on the website as the main way of evaluating players.
 
 ## Parameter inputs 
 
@@ -49,9 +49,9 @@ This image from the paper shows how the H-scoring algorithm actually performed o
 
 The overall H-score is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. It is based on the category-level H-scores. 
 
-For Each Categories scoring, it is defined as the average expected win rate across categories. 
+Different kinds of categories deal with fantasy points differently, and necessitate different formulations for the overall H-score. In "Each Category", teams rotate opponents weekly and keep all the fantasy points they win. For that format, the H-score is defined average expected win rate across categories. 
 
-For Most Categories, the average expected win rate is a poor proxy for success. A team that wins five out of nine categories 100% of the time and always loses the others is better for that format than one that wins each category 60% of the time, despite having a lower average expected win rate (56% vs 60%). For that reason, switching the format to Most Categories switches the definition of the overall H-score to the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).
+In "Most Categories", teams also rotate opponents, but instead of keeping all of their fantasy points, they get wins for every opponent they get a majority of fantasy points against. For that format, the average expected win rate is a poor proxy for success. A team that wins five out of nine categories 100% of the time and always loses the others is better for that format than one that wins each category 60% of the time, despite having a lower average expected win rate (56% vs 60%). For that reason, switching the format to Most Categories switches the definition of the overall H-score to the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).
 
 ![alt text](img/hmc.png)
 /// caption

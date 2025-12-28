@@ -661,7 +661,8 @@
 <h3 id="what-are-z-scores">What are Z-scores?</h3>
 <p>Fantasy basketball has a standard way of quantifying player value across categories, called 'Z-scoring', and it is used to make objective rankings of players. </p>
 <p>In a stats 101 class, Z-scores are what happens to a set of numbers after subtracting the mean (average) signified by <span class="arithmatex">\(\mu\)</span> and dividing by the standard deviation (how “spread out” the distribution is) signified by <span class="arithmatex">\(\sigma\)</span>. Mathematically, <span class="arithmatex">\(Z(x) = \frac{x - \mu}{\sigma}\)</span>.</p>
-<p>Z-scores in the fantasy context are essentially the same thing, with a few minor modifications (specifically for the percentage categories, which are more complicated. See the paper for details). They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. </p>
+<p>Z-scores in the fantasy context are essentially the same thing. They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. </p>
+<p>One complication is that some categories are percentage-based, like free throw percent. See the paper for details on how the analysis is extended to them. </p>
 <h3 id="justifying-z-scores">Justifying Z-scores</h3>
 <p>Consider this problem: <strong>Team one has <span class="arithmatex">\(N-1\)</span> players randomly selected from a pool of players, and team two has <span class="arithmatex">\(N\)</span> players chosen randomly from the same pool. Which final player should team one choose to optimize the expected value of categories won against team two, assuming all players perform at exactly their long term mean for a week?</strong></p>
 <p>The difference in category score between two teams indicates which team is winning the category and by how much. Randomly selecting the <span class="arithmatex">\(2N -1\)</span> random players many times gives a sense of what team two's score minus team one's score will be before the last player is added. See this simulation being carried out for blocks below with <span class="arithmatex">\(N=12\)</span></p>
@@ -708,7 +709,7 @@ CDF(0) = \frac{1}{2}\left[ 1 + \frac{2}{\sqrt{(2N-1) \pi}}* \frac{m_p – m_\mu}
 <p>With that said, it is worth listing out some of their limitations explicitly </p>
 <ul>
 <li>
-<p>Total G-scores have no mechanism for balancing out teams across categories. Drafting purely by G-score can lead to teams which dominate in a small number of categories, and struggle with the rest. </p>
+<p>Total G-scores have no mechanism for balancing out teams across categories. Drafting purely by G-score can lead to teams which dominate in a small number of categories, and struggle with the rest </p>
 </li>
 <li>
 <p>G-scores cannot encode dynamic strategies like "punting" weak categories </p>
