@@ -8,7 +8,7 @@ The website uses G-scores as a measure of static value. G-scores are a variant o
 
 ![alt text](img/gcand.png)
 
-During auctions and drafts, a tab will be available with the G-score table for available players. The G-score table shows available players ordered by total G-score during drafts and auctions. It includes the categorical components of G-scores as well.
+During auctions and drafts, a tab will be available with the G-score table for available players. It includes the categorical components of G-scores as well.
 
 ## Team table
 
