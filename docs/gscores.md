@@ -26,7 +26,9 @@ Fantasy basketball has a standard way of quantifying player value across categor
 
 In a stats 101 class, Z-scores are what happens to a set of numbers after subtracting the mean (average) signified by $\mu$ and dividing by the standard deviation (how “spread out” the distribution is) signified by $\sigma$. Mathematically, $Z(x) = \frac{x - \mu}{\sigma}$.
 
-Z-scores in the fantasy context are essentially the same thing, with a few minor modifications (specifically for the percentage categories, which are more complicated. See the paper for details). They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. 
+Z-scores in the fantasy context are essentially the same thing. They take a player's expected performance in a category, subtract out the average from the paper pool, and divide by the standard deviation. 
+
+One complication is that some categories are percentage-based, like free throw percent. See the paper for details on how the analysis is extended to them. 
 
 ### Justifying Z-scores
 
@@ -98,7 +100,7 @@ G-scores are fundamentally limited because they do not adapt to drafting circums
 
 With that said, it is worth listing out some of their limitations explicitly 
 
-- Total G-scores have no mechanism for balancing out teams across categories. Drafting purely by G-score can lead to teams which dominate in a small number of categories, and struggle with the rest. 
+- Total G-scores have no mechanism for balancing out teams across categories. Drafting purely by G-score can lead to teams which dominate in a small number of categories, and struggle with the rest 
 
 - G-scores cannot encode dynamic strategies like "punting" weak categories 
 
