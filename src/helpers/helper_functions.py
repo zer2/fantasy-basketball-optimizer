@@ -5,8 +5,6 @@ from functools import reduce
 import os 
 import uuid
 import snowflake.connector
-import json
-from streamlit_cookies_manager import CookieManager
 
 '''Getters 
 Getter functions are used for getting various inputs instead of direct access through session state or otherwise
@@ -594,38 +592,3 @@ def weighted_cov_matrix(df, weights):
     weighted_cov = np.dot(weights * deviations.T, deviations) / weights.sum()
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
 
-'''
-Cookie handlers
-'''
-cookies = CookieManager(prefix = 'FBBO/') #prefix ensures we don't clash with other cookies
-
-def set_cookie(key, value):
-   cookies[key] = value
-
-def get_default(key, parameter_default = None):
-   if not cookies.ready():
-    # Wait for the component to load and send us current cookies.
-      st.stop()
-
-   if key in cookies: #get default from cookies if a cookie have been stored for it
-      return json.loads(cookies[key])
-   else:
-      if parameter_default is not None: #default to the provided parameter value, if provided
-         return parameter_default 
-      else: #otherwise get the default straight from parameters
-         return get_params()['options'][key]['default']
-
-def store_options_as_cookies():
-   #save the options selected by users as cookies, so they can persist across session states
-
-   #ZR: Should align this so it can be treated like the others
-   cookies['categories'] = json.dumps(st.session_state.selected_categories)
-
-   params_to_save = ['n_drafters','n_drafters','n_picks','upsilon','psi'
-             ,'aleph','beth','omega','gamma','n_iterations','your_differential_threshold'
-             ,'my_differential_threshold','streaming_noise',
-             'n_Util','n_C' ,'n_G','n_PG','n_SG','n_F','n_PF','n_SF','n_bench']
-   
-   for param in params_to_save: 
-      if param in st.session_state:
-         cookies[param] = json.dumps(st.session_state[param])

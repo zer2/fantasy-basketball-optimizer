@@ -1,7 +1,9 @@
 import streamlit as st
 
-from src.helpers.helper_functions import get_data_from_session_state, get_params, get_default, set_cookie
+from src.helpers.helper_functions import get_data_from_session_state, get_params
+from src.helpers.cookie_control import get_default
 
+###
 
 def format_popover():
     """Collect information from the user on the desired fantasy sport format.
@@ -36,7 +38,7 @@ def format_popover():
         categories = st.multiselect('Which categories does your league use?'
                         , key = 'selected_categories'
                         , options = actual_options
-                        , default = get_default('categories')
+                        , default = get_default('selected_categories')
                             )
 
         c1, c2 = st.columns([0.2,0.8])

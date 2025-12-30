@@ -1,6 +1,7 @@
 import streamlit as st
 from src.helpers.helper_functions import  get_mode, get_n_picks, get_params \
-                                          , get_position_numbers, get_default
+                                          , get_position_numbers
+from src.helpers.cookie_control import get_default
 
 def position_requirement_popover():
     """Allows the user to prescribe the position structure for teams to follow

@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 
 from src.helpers.helper_functions import get_data_key, get_mode, get_params \
-                                        , store_dataset_in_session_state, get_default
+                                        , store_dataset_in_session_state
+from src.helpers.cookie_control import get_default
 from src.math.process_player_data import make_upsilon_adjustment
 
 def player_stat_param_popover():
@@ -20,7 +21,7 @@ def player_stat_param_popover():
     upsilon = st.number_input(r'Select a $\upsilon$ value'
                       , key = 'upsilon'
                       , min_value = float(params['options']['upsilon']['min'])
-                      , value = get_default('upsilon')
+                      , value = float(get_default('upsilon'))
                     , max_value = float(params['options']['upsilon']['max']))
     upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
                   miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
@@ -31,7 +32,7 @@ def player_stat_param_popover():
     psi = st.number_input(r'Select a $\psi$ value'
                       , key = 'psi'
                       , min_value = float(params['options']['psi']['min'])
-                      , value = get_default('psi')
+                      , value = float(get_default('psi'))
                       , max_value = float(params['options']['psi']['max']))
     psi_str = r'''It it assumed that of the games a player will miss, 
                   they are replaced by a replacement-level player for $\psi \%$ of them'''
@@ -40,7 +41,7 @@ def player_stat_param_popover():
 
     chi = st.number_input(r'Select a $\chi$ value'
         , key = 'chi'
-        , value = get_default('chi')
+        , value = float(get_default('chi'))
         , min_value = float(params['options']['chi']['min'])
         , max_value = float(params['options']['chi']['max']))
 
@@ -52,7 +53,7 @@ def player_stat_param_popover():
 
     aleph = st.number_input(r'Select a $\alef$ value'
         , key = 'aleph'
-        , value = get_default('aleph')
+        , value = float(get_default('aleph'))
         , min_value = float(params['options']['aleph']['min'])
         , max_value = float(params['options']['aleph']['max']))
 
@@ -64,7 +65,7 @@ def player_stat_param_popover():
 
     beth = st.number_input(r'Select a $\beth$ value'
         , key = 'beth'
-        , value = get_default('beth')
+        , value = float(get_default('beth'))
         , min_value = float(params['options']['beth']['min'])
         , max_value = None)
 
@@ -79,7 +80,7 @@ def player_stat_param_popover():
 
       streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
                                 , key = 'streaming_noise'
-                                , value = get_default('streaming_noise')
+                                , value = float(get_default('streaming_noise'))
                                 , min_value = float(params['options']['streaming_noise']['min'])
                                 , max_value = float(params['options']['streaming_noise']['max'])
                               )
@@ -112,7 +113,7 @@ def algorithm_param_popover():
 
     omega = st.number_input(r'Select a $\omega$ value'
                           , key = 'omega'
-                          , value = get_default('omega')
+                          , value = float(get_default('omega'))
                           , min_value = float(params['options']['omega']['min'])
                           , max_value = float(params['options']['omega']['max']))
     omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
@@ -122,7 +123,7 @@ def algorithm_param_popover():
   
     gamma = st.number_input(r'Select a $\gamma$ value'
                           , key = 'gamma'
-                          , value = get_default('gamma')
+                          , value = float(get_default('gamma'))
                           , min_value = float(params['options']['gamma']['min'])
                           , max_value = float(params['options']['gamma']['max']))
     gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 

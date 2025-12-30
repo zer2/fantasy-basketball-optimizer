@@ -199,7 +199,7 @@ NBA:
   g-score-total-multiplier : 50
   g-score-team-multiplier : 24
   options : 
-    categories : 
+    selected_categories : 
       default : 
       - Field Goal %
       - Free Throw %

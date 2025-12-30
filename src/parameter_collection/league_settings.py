@@ -7,10 +7,12 @@ from src.platform_integration.yahoo_integration import YahooIntegration
 from src.platform_integration.espn_integration import ESPNIntegration
 from src.tabs.drafting import clear_draft_board
 
-
 from src.helpers.helper_functions import get_mode, get_n_picks, get_params \
-                                        , get_default, get_team_names, set_params \
+                                        ,  get_team_names, set_params \
                                         , using_manual_entry
+from src.helpers.cookie_control import get_default
+
+###
 
 def league_settings_popover():
     """Collect settings for the league and set up a platform integration if necessary

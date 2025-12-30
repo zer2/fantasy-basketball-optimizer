@@ -2,7 +2,8 @@ import streamlit as st
 import yaml
 
 from src.helpers.helper_functions import gen_key, get_mode, initialize_selections_df \
-                                      , set_draft_position, using_manual_entry, store_options_as_cookies
+                                      , set_draft_position, using_manual_entry
+from src.helpers.cookie_control import store_options_as_cookies, reset_all_parameters
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
                            ,make_auction_tab_live_data ,make_auction_tab_own_data, update_data_and_info
@@ -14,6 +15,7 @@ from src.parameter_collection.position_requirement import position_requirement_p
 from src.parameter_collection.format import format_popover
 #from wfork_streamlit_profiler import Profiler
 from streamlit_theme import st_theme
+import extra_streamlit_components as stx
 
 #this reduces the padding at the top of the website, which is excessive otherwise 
 st.write('<style>div.block-container{padding-top:3rem;}</style>', unsafe_allow_html=True)
@@ -25,6 +27,9 @@ st.set_page_config(
           , page_title = 'Fantasy Sports Optimization'
           , initial_sidebar_state="auto"
           , menu_items=None)
+
+if "allow_cookie_bootstrap" not in st.session_state:
+    st.session_state.allow_cookie_bootstrap = True
 
 if 'data_source' not in st.session_state:
     st.session_state.data_source = 'Enter your own data'
@@ -67,6 +72,16 @@ with st.sidebar:
 
   st.title('🏀 Fantasy Sports Optimizer')
 
+  cookies = stx.CookieManager() 
+  st.session_state.saved_cookies = cookies.get_all()
+  reset_param_button = st.button('Reset parameters')
+
+  if reset_param_button:
+
+      reset_all_parameters(cookies)
+
+  print('Post re-run')
+
   st.write("---")
 
   with st.popover(':small[League Settings]'):
@@ -103,7 +118,10 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
-store_options_as_cookies() #store all of the user preferences as cookies. This keeps them persistent across sessions 
+with st.empty(): #we need this in st.empty because of a streamlit bug. It will allocate space otherwise
+  #store all of the user preferences as cookies. This keeps them persistent across sessions 
+  store_options_as_cookies(cookies) 
+
 initialize_selections_df()
 
 if using_manual_entry():
