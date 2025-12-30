@@ -1,6 +1,7 @@
 import streamlit as st
 
-from src.helpers.helper_functions import get_data_from_session_state, get_params
+from src.helpers.helper_functions import get_data_from_session_state, get_params, get_default, set_cookie
+
 
 def format_popover():
     """Collect information from the user on the desired fantasy sport format.
@@ -13,12 +14,14 @@ def format_popover():
       None 
     """
     with st.form('param form'):
+
+        #ZR: need to figure out a way to save this to cookies ##
         scoring_format = st.selectbox(
                 'Which format are you playing?',
                 ('Rotisserie', 'Head to Head: Each Category', 'Head to Head: Most Categories')
                 , key = 'scoring_format'
                 , index = 1)
-            
+                    
         if scoring_format == 'Rotisserie':
             st.caption('Note that H-scores for Rotisserie are experimental and have not been tested')
 
@@ -33,9 +36,9 @@ def format_popover():
         categories = st.multiselect('Which categories does your league use?'
                         , key = 'selected_categories'
                         , options = actual_options
-                        , default = params['default-categories']
+                        , default = get_default('categories')
                             )
-        
+
         c1, c2 = st.columns([0.2,0.8])
 
         with c1: 

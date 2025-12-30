@@ -5,6 +5,8 @@ from functools import reduce
 import os 
 import uuid
 import snowflake.connector
+import json
+from streamlit_cookies_manager import CookieManager
 
 '''Getters 
 Getter functions are used for getting various inputs instead of direct access through session state or otherwise
@@ -592,3 +594,50 @@ def weighted_cov_matrix(df, weights):
     weighted_cov = np.dot(weights * deviations.T, deviations) / weights.sum()
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
 
+'''
+Cookie handlers
+'''
+cookies = CookieManager(prefix = 'FBBO/') #prefix ensures we don't clash with other cookies
+
+def set_cookie(key, value):
+   cookies[key] = value
+
+def get_default(key, parameter_default = None):
+   if not cookies.ready():
+    # Wait for the component to load and send us current cookies.
+      st.stop()
+
+   if key in cookies: #get default from cookies if a cookie have been stored for it
+      return json.loads(cookies[key])
+   else:
+      if parameter_default is not None: #default to the provided parameter value, if provided
+         return parameter_default 
+      else: #otherwise get the default straight from parameters
+         return get_params()['options'][key]['default']
+
+def store_options_as_cookies():
+   cookies['categories'] = json.dumps(st.session_state.selected_categories)
+
+   cookies['n_drafters'] = json.dumps(st.session_state.n_drafters)
+   cookies['n_picks'] = json.dumps(st.session_state.n_picks)
+   cookies['upsilon'] = json.dumps(st.session_state.upsilon)
+
+   cookies['psi'] = json.dumps(st.session_state.psi)
+   cookies['chi'] = json.dumps(st.session_state.chi)
+   cookies['aleph'] = json.dumps(st.session_state.aleph)
+
+   cookies['beth'] = json.dumps(st.session_state.beth)
+   cookies['aleph'] = json.dumps(st.session_state.aleph)
+
+   cookies['omega'] = json.dumps(st.session_state.omega)
+   cookies['gamma'] = json.dumps(st.session_state.gamma)
+   cookies['n_iterations'] = json.dumps(st.session_state.n_iterations)
+
+   cookies['your_differential_threshold'] = json.dumps(st.session_state.your_differential_threshold)
+   cookies['their_differential_threshold'] = json.dumps(st.session_state.their_differential_threshold)
+
+   for position_code in ['Util','C' ,'G','PG','SG','F','PF','SF','bench']:
+      cookies[position_code] = json.dumps(st.session_state['n_' + position_code])
+
+   if 'streaming_noise' in st.session_state:
+      cookies['streaming_noise'] = json.dumps(st.session_state.streaming_noise)

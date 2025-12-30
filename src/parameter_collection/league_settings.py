@@ -8,7 +8,9 @@ from src.platform_integration.espn_integration import ESPNIntegration
 from src.tabs.drafting import clear_draft_board
 
 
-from src.helpers.helper_functions import get_mode, get_n_picks, get_params, get_selections_default, get_team_names, set_params, using_manual_entry
+from src.helpers.helper_functions import get_mode, get_n_picks, get_params \
+                                        , get_default, get_team_names, set_params \
+                                        , using_manual_entry
 
 def league_settings_popover():
     """Collect settings for the league and set up a platform integration if necessary
@@ -97,14 +99,14 @@ def league_settings_popover():
             n_drafters = st.number_input(r'How many drafters are in your league?'
                                         , key = 'n_drafters'
                                         , min_value = params['options']['n_drafters']['min']
-                                        , value = params['options']['n_drafters']['default']
+                                        , value = get_default('n_drafters')
                                         , on_change = clear_draft_board
                                         )
 
             n_picks = st.number_input(r'How many players will each drafter choose?'
                             , key = 'n_picks'
                             , min_value = params['options']['n_picks']['min']
-                            , value = params['options']['n_picks']['default']
+                            , value = get_default('n_picks')
                             , on_change = clear_draft_board)
                                     
             st.write('Enter team names here:')

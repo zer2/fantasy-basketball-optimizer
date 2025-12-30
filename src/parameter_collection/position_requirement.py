@@ -1,5 +1,6 @@
 import streamlit as st
-from src.helpers.helper_functions import  get_mode, get_n_picks, get_params, get_position_numbers
+from src.helpers.helper_functions import  get_mode, get_n_picks, get_params \
+                                          , get_position_numbers, get_default
 
 def position_requirement_popover():
     """Allows the user to prescribe the position structure for teams to follow
@@ -52,7 +53,7 @@ def position_requirement_popover():
 
           st.number_input(position_info['full_str']
                     , key = 'n_' + position_code
-                    , value = position_defaults['base'][position_code]
+                    , value = get_default(position_code, position_defaults['base'][position_code])
                     , min_value = 0
                         )
         
@@ -64,16 +65,14 @@ def position_requirement_popover():
 
           st.number_input(position_info['full_str']
                     , key = 'n_' + position_code
-                    , value = position_defaults['flex'][position_code]
+                    , value = get_default(position_code, position_defaults['flex'][position_code])
                     , min_value = 0
                         )
         st.number_input('Bench (these players are ignored for drafts)'
                         , key = 'n_bench'
-                        , value = 0
+                        , value = get_default('n_bench', 0)
                         , min_value = 0
                         )  
-                        
-
 
       implied_n_picks = sum(n for n in get_position_numbers().values()) + st.session_state.n_bench
       

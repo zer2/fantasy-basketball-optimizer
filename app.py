@@ -2,7 +2,7 @@ import streamlit as st
 import yaml
 
 from src.helpers.helper_functions import gen_key, get_mode, initialize_selections_df \
-                                      , set_draft_position, using_manual_entry
+                                      , set_draft_position, using_manual_entry, store_options_as_cookies
 from src.helpers.stylers import DarkStyler, LightStyler
 from src.tabs.drafting import make_drafting_tab_own_data, make_drafting_tab_live_data \
                            ,make_auction_tab_live_data ,make_auction_tab_own_data, update_data_and_info
@@ -103,6 +103,7 @@ with st.sidebar:
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
+store_options_as_cookies() #store all of the user preferences as cookies. This keeps them persistent across sessions 
 initialize_selections_df()
 
 if using_manual_entry():

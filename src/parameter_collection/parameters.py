@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-from src.helpers.helper_functions import get_data_key, get_mode, get_params, store_dataset_in_session_state
+from src.helpers.helper_functions import get_data_key, get_mode, get_params \
+                                        , store_dataset_in_session_state, get_default
 from src.math.process_player_data import make_upsilon_adjustment
 
 def player_stat_param_popover():
@@ -19,7 +20,7 @@ def player_stat_param_popover():
     upsilon = st.number_input(r'Select a $\upsilon$ value'
                       , key = 'upsilon'
                       , min_value = float(params['options']['upsilon']['min'])
-                      , value = float(params['options']['upsilon']['default'])
+                      , value = get_default('upsilon')
                     , max_value = float(params['options']['upsilon']['max']))
     upsilon_str = r'''Injury rates are scaled down by $\upsilon$. For example, if a player is expected to 
                   miss $20\%$ of games and $\upsilon$ is $75\%$, then it will be assumed that they miss 
@@ -30,8 +31,8 @@ def player_stat_param_popover():
     psi = st.number_input(r'Select a $\psi$ value'
                       , key = 'psi'
                       , min_value = float(params['options']['psi']['min'])
-                      , value = float(params['options']['psi']['default'])
-                    , max_value = float(params['options']['psi']['max']))
+                      , value = get_default('psi')
+                      , max_value = float(params['options']['psi']['max']))
     psi_str = r'''It it assumed that of the games a player will miss, 
                   they are replaced by a replacement-level player for $\psi \%$ of them'''
   
@@ -39,7 +40,7 @@ def player_stat_param_popover():
 
     chi = st.number_input(r'Select a $\chi$ value'
         , key = 'chi'
-        , value = float(params['options']['chi']['default'])
+        , value = get_default('chi')
         , min_value = float(params['options']['chi']['min'])
         , max_value = float(params['options']['chi']['max']))
 
@@ -51,7 +52,7 @@ def player_stat_param_popover():
 
     aleph = st.number_input(r'Select a $\alef$ value'
         , key = 'aleph'
-        , value = float(params['options']['aleph']['default'])
+        , value = get_default('aleph')
         , min_value = float(params['options']['aleph']['min'])
         , max_value = float(params['options']['aleph']['max']))
 
@@ -63,7 +64,7 @@ def player_stat_param_popover():
 
     beth = st.number_input(r'Select a $\beth$ value'
         , key = 'beth'
-        , value = float(params['options']['beth']['default'])
+        , value = get_default('beth')
         , min_value = float(params['options']['beth']['min'])
         , max_value = None)
 
@@ -78,9 +79,9 @@ def player_stat_param_popover():
 
       streaming_noise = st.number_input(r'Select an $S_{\sigma}$ value'
                                 , key = 'streaming_noise'
-                                , value = float(params['options']['S']['default'])
-                                , min_value = float(params['options']['S']['min'])
-                                , max_value = float(params['options']['S']['max'])
+                                , value = get_default('streaming_noise')
+                                , min_value = float(params['options']['streaming_noise']['min'])
+                                , max_value = float(params['options']['streaming_noise']['max'])
                               )
       stream_noise_str = r'''$S_{\sigma}$ controls the SAVOR algorithm. It roughly represents the 
                             standard deviation of dollar values expected for players during the 
@@ -111,7 +112,7 @@ def algorithm_param_popover():
 
     omega = st.number_input(r'Select a $\omega$ value'
                           , key = 'omega'
-                          , value = punting_levels[punting_default]['omega']
+                          , value = get_default('omega')
                           , min_value = float(params['options']['omega']['min'])
                           , max_value = float(params['options']['omega']['max']))
     omega_str = r'''The higher $\omega$ is, the more aggressively the algorithm will try to punt. Slightly more technically, 
@@ -121,7 +122,7 @@ def algorithm_param_popover():
   
     gamma = st.number_input(r'Select a $\gamma$ value'
                           , key = 'gamma'
-                          , value = punting_levels[punting_default]['gamma']
+                          , value = get_default('gamma')
                           , min_value = float(params['options']['gamma']['min'])
                           , max_value = float(params['options']['gamma']['max']))
     gamma_str = r'''$\gamma$ also influences the level of punting, complementing omega. Tuning gamma is not suggested but you can 
@@ -131,7 +132,7 @@ def algorithm_param_popover():
 
     n_iterations = st.number_input(r'Select a number of iterations for gradient descent to run'
                               , key = 'n_iterations'
-                              , value = punting_levels[punting_default]['n_iterations']
+                              , value = get_default('n_iterations')
                               , min_value = params['options']['n_iterations']['min']
                               , max_value = params['options']['n_iterations']['max'])
     n_iterations_str = r'''More iterations take more computational power, but theoretically achieve better convergence'''
@@ -151,7 +152,7 @@ def trade_param_popover():
     your_differential_threshold = st.number_input(
           r'Your differential threshold for the automatic trade suggester'
           , key = 'your_differential_threshold'
-          , value = 0)
+          , value = get_default('your_differential_threshold'))
     ydt_str = r'''Only trades which improve your H-score 
                   by this percent will be shown'''
     st.caption(ydt_str)
@@ -160,12 +161,13 @@ def trade_param_popover():
     their_differential_threshold = st.number_input(
           r'Counterparty differential threshold for the automatic trade suggester'
           , key = 'their_differential_threshold'
-          , value = -0.2)
+          , value = get_default('their_differential_threshold'))
     tdt_str = r'''Only trades which improve their H-score 
                 by this percent will be shown'''
     st.caption(tdt_str)
     their_differential_threshold = their_differential_threshold/100
 
+    #ZR: need to figure out how to save these in cookies at some point
     combo_params_default = pd.DataFrame({'N-traded' : [1,2,3]
                                   ,'N-received' : [1,2,3]
                                   ,'T' : [3,3,3]}
