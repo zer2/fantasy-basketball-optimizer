@@ -72,6 +72,8 @@ with st.sidebar:
 
   st.title('🏀 Fantasy Sports Optimizer')
 
+  most_sidebar = st.container()
+
   cookies = stx.CookieManager() 
   st.session_state.saved_cookies = cookies.get_all()
   reset_param_button = st.button('Reset parameters')
@@ -80,41 +82,40 @@ with st.sidebar:
 
       reset_all_parameters(cookies)
 
-  print('Post re-run')
+  with most_sidebar:
+    st.write("---")
 
-  st.write("---")
+    with st.popover(':small[League Settings]'):
 
-  with st.popover(':small[League Settings]'):
-
-    league_settings_popover()
-  
-  #explicitly setting the heights helps to avoid a Streamlit bug
-  #https://github.com/streamlit/streamlit/issues/8934
-  with st.popover(':small[Player Stats]').container(height = 300):
-
-    player_stats_popover()
-
-  with st.popover(':small[Format & Categories]'):
-
-    format_popover()
+      league_settings_popover()
     
-  with st.popover(':small[Player Stat Parameters]').container(height = 300):
+    #explicitly setting the heights helps to avoid a Streamlit bug
+    #https://github.com/streamlit/streamlit/issues/8934
+    with st.popover(':small[Player Stats]').container(height = 300):
 
-    player_stat_param_popover()      
+      player_stats_popover()
 
-  with st.popover(':small[H-score Parameters]').container(height = 300):
-                    
-    algorithm_param_popover()
+    with st.popover(':small[Format & Categories]'):
 
-  with st.popover(':small[Trade Parameters]').container(height = 300):
-          
-    trade_param_popover()
+      format_popover()
+      
+    with st.popover(':small[Player Stat Parameters]').container(height = 300):
 
-  with st.popover(':small[Position Parameters]').container(height = 400):
+      player_stat_param_popover()      
 
-    position_requirement_popover()
+    with st.popover(':small[H-score Parameters]').container(height = 300):
+                      
+      algorithm_param_popover()
 
-  st.write("---")
+    with st.popover(':small[Trade Parameters]').container(height = 300):
+            
+      trade_param_popover()
+
+    with st.popover(':small[Position Parameters]').container(height = 400):
+
+      position_requirement_popover()
+
+    st.write("---")
 
   st.link_button("Documentation", 'https://zer2.github.io/fantasy-basketball-optimizer/')
 
