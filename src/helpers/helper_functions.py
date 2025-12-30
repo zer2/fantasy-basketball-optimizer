@@ -616,28 +616,16 @@ def get_default(key, parameter_default = None):
          return get_params()['options'][key]['default']
 
 def store_options_as_cookies():
+   #save the options selected by users as cookies, so they can persist across session states
+
+   #ZR: Should align this so it can be treated like the others
    cookies['categories'] = json.dumps(st.session_state.selected_categories)
 
-   cookies['n_drafters'] = json.dumps(st.session_state.n_drafters)
-   cookies['n_picks'] = json.dumps(st.session_state.n_picks)
-   cookies['upsilon'] = json.dumps(st.session_state.upsilon)
-
-   cookies['psi'] = json.dumps(st.session_state.psi)
-   cookies['chi'] = json.dumps(st.session_state.chi)
-   cookies['aleph'] = json.dumps(st.session_state.aleph)
-
-   cookies['beth'] = json.dumps(st.session_state.beth)
-   cookies['aleph'] = json.dumps(st.session_state.aleph)
-
-   cookies['omega'] = json.dumps(st.session_state.omega)
-   cookies['gamma'] = json.dumps(st.session_state.gamma)
-   cookies['n_iterations'] = json.dumps(st.session_state.n_iterations)
-
-   cookies['your_differential_threshold'] = json.dumps(st.session_state.your_differential_threshold)
-   cookies['their_differential_threshold'] = json.dumps(st.session_state.their_differential_threshold)
-
-   for position_code in ['Util','C' ,'G','PG','SG','F','PF','SF','bench']:
-      cookies[position_code] = json.dumps(st.session_state['n_' + position_code])
-
-   if 'streaming_noise' in st.session_state:
-      cookies['streaming_noise'] = json.dumps(st.session_state.streaming_noise)
+   params_to_save = ['n_drafters','n_drafters','n_picks','upsilon','psi'
+             ,'aleph','beth','omega','gamma','n_iterations','your_differential_threshold'
+             ,'my_differential_threshold','streaming_noise',
+             'n_Util','n_C' ,'n_G','n_PG','n_SG','n_F','n_PF','n_SF','n_bench']
+   
+   for param in params_to_save: 
+      if param in st.session_state:
+         cookies[param] = json.dumps(st.session_state[param])

@@ -53,7 +53,8 @@ def position_requirement_popover():
 
           st.number_input(position_info['full_str']
                     , key = 'n_' + position_code
-                    , value = get_default(position_code, position_defaults['base'][position_code])
+                    , value = get_default('n_' + position_code
+                                          , position_defaults['base'][position_code])
                     , min_value = 0
                         )
         
@@ -65,7 +66,8 @@ def position_requirement_popover():
 
           st.number_input(position_info['full_str']
                     , key = 'n_' + position_code
-                    , value = get_default(position_code, position_defaults['flex'][position_code])
+                    , value = get_default('n_'  + position_code
+                                          , position_defaults['flex'][position_code])
                     , min_value = 0
                         )
         st.number_input('Bench (these players are ignored for drafts)'
