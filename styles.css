@@ -1,7 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
+
 #header {
     color: blue;
 }
 
 .players {
     color: green;
+}
+
+#realtable {
+    border-spacing: 1px;
+    border-radius: 12px;
+    background-color : grey;
+    border-color : grey;
+    border: 1px solid grey;
+    overflow: hidden; /* This clips the sharp cell corners */
+    font-family : "Source Sans 3";
+    font-weight : 400;
+    font-style : normal;
+    font-size: 0.875rem;
+    line-height: 1.6; 
+    text-size-adjust: 100%;
+    -webkit-font-smoothing: auto;
+}
+
+th {
+    padding: 4px 5px;
+}
+
+tr {
+    padding: 1px 0px;
+}
+
+body {
+    background-color : rgb(14, 17, 23);
+    color : lightgrey
+}
+
+/* 1. Top-Left Corner */
+tr:first-child td:first-child {
+  border-top-left-radius: 12px;
+}
+
+/* 2. Top-Right Corner */
+tr:first-child th:last-child{
+  border-top-right-radius: 12px;
+}
+
+/* 3. Bottom-Left Corner */
+tr:last-child td:first-child {
+  border-bottom-left-radius: 12px;
+}
+
+/* 4. Bottom-Right Corner */
+tr:last-child td:last-child {
+  border-bottom-right-radius: 12px;
 }
