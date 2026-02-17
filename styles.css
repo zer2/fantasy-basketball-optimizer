@@ -38,21 +38,22 @@ body {
 }
 
 /* 1. Top-Left Corner */
-tr:first-child td:first-child {
+thead tr:first-child > :first-child {
   border-top-left-radius: 12px;
 }
 
 /* 2. Top-Right Corner */
-tr:first-child th:last-child{
+thead tr:first-child > :last-child{
   border-top-right-radius: 12px;
 }
 
+
 /* 3. Bottom-Left Corner */
-tr:last-child td:first-child {
+tbody tr:last-child > :first-child {
   border-bottom-left-radius: 12px;
 }
 
 /* 4. Bottom-Right Corner */
-tr:last-child td:last-child {
+tbody tr:last-child > :last-child{
   border-bottom-right-radius: 12px;
 }
