@@ -68,5 +68,5 @@ for (let i=1; i< table.rows.length; i++) {
 
 first_row = table.rows[0]
 for (let cell of first_row.cells){
-    cell.style.cssText = "background-color:#161721;color:darkgrey;font-weight:500;text-align:left" 
+    cell.style.cssText = "background-color:#181923;color:darkgrey;font-weight:500;text-align:left" 
 }
