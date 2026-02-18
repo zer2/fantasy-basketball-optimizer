@@ -12,29 +12,25 @@
 </head>
 <body>
     <section id = 'header'>
+    Fantasy Basketball Optimization
     </section>
-
-    <div class="tab">
-        <button class = "tabLinks" onclick = "OpenHScoreTab()">HScore</button>
-        <button class = "tabLinks" onclick = "OpenGScoreTab()">GScore</button>
-    </div>
 
     <table id = 'realtable'>
 
     <thead>
         <tr>
-            <th scope = "col">Player</th>
-            <th scope = "col">G-score</th>
+            <th scope = "col" class = "tableheader">Player</th>
+            <th scope = "col" class = "tableheader">H-score</th>
 
-            <th scope = "col">Field Goal %</th>
-            <th scope = "col">Free Throw %</th>
-            <th scope = "col">Threes</th>
-            <th scope = "col">Points</th>
-            <th scope = "col">Rebounds</th>
-            <th scope = "col">Assists</th>
-            <th scope = "col">Steals</th>
-            <th scope = "col">Blocks</th>
-            <th scope = "col">Turnovers</th>
+            <th scope = "col" class = "tableheader">Field Goal %</th>
+            <th scope = "col" class = "tableheader">Free Throw %</th>
+            <th scope = "col" class = "tableheader">Threes</th>
+            <th scope = "col" class = "tableheader">Points</th>
+            <th scope = "col" class = "tableheader">Rebounds</th>
+            <th scope = "col" class = "tableheader">Assists</th>
+            <th scope = "col" class = "tableheader">Steals</th>
+            <th scope = "col" class = "tableheader">Blocks</th>
+            <th scope = "col" class = "tableheader">Turnovers</th>
 
 
         </tr>
@@ -42,51 +38,86 @@
 
     <tbody>
         <tr>
-            <th scope ="row">Nikola Jokic (C) </th>
-            <td>6.94</td>
-            <td>1.41</td>
-            <td>0.16</td>
-            <td>0.10</td>            
-            <td>1.31</td>
-            <td>1.85</td>            
-            <td>2.48</td>
-            <td>0.91</td>
-            <td>0.05</td>
-            <td>-1.34</td>
+            
+            <th scope ="row" class = "playerheader">
+                <div class = 'playerheaderdiv'>
+                    <div style = "width:80%">
+                        Nikola Jokic (C) 
+                    </div>
+                    <div style = "width:20%">
+                        <button class = 'playerpopup'>
+                            ▼
+                        </button>
+                    </div>
+                </div>
+            </th>
+            <td class = 'overallhscore'>53.7</td>
+            <td class = 'categoricalhscore'>66.2</td>
+            <td class = 'categoricalhscore'>14.2</td>
+            <td class = 'categoricalhscore'>33.9</td>
+            <td class = 'categoricalhscore'>66.3</td>            
+            <td class = 'categoricalhscore'>73.4</td>
+            <td class = 'categoricalhscore'>72.3</td>            
+            <td class = 'categoricalhscore'>59.7</td>
+            <td class = 'categoricalhscore'>67.7</td>
+            <td class = 'categoricalhscore'>29.7</td>
 
         </tr>
 
         <tr>
-            <th scope ="row">Shai Gilgeous-Alexander (PG) </th>
-            <td>6.09</td>
-            <td>0.66</td>
-            <td>1.71</td>
-            <td>0.29</td>            
-            <td>1.79</td>
-            <td>-0.21</td>            
-            <td>1.08</td>
-            <td>1.02</td>
-            <td>0.25</td>
-            <td>-0.5</td>       
+            <th scope ="row" class = "playerheader">
+                <div class = 'playerheaderdiv'> 
+                    <div style = "width:80%;height:100%">
+                        Shai Gilgeous-Alexander (PG) 
+                    </div>
+                    <div style = "width:20%;height:100%">
+                        <button class = 'playerpopup'>
+                            ▼
+                        </button>
+                    </div>
+                </div>
+            </th>
+            <td class = 'overallhscore'>53.0</td>
+            <td class = 'categoricalhscore'>40.8</td>
+            <td class = 'categoricalhscore'>71.9</td>
+            <td class = 'categoricalhscore'>65.4</td>            
+            <td class = 'categoricalhscore'>58.4</td>
+            <td class = 'categoricalhscore'>10.8</td>            
+            <td class = 'categoricalhscore'>55.2</td>
+            <td class = 'categoricalhscore'>59.1</td>
+            <td class = 'categoricalhscore'>57.2</td>
+            <td class = 'categoricalhscore'>58.2</td>       
         </tr>
 
+
         <tr>
-            <th scope ="row">Victor Wembanyama (C) </th>
-            <td>5.46</td>
-            <td>-0.05</td>
-            <td>0.13</td>
-            <td>0.42</td>            
-            <td>0.75</td>
-            <td>1.44</td>            
-            <td>0.05</td>
-            <td>0.19</td>
-            <td>3.47</td>
-            <td>-0.95</td>      
+                <th scope ="row" class = "playerheader">
+                    <div class = 'playerheaderdiv'>
+                        <div style = "width:80%">
+                            Victor Wembanyama (C)
+                        </div>
+                        <div style = "width:20%">
+                            <button class = 'playerpopup'>
+                                ▼
+                            </button>
+                        </div>
+                    </div>
+
+            <td class = 'overallhscore'>52.1</td>
+            <td class = 'categoricalhscore'>51.3</td>
+            <td class = 'categoricalhscore'>54.2</td>
+            <td class = 'categoricalhscore'>66.2</td>            
+            <td class = 'categoricalhscore'>41.7</td>
+            <td class = 'categoricalhscore'>57.4</td>            
+            <td class = 'categoricalhscore'>9.6</td>
+            <td class = 'categoricalhscore'>39.2</td>
+            <td class = 'categoricalhscore'>73.2</td>
+            <td class = 'categoricalhscore'>76.2</td>      
         </tr>
     </tbody>
     </table>
 
-    <script src = 'script.js'></script>
+    <script src = 'script.js' type = 'module'></script>
 
 </body>
 </html>

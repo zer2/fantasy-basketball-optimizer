@@ -1,19 +1,43 @@
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
 
 #header {
-    color: blue;
+    color: grey;
 }
 
-.players {
-    color: green;
+.playerpopup {
+    background-color: #181923;
+    color: darkgrey;
+    float: right;
+
+}
+
+body {
+    background-color : rgb(14, 17, 23);
+    color : lightgrey
+}
+
+
+/* Table */
+
+th {
+    padding: 4px 5px;
+    border: 1px solid grey;
+
+}
+
+tr {
+    padding: 1px 0px;
+    border: 1px solid grey;
+
 }
 
 #realtable {
-    border-spacing: 1px;
     border-radius: 12px;
     background-color : grey;
+    border-collapse : collapse;
     border-color : grey;
-    border: 1px solid grey;
+    border: 2px solid grey;
+    border-spacing: 1px;
     overflow: hidden; /* This clips the sharp cell corners */
     font-family : "Source Sans 3";
     font-weight : 400;
@@ -24,17 +48,11 @@
     -webkit-font-smoothing: auto;
 }
 
-th {
-    padding: 4px 5px;
-}
-
-tr {
-    padding: 1px 0px;
-}
-
-body {
-    background-color : rgb(14, 17, 23);
-    color : lightgrey
+.tableheader {
+    background-color:#181923;
+    color:darkgrey;
+    font-weight:500;
+    text-align:left;
 }
 
 /* 1. Top-Left Corner */
@@ -58,38 +76,38 @@ tbody tr:last-child > :last-child{
   border-bottom-right-radius: 12px;
 }
 
-/* Style the tab */
-.tab {
-  overflow: hidden;
-  border: 1px 0px solid #ccc;
+.playerheader {
+    background-color:rgb(14,17,23);
+    color:darkgrey;
+    font-weight:400;
+    text-align: left; 
+    width: 220px;
+
 }
 
-/* Style the buttons that are used to open the tab content */
-.tab button {
-  background-color: rgb(14, 17, 23); 
-  color: white;
-  float: left;
-  border: none;
-  outline: none;
-  cursor: pointer;
-  padding: 14px 16px;
-  transition: 0.3s;
+.playerheaderdiv {
+    display: flex; 
 }
 
-/* Change background color of buttons on hover */
-.tab button:hover {
-  color: #ddd;
+
+.overallhscore {
+    background-color:#2a2a33;
+    color:white;
+    font-weight:400;
+    text-align:right;
+    padding:5px
 }
 
-/* Create an active/current tablink class */
-.tab button.active {
-  color: #ccc;
+.overallhscore:after{
+    content : '%';
 }
 
-/* Style the tab content */
-.tabcontent {
-  display: none;
-  padding: 6px 12px;
-  border: 1px solid #ccc;
-  border-top: none;
+.categoricalhscore {
+    font-weight:500;
+    text-align:right
+    ;padding:5px
 }
+.categoricalhscore:after{
+    content : '%';
+}
+
