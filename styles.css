@@ -85,6 +85,10 @@ tbody tr:last-child > :last-child{
 
 }
 
+.expandedview {
+    display : none;
+}
+
 .playerheaderdiv {
     display: flex; 
 }
