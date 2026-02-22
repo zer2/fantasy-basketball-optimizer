@@ -1,17 +1,40 @@
 import { stat_styler_primary } from './styler_functions.js'
 import { ExpandView } from './helper_functions.js'
 
+const categories = ["Field Goal %","Free Throw %","Threes","Points","Rebounds","Assists","Steals","Blocks","Turnovers"]
 
 // Load player data
 
-//set up the table 
-let table = document.getElementById('realtable')
-
-// this should be incorporated into the second loop so we only loop once 
+// should be read in from csv 
+//should also do the field names programatically 
 const player_table_data = {
     "Nikola Jokic (C)" : [53.7, 66.2, 14.2, 33.9, 66.3, 73.4, 72.3, 59.7, 67.7, 29.7]
     ,"Shai Gilgeous-Alexander (PG)" : [53.0, 40.8,71.9,65.4,58.4,10.8, 55.2, 59.1, 57.2, 58.2]
     ,"Victor Wembanyama (C)" : [52.1, 51.3, 54.2, 66.2, 41.7, 57.4, 9.6, 39.2, 73.2, 76.2]
+}
+
+//set up the table 
+let table = document.getElementById('realtable')
+
+
+//create the header
+var header = table.createTHead();
+
+var first_header_cell = document.createElement('th')
+first_header_cell.className = 'tableheader'
+first_header_cell.textContent = 'Player'
+header.append(first_header_cell)
+
+var second_header_cell = document.createElement('th')
+second_header_cell.className = 'tableheader'
+second_header_cell.textContent = 'H-Score'
+header.append(second_header_cell)
+
+for (let category of categories){
+    var cat_header_cell = document.createElement('th')
+    cat_header_cell.className = 'tableheader'
+    cat_header_cell.textContent = category
+    header.append(cat_header_cell)
 }
 
 for (const [i, [player_name, player_data]] 
