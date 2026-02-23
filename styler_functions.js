@@ -26,6 +26,25 @@ export function stat_styler_primary(value
     }
 }
 
+export function stat_styler_tertiary(value
+    , multiplier
+    , middle) {
+
+    if (value == -999) {
+            return 'background-color:#8D8D9E;color:#8D8D9E;';
+    }
+    else {
+
+        let raw_intensity = (value-middle)*multiplier;
+        let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 165);
+
+        let r =  60
+        let g =  60 
+        let b = raw_intensity > 0 ? 70 + intensity : 70 - Math.round(intensity/20)
+
+        return final_formatter(r,g,b);
+    }
+}
 /**
 * Returns a CSS string for an RGB code. Determines whether text color should be black or white 
 * 

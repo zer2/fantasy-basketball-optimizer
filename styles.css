@@ -82,7 +82,14 @@ tbody tr:last-child > :last-child{
     font-weight:400;
     text-align: left; 
     width: 220px;
+}
 
+.mockheader {
+    background-color:rgb(14,17,23);
+    color:darkgrey;
+    font-weight:400;
+    text-align: middle; 
+    width: 220px;
 }
 
 .expandedview {
@@ -101,6 +108,15 @@ tbody tr:last-child > :last-child{
     text-align:right;
     padding:5px
 }
+
+.blankoverallhscore {
+    background-color:#2a2a33;
+    color:white;
+    font-weight:400;
+    text-align:right;
+    padding:5px
+}
+
 
 .overallhscore:after{
     content : '%';

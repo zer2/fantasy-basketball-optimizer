@@ -144,6 +144,7 @@ class DarkStyler(Styler):
         if value == -999:
             return 'background-color:#8D8D9E;color:#8D8D9E;'
         
+        #the abs is in the wrong place here
         raw_intensity = int(abs((value-middle)*multiplier))
         intensity = min(raw_intensity, 185)
 

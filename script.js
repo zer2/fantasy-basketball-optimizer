@@ -13,6 +13,12 @@ const player_table_data = {
     ,"Victor Wembanyama (C)" : [52.1, 51.3, 54.2, 66.2, 41.7, 57.4, 9.6, 39.2, 73.2, 76.2]
 }
 
+const percentage_weighting_data = {
+    "Nikola Jokic (C)" : [95, 83, 98, 114, 95, 102, 103, 111, 100]
+    ,"Shai Gilgeous-Alexander (PG)" : [103, 95.103,103,79,105,101, 107, 103]
+    ,"Victor Wembanyama (C)" : [111,105,107,102,124,67,85,101,98]
+}
+
 //set up the table 
 let table = document.getElementById('realtable')
 
@@ -59,7 +65,7 @@ for (const [i, [player_name, player_data]]
     row.append(player_header_cell);
 
     var button = player_header_cell.querySelector(`#PP${i}.playerpopup`);
-    button.addEventListener("click",() => ExpandView(i));
+    button.addEventListener("click",() => ExpandView(i, percentage_weighting_data));
 
     // create overall score cell
     var first_cell = row.insertCell(-1); 
@@ -77,10 +83,11 @@ for (const [i, [player_name, player_data]]
     }
 
     // add expansion row
+    var expanded_row_dummy = table.insertRow(-1);
+    expanded_row_dummy.className = `dummyrow EV${i}`
+
     var expanded_row = table.insertRow(-1);
-    expanded_row.className = "expandedview"
-    expanded_row.id = `EV${i}`
-    expanded_row.innerHTML = "Boo"
+    expanded_row.className = `expandedview EV${i}`
 
 }
 
