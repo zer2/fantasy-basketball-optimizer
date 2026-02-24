@@ -23,25 +23,35 @@ export function ExpandView(i, percentage_weighting_data){
         
         // switch the style of the rows to display
         for (let evrow of evrows ) {
-            console.log(evrow)
             evrow.style.display = 'table-row'
         }
 
         evpopup.textContent = '▲'
 
+        // set up the dummy rows
+        let dummyrows = document.querySelectorAll(`.EV${i}.dummyrow`);
+
+        for (let drow of dummyrows ) {
+
+            for (let j = 1; j < 12; j ++){
+                var dummycell = drow.insertCell(-1)
+                dummycell.className = 'mockheader'
+                dummycell.textContent = '-'
+            }
+
+        }
 
         // set the main one
         let ev = document.querySelector(`.EV${i}.expandedview`);
 
+        // create blankoverall score cell
+        var dummyfirstcell = ev.insertCell(-1); 
+        dummyfirstcell.className = 'mockheader'
         // add the row to the table 
         var dummyheadercell =  document.createElement('th');
         dummyheadercell.className = 'mockheader'
         dummyheadercell.textContent = 'Category weighting'
         ev.append(dummyheadercell);
-
-        // create blankoverall score cell
-        var dummyfirstcell = ev.insertCell(-1); 
-        dummyfirstcell.className = 'blankoverallhscore'
 
         // create categorical cells
         var extra_data = Object.values(percentage_weighting_data)[i]
@@ -56,6 +66,7 @@ export function ExpandView(i, percentage_weighting_data){
             next_cell.className = 'categoricalhscore'; 
     
         }
+
 
 
     }
