@@ -89,6 +89,10 @@ for (const [i, [player_name, player_data]]
     var expanded_row = table.insertRow(-1);
     expanded_row.className = `expandedview EV${i}`
 
+    var expanded_row_dummy = table.insertRow(-1);
+    expanded_row_dummy.className = `dummyrow EV${i}`
+
+
 }
 
 
