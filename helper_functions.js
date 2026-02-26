@@ -82,6 +82,7 @@ function makeGScoreTable(playerData, categories) {
     // First spacer is 136px (not 236px) because the table is indented 100px left.
     // Category columns still start at the same absolute position: 100 + 136 + 83 = 319px.
     let headerRow = table.createTHead().insertRow(-1);
+    headerRow.style.border = 'none'; // suppress global tr border on this invisible spacer row
     headerRow.appendChild(makeSpacerTh('136px'));
     headerRow.appendChild(makeSpacerTh('83px'));
     for (let i = 0; i < categories.length; i++) headerRow.appendChild(makeSpacerTh());
@@ -127,6 +128,7 @@ function makeWeightsTable(playerData, categories) {
     // auto-distribute to match the G-score table and main table widths.
     // Header: 219px label spacer + N unsized category spacers (same pattern as G-score table).
     let headerRow = table.createTHead().insertRow(-1);
+    headerRow.style.border = 'none'; // suppress global tr border on this invisible spacer row
     let emptyTh = document.createElement('th');
     emptyTh.className = 'exp-colheader-spacer';
     emptyTh.style.width = '219px';
@@ -265,10 +267,10 @@ function makeRosterGrid(playerData) {
                     cell.style.cssText = 'background-color:#8D8D9E;color:#8D8D9E;';
                     cell.textContent = '\u00A0';
                 } else if (assignment.isCandidate) {
-                    cell.style.cssText = 'background-color:rgb(90,90,240);color:white;';
+                    cell.style.cssText = 'background-color:rgb(53,109,196);color:white;';
                     cell.textContent = assignment.name;
                 } else {
-                    cell.style.cssText = 'background-color:rgb(70,70,150);color:white;';
+                    cell.style.cssText = 'background-color:rgb(34,54,86);color:white;';
                     cell.textContent = assignment.name;
                 }
             }

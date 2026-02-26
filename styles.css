@@ -21,22 +21,22 @@ body {
 
 th {
     padding: 4px 5px;
-    border: 1px solid #555566;
+    border: 1px solid grey;
 
 }
 
 tr {
     padding: 1px 0px;
-    border: 1px solid #555566;
+    border: 1px solid grey;
 
 }
 
 #realtable {
     border-radius: 12px;
-    background-color : #555566;
+    background-color : grey;
     border-collapse : collapse;
-    border-color : #555566;
-    border: 2px solid #555566;
+    border-color : grey;
+    border: 2px solid grey;
     border-spacing: 1px;
     overflow: hidden; /* This clips the sharp cell corners */
     font-family : "Source Sans 3";
@@ -153,7 +153,7 @@ tr {
 .expansion-cell {
     background-color: rgb(16, 18, 26);
     padding: 12px 0;
-    border-top: 1px solid #555566;
+    border-top: 0px solid #555566;
     border-bottom: 1px solid #555566;
 }
 
@@ -203,7 +203,7 @@ tr {
     font-weight: 500;
     padding: 3px 8px;
     text-align: left;
-    border: 1px solid #555566;
+    border: 1px solid grey;
     white-space: nowrap;
 }
 
@@ -213,7 +213,7 @@ tr {
     font-weight: 400;
     padding: 3px 10px;
     text-align: left;
-    border: 1px solid #555566;
+    border: 0px solid #555566;
     white-space: nowrap;
 }
 
@@ -225,7 +225,7 @@ tr {
 .exp-datacell {
     padding: 3px 8px;
     text-align: right;
-    border: 1px solid #555566;
+    border: 0.5px solid #555566;
     font-weight: 500;
     white-space: nowrap;
 }
@@ -236,7 +236,7 @@ tr {
     font-family: "Source Sans 3";
     margin-top: 12px;
     padding-top: 8px;
-    border-top: 1px solid #555566;
+    border-top: 0px solid #555566;
 }
 
 .expansion-rank strong {

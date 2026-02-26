@@ -67,8 +67,8 @@ export function stat_styler_tertiary(value, multiplier, middle) {
     let raw_intensity = Math.round(Math.abs((value - middle) * multiplier));
     let intensity = Math.min(raw_intensity, 185);
 
-    let r = raw_intensity > 0 ? 28 + Math.round(intensity/6) : 28 - Math.round(intensity / 60);
-    let g = raw_intensity > 0 ? 34 + Math.round(intensity/2) : 34 - Math.round(intensity / 20);
+    let r = raw_intensity > 0 ? 28 + Math.round(intensity/6) : 28 + Math.round(intensity / 60);
+    let g = raw_intensity > 0 ? 34 + Math.round(intensity/2) : 34 + Math.round(intensity / 20);
     let b = raw_intensity > 0 ? 46 + intensity : 46 - Math.round(intensity / 10);
 
     return final_formatter(r, g, b);
