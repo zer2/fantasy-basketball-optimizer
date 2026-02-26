@@ -91,6 +91,38 @@ export function styler_b() {
 }
 
 /**
+ * Ineligible slot: position type cannot hold this roster slot (e.g. SF in a G slot).
+ * @returns {string} A CSS style string
+ */
+export function styler_ineligible() {
+    return 'background-color:#555566;color:#555566;';
+}
+
+/**
+ * Absent slot: position type has fewer slots than the max depth, so this cell is empty.
+ * @returns {string} A CSS style string
+ */
+export function styler_absent() {
+    return 'background-color:#8D8D9E;color:#8D8D9E;';
+}
+
+/**
+ * Candidate player being evaluated for this roster pick.
+ * @returns {string} A CSS style string
+ */
+export function styler_candidate() {
+    return 'background-color:rgb(53,109,196);color:white;';
+}
+
+/**
+ * Player already rostered on the team.
+ * @returns {string} A CSS style string
+ */
+export function styler_rostered() {
+    return 'background-color:rgb(39,69,116);color:white;';
+}
+
+/**
 * Returns a CSS string for an RGB background, choosing black or white text for contrast.
 *
 * @param {number} r - Red channel (0–255)

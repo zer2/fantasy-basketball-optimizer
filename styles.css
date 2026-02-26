@@ -43,7 +43,7 @@ tr {
     font-weight : 400;
     font-style : normal;
     font-size: 0.875rem;
-    line-height: 1.6; 
+    line-height: 1.6;
     text-size-adjust: 100%;
     width: 1050px;
     table-layout: fixed;
@@ -81,18 +81,18 @@ tr {
     background-color:rgb(14,17,23);
     color:darkgrey;
     font-weight:400;
-    text-align: left; 
+    text-align: left;
     width: 224px;
     border-top : 2px solid grey;
     border-bottom : 2px solid grey;
-  
+
 }
 
 .mockheader {
     background-color:rgb(14,17,23);
     color:darkgrey;
     font-weight:400;
-    text-align: middle; 
+    text-align: middle;
     width: 220px;
 }
 
@@ -104,12 +104,12 @@ tr {
     border : 0px;
     background-color: black;
     color: black;
-    line-height: 1.6; 
+    line-height: 1.6;
 
 }
 
 .playerheaderdiv {
-    display: flex; 
+    display: flex;
 }
 
 
@@ -155,28 +155,16 @@ tr {
     content : '%';
 }
 
-/* ─── Expansion panel ────────────────────────────────────────────────────── */
+/* ─── Detail panel ───────────────────────────────────────────────────────── */
 
-.expansion-cell {
+.panel-cell {
     background-color: rgb(16, 18, 26);
     padding: 12px 0;
     border-top: 0px solid #555566;
     border-bottom: 1px solid #555566;
 }
 
-.expansion-container {
-    display: flex;
-    gap: 20px;
-    margin-top: 10px;
-}
-
-.expansion-panel {
-    flex: 1;
-    min-width: 0; /* prevent flex overflow */
-    overflow-x: auto;
-}
-
-.expansion-label {
+.panel-label {
     color: darkgrey;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
@@ -185,11 +173,11 @@ tr {
     padding-left: 16px;
 }
 
-.expansion-label:first-child {
+.panel-label:first-child {
     margin-top: 0;
 }
 
-.expansion-table {
+.panel-table {
     border-collapse: collapse;
     font-family: "Source Sans 3";
     font-weight: 400;
@@ -198,13 +186,13 @@ tr {
     width: 100%;
 }
 
-.exp-colheader-spacer {
-    background-color: rgb(16, 18, 26); /* matches .expansion-cell — invisible */
+.panel-colspacer {
+    background-color: rgb(16, 18, 26); /* matches .panel-cell — invisible */
     border: none;
     padding: 0;
 }
 
-.exp-colheader {
+.panel-colheader {
     background-color: #181923;
     color: darkgrey;
     font-weight: 500;
@@ -214,7 +202,7 @@ tr {
     white-space: nowrap;
 }
 
-.exp-rowlabel {
+.panel-rowlabel {
     background-color: rgb(14, 17, 23);
     color: darkgrey;
     font-weight: 400;
@@ -224,12 +212,12 @@ tr {
     white-space: nowrap;
 }
 
-.exp-rowlabel-total {
+.panel-rowlabel-total {
     color: darkgrey;
     font-weight: 500;
 }
 
-.exp-datacell {
+.panel-datacell {
     padding: 3px 8px;
     text-align: right;
     border: 0.5px solid #555566;
@@ -237,16 +225,6 @@ tr {
     white-space: nowrap;
 }
 
-.expansion-rank {
-    color: darkgrey;
-    font-size: 0.82rem;
-    font-family: "Source Sans 3";
-    margin-top: 12px;
-    padding-top: 8px;
-    border-top: 0px solid #555566;
+.panel-weight::after {
+    content: '%';
 }
-
-.expansion-rank strong {
-    color: lightgrey;
-}
-
