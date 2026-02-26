@@ -149,14 +149,14 @@ let header = table.createTHead()
 let playerHeaderCell = document.createElement('th')
 playerHeaderCell.className = 'tableheader'
 playerHeaderCell.textContent = 'Player'
-playerHeaderCell.style.width = '220px'
+playerHeaderCell.style.width = '224px'
 header.append(playerHeaderCell)
 
 // H-score column
 let hscoreHeaderCell = document.createElement('th')
 hscoreHeaderCell.className = 'tableheader'
 hscoreHeaderCell.textContent = 'H-Score'
-hscoreHeaderCell.style.width = '68px'
+hscoreHeaderCell.style.width = '72px'
 header.append(hscoreHeaderCell)
 
 // Category columns (remaining width split equally)

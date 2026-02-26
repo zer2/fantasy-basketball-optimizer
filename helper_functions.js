@@ -30,41 +30,43 @@ export function ExpandView(playerIndex, playerData, categories) {
         cell.className = 'expansion-cell';
 
         // --- G-SCORE EXPECTATIONS ---
-        cell.appendChild(makeLabel('G-score expectations (difference vs. other teams)'));
+        cell.appendChild(makeLabel('G-score expectations (difference vs. other teams)', '60px'));
         cell.appendChild(makeGScoreTable(playerData, categories));
 
         // --- CATEGORY WEIGHTS ---
-        cell.appendChild(makeLabel('Category weights for future picks'));
+        cell.appendChild(makeLabel('Category strategy', '60px'));
         cell.appendChild(makeWeightsTable(playerData, categories));
 
         // --- FLEX POSITION ALLOCATIONS ---
-        cell.appendChild(makeLabel('Flex position allocations for future flex spot picks'));
+        cell.appendChild(makeLabel('Flex position allocations for future flex spot picks', '60px'));
         cell.appendChild(makeFlexAllocationsTable(playerData));
 
-        // --- ROSTER ASSIGNMENTS ---
-        cell.appendChild(makeLabel('Roster assignments for chosen players'));
-        cell.appendChild(makeRosterTable(playerData));
+        // --- ROSTER ---
+        cell.appendChild(makeLabel('Roster assignments', '60px'));
+        cell.appendChild(makeRosterGrid(playerData));
 
     }
 }
 
 // ─── Helper: section label ───────────────────────────────────────────────────
 
-function makeLabel(text) {
+function makeLabel(text, paddingLeft) {
     let label = document.createElement('div');
     label.className = 'expansion-label';
     label.textContent = text;
+    if (paddingLeft) label.style.paddingLeft = paddingLeft;
     return label;
 }
 
-// ─── Helper: append a <th> to a row ──────────────────────────────────────────
+// ─── Helper: invisible spacer <th> to lock column width ──────────────────────
 
-function appendTh(row, text, className) {
+function makeSpacerTh(width) {
     let th = document.createElement('th');
-    th.className = className;
-    th.textContent = text;
-    row.appendChild(th);
+    th.className = 'exp-colheader-spacer';
+    if (width) th.style.width = width;
+    return th;
 }
+
 
 // ─── G-score expectations table ───────────────────────────────────────────────
 // Rows: current diff, player, future diff, total diff
@@ -74,12 +76,15 @@ function appendTh(row, text, className) {
 function makeGScoreTable(playerData, categories) {
     let table = document.createElement('table');
     table.className = 'expansion-table';
+    table.style.tableLayout = 'fixed';
 
-    // Header
+    // Header: two sized spacers + N unsized spacers lock all column widths.
+    // First spacer is 136px (not 236px) because the table is indented 100px left.
+    // Category columns still start at the same absolute position: 100 + 136 + 83 = 319px.
     let headerRow = table.createTHead().insertRow(-1);
-    appendTh(headerRow, '', 'exp-rowlabel');
-    for (let cat of categories) appendTh(headerRow, cat, 'exp-colheader');
-    appendTh(headerRow, 'Total', 'exp-colheader');
+    headerRow.appendChild(makeSpacerTh('136px'));
+    headerRow.appendChild(makeSpacerTh('83px'));
+    for (let i = 0; i < categories.length; i++) headerRow.appendChild(makeSpacerTh());
 
     // Data rows
     let tbody = table.createTBody();
@@ -91,21 +96,24 @@ function makeGScoreTable(playerData, categories) {
         labelCell.textContent = rowData.label;
         row.appendChild(labelCell);
 
+        // Total column (second): flat color, brighter for the summary row
+        let totalCell = row.insertCell(-1);
+        totalCell.textContent = rowData.total.toFixed(2);
+        totalCell.style.cssText = rowData.isTotal ? styler_b() : styler_a();
+        totalCell.className = 'exp-datacell';
+
         for (let value of rowData.values) {
             let cell = row.insertCell(-1);
             cell.textContent = value.toFixed(2);
             cell.style.cssText = stat_styler_primary(value, 60, 0);
             cell.className = 'exp-datacell';
         }
-
-        // Total column: flat color, brighter for the summary row
-        let totalCell = row.insertCell(-1);
-        totalCell.textContent = rowData.total.toFixed(2);
-        totalCell.style.cssText = rowData.isTotal ? styler_b() : styler_a();
-        totalCell.className = 'exp-datacell';
     }
 
-    return table;
+    let wrapper = document.createElement('div');
+    wrapper.style.marginLeft = '100px';
+    wrapper.appendChild(table);
+    return wrapper;
 }
 
 // ─── Category weights table ───────────────────────────────────────────────────
@@ -114,14 +122,23 @@ function makeGScoreTable(playerData, categories) {
 function makeWeightsTable(playerData, categories) {
     let table = document.createElement('table');
     table.className = 'expansion-table';
-
-    // Header
+    table.style.tableLayout = 'fixed';
+    // No explicit table width — inherits 100% from .expansion-table so category columns
+    // auto-distribute to match the G-score table and main table widths.
+    // Header: 219px label spacer + N unsized category spacers (same pattern as G-score table).
     let headerRow = table.createTHead().insertRow(-1);
-    for (let cat of categories) appendTh(headerRow, cat, 'exp-colheader');
+    let emptyTh = document.createElement('th');
+    emptyTh.className = 'exp-colheader-spacer';
+    emptyTh.style.width = '219px';
+    headerRow.appendChild(emptyTh);
+    for (let i = 0; i < categories.length; i++) headerRow.appendChild(makeSpacerTh());
 
-    // Data row
+    // Data row: row label + N category weight cells
     let row = table.createTBody().insertRow(-1);
-
+    let labelCell = document.createElement('th');
+    labelCell.className = 'exp-rowlabel';
+    labelCell.textContent = 'Future pick weight';
+    row.appendChild(labelCell);
     for (let value of playerData.category_weights) {
         let cell = row.insertCell(-1);
         cell.textContent = value.toFixed(0) + '%';
@@ -129,27 +146,37 @@ function makeWeightsTable(playerData, categories) {
         cell.className = 'exp-datacell';
     }
 
-    return table;
+    let wrapper = document.createElement('div');
+    wrapper.style.marginLeft = '100px';
+    wrapper.appendChild(table);
+    return wrapper;
 }
 
 // ─── Flex position allocations table ──────────────────────────────────────────
-// Rows: flex slot types (G-1, F-2, Util-3, ...) + Total
-// Columns: base positions (PG, SG, SF, PF, C)
-// Values: expected number of that slot type used by this player
-// -999 encodes "not eligible" → shown as hidden grey cell
+// Rows: slot types (G-1, F-2, Util-3, Total); Cols: base positions (PG–C)
+// Explicit table width = 90 + N×72 px so column widths are exact (not scaled by width:100%)
 
 function makeFlexAllocationsTable(playerData) {
-    let table = document.createElement('table');
-    table.className = 'expansion-table';
-
     let flexData = playerData.flex_allocations;
 
-    // Header
-    let headerRow = table.createTHead().insertRow(-1);
-    appendTh(headerRow, '', 'exp-rowlabel');
-    for (let pos of flexData.base_positions) appendTh(headerRow, pos, 'exp-colheader');
+    let table = document.createElement('table');
+    table.className = 'expansion-table';
+    table.style.tableLayout = 'fixed';
+    table.style.width = (90 + flexData.base_positions.length * 72) + 'px';
 
-    // Data rows
+    let headerRow = table.createTHead().insertRow(-1);
+    let emptyTh = document.createElement('th');
+    emptyTh.className = 'exp-colheader-spacer';
+    emptyTh.style.width = '90px';
+    headerRow.appendChild(emptyTh);
+    for (let pos of flexData.base_positions) {
+        let th = document.createElement('th');
+        th.className = 'exp-colheader';
+        th.style.width = '72px';
+        th.textContent = pos;
+        headerRow.appendChild(th);
+    }
+
     let tbody = table.createTBody();
     for (let rowData of flexData.rows) {
         let row = tbody.insertRow(-1);
@@ -171,50 +198,85 @@ function makeFlexAllocationsTable(playerData) {
         }
     }
 
-    return table;
+    let wrapper = document.createElement('div');
+    wrapper.style.marginLeft = '100px';
+    wrapper.appendChild(table);
+    return wrapper;
 }
 
-// ─── Roster assignments table ─────────────────────────────────────────────────
-// Single transposed row: columns = position slots, values = player last names
-// Existing players: dark blue. Candidate player: bright blue. Empty: hidden grey.
+// ─── Roster grid ─────────────────────────────────────────────────────────────
+// Rows = depth level (1st slot, 2nd slot, ...); Cols = all position types (PG…Util)
+// Explicit table width = 90 + N×72 px. Base-position cols (PG–C) align with flex table above.
+// Cell colors: dark blue = existing player, bright blue = candidate,
+//              #555566 = empty slot, #8D8D9E = no slot at this depth
 
-function makeRosterTable(playerData) {
-    let table = document.createElement('table');
-    table.className = 'expansion-table';
-
+function makeRosterGrid(playerData) {
     let roster = playerData.roster;
 
-    // Header row: slot names
-    let headerRow = table.createTHead().insertRow(-1);
-    appendTh(headerRow, '', 'exp-rowlabel');
-    for (let slot of roster.slots) appendTh(headerRow, slot, 'exp-colheader');
-
-    // Data row: player names
-    let row = table.createTBody().insertRow(-1);
-
-    let labelCell = document.createElement('th');
-    labelCell.className = 'exp-rowlabel';
-    labelCell.textContent = 'Players';
-    row.appendChild(labelCell);
-
+    // Derive ordered position types by stripping trailing digits (e.g. "PG1" → "PG")
+    let posTypes = [];
+    let groups = {};
     for (let slot of roster.slots) {
-        let cell = row.insertCell(-1);
-        cell.className = 'exp-datacell';
-        let assignment = roster.assignments[slot];
+        let type = slot.replace(/\d+$/, '');
+        if (!groups[type]) { groups[type] = []; posTypes.push(type); }
+        groups[type].push(slot);
+    }
+    let maxDepth = Math.max(...posTypes.map(t => groups[t].length));
 
-        if (!assignment) {
-            // Empty slot — hide with grey
-            cell.style.cssText = 'background-color:#555566;color:#555566;';
-        } else if (assignment.isCandidate) {
-            // Candidate player — bright blue
-            cell.style.cssText = 'background-color:rgb(90,90,240);color:white;';
-            cell.textContent = assignment.name;
-        } else {
-            // Existing player — dark blue
-            cell.style.cssText = 'background-color:rgb(70,70,150);color:white;';
-            cell.textContent = assignment.name;
+    let table = document.createElement('table');
+    table.className = 'expansion-table';
+    table.style.tableLayout = 'fixed';
+    table.style.width = (90 + posTypes.length * 72) + 'px';
+
+    // Label column (90px) + position type columns. Wrapper at 100px so PG still
+    // starts at 190px absolute — same position as without the label column.
+    let headerRow = table.createTHead().insertRow(-1);
+    let emptyTh = document.createElement('th');
+    emptyTh.className = 'exp-colheader-spacer';
+    emptyTh.style.width = '90px';
+    headerRow.appendChild(emptyTh);
+    for (let type of posTypes) {
+        let th = document.createElement('th');
+        th.className = 'exp-colheader';
+        th.style.width = '72px';
+        th.textContent = type;
+        headerRow.appendChild(th);
+    }
+
+    let tbody = table.createTBody();
+    for (let d = 0; d < maxDepth; d++) {
+        let row = tbody.insertRow(-1);
+
+        let labelCell = document.createElement('th');
+        labelCell.className = 'exp-rowlabel';
+        labelCell.textContent = 'Slot ' + (d + 1);
+        row.appendChild(labelCell);
+
+        for (let type of posTypes) {
+            let cell = row.insertCell(-1);
+            cell.className = 'exp-datacell';
+            let slot = groups[type][d];
+            if (slot === undefined) {
+                cell.style.cssText = 'background-color:#8D8D9E;color:#8D8D9E;';
+                cell.textContent = '\u00A0';
+            } else {
+                let assignment = roster.assignments[slot];
+                if (!assignment) {
+                    cell.style.cssText = 'background-color:#555566;color:#555566;';
+                    cell.textContent = '\u00A0';
+                } else if (assignment.isCandidate) {
+                    cell.style.cssText = 'background-color:rgb(90,90,240);color:white;';
+                    cell.textContent = assignment.name;
+                } else {
+                    cell.style.cssText = 'background-color:rgb(70,70,150);color:white;';
+                    cell.textContent = assignment.name;
+                }
+            }
         }
     }
 
-    return table;
+    let wrapper = document.createElement('div');
+    wrapper.style.marginLeft = '100px';
+    wrapper.appendChild(table);
+    return wrapper;
 }

@@ -82,7 +82,7 @@ tr {
     color:darkgrey;
     font-weight:400;
     text-align: left; 
-    width: 220px;
+    width: 224px;
 }
 
 .mockheader {
@@ -152,7 +152,7 @@ tr {
 
 .expansion-cell {
     background-color: rgb(16, 18, 26);
-    padding: 12px 16px;
+    padding: 12px 0;
     border-top: 2px solid rgba(80, 80, 110, 0.5);
     border-bottom: 2px solid rgba(80, 80, 110, 0.5);
 }
@@ -175,6 +175,7 @@ tr {
     font-family: "Source Sans 3";
     margin-bottom: 4px;
     margin-top: 12px;
+    padding-left: 16px;
 }
 
 .expansion-label:first-child {
@@ -188,6 +189,12 @@ tr {
     font-size: 0.8rem;
     line-height: 1.5;
     width: 100%;
+}
+
+.exp-colheader-spacer {
+    background-color: rgb(16, 18, 26); /* matches .expansion-cell — invisible */
+    border: none;
+    padding: 0;
 }
 
 .exp-colheader {
