@@ -78,14 +78,30 @@ function makeGScoreTable(playerData, categories) {
     table.className = 'expansion-table';
     table.style.tableLayout = 'fixed';
 
-    // Header: two sized spacers + N unsized spacers lock all column widths.
-    // First spacer is 136px (not 236px) because the table is indented 100px left.
-    // Category columns still start at the same absolute position: 100 + 136 + 83 = 319px.
-    let headerRow = table.createTHead().insertRow(-1);
-    headerRow.style.border = 'none'; // suppress global tr border on this invisible spacer row
-    headerRow.appendChild(makeSpacerTh('136px'));
-    headerRow.appendChild(makeSpacerTh('83px'));
-    for (let i = 0; i < categories.length; i++) headerRow.appendChild(makeSpacerTh());
+    // Row 1: invisible spacers lock column widths (no border/padding so content-box = border-box).
+    // 100px wrapper + 136px + 83px = 319px ≈ main table category start (player 224+10+2=236,
+    // H-score 72+10+2=84, total=320px). Spacer th widths are content-box=border-box since
+    // they have no padding/border, unlike the main table th which adds padding to its width.
+    let thead = table.createTHead();
+    let spacerRow = thead.insertRow(-1);
+    spacerRow.style.border = 'none';
+    spacerRow.appendChild(makeSpacerTh('136px'));
+    spacerRow.appendChild(makeSpacerTh('83px'));
+    for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh());
+
+    // Row 2: visible column headers — widths inherited from spacer row above.
+    let headerRow = thead.insertRow(-1);
+    headerRow.appendChild(makeSpacerTh()); // invisible label cell
+    let totalTh = document.createElement('th');
+    totalTh.className = 'exp-colheader';
+    totalTh.textContent = 'H-score';
+    headerRow.appendChild(totalTh);
+    for (let cat of categories) {
+        let th = document.createElement('th');
+        th.className = 'exp-colheader';
+        th.textContent = cat;
+        headerRow.appendChild(th);
+    }
 
     // Data rows
     let tbody = table.createTBody();
