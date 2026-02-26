@@ -190,10 +190,10 @@ function makeFlexAllocationsTable(playerData) {
             let cell = row.insertCell(-1);
             cell.className = 'exp-datacell';
             if (value === -999) {
-                cell.style.cssText = 'background-color:#8D8D9E;color:#8D8D9E;';
+                cell.style.cssText = 'background-color:#555566;color:#555566;';
             } else {
                 cell.textContent = value.toFixed(2);
-                cell.style.cssText = stat_styler_tertiary(value, 50, 0);
+                cell.style.cssText = stat_styler_tertiary(value, 150, 0);
             }
         }
     }
@@ -257,12 +257,12 @@ function makeRosterGrid(playerData) {
             cell.className = 'exp-datacell';
             let slot = groups[type][d];
             if (slot === undefined) {
-                cell.style.cssText = 'background-color:#8D8D9E;color:#8D8D9E;';
+                cell.style.cssText = 'background-color:#555566;color:#555566;';
                 cell.textContent = '\u00A0';
             } else {
                 let assignment = roster.assignments[slot];
                 if (!assignment) {
-                    cell.style.cssText = 'background-color:#555566;color:#555566;';
+                    cell.style.cssText = 'background-color:#8D8D9E;color:#8D8D9E;';
                     cell.textContent = '\u00A0';
                 } else if (assignment.isCandidate) {
                     cell.style.cssText = 'background-color:rgb(90,90,240);color:white;';

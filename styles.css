@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
 
 #header {
-    color: grey;
+    color: #555566;
 }
 
 .playerpopup {
@@ -21,22 +21,22 @@ body {
 
 th {
     padding: 4px 5px;
-    border: 1px solid grey;
+    border: 1px solid #555566;
 
 }
 
 tr {
     padding: 1px 0px;
-    border: 1px solid grey;
+    border: 1px solid #555566;
 
 }
 
 #realtable {
     border-radius: 12px;
-    background-color : grey;
+    background-color : #555566;
     border-collapse : collapse;
-    border-color : grey;
-    border: 2px solid grey;
+    border-color : #555566;
+    border: 2px solid #555566;
     border-spacing: 1px;
     overflow: hidden; /* This clips the sharp cell corners */
     font-family : "Source Sans 3";
@@ -153,8 +153,8 @@ tr {
 .expansion-cell {
     background-color: rgb(16, 18, 26);
     padding: 12px 0;
-    border-top: 2px solid rgba(80, 80, 110, 0.5);
-    border-bottom: 2px solid rgba(80, 80, 110, 0.5);
+    border-top: 1px solid #555566;
+    border-bottom: 1px solid #555566;
 }
 
 .expansion-container {
@@ -203,7 +203,7 @@ tr {
     font-weight: 500;
     padding: 3px 8px;
     text-align: left;
-    border: 1px solid rgba(128, 128, 128, 0.5);
+    border: 1px solid #555566;
     white-space: nowrap;
 }
 
@@ -213,19 +213,19 @@ tr {
     font-weight: 400;
     padding: 3px 10px;
     text-align: left;
-    border: 1px solid rgba(128, 128, 128, 0.4);
+    border: 1px solid #555566;
     white-space: nowrap;
 }
 
 .exp-rowlabel-total {
-    color: lightgrey;
+    color: darkgrey;
     font-weight: 500;
 }
 
 .exp-datacell {
     padding: 3px 8px;
     text-align: right;
-    border: 1px solid rgba(128, 128, 128, 0.25);
+    border: 1px solid #555566;
     font-weight: 500;
     white-space: nowrap;
 }
@@ -236,7 +236,7 @@ tr {
     font-family: "Source Sans 3";
     margin-top: 12px;
     padding-top: 8px;
-    border-top: 1px solid rgba(100, 100, 120, 0.35);
+    border-top: 1px solid #555566;
 }
 
 .expansion-rank strong {
