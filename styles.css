@@ -26,7 +26,6 @@ th {
 }
 
 tr {
-    padding: 1px 0px;
     border: 1px solid grey;
 
 }
@@ -35,19 +34,15 @@ tr {
     border-radius: 12px;
     background-color : grey;
     border-collapse : collapse;
-    border-color : grey;
     border: 2px solid grey;
-    border-spacing: 1px;
     overflow: hidden; /* This clips the sharp cell corners */
     font-family : "Source Sans 3";
     font-weight : 400;
-    font-style : normal;
     font-size: 0.875rem;
     line-height: 1.6;
     text-size-adjust: 100%;
     width: 1050px;
     table-layout: fixed;
-    -webkit-font-smoothing: auto;
 }
 
 .tableheader {
@@ -88,37 +83,12 @@ tr {
 
 }
 
-.mockheader {
-    background-color:rgb(14,17,23);
-    color:darkgrey;
-    font-weight:400;
-    text-align: middle;
-    width: 220px;
-}
-
 .expandedview {
     display : none;
 }
 
-.dummyrow {
-    border : 0px;
-    background-color: black;
-    color: black;
-    line-height: 1.6;
-
-}
-
 .playerheaderdiv {
     display: flex;
-}
-
-
-.rankcell {
-    background-color: #2a2a33;
-    color: white;
-    font-weight: 700;
-    text-align: center;
-    padding: 5px;
 }
 
 .overallhscore {
@@ -130,15 +100,6 @@ tr {
     border-top : 2px solid grey;
     border-bottom : 2px solid grey;
 }
-
-.blankoverallhscore {
-    background-color:#2a2a33;
-    color:white;
-    font-weight:400;
-    text-align:right;
-    padding:5px
-}
-
 
 .overallhscore:after{
     content : '%';
@@ -160,7 +121,7 @@ tr {
 .panel-cell {
     background-color: rgb(16, 18, 26);
     padding: 12px 0;
-    border-top: 0px solid #555566;
+    border-top: none;
     border-bottom: 1px solid #555566;
 }
 
@@ -208,7 +169,7 @@ tr {
     font-weight: 400;
     padding: 3px 10px;
     text-align: left;
-    border: 0px solid #555566;
+    border: none;
     white-space: nowrap;
 }
 
