@@ -8,7 +8,7 @@
 * @param {number} middle - The neutral value that maps to the default dark color
 * @returns {string} A CSS style string
 */
-export function stat_styler_primary(value, multiplier, middle) {
+export function stat_styler_primary(value: number, multiplier: number, middle: number): string {
     if (value == -999) {
         return 'background-color:#8D8D9E;color:#8D8D9E;';
     }
@@ -31,7 +31,7 @@ export function stat_styler_primary(value, multiplier, middle) {
 * @param {number} middle - The neutral value
 * @returns {string} A CSS style string
 */
-export function stat_styler_secondary(value, multiplier, middle) {
+export function stat_styler_secondary(value: number, multiplier: number, middle: number): string {
     if (value == -999) {
         return 'background-color:#8D8D9E;color:#8D8D9E;';
     }
@@ -60,7 +60,7 @@ export function stat_styler_secondary(value, multiplier, middle) {
 * @param {number} middle - The neutral value. Values below middle have minimal color effect.
 * @returns {string} A CSS style string
 */
-export function stat_styler_tertiary(value, multiplier, middle) {
+export function stat_styler_tertiary(value: number, multiplier: number, middle: number): string {
     if (value == -999) {
         return 'background-color:#555566;color:#555566;';
     }
@@ -78,7 +78,7 @@ export function stat_styler_tertiary(value, multiplier, middle) {
 * Flat dark background for overall H-score / aggregate cells.
 * @returns {string} A CSS style string
 */
-export function styler_a() {
+export function styler_a(): string {
     return 'background-color:#2a2a33;color:white;';
 }
 
@@ -86,7 +86,7 @@ export function styler_a() {
 * Slightly brighter background for summary / total-row cells.
 * @returns {string} A CSS style string
 */
-export function styler_b() {
+export function styler_b(): string {
     return 'background-color:#38384A;color:white;';
 }
 
@@ -94,7 +94,7 @@ export function styler_b() {
  * Ineligible slot: position type cannot hold this roster slot (e.g. SF in a G slot).
  * @returns {string} A CSS style string
  */
-export function styler_ineligible() {
+export function styler_ineligible(): string {
     return 'background-color:#555566;color:#555566;';
 }
 
@@ -102,7 +102,7 @@ export function styler_ineligible() {
  * Absent slot: position type has fewer slots than the max depth, so this cell is empty.
  * @returns {string} A CSS style string
  */
-export function styler_absent() {
+export function styler_absent(): string {
     return 'background-color:#8D8D9E;color:#8D8D9E;';
 }
 
@@ -110,7 +110,7 @@ export function styler_absent() {
  * Candidate player being evaluated for this roster pick.
  * @returns {string} A CSS style string
  */
-export function styler_candidate() {
+export function styler_candidate(): string {
     return 'background-color:rgb(53,109,196);color:white;';
 }
 
@@ -118,8 +118,8 @@ export function styler_candidate() {
  * Player already rostered on the team.
  * @returns {string} A CSS style string
  */
-export function styler_rostered() {
-    return 'background-color:rgb(39,69,116);color:white;';
+export function styler_rostered(): string {
+    return 'background-color:rgb(34,54,86);color:white;';
 }
 
 /**
@@ -130,7 +130,7 @@ export function styler_rostered() {
 * @param {number} b - Blue channel (0–255)
 * @returns {string} A CSS style string
 */
-function final_formatter(r, g, b) {
+function final_formatter(r: number, g: number, b: number): string {
     // Formula adapted from:
     // https://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
     let darkness_value = r * 0.299 + g * 0.587 + b * 0.114;

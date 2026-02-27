@@ -1,19 +1,20 @@
 import { stat_styler_primary, stat_styler_tertiary, styler_a, styler_b,
          styler_ineligible, styler_absent, styler_candidate, styler_rostered } from './styler_functions.js'
+import { Player } from './types.js'
 
 /**
  * Toggle the expanded detail panel for a player row.
  * Shows G-score expectations, category weights, position allocations, and roster assignments.
  *
- * @param {number}   playerIndex - Index of the player row in the table
- * @param {object}   playerData  - Full player data object (see script.js)
- * @param {string[]} categories  - Ordered list of category names
+ * @param playerIndex - Index of the player row in the table
+ * @param playerData  - Full player data object (see script.ts)
+ * @param categories  - Ordered list of category names
  */
-export function ExpandView(playerIndex, playerData, categories) {
+export function ExpandView(playerIndex: number, playerData: Player, categories: string[]): void {
     const totalCols = categories.length + 2; // player th + H-score + N category cols
 
-    let evpopup = document.querySelector(`#PP${playerIndex}.playerpopup`);
-    let expandedRow = document.querySelector(`.EV${playerIndex}.expandedview`);
+    let evpopup = document.querySelector(`#PP${playerIndex}.playerpopup`) as HTMLButtonElement;
+    let expandedRow = document.querySelector(`.EV${playerIndex}.expandedview`) as HTMLTableRowElement;
 
     if (expandedRow.style.display === 'table-row') {
         // Collapse: clear content and hide
@@ -47,11 +48,10 @@ export function ExpandView(playerIndex, playerData, categories) {
 // ─── Helper: section label ───────────────────────────────────────────────────
 
 /**
- * @param {string}  text          - Label text
- * @param {string}  [paddingLeft] - Optional left padding override (e.g. '60px')
- * @returns {HTMLDivElement}
+ * @param text          - Label text
+ * @param paddingLeft   - Optional left padding override (e.g. '60px')
  */
-function makeLabel(text, paddingLeft) {
+function makeLabel(text: string, paddingLeft?: string): HTMLDivElement {
     let label = document.createElement('div');
     label.className = 'panel-label';
     label.textContent = text;
@@ -62,10 +62,9 @@ function makeLabel(text, paddingLeft) {
 // ─── Helper: invisible spacer <th> to lock column width ──────────────────────
 
 /**
- * @param {string} [width] - Optional explicit width (e.g. '136px')
- * @returns {HTMLTableCellElement}
+ * @param width - Optional explicit width (e.g. '136px')
  */
-function makeSpacerTh(width) {
+function makeSpacerTh(width?: string): HTMLTableCellElement {
     let th = document.createElement('th');
     th.className = 'panel-colspacer';
     if (width) th.style.width = width;
@@ -79,11 +78,10 @@ function makeSpacerTh(width) {
 // Total cell: styler_a (flat dark), styler_b for the isTotal row
 
 /**
- * @param {object}   playerData - Player data with g_score_rows array
- * @param {string[]} categories - Category names
- * @returns {HTMLDivElement}
+ * @param playerData - Player data with g_score_rows array
+ * @param categories - Category names
  */
-function makeGScoreTable(playerData, categories) {
+function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivElement {
     let table = document.createElement('table');
     table.className = 'panel-table';
     table.style.tableLayout = 'fixed';
@@ -104,7 +102,7 @@ function makeGScoreTable(playerData, categories) {
     headerRow.appendChild(makeSpacerTh()); // invisible label cell
     let totalTh = document.createElement('th');
     totalTh.className = 'panel-colheader';
-    totalTh.textContent = 'Total';
+    totalTh.textContent = 'H-score';
     headerRow.appendChild(totalTh);
     for (let cat of categories) {
         let th = document.createElement('th');
@@ -148,11 +146,10 @@ function makeGScoreTable(playerData, categories) {
 // The '%' suffix is added via the panel-weight CSS class (::after rule).
 
 /**
- * @param {object}   playerData - Player data with category_weights array
- * @param {string[]} categories - Category names
- * @returns {HTMLDivElement}
+ * @param playerData - Player data with category_weights array
+ * @param categories - Category names
  */
-function makeWeightsTable(playerData, categories) {
+function makeWeightsTable(playerData: Player, categories: string[]): HTMLDivElement {
     let table = document.createElement('table');
     table.className = 'panel-table';
     table.style.tableLayout = 'fixed';
@@ -190,10 +187,9 @@ function makeWeightsTable(playerData, categories) {
 // Explicit table width = 90 + N×72 px so column widths are exact (not scaled by width:100%)
 
 /**
- * @param {object} playerData - Player data with flex_allocations object
- * @returns {HTMLDivElement}
+ * @param playerData - Player data with flex_allocations object
  */
-function makeFlexAllocationsTable(playerData) {
+function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
     let flexData = playerData.flex_allocations;
 
     let table = document.createElement('table');
@@ -246,15 +242,14 @@ function makeFlexAllocationsTable(playerData) {
 // Explicit table width = 90 + N×72 px. Base-position cols (PG–C) align with flex table above.
 
 /**
- * @param {object} playerData - Player data with roster object
- * @returns {HTMLDivElement}
+ * @param playerData - Player data with roster object
  */
-function makeRosterGrid(playerData) {
+function makeRosterGrid(playerData: Player): HTMLDivElement {
     let roster = playerData.roster;
 
     // Derive ordered position types by stripping trailing digits (e.g. "PG1" → "PG")
-    let posTypes = [];
-    let groups = {};
+    let posTypes: string[] = [];
+    let groups: Record<string, string[]> = {};
     for (let slot of roster.slots) {
         let type = slot.replace(/\d+$/, '');
         if (!groups[type]) { groups[type] = []; posTypes.push(type); }

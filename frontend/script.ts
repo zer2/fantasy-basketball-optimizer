@@ -1,18 +1,10 @@
 import { stat_styler_primary } from './styler_functions.js'
 import { ExpandView } from './helper_functions.js'
+import { Player } from './types.js'
 
-const categories = ["FG%", "FT%", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
+const categories: string[] = ["FG%", "FT%", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
 
-// Player data. Each player has:
-//   h_score            – overall H-score win rate (0–100 scale)
-//   win_rates          – per-category win rates (0–100 scale, 50 = average)
-//   category_weights   – algorithm's relative weighting for future picks (100 = baseline)
-//   g_score_rows       – rows for the G-score expectations table
-//   flex_allocations   – expected usage of remaining flex slots
-//   roster             – position slot assignments for existing team + candidate
-//   h_rank / g_rank    – rank among available players
-
-const players = [
+const players: Player[] = [
     {
         name: "Nikola Jokic (C)",
         h_score: 53.7,
@@ -140,7 +132,7 @@ const players = [
 
 // ─── Build the table ──────────────────────────────────────────────────────────
 
-let table = document.getElementById('realtable')
+let table = document.getElementById('realtable') as HTMLTableElement
 
 // Header row
 let header = table.createTHead()
@@ -184,7 +176,7 @@ for (const [i, player] of players.entries()) {
     nameCell.className = 'playerheader'
     row.append(nameCell)
 
-    let button = nameCell.querySelector(`#PP${i}.playerpopup`)
+    let button = nameCell.querySelector(`#PP${i}.playerpopup`) as HTMLButtonElement
     button.addEventListener('click', () => ExpandView(i, player, categories))
 
     // H-score cell
