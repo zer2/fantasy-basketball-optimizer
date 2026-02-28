@@ -8,5 +8,5 @@
         "outDir": "./frontend/dist",
         "strict": true
     },
-    "include": ["frontend/*.ts"]
+    "include": ["frontend/**/*.ts"]
 }

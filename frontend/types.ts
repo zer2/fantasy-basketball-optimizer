@@ -32,6 +32,40 @@ export interface Roster {
     assignments: Record<string, RosterAssignment | null>;  // null = empty slot
 }
 
+// ─── API request types ────────────────────────────────────────────────────────
+
+export interface ModelParameters {
+    omega: number
+    gamma: number
+    beth: number
+    upsilon: number
+    psi: number
+    chi: number
+    aleph: number
+    n_iterations: number
+}
+
+export interface DataSource {
+    type: 'projections' | 'historical'
+    blend_weights: { espn: number; darko: number; htb: number; bbm: number }
+    custom_data_ids: { HTB: string | null; BBM: string | null }
+}
+
+export interface SessionRequest {
+    league: {
+        sport: string
+        n_drafters: number
+        n_picks: number
+        scoring_format: string
+        categories: string[]
+    }
+    slot_counts: Record<string, number>
+    parameters: ModelParameters
+    data_source: DataSource
+    injured_players: string[]
+    my_team_id: string
+}
+
 // ─── Top-level player ─────────────────────────────────────────────────────────
 
 export interface Player {

@@ -1,8 +1,66 @@
 import { stat_styler_primary } from './styler_functions.js'
-import { ExpandView } from './helper_functions.js'
-import { Player } from './types.js'
+import { ExpandView } from './expand_view.js'
+import { Player, SessionRequest } from './types.js'
+import { renderLeagueSettings, getLeagueSettings } from './parameter_collection/league_settings.js'
+import { renderFormatAndCategories, getFormatAndCategories } from './parameter_collection/format_and_categories.js'
+import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/player_stats.js'
+import { renderPlayerStatParameters, getPlayerStatParameters } from './parameter_collection/player_stat_parameters.js'
+import { renderAlgoParameters, getAlgoParameters } from './parameter_collection/algo_parameters.js'
+import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
+import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
 
-const categories: string[] = ["FG%", "FT%", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+/**
+ * Creates a collapsible `<details>` sidebar section and returns its content div.
+ * The returned element is the container that `render*` functions should populate.
+ */
+function createSection(parent: HTMLElement, title: string): HTMLElement {
+    const details = document.createElement('details')
+    details.className = 'sidebar-section'
+    const summary = document.createElement('summary')
+    summary.textContent = title
+    details.append(summary)
+    const content = document.createElement('div')
+    content.className = 'sidebar-section-content'
+    details.append(content)
+    parent.append(details)
+    return content
+}
+
+const sidebar = document.getElementById('sidebar') as HTMLElement
+const sidebarSections = document.getElementById('sidebar-sections')!
+renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
+renderPlayerStats(createSection(sidebarSections, 'Player Stats'))
+renderFormatAndCategories(createSection(sidebarSections, 'Format & Categories'))
+renderPlayerStatParameters(createSection(sidebarSections, 'Player Stat Parameters'))
+renderAlgoParameters(createSection(sidebarSections, 'H-score Parameters'))
+renderSlotCounts(createSection(sidebarSections, 'Position Parameters'))
+renderTradeParameters(createSection(sidebarSections, 'Trade Parameters'))
+// All sections are fully built; reveal the sidebar in one repaint
+sidebar.style.visibility = ''
+
+/**
+ * Collects all sidebar parameter values and assembles a `SessionRequest` object
+ * ready to POST to `/sessions`.
+ */
+export function buildSessionRequest(): SessionRequest {
+    const { sport, n_drafters, n_picks, my_team_id } = getLeagueSettings()
+    const { scoring_format, categories } = getFormatAndCategories()
+    const { data_source, injured_players } = getPlayerStatsParams()
+    return {
+        league: { sport, n_drafters, n_picks, scoring_format, categories },
+        slot_counts: getSlotCounts(),
+        parameters: { ...getPlayerStatParameters(), ...getAlgoParameters() },
+        data_source,
+        injured_players,
+        my_team_id,
+    }
+}
+
+// ─── Player table ─────────────────────────────────────────────────────────────
+
+const categories: string[] = ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
 
 const players: Player[] = [
     {
@@ -52,7 +110,7 @@ const players: Player[] = [
         h_rank: 2,
         g_rank: 2,
         win_rates: [40.8, 71.9, 65.4, 58.4, 10.8, 55.2, 59.1, 35.2, 58.2],
-        category_weights: [88, 108, 112, 96, 72, 95, 118, 96, 98],
+        category_weights: [103, 95, 103, 103, 79, 105, 101, 107, 103],
         g_score_rows: [
             { label: 'Current diff', values: [ 0.42, -0.18, -0.31,  0.28,  0.61,  0.54,  0.12,  0.19, -0.38], total:  1.29, isTotal: false },
             { label: 'SGA',          values: [-0.60,  1.80,  1.40,  0.80, -2.40,  0.50,  0.60,  0.50,  0.60], total:  3.20, isTotal: false },
@@ -93,7 +151,7 @@ const players: Player[] = [
         h_rank: 3,
         g_rank: 3,
         win_rates: [51.3, 54.2, 66.2, 41.7, 57.4,  9.6, 39.2, 73.2, 76.2],
-        category_weights: [102, 97, 114, 88, 108, 72, 85, 138, 112],
+        category_weights: [111, 105, 107, 102, 124, 67, 85, 101, 98],
         g_score_rows: [
             { label: 'Current diff', values: [ 0.42, -0.18, -0.31,  0.28,  0.61,  0.54,  0.12,  0.19, -0.38], total:  1.29, isTotal: false },
             { label: 'Wembanyama',   values: [ 0.10,  0.20,  1.50, -0.60,  0.40, -2.60, -0.40,  2.00,  1.80], total:  2.40, isTotal: false },
@@ -170,7 +228,7 @@ for (const [i, player] of players.entries()) {
         <div class='playerheaderdiv'>
             <div style="width:80%">${player.name}</div>
             <div style="width:20%">
-                <button class='playerpopup' id='PP${i}'>▼</button>
+                <button class='playerpopup' id='PP${i}'>▶</button>
             </div>
         </div>`
     nameCell.className = 'playerheader'

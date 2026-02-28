@@ -1,14 +1,527 @@
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
 
-#header {
-    color: #555566;
+/* ─── App layout ─────────────────────────────────────────────────────────── */
+
+#app-layout {
+    display: flex;
+    min-height: 100vh;
 }
+
+#sidebar {
+    width: 280px;
+    min-width: 280px;
+    background-color: #0e1117;
+    border-right: 1px solid #3d3d55;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-title {
+    color: lightgrey;
+    font-family: "Source Sans 3";
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 14px 16px 10px;
+}
+
+.sidebar-divider {
+    border: none;
+    border-top: 1px solid #3d3d55;
+    margin: 0;
+}
+
+#main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* ─── Sidebar sections (collapsible, mirroring Streamlit popovers) ───────── */
+
+.sidebar-section {
+    border-bottom: 1px solid #3d3d55;
+}
+
+.sidebar-section > summary {
+    color: darkgrey;
+    font-family: "Source Sans 3";
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 9px 16px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-section > summary::before {
+    content: '▶';
+    font-size: 0.55rem;
+    transition: transform 0.15s;
+    color: #666688;
+}
+
+.sidebar-section[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.sidebar-section-content {
+    padding: 4px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ─── Sidebar input widgets ──────────────────────────────────────────────── */
+
+.sidebar-label {
+    color: darkgrey;
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    margin-top: 6px;
+}
+
+.sidebar-static {
+    color: lightgrey;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+}
+
+.sidebar-input {
+    background-color: #181923;
+    color: lightgrey;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sidebar-input:focus {
+    outline: 1px solid #666688;
+}
+
+.sidebar-caption {
+    color: #666688;
+    font-family: "Source Sans 3";
+    font-size: 0.73rem;
+}
+
+.sidebar-error {
+    color: #e06c6c;
+    font-family: "Source Sans 3";
+    font-size: 0.75rem;
+}
+
+/* ─── Toggle switch (mirrors st.toggle) ─────────────────────────────────── */
+
+.sidebar-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    color: lightgrey;
+    margin-top: 4px;
+    user-select: none;
+}
+
+.sidebar-toggle-input {
+    display: none; /* hidden — the track acts as the visual */
+}
+
+.sidebar-toggle-track {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    background-color: #3d3d55;
+    border-radius: 9px;
+    flex-shrink: 0;
+    transition: background-color 0.2s;
+}
+
+.sidebar-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    background-color: #666688;
+    border-radius: 50%;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.sidebar-toggle-input:checked ~ .sidebar-toggle-track {
+    background-color: #4a4a8a;
+}
+
+.sidebar-toggle-input:checked ~ .sidebar-toggle-track::after {
+    transform: translateX(16px);
+    background-color: #aaaaff;
+}
+
+/* ─── Multiselect (chip-style, mirrors st.multiselect) ──────────────────── */
+
+.ms-container {
+    position: relative;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+}
+
+.ms-input-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    background-color: #181923;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    min-height: 30px;
+    cursor: text;
+    align-items: center;
+}
+
+.ms-input-area:focus-within {
+    outline: 1px solid #666688;
+}
+
+.ms-chip {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background-color: #3a3a52;
+    color: lightgrey;
+    border-radius: 3px;
+    padding: 1px 4px 1px 7px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.ms-chip-remove {
+    background: none;
+    border: none;
+    color: #aaaaaa;
+    cursor: pointer;
+    padding: 0 1px;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.ms-chip-remove:hover {
+    color: white;
+}
+
+.ms-input {
+    background: none;
+    border: none;
+    color: lightgrey;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    outline: none;
+    flex: 1;
+    min-width: 50px;
+    padding: 1px 0;
+}
+
+.ms-input::placeholder {
+    color: #555577;
+}
+
+.ms-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #1a1c28;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    margin-top: 2px;
+    z-index: 100;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.ms-option {
+    padding: 5px 10px;
+    color: lightgrey;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+}
+
+.ms-option:hover {
+    background-color: #3d3d55;
+}
+
+.ms-empty {
+    padding: 5px 10px;
+    color: #555577;
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+/* ─── Custom select (browser-rendered, avoids OS-native dropdown flash) ──── */
+
+.cs-wrapper {
+    position: relative;
+    width: 100%;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+}
+
+.cs-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    background-color: #181923;
+    color: lightgrey;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 28px;
+}
+
+.cs-trigger:focus,
+.cs-open .cs-trigger {
+    outline: 1px solid #666688;
+}
+
+.cs-trigger-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cs-arrow {
+    font-size: 0.7rem;
+    color: #888;
+    margin-left: 6px;
+    flex-shrink: 0;
+    transition: transform 0.1s;
+}
+
+.cs-open .cs-arrow {
+    transform: rotate(180deg);
+}
+
+.cs-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    background-color: #1a1c28;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    z-index: 200;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.cs-option {
+    padding: 5px 10px;
+    color: lightgrey;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+}
+
+.cs-option:hover {
+    background-color: #3d3d55;
+}
+
+.cs-option-selected {
+    background-color: #2a2a3e;
+    font-weight: 600;
+}
+
+/* ─── Blend weight sliders ───────────────────────────────────────────────── */
+
+.sidebar-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-slider-row label {
+    color: darkgrey;
+    font-size: 0.78rem;
+    font-family: "Source Sans 3";
+    width: 52px;
+    flex-shrink: 0;
+}
+
+.sidebar-slider-row input[type="range"] {
+    flex: 1;
+    accent-color: #666688;
+}
+
+.sidebar-slider-row .slider-value {
+    color: lightgrey;
+    font-size: 0.78rem;
+    font-family: "Source Sans 3";
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.sidebar-file-input {
+    font-size: 0.75rem;
+    color: darkgrey;
+    font-family: "Source Sans 3";
+    margin-top: 2px;
+    width: 100%;
+}
+
+/* ─── Compact parameter grid (2-column, for player stat / algo params) ──── */
+
+.param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+}
+
+.param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.param-label-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.param-label-row label {
+    color: darkgrey;
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    flex: 1;
+}
+
+.info-btn {
+    background: none;
+    border: none;
+    color: #666688;
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.info-btn:hover {
+    color: darkgrey;
+}
+
+.param-caption {
+    color: #666688;
+    font-family: "Source Sans 3";
+    font-size: 0.72rem;
+    grid-column: 1 / -1;
+    padding: 2px 0 4px;
+}
+
+/* ─── Trade parameters table ─────────────────────────────────────────────── */
+
+.trade-combo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    margin-top: 4px;
+}
+
+.trade-combo-table th {
+    color: darkgrey;
+    font-weight: 500;
+    padding: 3px 4px;
+    border: none;
+    text-align: left;
+}
+
+.trade-combo-table td {
+    padding: 2px 3px;
+    border: none;
+}
+
+.trade-combo-input {
+    width: 52px !important;
+    padding: 3px 5px !important;
+}
+
+.trade-add-btn {
+    background: none;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    color: #666688;
+    font-family: "Source Sans 3";
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.trade-add-btn:hover {
+    color: darkgrey;
+    border-color: #666688;
+}
+
+/* ─── Slot count grid ────────────────────────────────────────────────────── */
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.slot-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.slot-row label {
+    color: darkgrey;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+    width: 34px;
+    flex-shrink: 0;
+}
+
+.slot-input {
+    width: 52px !important;
+}
+
+/* ─── Main content ───────────────────────────────────────────────────────── */
 
 .playerpopup {
     background-color: #181923;
-    color: darkgrey;
+    color: #666688;
+    border: none;
+    cursor: pointer;
+    font-size: 0.6rem;
     float: right;
+    padding: 2px 4px;
+    transition: transform 0.15s;
+    line-height: 1;
+}
 
+.playerpopup.popup-open {
+    transform: rotate(90deg);
 }
 
 body {
@@ -21,23 +534,23 @@ body {
 
 th {
     padding: 4px 5px;
-    border: 1px solid grey;
+    border: 1px solid #3d3d55;
 
 }
 
 tr {
-    border: 1px solid grey;
+    border: 1px solid #3d3d55;
 
 }
 
 #realtable {
     border-radius: 12px;
-    background-color : grey;
-    border-collapse : collapse;
-    border: 2px solid grey;
+    background-color: #3d3d55;
+    border-collapse: collapse;
+    border: 2px solid #3d3d55;
     overflow: hidden; /* This clips the sharp cell corners */
-    font-family : "Source Sans 3";
-    font-weight : 400;
+    font-family: "Source Sans 3";
+    font-weight: 400;
     font-size: 0.875rem;
     line-height: 1.6;
     text-size-adjust: 100%;
@@ -49,6 +562,7 @@ tr {
     background-color:#181923;
     color:darkgrey;
     font-weight:500;
+    font-size: 0.75rem;
     text-align:left;
 }
 
@@ -78,8 +592,8 @@ tr {
     font-weight:400;
     text-align: left;
     width: 224px;
-    border-top : 2px solid grey;
-    border-bottom : 2px solid grey;
+    border-top : 2px solid #3d3d55;
+    border-bottom : 2px solid #3d3d55;
 
 }
 
@@ -97,8 +611,8 @@ tr {
     font-weight:400;
     text-align:right;
     padding:5px;
-    border-top : 2px solid grey;
-    border-bottom : 2px solid grey;
+    border-top : 2px solid #3d3d55;
+    border-bottom : 2px solid #3d3d55;
 }
 
 .overallhscore:after{
@@ -109,8 +623,8 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top : 2px solid grey;
-    border-bottom : 2px solid grey;
+    border-top : 2px solid #3d3d55;
+    border-bottom : 2px solid #3d3d55;
 }
 .categoricalhscore:after{
     content : '%';
@@ -157,10 +671,9 @@ tr {
     background-color: #181923;
     color: darkgrey;
     font-weight: 500;
-    padding: 3px 8px;
-    text-align: left;
-    border: 1px solid grey;
-    white-space: nowrap;
+    font-size: 0.75rem;
+    text-align: center;
+    border: 1px solid #3d3d55;
 }
 
 .panel-rowlabel {

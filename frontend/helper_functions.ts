@@ -1,314 +1,163 @@
-import { stat_styler_primary, stat_styler_tertiary, styler_a, styler_b,
-         styler_ineligible, styler_absent, styler_candidate, styler_rostered } from './styler_functions.js'
-import { Player } from './types.js'
+// helper_functions.ts
+// Shared UI building blocks used across parameter_collection modules.
+// Table-specific helpers (ExpandView and friends) live in expand_view.ts.
+
+/** Creates a `<label>` with class `sidebar-label`, linked to the given input id. */
+export function makeLabel(forId: string, text: string): HTMLLabelElement {
+    const label = document.createElement('label')
+    label.className = 'sidebar-label'
+    label.htmlFor = forId
+    label.textContent = text
+    return label
+}
 
 /**
- * Toggle the expanded detail panel for a player row.
- * Shows G-score expectations, category weights, position allocations, and roster assignments.
+ * Creates a `<input type="number">` with class `sidebar-input`.
+ * @param min - Optional minimum value; omit to allow any value (e.g. for signed thresholds).
+ */
+export function makeNumberInput(id: string, defaultValue: number, min?: number): HTMLInputElement {
+    const input = document.createElement('input')
+    input.type = 'number'
+    input.id = id
+    input.className = 'sidebar-input'
+    if (min !== undefined) input.min = String(min)
+    input.value = String(defaultValue)
+    return input
+}
+
+/**
+ * Creates a toggle switch row (mirrors Streamlit's `st.toggle`).
+ * The underlying `<input type="checkbox">` retains the given id so that
+ * `getElementById(id).checked` still works for reading the value.
  *
- * @param playerIndex - Index of the player row in the table
- * @param playerData  - Full player data object (see script.ts)
- * @param categories  - Ordered list of category names
+ * @returns The outer `<label>` element — append it directly to the container.
  */
-export function ExpandView(playerIndex: number, playerData: Player, categories: string[]): void {
-    const totalCols = categories.length + 2; // player th + H-score + N category cols
+export function makeSidebarToggle(id: string, labelText: string): HTMLLabelElement {
+    const row = document.createElement('label')
+    row.className = 'sidebar-toggle-row'
 
-    let evpopup = document.querySelector(`#PP${playerIndex}.playerpopup`) as HTMLButtonElement;
-    let expandedRow = document.querySelector(`.EV${playerIndex}.expandedview`) as HTMLTableRowElement;
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.className = 'sidebar-toggle-input'
+    input.id = id
 
-    if (expandedRow.style.display === 'table-row') {
-        // Collapse: clear content and hide
-        expandedRow.style.display = 'none';
-        expandedRow.innerHTML = '';
-        evpopup.textContent = '▼';
-    } else {
-        // Expand: build the detail panel as a vertical stack
-        expandedRow.style.display = 'table-row';
-        evpopup.textContent = '▲';
+    const track = document.createElement('span')
+    track.className = 'sidebar-toggle-track'
 
-        // Single cell spanning all columns
-        let cell = expandedRow.insertCell(-1);
-        cell.colSpan = totalCols;
-        cell.className = 'panel-cell';
+    const textSpan = document.createElement('span')
+    textSpan.textContent = labelText
 
-        cell.appendChild(makeLabel('G-score expectations (difference vs. other teams)', '60px'));
-        cell.appendChild(makeGScoreTable(playerData, categories));
-
-        cell.appendChild(makeLabel('Category strategy', '60px'));
-        cell.appendChild(makeWeightsTable(playerData, categories));
-
-        cell.appendChild(makeLabel('Flex position allocations for future flex spot picks', '60px'));
-        cell.appendChild(makeFlexAllocationsTable(playerData));
-
-        cell.appendChild(makeLabel('Roster assignments', '60px'));
-        cell.appendChild(makeRosterGrid(playerData));
-    }
+    row.append(input, track, textSpan)
+    return row
 }
 
-// ─── Helper: section label ───────────────────────────────────────────────────
-
 /**
- * @param text          - Label text
- * @param paddingLeft   - Optional left padding override (e.g. '60px')
+ * Renders a chip-style multiselect widget (mirrors Streamlit's `st.multiselect`).
+ * Selected items are shown as removable chips; clicking the input area opens a
+ * filtered dropdown of remaining options.
+ *
+ * Returns the **live** selected-items array that the widget mutates in place.
+ * Callers should store this reference so their getter always sees the current state:
+ * ```ts
+ * let _selected = renderMultiselect(container, ALL, DEFAULT)
+ * // later: _selected always reflects current chip state
+ * ```
  */
-function makeLabel(text: string, paddingLeft?: string): HTMLDivElement {
-    let label = document.createElement('div');
-    label.className = 'panel-label';
-    label.textContent = text;
-    if (paddingLeft) label.style.paddingLeft = paddingLeft;
-    return label;
-}
+export function renderMultiselect(
+    container:       HTMLElement,
+    allOptions:      string[],
+    defaultSelected: string[],
+): string[] {
 
-// ─── Helper: invisible spacer <th> to lock column width ──────────────────────
+    const selected: string[] = [...defaultSelected]
 
-/**
- * @param width - Optional explicit width (e.g. '136px')
- */
-function makeSpacerTh(width?: string): HTMLTableCellElement {
-    let th = document.createElement('th');
-    th.className = 'panel-colspacer';
-    if (width) th.style.width = width;
-    return th;
-}
+    const wrapper = document.createElement('div')
+    wrapper.className = 'ms-container'
 
+    const inputArea = document.createElement('div')
+    inputArea.className = 'ms-input-area'
 
-// ─── G-score expectations table ───────────────────────────────────────────────
-// Rows: current diff, player, future diff, total diff
-// Category cells: stat_styler_primary (middle=0, multiplier=60)
-// Total cell: styler_a (flat dark), styler_b for the isTotal row
+    const textInput = document.createElement('input')
+    textInput.type = 'text'
+    textInput.className = 'ms-input'
+    textInput.placeholder = 'Add…'
+    textInput.autocomplete = 'off'
 
-/**
- * @param playerData - Player data with g_score_rows array
- * @param categories - Category names
- */
-function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivElement {
-    let table = document.createElement('table');
-    table.className = 'panel-table';
-    table.style.tableLayout = 'fixed';
+    const dropdown = document.createElement('div')
+    dropdown.className = 'ms-dropdown'
+    dropdown.hidden = true
 
-    // Row 1: invisible spacers lock column widths (no border/padding so content-box = border-box).
-    // 100px wrapper + 136px + 83px = 319px ≈ main table category start (player 224+10+2=236,
-    // H-score 72+10+2=84, total=320px). Spacer th widths are content-box=border-box since
-    // they have no padding/border, unlike the main table th which adds padding to its width.
-    let thead = table.createTHead();
-    let spacerRow = thead.insertRow(-1);
-    spacerRow.style.border = 'none';
-    spacerRow.appendChild(makeSpacerTh('136px'));
-    spacerRow.appendChild(makeSpacerTh('83px'));
-    for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh());
+    function renderChips(): void {
+        Array.from(inputArea.children).forEach(child => {
+            if (child !== textInput) child.remove()
+        })
+        for (const cat of selected) {
+            const chip = document.createElement('span')
+            chip.className = 'ms-chip'
 
-    // Row 2: visible column headers — widths inherited from spacer row above.
-    let headerRow = thead.insertRow(-1);
-    headerRow.appendChild(makeSpacerTh()); // invisible label cell
-    let totalTh = document.createElement('th');
-    totalTh.className = 'panel-colheader';
-    totalTh.textContent = 'H-score';
-    headerRow.appendChild(totalTh);
-    for (let cat of categories) {
-        let th = document.createElement('th');
-        th.className = 'panel-colheader';
-        th.textContent = cat;
-        headerRow.appendChild(th);
-    }
+            const chipText = document.createElement('span')
+            chipText.textContent = cat
+            chip.append(chipText)
 
-    // Data rows
-    let tbody = table.createTBody();
-    for (let rowData of playerData.g_score_rows) {
-        let row = tbody.insertRow(-1);
-
-        let labelCell = document.createElement('th');
-        labelCell.className = 'panel-rowlabel';
-        labelCell.textContent = rowData.label;
-        row.appendChild(labelCell);
-
-        // Total column (second): flat color, brighter for the summary row
-        let totalCell = row.insertCell(-1);
-        totalCell.textContent = rowData.total.toFixed(2);
-        totalCell.style.cssText = rowData.isTotal ? styler_b() : styler_a();
-        totalCell.className = 'panel-datacell';
-
-        for (let value of rowData.values) {
-            let cell = row.insertCell(-1);
-            cell.textContent = value.toFixed(2);
-            cell.style.cssText = stat_styler_primary(value, 60, 0);
-            cell.className = 'panel-datacell';
+            const removeBtn = document.createElement('button')
+            removeBtn.type = 'button'
+            removeBtn.className = 'ms-chip-remove'
+            removeBtn.textContent = '×'
+            removeBtn.addEventListener('mousedown', e => {
+                e.preventDefault()
+                selected.splice(selected.indexOf(cat), 1)
+                renderChips()
+                renderDropdown()
+            })
+            chip.append(removeBtn)
+            inputArea.insertBefore(chip, textInput)
         }
     }
 
-    let wrapper = document.createElement('div');
-    wrapper.style.marginLeft = '100px';
-    wrapper.appendChild(table);
-    return wrapper;
-}
-
-// ─── Category weights table ───────────────────────────────────────────────────
-// Single row: weight per category (blue shades, middle=90 since values are ×100)
-// The '%' suffix is added via the panel-weight CSS class (::after rule).
-
-/**
- * @param playerData - Player data with category_weights array
- * @param categories - Category names
- */
-function makeWeightsTable(playerData: Player, categories: string[]): HTMLDivElement {
-    let table = document.createElement('table');
-    table.className = 'panel-table';
-    table.style.tableLayout = 'fixed';
-    // No explicit table width — inherits 100% from .panel-table so category columns
-    // auto-distribute to match the G-score table and main table widths.
-    let headerRow = table.createTHead().insertRow(-1);
-    headerRow.style.border = 'none'; // suppress global tr border on this invisible spacer row
-    let emptyTh = document.createElement('th');
-    emptyTh.className = 'panel-colspacer';
-    emptyTh.style.width = '219px';
-    headerRow.appendChild(emptyTh);
-    for (let i = 0; i < categories.length; i++) headerRow.appendChild(makeSpacerTh());
-
-    // Data row: row label + N category weight cells
-    let row = table.createTBody().insertRow(-1);
-    let labelCell = document.createElement('th');
-    labelCell.className = 'panel-rowlabel';
-    labelCell.textContent = 'Future pick weight';
-    row.appendChild(labelCell);
-    for (let value of playerData.category_weights) {
-        let cell = row.insertCell(-1);
-        cell.textContent = value.toFixed(0); // '%' appended by CSS panel-weight::after
-        cell.style.cssText = stat_styler_tertiary(value, 5, 90);
-        cell.className = 'panel-datacell panel-weight';
-    }
-
-    let wrapper = document.createElement('div');
-    wrapper.style.marginLeft = '100px';
-    wrapper.appendChild(table);
-    return wrapper;
-}
-
-// ─── Flex position allocations table ──────────────────────────────────────────
-// Rows: slot types (G-1, F-2, Util-3, Total); Cols: base positions (PG–C)
-// Explicit table width = 90 + N×72 px so column widths are exact (not scaled by width:100%)
-
-/**
- * @param playerData - Player data with flex_allocations object
- */
-function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
-    let flexData = playerData.flex_allocations;
-
-    let table = document.createElement('table');
-    table.className = 'panel-table';
-    table.style.tableLayout = 'fixed';
-    table.style.width = (90 + flexData.base_positions.length * 72) + 'px';
-
-    let headerRow = table.createTHead().insertRow(-1);
-    let emptyTh = document.createElement('th');
-    emptyTh.className = 'panel-colspacer';
-    emptyTh.style.width = '90px';
-    headerRow.appendChild(emptyTh);
-    for (let pos of flexData.base_positions) {
-        let th = document.createElement('th');
-        th.className = 'panel-colheader';
-        th.style.width = '72px';
-        th.textContent = pos;
-        headerRow.appendChild(th);
-    }
-
-    let tbody = table.createTBody();
-    for (let rowData of flexData.rows) {
-        let row = tbody.insertRow(-1);
-
-        let labelCell = document.createElement('th');
-        labelCell.className = rowData.isTotal ? 'panel-rowlabel panel-rowlabel-total' : 'panel-rowlabel';
-        labelCell.textContent = rowData.label;
-        row.appendChild(labelCell);
-
-        for (let value of rowData.values) {
-            let cell = row.insertCell(-1);
-            cell.className = 'panel-datacell';
-            if (value === -999) {
-                cell.style.cssText = styler_ineligible();
-            } else {
-                cell.textContent = value.toFixed(2);
-                cell.style.cssText = stat_styler_tertiary(value, 150, 0);
-            }
+    function renderDropdown(): void {
+        dropdown.replaceChildren()
+        const filter = textInput.value.toLowerCase()
+        const available = allOptions.filter(
+            opt => !selected.includes(opt) && opt.toLowerCase().includes(filter)
+        )
+        if (available.length === 0) {
+            const empty = document.createElement('div')
+            empty.className = 'ms-empty'
+            empty.textContent = filter ? 'No matches' : 'All categories selected'
+            dropdown.append(empty)
+            return
+        }
+        for (const opt of available) {
+            const item = document.createElement('div')
+            item.className = 'ms-option'
+            item.textContent = opt
+            item.addEventListener('mousedown', e => {
+                e.preventDefault()
+                selected.push(opt)
+                textInput.value = ''
+                renderChips()
+                renderDropdown()
+            })
+            dropdown.append(item)
         }
     }
 
-    let wrapper = document.createElement('div');
-    wrapper.style.marginLeft = '100px';
-    wrapper.appendChild(table);
-    return wrapper;
-}
+    textInput.addEventListener('focus', () => {
+        renderDropdown()
+        dropdown.hidden = false
+    })
 
-// ─── Roster grid ─────────────────────────────────────────────────────────────
-// Rows = depth level (1st slot, 2nd slot, ...); Cols = all position types (PG…Util)
-// Explicit table width = 90 + N×72 px. Base-position cols (PG–C) align with flex table above.
+    textInput.addEventListener('blur', () => {
+        setTimeout(() => { dropdown.hidden = true }, 150)
+    })
 
-/**
- * @param playerData - Player data with roster object
- */
-function makeRosterGrid(playerData: Player): HTMLDivElement {
-    let roster = playerData.roster;
+    textInput.addEventListener('input', renderDropdown)
+    inputArea.addEventListener('click', () => textInput.focus())
 
-    // Derive ordered position types by stripping trailing digits (e.g. "PG1" → "PG")
-    let posTypes: string[] = [];
-    let groups: Record<string, string[]> = {};
-    for (let slot of roster.slots) {
-        let type = slot.replace(/\d+$/, '');
-        if (!groups[type]) { groups[type] = []; posTypes.push(type); }
-        groups[type].push(slot);
-    }
-    let maxDepth = Math.max(...posTypes.map(t => groups[t].length));
+    inputArea.append(textInput)
+    wrapper.append(inputArea, dropdown)
+    container.append(wrapper)
 
-    let table = document.createElement('table');
-    table.className = 'panel-table';
-    table.style.tableLayout = 'fixed';
-    table.style.width = (90 + posTypes.length * 72) + 'px';
-
-    let headerRow = table.createTHead().insertRow(-1);
-    let emptyTh = document.createElement('th');
-    emptyTh.className = 'panel-colspacer';
-    emptyTh.style.width = '90px';
-    headerRow.appendChild(emptyTh);
-    for (let type of posTypes) {
-        let th = document.createElement('th');
-        th.className = 'panel-colheader';
-        th.style.width = '72px';
-        th.textContent = type;
-        headerRow.appendChild(th);
-    }
-
-    let tbody = table.createTBody();
-    for (let d = 0; d < maxDepth; d++) {
-        let row = tbody.insertRow(-1);
-
-        let labelCell = document.createElement('th');
-        labelCell.className = 'panel-rowlabel';
-        labelCell.textContent = 'Slot ' + (d + 1);
-        row.appendChild(labelCell);
-
-        for (let type of posTypes) {
-            let cell = row.insertCell(-1);
-            cell.className = 'panel-datacell';
-            let slot = groups[type][d];
-            if (slot === undefined) {
-                cell.style.cssText = styler_ineligible();
-                cell.textContent = '\u00A0';
-            } else {
-                let assignment = roster.assignments[slot];
-                if (!assignment) {
-                    cell.style.cssText = styler_absent();
-                    cell.textContent = '\u00A0';
-                } else if (assignment.isCandidate) {
-                    cell.style.cssText = styler_candidate();
-                    cell.textContent = assignment.name;
-                } else {
-                    cell.style.cssText = styler_rostered();
-                    cell.textContent = assignment.name;
-                }
-            }
-        }
-    }
-
-    let wrapper = document.createElement('div');
-    wrapper.style.marginLeft = '100px';
-    wrapper.appendChild(table);
-    return wrapper;
+    renderChips()
+    return selected
 }
