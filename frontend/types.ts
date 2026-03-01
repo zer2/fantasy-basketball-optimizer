@@ -43,6 +43,7 @@ export interface ModelParameters {
     chi: number
     aleph: number
     n_iterations: number
+    streaming_noise: number   // S_σ: SAVOR noise parameter, only meaningful in Auction Mode
 }
 
 export interface DataSource {
@@ -58,6 +59,7 @@ export interface SessionRequest {
         n_picks: number
         scoring_format: string
         categories: string[]
+        cash_per_team?: number   // only set in Auction Mode
     }
     platform: string
     slot_counts: Record<string, number>
@@ -69,6 +71,12 @@ export interface SessionRequest {
 
 // ─── Top-level player ─────────────────────────────────────────────────────────
 
+export interface AuctionValues {
+    your_dollar: number;   // SAVOR-adjusted value for your specific team situation
+    gnrc_dollar: number;   // Generic cash-adjusted value (remaining cash/players)
+    orig_dollar: number;   // Original value before any players have been taken
+}
+
 export interface Player {
     name: string;
     h_score: number;            // overall H-score win rate (0–100 scale)
@@ -79,4 +87,5 @@ export interface Player {
     g_score_rows: GScoreRow[];
     flex_allocations: FlexAllocations;
     roster: Roster;
+    auction_values?: AuctionValues;  // present when mode === 'Auction Mode'
 }

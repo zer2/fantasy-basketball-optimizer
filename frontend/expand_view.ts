@@ -43,8 +43,7 @@ function expandFlexLabel(label: string): string {
  * @param playerData  - Full player data object
  * @param categories  - Ordered list of category names matching the table columns
  */
-export function ExpandView(playerIndex: number, playerData: Player, categories: string[]): void {
-    const totalCols = categories.length + 2; // player th + H-score + N category cols
+export function ExpandView(playerIndex: number, playerData: Player, categories: string[], totalCols: number): void {
 
     let evpopup = document.querySelector(`#PP${playerIndex}.playerpopup`) as HTMLButtonElement;
     let expandedRow = document.querySelector(`.EV${playerIndex}.expandedview`) as HTMLTableRowElement;

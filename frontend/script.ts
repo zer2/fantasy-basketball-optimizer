@@ -1,4 +1,4 @@
-import { stat_styler_primary } from './styler_functions.js'
+import { stat_styler_primary, stat_styler_secondary, styler_a } from './styler_functions.js'
 import { ExpandView } from './expand_view.js'
 import { Player, SessionRequest } from './types.js'
 import { renderLeagueSettings, getLeagueSettings } from './parameter_collection/league_settings.js'
@@ -43,11 +43,13 @@ sidebar.style.visibility = ''
  * ready to POST to `/sessions`.
  */
 export function buildSessionRequest(): SessionRequest {
-    const { sport, platform, n_drafters, n_picks, my_team_id } = getLeagueSettings()
+    const { sport, platform, mode, n_drafters, n_picks, cash_per_team, my_team_id } = getLeagueSettings()
     const { scoring_format, categories } = getFormatAndCategories()
     const { data_source, injured_players } = getPlayerStatsParams()
+    const league: SessionRequest['league'] = { sport, n_drafters, n_picks, scoring_format, categories }
+    if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
     return {
-        league: { sport, n_drafters, n_picks, scoring_format, categories },
+        league,
         platform,
         slot_counts: getSlotCounts(),
         parameters: getModelParameters(),
@@ -59,9 +61,9 @@ export function buildSessionRequest(): SessionRequest {
 
 // ─── Player table ─────────────────────────────────────────────────────────────
 
-const categories: string[] = ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
+let categories: string[] = ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
 
-const players: Player[] = [
+let players: Player[] = [
     {
         name: "Nikola Jokic (C)",
         h_score: 53.7,
@@ -101,7 +103,8 @@ const players: Player[] = [
                 "Util2": null,
                 "Util3": null,
             }
-        }
+        },
+        auction_values: { your_dollar: 52, gnrc_dollar: 48, orig_dollar: 50 },
     },
     {
         name: "Shai Gilgeous-Alexander (PG)",
@@ -142,7 +145,8 @@ const players: Player[] = [
                 "Util2": null,
                 "Util3": null,
             }
-        }
+        },
+        auction_values: { your_dollar: 45, gnrc_dollar: 43, orig_dollar: 44 },
     },
     {
         name: "Victor Wembanyama (C)",
@@ -183,74 +187,141 @@ const players: Player[] = [
                 "Util2": null,
                 "Util3": null,
             }
-        }
+        },
+        auction_values: { your_dollar: 38, gnrc_dollar: 41, orig_dollar: 39 },
     }
 ]
 
 // ─── Build the table ──────────────────────────────────────────────────────────
 
-let table = document.getElementById('realtable') as HTMLTableElement
+const table = document.getElementById('realtable') as HTMLTableElement
 
-// Header row
-let header = table.createTHead()
+function buildTable(): void {
+    const isAuction = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
 
-// Player column — explicit width so table-layout:fixed locks it in
-let playerHeaderCell = document.createElement('th')
-playerHeaderCell.className = 'tableheader'
-playerHeaderCell.textContent = 'Player'
-playerHeaderCell.style.width = '224px'
-header.append(playerHeaderCell)
+    // 1 (player) + score cols + N categories
+    const PLAYER_COL_W = 224
+    const SCORE_COL_W  = 72
+    const scoreCols    = isAuction ? 4 : 1  // Diff / Your $ / Gnrc. $ / Orig. $  vs  H-Score
 
-// H-score column
-let hscoreHeaderCell = document.createElement('th')
-hscoreHeaderCell.className = 'tableheader'
-hscoreHeaderCell.textContent = 'H-Score'
-hscoreHeaderCell.style.width = '72px'
-header.append(hscoreHeaderCell)
+    // Keep category column widths consistent across modes by widening the table
+    // to compensate for the extra auction columns (otherwise they'd wrap).
+    const CAT_COL_W    = 90   // desired minimum width per category column
+    const tableWidth   = PLAYER_COL_W + scoreCols * SCORE_COL_W + categories.length * CAT_COL_W
+    table.style.width  = tableWidth + 'px'
 
-// Category columns (remaining width split equally)
-for (let category of categories) {
-    let catHeaderCell = document.createElement('th')
-    catHeaderCell.className = 'tableheader'
-    catHeaderCell.textContent = category
-    header.append(catHeaderCell)
-}
+    const totalCols = 1 + scoreCols + categories.length
 
-// Player rows
-for (const [i, player] of players.entries()) {
+    table.innerHTML = ''
 
-    let row = table.insertRow(-1)
+    // ── Header ──────────────────────────────────────────────────────────────
+    const thead = table.createTHead()
+    const headerRow = thead.insertRow()
 
-    // Player name cell with expand button
-    let nameCell = document.createElement('th')
-    nameCell.innerHTML = `
-        <div class='playerheaderdiv'>
-            <div style="width:80%">${player.name}</div>
-            <div style="width:20%">
-                <button class='playerpopup' id='PP${i}'>▶</button>
-            </div>
-        </div>`
-    nameCell.className = 'playerheader'
-    row.append(nameCell)
+    const playerTh = document.createElement('th')
+    playerTh.className = 'tableheader'
+    playerTh.textContent = 'Player'
+    playerTh.style.width = '224px'
+    headerRow.append(playerTh)
 
-    let button = nameCell.querySelector(`#PP${i}.playerpopup`) as HTMLButtonElement
-    button.addEventListener('click', () => ExpandView(i, player, categories))
-
-    // H-score cell
-    let hscoreCell = row.insertCell(-1)
-    hscoreCell.className = 'overallhscore'
-    hscoreCell.textContent = player.h_score.toFixed(1)
-
-    // Category win rate cells
-    for (let value of player.win_rates) {
-        let cell = row.insertCell(-1)
-        cell.textContent = value.toFixed(1)
-        cell.style.cssText += stat_styler_primary(value, 5, 50)
-        cell.className = 'categoricalhscore'
+    if (isAuction) {
+        for (const label of ['Diff.', 'Your $', 'Gnrc. $', 'Orig. $']) {
+            const th = document.createElement('th')
+            th.className = 'tableheader'
+            th.textContent = label
+            th.style.width = '72px'
+            headerRow.append(th)
+        }
+    } else {
+        const th = document.createElement('th')
+        th.className = 'tableheader'
+        th.textContent = 'H-Score'
+        th.style.width = '72px'
+        headerRow.append(th)
     }
 
-    // Expansion row (hidden until button clicked)
-    let expandedRow = table.insertRow(-1)
-    expandedRow.className = `expandedview EV${i}`
-    expandedRow.style.display = 'none'
+    for (const category of categories) {
+        const th = document.createElement('th')
+        th.className = 'tableheader'
+        th.textContent = category
+        headerRow.append(th)
+    }
+
+    // ── Player rows ─────────────────────────────────────────────────────────
+    for (const [i, player] of players.entries()) {
+        const row = table.insertRow(-1)
+
+        // Player name cell with expand button
+        const nameCell = document.createElement('th')
+        nameCell.innerHTML = `
+            <div class='playerheaderdiv'>
+                <div style="width:80%">${player.name}</div>
+                <div style="width:20%">
+                    <button class='playerpopup' id='PP${i}'>▶</button>
+                </div>
+            </div>`
+        nameCell.className = 'playerheader'
+        row.append(nameCell)
+
+        const button = nameCell.querySelector(`#PP${i}.playerpopup`) as HTMLButtonElement
+        button.addEventListener('click', () => ExpandView(i, player, categories, totalCols))
+
+        // Score column(s)
+        if (isAuction) {
+            const av = player.auction_values!
+            const diff = av.your_dollar - av.gnrc_dollar
+
+            const diffCell = row.insertCell(-1)
+            diffCell.textContent = diff.toFixed(1)
+            diffCell.style.cssText = stat_styler_secondary(diff, 6, 0)
+            diffCell.className = 'auction-dollar'
+
+            for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
+                const cell = row.insertCell(-1)
+                cell.textContent = String(val.toFixed(1))
+                cell.style.cssText = styler_a()
+                cell.className = 'auction-dollar'
+            }
+        } else {
+            const hscoreCell = row.insertCell(-1)
+            hscoreCell.className = 'overallhscore'
+            hscoreCell.textContent = player.h_score.toFixed(1)
+        }
+
+        // Category win rate cells
+        for (const value of player.win_rates) {
+            const cell = row.insertCell(-1)
+            cell.textContent = value.toFixed(1)
+            cell.style.cssText = stat_styler_primary(value, 5, 50)
+            cell.className = 'categoricalhscore'
+        }
+
+        // Expansion row (hidden until button clicked)
+        const expandedRow = table.insertRow(-1)
+        expandedRow.className = `expandedview EV${i}`
+        expandedRow.style.display = 'none'
+    }
+}
+
+// Initial build
+buildTable()
+
+// ── DEV ONLY: mock backend response on mode change ────────────────────────────
+// Remove once the real backend call is wired up to the mode change event.
+document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
+    updateTable(players, categories)
+})
+
+/**
+ * Updates the player data and rebuilds the table.
+ * Call this whenever the backend returns a new set of results.
+ * Reads the current mode from the DOM, so the layout stays in sync automatically.
+ *
+ * @param newPlayers    - Full player list from the backend response
+ * @param newCategories - Category list; omit if unchanged (e.g. same session)
+ */
+export function updateTable(newPlayers: Player[], newCategories?: string[]): void {
+    players = newPlayers
+    if (newCategories) categories = newCategories
+    buildTable()
 }

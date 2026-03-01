@@ -1,5 +1,5 @@
 // Collects: sport, platform, mode, n_drafters, n_picks,
-//           third_round_reversal, team_names, my_team_id
+//           cash_per_team (Auction Mode only), third_round_reversal, team_names, my_team_id
 // Mirrors league_settings_popover() in src/parameter_collection/league_settings.py
 
 import { makeCustomSelect } from '../custom_select.js'
@@ -73,6 +73,13 @@ export function renderLeagueSettings(container: HTMLElement): void {
     picksCell.append(makeNumberInput('ls-n-picks', 13, 1))
     grid.append(picksCell)
 
+    // ── Budget per team (left col, Auction Mode only) ─────────────────────
+    const cashCell = makeCell()
+    cashCell.style.display = 'none'
+    cashCell.append(makeLabel('ls-cash-per-team', 'Budget / team ($)'))
+    cashCell.append(makeNumberInput('ls-cash-per-team', 200, 1))
+    grid.append(cashCell)
+
     // ── Third round reversal toggle (full-width, Draft Mode only) ─────────
     const trrToggle = makeSidebarToggle('ls-third-round-reversal', 'Third round reversal')
     trrToggle.id = 'ls-trr-row'
@@ -82,6 +89,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
     modeSelect.element.addEventListener('change', () => {
         const mode = modeSelect.getValue()
+        cashCell.style.display = mode === 'Auction Mode' ? '' : 'none'
         trrToggle.style.display = mode === 'Draft Mode' ? '' : 'none'
         if (mode !== 'Draft Mode') trrCheckbox.checked = false
     })
@@ -129,16 +137,19 @@ export function getLeagueSettings(): {
     mode: DraftMode
     n_drafters: number
     n_picks: number
+    cash_per_team: number
     third_round_reversal: boolean
     team_names: string[]
     my_team_id: string
 } {
+    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
     return {
         sport:                (document.getElementById('ls-sport') as HTMLInputElement).value,
         platform:             (document.getElementById('ls-platform') as HTMLInputElement).value as Platform,
-        mode:                 (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode,
+        mode,
         n_drafters:           parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value),
         n_picks:              parseInt((document.getElementById('ls-n-picks') as HTMLInputElement).value),
+        cash_per_team:        parseInt((document.getElementById('ls-cash-per-team') as HTMLInputElement).value),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
         team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
                                   .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),

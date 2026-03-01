@@ -17,6 +17,13 @@ interface ParamSpec {
     step:    number
 }
 
+// S_σ is shown only in Auction Mode; kept separate so it can be toggled independently.
+const S_SPEC: ParamSpec = {
+    id: 'mp-s', label: 'S\u03C3 (SAVOR)', step: 1,
+    default: 10, min: 0, max: 200,
+    caption: 'SAVOR noise parameter. Roughly represents the standard deviation of dollar values expected for players during the season. Higher values down-weight low-dollar players more aggressively.',
+}
+
 const PARAM_SPECS: ParamSpec[] = [
     {
         id: 'mp-upsilon', label: 'υ (upsilon)', step: 0.05,
@@ -73,6 +80,15 @@ export function renderModelParameters(container: HTMLElement): void {
     for (const spec of PARAM_SPECS) {
         grid.append(makeParamItem(spec))
     }
+
+    // S_σ is only relevant in Auction Mode; hidden otherwise.
+    const sItem = makeParamItem(S_SPEC)
+    sItem.style.display = 'none'
+    grid.append(sItem)
+
+    document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
+        sItem.style.display = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode' ? '' : 'none'
+    })
 }
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
@@ -110,14 +126,15 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
 
 export function getModelParameters(): ModelParameters {
     return {
-        upsilon:      readNumberInput('mp-upsilon'),
-        psi:          readNumberInput('mp-psi'),
-        chi:          readNumberInput('mp-chi'),
-        aleph:        readNumberInput('mp-aleph'),
-        omega:        readNumberInput('mp-omega'),
-        gamma:        readNumberInput('mp-gamma'),
-        beth:         readNumberInput('mp-beth'),
-        n_iterations: readNumberInput('mp-n-iterations'),
+        upsilon:         readNumberInput('mp-upsilon'),
+        psi:             readNumberInput('mp-psi'),
+        chi:             readNumberInput('mp-chi'),
+        aleph:           readNumberInput('mp-aleph'),
+        omega:           readNumberInput('mp-omega'),
+        gamma:           readNumberInput('mp-gamma'),
+        beth:            readNumberInput('mp-beth'),
+        n_iterations:    readNumberInput('mp-n-iterations'),
+        streaming_noise: readNumberInput('mp-s'),
     }
 }
 
