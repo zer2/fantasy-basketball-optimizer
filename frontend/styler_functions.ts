@@ -1,6 +1,7 @@
 /**
 * Determines a CSS style for a cell based on the difference between value and middle.
-* Color scheme: cyan/teal for positive, magenta for negative.
+* Color scheme: muted teal for positive, muted magenta-purple for negative.
+* Dark blue-grey baseline, intensity capped to stay cohesive with the sidebar palette.
 * Used for category-level win rates and G-score category cells.
 *
 * @param {number} value - The value of the cell
@@ -13,17 +14,17 @@ export function stat_styler_primary(value: number, multiplier: number, middle: n
         return 'background-color:#8D8D9E;color:#8D8D9E;';
     }
     let raw_intensity = (value - middle) * multiplier;
-    let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 165);
+    let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 110);
 
-    let r = raw_intensity > 0 ? 90 : 90 + intensity;
-    let g = raw_intensity > 0 ? 90 + intensity : 90;
-    let b = 90 + intensity;
+    let r = raw_intensity > 0 ? 55 : 55 + intensity;
+    let g = raw_intensity > 0 ? 55 + intensity : 55;
+    let b = 70 + Math.round(intensity * 0.7);
 
     return final_formatter(r, g, b);
 }
 
 /**
-* Color scheme: yellow for positive, orange for negative.
+* Color scheme: muted gold for positive, muted amber-orange for negative.
 * Used for overall totals and differences.
 *
 * @param {number} value - The value of the cell
@@ -36,23 +37,23 @@ export function stat_styler_secondary(value: number, multiplier: number, middle:
         return 'background-color:#8D8D9E;color:#8D8D9E;';
     }
     let raw_intensity = (value - middle) * multiplier;
-    let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 255);
+    let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 150);
 
     let r, g, b;
     if (raw_intensity > 0) {
-        r = 130 + Math.round(2 * intensity / 3);
-        g = 130 + Math.round(2 * intensity / 3);
-        b = 130;
+        r = 80 + Math.round(intensity * 0.53);
+        g = 80 + Math.round(intensity * 0.5);
+        b = 80;
     } else {
-        r = 130 + intensity;
-        g = 130 + Math.round(intensity / 3);
-        b = 130;
+        r = 80 + Math.round(intensity * 0.67);
+        g = 80 + Math.round(intensity * 0.2);
+        b = 80;
     }
     return final_formatter(r, g, b);
 }
 
 /**
-* Color scheme: varying shades of blue.
+* Color scheme: muted steel-blue shades.
 * Used for algorithm decisions like category weights.
 *
 * @param {number} value - The value of the cell
@@ -65,11 +66,11 @@ export function stat_styler_tertiary(value: number, multiplier: number, middle: 
         return 'background-color:#555566;color:#555566;';
     }
     let raw_intensity = Math.round((value - middle) * multiplier);
-    let intensity = Math.min(Math.abs(raw_intensity), 185);
+    let intensity = Math.min(Math.abs(raw_intensity), 130);
 
-    let r = raw_intensity > 0 ? 28 + Math.round(intensity/6) : 28 - Math.round(intensity / 60);
-    let g = raw_intensity > 0 ? 34 + Math.round(intensity/2) : 34 - Math.round(intensity / 20);
-    let b = raw_intensity > 0 ? 46 + intensity : 46 - Math.round(intensity / 10);
+    let r = raw_intensity > 0 ? 28 + Math.round(intensity / 6) : 28 - Math.round(intensity / 60);
+    let g = raw_intensity > 0 ? 34 + Math.round(intensity / 2) : 34 - Math.round(intensity / 20);
+    let b = raw_intensity > 0 ? 46 + Math.round(intensity * 0.7) : 46 - Math.round(intensity / 10);
 
     return final_formatter(r, g, b);
 }
@@ -108,18 +109,20 @@ export function styler_absent(): string {
 
 /**
  * Candidate player being evaluated for this roster pick.
+ * Muted steel-blue, cohesive with the flex allocation table's stat_styler_tertiary palette.
  * @returns {string} A CSS style string
  */
 export function styler_candidate(): string {
-    return 'background-color:rgb(53,109,196);color:white;';
+    return 'background-color:rgb(54,90,148);color:white;';
 }
 
 /**
  * Player already rostered on the team.
+ * Dark muted navy, subdued relative to the candidate highlight.
  * @returns {string} A CSS style string
  */
 export function styler_rostered(): string {
-    return 'background-color:rgb(34,54,86);color:white;';
+    return 'background-color:rgb(36,48,70);color:white;';
 }
 
 /**

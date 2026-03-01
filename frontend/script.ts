@@ -273,7 +273,7 @@ function buildTable(): void {
 
             const diffCell = row.insertCell(-1)
             diffCell.textContent = diff.toFixed(1)
-            diffCell.style.cssText = stat_styler_secondary(diff, 6, 0)
+            diffCell.style.cssText = stat_styler_secondary(diff, 10, 0)
             diffCell.className = 'auction-dollar'
 
             for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
@@ -292,7 +292,7 @@ function buildTable(): void {
         for (const value of player.win_rates) {
             const cell = row.insertCell(-1)
             cell.textContent = value.toFixed(1)
-            cell.style.cssText = stat_styler_primary(value, 5, 50)
+            cell.style.cssText = stat_styler_primary(value, 3, 50)
             cell.className = 'categoricalhscore'
         }
 
