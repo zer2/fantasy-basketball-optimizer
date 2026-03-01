@@ -2,6 +2,27 @@
 // Shared UI building blocks used across parameter_collection modules.
 // Table-specific helpers (ExpandView and friends) live in expand_view.ts.
 
+// ─── Global JS tooltip ────────────────────────────────────────────────────────
+// Uses position:fixed so it escapes the sidebar's overflow-y:auto clipping.
+// Any element with a `data-tooltip` attribute automatically gets a hover tooltip.
+
+const _tooltip = document.createElement('div')
+_tooltip.className = 'js-tooltip'
+document.body.append(_tooltip)
+
+document.addEventListener('mouseover', (e: MouseEvent) => {
+    const target = (e.target as Element).closest<HTMLElement>('[data-tooltip]')
+    if (!target) {
+        _tooltip.style.display = 'none'
+        return
+    }
+    const rect = target.getBoundingClientRect()
+    _tooltip.textContent = target.dataset.tooltip!
+    _tooltip.style.left = (rect.left + rect.width / 2) + 'px'
+    _tooltip.style.top = rect.top + 'px'
+    _tooltip.style.display = 'block'
+})
+
 /** Creates a `<label>` with class `sidebar-label`, linked to the given input id. */
 export function makeLabel(forId: string, text: string): HTMLLabelElement {
     const label = document.createElement('label')

@@ -4,8 +4,7 @@ import { Player, SessionRequest } from './types.js'
 import { renderLeagueSettings, getLeagueSettings } from './parameter_collection/league_settings.js'
 import { renderFormatAndCategories, getFormatAndCategories } from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/player_stats.js'
-import { renderPlayerStatParameters, getPlayerStatParameters } from './parameter_collection/player_stat_parameters.js'
-import { renderAlgoParameters, getAlgoParameters } from './parameter_collection/algo_parameters.js'
+import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
 import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
 
@@ -33,8 +32,7 @@ const sidebarSections = document.getElementById('sidebar-sections')!
 renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
 renderPlayerStats(createSection(sidebarSections, 'Player Stats'))
 renderFormatAndCategories(createSection(sidebarSections, 'Format & Categories'))
-renderPlayerStatParameters(createSection(sidebarSections, 'Player Stat Parameters'))
-renderAlgoParameters(createSection(sidebarSections, 'H-score Parameters'))
+renderModelParameters(createSection(sidebarSections, 'Model Parameters'))
 renderSlotCounts(createSection(sidebarSections, 'Position Parameters'))
 renderTradeParameters(createSection(sidebarSections, 'Trade Parameters'))
 // All sections are fully built; reveal the sidebar in one repaint
@@ -51,7 +49,7 @@ export function buildSessionRequest(): SessionRequest {
     return {
         league: { sport, n_drafters, n_picks, scoring_format, categories },
         slot_counts: getSlotCounts(),
-        parameters: { ...getPlayerStatParameters(), ...getAlgoParameters() },
+        parameters: getModelParameters(),
         data_source,
         injured_players,
         my_team_id,

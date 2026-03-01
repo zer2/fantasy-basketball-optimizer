@@ -105,6 +105,16 @@
     outline: 1px solid #666688;
 }
 
+.sidebar-input[type=number]::-webkit-inner-spin-button,
+.sidebar-input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.sidebar-input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
 .sidebar-caption {
     color: #666688;
     font-family: "Source Sans 3";
@@ -424,6 +434,25 @@
 
 .info-btn:hover {
     color: darkgrey;
+}
+
+.js-tooltip {
+    position: fixed;
+    display: none;
+    background-color: #1e1e2e;
+    color: lightgrey;
+    font-size: 0.72rem;
+    font-family: "Source Sans 3";
+    font-weight: 400;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid #3d3d55;
+    width: 220px;
+    white-space: normal;
+    text-align: left;
+    pointer-events: none;
+    z-index: 1000;
+    transform: translate(-50%, calc(-100% - 8px));
 }
 
 .param-caption {

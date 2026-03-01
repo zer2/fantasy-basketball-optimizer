@@ -25,7 +25,7 @@ const PARAM_SPECS: ParamSpec[] = [
     },
     {
         id: 'mp-psi', label: 'ψ (psi)', step: 0.05,
-        default: 0.5, min: 0.0, max: 1.0,
+        default: 0.8, min: 0.0, max: 1.0,
         caption: 'Fraction of missed games assumed to be replaced by a replacement-level player.',
     },
     {
@@ -35,68 +35,92 @@ const PARAM_SPECS: ParamSpec[] = [
     },
     {
         id: 'mp-aleph', label: 'ℵ (aleph)', step: 0.05,
-        default: 0.0, min: 0.0, max: 1.0,
+        default: 0.2, min: 0.0, max: 1.0,
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
         id: 'mp-omega', label: 'ω (omega)', step: 0.05,
-        default: 0.85, min: 0.0, max: 2.0,
+        default: 1.2, min: 0.0, max: 2.0,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
     {
         id: 'mp-gamma', label: 'γ (gamma)', step: 0.05,
-        default: 1.0, min: 0.0, max: 5.0,
+        default: 0.1, min: 0.0, max: 1.0,
         caption: 'Complements omega. Higher values require more general value to be sacrificed to pursue a punting strategy.',
     },
     {
-        id: 'mp-beth', label: 'ב (beth)', step: 0.1,
-        default: 0.0, min: 0.0, max: null,
+        id: 'mp-beth', label: 'ב (beth)', step: 0.5,
+        default: 3, min: 0.0, max: null,
         caption: "Bayesian shrinkage applied to your team's projected stats. Higher values pull projections closer to the average.",
     },
     {
         id: 'mp-n-iterations', label: 'Iterations', step: 1,
-        default: 15, min: 1, max: 50,
+        default: 30, min: 0, max: 10000,
         caption: 'Number of gradient descent iterations. More iterations improve convergence but increase compute time.',
     },
 ]
 
+/**
+ * Renders all model parameters as a compact 2-column grid of inputs with
+ * collapsible ⓘ captions. Covers all parameters from both player_stat_param_popover()
+ * and algorithm_param_popover() in parameters.py.
+ */
 export function renderModelParameters(container: HTMLElement): void {
+    const grid = document.createElement('div')
+    grid.className = 'param-grid'
+    container.append(grid)
+
     for (const spec of PARAM_SPECS) {
-        const label = document.createElement('label')
-        label.className = 'sidebar-label'
-        label.htmlFor = spec.id
-        label.textContent = spec.label
-        container.append(label)
-
-        const input = document.createElement('input')
-        input.type = 'number'
-        input.id = spec.id
-        input.className = 'sidebar-input'
-        input.min = String(spec.min)
-        if (spec.max !== null) input.max = String(spec.max)
-        input.step = String(spec.step)
-        input.value = String(spec.default)
-        container.append(input)
-
-        const caption = document.createElement('div')
-        caption.className = 'sidebar-caption'
-        caption.textContent = spec.caption
-        container.append(caption)
+        grid.append(makeParamItem(spec))
     }
 }
 
+/** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
+function makeParamItem(spec: ParamSpec): HTMLElement {
+    const item = document.createElement('div')
+    item.className = 'param-item'
+
+    const labelRow = document.createElement('div')
+    labelRow.className = 'param-label-row'
+
+    const label = document.createElement('label')
+    label.htmlFor = spec.id
+    label.textContent = spec.label
+    labelRow.append(label)
+
+    const infoBtn = document.createElement('button')
+    infoBtn.type = 'button'
+    infoBtn.className = 'info-btn'
+    infoBtn.textContent = 'ⓘ'
+    infoBtn.dataset.tooltip = spec.caption
+    labelRow.append(infoBtn)
+
+    const input = document.createElement('input')
+    input.type = 'number'
+    input.id = spec.id
+    input.className = 'sidebar-input'
+    input.min = String(spec.min)
+    if (spec.max !== null) input.max = String(spec.max)
+    input.step = String(spec.step)
+    input.value = String(spec.default)
+
+    item.append(labelRow, input)
+    return item
+}
+
 export function getModelParameters(): ModelParameters {
-    function val(id: string): number {
-        return parseFloat((document.getElementById(id) as HTMLInputElement).value)
-    }
     return {
-        upsilon:      val('mp-upsilon'),
-        psi:          val('mp-psi'),
-        chi:          val('mp-chi'),
-        aleph:        val('mp-aleph'),
-        omega:        val('mp-omega'),
-        gamma:        val('mp-gamma'),
-        beth:         val('mp-beth'),
-        n_iterations: val('mp-n-iterations'),
+        upsilon:      readNumberInput('mp-upsilon'),
+        psi:          readNumberInput('mp-psi'),
+        chi:          readNumberInput('mp-chi'),
+        aleph:        readNumberInput('mp-aleph'),
+        omega:        readNumberInput('mp-omega'),
+        gamma:        readNumberInput('mp-gamma'),
+        beth:         readNumberInput('mp-beth'),
+        n_iterations: readNumberInput('mp-n-iterations'),
     }
+}
+
+function readNumberInput(id: string): number {
+    return parseFloat((document.getElementById(id) as HTMLInputElement).value)
 }
