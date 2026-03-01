@@ -1,44 +1,83 @@
-// Collects: sport (NBA only), mode, n_drafters, n_picks, third_round_reversal, team_names, my_team_id
+// Collects: sport, platform, mode, n_drafters, n_picks,
+//           third_round_reversal, team_names, my_team_id
 // Mirrors league_settings_popover() in src/parameter_collection/league_settings.py
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeNumberInput, makeSidebarToggle } from '../helper_functions.js'
 
 export type DraftMode = 'Draft Mode' | 'Auction Mode' | 'Season Mode'
+export type Platform = 'Enter your own data' | 'Retrieve from Yahoo' | 'Retrieve from Fantrax' | 'Retrieve from ESPN'
+
+const PLATFORM_OPTIONS: Platform[] = [
+    'Enter your own data',
+    'Retrieve from Yahoo',
+    'Retrieve from Fantrax',
+    'Retrieve from ESPN',
+]
 
 /**
  * Renders the League Settings section into `container`.
- * Includes sport (static), mode, third-round-reversal toggle (Draft Mode only),
- * drafter/pick counts, team names textarea, and "Your team" selector.
+ * Layout: 2-column grid for compact items, followed by full-width items.
  */
 export function renderLeagueSettings(container: HTMLElement): void {
 
-    // Sport — static for now
-    const sportLabel = document.createElement('div')
-    sportLabel.className = 'sidebar-label'
-    sportLabel.textContent = 'Sport'
-    container.append(sportLabel)
+    const grid = document.createElement('div')
+    grid.className = 'ls-grid'
+    container.append(grid)
 
-    const sportValue = document.createElement('div')
-    sportValue.className = 'sidebar-static'
-    sportValue.textContent = 'NBA'
-    container.append(sportValue)
+    // ── Sport (left col) ──────────────────────────────────────────────────
+    // Only NBA is supported now; structured as a selector for future expansion.
+    const sportCell = makeCell()
+    sportCell.append(makeLabel('ls-sport', 'Sport'))
+    const sportSelect = makeCustomSelect(
+        'ls-sport',
+        [{ value: 'NBA', label: 'NBA' }],
+        'NBA',
+    )
+    sportCell.append(sportSelect.element)
+    grid.append(sportCell)
 
-    // Mode
-    container.append(makeLabel('ls-mode', 'Mode'))
+    // ── Mode (right col) ──────────────────────────────────────────────────
+    const modeCell = makeCell()
+    modeCell.append(makeLabel('ls-mode', 'Mode'))
     const modeSelect = makeCustomSelect(
         'ls-mode',
         ['Draft Mode', 'Auction Mode', 'Season Mode'].map(m => ({ value: m, label: m })),
         'Draft Mode',
     )
-    container.append(modeSelect.element)
+    modeCell.append(modeSelect.element)
+    grid.append(modeCell)
 
-    // Third round reversal toggle (Draft Mode only)
+    // ── Platform (full-width) ─────────────────────────────────────────────
+    // Controls whether league data is entered manually or pulled from a platform.
+    const platformCell = makeCell('ls-cell-full')
+    platformCell.append(makeLabel('ls-platform', 'Fantasy Platform'))
+    const platformSelect = makeCustomSelect(
+        'ls-platform',
+        PLATFORM_OPTIONS.map(p => ({ value: p, label: p })),
+        'Enter your own data',
+    )
+    platformCell.append(platformSelect.element)
+    grid.append(platformCell)
+
+    // ── Number of drafters (left col) ─────────────────────────────────────
+    const draftersCell = makeCell()
+    draftersCell.append(makeLabel('ls-n-drafters', 'Drafters'))
+    const nDraftersInput = makeNumberInput('ls-n-drafters', 12, 2)
+    draftersCell.append(nDraftersInput)
+    grid.append(draftersCell)
+
+    // ── Picks per drafter (right col) ─────────────────────────────────────
+    const picksCell = makeCell()
+    picksCell.append(makeLabel('ls-n-picks', 'Picks / drafter'))
+    picksCell.append(makeNumberInput('ls-n-picks', 13, 1))
+    grid.append(picksCell)
+
+    // ── Third round reversal toggle (full-width, Draft Mode only) ─────────
     const trrToggle = makeSidebarToggle('ls-third-round-reversal', 'Third round reversal')
     trrToggle.id = 'ls-trr-row'
     container.append(trrToggle)
 
-    // The checkbox inside the toggle is what the getter reads; get a reference for resetting it.
     const trrCheckbox = trrToggle.querySelector('input') as HTMLInputElement
 
     modeSelect.element.addEventListener('change', () => {
@@ -47,16 +86,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         if (mode !== 'Draft Mode') trrCheckbox.checked = false
     })
 
-    // Number of drafters
-    container.append(makeLabel('ls-n-drafters', 'Number of drafters'))
-    const nDraftersInput = makeNumberInput('ls-n-drafters', 12, 2)
-    container.append(nDraftersInput)
-
-    // Picks per drafter
-    container.append(makeLabel('ls-n-picks', 'Picks per drafter'))
-    container.append(makeNumberInput('ls-n-picks', 13, 1))
-
-    // Team names
+    // ── Team names textarea (full-width) ───────────────────────────────────
     container.append(makeLabel('ls-team-names', 'Team names (one per line)'))
     const teamNamesInput = document.createElement('textarea')
     teamNamesInput.id = 'ls-team-names'
@@ -65,8 +95,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     teamNamesInput.value = defaultTeamNames(12)
     container.append(teamNamesInput)
 
-    // My team — a select whose options are kept in sync with the team names textarea,
-    // so the user can only choose a name that is actually in the league.
+    // ── Your team selector (full-width) ───────────────────────────────────
     const myTeamSelect = makeCustomSelect('ls-my-team-id', [])
 
     function syncMyTeamSelect(): void {
@@ -74,14 +103,12 @@ export function renderLeagueSettings(container: HTMLElement): void {
         myTeamSelect.setOptions(names.map(n => ({ value: n, label: n })))
     }
 
-    // Populate options before appending to DOM so the element is never seen in an empty state.
     syncMyTeamSelect()
 
     container.append(makeLabel('ls-my-team-id', 'Your team'))
     container.append(myTeamSelect.element)
 
-    // Re-sync the team names textarea and "Your team" dropdown whenever n_drafters changes,
-    // so the textarea always has exactly n_drafters entries and the dropdown matches.
+    // Re-sync team list when drafter count changes
     nDraftersInput.addEventListener('change', () => {
         const n = parseInt(nDraftersInput.value)
         if (!isNaN(n) && n > 0) {
@@ -95,10 +122,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
 /**
  * Reads all League Settings values from the DOM and returns them as a plain object.
- * The `my_team_id` value is one of the strings from `team_names`.
  */
 export function getLeagueSettings(): {
     sport: string
+    platform: Platform
     mode: DraftMode
     n_drafters: number
     n_picks: number
@@ -107,7 +134,8 @@ export function getLeagueSettings(): {
     my_team_id: string
 } {
     return {
-        sport:                'NBA',
+        sport:                (document.getElementById('ls-sport') as HTMLInputElement).value,
+        platform:             (document.getElementById('ls-platform') as HTMLInputElement).value as Platform,
         mode:                 (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode,
         n_drafters:           parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value),
         n_picks:              parseInt((document.getElementById('ls-n-picks') as HTMLInputElement).value),
@@ -116,6 +144,13 @@ export function getLeagueSettings(): {
                                   .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
         my_team_id:           (document.getElementById('ls-my-team-id') as HTMLInputElement).value,
     }
+}
+
+/** Creates a grid cell `<div>` that stacks its label and input vertically. */
+function makeCell(extraClass?: string): HTMLDivElement {
+    const cell = document.createElement('div')
+    cell.className = extraClass ? `ls-cell ${extraClass}` : 'ls-cell'
+    return cell
 }
 
 /** Generates default team names ("Drafter 1", "Drafter 2", …) for `n` drafters. */

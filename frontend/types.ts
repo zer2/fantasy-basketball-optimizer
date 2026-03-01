@@ -59,6 +59,7 @@ export interface SessionRequest {
         scoring_format: string
         categories: string[]
     }
+    platform: string
     slot_counts: Record<string, number>
     parameters: ModelParameters
     data_source: DataSource

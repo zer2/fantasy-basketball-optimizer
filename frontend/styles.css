@@ -74,6 +74,25 @@
     gap: 6px;
 }
 
+/* ─── League settings 2-column grid ─────────────────────────────────────── */
+
+.ls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+}
+
+.ls-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;   /* prevent grid blowout from long custom-select text */
+}
+
+.ls-cell-full {
+    grid-column: 1 / -1;
+}
+
 /* ─── Sidebar input widgets ──────────────────────────────────────────────── */
 
 .sidebar-label {

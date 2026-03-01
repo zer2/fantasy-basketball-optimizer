@@ -43,11 +43,12 @@ sidebar.style.visibility = ''
  * ready to POST to `/sessions`.
  */
 export function buildSessionRequest(): SessionRequest {
-    const { sport, n_drafters, n_picks, my_team_id } = getLeagueSettings()
+    const { sport, platform, n_drafters, n_picks, my_team_id } = getLeagueSettings()
     const { scoring_format, categories } = getFormatAndCategories()
     const { data_source, injured_players } = getPlayerStatsParams()
     return {
         league: { sport, n_drafters, n_picks, scoring_format, categories },
+        platform,
         slot_counts: getSlotCounts(),
         parameters: getModelParameters(),
         data_source,
