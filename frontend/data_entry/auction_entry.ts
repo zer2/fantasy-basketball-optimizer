@@ -24,6 +24,23 @@ const TEAM_W  = 85
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Returns the current auction state for use in /evaluate requests. */
+export function getAuctionState(): {
+    player_assignments: Record<string, string[]>
+    remaining_cash: Record<string, number>
+} {
+    const player_assignments: Record<string, string[]> = {}
+    const remaining_cash: Record<string, number> = {}
+    for (let d = 0; d < nDrafters; d++) {
+        const name = teamNames[d] ?? `Drafter ${d + 1}`
+        const teamPicks = picks.map(row => row[d]).filter(Boolean) as AuctionPick[]
+        player_assignments[name] = teamPicks.map(p => p.player)
+        const spent = teamPicks.reduce((sum, p) => sum + p.cost, 0)
+        remaining_cash[name] = cashPerTeam - spent
+    }
+    return { player_assignments, remaining_cash }
+}
+
 export function renderAuctionEntry(container: HTMLElement): void {
     const cfg = readConfig()
 

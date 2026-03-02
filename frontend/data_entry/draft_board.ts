@@ -20,6 +20,16 @@ const TEAM_W  = 85   // px — per-drafter column
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Returns the current draft state for use in /evaluate requests. */
+export function getDraftState(): { player_assignments: Record<string, string[]> } {
+    const player_assignments: Record<string, string[]> = {}
+    for (let d = 0; d < nDrafters; d++) {
+        const name = teamNames[d] ?? `Drafter ${d + 1}`
+        player_assignments[name] = drafted.map(row => row[d]).filter(Boolean) as string[]
+    }
+    return { player_assignments }
+}
+
 export function renderDraftBoard(container: HTMLElement): void {
     const cfg = readConfig()
 

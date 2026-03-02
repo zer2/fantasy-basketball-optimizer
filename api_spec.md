@@ -240,16 +240,29 @@ on every call. The session holds no pick state.
 ```json
 {
   "player_assignments": {
-    "team_1": ["Stephen Curry", "Kevin Durant"],
-    "team_2": ["LeBron James"],
-    "team_3": []
+    "Drafter 1": ["Stephen Curry", "Kevin Durant"],
+    "Drafter 2": ["LeBron James"],
+    "Drafter 3": []
   },
+  "remaining_cash": {
+    "Drafter 1": 163,
+    "Drafter 2": 178,
+    "Drafter 3": 200
+  },
+  "my_team_id": "Drafter 1",
   "exclusion_list": ["Zion Williamson"]
 }
 ```
 
-`player_assignments` maps every team ID to their picks so far. Required; send empty arrays
-for teams with no picks yet.
+`player_assignments` maps every team name to their picks so far. Team names are the
+human-readable strings entered in the league settings (e.g. `"Drafter 1"`) — not
+positional IDs. Required; send empty arrays for teams with no picks yet.
+
+`remaining_cash` — required in Auction Mode only; maps each team name to the dollar
+amount not yet spent. Omit entirely for Draft Mode.
+
+`my_team_id` — the team name of the user running the tool. Passed at evaluate time from
+the seat selector; tells the backend which team is "yours" for the roster display.
 
 `exclusion_list` is optional — removes players from the candidate pool without affecting
 coefficient calculations (use `PATCH /sessions/{id}` with `injured_players` for that).
