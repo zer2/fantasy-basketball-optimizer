@@ -760,3 +760,271 @@ tr {
 .panel-weight::after {
     content: '%';
 }
+
+/* ─── Main layout ────────────────────────────────────────────────────────────── */
+
+#content-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+#left-panel {
+    flex: 0 0 390px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#candidate-panel {
+    flex: 1;
+    min-width: 0;
+}
+
+#right-header:not(:empty) {
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #3d3d55;
+}
+
+#right-sub-header:not(:empty) {
+    margin-bottom: 12px;
+}
+
+#season-rosters-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+#rosters-left  { flex: 0 0 390px; }
+#rosters-right { flex: 1; min-width: 0; }
+
+#live-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+/* ─── Season tab bar ─────────────────────────────────────────────────────────── */
+
+#season-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #3d3d55;
+}
+
+.season-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: #666688;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-family: "Source Sans 3";
+}
+
+.season-tab-btn.active {
+    color: white;
+    border-bottom-color: #666688;
+}
+
+/* ─── Data entry tables ──────────────────────────────────────────────────────── */
+
+.entry-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.8rem;
+    table-layout: fixed;
+}
+
+.entry-table th {
+    background: #181923;
+    color: #aaaaaa;
+    padding: 5px 8px;
+    text-align: center;
+    font-weight: 500;
+    border: 1px solid #3d3d55;
+    white-space: nowrap;
+}
+
+.entry-table td {
+    background: #1a1c28;
+    border: 1px solid #3d3d55;
+    padding: 2px 4px;
+    text-align: center;
+    color: #aaaaaa;
+}
+
+.entry-table td.current-pick {
+    outline: 2px solid #666688;
+    outline-offset: -2px;
+}
+
+.entry-table td.drafted {
+    color: white;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.entry-cell-label {
+    background: #181923 !important;
+    color: #aaaaaa !important;
+    font-weight: 500;
+    width: 48px;
+}
+
+/* Scrollable wrapper for tall/wide entry tables */
+.entry-table-scroll {
+    max-height: 340px;
+    overflow: auto;
+}
+
+/* ─── Pick control ───────────────────────────────────────────────────────────── */
+
+.pick-control-label {
+    color: #aaaaaa;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+}
+
+.pick-control-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-top: 6px;
+    margin-bottom: 12px;
+}
+
+.pick-control-buttons {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.pick-btn {
+    padding: 5px 10px;
+    white-space: nowrap;
+    background: #2a2a33;
+    border: 1px solid #3d3d55;
+    color: white;
+    cursor: pointer;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    font-family: "Source Sans 3";
+}
+
+.pick-btn:hover { background: #3d3d55; }
+
+/* ─── Auction board ──────────────────────────────────────────────────────────── */
+
+.pick-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.pick-col-label {
+    font-size: 0.75rem;
+    color: #aaaaaa;
+}
+
+.auction-cost-input {
+    width: 60px;
+    padding: 4px 6px;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+    background: #1e1e2e;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    color: white;
+    flex-shrink: 0;
+}
+
+.auction-cell-name {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: white;
+}
+
+.auction-cell-cost {
+    font-size: 0.7rem;
+    color: #8888aa;
+    margin-top: 1px;
+}
+
+.auction-budget-label {
+    font-size: 0.75rem;
+}
+
+.auction-budget-cell {
+    background: #181923;
+    color: #aaaaaa;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-align: center;
+    padding: 4px 6px;
+    border-top: 1px solid #3d3d55;
+}
+
+/* ─── Live bar ───────────────────────────────────────────────────────────────── */
+
+.refresh-btn {
+    padding: 6px 14px;
+    background: #2a2a33;
+    border: 1px solid #3d3d55;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: "Source Sans 3";
+}
+
+.refresh-btn:hover { background: #3d3d55; }
+
+/* ─── Seat selector ──────────────────────────────────────────────────────────── */
+
+.seat-selector-wrap {
+    margin-bottom: 8px;
+}
+
+/* ─── Waiver controls bar ────────────────────────────────────────────────────── */
+
+.waiver-bar {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+}
+
+.waiver-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 160px;
+}
+
+/* ─── Team display stub ──────────────────────────────────────────────────────── */
+
+.team-display-stub {
+    color: #555577;
+    font-size: 0.8rem;
+    margin-top: 12px;
+    font-style: italic;
+}
+
+/* ─── Coming soon ────────────────────────────────────────────────────────────── */
+
+.coming-soon {
+    color: #555577;
+    font-style: italic;
+    padding: 24px 0;
+}

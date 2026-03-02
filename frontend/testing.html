@@ -20,9 +20,35 @@
         </aside>
 
         <main id="main-content">
-            <table id="realtable">
-                <tbody></tbody>
-            </table>
+
+            <!-- Season tab bar (Season mode only) -->
+            <nav id="season-nav" style="display:none"></nav>
+
+            <!-- Live data controls (Draft/Auction + live platform only) -->
+            <div id="live-bar" style="display:none"></div>
+
+            <!-- Standard content row: optional left panel + candidate panel -->
+            <div id="content-row">
+                <div id="left-panel" style="display:none"></div>
+                <div id="candidate-panel">
+                    <div id="right-header"></div>
+                    <div id="right-sub-header"></div>
+                    <table id="realtable"><tbody></tbody></table>
+                    <div id="right-footer"></div>
+                </div>
+            </div>
+
+            <!-- Season Rosters two-col (replaces content-row for Rosters tab) -->
+            <div id="season-rosters-row" style="display:none">
+                <div id="rosters-left"></div>
+                <div id="rosters-right"></div>
+            </div>
+
+            <!-- Season Trading placeholder -->
+            <div id="season-trading-row" style="display:none">
+                <p class="coming-soon">Trading — coming soon</p>
+            </div>
+
         </main>
 
     </div>

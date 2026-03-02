@@ -7,6 +7,7 @@ import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
 import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
+import { initLayout } from './layout.js'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,9 @@ let players: Player[] = [
     }
 ]
 
+export function getPlayers():    Player[] { return players }
+export function getCategories(): string[] { return categories }
+
 // ─── Build the table ──────────────────────────────────────────────────────────
 
 const table = document.getElementById('realtable') as HTMLTableElement
@@ -307,10 +311,14 @@ function buildTable(): void {
 buildTable()
 
 // ── DEV ONLY: mock backend response on mode change ────────────────────────────
+// Registered before initLayout so updateTable fires before applyLayout on mode
+// change, ensuring realtable.style.width is correct when applyLayout reads it.
 // Remove once the real backend call is wired up to the mode change event.
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
     updateTable(players, categories)
 })
+
+initLayout()
 
 /**
  * Updates the player data and rebuilds the table.
