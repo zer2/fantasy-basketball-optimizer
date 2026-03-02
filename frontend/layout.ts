@@ -23,6 +23,9 @@ export function initLayout(): void {
         .addEventListener('change', applyLayout)
 }
 
+/** Re-runs the layout dispatcher with current DOM state. Called by the Apply button. */
+export function reapplyLayout(): void { applyLayout() }
+
 // ─── Layout dispatcher ────────────────────────────────────────────────────────
 
 function applyLayout(): void {
@@ -51,7 +54,6 @@ function showOwnDataLayout(mode: string): void {
     hide('season-trading-row')
 
     show('content-row')
-    show('candidate-panel')
 
     const rightHeader    = document.getElementById('right-header')!
     const rightSubHeader = document.getElementById('right-sub-header')!
@@ -90,7 +92,6 @@ function showLiveLayout(): void {
     hide('season-trading-row')
 
     show('content-row')
-    show('candidate-panel')
 
     const rightHeader    = document.getElementById('right-header')!
     const rightSubHeader = document.getElementById('right-sub-header')!
@@ -115,6 +116,11 @@ function showLiveLayout(): void {
 function showSeasonLayout(): void {
     hide('live-bar')
     hide('left-panel')
+
+    // Clear sub-header so the seat selector from draft/auction mode doesn't bleed in
+    const rightSubHeader = document.getElementById('right-sub-header')!
+    rightSubHeader.innerHTML    = ''
+    rightSubHeader.style.maxWidth = ''
 
     show('season-nav')
 
@@ -157,7 +163,6 @@ function activateSeasonTab(tabId: string): void {
         hide('season-rosters-row')
         hide('season-trading-row')
         show('content-row')
-        show('candidate-panel')
 
         const rightHeader = document.getElementById('right-header')!
         rightHeader.innerHTML = ''
@@ -183,17 +188,22 @@ function activateSeasonTab(tabId: string): void {
 // ─── Waiver controls ──────────────────────────────────────────────────────────
 
 function renderWaiverControls(container: HTMLElement): void {
-    const teamNames   = readTeamNames()
-    const bar = document.createElement('div')
-    bar.className = 'waiver-filter-bar'
+    const teamNames = readTeamNames()
+    const wrap = document.createElement('div')
+    wrap.className = 'seat-selector-wrap'
+
+    const label = document.createElement('div')
+    label.className   = 'pick-control-label'
+    label.textContent = 'Which team do you want to drop a player from?'
+    wrap.append(label)
 
     const teamSel = makeCustomSelect(
         'waiver-team-select',
         teamNames.map(n => ({ value: n, label: n })),
     )
-    bar.append(teamSel.element)
+    wrap.append(teamSel.element)
 
-    container.append(bar)
+    container.append(wrap)
 }
 
 // ─── Seat selector ────────────────────────────────────────────────────────────

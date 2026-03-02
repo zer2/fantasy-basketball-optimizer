@@ -65,20 +65,22 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     scroll.append(table)
     leftEl.append(scroll)
 
-    // Lock-in button
-    const lockBtn = document.createElement('button')
-    lockBtn.className   = 'lock-in-btn'
-    lockBtn.textContent = 'Lock in'
-    leftEl.append(lockBtn)
-
     // ── Right: team selector + stub ─────────────────────────────────────────
+
+    const wrap = document.createElement('div')
+    wrap.className = 'seat-selector-wrap'
+
+    const label = document.createElement('div')
+    label.className   = 'pick-control-label'
+    label.textContent = 'Which team do you want to inspect?'
+    wrap.append(label)
 
     const teamSel = makeCustomSelect(
         'sr-team-select',
         teamNames.map(n => ({ value: n, label: n })),
     )
-    teamSel.element.style.marginBottom = '10px'
-    rightEl.append(teamSel.element)
+    wrap.append(teamSel.element)
+    rightEl.append(wrap)
 
     const stub = document.createElement('div')
     stub.className   = 'team-display-stub'

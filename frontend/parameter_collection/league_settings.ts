@@ -103,29 +103,13 @@ export function renderLeagueSettings(container: HTMLElement): void {
     teamNamesInput.value = defaultTeamNames(12)
     container.append(teamNamesInput)
 
-    // ── Your team selector (full-width) ───────────────────────────────────
-    const myTeamSelect = makeCustomSelect('ls-my-team-id', [])
-
-    function syncMyTeamSelect(): void {
-        const names = teamNamesInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0)
-        myTeamSelect.setOptions(names.map(n => ({ value: n, label: n })))
-    }
-
-    syncMyTeamSelect()
-
-    container.append(makeLabel('ls-my-team-id', 'Your team'))
-    container.append(myTeamSelect.element)
-
-    // Re-sync team list when drafter count changes
+    // Re-fill team names when drafter count changes
     nDraftersInput.addEventListener('change', () => {
         const n = parseInt(nDraftersInput.value)
         if (!isNaN(n) && n > 0) {
             teamNamesInput.value = defaultTeamNames(n)
-            syncMyTeamSelect()
         }
     })
-
-    teamNamesInput.addEventListener('input', syncMyTeamSelect)
 }
 
 /**
@@ -140,7 +124,6 @@ export function getLeagueSettings(): {
     cash_per_team: number
     third_round_reversal: boolean
     team_names: string[]
-    my_team_id: string
 } {
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
     return {
@@ -153,7 +136,6 @@ export function getLeagueSettings(): {
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
         team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
                                   .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
-        my_team_id:           (document.getElementById('ls-my-team-id') as HTMLInputElement).value,
     }
 }
 

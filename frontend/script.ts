@@ -7,7 +7,7 @@ import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
 import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
-import { initLayout } from './layout.js'
+import { initLayout, reapplyLayout } from './layout.js'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -30,12 +30,43 @@ function createSection(parent: HTMLElement, title: string): HTMLElement {
 
 const sidebar = document.getElementById('sidebar') as HTMLElement
 const sidebarSections = document.getElementById('sidebar-sections')!
+
+/**
+ * Appends a small "Apply" button to a sidebar section content div.
+ * The callback is invoked when clicked; `updateTable` always runs before
+ * `reapplyLayout` to keep the table-width ordering constraint intact.
+ */
+function addApplyBtn(container: HTMLElement, onClick: () => void): void {
+    const btn = document.createElement('button')
+    btn.className   = 'section-apply-btn'
+    btn.textContent = 'Apply'
+    btn.addEventListener('click', onClick)
+    container.append(btn)
+}
+
 renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
-renderPlayerStats(createSection(sidebarSections, 'Player Stats'))
-renderFormatAndCategories(createSection(sidebarSections, 'Format & Categories'))
-renderModelParameters(createSection(sidebarSections, 'Model Parameters'))
-renderSlotCounts(createSection(sidebarSections, 'Position Parameters'))
-renderTradeParameters(createSection(sidebarSections, 'Trade Parameters'))
+// League Settings auto-updates via listeners added after initLayout() below.
+
+const playerStatsSection = createSection(sidebarSections, 'Player Stats')
+renderPlayerStats(playerStatsSection)
+addApplyBtn(playerStatsSection, () => { updateTable(players, categories); reapplyLayout() })
+
+const formatSection = createSection(sidebarSections, 'Format & Categories')
+renderFormatAndCategories(formatSection)
+addApplyBtn(formatSection, () => updateTable(players, categories))
+
+const modelSection = createSection(sidebarSections, 'Model Parameters')
+renderModelParameters(modelSection)
+addApplyBtn(modelSection, () => updateTable(players, categories))
+
+const slotSection = createSection(sidebarSections, 'Position Parameters')
+renderSlotCounts(slotSection)
+addApplyBtn(slotSection, () => updateTable(players, categories))
+
+const tradeSection = createSection(sidebarSections, 'Trade Parameters')
+renderTradeParameters(tradeSection)
+addApplyBtn(tradeSection, () => updateTable(players, categories))
+
 // All sections are fully built; reveal the sidebar in one repaint
 sidebar.style.visibility = ''
 
@@ -44,7 +75,7 @@ sidebar.style.visibility = ''
  * ready to POST to `/sessions`.
  */
 export function buildSessionRequest(): SessionRequest {
-    const { sport, platform, mode, n_drafters, n_picks, cash_per_team, my_team_id } = getLeagueSettings()
+    const { sport, platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     const { scoring_format, categories } = getFormatAndCategories()
     const { data_source, injured_players } = getPlayerStatsParams()
     const league: SessionRequest['league'] = { sport, n_drafters, n_picks, scoring_format, categories }
@@ -56,7 +87,7 @@ export function buildSessionRequest(): SessionRequest {
         parameters: getModelParameters(),
         data_source,
         injured_players,
-        my_team_id,
+        // my_team_id comes from the seat selector in the main content area
     }
 }
 
@@ -319,6 +350,26 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 })
 
 initLayout()
+
+// ── League settings auto-update ───────────────────────────────────────────────
+// Number inputs fire on 'change' (when focus leaves); updateTable runs first to
+// set realtable.style.width before reapplyLayout reads it.
+for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
+    document.getElementById(id)!.addEventListener('change', () => {
+        updateTable(players, categories)
+        reapplyLayout()
+    })
+}
+
+// Team names debounce: wait 600 ms after last keystroke to avoid flicker while typing.
+let teamNamesTimer: ReturnType<typeof setTimeout> | null = null
+document.getElementById('ls-team-names')!.addEventListener('input', () => {
+    if (teamNamesTimer) clearTimeout(teamNamesTimer)
+    teamNamesTimer = setTimeout(() => {
+        updateTable(players, categories)
+        reapplyLayout()
+    }, 600)
+})
 
 /**
  * Updates the player data and rebuilds the table.

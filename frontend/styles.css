@@ -17,6 +17,25 @@
     flex-direction: column;
 }
 
+.section-apply-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 6px;
+    background: #2a2a3e;
+    border: 1px solid #3d3d55;
+    border-radius: 4px;
+    color: #aaaacc;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.section-apply-btn:hover {
+    background: #3d3d55;
+    color: white;
+}
+
 .sidebar-title {
     color: lightgrey;
     font-family: "Source Sans 3";
@@ -793,12 +812,12 @@ tr {
 
 #season-rosters-row {
     display: flex;
+    flex-direction: column;
     gap: 20px;
-    align-items: flex-start;
 }
 
-#rosters-left  { flex: 0 0 390px; }
-#rosters-right { flex: 1; min-width: 0; }
+#rosters-left  { width: 100%; }
+#rosters-right { width: 100%; }
 
 #live-bar {
     display: flex;
