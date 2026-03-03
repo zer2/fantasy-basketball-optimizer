@@ -11,10 +11,12 @@ import { makeCustomSelect }    from './custom_select.js'
 
 let seasonNavBuilt = false
 let currentSeat    = ''
+let _onEvaluate: (() => void | Promise<void>) | undefined
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export function initLayout(): void {
+export function initLayout(opts: { onEvaluate?: () => void | Promise<void> } = {}): void {
+    _onEvaluate = opts.onEvaluate
     applyLayout()
     // Re-apply whenever mode or platform changes
     document.getElementById('ls-mode')!.parentElement!
@@ -25,6 +27,9 @@ export function initLayout(): void {
 
 /** Re-runs the layout dispatcher with current DOM state. Called by the Apply button. */
 export function reapplyLayout(): void { applyLayout() }
+
+/** Returns the currently selected seat (team name). Empty string if none selected. */
+export function getCurrentSeat(): string { return currentSeat }
 
 // ─── Layout dispatcher ────────────────────────────────────────────────────────
 
@@ -68,9 +73,9 @@ function showOwnDataLayout(mode: string): void {
     rightSubHeader.style.maxWidth = hscoreW
 
     if (mode === 'Auction Mode') {
-        renderAuctionEntry(rightHeader)
+        renderAuctionEntry(rightHeader, _onEvaluate)
     } else {
-        renderDraftBoard(rightHeader)
+        renderDraftBoard(rightHeader, _onEvaluate)
     }
 
     // Seat selector lives below the divider, directly above the H-score table
@@ -235,7 +240,15 @@ function renderSeatSelector(container: HTMLElement, btnLabel = 'Run algorithm'):
     runBtn.className   = 'pick-btn'
     runBtn.textContent = btnLabel
     runBtn.addEventListener('click', () => {
-        // TODO: trigger backend call
+        currentSeat = sel.getValue() ?? currentSeat
+        if (_onEvaluate) {
+            const result = _onEvaluate()
+            if (result instanceof Promise) {
+                runBtn.disabled = true
+                result.finally(() => { runBtn.disabled = false })
+                       .catch(err => console.error('Evaluate failed:', err))
+            }
+        }
     })
     row.append(runBtn)
 

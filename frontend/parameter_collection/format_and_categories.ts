@@ -9,9 +9,9 @@ import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, renderMultiselect } from '../helper_functions.js'
 
 const SCORING_FORMAT_OPTIONS: { label: string; value: string }[] = [
-    { label: 'Head to Head: Each Category',   value: 'H2H_EC' },
-    { label: 'Head to Head: Most Categories', value: 'H2H_MC' },
-    { label: 'Rotisserie',                    value: 'Rotisserie' },
+    { label: 'Head to Head: Each Category',   value: 'Head to Head: Each Category'   },
+    { label: 'Head to Head: Most Categories', value: 'Head to Head: Most Categories' },
+    { label: 'Rotisserie',                    value: 'Rotisserie'                    },
 ]
 
 const ALL_CATEGORIES: string[] = [
@@ -44,7 +44,7 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     const fmtSelect = makeCustomSelect(
         'fc-scoring-format',
         SCORING_FORMAT_OPTIONS,
-        'H2H_EC',
+        'Head to Head: Each Category',
     )
     container.append(fmtSelect.element)
 

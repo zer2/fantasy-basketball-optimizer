@@ -18,6 +18,7 @@ let nDrafters = 0
 let nPicks    = 0
 let cashPerTeam = 0
 let configKey = ''
+let _onPick: (() => void | Promise<void>) | undefined
 
 const ROUND_W = 46
 const TEAM_W  = 85
@@ -41,7 +42,11 @@ export function getAuctionState(): {
     return { player_assignments, remaining_cash }
 }
 
-export function renderAuctionEntry(container: HTMLElement): void {
+export function renderAuctionEntry(
+    container: HTMLElement,
+    onPick?: () => void | Promise<void>,
+): void {
+    if (onPick !== undefined) _onPick = onPick
     const cfg = readConfig()
 
     if (cfg.key !== configKey) {
@@ -113,6 +118,14 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         picks[emptyRow][dIdx] = { player, cost }
         history.push([emptyRow, dIdx])
         renderAuctionEntry(container)
+        if (_onPick) {
+            const result = _onPick()
+            if (result instanceof Promise) {
+                lockBtn.disabled = true
+                result.finally(() => { lockBtn.disabled = false })
+                       .catch(err => console.error('Evaluate after pick failed:', err))
+            }
+        }
     })
 
     const undoBtn = document.createElement('button')

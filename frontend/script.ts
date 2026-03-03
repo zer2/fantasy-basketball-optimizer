@@ -7,7 +7,10 @@ import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
 import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
-import { initLayout, reapplyLayout } from './layout.js'
+import { initLayout, reapplyLayout, getCurrentSeat } from './layout.js'
+import { getDraftState } from './data_entry/draft_board.js'
+import { getAuctionState } from './data_entry/auction_entry.js'
+import * as api from './api.js'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -33,14 +36,20 @@ const sidebarSections = document.getElementById('sidebar-sections')!
 
 /**
  * Appends a small "Apply" button to a sidebar section content div.
- * The callback is invoked when clicked; `updateTable` always runs before
- * `reapplyLayout` to keep the table-width ordering constraint intact.
+ * The callback may be sync or async; errors are caught and logged.
  */
-function addApplyBtn(container: HTMLElement, onClick: () => void): void {
+function addApplyBtn(container: HTMLElement, onClick: () => void | Promise<void>): void {
     const btn = document.createElement('button')
     btn.className   = 'section-apply-btn'
     btn.textContent = 'Apply'
-    btn.addEventListener('click', onClick)
+    btn.addEventListener('click', () => {
+        const result = onClick()
+        if (result instanceof Promise) {
+            btn.disabled = true
+            result.finally(() => { btn.disabled = false })
+                  .catch(err => console.error('Apply failed:', err))
+        }
+    })
     container.append(btn)
 }
 
@@ -49,26 +58,47 @@ renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
 
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
-addApplyBtn(playerStatsSection, () => { updateTable(players, categories); reapplyLayout() })
+addApplyBtn(playerStatsSection, async () => {
+    const { data_source, injured_players } = getPlayerStatsParams()
+    await createOrPatchSession(1, { data_source, injured_players })
+    await runEvaluate()
+})
 
 const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
-addApplyBtn(formatSection, () => updateTable(players, categories))
+addApplyBtn(formatSection, async () => {
+    const { scoring_format, categories: cats } = getFormatAndCategories()
+    await createOrPatchSession(4, { league: { scoring_format, categories: cats } })
+    await runEvaluate()
+})
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
 renderModelParameters(modelSection)
-addApplyBtn(modelSection, () => updateTable(players, categories))
+addApplyBtn(modelSection, async () => {
+    const parameters = getModelParameters()
+    await createOrPatchSession(3, { parameters })
+    await runEvaluate()
+})
 
 const slotSection = createSection(sidebarSections, 'Position Parameters')
 renderSlotCounts(slotSection)
-addApplyBtn(slotSection, () => updateTable(players, categories))
+addApplyBtn(slotSection, async () => {
+    const slot_counts = getSlotCounts()
+    await createOrPatchSession(4, { slot_counts })
+    await runEvaluate()
+})
 
 const tradeSection = createSection(sidebarSections, 'Trade Parameters')
 renderTradeParameters(tradeSection)
-addApplyBtn(tradeSection, () => updateTable(players, categories))
+// Trade parameters target a future endpoint; no backend call yet.
+addApplyBtn(tradeSection, () => {})
 
 // All sections are fully built; reveal the sidebar in one repaint
 sidebar.style.visibility = ''
+
+// ─── Session management ───────────────────────────────────────────────────────
+
+let sessionId: string | null = null
 
 /**
  * Collects all sidebar parameter values and assembles a `SessionRequest` object
@@ -91,138 +121,66 @@ export function buildSessionRequest(): SessionRequest {
     }
 }
 
+/**
+ * Creates a new session if none exists, or patches the existing one starting from
+ * `fromStep` with the given partial parameter body.
+ */
+async function createOrPatchSession(
+    fromStep: number,
+    patchBody: Record<string, unknown> = {},
+): Promise<void> {
+    if (!sessionId) {
+        const req = buildSessionRequest()
+        const resp = await api.createSession(req)
+        sessionId = resp.session_id
+        categories = resp.categories
+    } else {
+        await api.patchSession(sessionId, { from_step: fromStep, ...patchBody })
+    }
+}
+
+/**
+ * Ensures a session exists (creating one from current sidebar state if not).
+ * Called before evaluate when the session may not have been explicitly created yet.
+ */
+async function ensureSession(): Promise<void> {
+    if (sessionId) return
+    const req = buildSessionRequest()
+    const resp = await api.createSession(req)
+    sessionId = resp.session_id
+    categories = resp.categories
+}
+
+/**
+ * Runs the evaluate endpoint with the current draft / auction state and
+ * updates the candidate table with the response.
+ */
+export async function runEvaluate(): Promise<void> {
+    await ensureSession()
+
+    // Default to the first team name if no seat has been chosen yet
+    const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
+    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+
+    let evalReq: Parameters<typeof api.evaluate>[1]
+    if (mode === 'Auction Mode') {
+        const { player_assignments, remaining_cash } = getAuctionState()
+        evalReq = { player_assignments, my_team_id: seat, remaining_cash }
+    } else {
+        const { player_assignments } = getDraftState()
+        evalReq = { player_assignments, my_team_id: seat }
+    }
+
+    const resp = await api.evaluate(sessionId!, evalReq)
+    updateTable(api.candidatesToPlayers(resp.candidates))
+    reapplyLayout()
+}
+
 // ─── Player table ─────────────────────────────────────────────────────────────
 
 let categories: string[] = ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"]
 
-let players: Player[] = [
-    {
-        name: "Nikola Jokic (C)",
-        h_score: 53.7,
-        h_rank: 1,
-        g_rank: 1,
-        win_rates: [66.2, 14.2, 33.9, 66.3, 73.4, 72.3, 59.7, 67.7, 29.7],
-        category_weights: [95, 83, 98, 114, 95, 102, 103, 111, 100],
-        g_score_rows: [
-            { label: 'Current diff', values: [ 0.42, -0.18, -0.31,  0.28,  0.61,  0.54,  0.12,  0.19, -0.38], total:  1.29, isTotal: false },
-            { label: 'Jokic',        values: [ 1.80, -2.10, -0.90,  1.70,  2.40,  2.20,  0.50,  1.60, -1.30], total:  5.90, isTotal: false },
-            { label: 'Future diff',  values: [ 0.31, -0.09, -0.22,  0.19,  0.47,  0.38,  0.09,  0.14, -0.27], total:  1.00, isTotal: false },
-            { label: 'Total diff',   values: [ 2.53, -2.37, -1.43,  2.17,  3.48,  3.12,  0.71,  1.93, -1.95], total:  8.19, isTotal: true  },
-        ],
-        flex_allocations: {
-            base_positions: ["PG", "SG", "SF", "PF", "C"],
-            rows: [
-                { label: "G-1",    values: [0.65,  0.35,  -999,  -999,  -999], isTotal: false },
-                { label: "F-2",    values: [-999,  -999,  1.10,  0.90,  -999], isTotal: false },
-                { label: "Util-3", values: [0.50,  0.40,  0.70,  0.60,  0.80], isTotal: false },
-                { label: "Total",  values: [1.15,  0.75,  1.80,  1.50,  0.80], isTotal: true  },
-            ]
-        },
-        roster: {
-            slots: ["PG1", "SG1", "SF1", "PF1", "C1", "C2", "G1", "G2", "F1", "F2", "Util1", "Util2", "Util3"],
-            assignments: {
-                "PG1":   { name: "Curry",  isCandidate: false },
-                "SG1":   null,
-                "SF1":   { name: "Durant", isCandidate: false },
-                "PF1":   null,
-                "C1":    { name: "Jokic",  isCandidate: true  },
-                "C2":    null,
-                "G1":    { name: "Paul",   isCandidate: false },
-                "G2":    null,
-                "F1":    null,
-                "F2":    null,
-                "Util1": null,
-                "Util2": null,
-                "Util3": null,
-            }
-        },
-        auction_values: { your_dollar: 52, gnrc_dollar: 48, orig_dollar: 50 },
-    },
-    {
-        name: "Shai Gilgeous-Alexander (PG)",
-        h_score: 53.0,
-        h_rank: 2,
-        g_rank: 2,
-        win_rates: [40.8, 71.9, 65.4, 58.4, 10.8, 55.2, 59.1, 35.2, 58.2],
-        category_weights: [103, 95, 103, 103, 79, 105, 101, 107, 103],
-        g_score_rows: [
-            { label: 'Current diff', values: [ 0.42, -0.18, -0.31,  0.28,  0.61,  0.54,  0.12,  0.19, -0.38], total:  1.29, isTotal: false },
-            { label: 'SGA',          values: [-0.60,  1.80,  1.40,  0.80, -2.40,  0.50,  0.60,  0.50,  0.60], total:  3.20, isTotal: false },
-            { label: 'Future diff',  values: [ 0.31, -0.09, -0.22,  0.19,  0.47,  0.38,  0.09,  0.14, -0.27], total:  1.00, isTotal: false },
-            { label: 'Total diff',   values: [ 0.13,  1.53,  0.87,  1.27, -1.32,  1.42,  0.81,  0.83, -0.05], total:  5.49, isTotal: true  },
-        ],
-        flex_allocations: {
-            base_positions: ["PG", "SG", "SF", "PF", "C"],
-            rows: [
-                { label: "G-1",    values: [0.40,  0.60,  -999,  -999,  -999], isTotal: false },
-                { label: "F-2",    values: [-999,  -999,  1.20,  0.80,  -999], isTotal: false },
-                { label: "Util-3", values: [0.60,  0.30,  0.70,  0.50,  0.90], isTotal: false },
-                { label: "Total",  values: [1.00,  0.90,  1.90,  1.30,  0.90], isTotal: true  },
-            ]
-        },
-        roster: {
-            slots: ["PG1", "SG1", "SF1", "PF1", "C1", "C2", "G1", "G2", "F1", "F2", "Util1", "Util2", "Util3"],
-            assignments: {
-                "PG1":   { name: "Curry",  isCandidate: false },
-                "SG1":   { name: "SGA",    isCandidate: true  },
-                "SF1":   { name: "Durant", isCandidate: false },
-                "PF1":   null,
-                "C1":    null,
-                "C2":    null,
-                "G1":    { name: "Paul",   isCandidate: false },
-                "G2":    null,
-                "F1":    null,
-                "F2":    null,
-                "Util1": null,
-                "Util2": null,
-                "Util3": null,
-            }
-        },
-        auction_values: { your_dollar: 45, gnrc_dollar: 43, orig_dollar: 44 },
-    },
-    {
-        name: "Victor Wembanyama (C)",
-        h_score: 52.1,
-        h_rank: 3,
-        g_rank: 3,
-        win_rates: [51.3, 54.2, 66.2, 41.7, 57.4,  9.6, 39.2, 73.2, 76.2],
-        category_weights: [111, 105, 107, 102, 124, 67, 85, 101, 98],
-        g_score_rows: [
-            { label: 'Current diff', values: [ 0.42, -0.18, -0.31,  0.28,  0.61,  0.54,  0.12,  0.19, -0.38], total:  1.29, isTotal: false },
-            { label: 'Wembanyama',   values: [ 0.10,  0.20,  1.50, -0.60,  0.40, -2.60, -0.40,  2.00,  1.80], total:  2.40, isTotal: false },
-            { label: 'Future diff',  values: [ 0.31, -0.09, -0.22,  0.19,  0.47,  0.38,  0.09,  0.14, -0.27], total:  1.00, isTotal: false },
-            { label: 'Total diff',   values: [ 0.83, -0.07,  0.97, -0.13,  1.48, -1.68, -0.19,  2.33,  1.15], total:  4.69, isTotal: true  },
-        ],
-        flex_allocations: {
-            base_positions: ["PG", "SG", "SF", "PF", "C"],
-            rows: [
-                { label: "G-1",    values: [0.65,  0.35,  -999,  -999,  -999], isTotal: false },
-                { label: "F-2",    values: [-999,  -999,  1.10,  0.90,  -999], isTotal: false },
-                { label: "Util-3", values: [0.40,  0.30,  0.60,  0.50,  1.20], isTotal: false },
-                { label: "Total",  values: [1.05,  0.65,  1.70,  1.40,  1.20], isTotal: true  },
-            ]
-        },
-        roster: {
-            slots: ["PG1", "SG1", "SF1", "PF1", "C1", "C2", "G1", "G2", "F1", "F2", "Util1", "Util2", "Util3"],
-            assignments: {
-                "PG1":   { name: "Curry",      isCandidate: false },
-                "SG1":   null,
-                "SF1":   { name: "Durant",     isCandidate: false },
-                "PF1":   null,
-                "C1":    { name: "Wembanyama", isCandidate: true  },
-                "C2":    null,
-                "G1":    { name: "Paul",       isCandidate: false },
-                "G2":    null,
-                "F1":    null,
-                "F2":    null,
-                "Util1": null,
-                "Util2": null,
-                "Util3": null,
-            }
-        },
-        auction_values: { your_dollar: 38, gnrc_dollar: 41, orig_dollar: 39 },
-    }
-]
+let players: Player[] = []
 
 export function getPlayers():    Player[] { return players }
 export function getCategories(): string[] { return categories }
@@ -338,18 +296,20 @@ function buildTable(): void {
     }
 }
 
-// Initial build
+// Initial build (empty; will be populated once the backend responds on load)
 buildTable()
 
-// ── DEV ONLY: mock backend response on mode change ────────────────────────────
+// ── Mode change: rebuild table ────────────────────────────────────────────────
 // Registered before initLayout so updateTable fires before applyLayout on mode
 // change, ensuring realtable.style.width is correct when applyLayout reads it.
-// Remove once the real backend call is wired up to the mode change event.
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
     updateTable(players, categories)
 })
 
-initLayout()
+initLayout({ onEvaluate: runEvaluate })
+
+// Run all backend steps immediately on page load
+runEvaluate().catch(err => console.error('Initial load failed:', err))
 
 // ── League settings auto-update ───────────────────────────────────────────────
 // Number inputs fire on 'change' (when focus leaves); updateTable runs first to
@@ -357,7 +317,11 @@ initLayout()
 for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     document.getElementById(id)!.addEventListener('change', () => {
         updateTable(players, categories)
-        reapplyLayout()
+        const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
+        createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team } })
+            .then(() => runEvaluate())
+            .then(() => reapplyLayout())
+            .catch(err => console.error('League settings update failed:', err))
     })
 }
 

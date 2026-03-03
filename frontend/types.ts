@@ -11,7 +11,7 @@ export interface GScoreRow {
 
 export interface FlexRow {
     label: string;
-    values: number[];   // expected fill counts per base position; -999 = ineligible slot
+    values: (number | null)[];   // expected fill counts per base position; null = ineligible slot
     isTotal: boolean;
 }
 
@@ -47,9 +47,10 @@ export interface ModelParameters {
 }
 
 export interface DataSource {
-    type: 'projections' | 'historical'
-    blend_weights: { espn: number; darko: number; htb: number; bbm: number }
+    type: 'blended' | 'historical' | 'csv' | 'mock'
+    blend_weights: { ESPN: number; DARKO: number; HTB: number; BBM: number }
     custom_data_ids: { HTB: string | null; BBM: string | null }
+    season?: string | null   // for 'historical' type
 }
 
 export interface SessionRequest {

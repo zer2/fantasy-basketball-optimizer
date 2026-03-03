@@ -243,11 +243,11 @@ function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
         for (let value of rowData.values) {
             let cell = row.insertCell(-1);
             cell.className = 'panel-datacell';
-            if (value === -999) {
+            if (value === null) {
                 cell.style.cssText = styler_ineligible();
             } else {
                 cell.textContent = value.toFixed(2);
-                cell.style.cssText = stat_styler_tertiary(value, 150, 0);
+                cell.style.cssText = stat_styler_tertiary(value, 50, 0);
             }
         }
     }

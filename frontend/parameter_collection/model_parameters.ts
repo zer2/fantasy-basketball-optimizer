@@ -47,12 +47,12 @@ const PARAM_SPECS: ParamSpec[] = [
     },
     {
         id: 'mp-omega', label: 'ω (omega)', step: 0.05,
-        default: 1.2, min: 0.0, max: 2.0,
+        default: 0.7, min: 0.0, max: 2.0,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
     {
         id: 'mp-gamma', label: 'γ (gamma)', step: 0.05,
-        default: 0.1, min: 0.0, max: 1.0,
+        default: 0.25, min: 0.0, max: 1.0,
         caption: 'Complements omega. Higher values require more general value to be sacrificed to pursue a punting strategy.',
     },
     {

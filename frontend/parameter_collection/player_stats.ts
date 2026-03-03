@@ -1,14 +1,20 @@
 // Collects: data_source (type, blend_weights, custom_data_ids), injured_players
 // Mirrors player_stats_popover() in src/parameter_collection/player_stats.py
-//
-// CSV upload handling is a skeleton — actual upload logic requires POST /data/upload.
 
 import { makeCustomSelect } from '../custom_select.js'
+import { uploadCsv } from '../api.js'
 import { DataSource } from '../types.js'
+
+// ─── Module state ──────────────────────────────────────────────────────────────
+
+// Stored data_ids from POST /data/upload; updated immediately on file selection.
+let customDataIds: { HTB: string | null; BBM: string | null } = { HTB: null, BBM: null }
+
+// ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
  * Renders the Player Stats section: data source selector, projection blend weight
- * sliders, optional CSV uploads (skeleton), and injured/excluded player list.
+ * sliders, optional CSV uploads, and injured/excluded player list.
  */
 export function renderPlayerStats(container: HTMLElement): void {
 
@@ -21,20 +27,25 @@ export function renderPlayerStats(container: HTMLElement): void {
 
     const typeSelect = makeCustomSelect(
         'ps-data-type',
-        [{ value: 'projections', label: 'Projections' }, { value: 'historical', label: 'Historical' }],
-        'projections',
+        [
+            { value: 'blended',   label: 'Projections (Snowflake)'  },
+            { value: 'historical', label: 'Historical (Snowflake)'  },
+            { value: 'mock',      label: 'Mock data (no Snowflake)' },
+        ],
+        'blended',
     )
     container.append(typeSelect.element)
 
-    // Projection blend weights section (hidden when historical is selected)
+    // Projection blend weights section (only relevant for 'blended' type)
     const projSection = document.createElement('div')
     projSection.id = 'ps-proj-section'
+    // visible by default since 'blended' is the default selection
     container.append(projSection)
 
     renderBlendWeights(projSection)
 
     typeSelect.element.addEventListener('change', () => {
-        projSection.style.display = typeSelect.getValue() === 'projections' ? '' : 'none'
+        projSection.style.display = typeSelect.getValue() === 'blended' ? '' : 'none'
     })
 
     // Injured players
@@ -57,7 +68,7 @@ export function renderPlayerStats(container: HTMLElement): void {
     container.append(injuredCaption)
 }
 
-/** Renders blend weight sliders and optional CSV upload inputs for each data source. */
+/** Renders blend weight sliders and CSV upload inputs for HTB and BBM sources. */
 function renderBlendWeights(container: HTMLElement): void {
 
     const weightLabel = document.createElement('div')
@@ -66,10 +77,10 @@ function renderBlendWeights(container: HTMLElement): void {
     container.append(weightLabel)
 
     const sources: { id: string; label: string; defaultValue: number }[] = [
-        { id: 'ps-w-espn', label: 'ESPN',  defaultValue: 0.5 },
+        { id: 'ps-w-espn',  label: 'ESPN',  defaultValue: 0.5 },
         { id: 'ps-w-darko', label: 'DARKO', defaultValue: 0.5 },
-        { id: 'ps-w-htb',  label: 'HTB',   defaultValue: 0.0 },
-        { id: 'ps-w-bbm',  label: 'BBM',   defaultValue: 0.0 },
+        { id: 'ps-w-htb',   label: 'HTB',   defaultValue: 0.0 },
+        { id: 'ps-w-bbm',   label: 'BBM',   defaultValue: 0.0 },
     ]
 
     for (const source of sources) {
@@ -101,41 +112,66 @@ function renderBlendWeights(container: HTMLElement): void {
 
         container.append(row)
 
-        // File upload for sources that accept custom CSVs
+        // File upload for HTB and BBM (user-supplied CSV projections)
         if (source.id === 'ps-w-htb' || source.id === 'ps-w-bbm') {
-            const uploadId = source.id === 'ps-w-htb' ? 'ps-upload-htb' : 'ps-upload-bbm'
+            const fileType = source.id === 'ps-w-htb' ? 'HTB' : 'BBM'
+            const uploadId = `ps-upload-${fileType.toLowerCase()}`
+
+            const uploadRow = document.createElement('div')
+            uploadRow.className = 'sidebar-upload-row'
+
             const uploadInput = document.createElement('input')
             uploadInput.type = 'file'
             uploadInput.id = uploadId
             uploadInput.accept = '.csv'
             uploadInput.className = 'sidebar-file-input'
-            // TODO: on change, POST file to /data/upload and store returned data_id
-            container.append(uploadInput)
+            uploadRow.append(uploadInput)
+
+            const statusSpan = document.createElement('span')
+            statusSpan.className = 'sidebar-caption'
+            uploadRow.append(statusSpan)
+
+            uploadInput.addEventListener('change', async () => {
+                const file = uploadInput.files?.[0]
+                if (!file) return
+                statusSpan.textContent = 'Uploading…'
+                try {
+                    const resp = await uploadCsv(file, fileType)
+                    customDataIds[fileType] = resp.data_id
+                    statusSpan.textContent = `✓ ${resp.n_players} players loaded`
+                } catch (err) {
+                    customDataIds[fileType] = null
+                    statusSpan.textContent = `Upload failed: ${err}`
+                    console.error(`${fileType} upload failed:`, err)
+                }
+            })
+
+            container.append(uploadRow)
         }
     }
 }
 
+// ─── Getter ───────────────────────────────────────────────────────────────────
+
 /**
  * Reads data source type, blend weights, and excluded player list from the DOM.
- * `custom_data_ids` are always `null` until the CSV upload flow is implemented.
+ * custom_data_ids are populated by the CSV upload handlers above.
  */
 export function getPlayerStatsParams(): { data_source: DataSource; injured_players: string[] } {
-    const type = (document.getElementById('ps-data-type') as HTMLInputElement).value as 'projections' | 'historical'
+    const type = (document.getElementById('ps-data-type') as HTMLInputElement).value as DataSource['type']
 
     const blend_weights = {
-        espn:  parseFloat((document.getElementById('ps-w-espn')  as HTMLInputElement).value),
-        darko: parseFloat((document.getElementById('ps-w-darko') as HTMLInputElement).value),
-        htb:   parseFloat((document.getElementById('ps-w-htb')   as HTMLInputElement).value),
-        bbm:   parseFloat((document.getElementById('ps-w-bbm')   as HTMLInputElement).value),
+        ESPN:  parseFloat((document.getElementById('ps-w-espn')  as HTMLInputElement).value),
+        DARKO: parseFloat((document.getElementById('ps-w-darko') as HTMLInputElement).value),
+        HTB:   parseFloat((document.getElementById('ps-w-htb')   as HTMLInputElement).value),
+        BBM:   parseFloat((document.getElementById('ps-w-bbm')   as HTMLInputElement).value),
     }
 
-    // TODO: replace nulls with data_ids returned by POST /data/upload once upload is wired up
-    const custom_data_ids = {
-        HTB: null as string | null,
-        BBM: null as string | null,
+    const data_source: DataSource = {
+        type,
+        blend_weights,
+        custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM },
     }
-
-    const data_source: DataSource = { type, blend_weights, custom_data_ids }
 
     const injuredRaw = (document.getElementById('ps-injured') as HTMLTextAreaElement).value
     const injured_players = injuredRaw

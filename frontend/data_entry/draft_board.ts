@@ -14,6 +14,7 @@ let teamNames:  string[] = []
 let nDrafters = 0
 let nPicks    = 0
 let configKey = ''   // detects sidebar changes that require a reset
+let _onPick: (() => void | Promise<void>) | undefined
 
 const ROUND_W = 46   // px — Round label column
 const TEAM_W  = 85   // px — per-drafter column
@@ -30,7 +31,11 @@ export function getDraftState(): { player_assignments: Record<string, string[]> 
     return { player_assignments }
 }
 
-export function renderDraftBoard(container: HTMLElement): void {
+export function renderDraftBoard(
+    container: HTMLElement,
+    onPick?: () => void | Promise<void>,
+): void {
+    if (onPick !== undefined) _onPick = onPick
     const cfg = readConfig()
 
     // Reset state if league settings changed (different drafter/pick counts or teams)
@@ -84,6 +89,14 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         drafted[pickRow][pickDrafter] = chosen
         advance()
         renderDraftBoard(container)
+        if (_onPick) {
+            const result = _onPick()
+            if (result instanceof Promise) {
+                lockBtn.disabled = true
+                result.finally(() => { lockBtn.disabled = false })
+                       .catch(err => console.error('Evaluate after pick failed:', err))
+            }
+        }
     })
 
     const undoBtn = document.createElement('button')
@@ -94,6 +107,12 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         goBack()
         drafted[pickRow][pickDrafter] = null
         renderDraftBoard(container)
+        if (_onPick) {
+            const result = _onPick()
+            if (result instanceof Promise) {
+                result.catch(err => console.error('Evaluate after undo failed:', err))
+            }
+        }
     })
 
     const clearBtn = document.createElement('button')
@@ -104,6 +123,12 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         pickDrafter = 0
         drafted = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
         renderDraftBoard(container)
+        if (_onPick) {
+            const result = _onPick()
+            if (result instanceof Promise) {
+                result.catch(err => console.error('Evaluate after clear failed:', err))
+            }
+        }
     })
 
     btns.append(lockBtn, undoBtn, clearBtn)
