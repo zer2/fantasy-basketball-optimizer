@@ -99,6 +99,8 @@ sidebar.style.visibility = ''
 // ─── Session management ───────────────────────────────────────────────────────
 
 let sessionId: string | null = null
+// Tracks the in-flight evaluate request so it can be aborted when a newer one starts.
+let evaluateController: AbortController | null = null
 
 /**
  * Collects all sidebar parameter values and assembles a `SessionRequest` object
@@ -156,24 +158,35 @@ async function ensureSession(): Promise<void> {
  * updates the candidate table with the response.
  */
 export async function runEvaluate(): Promise<void> {
-    await ensureSession()
+    // Abort any in-flight evaluate request so the backend is only computing
+    // the most recent draft state, not every intermediate pick.
+    if (evaluateController) evaluateController.abort()
+    evaluateController = new AbortController()
+    const { signal } = evaluateController
 
-    // Default to the first team name if no seat has been chosen yet
-    const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
-    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+    try {
+        await ensureSession()
 
-    let evalReq: Parameters<typeof api.evaluate>[1]
-    if (mode === 'Auction Mode') {
-        const { player_assignments, remaining_cash } = getAuctionState()
-        evalReq = { player_assignments, my_team_id: seat, remaining_cash }
-    } else {
-        const { player_assignments } = getDraftState()
-        evalReq = { player_assignments, my_team_id: seat }
+        // Default to the first team name if no seat has been chosen yet
+        const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
+        const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+
+        let evalReq: Parameters<typeof api.evaluate>[1]
+        if (mode === 'Auction Mode') {
+            const { player_assignments, remaining_cash } = getAuctionState()
+            evalReq = { player_assignments, my_team_id: seat, remaining_cash }
+        } else {
+            const { player_assignments } = getDraftState()
+            evalReq = { player_assignments, my_team_id: seat }
+        }
+
+        const resp = await api.evaluate(sessionId!, evalReq, signal)
+        updateTable(api.candidatesToPlayers(resp.candidates))
+        reapplyLayout()
+    } catch (err: any) {
+        if (err.name === 'AbortError') return  // superseded by a newer call
+        throw err
     }
-
-    const resp = await api.evaluate(sessionId!, evalReq)
-    updateTable(api.candidatesToPlayers(resp.candidates))
-    reapplyLayout()
 }
 
 // ─── Player table ─────────────────────────────────────────────────────────────
@@ -191,6 +204,7 @@ const table = document.getElementById('realtable') as HTMLTableElement
 
 function buildTable(): void {
     const isAuction = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
+    const isRoto    = getFormatAndCategories().scoring_format === 'Rotisserie'
 
     // 1 (player) + score cols + N categories
     const PLAYER_COL_W = 224
@@ -261,19 +275,29 @@ function buildTable(): void {
 
         // Score column(s)
         if (isAuction) {
-            const av = player.auction_values!
-            const diff = av.your_dollar - av.gnrc_dollar
+            const av = player.auction_values
+            if (av) {
+                const diff = av.your_dollar - av.gnrc_dollar
 
-            const diffCell = row.insertCell(-1)
-            diffCell.textContent = diff.toFixed(1)
-            diffCell.style.cssText = stat_styler_secondary(diff, 10, 0)
-            diffCell.className = 'auction-dollar'
+                const diffCell = row.insertCell(-1)
+                diffCell.textContent = diff.toFixed(1)
+                diffCell.style.cssText = stat_styler_secondary(diff, 10, 0)
+                diffCell.className = 'auction-dollar'
 
-            for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
-                const cell = row.insertCell(-1)
-                cell.textContent = String(val.toFixed(1))
-                cell.style.cssText = styler_a()
-                cell.className = 'auction-dollar'
+                for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
+                    const cell = row.insertCell(-1)
+                    cell.textContent = String(val.toFixed(1))
+                    cell.style.cssText = styler_a()
+                    cell.className = 'auction-dollar'
+                }
+            } else {
+                // Auction values not yet available (e.g. stale results from draft mode).
+                // Insert empty cells to keep column count correct; runEvaluate will refresh.
+                for (let i = 0; i < 4; i++) {
+                    const cell = row.insertCell(-1)
+                    cell.textContent = '—'
+                    cell.className = 'auction-dollar'
+                }
             }
         } else {
             const hscoreCell = row.insertCell(-1)
@@ -284,9 +308,18 @@ function buildTable(): void {
         // Category win rate cells
         for (const value of player.win_rates) {
             const cell = row.insertCell(-1)
-            cell.textContent = value.toFixed(1)
-            cell.style.cssText = stat_styler_primary(value, 3, 50)
-            cell.className = 'categoricalhscore'
+            if (isRoto) {
+                const n = getLeagueSettings().n_drafters
+                const rotoValue = 1 + (value / 100) * (n - 1)
+                const rotoMiddle = (n - 1) / 2 + 1
+                cell.textContent = rotoValue.toFixed(1)
+                cell.style.cssText = stat_styler_primary(rotoValue, 3 * (n - 1), rotoMiddle)
+                cell.className = 'categoricalRotoHscore'
+            } else {
+                cell.textContent = value.toFixed(1)
+                cell.style.cssText = stat_styler_primary(value, 3, 50)
+                cell.className = 'categoricalhscore'
+            }
         }
 
         // Expansion row (hidden until button clicked)
@@ -299,11 +332,19 @@ function buildTable(): void {
 // Initial build (empty; will be populated once the backend responds on load)
 buildTable()
 
-// ── Mode change: rebuild table ────────────────────────────────────────────────
+// ── Mode change: rebuild table and sync session ───────────────────────────────
 // Registered before initLayout so updateTable fires before applyLayout on mode
 // change, ensuring realtable.style.width is correct when applyLayout reads it.
+//
+// When switching to Auction Mode the existing session must be patched with
+// cash_per_team; without it the backend cannot compute auction dollar values.
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
     updateTable(players, categories)
+    const { mode, cash_per_team } = getLeagueSettings()
+    const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
+    createOrPatchSession(4, patch)
+        .then(() => runEvaluate())
+        .catch(err => console.error('Mode change failed:', err))
 })
 
 initLayout({ onEvaluate: runEvaluate })

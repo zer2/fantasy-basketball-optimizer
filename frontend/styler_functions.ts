@@ -104,7 +104,7 @@ export function styler_ineligible(): string {
  * @returns {string} A CSS style string
  */
 export function styler_absent(): string {
-    return 'background-color:#8D8D9E;color:#8D8D9E;';
+    return 'background-color:#8D8D9E;color:#8D8D9E;text-align:center;';
 }
 
 /**
@@ -113,7 +113,7 @@ export function styler_absent(): string {
  * @returns {string} A CSS style string
  */
 export function styler_candidate(): string {
-    return 'background-color:rgb(54,90,148);color:white;';
+    return 'background-color:rgb(54,90,148);color:white;text-align:center;';
 }
 
 /**

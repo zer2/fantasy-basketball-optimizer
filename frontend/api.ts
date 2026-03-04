@@ -39,6 +39,11 @@ export function candidatesToPlayers(candidates: any[]): Player[] {
                 ]),
             ),
         },
+        auction_values: c.auction_values ? {
+            your_dollar: c.auction_values.your_dollar,
+            gnrc_dollar: c.auction_values.gnrc_dollar,
+            orig_dollar: c.auction_values.orig_dollar,
+        } : undefined,
     }))
 }
 
@@ -104,12 +109,14 @@ export async function evaluate(
         exclusion_list?: string[]
         remaining_cash?: Record<string, number>
     },
+    signal?: AbortSignal,
 ): Promise<{ iteration: number; candidates: any[] }> {
     const body = { exclusion_list: [], ...req }
     const res = await fetch(`${BASE_URL}/sessions/${sessionId}/evaluate`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
+        signal,
     })
     if (!res.ok) {
         const detail = await res.text()

@@ -699,6 +699,14 @@ tr {
     content : '%';
 }
 
+.categoricalRotoHscore {
+    font-weight:500;
+    text-align:right;
+    padding:5px;
+    border-top : 2px solid #3d3d55;
+    border-bottom : 2px solid #3d3d55;
+}
+
 .auction-dollar {
     font-weight:500;
     text-align:right;

@@ -98,6 +98,9 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
         'chi':              p.chi,
         'aleph':            p.aleph,
         'n_iterations':     p.n_iterations,
+        'streaming_noise':  p.streaming_noise,
+        # auction
+        'cash_per_team':    req.league.cash_per_team,
         # data source
         'data_source_type': req.data_source.type,
         'season':           req.data_source.season,

@@ -5,6 +5,7 @@ to the /evaluate response payload.
 
 from __future__ import annotations
 
+import re
 import numpy as np
 import pandas as pd
 from typing import Optional
@@ -12,8 +13,24 @@ from typing import Optional
 from backend.session import get_session
 from backend.models import (
     Candidate, GScoreRow, FlexAllocations, FlexRow,
-    Roster, RosterAssignment, EvaluateResponse,
+    Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
+from src.math.algorithm_helpers import auction_value_adjuster
+
+# Matches a trailing position suffix such as " (C,PF)", " (PG,SG)", " (PF/C)".
+# Format is a space followed by a parenthesised, comma/slash-separated list of
+# uppercase position codes, e.g. "(C,PF)" or "(PG/SG)".
+_POSITION_SUFFIX_RE = re.compile(r'\s+\([A-Z,/]+\)$')
+
+
+def _last_name(player_full_name: str) -> str:
+    """Return the player's last name, stripping any trailing position suffix.
+
+    For example: "Nikola Jokic (C,PF)" → "Jokic", "LeBron James (PF,SF)" → "James",
+    "Nikola Jokic" → "Jokic".
+    """
+    without_position = _POSITION_SUFFIX_RE.sub('', player_full_name).strip()
+    return without_position.split()[-1] if without_position else player_full_name
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -26,35 +43,60 @@ def run_evaluate(
     remaining_cash: Optional[dict[str, float]],
     n_iterations: int,
 ) -> EvaluateResponse:
+    """Drive the HAgent gradient-descent loop and return ranked candidates.
 
+    Retrieves the session, clears warm-start weights so each evaluate call
+    starts fresh, then advances the get_h_scores generator for the requested
+    number of iterations.  The final yielded result is converted to a
+    serialisable EvaluateResponse.
+
+    Args:
+        session_id:         Identifies the active session (created by POST /sessions).
+        player_assignments: Maps each team name to the list of players already
+                            drafted/won by that team.
+        my_team_id:         The team name whose perspective the evaluation is from.
+        exclusion_list:     Players to exclude from the candidate rankings
+                            (e.g. already drafted by the user, injured).
+        remaining_cash:     Per-team auction budget remaining; None for draft mode.
+        n_iterations:       Number of gradient-descent iterations to run.
+
+    Returns:
+        EvaluateResponse containing the iteration count and ranked Candidate list.
+
+    Raises:
+        KeyError: If the session does not exist or has expired.
+    """
     session = get_session(session_id)
     if session is None:
         raise KeyError(f"Session '{session_id}' not found or expired")
-    info       = session.info
-    H          = session.H
-    categories = session.current_params.get('categories', [])
-    cp         = session.current_params
 
-    # Run the generator
+    info           = session.info
+    H              = session.H
+    categories     = session.current_params.get('categories', [])
+    current_params = session.current_params
+
+    # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()
     generator = H.get_h_scores(
-        player_assignments    = player_assignments,
-        drafter               = my_team_id,
+        player_assignments      = player_assignments,
+        drafter                 = my_team_id,
         cash_remaining_per_team = remaining_cash,
-        exclusion_list        = exclusion_list,
+        exclusion_list          = exclusion_list,
     )
 
-    result = None
+    h_score_result    = None
     actual_iterations = 0
     for _ in range(max(1, n_iterations)):
-        result = next(generator)
+        h_score_result     = next(generator)
         actual_iterations += 1
 
-    if result is None:
+    if h_score_result is None:
         return EvaluateResponse(iteration=0, candidates=[])
 
-    candidates = _build_candidates(result, info, H, categories, player_assignments,
-                                   my_team_id, cp)
+    candidates = _build_candidates(
+        h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
+        remaining_cash,
+    )
 
     return EvaluateResponse(
         iteration  = actual_iterations,
@@ -65,82 +107,166 @@ def run_evaluate(
 # ── Build candidate list ──────────────────────────────────────────────────────
 
 def _build_candidates(
-    res: dict,
+    h_score_result: dict,
     info: dict,
     H,
     categories: list[str],
     player_assignments: dict[str, list[str]],
     my_team_id: str,
-    cp: dict,
+    current_params: dict,
+    remaining_cash: Optional[dict[str, float]] = None,
 ) -> list[Candidate]:
+    """Convert a raw HAgent result dict into a list of ranked Candidate objects.
 
-    scores         = res['Scores'].sort_values(ascending=False)  # pd.Series player → h_score (0–1), sorted descending
-    weights_raw    = res['Weights']          # pd.DataFrame player × cat (raw weights)
-    rates          = res['Rates']            # pd.DataFrame player × cat (cdf, 0–1)
-    diff_df        = res['Diff']             # pd.DataFrame player × cat (total x-score diff)
-    future_diff_df = res['Future-Diff']      # pd.DataFrame or None
-    positions_s    = info['Positions']       # pd.Series player → list[str]
-    g_scores_all   = info['G-scores']        # pd.DataFrame includes 'Total' col
+    Extracts per-player scores, win rates, category weights, G-score breakdown
+    rows, flex-slot allocations, optimal roster assignment, and (in auction mode)
+    SAVOR dollar values for each player that physically fits the roster, then
+    returns them sorted by H-score.
 
-    fits_roster = res['Rosters'].loc[:, 0] >= 0  # boolean Series
+    Args:
+        h_score_result: The final dict yielded by HAgent.get_h_scores().
+        info:           Session info dict (Positions, G-scores, etc.).
+        H:              The HAgent instance (carries v, original_v, position_structure).
+        categories:     Ordered list of scoring category names.
+        player_assignments: Current draft/auction state (team → player list).
+        my_team_id:     The user's team identifier.
+        current_params: Session parameters dict (contains slot_counts, etc.).
+        remaining_cash: Per-team auction budget remaining; None in draft mode.
 
-    n_cat = len(categories)
-    v_reshaped = H.v.reshape(n_cat)           # (n_cat,) for division
-    original_v = np.array(H.original_v)       # (n_cat,)
+    Returns:
+        List of Candidate objects sorted descending by H-score, one per
+        eligible player that fits the current roster.
+    """
+    # Pull named arrays from the result dict.
+    # h_scores_sorted: pd.Series  player → h_score (0–1), sorted descending
+    h_scores_sorted          = h_score_result['Scores'].sort_values(ascending=False)
+    category_weights_raw     = h_score_result['Weights']   # pd.DataFrame: player × category
+    win_rate_cdfs            = h_score_result['Rates']     # pd.DataFrame: player × category (CDF, 0–1)
+    team_diff_df             = h_score_result['Diff']      # pd.DataFrame or None: player × category
+    future_diff_df           = h_score_result['Future-Diff']  # pd.DataFrame or None
+    player_position_map      = info['Positions']           # pd.Series: player → list[str]
+    player_g_scores          = info['G-scores']            # pd.DataFrame: player × category (includes 'Total')
 
-    # Category weights: normalize by H.v so 100 = neutral
-    weights_norm = (weights_raw.values / v_reshaped) * 100   # (n_players, n_cat)
+    # res['Rosters'] column 0 encodes whether a valid slot assignment was found.
+    # position_optimization returns [-1, -1, ...] when linear_sum_assignment fails
+    # to place all players (no feasible assignment exists), so any value < 0
+    # indicates the candidate cannot be fitted into the current roster.
+    player_fits_roster = h_score_result['Rosters'].loc[:, 0] >= 0
 
-    my_players = [p for p in player_assignments.get(my_team_id, []) if isinstance(p, str)]
+    n_categories = len(categories)
+
+    # H.v is the normalised weight vector (sums to 1), shaped (n_cat, 1).
+    # Reshape to (n_cat,) so it can broadcast against per-player weight rows.
+    v_reshaped = H.v.reshape(n_categories)
+    original_v = np.array(H.original_v)  # unnormalised weights; see _build_g_score_rows
+
+    # Normalise raw category weights relative to v so that 100 = neutral emphasis.
+    # H.v is a scaled version of original_v adjusted to sum to 1 (required by the
+    # H-score math).  When the algorithm places no punting emphasis on a category,
+    # weights_raw ≈ v, so dividing by v and scaling to 100 gives a neutral baseline of 100.
+    category_weights_normalized = (category_weights_raw.values / v_reshaped) * 100  # (n_players, n_cat)
+
+    my_players         = [p for p in player_assignments.get(my_team_id, []) if isinstance(p, str)]
     position_structure = H.position_structure
-    base_list = position_structure['base_list']
-    slot_counts = cp.get('slot_counts', {})
+    base_list          = position_structure['base_list']
+    slot_counts        = current_params.get('slot_counts', {})
+    slot_names         = _make_slot_names(slot_counts, position_structure)
 
-    # Slot names in canonical order
-    slot_names = _make_slot_names(slot_counts, position_structure)
+    # ── Auction dollar values (SAVOR) ─────────────────────────────────────────
+    # Computed once for all players before the loop; None in draft mode.
+    #
+    # Three values per player:
+    #   your_dollar — SAVOR on H-scores (team-specific, uses remaining cash)
+    #   gnrc_dollar — SAVOR on G-scores for available players (generic, remaining cash)
+    #   orig_dollar — SAVOR on G-scores for ALL players, as if auction just started
+    #
+    # n_remaining is the number of players still to be drafted across all teams.
+    # The SAVOR function uses this to find the replacement-level player (the
+    # n_remaining-th best available player), which anchors the dollar scale.
+    player_auction_values: dict[str, AuctionValues] | None = None
+    if remaining_cash is not None:
+        cash_per_team   = current_params.get('cash_per_team')
+        streaming_noise = float(current_params.get('streaming_noise', 10.0))
+        total_picks     = H.n_drafters * H.n_picks
 
-    candidates = []
-    for rank_idx, player in enumerate(scores.index):
-        if not fits_roster.get(player, True):
-            continue   # skip players that don't fit the roster
+        all_players_chosen = [
+            p for team_players in player_assignments.values()
+            for p in team_players if isinstance(p, str)
+        ]
+        n_remaining          = total_picks - len(all_players_chosen)
+        total_cash_remaining = float(sum(remaining_cash.values()))
 
-        h_score  = float(scores[player]) * 100
-        win_rates_row = rates.loc[player].values * 100
+        if cash_per_team is not None and n_remaining > 0:
+            total_original_cash = float(H.n_drafters * cash_per_team)
 
-        # category weights row
-        cat_weights_row = weights_norm[scores.index.get_loc(player)]
+            try:
+                # your_dollar: team-specific H-scores, current state (remaining cash + picks)
+                your_dollar_series = auction_value_adjuster(
+                    h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+                )
+                # gnrc_dollar: same H-scores and state, but without team-specific context.
+                # In the original app this uses a separate "default" H-score run; here we
+                # use the same scores as a simplification until a generic run is available.
+                gnrc_dollar_series = auction_value_adjuster(
+                    h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+                )
+                # orig_dollar: H-scores of available players scaled to the full original
+                # cash pool and total picks, representing value as if the auction just started.
+                orig_dollar_series = auction_value_adjuster(
+                    h_scores_sorted, total_picks, total_original_cash, streaming_noise,
+                )
+                player_auction_values = {
+                    p: AuctionValues(
+                        your_dollar = round(float(your_dollar_series.get(p, 0.0)), 2),
+                        gnrc_dollar = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
+                        orig_dollar = round(float(orig_dollar_series.get(p, 0.0)), 2),
+                    )
+                    for p in h_scores_sorted.index
+                }
+            except Exception:
+                player_auction_values = None  # degrade gracefully on edge cases
 
-        # G-score rows
-        g_rows = _build_g_score_rows(
-            player, categories, g_scores_all,
-            diff_df, future_diff_df, original_v,
+    candidates: list[Candidate] = []
+    for rank_idx, player in enumerate(h_scores_sorted.index):
+        if not player_fits_roster.get(player, True):
+            continue  # skip players for whom no valid roster slot exists
+
+        h_score               = float(h_scores_sorted[player]) * 100
+        player_win_rates      = win_rate_cdfs.loc[player].values * 100
+
+        # Use positional lookup rather than label lookup because h_scores_sorted
+        # and category_weights_normalized share the same sorted row order.
+        player_category_weights = category_weights_normalized[h_scores_sorted.index.get_loc(player)]
+
+        g_score_rows = _build_g_score_rows(
+            player, categories, player_g_scores,
+            team_diff_df, future_diff_df, original_v,
         )
 
-        # Flex allocations
-        flex_alloc = _build_flex_allocations(
+        flex_allocations = _build_flex_allocations(
             player, base_list, position_structure,
-            res['Position-Shares'], slot_counts,
+            h_score_result['Position-Shares'], slot_counts,
         )
 
-        # Roster
-        roster_obj = _build_roster(
-            player, my_players, positions_s, slot_names, slot_counts,
+        roster = _build_roster(
+            player, my_players, player_position_map, slot_names, slot_counts,
             position_structure,
         )
 
-        pos_raw = positions_s.get(player, ['?'])
-        position_str = ','.join(pos_raw) if isinstance(pos_raw, list) else str(pos_raw)
+        raw_positions    = player_position_map.get(player, ['?'])
+        position_display = ','.join(raw_positions) if isinstance(raw_positions, list) else str(raw_positions)
 
         candidates.append(Candidate(
-            name              = player,
-            position          = position_str,
-            h_score           = round(h_score, 2),
-            h_rank            = rank_idx + 1,
-            win_rates         = [round(float(v), 2) for v in win_rates_row],
-            category_weights  = [round(float(v), 1) for v in cat_weights_row],
-            g_score_rows      = g_rows,
-            flex_allocations  = flex_alloc,
-            roster            = roster_obj,
+            name             = player,
+            position         = position_display,
+            h_score          = round(h_score, 2),
+            h_rank           = rank_idx + 1,
+            win_rates        = [round(float(val), 2) for val in player_win_rates],
+            category_weights = [round(float(val), 1) for val in player_category_weights],
+            g_score_rows     = g_score_rows,
+            flex_allocations = flex_allocations,
+            roster           = roster,
+            auction_values   = player_auction_values.get(player) if player_auction_values else None,
         ))
 
     return candidates
@@ -151,53 +277,122 @@ def _build_candidates(
 def _build_g_score_rows(
     player: str,
     categories: list[str],
-    g_scores_all: pd.DataFrame,
-    diff_df: pd.DataFrame | None,
+    player_g_scores: pd.DataFrame,
+    team_diff_df: pd.DataFrame | None,
     future_diff_df: pd.DataFrame | None,
     original_v: np.ndarray,
 ) -> list[GScoreRow]:
+    """Build the G-score breakdown table rows for one candidate player.
 
-    n_cat = len(categories)
+    Mirrors make_main_df_styled() in src/tabs/candidate_subtabs.py.
 
-    # Player's own G-scores (excluding the 'Total' column)
-    player_gs = (
-        g_scores_all.loc[player, categories].values.astype(float)
-        if player in g_scores_all.index
-        else np.zeros(n_cat)
+    The table always ends with a 'Total diff' row = current team diff + this
+    player's own G-scores.  Depending on whether a future component was
+    computed, the layout is either 3 rows (no future) or 4 rows (with future).
+
+    Why the diff decomposition works
+    ---------------------------------
+    res['Diff'] is stored as:
+        expected_future_diff.mean(axis=2) + diff_means.mean(axis=2)
+    where diff_means is the current team's x-score differential versus all
+    opponents simultaneously (axis=2 of diff_means is the opponent dimension;
+    the mean collapses it to a single average-across-opponents value).
+    diff_means is the same for every candidate since it depends only on the
+    players already drafted.  expected_future_diff is the algorithm's
+    projection for the picks remaining, which does vary per candidate.
+
+    Therefore:
+        current_diff = res['Diff'] - res['Future-Diff']
+                     = (future_diff + diff_means) - future_diff
+                     = diff_means        ← same value for every candidate
+
+    Both diff DataFrames store values in x-score space (divided by v during
+    computation).  Multiplying by original_v converts them back to G-score
+    units so they are comparable to the player_g_scores values.  original_v
+    is the exact conversion factor between x-score and G-score space
+    (original_v = sqrt(mov/vom) for Rotisserie, sqrt(mov/(mov+vom)) for H2H).
+    The algorithm's v is original_v rescaled to sum to 1; original_v is used
+    here instead because G-score display is in the original units.
+
+    Note: res['Diff'] does NOT include the candidate player's own G-scores;
+    player_g_scores must be added explicitly to form the Total row.
+
+    Args:
+        player:          Candidate player name.
+        categories:      Ordered list of scoring category names.
+        player_g_scores: DataFrame of per-player, per-category G-scores.
+        team_diff_df:    res['Diff'] — total expected team x-score differential
+                         (future + current), per player row, per category column.
+                         None when the dynamic optimiser did not run (e.g., last pick).
+        future_diff_df:  res['Future-Diff'] — expected future component only.
+                         None when no future picks remain or dynamic=False.
+        original_v:      Unnormalised category weight vector; used to convert
+                         x-score diff values to G-score units.
+
+    Returns:
+        List of GScoreRow objects: either 3 rows (no future) or 4 rows (with future).
+    """
+    n_categories = len(categories)
+
+    # Retrieve this player's pre-computed G-scores; fall back to zeros if absent.
+    player_own_g_scores = (
+        player_g_scores.loc[player, categories].values.astype(float)
+        if player in player_g_scores.index
+        else np.zeros(n_categories)
     )
 
-    def _row(label, vals, is_total=False):
-        v = [round(float(x), 2) for x in vals]
-        return GScoreRow(label=label, values=v, total=round(float(sum(vals)), 2), is_total=is_total)
+    def _make_row(label: str, values: np.ndarray, is_total: bool = False) -> GScoreRow:
+        """Package a label + numeric array into a GScoreRow, rounding to 2dp."""
+        rounded_values = [round(float(x), 2) for x in values]
+        return GScoreRow(
+            label    = label,
+            values   = rounded_values,
+            total    = round(float(sum(values)), 2),
+            is_total = is_total,
+        )
 
-    # Mirrors make_main_df_styled() in src/tabs/candidate_subtabs.py.
-    # res['Diff'] is the team diff WITHOUT the candidate player's own stats.
-    if diff_df is None or diff_df.empty or player not in diff_df.index:
+    # Fallback when the diff wasn't computed (last pick or dynamic=False):
+    # current team diff is unknown so show zeros; Total = player's own G-scores.
+    # Use only the last name to keep the table compact.
+    player_last_name = _last_name(player)
+
+    if team_diff_df is None or team_diff_df.empty or player not in team_diff_df.index:
         return [
-            _row('Current diff', np.zeros(n_cat)),
-            _row(player,         player_gs),
-            _row('Total diff',   player_gs, is_total=True),
+            _make_row('Current diff',   np.zeros(n_categories)),
+            _make_row(player_last_name, player_own_g_scores),
+            _make_row('Total diff',     player_own_g_scores, is_total=True),
         ]
 
-    total_diff            = diff_df.loc[player, categories].values.astype(float) * original_v
-    total_diff_plus_player = total_diff + player_gs   # always the Total row
+    # Convert x-score diff to G-score units by multiplying by original_v.
+    # team_diff_df stores (future_diff + current_diff) for this player's row.
+    total_diff = team_diff_df.loc[player, categories].values.astype(float) * original_v
+
+    # Total diff always equals team differential + candidate's own contribution.
+    # This is the single source of truth for the Total row regardless of whether
+    # the future component is present.
+    total_diff_with_player = total_diff + player_own_g_scores
 
     if future_diff_df is None or player not in future_diff_df.index:
-        # No future component: 3-row layout matching original
+        # 3-row layout: dynamic optimiser did not separate current from future.
+        # 'Current diff' here is actually total_diff (= diff_means * original_v),
+        # which is the same across all candidates.
         return [
-            _row('Current diff', total_diff),
-            _row(player,         player_gs),
-            _row('Total diff',   total_diff_plus_player, is_total=True),
+            _make_row('Current diff',   total_diff),
+            _make_row(player_last_name, player_own_g_scores),
+            _make_row('Total diff',     total_diff_with_player, is_total=True),
         ]
 
+    # 4-row layout: separate out the future component so the user can see how
+    # much of the expected advantage is 'already there' vs. 'expected from
+    # future picks given this player is on the team'.
     future_diff  = future_diff_df.loc[player, categories].values.astype(float) * original_v
-    current_diff = total_diff - future_diff
+    current_diff = total_diff - future_diff  # = diff_means * original_v; same for all candidates
 
     return [
-        _row('Current diff',      current_diff),
-        _row(player,              player_gs),
-        _row('Future diff',       future_diff),
-        _row('Total diff',        total_diff_plus_player, is_total=True),
+        _make_row('Current diff',   current_diff),
+        _make_row(player_last_name, player_own_g_scores),
+        _make_row('Future diff',    future_diff),
+        _make_row('Total diff',     total_diff_with_player, is_total=True),
     ]
 
 
@@ -210,128 +405,196 @@ def _build_flex_allocations(
     position_shares: dict,
     slot_counts: dict,
 ) -> FlexAllocations:
+    """Build the flex-slot usage table for one candidate player.
 
-    flex_list = position_structure['flex_list']
-    flex_info = position_structure['flex']
+    For each flex position type (e.g. 'UTIL') that has at least one slot, one
+    row is created showing how many of those slots the candidate is expected to
+    occupy in each base-position role (e.g. PG share of UTIL slots).  A Total
+    row sums across all flex types.
 
-    rows: list[FlexRow] = []
-    total = {b: 0.0 for b in base_list}
+    Position shares are fractions (0–1) representing the probability the player
+    occupies a given base-position role within a flex slot.  Multiplying by the
+    slot count gives an expected number of slots used.
 
-    for flex_type in flex_list:
-        n_slots = slot_counts.get(flex_type, 0)
-        if n_slots == 0:
-            continue
+    Args:
+        player:             Candidate player name.
+        base_list:          Ordered list of base position codes (e.g. ['PG','SG','SF','PF','C']).
+        position_structure: Dict with 'flex_list' and 'flex' keys describing which
+                            base positions each flex type can accommodate.
+        position_shares:    Dict mapping flex type → DataFrame of per-player base-position
+                            share fractions (output of the position share optimiser).
+        slot_counts:        Dict mapping position code → number of roster slots.
 
-        bases = flex_info[flex_type]['bases']
-        shares_df = position_shares.get(flex_type)
+    Returns:
+        FlexAllocations with one row per active flex type plus a Total row.
+    """
+    flex_position_types   = position_structure['flex_list']
+    flex_position_details = position_structure['flex']
 
-        if shares_df is None or player not in shares_df.index:
-            row_values: list[float | None] = [None] * len(base_list)
+    flex_rows: list[FlexRow]        = []
+    totals_by_base: dict[str, float] = {base_pos: 0.0 for base_pos in base_list}
+
+    for flex_type in flex_position_types:
+        n_flex_slots = slot_counts.get(flex_type, 0)
+        if n_flex_slots == 0:
+            continue  # this flex type has no slots in the current league settings
+
+        eligible_bases   = flex_position_details[flex_type]['bases']
+        position_share_df = position_shares.get(flex_type)
+
+        if position_share_df is None or player not in position_share_df.index:
+            # No share data for this player / flex type; mark every column as ineligible.
+            base_position_values: list[float | None] = [None] * len(base_list)
         else:
-            row_values = []
-            for b in base_list:
-                if b in bases:
-                    share = float(shares_df.loc[player, b]) * n_slots
-                    row_values.append(round(share, 2))
-                    total[b] += share
+            base_position_values = []
+            for base_pos in base_list:
+                if base_pos in eligible_bases:
+                    # Convert share fraction to expected slot usage across all flex slots.
+                    expected_slot_usage = float(position_share_df.loc[player, base_pos]) * n_flex_slots
+                    base_position_values.append(round(expected_slot_usage, 2))
+                    totals_by_base[base_pos] += expected_slot_usage
                 else:
-                    row_values.append(None)
+                    # This base position is ineligible for this flex type.
+                    base_position_values.append(None)
 
-        rows.append(FlexRow(
-            label    = f"{flex_type}-{n_slots}",
-            values   = row_values,
+        flex_rows.append(FlexRow(
+            label    = f"{flex_type}-{n_flex_slots}",
+            values   = base_position_values,
             is_total = False,
         ))
 
-    # Total row
-    total_values = [round(total[b], 2) for b in base_list]
-    rows.append(FlexRow(label='Total', values=total_values, is_total=True))
+    # Append a Total row summing expected slot usage across all flex types.
+    total_row_values = [round(totals_by_base[base_pos], 2) for base_pos in base_list]
+    flex_rows.append(FlexRow(label='Total', values=total_row_values, is_total=True))
 
-    return FlexAllocations(base_positions=base_list, rows=rows)
+    return FlexAllocations(base_positions=base_list, rows=flex_rows)
 
 
 # ── Roster assignment ─────────────────────────────────────────────────────────
 
 def _make_slot_names(slot_counts: dict, position_structure: dict) -> list[str]:
-    """Return slot IDs in canonical order: base positions then flex."""
-    order = position_structure['base_list'] + position_structure['flex_list']
-    slots = []
-    for pos in order:
-        n = slot_counts.get(pos, 0)
-        for i in range(1, n + 1):
-            slots.append(f"{pos}{i}")
-    return slots
+    """Return slot IDs in canonical order: base positions then flex.
+
+    Each position type contributes as many slot IDs as it has slots, numbered
+    from 1.  For example, two PG slots and one UTIL slot yield
+    ['PG1', 'PG2', 'UTIL1'].
+
+    Args:
+        slot_counts:        Dict mapping position code → number of roster slots.
+        position_structure: Dict with 'base_list' and 'flex_list' for ordering.
+
+    Returns:
+        Flat list of slot ID strings in canonical order.
+    """
+    position_order = position_structure['base_list'] + position_structure['flex_list']
+    slot_list: list[str] = []
+    for position_type in position_order:
+        slot_count = slot_counts.get(position_type, 0)
+        for i in range(1, slot_count + 1):
+            slot_list.append(f"{position_type}{i}")
+    return slot_list
 
 
 def _build_roster(
     candidate: str,
     my_players: list[str],
-    positions_s: pd.Series,
+    player_position_map: pd.Series,
     slot_names: list[str],
     slot_counts: dict,
     position_structure: dict,
 ) -> Roster:
-    """Compute optimal slot assignment for my_players + candidate, return Roster."""
+    """Compute the optimal slot assignment for the current team plus one candidate.
+
+    Uses the Hungarian algorithm (linear_sum_assignment) to find the maximum
+    cardinality matching between players and slots given position eligibility
+    constraints.  The eligibility matrix is encoded with 0 (eligible) and -inf
+    (ineligible) so that the maximisation objective counts matched eligible pairs
+    while forbidding ineligible assignments entirely.
+
+    Args:
+        candidate:           The candidate player being evaluated.
+        my_players:          Players already on the user's team.
+        player_position_map: pd.Series mapping player name → list of eligible position codes.
+        slot_names:          Ordered slot ID strings (from _make_slot_names).
+        slot_counts:         Dict mapping position code → number of slots.
+        position_structure:  Dict with 'base_list' and 'flex' describing eligibility rules.
+
+    Returns:
+        Roster object with slots list and assignments dict (slot → RosterAssignment or None).
+    """
     from scipy.optimize import linear_sum_assignment
 
-    n_slots = len(slot_names)
-    all_players = my_players + [candidate]
-    n_players   = len(all_players)
+    total_slots       = len(slot_names)
+    roster_candidates = my_players + [candidate]  # candidate appended last for easy identification
+    n_roster_candidates = len(roster_candidates)
 
-    if n_players == 0:
-        assignments = {s: None for s in slot_names}
-        return Roster(slots=slot_names, assignments=assignments)
+    if n_roster_candidates == 0:
+        return Roster(slots=slot_names, assignments={slot: None for slot in slot_names})
 
-    # Build eligibility matrix: rows=players, cols=slots
-    # value 0 = eligible, -inf = not eligible
-    eligibility = np.full((n_players, n_slots), -np.inf)
-    base_list   = position_structure['base_list']
-    flex_info   = position_structure['flex']
+    # Build eligibility matrix: rows = players, cols = slots.
+    # 0 means eligible, -inf means ineligible.
+    # The maximisation of this matrix maximises the number of matched eligible pairs.
+    eligibility            = np.full((n_roster_candidates, total_slots), -np.inf)
+    base_list              = position_structure['base_list']
+    flex_position_details  = position_structure['flex']
+    slot_position_types    = _expand_slots(slot_counts, position_structure)
 
-    slot_position_list = _expand_slots(slot_counts, position_structure)  # list of pos per slot index
-
-    for pi, pname in enumerate(all_players):
-        pos_raw = positions_s.get(pname)
-        if pos_raw is None:
+    for player_idx, player_name in enumerate(roster_candidates):
+        raw_positions = player_position_map.get(player_name)
+        if raw_positions is None:
             continue
-        player_positions = pos_raw if isinstance(pos_raw, list) else list(pos_raw)
+        player_positions = raw_positions if isinstance(raw_positions, list) else list(raw_positions)
 
-        for si, slot_pos in enumerate(slot_position_list):
-            eligible = False
-            if slot_pos in base_list:
-                eligible = slot_pos in player_positions
+        for slot_idx, slot_position_type in enumerate(slot_position_types):
+            if slot_position_type in base_list:
+                # Base slot: player must explicitly hold this position.
+                eligible = slot_position_type in player_positions
             else:
-                # flex slot: eligible if any of the flex bases match
-                bases = flex_info.get(slot_pos, {}).get('bases', [])
-                eligible = any(b in player_positions for b in bases)
+                # Flex slot: player must hold at least one of the flex type's base positions.
+                eligible_bases = flex_position_details.get(slot_position_type, {}).get('bases', [])
+                eligible = any(base_pos in player_positions for base_pos in eligible_bases)
+
             if eligible:
-                eligibility[pi, si] = 0
+                eligibility[player_idx, slot_idx] = 0
 
-    # Run linear assignment (maximise → use the 0 / -inf matrix)
     try:
-        row_ind, col_ind = linear_sum_assignment(eligibility, maximize=True)
+        matched_player_indices, matched_slot_indices = linear_sum_assignment(
+            eligibility, maximize=True
+        )
     except Exception:
-        # Fall back to empty assignment
-        assignments = {s: None for s in slot_names}
-        return Roster(slots=slot_names, assignments=assignments)
+        return Roster(slots=slot_names, assignments={slot: None for slot in slot_names})
 
-    assignments: dict[str, RosterAssignment | None] = {s: None for s in slot_names}
-    for pi, si in zip(row_ind, col_ind):
-        if eligibility[pi, si] == 0:
-            pname = all_players[pi]
-            assignments[slot_names[si]] = RosterAssignment(
-                name         = pname,
-                is_candidate = (pname == candidate),
+    assignments: dict[str, RosterAssignment | None] = {slot: None for slot in slot_names}
+    for player_idx, slot_idx in zip(matched_player_indices, matched_slot_indices):
+        if eligibility[player_idx, slot_idx] == 0:  # 0 confirms eligibility was satisfied
+            player_name = roster_candidates[player_idx]
+            assignments[slot_names[slot_idx]] = RosterAssignment(
+                name         = _last_name(player_name),
+                is_candidate = (player_name == candidate),
             )
 
     return Roster(slots=slot_names, assignments=assignments)
 
 
 def _expand_slots(slot_counts: dict, position_structure: dict) -> list[str]:
-    """Return a flat list of position types, one entry per slot (in order)."""
-    order = position_structure['base_list'] + position_structure['flex_list']
-    slots = []
-    for pos in order:
-        n = slot_counts.get(pos, 0)
-        slots.extend([pos] * n)
-    return slots
+    """Return a flat list of position types, one entry per slot (in canonical order).
+
+    Used to map a slot index to its position type without constructing the full
+    slot name strings.  For example, two PG slots and one UTIL slot yields
+    ['PG', 'PG', 'UTIL'].
+
+    Args:
+        slot_counts:        Dict mapping position code → number of roster slots.
+        position_structure: Dict with 'base_list' and 'flex_list' for ordering.
+
+    Returns:
+        Flat list of position type strings, one entry per slot.
+    """
+    position_order = position_structure['base_list'] + position_structure['flex_list']
+    slot_position_types: list[str] = []
+    for position_type in position_order:
+        slot_count = slot_counts.get(position_type, 0)
+        slot_position_types.extend([position_type] * slot_count)
+    return slot_position_types
+
+

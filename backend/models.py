@@ -124,6 +124,12 @@ class Roster(BaseModel):
     assignments: dict[str, Optional[RosterAssignment]]
 
 
+class AuctionValues(BaseModel):
+    your_dollar: float   # SAVOR-adjusted value for your specific team situation (from H-scores)
+    gnrc_dollar: float   # Generic cash-adjusted value (from G-scores, remaining cash)
+    orig_dollar: float   # Original value assuming auction just started (from G-scores, full cash)
+
+
 class Candidate(BaseModel):
     name: str
     position: str
@@ -134,6 +140,7 @@ class Candidate(BaseModel):
     g_score_rows: list[GScoreRow]
     flex_allocations: FlexAllocations
     roster: Roster
+    auction_values: Optional[AuctionValues] = None   # None in draft mode
 
 
 class EvaluateResponse(BaseModel):

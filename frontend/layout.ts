@@ -108,7 +108,7 @@ function showLiveLayout(): void {
     const hscoreW = (document.getElementById('realtable') as HTMLTableElement).style.width
     rightSubHeader.style.maxWidth = hscoreW
 
-    renderSeatSelector(rightSubHeader, 'Refresh & Run Algorithm')
+    renderSeatSelector(rightSubHeader)
 
     const stub = document.createElement('div')
     stub.className   = 'team-display-stub'
@@ -213,7 +213,7 @@ function renderWaiverControls(container: HTMLElement): void {
 
 // ─── Seat selector ────────────────────────────────────────────────────────────
 
-function renderSeatSelector(container: HTMLElement, btnLabel = 'Run algorithm'): void {
+function renderSeatSelector(container: HTMLElement): void {
     const teamNames = readTeamNames()
     const wrap = document.createElement('div')
     wrap.className = 'seat-selector-wrap'
@@ -223,9 +223,6 @@ function renderSeatSelector(container: HTMLElement, btnLabel = 'Run algorithm'):
     label.textContent = 'Which team are you?'
     wrap.append(label)
 
-    const row = document.createElement('div')
-    row.className = 'pick-control-row'
-
     const sel = makeCustomSelect(
         'seat-select',
         teamNames.map(n => ({ value: n, label: n })),
@@ -233,26 +230,14 @@ function renderSeatSelector(container: HTMLElement, btnLabel = 'Run algorithm'):
     if (currentSeat) sel.setValue(currentSeat)
     sel.element.addEventListener('change', () => {
         currentSeat = sel.getValue() ?? ''
-    })
-    row.append(sel.element)
-
-    const runBtn = document.createElement('button')
-    runBtn.className   = 'pick-btn'
-    runBtn.textContent = btnLabel
-    runBtn.addEventListener('click', () => {
-        currentSeat = sel.getValue() ?? currentSeat
+        // Re-evaluate immediately when the user switches their seat
         if (_onEvaluate) {
             const result = _onEvaluate()
-            if (result instanceof Promise) {
-                runBtn.disabled = true
-                result.finally(() => { runBtn.disabled = false })
-                       .catch(err => console.error('Evaluate failed:', err))
-            }
+            if (result instanceof Promise) result.catch(err => console.error('Evaluate failed:', err))
         }
     })
-    row.append(runBtn)
+    wrap.append(sel.element)
 
-    wrap.append(row)
     container.append(wrap)
 }
 
