@@ -1,4 +1,4 @@
-import { stat_styler_primary, stat_styler_secondary, styler_a } from './styler_functions.js'
+import { stat_styler_primary, stat_styler_secondary } from './styler_functions.js'
 import { ExpandView } from './expand_view.js'
 import { Player, SessionRequest } from './types.js'
 import { renderLeagueSettings, getLeagueSettings } from './parameter_collection/league_settings.js'
@@ -287,8 +287,7 @@ function buildTable(): void {
                 for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
                     const cell = row.insertCell(-1)
                     cell.textContent = String(val.toFixed(1))
-                    cell.style.cssText = styler_a()
-                    cell.className = 'auction-dollar'
+                    cell.className = 'auction-dollar celltypea'
                 }
             } else {
                 // Auction values not yet available (e.g. stale results from draft mode).

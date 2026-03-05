@@ -41,7 +41,7 @@ class ModelParameters(BaseModel):
 
 class DataSource(BaseModel):
     type: str = 'mock'
-    season: Optional[str] = None                              # 'historical' type only
+    season: Optional[str] = None                           # 'historical' type only
     blend_weights: Optional[dict[str, float]] = None          # 'blended' type only
     custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'blended'
 
@@ -125,9 +125,11 @@ class Roster(BaseModel):
 
 
 class AuctionValues(BaseModel):
-    your_dollar: float   # SAVOR-adjusted value for your specific team situation (from H-scores)
-    gnrc_dollar: float   # Generic cash-adjusted value (from G-scores, remaining cash)
-    orig_dollar: float   # Original value assuming auction just started (from G-scores, full cash)
+    your_dollar:   float   # SAVOR on H-scores, team-specific, current cash/picks
+    gnrc_dollar:   float   # SAVOR on H-scores, current cash/picks (generic baseline)
+    orig_dollar:   float   # SAVOR on H-scores, full original cash/picks
+    gnrc_dollar_g: float   # SAVOR on G-scores, current cash/picks
+    orig_dollar_g: float   # SAVOR on G-scores, full original cash/picks
 
 
 class Candidate(BaseModel):

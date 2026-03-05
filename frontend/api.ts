@@ -40,9 +40,11 @@ export function candidatesToPlayers(candidates: any[]): Player[] {
             ),
         },
         auction_values: c.auction_values ? {
-            your_dollar: c.auction_values.your_dollar,
-            gnrc_dollar: c.auction_values.gnrc_dollar,
-            orig_dollar: c.auction_values.orig_dollar,
+            your_dollar:   c.auction_values.your_dollar,
+            gnrc_dollar:   c.auction_values.gnrc_dollar,
+            orig_dollar:   c.auction_values.orig_dollar,
+            gnrc_dollar_g: c.auction_values.gnrc_dollar_g,
+            orig_dollar_g: c.auction_values.orig_dollar_g,
         } : undefined,
     }))
 }

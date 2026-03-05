@@ -76,56 +76,6 @@ export function stat_styler_tertiary(value: number, multiplier: number, middle: 
 }
 
 /**
-* Flat dark background for overall H-score / aggregate cells.
-* @returns {string} A CSS style string
-*/
-export function styler_a(): string {
-    return 'background-color:#2a2a33;color:white;';
-}
-
-/**
-* Slightly brighter background for summary / total-row cells.
-* @returns {string} A CSS style string
-*/
-export function styler_b(): string {
-    return 'background-color:#38384A;color:white;';
-}
-
-/**
- * Ineligible slot: position type cannot hold this roster slot (e.g. SF in a G slot).
- * @returns {string} A CSS style string
- */
-export function styler_ineligible(): string {
-    return 'background-color:#555566;color:#555566;';
-}
-
-/**
- * Absent slot: position type has fewer slots than the max depth, so this cell is empty.
- * @returns {string} A CSS style string
- */
-export function styler_absent(): string {
-    return 'background-color:#8D8D9E;color:#8D8D9E;text-align:center;';
-}
-
-/**
- * Candidate player being evaluated for this roster pick.
- * Muted steel-blue, cohesive with the flex allocation table's stat_styler_tertiary palette.
- * @returns {string} A CSS style string
- */
-export function styler_candidate(): string {
-    return 'background-color:rgb(54,90,148);color:white;text-align:center;';
-}
-
-/**
- * Player already rostered on the team.
- * Dark muted navy, subdued relative to the candidate highlight.
- * @returns {string} A CSS style string
- */
-export function styler_rostered(): string {
-    return 'background-color:rgb(36,48,70);color:white;';
-}
-
-/**
 * Returns a CSS string for an RGB background, choosing black or white text for contrast.
 *
 * @param {number} r - Red channel (0–255)

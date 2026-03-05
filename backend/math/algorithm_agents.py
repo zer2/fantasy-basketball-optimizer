@@ -69,10 +69,26 @@ class HAgent:
 
         self.n_categories = x_scores.shape[1]
 
+        #TODO: clean this up 
         if info['Position-Means'] is not None:
             self.position_means = np.array(info['Position-Means']).reshape(1, -1, self.n_categories)
+            
+            position_means_df = info['Position-Means']
+            position_means_df.loc['NP'] = 0 
+
+            #TODO: This should probably use the average of the position means for a player
+            #E.g. if they are a PF/C, this should be the average of the means for PF and C
+            #that get subtracted out 
+            rel_players = [p for p in x_scores.index if p != 'RP']
+            self.pos_avg = pd.DataFrame(
+                [position_means_df.loc[self.positions.get(p)[0]]
+                for p in rel_players],
+                index= rel_players,
+                columns=x_scores.columns
+            )
         else:
             self.position_means = None
+            self.pos_avg = None
 
         L_by_position = info['L-by-Position']
         L_by_position = np.array(L_by_position).reshape(1, -1, self.n_categories, self.n_categories)
@@ -239,9 +255,20 @@ class HAgent:
         default_weights = self.v.T.reshape(1, self.n_categories, 1)
         category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
 
+
+
         if self.initial_category_weights is None:
+
+            #we want to subtract out roughly the player's position means 
+            #to account for the fact that they are taking up that slot
+            if self.pos_avg is not None:
+                pos_avg = self.pos_avg.loc[x_scores_available.index]
+                pos_avg_array = np.expand_dims(np.array(pos_avg), axis=2)
+            else: 
+                pos_avg_array = 0 #not an array, but this will work fine
+
             initial_category_weights = (
-                (diff_means + x_scores_available_array)
+                (diff_means + x_scores_available_array - pos_avg_array)
                 / (default_weights * category_momentum_factor)
                 + default_weights
             ).mean(axis=2)

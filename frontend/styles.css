@@ -674,6 +674,16 @@ tr {
     display: flex;
 }
 
+.celltypea {
+    background-color:#2a2a33;
+    color:white;
+}
+
+.celltypeb {
+    background-color:#38384A;
+    color:white;
+}
+
 .overallhscore {
     background-color:#2a2a33;
     color:white;
@@ -705,6 +715,29 @@ tr {
     padding:5px;
     border-top : 2px solid #3d3d55;
     border-bottom : 2px solid #3d3d55;
+}
+
+.rosterabsent {
+    background-color:#8D8D9E;
+    color:#8D8D9E;
+    text-align:center;
+}
+
+.rostercandidate {
+    background-color:rgb(54,90,148);
+    color:white;
+    text-align:center;
+}
+
+.rosteronteam {
+    background-color:rgb(36,48,70);
+    color:white;
+    text-align:center;
+}
+
+.ineligible {
+        background-color:#555566;
+        color:#555566;
 }
 
 .auction-dollar {

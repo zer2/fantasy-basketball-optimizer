@@ -26,11 +26,10 @@ _POSITION_SUFFIX_RE = re.compile(r'\s+\([A-Z,/]+\)$')
 def _last_name(player_full_name: str) -> str:
     """Return the player's last name, stripping any trailing position suffix.
 
-    For example: "Nikola Jokic (C,PF)" → "Jokic", "LeBron James (PF,SF)" → "James",
+    For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
     "Nikola Jokic" → "Jokic".
     """
-    without_position = _POSITION_SUFFIX_RE.sub('', player_full_name).strip()
-    return without_position.split()[-1] if without_position else player_full_name
+    return player_full_name.split(' (')[0].split(' ')[-1]
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -199,27 +198,38 @@ def _build_candidates(
         if cash_per_team is not None and n_remaining > 0:
             total_original_cash = float(H.n_drafters * cash_per_team)
 
+            # G-scores for available (undrafted) players, used for G-score dollar values.
+            available_in_g = [p for p in h_scores_sorted.index if p in player_g_scores.index]
+            g_scores_available = player_g_scores.loc[available_in_g, 'Total']
+
             try:
                 # your_dollar: team-specific H-scores, current state (remaining cash + picks)
                 your_dollar_series = auction_value_adjuster(
                     h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
                 )
-                # gnrc_dollar: same H-scores and state, but without team-specific context.
-                # In the original app this uses a separate "default" H-score run; here we
-                # use the same scores as a simplification until a generic run is available.
+                # gnrc_dollar / orig_dollar: H-scores, same/full cash.
+                # In the original app these use a separate generic H-score run; here we
+                # use the same scores as a simplification.
                 gnrc_dollar_series = auction_value_adjuster(
                     h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
                 )
-                # orig_dollar: H-scores of available players scaled to the full original
-                # cash pool and total picks, representing value as if the auction just started.
                 orig_dollar_series = auction_value_adjuster(
                     h_scores_sorted, total_picks, total_original_cash, streaming_noise,
                 )
+                # G-score variants: generic value using G-scores instead of H-scores.
+                gnrc_dollar_g_series = auction_value_adjuster(
+                    g_scores_available, n_remaining, total_cash_remaining, streaming_noise,
+                )
+                orig_dollar_g_series = auction_value_adjuster(
+                    player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
+                )
                 player_auction_values = {
                     p: AuctionValues(
-                        your_dollar = round(float(your_dollar_series.get(p, 0.0)), 2),
-                        gnrc_dollar = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
-                        orig_dollar = round(float(orig_dollar_series.get(p, 0.0)), 2),
+                        your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
+                        gnrc_dollar   = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
+                        orig_dollar   = round(float(orig_dollar_series.get(p, 0.0)), 2),
+                        gnrc_dollar_g = round(float(gnrc_dollar_g_series.get(p, 0.0)), 2),
+                        orig_dollar_g = round(float(orig_dollar_g_series.get(p, 0.0)), 2),
                     )
                     for p in h_scores_sorted.index
                 }

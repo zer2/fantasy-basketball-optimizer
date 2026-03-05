@@ -2,10 +2,7 @@
 // Builds the expandable detail panel beneath each player row in the main table.
 // Mirrors the detail panels in the original Streamlit app.
 
-import { stat_styler_primary, stat_styler_tertiary,
-         styler_a, styler_b,
-         styler_ineligible, styler_absent,
-         styler_candidate, styler_rostered } from './styler_functions.js'
+import { stat_styler_primary, stat_styler_tertiary} from './styler_functions.js'
 import { Player } from './types.js'
 
 const POSITION_NAMES: Record<string, string> = {
@@ -70,7 +67,22 @@ export function ExpandView(playerIndex: number, playerData: Player, categories: 
         cell.appendChild(makeWeightsTable(playerData, categories));
 
         cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'));
-        cell.appendChild(makeFlexAllocationsTable(playerData));
+
+        if (playerData.auction_values) {
+            // In auction mode, show the flex allocations and the auction values table side-by-side.
+            const sideRow = document.createElement('div');
+            sideRow.style.cssText = 'display:flex; gap:32px; align-items:flex-start; margin-left:100px;';
+            sideRow.appendChild(makeFlexAllocationsTable(playerData, true));
+
+            const auctionBlock = document.createElement('div');
+            auctionBlock.appendChild(makePanelLabel('All auction values'));
+            auctionBlock.appendChild(makeAuctionValuesTable(playerData));
+            sideRow.appendChild(auctionBlock);
+
+            cell.appendChild(sideRow);
+        } else {
+            cell.appendChild(makeFlexAllocationsTable(playerData));
+        }
 
         cell.appendChild(makePanelLabel('Roster assignments', '60px'));
         cell.appendChild(makeRosterGrid(playerData));
@@ -145,8 +157,8 @@ function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivEleme
         // Total column: flat color, brighter for the summary row
         let totalCell = row.insertCell(-1);
         totalCell.textContent = rowData.total.toFixed(2);
-        totalCell.style.cssText = rowData.isTotal ? styler_b() : styler_a();
         totalCell.className = 'panel-datacell';
+        totalCell.className += rowData.isTotal ? ' celltypeb' : ' celltypea';
 
         for (let value of rowData.values) {
             let cell = row.insertCell(-1);
@@ -210,7 +222,7 @@ function makeWeightsTable(playerData: Player, categories: string[]): HTMLDivElem
  * Builds the flex allocations table showing how future picks are expected to
  * fill remaining flex roster slots, given that this candidate is drafted.
  */
-function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
+function makeFlexAllocationsTable(playerData: Player, noMargin = false): HTMLDivElement {
     let flexData = playerData.flex_allocations;
 
     let table = document.createElement('table');
@@ -242,10 +254,10 @@ function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
 
         for (let value of rowData.values) {
             let cell = row.insertCell(-1);
-            cell.className = 'panel-datacell';
             if (value === null) {
-                cell.style.cssText = styler_ineligible();
+                cell.className = 'ineligible panel-datacell';
             } else {
+                cell.className = 'panel-datacell';
                 cell.textContent = value.toFixed(2);
                 cell.style.cssText = stat_styler_tertiary(value, 50, 0);
             }
@@ -253,9 +265,68 @@ function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
     }
 
     let wrapper = document.createElement('div');
-    wrapper.style.marginLeft = '100px';
+    if (!noMargin) wrapper.style.marginLeft = '100px';
     wrapper.appendChild(table);
     return wrapper;
+}
+
+// ─── Auction values table ─────────────────────────────────────────────────────
+// Two rows (H-score, G-score) × three columns (Your $, Gnrc. $, Orig. $).
+// The H-score row mirrors the values shown in the main candidate table.
+// The G-score row shows the same dollar columns computed from G-scores instead;
+// Your $ has no G-score equivalent and is shown as a dash.
+
+function makeAuctionValuesTable(playerData: Player): HTMLTableElement {
+    const av = playerData.auction_values!;
+
+    const table = document.createElement('table');
+    table.className = 'panel-table';
+    table.style.tableLayout = 'fixed';
+
+    // Header
+    const headerRow = table.createTHead().insertRow(-1);
+    const labelTh = document.createElement('th');
+    labelTh.className = 'panel-colspacer';
+    labelTh.style.width = '72px';
+    headerRow.appendChild(labelTh);
+    for (const col of ['Your $', 'Gnrc. $', 'Orig. $']) {
+        const th = document.createElement('th');
+        th.className = 'panel-colheader';
+        th.style.width = '72px';
+        th.textContent = col;
+        headerRow.appendChild(th);
+    }
+
+    const tbody = table.createTBody();
+
+    // H-score row
+    const hRow = tbody.insertRow(-1);
+    const hLabel = document.createElement('th');
+    hLabel.className = 'panel-rowlabel';
+    hLabel.textContent = 'H-score';
+    hRow.appendChild(hLabel);
+    for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
+        const cell = hRow.insertCell(-1);
+        cell.className = 'panel-datacell celltypea';
+        cell.textContent = val.toFixed(1);
+    }
+
+    // G-score row (Your $ is not applicable for G-scores)
+    const gRow = tbody.insertRow(-1);
+    const gLabel = document.createElement('th');
+    gLabel.className = 'panel-rowlabel';
+    gLabel.textContent = 'G-score';
+    gRow.appendChild(gLabel);
+    const naCell = gRow.insertCell(-1);
+    naCell.className = 'panel-datacell celltypea';
+    naCell.textContent = '—';
+    for (const val of [av.gnrc_dollar_g, av.orig_dollar_g]) {
+        const cell = gRow.insertCell(-1);
+        cell.className = 'panel-datacell celltypea';
+        cell.textContent = val.toFixed(1);
+    }
+
+    return table;
 }
 
 // ─── Roster grid ─────────────────────────────────────────────────────────────
@@ -268,6 +339,8 @@ function makeFlexAllocationsTable(playerData: Player): HTMLDivElement {
  */
 function makeRosterGrid(playerData: Player): HTMLDivElement {
     let roster = playerData.roster;
+
+    console.log(roster)
 
     // Derive ordered position types by stripping trailing digits (e.g. "PG1" → "PG")
     let posTypes: string[] = [];
@@ -308,21 +381,20 @@ function makeRosterGrid(playerData: Player): HTMLDivElement {
 
         for (let type of posTypes) {
             let cell = row.insertCell(-1);
-            cell.className = 'panel-datacell';
             let slot = groups[type][d];
             if (slot === undefined) {
-                cell.style.cssText = styler_ineligible();
+                cell.className = 'ineligible panel-datacell';
                 cell.textContent = '\u00A0';
             } else {
                 let assignment = roster.assignments[slot];
                 if (!assignment) {
-                    cell.style.cssText = styler_absent();
+                    cell.className = 'rosterabsent panel-datacell';
                     cell.textContent = '\u00A0';
                 } else if (assignment.isCandidate) {
-                    cell.style.cssText = styler_candidate();
+                    cell.className = 'rostercandidate panel-datacell';
                     cell.textContent = assignment.name;
                 } else {
-                    cell.style.cssText = styler_rostered();
+                    cell.className = 'rosteronteam panel-datacell';
                     cell.textContent = assignment.name;
                 }
             }

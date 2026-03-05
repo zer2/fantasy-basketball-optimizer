@@ -73,9 +73,11 @@ export interface SessionRequest {
 // ─── Top-level player ─────────────────────────────────────────────────────────
 
 export interface AuctionValues {
-    your_dollar: number;   // SAVOR-adjusted value for your specific team situation
-    gnrc_dollar: number;   // Generic cash-adjusted value (remaining cash/players)
-    orig_dollar: number;   // Original value before any players have been taken
+    your_dollar:   number;   // SAVOR on H-scores, team-specific, current cash/picks
+    gnrc_dollar:   number;   // SAVOR on H-scores, current cash/picks (generic baseline)
+    orig_dollar:   number;   // SAVOR on H-scores, full original cash/picks
+    gnrc_dollar_g: number;   // SAVOR on G-scores, current cash/picks
+    orig_dollar_g: number;   // SAVOR on G-scores, full original cash/picks
 }
 
 export interface Player {

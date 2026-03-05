@@ -170,7 +170,7 @@ export function getPlayerStatsParams(): { data_source: DataSource; injured_playe
     const data_source: DataSource = {
         type,
         blend_weights,
-        custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM },
+        custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM }
     }
 
     const injuredRaw = (document.getElementById('ps-injured') as HTMLTextAreaElement).value

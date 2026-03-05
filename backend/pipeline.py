@@ -62,7 +62,7 @@ def run_step1(
 
     elif source_type == 'historical':
         from backend.data_retrieval import get_specified_historical_stats
-        v0 = get_specified_historical_stats(cp['season'], params)
+        v0 = get_specified_historical_stats('2024-25', params)
 
     elif source_type == 'blended':
         from backend.data_retrieval import combine_projections
