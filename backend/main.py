@@ -200,6 +200,17 @@ async def upload_projection(
     )
 
 
+# ── GET /seasons ──────────────────────────────────────────────────────────────
+
+@app.get('/seasons')
+def get_seasons_route():
+    try:
+        from backend.data_retrieval import get_available_seasons
+        return {'seasons': get_available_seasons()}
+    except Exception:
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+
 # ── POST /sessions ────────────────────────────────────────────────────────────
 
 @app.post('/sessions', response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
@@ -237,7 +248,7 @@ def create_session_route(req: SessionRequest):
         delete_session(session.id)
         raise HTTPException(status_code=500, detail=traceback.format_exc())
 
-    categories = session.current_params.get('categories', [])
+    categories = session.current_params['categories']
 
     return SessionResponse(
         session_id=session.id,
@@ -284,7 +295,7 @@ def patch_session_route(session_id: str, req: PatchRequest):
             patch['blend_weights'] = req.data_source.blend_weights
         if req.data_source.custom_data_ids is not None:
             patch['custom_data_ids'] = req.data_source.custom_data_ids
-            _sport = session.current_params.get('sport', 'NBA')
+            _sport = session.current_params['sport']
             params = _load_all_params()[_sport]
             if source_type == 'csv':
                 csv_bytes, file_type_str = _resolve_csv(req.data_source.custom_data_ids)
@@ -301,6 +312,9 @@ def patch_session_route(session_id: str, req: PatchRequest):
 
 @app.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse)
 def evaluate_route(session_id: str, req: EvaluateRequest):
+
+    #ZR: What is the point of these lines? This function isn't using the session at all
+    #just the session id.
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
@@ -316,10 +330,9 @@ def evaluate_route(session_id: str, req: EvaluateRequest):
             remaining_cash    = req.remaining_cash,
             n_iterations      = n_iterations,
         )
+        return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
-
-    return result
 
 
 # ── DELETE /sessions/{session_id} ─────────────────────────────────────────────

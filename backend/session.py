@@ -83,6 +83,11 @@ class Session:
     info: Optional[dict]   = None   # process_player_data result
     H:    Optional[object] = None   # HAgent instance
 
+    # Cached baseline H-scores from a run with no players taken.
+    # Used for gnrc_dollar / orig_dollar auction values.
+    # Invalidated whenever run_step5 rebuilds the HAgent.
+    generic_h_scores: Optional[object] = None  # pd.Series when populated
+
 
 _store: dict[str, Session] = {}
 _lock = threading.Lock()
@@ -104,6 +109,8 @@ def get_session(sid: str) -> Optional[Session]:
         if session is None:
             return None
         if time.time() - session.last_accessed > SESSION_TTL:
+            #ZR: What is the point of this? Is it efficient to only remove stuff 
+            #from the store when it is queried actively? 
             del _store[sid]
             return None
         session.last_accessed = time.time()

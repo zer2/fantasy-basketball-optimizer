@@ -140,9 +140,9 @@ class Candidate(BaseModel):
     win_rates: list[float]
     category_weights: list[float]
     g_score_rows: list[GScoreRow]
-    flex_allocations: FlexAllocations
-    roster: Roster
-    auction_values: Optional[AuctionValues] = None   # None in draft mode
+    flex_allocations: Optional[FlexAllocations] = None   # None when position data absent
+    roster: Optional[Roster] = None                       # None when position data absent
+    auction_values: Optional[AuctionValues] = None        # None in draft mode
 
 
 class EvaluateResponse(BaseModel):

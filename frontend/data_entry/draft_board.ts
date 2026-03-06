@@ -3,7 +3,8 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getPlayers } from '../script.js'
+import { getPlayers } from '../app_state.js'
+import { makeDebouncer, Debouncer } from '../helper_functions.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -15,11 +16,25 @@ let nDrafters = 0
 let nPicks    = 0
 let configKey = ''   // detects sidebar changes that require a reset
 let _onPick: (() => void | Promise<void>) | undefined
+let _debouncer: Debouncer | null = null
 
 const ROUND_W = 46   // px — Round label column
 const TEAM_W  = 85   // px — per-drafter column
 
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Clears the draft board state. Call when the player pool changes (e.g. data source switch)
+ * so drafted names from the old dataset are not sent to the backend.
+ * The next renderDraftBoard call will reinitialise from current sidebar values.
+ */
+export function resetDraftBoard(): void {
+    pickRow     = 0
+    pickDrafter = 0
+    drafted     = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
+    configKey   = ''
+    _debouncer?.cancel()
+}
 
 /** Returns the current draft state for use in /evaluate requests. */
 export function getDraftState(): { player_assignments: Record<string, string[]> } {
@@ -31,12 +46,16 @@ export function getDraftState(): { player_assignments: Record<string, string[]> 
     return { player_assignments }
 }
 
+/** Renders the draft board UI into the container. Resets state if sidebar config changed. Calls onPick (debounced) after each draft action. */
 export function renderDraftBoard(
     container: HTMLElement,
     onPick?: () => void | Promise<void>,
 ): void {
-    if (onPick !== undefined) _onPick = onPick
-    const cfg = readConfig()
+    if (onPick !== undefined) {
+        _onPick = onPick
+        _debouncer = makeDebouncer(() => { _onPick?.() })
+    }
+    const cfg = readDraftConfig()
 
     // Reset state if league settings changed (different drafter/pick counts or teams)
     if (cfg.key !== configKey) {
@@ -56,6 +75,7 @@ export function renderDraftBoard(
 
 // ─── Pick control ─────────────────────────────────────────────────────────────
 
+/** Builds the pick control row: player dropdown, lock-in / undo / clear buttons. */
 function buildPickControl(container: HTMLElement): HTMLElement {
     const wrap = document.createElement('div')
 
@@ -89,14 +109,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         drafted[pickRow][pickDrafter] = chosen
         advance()
         renderDraftBoard(container)
-        if (_onPick) {
-            const result = _onPick()
-            if (result instanceof Promise) {
-                lockBtn.disabled = true
-                result.finally(() => { lockBtn.disabled = false })
-                       .catch(err => console.error('Evaluate after pick failed:', err))
-            }
-        }
+        _debouncer?.fire()
     })
 
     const undoBtn = document.createElement('button')
@@ -107,12 +120,8 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         goBack()
         drafted[pickRow][pickDrafter] = null
         renderDraftBoard(container)
-        if (_onPick) {
-            const result = _onPick()
-            if (result instanceof Promise) {
-                result.catch(err => console.error('Evaluate after undo failed:', err))
-            }
-        }
+        _debouncer?.fire()
+
     })
 
     const clearBtn = document.createElement('button')
@@ -139,6 +148,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 
 // ─── Draft board table ────────────────────────────────────────────────────────
 
+/** Builds the draft board grid table: rounds × drafters with serpentine pick highlighting. */
 function buildDraftBoard(): HTMLElement {
     const scroll = document.createElement('div')
     scroll.className = 'entry-table-scroll'
@@ -188,6 +198,7 @@ function buildDraftBoard(): HTMLElement {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Returns player names that have not yet been drafted. */
 function getAvailablePlayers(): string[] {
     const allPlayers = getPlayers().map(p => p.name)
     const draftedSet = new Set(drafted.flat().filter(Boolean) as string[])
@@ -227,11 +238,13 @@ function goBack(): void {
     }
 }
 
-function readConfig(): { nDrafters: number; nPicks: number; teamNames: string[]; key: string } {
-    const nD = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
-    const nP = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
+/** Reads current sidebar league settings and returns them with a composite key for change detection. */
+function readDraftConfig(): { nDrafters: number; nPicks: number; teamNames: string[]; key: string } {
+    const nD  = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
+    const nP  = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
+    const src = (document.getElementById('ps-data-type') as HTMLInputElement).value
     const names = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
-    return { nDrafters: nD, nPicks: nP, teamNames: names, key: `${nD}:${nP}:${names.join(',')}` }
+    return { nDrafters: nD, nPicks: nP, teamNames: names, key: `${nD}:${nP}:${src}:${names.join(',')}` }
 }
 

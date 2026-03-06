@@ -124,6 +124,7 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
     return item
 }
 
+/** Reads all model parameter values from the DOM and returns them as a typed object. */
 export function getModelParameters(): ModelParameters {
     return {
         upsilon:         readNumberInput('mp-upsilon'),
@@ -138,6 +139,7 @@ export function getModelParameters(): ModelParameters {
     }
 }
 
+/** Reads a numeric input element's value by DOM id. */
 function readNumberInput(id: string): number {
     return parseFloat((document.getElementById(id) as HTMLInputElement).value)
 }

@@ -55,14 +55,15 @@ def run_step1(
     """
     _, params, _ = _sport_params(session)
     cp = session.current_params
-    source_type = cp.get('data_source_type', 'mock')
+    source_type = cp['data_source_type']
 
     if source_type == 'csv':
         v0 = _parse_projection_csv(csv_bytes, file_type, params)
 
     elif source_type == 'historical':
         from backend.data_retrieval import get_specified_historical_stats
-        v0 = get_specified_historical_stats('2024-25', params)
+
+        v0 = get_specified_historical_stats(cp.get('season') or '2024-25', params)
 
     elif source_type == 'blended':
         from backend.data_retrieval import combine_projections
@@ -178,6 +179,8 @@ def run_step5(session: Session) -> None:
     slot_counts = cp['slot_counts']
     n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
     n_drafters  = cp['n_drafters']
+
+    session.generic_h_scores = None  # invalidate cached baseline whenever HAgent rebuilds
 
     session.H = HAgent(
         info           = session.info,

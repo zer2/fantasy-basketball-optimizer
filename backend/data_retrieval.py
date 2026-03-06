@@ -105,6 +105,29 @@ def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
     return df
 
 
+# ── Available seasons ─────────────────────────────────────────────────────────
+
+_seasons_cache: tuple[float, list[str]] | None = None
+_seasons_lock = threading.Lock()
+
+
+def get_available_seasons() -> list[str]:
+    """Return distinct historical seasons from Snowflake, newest first.
+
+    Result is cached for 24 hours (same TTL as the full data cache).
+    """
+    global _seasons_cache
+    with _seasons_lock:
+        if _seasons_cache is not None and time.time() - _seasons_cache[0] < _CACHE_TTL:
+            return _seasons_cache[1]
+        df = _get_connection().cursor().execute(
+            'SELECT DISTINCT SEASON FROM AVERAGE_NUMBERS_VIEW_2 ORDER BY SEASON DESC'
+        ).fetch_pandas_all()
+        seasons = [str(s) for s in df['SEASON'].tolist()]
+        _seasons_cache = (time.time(), seasons)
+        return seasons
+
+
 # ── Historical data ───────────────────────────────────────────────────────────
 
 def get_historical_data(params: dict) -> pd.DataFrame:

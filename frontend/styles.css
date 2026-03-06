@@ -345,11 +345,32 @@
     outline: 1px solid #666688;
 }
 
-.cs-trigger-text {
+.cs-search-input {
     flex: 1;
-    overflow: hidden;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: lightgrey;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    padding: 0;
+    min-width: 0;
+    cursor: pointer;
     text-overflow: ellipsis;
-    white-space: nowrap;
+}
+
+.cs-search-input::placeholder {
+    color: #888;
+}
+
+.cs-open .cs-search-input {
+    cursor: text;
+}
+
+.cs-no-matches {
+    color: #666;
+    font-style: italic;
+    cursor: default;
 }
 
 .cs-arrow {

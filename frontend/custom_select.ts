@@ -63,16 +63,17 @@ export function makeCustomSelect(
     // Visible trigger
     const trigger = document.createElement('div')
     trigger.className = 'cs-trigger'
-    trigger.tabIndex  = 0
 
-    const triggerText = document.createElement('span')
-    triggerText.className = 'cs-trigger-text'
+    const searchInput = document.createElement('input')
+    searchInput.type      = 'text'
+    searchInput.className = 'cs-search-input'
+    searchInput.autocomplete = 'off'
 
     const arrow = document.createElement('span')
     arrow.className   = 'cs-arrow'
     arrow.textContent = '▾'
 
-    trigger.append(triggerText, arrow)
+    trigger.append(searchInput, arrow)
 
     // Dropdown panel
     const dropdown = document.createElement('div')
@@ -88,21 +89,36 @@ export function makeCustomSelect(
     }
 
     function commit(value: string, silent = false): void {
-        currentValue            = value
-        hiddenInput.value       = value
-        triggerText.textContent = getLabelFor(value)
+        currentValue      = value
+        hiddenInput.value = value
+        searchInput.value = getLabelFor(value)
         if (!silent) wrapper.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    /** Returns the options that match the current search text (case-insensitive). */
+    function filteredOptions(): CustomSelectOption[] {
+        const filter = searchInput.value.toLowerCase()
+        if (!filter || filter === getLabelFor(currentValue).toLowerCase()) return currentOptions
+        return currentOptions.filter(o => o.label.toLowerCase().includes(filter))
     }
 
     function renderDropdown(): void {
         dropdown.replaceChildren()
-        for (const opt of currentOptions) {
+        const visible = filteredOptions()
+        if (visible.length === 0) {
+            const empty = document.createElement('div')
+            empty.className = 'cs-option cs-no-matches'
+            empty.textContent = 'No matches'
+            dropdown.append(empty)
+            return
+        }
+        for (const opt of visible) {
             const item = document.createElement('div')
             item.className = 'cs-option'
             if (opt.value === currentValue) item.classList.add('cs-option-selected')
             item.textContent = opt.label
             item.addEventListener('mousedown', e => {
-                e.preventDefault()   // prevent trigger's blur from firing before click
+                e.preventDefault()   // prevent blur from firing before click
                 close()
                 commit(opt.value)
             })
@@ -111,6 +127,8 @@ export function makeCustomSelect(
     }
 
     function open(): void {
+        searchInput.value = ''
+        searchInput.placeholder = getLabelFor(currentValue)
         renderDropdown()
         dropdown.hidden = false
         wrapper.classList.add('cs-open')
@@ -119,35 +137,49 @@ export function makeCustomSelect(
     function close(): void {
         dropdown.hidden = true
         wrapper.classList.remove('cs-open')
+        searchInput.value       = getLabelFor(currentValue)
+        searchInput.placeholder = ''
     }
 
     // ── Event wiring ───────────────────────────────────────────────────────
 
-    trigger.addEventListener('click', () => {
-        dropdown.hidden ? open() : close()
+    // Clicking the arrow toggles; clicking the input opens if closed.
+    arrow.addEventListener('mousedown', e => {
+        e.preventDefault()
+        if (dropdown.hidden) { searchInput.focus(); open() } else { close(); searchInput.blur() }
     })
 
-    trigger.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            dropdown.hidden ? open() : close()
-        } else if (e.key === 'Escape') {
+    searchInput.addEventListener('focus', () => {
+        if (dropdown.hidden) open()
+    })
+
+    searchInput.addEventListener('input', () => {
+        if (dropdown.hidden) open()
+        renderDropdown()
+    })
+
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
             close()
-        } else if (!dropdown.hidden) {
-            const idx = currentOptions.findIndex(o => o.value === currentValue)
-            if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                const next = currentOptions[idx + 1]
-                if (next) { commit(next.value); renderDropdown() }
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                const prev = currentOptions[idx - 1]
-                if (prev) { commit(prev.value); renderDropdown() }
+            searchInput.blur()
+        } else if (e.key === 'Enter') {
+            // Select the first visible option
+            const visible = filteredOptions()
+            if (visible.length > 0) {
+                close()
+                commit(visible[0].value)
             }
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (dropdown.hidden) return
+            e.preventDefault()
+            const visible = filteredOptions()
+            const idx = visible.findIndex(o => o.value === currentValue)
+            const next = e.key === 'ArrowDown' ? visible[idx + 1] : visible[idx - 1]
+            if (next) { commit(next.value); renderDropdown() }
         }
     })
 
-    trigger.addEventListener('blur', () => {
+    searchInput.addEventListener('blur', () => {
         // Delay so the mousedown handler on a dropdown option fires first.
         setTimeout(close, 150)
     })

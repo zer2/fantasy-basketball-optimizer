@@ -15,6 +15,7 @@ let _onEvaluate: (() => void | Promise<void>) | undefined
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Initializes the main content area and registers change listeners for mode/platform selectors. */
 export function initLayout(opts: { onEvaluate?: () => void | Promise<void> } = {}): void {
     _onEvaluate = opts.onEvaluate
     applyLayout()
@@ -33,6 +34,7 @@ export function getCurrentSeat(): string { return currentSeat }
 
 // ─── Layout dispatcher ────────────────────────────────────────────────────────
 
+/** Reads current mode/platform from the DOM and dispatches to the appropriate layout builder. */
 function applyLayout(): void {
     const mode     = (document.getElementById('ls-mode')     as HTMLInputElement).value
     const platform = (document.getElementById('ls-platform') as HTMLInputElement).value
@@ -51,6 +53,7 @@ function applyLayout(): void {
 
 // ─── Own-data layout (Draft or Auction) ───────────────────────────────────────
 
+/** Renders the own-data layout: draft/auction board + seat selector above the H-score table. */
 function showOwnDataLayout(mode: string): void {
     hide('season-nav')
     hide('live-bar')
@@ -89,6 +92,7 @@ function showOwnDataLayout(mode: string): void {
 
 // ─── Live-platform layout (Draft or Auction) ──────────────────────────────────
 
+/** Renders the live-platform layout: seat selector only (no data-entry grid). */
 function showLiveLayout(): void {
     hide('season-nav')
     hide('live-bar')
@@ -118,6 +122,7 @@ function showLiveLayout(): void {
 
 // ─── Season layout ────────────────────────────────────────────────────────────
 
+/** Renders the season mode layout: tab nav (Waiver / Trading / Rosters) with content panes. */
 function showSeasonLayout(): void {
     hide('live-bar')
     hide('left-panel')
@@ -138,6 +143,7 @@ function showSeasonLayout(): void {
     activateSeasonTab('waiver')
 }
 
+/** Creates the season mode tab buttons (Waiver, Trading, Rosters) in the nav bar. */
 function buildSeasonNav(): void {
     const nav = document.getElementById('season-nav')!
     nav.innerHTML = ''
@@ -158,6 +164,7 @@ function buildSeasonNav(): void {
     }
 }
 
+/** Switches the visible season mode content pane and highlights the active tab button. */
 function activateSeasonTab(tabId: string): void {
     // Update active button styling
     document.querySelectorAll('.season-tab-btn').forEach(btn => {
@@ -192,6 +199,7 @@ function activateSeasonTab(tabId: string): void {
 
 // ─── Waiver controls ──────────────────────────────────────────────────────────
 
+/** Builds the waiver tab controls: team selector for dropping a player. */
 function renderWaiverControls(container: HTMLElement): void {
     const teamNames = readTeamNames()
     const wrap = document.createElement('div')
@@ -213,6 +221,7 @@ function renderWaiverControls(container: HTMLElement): void {
 
 // ─── Seat selector ────────────────────────────────────────────────────────────
 
+/** Builds the "Which team are you?" selector. Changing the seat triggers an immediate re-evaluate. */
 function renderSeatSelector(container: HTMLElement): void {
     const teamNames = readTeamNames()
     const wrap = document.createElement('div')

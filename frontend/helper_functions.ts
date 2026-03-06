@@ -1,6 +1,6 @@
 // helper_functions.ts
-// Shared UI building blocks used across parameter_collection modules.
-// Table-specific helpers (ExpandView and friends) live in expand_view.ts.
+// Shared UI building blocks used across sidebar and parameter_collection modules.
+// Table-specific helpers (ExpandView and friends) live in table/expand_view.ts.
 
 // ─── Global JS tooltip ────────────────────────────────────────────────────────
 // Uses position:fixed so it escapes the sidebar's overflow-y:auto clipping.
@@ -22,6 +22,31 @@ document.addEventListener('mouseover', (e: MouseEvent) => {
     _tooltip.style.top = rect.top + 'px'
     _tooltip.style.display = 'block'
 })
+
+// ─── Debounce helper ─────────────────────────────────────────────────────────
+// Used by draft_board and auction_entry so rapid "Lock in" clicks only trigger
+// one backend call after a 300ms pause.
+
+export interface Debouncer {
+    /** Schedule the callback; resets the timer on each call. */
+    fire(): void
+    /** Cancel any pending invocation (e.g. on board reset). */
+    cancel(): void
+}
+
+/** Creates a debouncer that calls `fn` only after `delayMs` ms of inactivity. Each `fire()` resets the timer. */
+export function makeDebouncer(fn: () => void, delayMs = 300): Debouncer {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    return {
+        fire() {
+            if (timer) clearTimeout(timer)
+            timer = setTimeout(() => { timer = null; fn() }, delayMs)
+        },
+        cancel() {
+            if (timer) { clearTimeout(timer); timer = null }
+        },
+    }
+}
 
 /** Creates a `<label>` with class `sidebar-label`, linked to the given input id. */
 export function makeLabel(forId: string, text: string): HTMLLabelElement {
@@ -181,4 +206,43 @@ export function renderMultiselect(
 
     renderChips()
     return selected
+}
+
+// ─── Sidebar section helpers ────────────────────────────────────────────────
+// Generic utilities for building collapsible sidebar sections with Apply buttons.
+
+/**
+ * Creates a collapsible `<details>` sidebar section and returns its content div.
+ * The returned element is the container that `render*` functions should populate.
+ */
+export function createSection(parent: HTMLElement, title: string): HTMLElement {
+    const details = document.createElement('details')
+    details.className = 'sidebar-section'
+    const summary = document.createElement('summary')
+    summary.textContent = title
+    details.append(summary)
+    const content = document.createElement('div')
+    content.className = 'sidebar-section-content'
+    details.append(content)
+    parent.append(details)
+    return content
+}
+
+/**
+ * Appends a small "Apply" button to a sidebar section content div.
+ * The callback may be sync or async; errors are caught and logged.
+ */
+export function addApplyBtn(container: HTMLElement, onClick: () => void | Promise<void>): void {
+    const btn = document.createElement('button')
+    btn.className   = 'section-apply-btn'
+    btn.textContent = 'Apply'
+    btn.addEventListener('click', () => {
+        const result = onClick()
+        if (result instanceof Promise) {
+            btn.disabled = true
+            result.finally(() => { btn.disabled = false })
+                  .catch(err => console.error('Apply failed:', err))
+        }
+    })
+    container.append(btn)
 }

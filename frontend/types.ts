@@ -88,7 +88,7 @@ export interface Player {
     win_rates: number[];        // per-category win rates (0–100, 50 = average)
     category_weights: number[]; // algorithm's relative weighting for future picks (100 = baseline)
     g_score_rows: GScoreRow[];
-    flex_allocations: FlexAllocations;
-    roster: Roster;
-    auction_values?: AuctionValues;  // present when mode === 'Auction Mode'
+    flex_allocations?: FlexAllocations;  // absent when position data unavailable
+    roster?: Roster;                     // absent when position data unavailable
+    auction_values?: AuctionValues;      // present when mode === 'Auction Mode'
 }

@@ -2,7 +2,7 @@
 // Mirrors player_stats_popover() in src/parameter_collection/player_stats.py
 
 import { makeCustomSelect } from '../custom_select.js'
-import { uploadCsv } from '../api.js'
+import { uploadCsv, getSeasons } from '../api/client.js'
 import { DataSource } from '../types.js'
 
 // ─── Module state ──────────────────────────────────────────────────────────────
@@ -44,8 +44,46 @@ export function renderPlayerStats(container: HTMLElement): void {
 
     renderBlendWeights(projSection)
 
+    // Historical season selector (only relevant for 'historical' type)
+    const histSection = document.createElement('div')
+    histSection.id = 'ps-hist-section'
+    histSection.style.display = 'none'
+    container.append(histSection)
+
+    let seasonsLoaded = false
+    /** Fetches available seasons from the backend and renders the season dropdown (once). */
+    async function loadSeasons(): Promise<void> {
+        if (seasonsLoaded) return
+        const loadingEl = document.createElement('div')
+        loadingEl.className = 'sidebar-caption'
+        loadingEl.textContent = 'Loading seasons…'
+        histSection.append(loadingEl)
+        try {
+            const seasons = await getSeasons()
+            loadingEl.remove()
+            const label = document.createElement('label')
+            label.className = 'sidebar-label'
+            label.htmlFor = 'ps-season'
+            label.textContent = 'Season'
+            histSection.append(label)
+            const seasonSelect = makeCustomSelect(
+                'ps-season',
+                seasons.map(s => ({ value: s, label: s })),
+                seasons[0] ?? '',
+            )
+            histSection.append(seasonSelect.element)
+            seasonsLoaded = true
+        } catch (err) {
+            loadingEl.textContent = `Failed to load seasons: ${err}`
+            console.error('Failed to load seasons:', err)
+        }
+    }
+
     typeSelect.element.addEventListener('change', () => {
-        projSection.style.display = typeSelect.getValue() === 'blended' ? '' : 'none'
+        const type = typeSelect.getValue()
+        projSection.style.display = type === 'blended'    ? '' : 'none'
+        histSection.style.display = type === 'historical' ? '' : 'none'
+        if (type === 'historical') loadSeasons()
     })
 
     // Injured players
@@ -167,10 +205,12 @@ export function getPlayerStatsParams(): { data_source: DataSource; injured_playe
         BBM:   parseFloat((document.getElementById('ps-w-bbm')   as HTMLInputElement).value),
     }
 
+    const seasonEl = document.getElementById('ps-season') as HTMLInputElement | null
     const data_source: DataSource = {
         type,
         blend_weights,
-        custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM }
+        custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM },
+        season: type === 'historical' ? (seasonEl?.value ?? null) : null,
     }
 
     const injuredRaw = (document.getElementById('ps-injured') as HTMLTextAreaElement).value

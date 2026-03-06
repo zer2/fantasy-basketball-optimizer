@@ -71,7 +71,7 @@ def run_evaluate(
 
     info           = session.info
     H              = session.H
-    categories     = session.current_params.get('categories', [])
+    categories     = session.current_params['categories']
     current_params = session.current_params
 
     # Clear warm-start weights so this call is independent of any previous one.
@@ -92,9 +92,43 @@ def run_evaluate(
     if h_score_result is None:
         return EvaluateResponse(iteration=0, candidates=[])
 
+    # ── Generic H-scores cache (auction mode only) ────────────────────────────
+    # gnrc_dollar / orig_dollar are anchored to a neutral state: no players taken.
+    # On the first call (no players assigned), the current result already represents
+    # that neutral state, so we cache it directly — avoiding a redundant second run
+    # and guaranteeing Your $ == Gnrc. $ at the start of the auction.
+    # On later calls the cached value is reused unchanged.
+    # If the session connects mid-auction (players already assigned on first call),
+    # run a separate clean evaluation to obtain the neutral baseline.
+    if remaining_cash is not None and session.generic_h_scores is None:
+        all_assigned = [
+            p for team_players in player_assignments.values()
+            for p in team_players if isinstance(p, str)
+        ]
+        if len(all_assigned) == 0:
+            # No players taken yet — current scores are the neutral baseline.
+            session.generic_h_scores = h_score_result['Scores'].sort_values(ascending=False)
+        else:
+            # Mid-auction start: run a clean evaluation with all slots empty.
+            team_names        = current_params.get('team_names', [my_team_id])
+            empty_assignments = {name: [] for name in team_names}
+            generic_H         = H.clear_initial_weights()
+            generic_gen       = generic_H.get_h_scores(
+                player_assignments      = empty_assignments,
+                drafter                 = my_team_id,
+                cash_remaining_per_team = remaining_cash,
+                exclusion_list          = [],
+            )
+            generic_result = None
+            for _ in range(max(1, n_iterations)):
+                generic_result = next(generic_gen)
+            if generic_result is not None:
+                session.generic_h_scores = generic_result['Scores'].sort_values(ascending=False)
+
     candidates = _build_candidates(
         h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
         remaining_cash,
+        generic_h_scores=session.generic_h_scores,
     )
 
     return EvaluateResponse(
@@ -114,6 +148,7 @@ def _build_candidates(
     my_team_id: str,
     current_params: dict,
     remaining_cash: Optional[dict[str, float]] = None,
+    generic_h_scores: Optional[pd.Series] = None,
 ) -> list[Candidate]:
     """Convert a raw HAgent result dict into a list of ranked Candidate objects.
 
@@ -137,20 +172,33 @@ def _build_candidates(
         eligible player that fits the current roster.
     """
     # Pull named arrays from the result dict.
-    # h_scores_sorted: pd.Series  player → h_score (0–1), sorted descending
+    # Per-candidate result DataFrames are reindexed to h_scores_sorted order so
+    # that positional indexing (.iloc[rank_idx]) is safe in the candidate loop.
+    # Full-population lookup tables (player_position_map, player_g_scores) are
+    # NOT reindexed — they are used to look up already-drafted players and for
+    # auction value calculations across the entire player pool.
     h_scores_sorted          = h_score_result['Scores'].sort_values(ascending=False)
-    category_weights_raw     = h_score_result['Weights']   # pd.DataFrame: player × category
-    win_rate_cdfs            = h_score_result['Rates']     # pd.DataFrame: player × category (CDF, 0–1)
-    team_diff_df             = h_score_result['Diff']      # pd.DataFrame or None: player × category
-    future_diff_df           = h_score_result['Future-Diff']  # pd.DataFrame or None
-    player_position_map      = info['Positions']           # pd.Series: player → list[str]
-    player_g_scores          = info['G-scores']            # pd.DataFrame: player × category (includes 'Total')
+    sorted_index             = h_scores_sorted.index
+    category_weights_raw     = h_score_result['Weights'].reindex(sorted_index)
+    win_rate_cdfs            = h_score_result['Rates'].reindex(sorted_index)
+    team_diff_df             = h_score_result['Diff'].reindex(sorted_index) if h_score_result['Diff'] is not None else None
+    future_diff_df           = h_score_result['Future-Diff'].reindex(sorted_index) if h_score_result['Future-Diff'] is not None else None
+    player_position_map      = info['Positions']           # full-population: used by _build_roster for my_players
+    player_g_scores          = info['G-scores']            # full-population: used for auction dollar values
 
     # res['Rosters'] column 0 encodes whether a valid slot assignment was found.
-    # position_optimization returns [-1, -1, ...] when linear_sum_assignment fails
-    # to place all players (no feasible assignment exists), so any value < 0
-    # indicates the candidate cannot be fitted into the current roster.
-    player_fits_roster = h_score_result['Rosters'].loc[:, 0] >= 0
+    # When position data is entirely absent the algorithm yields a single-column
+    # DataFrame filled with -1 as a sentinel.  In that case we skip position
+    # filtering and return None for all position-derived fields.
+    # When position data IS present, any value < 0 indicates an individual
+    # candidate cannot be fitted into the current roster and is excluded.
+    rosters_col0 = h_score_result['Rosters'].iloc[:, 0]
+    no_position_data = bool((rosters_col0 == -1).all())
+    player_fits_roster = (
+        pd.Series(True, index=sorted_index)
+        if no_position_data
+        else (rosters_col0 >= 0).reindex(sorted_index)
+    )
 
     n_categories = len(categories)
 
@@ -176,8 +224,8 @@ def _build_candidates(
     #
     # Three values per player:
     #   your_dollar — SAVOR on H-scores (team-specific, uses remaining cash)
-    #   gnrc_dollar — SAVOR on G-scores for available players (generic, remaining cash)
-    #   orig_dollar — SAVOR on G-scores for ALL players, as if auction just started
+    #   gnrc_dollar — SAVOR on generic H-scores (no players taken), remaining cash/picks
+    #   orig_dollar — SAVOR on generic H-scores (no players taken), original full cash/picks
     #
     # n_remaining is the number of players still to be drafted across all teams.
     # The SAVOR function uses this to find the replacement-level player (the
@@ -202,19 +250,22 @@ def _build_candidates(
             available_in_g = [p for p in h_scores_sorted.index if p in player_g_scores.index]
             g_scores_available = player_g_scores.loc[available_in_g, 'Total']
 
+            # Baseline scores for gnrc/orig: generic run (no players taken) if cached,
+            # otherwise fall back to the current team-specific scores.
+            baseline_scores = generic_h_scores if generic_h_scores is not None else h_scores_sorted
+
             try:
                 # your_dollar: team-specific H-scores, current state (remaining cash + picks)
                 your_dollar_series = auction_value_adjuster(
                     h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
                 )
-                # gnrc_dollar / orig_dollar: H-scores, same/full cash.
-                # In the original app these use a separate generic H-score run; here we
-                # use the same scores as a simplification.
+                # gnrc_dollar: neutral baseline H-scores, current cash/picks remaining
                 gnrc_dollar_series = auction_value_adjuster(
-                    h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+                    baseline_scores, n_remaining, total_cash_remaining, streaming_noise,
                 )
+                # orig_dollar: neutral baseline H-scores, full original cash/picks
                 orig_dollar_series = auction_value_adjuster(
-                    h_scores_sorted, total_picks, total_original_cash, streaming_noise,
+                    baseline_scores, total_picks, total_original_cash, streaming_noise,
                 )
                 # G-score variants: generic value using G-scores instead of H-scores.
                 gnrc_dollar_g_series = auction_value_adjuster(
@@ -237,30 +288,33 @@ def _build_candidates(
                 player_auction_values = None  # degrade gracefully on edge cases
 
     candidates: list[Candidate] = []
-    for rank_idx, player in enumerate(h_scores_sorted.index):
-        if not player_fits_roster.get(player, True):
+    for rank_idx, player in enumerate(sorted_index):
+        if not player_fits_roster.iloc[rank_idx]:
             continue  # skip players for whom no valid roster slot exists
 
-        h_score               = float(h_scores_sorted[player]) * 100
-        player_win_rates      = win_rate_cdfs.loc[player].values * 100
-
-        # Use positional lookup rather than label lookup because h_scores_sorted
-        # and category_weights_normalized share the same sorted row order.
-        player_category_weights = category_weights_normalized[h_scores_sorted.index.get_loc(player)]
+        h_score                 = float(h_scores_sorted.iloc[rank_idx]) * 100
+        player_win_rates        = win_rate_cdfs.iloc[rank_idx].values * 100
+        player_category_weights = category_weights_normalized[rank_idx]
 
         g_score_rows = _build_g_score_rows(
             player, categories, player_g_scores,
             team_diff_df, future_diff_df, original_v,
         )
 
-        flex_allocations = _build_flex_allocations(
-            player, base_list, position_structure,
-            h_score_result['Position-Shares'], slot_counts,
+        flex_allocations = (
+            None if no_position_data
+            else _build_flex_allocations(
+                player, base_list, position_structure,
+                h_score_result['Position-Shares'], slot_counts,
+            )
         )
 
-        roster = _build_roster(
-            player, my_players, player_position_map, slot_names, slot_counts,
-            position_structure,
+        roster = (
+            None if no_position_data
+            else _build_roster(
+                player, my_players, player_position_map, slot_names, slot_counts,
+                position_structure,
+            )
         )
 
         raw_positions    = player_position_map.get(player, ['?'])

@@ -1,9 +1,9 @@
-// expand_view.ts
+// table/expand_view.ts
 // Builds the expandable detail panel beneath each player row in the main table.
 // Mirrors the detail panels in the original Streamlit app.
 
-import { stat_styler_primary, stat_styler_tertiary} from './styler_functions.js'
-import { Player } from './types.js'
+import { stat_styler_primary, stat_styler_tertiary} from '../styler_functions.js'
+import { Player, FlexAllocations, Roster } from '../types.js'
 
 const POSITION_NAMES: Record<string, string> = {
     PG:   'Point Guard',
@@ -66,26 +66,34 @@ export function ExpandView(playerIndex: number, playerData: Player, categories: 
         cell.appendChild(makePanelLabel('Category strategy', '60px'));
         cell.appendChild(makeWeightsTable(playerData, categories));
 
-        cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'));
+        if (playerData.flex_allocations) {
+            cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'));
 
-        if (playerData.auction_values) {
-            // In auction mode, show the flex allocations and the auction values table side-by-side.
-            const sideRow = document.createElement('div');
-            sideRow.style.cssText = 'display:flex; gap:32px; align-items:flex-start; margin-left:100px;';
-            sideRow.appendChild(makeFlexAllocationsTable(playerData, true));
+            if (playerData.auction_values) {
+                // In auction mode, show the flex allocations and the auction values table side-by-side.
+                const sideRow = document.createElement('div');
+                sideRow.style.cssText = 'display:flex; gap:32px; align-items:flex-start; margin-left:100px;';
+                sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true));
 
-            const auctionBlock = document.createElement('div');
-            auctionBlock.appendChild(makePanelLabel('All auction values'));
-            auctionBlock.appendChild(makeAuctionValuesTable(playerData));
-            sideRow.appendChild(auctionBlock);
+                const auctionBlock = document.createElement('div');
+                auctionBlock.appendChild(makePanelLabel('All auction values'));
+                auctionBlock.appendChild(makeAuctionValuesTable(playerData));
+                sideRow.appendChild(auctionBlock);
 
-            cell.appendChild(sideRow);
-        } else {
-            cell.appendChild(makeFlexAllocationsTable(playerData));
+                cell.appendChild(sideRow);
+            } else {
+                cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations));
+            }
+        } else if (playerData.auction_values) {
+            // No position data but in auction mode: still show auction values alone.
+            cell.appendChild(makePanelLabel('All auction values', '60px'));
+            cell.appendChild(makeAuctionValuesTable(playerData));
         }
 
-        cell.appendChild(makePanelLabel('Roster assignments', '60px'));
-        cell.appendChild(makeRosterGrid(playerData));
+        if (playerData.roster) {
+            cell.appendChild(makePanelLabel('Roster assignments', '60px'));
+            cell.appendChild(makeRosterGrid(playerData.roster));
+        }
     }
 }
 
@@ -222,8 +230,7 @@ function makeWeightsTable(playerData: Player, categories: string[]): HTMLDivElem
  * Builds the flex allocations table showing how future picks are expected to
  * fill remaining flex roster slots, given that this candidate is drafted.
  */
-function makeFlexAllocationsTable(playerData: Player, noMargin = false): HTMLDivElement {
-    let flexData = playerData.flex_allocations;
+function makeFlexAllocationsTable(flexData: FlexAllocations, noMargin = false): HTMLDivElement {
 
     let table = document.createElement('table');
     table.className = 'panel-table';
@@ -276,6 +283,7 @@ function makeFlexAllocationsTable(playerData: Player, noMargin = false): HTMLDiv
 // The G-score row shows the same dollar columns computed from G-scores instead;
 // Your $ has no G-score equivalent and is shown as a dash.
 
+/** Builds the auction values detail table: H-score and G-score rows × Your $ / Gnrc. $ / Orig. $ columns. */
 function makeAuctionValuesTable(playerData: Player): HTMLTableElement {
     const av = playerData.auction_values!;
 
@@ -337,8 +345,7 @@ function makeAuctionValuesTable(playerData: Player): HTMLTableElement {
  * Builds the roster grid showing which players are assigned to each slot,
  * and highlights the candidate player being evaluated.
  */
-function makeRosterGrid(playerData: Player): HTMLDivElement {
-    let roster = playerData.roster;
+function makeRosterGrid(roster: Roster): HTMLDivElement {
 
     console.log(roster)
 

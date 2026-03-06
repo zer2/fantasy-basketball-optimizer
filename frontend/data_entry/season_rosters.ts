@@ -3,8 +3,9 @@
 // Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../custom_select.js'
-import { getPlayers } from '../script.js'
+import { getPlayers } from '../app_state.js'
 
+/** Renders the season roster entry grid (left) and team inspector selector with stub (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
     const nDrafters = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
     const nPicks    = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13

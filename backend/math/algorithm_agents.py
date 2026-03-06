@@ -267,6 +267,8 @@ class HAgent:
             else: 
                 pos_avg_array = 0 #not an array, but this will work fine
 
+            pos_avg_array = 0 #Hack, to keep things consistent. ZR 
+
             initial_category_weights = (
                 (diff_means + x_scores_available_array - pos_avg_array)
                 / (default_weights * category_momentum_factor)
