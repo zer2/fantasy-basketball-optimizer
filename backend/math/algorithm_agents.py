@@ -493,12 +493,12 @@ class HAgent:
                     for pos_code in self.position_structure['flex'].keys()
                 }
 
-            elif n_players_selected == self.n_picks - 1:
+            elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
                 x_diff_array   = diff_means + x_scores_available_array
                 cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
-                score, _       = self.get_objective_and_pdf_weights(
+                score          = self.get_objective_and_pdf_weights(
                     x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
-                    calculate_pdf_weights=True,
+                    calculate_pdf_weights=False,
                 )
                 rosters              = None
                 expected_future_diff = None
@@ -506,9 +506,9 @@ class HAgent:
             else:
                 x_diff_array   = diff_means + x_scores_available_array
                 cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
-                score, _       = self.get_objective_and_pdf_weights(
+                score          = self.get_objective_and_pdf_weights(
                     x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
-                    calculate_pdf_weights=True,
+                    calculate_pdf_weights=False,
                 )
                 rosters              = None
                 expected_future_diff = None

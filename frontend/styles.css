@@ -1195,3 +1195,14 @@ tr {
     color: #bbc;
     margin-bottom: 8px;
 }
+
+/* ─── Waiver Wire ─────────────────────────────────────────────────────────────── */
+
+.waiver-selector-row {
+    margin-bottom: 12px;
+}
+
+/* Highlights the dropped player's candidate row in blue */
+.waiver-drop-highlight {
+    background-color: rgba(53, 128, 187, 0.55) !important;
+}

@@ -4,7 +4,7 @@
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn } from './helper_functions.js'
-import { getPlayers, getCategories } from './app_state.js'
+import { getCandidatePlayers, getCategories } from './app_state.js'
 import { createOrPatchSession, runEvaluate, updateTable } from './api/session.js'
 import { buildTable } from './table/player_table.js'
 import { initLayout, reapplyLayout } from './layout.js'
@@ -87,7 +87,7 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 
     if (mode === 'Season Mode') return   // table is hidden in season mode; skip rebuild and backend call
 
-    updateTable(getPlayers(), getCategories())
+    updateTable(getCandidatePlayers(), getCategories())
 
     const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
     createOrPatchSession(4, patch, signal)
@@ -111,7 +111,7 @@ runEvaluate().catch(err => console.error('Initial load failed:', err))
 // set realtable.style.width before reapplyLayout reads it.
 for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     document.getElementById(id)!.addEventListener('change', () => {
-        updateTable(getPlayers(), getCategories())
+        updateTable(getCandidatePlayers(), getCategories())
         const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
         createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team } })
             .then(() => runEvaluate())
@@ -125,7 +125,7 @@ let teamNamesTimer: ReturnType<typeof setTimeout> | null = null
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
     if (teamNamesTimer) clearTimeout(teamNamesTimer)
     teamNamesTimer = setTimeout(() => {
-        updateTable(getPlayers(), getCategories())
+        updateTable(getCandidatePlayers(), getCategories())
         reapplyLayout()
     }, 600)
 })

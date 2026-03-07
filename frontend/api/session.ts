@@ -134,6 +134,32 @@ export async function runEvaluate(): Promise<void> {
 }
 
 /**
+ * Runs evaluate for waiver wire analysis with a caller-supplied roster state.
+ * Unlike runEvaluate, the caller is responsible for passing modified player_assignments
+ * (with the dropped player removed from their team) so they appear as a free-agent candidate.
+ * Does not reapply layout — the waiver tab layout is already correct.
+ */
+export async function runWaiverEvaluate(
+    playerAssignments: Record<string, string[]>,
+    myTeamId: string,
+): Promise<void> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            await ensureSession()
+            const resp = await api.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
+            updateTable(api.candidatesToPlayers(resp.candidates))
+            return
+        } catch (err: any) {
+            if (attempt === 0 && err.message?.includes('(404)')) {
+                sessionId = null
+                continue
+            }
+            throw err
+        }
+    }
+}
+
+/**
  * Updates the player data and rebuilds the table.
  * Call this whenever the backend returns a new set of results.
  * Reads the current mode from the DOM, so the layout stays in sync automatically.

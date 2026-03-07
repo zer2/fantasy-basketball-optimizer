@@ -3,7 +3,7 @@
 // Mirrors the draft board structure: pick control on top, grid below.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getPlayers } from '../app_state.js'
+import { getCandidatePlayers } from '../app_state.js'
 import { makeDebouncer, Debouncer } from '../helper_functions.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ function makePickCol(labelText: string, input: HTMLElement): HTMLElement {
 
 /** Returns player names that have not yet been auctioned. */
 function getAvailablePlayers(): string[] {
-    const allPlayers = getPlayers().map(p => p.name)
+    const allPlayers = getCandidatePlayers().map(p => p.name)
     const pickedSet  = new Set(
         picks.flat().filter(Boolean).map(p => (p as AuctionPick).player),
     )

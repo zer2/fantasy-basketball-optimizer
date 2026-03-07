@@ -6,12 +6,14 @@ import { renderDraftBoard }    from './data_entry/draft_board.js'
 import { renderAuctionEntry }  from './data_entry/auction_entry.js'
 import { renderSeasonRosters } from './data_entry/season/season_rosters.js'
 import { renderSeasonTrading } from './data_entry/season/season_trading.js'
+import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { makeCustomSelect }    from './custom_select.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-let seasonNavBuilt = false
-let currentSeat    = ''
+let seasonNavBuilt  = false
+let currentSeasonTab = ''   // tracks active season tab; '' means no tab activated yet
+let currentSeat     = ''
 let _onEvaluate: (() => void | Promise<void>) | undefined
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -42,6 +44,9 @@ function applyLayout(): void {
 
     const isOwnData = platform === 'Enter your own data'
     const isSeason  = mode === 'Season Mode'
+
+    // Reset season tab tracking when leaving Season Mode so the next entry defaults to Waiver
+    if (!isSeason) currentSeasonTab = ''
 
     if (isSeason) {
         showSeasonLayout()
@@ -138,10 +143,18 @@ function showSeasonLayout(): void {
     if (!seasonNavBuilt) {
         buildSeasonNav()
         seasonNavBuilt = true
+        // Pre-populate roster DOM elements so the Waiver tab can read sr-player-* inputs
+        // on first visit, before the user has manually opened the Rosters tab.
+        renderSeasonRosters(
+            document.getElementById('rosters-left')!,
+            document.getElementById('rosters-right')!,
+        )
     }
 
-    // Default to Waiver tab on first show
-    activateSeasonTab('waiver')
+    // Only default to Waiver on first entry; leave the active tab alone on subsequent calls
+    if (!currentSeasonTab) {
+        activateSeasonTab('waiver')
+    }
 }
 
 /** Creates the season mode tab buttons (Waiver, Trading, Rosters) in the nav bar. */
@@ -167,6 +180,8 @@ function buildSeasonNav(): void {
 
 /** Switches the visible season mode content pane and highlights the active tab button. */
 function activateSeasonTab(tabId: string): void {
+    currentSeasonTab = tabId
+
     // Update active button styling
     document.querySelectorAll('.season-tab-btn').forEach(btn => {
         btn.classList.toggle('active', (btn as HTMLElement).dataset.tab === tabId)
@@ -199,28 +214,6 @@ function activateSeasonTab(tabId: string): void {
         const rostersRight = document.getElementById('rosters-right')!
         renderSeasonRosters(rostersLeft, rostersRight)
     }
-}
-
-// ─── Waiver controls ──────────────────────────────────────────────────────────
-
-/** Builds the waiver tab controls: team selector for dropping a player. */
-function renderWaiverControls(container: HTMLElement): void {
-    const teamNames = readTeamNames()
-    const wrap = document.createElement('div')
-    wrap.className = 'seat-selector-wrap'
-
-    const label = document.createElement('div')
-    label.className   = 'pick-control-label'
-    label.textContent = 'Which team do you want to drop a player from?'
-    wrap.append(label)
-
-    const teamSel = makeCustomSelect(
-        'waiver-team-select',
-        teamNames.map(n => ({ value: n, label: n })),
-    )
-    wrap.append(teamSel.element)
-
-    container.append(wrap)
 }
 
 // ─── Seat selector ────────────────────────────────────────────────────────────

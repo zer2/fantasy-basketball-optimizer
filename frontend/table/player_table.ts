@@ -4,7 +4,7 @@
 
 import { stat_styler_primary, stat_styler_secondary } from '../styler_functions.js'
 import { ExpandView } from './expand_view.js'
-import { getPlayers, getCategories } from '../app_state.js'
+import { getCandidatePlayers, getCategories } from '../app_state.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 
@@ -12,7 +12,7 @@ const table = document.getElementById('realtable') as HTMLTableElement
 
 /** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
 export function buildTable(): void {
-    const players    = getPlayers()
+    const players    = getCandidatePlayers()
     const categories = getCategories()
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
     const isRoto     = getFormatAndCategories().scoring_format === 'Rotisserie'

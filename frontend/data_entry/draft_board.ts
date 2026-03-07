@@ -3,7 +3,7 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getPlayers } from '../app_state.js'
+import { getCandidatePlayers } from '../app_state.js'
 import { makeDebouncer, Debouncer } from '../helper_functions.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ function buildDraftBoard(): HTMLElement {
 
 /** Returns player names that have not yet been drafted. */
 function getAvailablePlayers(): string[] {
-    const allPlayers = getPlayers().map(p => p.name)
+    const allPlayers = getCandidatePlayers().map(p => p.name)
     const draftedSet = new Set(drafted.flat().filter(Boolean) as string[])
     return allPlayers.filter(n => !draftedSet.has(n))
 }
