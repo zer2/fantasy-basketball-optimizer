@@ -1204,5 +1204,5 @@ tr {
 
 /* Highlights the dropped player's candidate row in blue */
 .waiver-drop-highlight {
-    background-color: rgba(53, 128, 187, 0.55) !important;
+    background-color: rgba(53, 128, 187, 0.7) !important;
 }
