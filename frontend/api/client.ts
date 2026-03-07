@@ -86,11 +86,13 @@ export async function getSeasons(): Promise<string[]> {
 /** Creates a new backend session, running the full 5-step pipeline. Returns session_id and resolved categories. */
 export async function createSession(
     req: SessionRequest,
+    signal?: AbortSignal,
 ): Promise<{ session_id: string; categories: string[]; n_players_loaded: number; expires_at: string }> {
     const res = await fetch(`${BASE_URL}/sessions`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
+        signal,
     })
     if (!res.ok) {
         const detail = await res.text()
@@ -108,11 +110,13 @@ an expired session
 export async function patchSession(
     sessionId: string,
     req: Record<string, unknown>,
+    signal?: AbortSignal,
 ): Promise<{ ok: boolean; steps_rerun: number[] }> {
     const res = await fetch(`${BASE_URL}/sessions/${sessionId}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
+        signal,
     })
     if (!res.ok) {
         const detail = await res.text()

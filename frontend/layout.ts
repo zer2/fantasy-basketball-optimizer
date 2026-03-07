@@ -4,7 +4,8 @@
 
 import { renderDraftBoard }    from './data_entry/draft_board.js'
 import { renderAuctionEntry }  from './data_entry/auction_entry.js'
-import { renderSeasonRosters } from './data_entry/season_rosters.js'
+import { renderSeasonRosters } from './data_entry/season/season_rosters.js'
+import { renderSeasonTrading } from './data_entry/season/season_trading.js'
 import { makeCustomSelect }    from './custom_select.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
@@ -185,6 +186,9 @@ function activateSeasonTab(tabId: string): void {
         hide('content-row')
         hide('season-rosters-row')
         show('season-trading-row')
+
+        const tradingContainer = document.getElementById('season-trading-row')!
+        renderSeasonTrading(tradingContainer)
 
     } else if (tabId === 'rosters') {
         hide('content-row')

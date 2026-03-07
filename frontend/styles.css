@@ -1109,3 +1109,89 @@ tr {
     font-style: italic;
     padding: 24px 0;
 }
+
+/* ─── Season Trading tab ─────────────────────────────────────────────────────── */
+
+#season-trading-row { padding: 0 16px; }
+
+.trade-selector-row {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 4px;
+}
+
+.trade-selector-col { flex: 1; }
+
+.trade-divider {
+    border: none;
+    border-top: 1px solid #333355;
+    margin: 16px 0;
+}
+
+.trade-body-row {
+    display: flex;
+    gap: 24px;
+}
+
+.trade-left-col { flex: 0 0 36%; }
+.trade-right-col { flex: 1; min-width: 0; }
+
+/* Trade player multi-selects (reuse .ms-* styles from helper_functions) */
+.trade-multi-select { margin-bottom: 14px; }
+
+/* Inner H/G tab bar */
+.trade-tab-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #333355;
+    margin-bottom: 10px;
+}
+
+.trade-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #778;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.trade-tab-btn.active {
+    color: #dde;
+    border-bottom-color: #5577cc;
+}
+
+.trade-tab-pane { min-height: 60px; }
+
+/* G-score result table */
+.trade-result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+}
+.trade-result-table th,
+.trade-result-table td {
+    padding: 3px 6px;
+    text-align: right;
+    border-bottom: 1px solid #222244;
+}
+.trade-result-table th { color: #889; font-weight: 500; }
+.trade-row-label { text-align: left !important; color: #aab; font-weight: 500; }
+.trade-row-subtotal td { border-top: 1px solid #444466; font-weight: 600; color: #bbc; }
+.trade-row-diff td     { border-top: 2px solid #555577; font-weight: 700; color: #dde; }
+
+/* Stubs */
+.trade-hscore-stub,
+.trade-suggestion-stub {
+    color: #555577;
+    font-style: italic;
+    font-size: 0.8rem;
+    padding: 12px 0;
+}
+
+.trade-suggest-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #bbc;
+    margin-bottom: 8px;
+}

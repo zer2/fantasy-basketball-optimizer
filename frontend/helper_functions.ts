@@ -208,6 +208,50 @@ export function renderMultiselect(
     return selected
 }
 
+/**
+ * A self-contained multiselect widget: labeled container, chip UI, and reactive
+ * change notification via MutationObserver.  Use when you need push-style updates
+ * (no Apply button) rather than the pull-style `renderMultiselect` + Apply pattern.
+ */
+export interface MultiSelectWidget {
+    element:     HTMLElement
+    getSelected: () => string[]
+    onChange:    (cb: () => void) => void
+}
+
+/**
+ * Wraps `renderMultiselect` with a labeled container and change detection.
+ * Each chip add/remove fires all registered `onChange` callbacks immediately.
+ */
+export function makeMultiSelectWidget(
+    label:   string,
+    options: string[],
+    wrapperClass = 'ms-widget',
+): MultiSelectWidget {
+    const wrap = document.createElement('div')
+    wrap.className = wrapperClass
+
+    const lbl = document.createElement('div')
+    lbl.className = 'pick-control-label'
+    lbl.textContent = label
+    wrap.append(lbl)
+
+    const selected = renderMultiselect(wrap, options, [])
+
+    const callbacks: (() => void)[] = []
+    const inputArea = wrap.querySelector('.ms-input-area')
+    if (inputArea) {
+        new MutationObserver(() => callbacks.forEach(cb => cb()))
+            .observe(inputArea, { childList: true })
+    }
+
+    return {
+        element:     wrap,
+        getSelected: () => [...selected],
+        onChange:    (cb) => callbacks.push(cb),
+    }
+}
+
 // ─── Sidebar section helpers ────────────────────────────────────────────────
 // Generic utilities for building collapsible sidebar sections with Apply buttons.
 

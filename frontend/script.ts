@@ -74,13 +74,28 @@ sidebar.style.visibility = ''
 //
 // When switching to Auction Mode the existing session must be patched with
 // cash_per_team; without it the backend cannot compute auction dollar values.
+//
+// Uses an AbortController so rapid mode switches cancel stale backend calls
+// instead of letting them pile up.
+let modeChangeController: AbortController | null = null
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
-    updateTable(getPlayers(), getCategories())
+    if (modeChangeController) modeChangeController.abort()
+    modeChangeController = new AbortController()
+    const { signal } = modeChangeController
+
     const { mode, cash_per_team } = getLeagueSettings()
+
+    if (mode === 'Season Mode') return   // table is hidden in season mode; skip rebuild and backend call
+
+    updateTable(getPlayers(), getCategories())
+
     const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
-    createOrPatchSession(4, patch)
-        .then(() => runEvaluate())
-        .catch(err => console.error('Mode change failed:', err))
+    createOrPatchSession(4, patch, signal)
+        .then(() => { if (!signal.aborted) return runEvaluate() })
+        .catch(err => {
+            if (err.name === 'AbortError') return
+            console.error('Mode change failed:', err)
+        })
 })
 
 initLayout({ onEvaluate: runEvaluate })

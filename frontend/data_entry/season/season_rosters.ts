@@ -1,9 +1,9 @@
-// data_entry/season_rosters.ts
+// data_entry/season/season_rosters.ts
 // Renders the season roster entry table (left) and team selector / stub (right).
 // Used by layout.ts for Season → Rosters tab.
 
-import { makeCustomSelect, CustomSelect } from '../custom_select.js'
-import { getPlayers } from '../app_state.js'
+import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
+import { getPlayers } from '../../app_state.js'
 
 /** Renders the season roster entry grid (left) and team inspector selector with stub (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
@@ -42,6 +42,17 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const blankOption = [{ value: '', label: '' }]
     const tbody = table.createTBody()
 
+    // Sort players by G-score rank and snake-draft to pre-fill the table
+    const sorted = [...getPlayers()].sort((a, b) => a.g_rank - b.g_rank)
+    const totalSlots = nDrafters * nPicks
+    const snakeDraft: string[][] = Array.from({ length: nDrafters }, () => [])
+    for (let i = 0; i < Math.min(sorted.length, totalSlots); i++) {
+        const round = Math.floor(i / nDrafters)
+        const pos   = i % nDrafters
+        const team  = round % 2 === 0 ? pos : nDrafters - 1 - pos
+        snakeDraft[team].push(sorted[i].name)
+    }
+
     for (let r = 0; r < nPicks; r++) {
         const row  = tbody.insertRow()
         const rowSelects: CustomSelect[] = []
@@ -57,6 +68,9 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
                 [...blankOption, ...playerNames.map(n => ({ value: n, label: n }))],
             )
             sel.element.style.fontSize = '0.75rem'
+            // Pre-fill from snake draft if a player is available for this slot
+            const prefill = snakeDraft[d]?.[r]
+            if (prefill) sel.setValue(prefill)
             cell.append(sel.element)
             rowSelects.push(sel)
         }

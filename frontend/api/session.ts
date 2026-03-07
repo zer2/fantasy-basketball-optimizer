@@ -54,22 +54,23 @@ export function buildSessionRequest(): SessionRequest {
 export async function createOrPatchSession(
     fromStep: number,
     patchBody: Record<string, unknown> = {},
+    signal?: AbortSignal,
 ): Promise<void> {
     if (!sessionId) {
         const req = buildSessionRequest()
-        const resp = await api.createSession(req)
+        const resp = await api.createSession(req, signal)
         sessionId = resp.session_id
         setCategories(resp.categories)
         return
     }
     try {
-        await api.patchSession(sessionId, { from_step: fromStep, ...patchBody })
+        await api.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
     } catch (err: any) {
         if (!err.message?.includes('(404)')) throw err
         // Session expired; rebuild from current sidebar state.
         sessionId = null
         const req = buildSessionRequest()
-        const resp = await api.createSession(req)
+        const resp = await api.createSession(req, signal)
         sessionId = resp.session_id
         setCategories(resp.categories)
     }
