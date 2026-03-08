@@ -56,10 +56,17 @@ class SessionRequest(BaseModel):
     my_team_id: Optional[str] = None
 
 
+class PlayerGScore(BaseModel):
+    name: str
+    total: float
+    values: list[float]   # per-category G-scores, same order as categories
+
+
 class SessionResponse(BaseModel):
     session_id: str
     n_players_loaded: int
     categories: list[str]
+    g_scores: list[PlayerGScore]
     expires_at: str
 
 

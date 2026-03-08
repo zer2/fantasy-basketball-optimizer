@@ -20,7 +20,7 @@ from backend.session import create_session, get_session, delete_session
 from backend.pipeline import run_pipeline, _parse_projection_csv
 from backend.models import (
     UploadResponse,
-    SessionRequest, SessionResponse,
+    SessionRequest, SessionResponse, PlayerGScore,
     PatchRequest, PatchResponse,
     EvaluateRequest, EvaluateResponse,
 )
@@ -250,10 +250,22 @@ def create_session_route(req: SessionRequest):
 
     categories = session.current_params['categories']
 
+    # Serialize the G-scores DataFrame into a list of PlayerGScore objects
+    g_scores_df = session.info['G-scores']
+    g_scores_list = [
+        PlayerGScore(
+            name=str(name),
+            total=round(float(row['Total']), 2),
+            values=[round(float(row[cat]), 2) for cat in categories],
+        )
+        for name, row in g_scores_df.iterrows()
+    ]
+
     return SessionResponse(
         session_id=session.id,
         n_players_loaded=len(session.v0_clean),
         categories=list(categories),
+        g_scores=g_scores_list,
         expires_at=_iso_expires(4 * 3600),
     )
 

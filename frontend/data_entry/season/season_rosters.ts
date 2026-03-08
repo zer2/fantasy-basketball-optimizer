@@ -1,11 +1,12 @@
 // data_entry/season/season_rosters.ts
-// Renders the season roster entry table (left) and team selector / stub (right).
-// Used by layout.ts for Season → Rosters tab.
+// Renders the season roster entry table (left) and team selector + G-score
+// inspector table (right).  Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
-import { getPlayers } from '../../app_state.js'
+import { getPlayers, getGScoreByName, getCategories } from '../../app_state.js'
+import { stat_styler_primary } from '../../styler_functions.js'
 
-/** Renders the season roster entry grid (left) and team inspector selector with stub (right). */
+/** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
     const nDrafters = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
     const nPicks    = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
@@ -80,7 +81,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     scroll.append(table)
     leftEl.append(scroll)
 
-    // ── Right: team selector + stub ─────────────────────────────────────────
+    // ── Right: team selector + G-score table ─────────────────────────────────
 
     const wrap = document.createElement('div')
     wrap.className = 'seat-selector-wrap'
@@ -97,8 +98,139 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     wrap.append(teamSel.element)
     rightEl.append(wrap)
 
-    const stub = document.createElement('div')
-    stub.className   = 'team-display-stub'
-    stub.textContent = 'Team statistics will appear here once the backend is connected.'
-    rightEl.append(stub)
+    // Container for the G-score table — rebuilt when team or roster changes
+    const tableContainer = document.createElement('div')
+    rightEl.append(tableContainer)
+
+    function rebuildInspector(): void {
+        const selectedTeam = teamSel.getValue()
+        const teamIdx = teamNames.indexOf(selectedTeam)
+        if (teamIdx < 0) { tableContainer.innerHTML = ''; return }
+        buildTeamGScoreTable(teamIdx, selects, nPicks, tableContainer)
+    }
+
+    // Rebuild when the team selector changes
+    teamSel.element.addEventListener('change', rebuildInspector)
+
+    // Rebuild when any roster select changes
+    for (const rowSelects of selects) {
+        for (const sel of rowSelects) {
+            sel.element.addEventListener('change', rebuildInspector)
+        }
+    }
+
+    // Initial render
+    rebuildInspector()
+}
+
+// ─── G-score team inspector table ────────────────────────────────────────────
+
+/**
+ * Builds a G-score table for the selected team: one row per rostered player
+ * plus a totals row.  Styled to match the expanded-view G-score tables.
+ */
+function buildTeamGScoreTable(
+    teamIdx: number,
+    selects: CustomSelect[][],
+    nPicks: number,
+    container: HTMLElement,
+): void {
+    container.innerHTML = ''
+    const categories = getCategories()
+    const gScoreMap  = getGScoreByName()
+
+    // Collect G-scores for players on this team
+    const rows: { name: string; values: number[]; total: number }[] = []
+    for (let r = 0; r < nPicks; r++) {
+        const name = selects[r][teamIdx].getValue()
+        if (!name) continue
+        const gs = gScoreMap.get(name)
+        if (!gs) continue
+        rows.push({ name: gs.name, values: gs.values, total: gs.total })
+    }
+
+    if (rows.length === 0) return
+
+    // ── Build table ──────────────────────────────────────────────────────────
+
+    const tbl = document.createElement('table')
+    tbl.className = 'panel-table'
+    tbl.style.tableLayout = 'fixed'
+
+    // Spacer row to lock column widths
+    const tHead = tbl.createTHead()
+    const spacerRow = tHead.insertRow(-1)
+    spacerRow.style.border = 'none'
+    spacerRow.appendChild(makeSpacerTh('136px'))  // player name
+    spacerRow.appendChild(makeSpacerTh('83px'))   // total
+    for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh())
+
+    // Header row
+    const headerRow = tHead.insertRow(-1)
+    headerRow.appendChild(makeSpacerTh())  // invisible label spacer
+    const totalTh = document.createElement('th')
+    totalTh.className = 'panel-colheader'
+    totalTh.textContent = 'Total'
+    headerRow.appendChild(totalTh)
+    for (const cat of categories) {
+        const th = document.createElement('th')
+        th.className = 'panel-colheader'
+        th.textContent = cat
+        headerRow.appendChild(th)
+    }
+
+    // Data rows — one per player
+    const tBody = tbl.createTBody()
+    const teamTotals = new Array(categories.length).fill(0)
+    let teamTotalSum = 0
+
+    for (const row of rows) {
+        const tr = tBody.insertRow(-1)
+
+        const labelCell = document.createElement('th')
+        labelCell.className = 'panel-rowlabel'
+        labelCell.textContent = row.name
+        tr.appendChild(labelCell)
+
+        const totalCell = tr.insertCell(-1)
+        totalCell.textContent = row.total.toFixed(2)
+        totalCell.className = 'panel-datacell celltypea'
+        teamTotalSum += row.total
+
+        for (let i = 0; i < row.values.length; i++) {
+            const cell = tr.insertCell(-1)
+            cell.textContent = row.values[i].toFixed(2)
+            cell.style.cssText = stat_styler_primary(row.values[i], 60, 0)
+            cell.className = 'panel-datacell'
+            teamTotals[i] += row.values[i]
+        }
+    }
+
+    // Totals row
+    const totalsRow = tBody.insertRow(-1)
+    const totalsLabel = document.createElement('th')
+    totalsLabel.className = 'panel-rowlabel'
+    totalsLabel.textContent = 'Team Total'
+    totalsRow.appendChild(totalsLabel)
+
+    const totalsCell = totalsRow.insertCell(-1)
+    totalsCell.textContent = teamTotalSum.toFixed(2)
+    totalsCell.className = 'panel-datacell celltypeb'
+
+    for (const val of teamTotals) {
+        const cell = totalsRow.insertCell(-1)
+        cell.textContent = val.toFixed(2)
+        cell.style.cssText = stat_styler_primary(val, 60, 0)
+        cell.className = 'panel-datacell'
+    }
+
+    container.appendChild(tbl)
+}
+
+/** Creates an invisible `<th>` spacer to lock column widths in panel tables. */
+function makeSpacerTh(width?: string): HTMLTableCellElement {
+    const th = document.createElement('th')
+    th.className = 'panel-colspacer'
+    if (width) th.style.width = width
+    return th
 }

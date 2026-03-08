@@ -1,3 +1,11 @@
+// ─── Player G-scores (from session creation, pipeline step 4) ────────────────
+
+export interface PlayerGScore {
+    name: string;
+    total: number;
+    values: number[];   // per-category G-scores, same order as categories
+}
+
 // ─── G-score expectations table ───────────────────────────────────────────────
 
 export interface GScoreRow {

@@ -2,7 +2,7 @@
 // HTTP client for the Fantasy Basketball Optimizer backend.
 // All fetch calls go through this module; callers receive typed results.
 
-import { Player, SessionRequest } from '../types.js'
+import { Player, PlayerGScore, SessionRequest } from '../types.js'
 
 export const BASE_URL = 'http://127.0.0.1:8000'
 
@@ -87,7 +87,7 @@ export async function getSeasons(): Promise<string[]> {
 export async function createSession(
     req: SessionRequest,
     signal?: AbortSignal,
-): Promise<{ session_id: string; categories: string[]; n_players_loaded: number; expires_at: string }> {
+): Promise<{ session_id: string; categories: string[]; g_scores: PlayerGScore[]; n_players_loaded: number; expires_at: string }> {
     const res = await fetch(`${BASE_URL}/sessions`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },

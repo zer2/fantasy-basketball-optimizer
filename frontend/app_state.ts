@@ -3,11 +3,12 @@
 // Kept in a standalone module with no app-internal imports (only types.ts)
 // so that any module can read the state without creating circular dependencies.
 
-import { Player } from './types.js'
+import { Player, PlayerGScore } from './types.js'
 
 let allPlayers:      Player[] = []   // full dataset — only grows, never shrinks
 let candidates:      Player[] = []   // current evaluate output (may be a subset, e.g. waiver free agents)
 let allPlayerByName: Map<string, Player> = new Map()
+let gScoreByName:    Map<string, PlayerGScore> = new Map()
 let categories: string[] = [
     'Field Goal %', 'Free Throw %', 'Threes', 'Points',
     'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers',
@@ -37,6 +38,14 @@ export function setAllPlayers(p: Player[]): void {
  *  where allPlayers should not change. */
 export function setCandidates(p: Player[]): void {
     candidates = p
+}
+
+/** Returns the name → PlayerGScore map (raw G-scores from the pipeline). */
+export function getGScoreByName(): Map<string, PlayerGScore> { return gScoreByName }
+
+/** Replaces the G-score map. Called by session.ts after session creation. */
+export function setGScores(scores: PlayerGScore[]): void {
+    gScoreByName = new Map(scores.map(s => [s.name, s]))
 }
 
 /** Replaces the category list. Called by session.ts when categories change. */

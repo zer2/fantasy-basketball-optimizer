@@ -4,7 +4,7 @@
 // backend responses and the player table.
 
 import { SessionRequest } from '../types.js'
-import { setAllPlayers, setCandidates, setCategories } from '../app_state.js'
+import { setAllPlayers, setCandidates, setCategories, setGScores } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
@@ -60,6 +60,7 @@ export async function createOrPatchSession(
         const resp = await api.createSession(req, signal)
         sessionId = resp.session_id
         setCategories(resp.categories)
+        setGScores(resp.g_scores)
         return
     }
     try {
@@ -72,6 +73,7 @@ export async function createOrPatchSession(
         const resp = await api.createSession(req, signal)
         sessionId = resp.session_id
         setCategories(resp.categories)
+        setGScores(resp.g_scores)
     }
 }
 
@@ -85,6 +87,7 @@ async function ensureSession(): Promise<void> {
     const resp = await api.createSession(req)
     sessionId = resp.session_id
     setCategories(resp.categories)
+    setGScores(resp.g_scores)
 }
 
 /**
@@ -152,7 +155,6 @@ export async function runWaiverEvaluate(
             const resp = await api.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
             const players = api.candidatesToPlayers(resp.candidates)
 
-            console.log(players)
             setCandidates(players)
             buildTable(players)
             return
