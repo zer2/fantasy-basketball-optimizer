@@ -502,6 +502,7 @@ class HAgent:
                 )
                 rosters              = None
                 expected_future_diff = None
+                category_weights_current = None
 
             else:
                 x_diff_array   = diff_means + x_scores_available_array
@@ -512,13 +513,15 @@ class HAgent:
                 )
                 rosters              = None
                 expected_future_diff = None
+                category_weights_current = None
 
             cdf_means = cdf_estimates.mean(axis=2)
 
             if expected_future_diff is not None:
                 expected_diff_means = expected_future_diff.mean(axis=2) + diff_means.mean(axis=2)
             else:
-                expected_diff_means = None
+                #ZR: This is a bit of a hack. It just gets diff_means into the right shape 
+                expected_diff_means = cdf_means * 0 + diff_means.mean(axis=2)
 
             future_diff_df = (
                 pd.DataFrame(expected_future_diff.mean(axis=2),
@@ -528,8 +531,8 @@ class HAgent:
 
             res = {
                 'Scores':  pd.Series(score, index=result_index),
-                'Weights': pd.DataFrame(category_weights_current, index=result_index,
-                                        columns=self.x_scores.columns),
+                'Weights': None if category_weights_current is None else \
+                            pd.DataFrame(category_weights_current, index=result_index,columns=self.x_scores.columns), 
                 'Rates':   pd.DataFrame(cdf_means, index=result_index,
                                         columns=self.x_scores.columns),
                 'Diff':    (pd.DataFrame(expected_diff_means, index=result_index,

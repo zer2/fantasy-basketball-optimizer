@@ -5,9 +5,9 @@
 
 import { Player } from './types.js'
 
-let allPlayers:  Player[] = []   // full dataset — only grows, never shrinks
-let candidates:  Player[] = []   // current evaluate output (may be a subset, e.g. waiver free agents)
-let playerByName: Map<string, Player> = new Map()
+let allPlayers:      Player[] = []   // full dataset — only grows, never shrinks
+let candidates:      Player[] = []   // current evaluate output (may be a subset, e.g. waiver free agents)
+let allPlayerByName: Map<string, Player> = new Map()
 let categories: string[] = [
     'Field Goal %', 'Free Throw %', 'Threes', 'Points',
     'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers',
@@ -19,18 +19,24 @@ export function getPlayers(): Player[] { return allPlayers }
 /** Returns the current list of ranked candidate players displayed in the table. */
 export function getCandidatePlayers(): Player[] { return candidates }
 
-/** Returns a name → Player map, rebuilt whenever the player list is updated. */
-export function getPlayerByName(): Map<string, Player> { return playerByName }
+/** Returns a name → Player map for every player in the full dataset. */
+export function getPlayerByName(): Map<string, Player> { return allPlayerByName }
 
 /** Returns the current list of scoring category names (e.g. "Points", "Rebounds"). */
 export function getCategories(): string[] { return categories }
 
-/** Replaces the candidate list. Called by session.ts after an evaluate response.
- *  Also expands allPlayers when the new list is larger (i.e. a full-pool evaluate). */
-export function setPlayers(p: Player[]): void {
+/** Replaces the full player dataset. Call after a full evaluate (draft/auction/season).
+ *  Also updates candidates, since a full evaluate's candidate list = the full pool. */
+export function setAllPlayers(p: Player[]): void {
+    allPlayers      = p
+    allPlayerByName = new Map(p.map(pl => [pl.name, pl]))
+    candidates      = p
+}
+
+/** Replaces only the candidate list. Call after a partial evaluate (e.g. waiver wire)
+ *  where allPlayers should not change. */
+export function setCandidates(p: Player[]): void {
     candidates = p
-    playerByName = new Map(p.map(pl => [pl.name, pl]))
-    if (p.length >= allPlayers.length) allPlayers = p
 }
 
 /** Replaces the category list. Called by session.ts when categories change. */

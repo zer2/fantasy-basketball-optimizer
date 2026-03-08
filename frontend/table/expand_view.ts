@@ -63,8 +63,11 @@ export function ExpandView(playerIndex: number, playerData: Player, categories: 
         cell.appendChild(makePanelLabel('G-score expectations (difference vs. other teams)', '60px'));
         cell.appendChild(makeGScoreTable(playerData, categories));
 
-        cell.appendChild(makePanelLabel('Category strategy', '60px'));
-        cell.appendChild(makeWeightsTable(playerData, categories));
+
+        if (playerData.category_weights) {
+            cell.appendChild(makePanelLabel('Category strategy', '60px'));
+            cell.appendChild(makeWeightsTable(playerData, categories));
+        }
 
         if (playerData.flex_allocations) {
             cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'));

@@ -138,7 +138,7 @@ class Candidate(BaseModel):
     h_score: float
     h_rank: int
     win_rates: list[float]
-    category_weights: list[float]
+    category_weights: Optional[list[float]] = None
     g_score_rows: list[GScoreRow]
     flex_allocations: Optional[FlexAllocations] = None   # None when position data absent
     roster: Optional[Roster] = None                       # None when position data absent

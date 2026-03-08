@@ -5,7 +5,7 @@
 // then highlights that player's row in the results.
 
 import { makeCustomSelect } from '../../custom_select.js'
-import { getCandidatePlayers, getPlayers } from '../../app_state.js'
+import { getCandidatePlayers, getPlayerByName } from '../../app_state.js'
 import { runWaiverEvaluate } from '../../api/session.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ function readRosterAssignments(): Record<string, string[]> {
 /** Returns the name of the player with the highest g_rank (worst) among the given names.
  *  Returns null if none of the names are found in the backend player data. */
 function lowestGRankPlayer(playerNames: string[]): string | null {
-    const byName = new Map(getPlayers().map(p => [p.name, p]))
+    const byName = getPlayerByName()
     let worst: string | null = null
     let worstRank = -Infinity
     for (const name of playerNames) {

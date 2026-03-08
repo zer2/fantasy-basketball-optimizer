@@ -4,8 +4,8 @@
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn } from './helper_functions.js'
-import { getCandidatePlayers, getCategories } from './app_state.js'
-import { createOrPatchSession, runEvaluate, updateTable } from './api/session.js'
+import { getCandidatePlayers } from './app_state.js'
+import { createOrPatchSession, runEvaluate } from './api/session.js'
 import { buildTable } from './table/player_table.js'
 import { initLayout, reapplyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
@@ -69,7 +69,7 @@ addApplyBtn(tradeSection, () => {})
 sidebar.style.visibility = ''
 
 // ─── Mode change: rebuild table and sync session ───────────────────────────
-// Registered before initLayout so updateTable fires before applyLayout on mode
+// Registered before initLayout so buildTable fires before applyLayout on mode
 // change, ensuring realtable.style.width is correct when applyLayout reads it.
 //
 // When switching to Auction Mode the existing session must be patched with
@@ -87,7 +87,7 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 
     if (mode === 'Season Mode') return   // table is hidden in season mode; skip rebuild and backend call
 
-    updateTable(getCandidatePlayers(), getCategories())
+    buildTable(getCandidatePlayers())
 
     const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
     createOrPatchSession(4, patch, signal)
@@ -101,17 +101,17 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 initLayout({ onEvaluate: runEvaluate })
 
 // Initial build (empty; will be populated once the backend responds on load)
-buildTable()
+buildTable(getCandidatePlayers())
 
 // Run all backend steps immediately on page load
 runEvaluate().catch(err => console.error('Initial load failed:', err))
 
 // ── League settings auto-update ───────────────────────────────────────────
-// Number inputs fire on 'change' (when focus leaves); updateTable runs first to
+// Number inputs fire on 'change' (when focus leaves); buildTable runs first to
 // set realtable.style.width before reapplyLayout reads it.
 for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     document.getElementById(id)!.addEventListener('change', () => {
-        updateTable(getCandidatePlayers(), getCategories())
+        buildTable(getCandidatePlayers())
         const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
         createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team } })
             .then(() => runEvaluate())
@@ -125,7 +125,7 @@ let teamNamesTimer: ReturnType<typeof setTimeout> | null = null
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
     if (teamNamesTimer) clearTimeout(teamNamesTimer)
     teamNamesTimer = setTimeout(() => {
-        updateTable(getCandidatePlayers(), getCategories())
+        buildTable(getCandidatePlayers())
         reapplyLayout()
     }, 600)
 })

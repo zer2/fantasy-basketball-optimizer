@@ -179,7 +179,7 @@ def _build_candidates(
     # auction value calculations across the entire player pool.
     h_scores_sorted          = h_score_result['Scores'].sort_values(ascending=False)
     sorted_index             = h_scores_sorted.index
-    category_weights_raw     = h_score_result['Weights'].reindex(sorted_index)
+    category_weights_raw     = h_score_result['Weights'].reindex(sorted_index) if h_score_result['Weights'] is not None else None
     win_rate_cdfs            = h_score_result['Rates'].reindex(sorted_index)
     team_diff_df             = h_score_result['Diff'].reindex(sorted_index) if h_score_result['Diff'] is not None else None
     future_diff_df           = h_score_result['Future-Diff'].reindex(sorted_index) if h_score_result['Future-Diff'] is not None else None
@@ -211,7 +211,8 @@ def _build_candidates(
     # H.v is a scaled version of original_v adjusted to sum to 1 (required by the
     # H-score math).  When the algorithm places no punting emphasis on a category,
     # weights_raw ≈ v, so dividing by v and scaling to 100 gives a neutral baseline of 100.
-    category_weights_normalized = (category_weights_raw.values / v_reshaped) * 100  # (n_players, n_cat)
+    category_weights_normalized = None if category_weights_raw is None else \
+                                  (category_weights_raw.values / v_reshaped) * 100  # (n_players, n_cat)
 
     my_players         = [p for p in player_assignments.get(my_team_id, []) if isinstance(p, str)]
     position_structure = H.position_structure
@@ -294,7 +295,7 @@ def _build_candidates(
 
         h_score                 = float(h_scores_sorted.iloc[rank_idx]) * 100
         player_win_rates        = win_rate_cdfs.iloc[rank_idx].values * 100
-        player_category_weights = category_weights_normalized[rank_idx]
+        player_category_weights = None if category_weights_normalized is None else category_weights_normalized[rank_idx]
 
         g_score_rows = _build_g_score_rows(
             player, categories, player_g_scores,
@@ -326,7 +327,7 @@ def _build_candidates(
             h_score          = round(h_score, 2),
             h_rank           = rank_idx + 1,
             win_rates        = [round(float(val), 2) for val in player_win_rates],
-            category_weights = [round(float(val), 1) for val in player_category_weights],
+            category_weights = None if player_category_weights is None else [round(float(val), 1) for val in player_category_weights],
             g_score_rows     = g_score_rows,
             flex_allocations = flex_allocations,
             roster           = roster,

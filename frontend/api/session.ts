@@ -4,7 +4,7 @@
 // backend responses and the player table.
 
 import { SessionRequest } from '../types.js'
-import { setPlayers, setCategories } from '../app_state.js'
+import { setAllPlayers, setCandidates, setCategories } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
@@ -15,7 +15,6 @@ import { getDraftState } from '../data_entry/draft_board.js'
 import { getAuctionState } from '../data_entry/auction_entry.js'
 import { buildTable } from '../table/player_table.js'
 import * as api from './client.js'
-import { Player } from '../types.js'
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
@@ -118,8 +117,12 @@ export async function runEvaluate(): Promise<void> {
             }
 
             const resp = await api.evaluate(sessionId!, evalReq, signal)
-            updateTable(api.candidatesToPlayers(resp.candidates))
-            reapplyLayout()
+            const players = api.candidatesToPlayers(resp.candidates)
+            setAllPlayers(players)
+            if (mode !== 'Season Mode') {
+                buildTable(players)
+                reapplyLayout()
+            }
             return
         } catch (err: any) {
             if (err.name === 'AbortError') return  // superseded by a newer call
@@ -147,7 +150,11 @@ export async function runWaiverEvaluate(
         try {
             await ensureSession()
             const resp = await api.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
-            updateTable(api.candidatesToPlayers(resp.candidates))
+            const players = api.candidatesToPlayers(resp.candidates)
+
+            console.log(players)
+            setCandidates(players)
+            buildTable(players)
             return
         } catch (err: any) {
             if (attempt === 0 && err.message?.includes('(404)')) {
@@ -159,16 +166,3 @@ export async function runWaiverEvaluate(
     }
 }
 
-/**
- * Updates the player data and rebuilds the table.
- * Call this whenever the backend returns a new set of results.
- * Reads the current mode from the DOM, so the layout stays in sync automatically.
- *
- * @param newPlayers    - Full player list from the backend response
- * @param newCategories - Category list; omit if unchanged (e.g. same session)
- */
-export function updateTable(newPlayers: Player[], newCategories?: string[]): void {
-    setPlayers(newPlayers)
-    if (newCategories) setCategories(newCategories)
-    buildTable()
-}
