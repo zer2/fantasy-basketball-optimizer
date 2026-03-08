@@ -9,6 +9,7 @@
 
 import { ModelParameters } from '../types.js'
 import { getSportConfig } from '../app_state.js'
+import { pref, savePref } from '../preferences.js'
 
 interface ParamSpec {
     id:      string
@@ -133,7 +134,8 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
     input.min = String(resolved.min)
     if (resolved.max !== null) input.max = String(resolved.max)
     input.step = String(spec.step)
-    input.value = String(resolved.default)
+    input.value = String(pref(spec.key, resolved.default))
+    input.addEventListener('change', () => savePref(spec.key, parseFloat(input.value)))
 
     item.append(labelRow, input)
     return item

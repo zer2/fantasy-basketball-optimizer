@@ -48,6 +48,26 @@ export function setGScores(scores: PlayerGScore[]): void {
     gScoreByName = new Map(scores.map(s => [s.name, s]))
 }
 
+/**
+ * Builds minimal Player objects from the G-score map so that Season Mode
+ * has player names and G-ranks available for roster dropdowns, without
+ * needing a full evaluate call.
+ */
+export function setPlayersFromGScores(): void {
+    const scores = [...gScoreByName.values()].sort((a, b) => b.total - a.total)
+    allPlayers = scores.map((gs, i) => ({
+        name: gs.name,
+        h_score: 0,
+        h_rank: 0,
+        g_rank: i + 1,
+        win_rates: [],
+        category_weights: [],
+        g_score_rows: [],
+    }))
+    allPlayerByName = new Map(allPlayers.map(p => [p.name, p]))
+    candidates = allPlayers
+}
+
 /** Replaces the category list. Called by session.ts when categories change. */
 export function setCategories(c: string[]): void { categories = c }
 

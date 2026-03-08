@@ -8,6 +8,7 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, renderMultiselect } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
+import { pref, savePref } from '../preferences.js'
 
 const SCORING_FORMAT_OPTIONS: { label: string; value: string }[] = [
     { label: 'Head to Head: Each Category',   value: 'Head to Head: Each Category'   },
@@ -41,15 +42,19 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     const allCategories     = config?.all_categories     ?? FALLBACK_ALL_CATEGORIES
     const defaultCategories = config?.default_categories  ?? FALLBACK_DEFAULT_CATEGORIES
 
-    _selectedCategories = [...defaultCategories]
+    const savedCategories = pref<string[] | null>('categories', null)
+    const initialCategories = savedCategories ?? defaultCategories
+
+    _selectedCategories = [...initialCategories]
 
     // Scoring format
     container.append(makeLabel('fc-scoring-format', 'Scoring format'))
     const fmtSelect = makeCustomSelect(
         'fc-scoring-format',
         SCORING_FORMAT_OPTIONS,
-        'Head to Head: Each Category',
+        pref('scoring_format', 'Head to Head: Each Category'),
     )
+    fmtSelect.element.addEventListener('change', () => savePref('scoring_format', fmtSelect.getValue()))
     container.append(fmtSelect.element)
 
     // Categories multiselect
@@ -61,8 +66,15 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     _selectedCategories = renderMultiselect(
         container,
         allCategories,
-        defaultCategories,
+        initialCategories,
     )
+
+    // Save categories on chip add/remove (observe DOM mutations on the chip area)
+    const inputArea = container.querySelector('.ms-input-area')
+    if (inputArea) {
+        new MutationObserver(() => savePref('categories', [..._selectedCategories]))
+            .observe(inputArea, { childList: true })
+    }
 }
 
 /**

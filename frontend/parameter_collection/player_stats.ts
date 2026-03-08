@@ -4,6 +4,7 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { uploadCsv, getSeasons } from '../api/client.js'
 import { DataSource } from '../types.js'
+import { pref, savePref } from '../preferences.js'
 
 // ─── Module state ──────────────────────────────────────────────────────────────
 
@@ -32,14 +33,15 @@ export function renderPlayerStats(container: HTMLElement): void {
             { value: 'historical', label: 'Historical (Snowflake)'  },
             { value: 'mock',      label: 'Mock data (no Snowflake)' },
         ],
-        'blended',
+        pref('data_source_type', 'blended'),
     )
+    typeSelect.element.addEventListener('change', () => savePref('data_source_type', typeSelect.getValue()))
     container.append(typeSelect.element)
 
     // Projection blend weights section (only relevant for 'blended' type)
     const projSection = document.createElement('div')
     projSection.id = 'ps-proj-section'
-    // visible by default since 'blended' is the default selection
+    projSection.style.display = typeSelect.getValue() === 'blended' ? '' : 'none'
     container.append(projSection)
 
     renderBlendWeights(projSection)
@@ -47,7 +49,7 @@ export function renderPlayerStats(container: HTMLElement): void {
     // Historical season selector (only relevant for 'historical' type)
     const histSection = document.createElement('div')
     histSection.id = 'ps-hist-section'
-    histSection.style.display = 'none'
+    histSection.style.display = typeSelect.getValue() === 'historical' ? '' : 'none'
     container.append(histSection)
 
     let seasonsLoaded = false
@@ -86,6 +88,9 @@ export function renderPlayerStats(container: HTMLElement): void {
         if (type === 'historical') loadSeasons()
     })
 
+    // Load seasons immediately if restored type is 'historical'
+    if (typeSelect.getValue() === 'historical') loadSeasons()
+
     // Injured players
     const injuredLabel = document.createElement('label')
     injuredLabel.className = 'sidebar-label'
@@ -114,11 +119,11 @@ function renderBlendWeights(container: HTMLElement): void {
     weightLabel.textContent = 'Projection blend weights'
     container.append(weightLabel)
 
-    const sources: { id: string; label: string; defaultValue: number }[] = [
-        { id: 'ps-w-espn',  label: 'ESPN',  defaultValue: 0.5 },
-        { id: 'ps-w-darko', label: 'DARKO', defaultValue: 0.5 },
-        { id: 'ps-w-htb',   label: 'HTB',   defaultValue: 0.0 },
-        { id: 'ps-w-bbm',   label: 'BBM',   defaultValue: 0.0 },
+    const sources: { id: string; label: string; prefKey: string; defaultValue: number }[] = [
+        { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 0.5 },
+        { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.5 },
+        { id: 'ps-w-htb',   label: 'HTB',   prefKey: 'blend_w_htb',   defaultValue: 0.0 },
+        { id: 'ps-w-bbm',   label: 'BBM',   prefKey: 'blend_w_bbm',   defaultValue: 0.0 },
     ]
 
     for (const source of sources) {
@@ -130,22 +135,25 @@ function renderBlendWeights(container: HTMLElement): void {
         label.textContent = source.label
         row.append(label)
 
+        const savedWeight = pref(source.prefKey, source.defaultValue)
+
         const slider = document.createElement('input')
         slider.type = 'range'
         slider.id = source.id
         slider.min = '0'
         slider.max = '1'
         slider.step = '0.05'
-        slider.value = String(source.defaultValue)
+        slider.value = String(savedWeight)
         row.append(slider)
 
         const valueDisplay = document.createElement('span')
         valueDisplay.className = 'slider-value'
-        valueDisplay.textContent = source.defaultValue.toFixed(2)
+        valueDisplay.textContent = savedWeight.toFixed(2)
         row.append(valueDisplay)
 
         slider.addEventListener('input', () => {
             valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
+            savePref(source.prefKey, parseFloat(slider.value))
         })
 
         container.append(row)

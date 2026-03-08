@@ -4,7 +4,7 @@
 // backend responses and the player table.
 
 import { SessionRequest } from '../types.js'
-import { setAllPlayers, setCandidates, setCategories, setGScores } from '../app_state.js'
+import { setAllPlayers, setCandidates, setCategories, setGScores, setPlayersFromGScores } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
@@ -96,6 +96,16 @@ async function ensureSession(): Promise<void> {
  * Retries once if the session has expired (404), creating a fresh session first.
  */
 export async function runEvaluate(): Promise<void> {
+    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+    if (mode === 'Season Mode') {
+        // Season Mode uses its own evaluate flow (runWaiverEvaluate).
+        // Just ensure the session exists so G-scores are loaded, then
+        // build minimal Player objects for the roster dropdowns.
+        await ensureSession()
+        setPlayersFromGScores()
+        return
+    }
+
     // Abort any in-flight evaluate request so the backend is only computing
     // the most recent draft state, not every intermediate pick.
     if (evaluateController) evaluateController.abort()

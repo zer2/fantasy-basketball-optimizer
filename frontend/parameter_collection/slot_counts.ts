@@ -7,6 +7,7 @@
 
 import { makeLabel, makeNumberInput } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
+import { pref, savePref } from '../preferences.js'
 
 const FALLBACK_BASE: string[] = ['PG', 'SG', 'SF', 'PF', 'C']
 const FALLBACK_FLEX: string[] = ['G', 'F', 'Util']
@@ -76,11 +77,11 @@ export function renderSlotCounts(container: HTMLElement): void {
     grid.append(rightCol)
 
     for (const pos of basePositions) {
-        leftCol.append(makeSlotRow(pos, defaults[pos] ?? 0))
+        leftCol.append(makeSlotRow(pos, pref(`slot_${pos}`, defaults[pos] ?? 0)))
     }
 
     for (const pos of flexPositions) {
-        rightCol.append(makeSlotRow(pos, defaults[pos] ?? 0))
+        rightCol.append(makeSlotRow(pos, pref(`slot_${pos}`, defaults[pos] ?? 0)))
     }
 
     // Bench slots
@@ -93,7 +94,9 @@ export function renderSlotCounts(container: HTMLElement): void {
         'only 13 are start/sit relevant, set this to 3). These are excluded from the optimizer.'
     container.append(benchCaption)
 
-    container.append(makeNumberInput('sc-bench-slots', 0, 0))
+    const benchInput = makeNumberInput('sc-bench-slots', pref('bench_slots', 0), 0)
+    benchInput.addEventListener('change', () => savePref('bench_slots', parseInt(benchInput.value) || 0))
+    container.append(benchInput)
 
     // Validation message
     const validationMsg = document.createElement('div')
@@ -122,6 +125,7 @@ function makeSlotRow(pos: string, defaultValue: number): HTMLElement {
     input.className = 'sidebar-input slot-input'
     input.min = '0'
     input.value = String(defaultValue)
+    input.addEventListener('change', () => savePref(`slot_${pos}`, parseInt(input.value) || 0))
     row.append(input)
 
     return row

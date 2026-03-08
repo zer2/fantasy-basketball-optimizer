@@ -4,6 +4,7 @@
 // by a future trade evaluation endpoint.
 
 import { makeLabel, makeNumberInput } from '../helper_functions.js'
+import { pref, savePref } from '../preferences.js'
 
 export interface TradeComboRow {
     n_traded:   number
@@ -32,7 +33,9 @@ export function renderTradeParameters(container: HTMLElement): void {
 
     // Your threshold
     container.append(makeLabel('tp-your-threshold', 'Your improvement threshold (%)'))
-    container.append(makeNumberInput('tp-your-threshold', 0))
+    const yourInput = makeNumberInput('tp-your-threshold', pref('tp_your_threshold', 0))
+    yourInput.addEventListener('change', () => savePref('tp_your_threshold', parseFloat(yourInput.value)))
+    container.append(yourInput)
 
     const yourCaption = document.createElement('div')
     yourCaption.className = 'sidebar-caption'
@@ -41,7 +44,9 @@ export function renderTradeParameters(container: HTMLElement): void {
 
     // Their threshold
     container.append(makeLabel('tp-their-threshold', 'Counterparty threshold (%)'))
-    container.append(makeNumberInput('tp-their-threshold', -0.2))
+    const theirInput = makeNumberInput('tp-their-threshold', pref('tp_their_threshold', -0.2))
+    theirInput.addEventListener('change', () => savePref('tp_their_threshold', parseFloat(theirInput.value)))
+    container.append(theirInput)
 
     const theirCaption = document.createElement('div')
     theirCaption.className = 'sidebar-caption'
@@ -74,15 +79,35 @@ export function renderTradeParameters(container: HTMLElement): void {
     table.append(tbody)
     container.append(table)
 
-    for (const row of DEFAULT_COMBOS) {
+    const savedCombos = pref<TradeComboRow[]>('tp_combo_params', DEFAULT_COMBOS)
+    for (const row of savedCombos) {
         addComboRow(tbody, row)
     }
+
+    /** Saves the current combo table state to localStorage. */
+    function saveCombos(): void {
+        const rows = Array.from(tbody.querySelectorAll<HTMLTableRowElement>('tr'))
+        savePref('tp_combo_params', rows.map(r => {
+            const inputs = r.querySelectorAll<HTMLInputElement>('input')
+            return {
+                n_traded:   parseInt(inputs[0].value) || 0,
+                n_received: parseInt(inputs[1].value) || 0,
+                threshold:  parseFloat(inputs[2].value) || 0,
+            }
+        }))
+    }
+
+    // Save on any cell edit
+    tbody.addEventListener('change', saveCombos)
 
     const addBtn = document.createElement('button')
     addBtn.type = 'button'
     addBtn.className = 'trade-add-btn'
     addBtn.textContent = '+ Add row'
-    addBtn.addEventListener('click', () => addComboRow(tbody, { n_traded: 1, n_received: 1, threshold: 3 }))
+    addBtn.addEventListener('click', () => {
+        addComboRow(tbody, { n_traded: 1, n_received: 1, threshold: 3 })
+        saveCombos()
+    })
     container.append(addBtn)
 }
 
@@ -106,7 +131,12 @@ function addComboRow(tbody: HTMLElement, defaults: TradeComboRow): void {
     removeBtn.type = 'button'
     removeBtn.className = 'info-btn'
     removeBtn.textContent = '✕'
-    removeBtn.addEventListener('click', () => row.remove())
+    removeBtn.addEventListener('click', () => {
+        row.remove()
+        // Combo save is handled by the parent via MutationObserver or caller;
+        // but since we can't access saveCombos here, dispatch a change event.
+        tbody.dispatchEvent(new Event('change', { bubbles: true }))
+    })
     removeTd.append(removeBtn)
     row.append(removeTd)
 
