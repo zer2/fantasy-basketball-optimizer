@@ -23,8 +23,11 @@ from backend.models import (
     SessionRequest, SessionResponse, PlayerGScore,
     PatchRequest, PatchResponse,
     EvaluateRequest, EvaluateResponse,
+    TradeAnalyzeRequest, TradeAnalyzeResponse,
+    TradeSuggestRequest, TradeSuggestResponse,
 )
 from backend.evaluate import run_evaluate
+from backend.math.trading import run_trade_analyze, run_trade_suggest
 
 
 # ── Upload store ──────────────────────────────────────────────────────────────
@@ -162,6 +165,49 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+
+# ── GET /config/{sport} ───────────────────────────────────────────────────────
+
+@app.get('/config/{sport}')
+def get_config_route(sport: str):
+    all_params = _load_all_params()
+    if sport not in all_params:
+        raise HTTPException(status_code=400, detail=f'Unknown sport: {sport!r}')
+
+    p = all_params[sport]
+
+    # All selectable categories = ratio stat names + counting stat names
+    ratio_names = list(p.get('ratio-statistics', {}).keys())
+    counting_names = p.get('counting-statistics', [])
+    all_categories = ratio_names + [c for c in counting_names if c not in ratio_names]
+
+    # Options (min/max/default for each parameter), excluding positions
+    raw_options = p.get('options', {})
+    options = {k: v for k, v in raw_options.items() if k != 'positions'}
+
+    # Apply punting preset to get effective defaults for omega/gamma/n_iterations
+    punting_defaults = p.get('punting_defaults', {})
+    punting_default = p.get('punting_default', None)
+    if punting_default and punting_default in punting_defaults:
+        preset = punting_defaults[punting_default]
+        for key, value in preset.items():
+            if key in options:
+                options[key] = dict(options[key])
+                options[key]['default'] = value
+
+    return {
+        'default_categories': p.get('default-categories', []),
+        'all_categories': all_categories,
+        'options': options,
+        'positions': raw_options.get('positions', {}),
+        'position_structure': {
+            'base_list': p.get('position_structure', {}).get('base_list', []),
+            'flex_list': p.get('position_structure', {}).get('flex_list', []),
+        },
+        'punting_defaults': punting_defaults,
+        'punting_default': punting_default,
+    }
 
 
 # ── POST /data/upload ─────────────────────────────────────────────────────────
@@ -344,6 +390,49 @@ def evaluate_route(session_id: str, req: EvaluateRequest):
         )
         return result
     except Exception as exc:
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+
+# ── POST /sessions/{session_id}/trade/analyze ────────────────────────────────
+
+@app.post('/sessions/{session_id}/trade/analyze', response_model=TradeAnalyzeResponse)
+def trade_analyze_route(session_id: str, req: TradeAnalyzeRequest):
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found or expired.')
+
+    try:
+        return run_trade_analyze(
+            session,
+            player_assignments=req.player_assignments,
+            my_team=req.my_team,
+            their_team=req.their_team,
+            my_trade=req.my_trade,
+            their_trade=req.their_trade,
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+
+# ── POST /sessions/{session_id}/trade/suggest ────────────────────────────────
+
+@app.post('/sessions/{session_id}/trade/suggest', response_model=TradeSuggestResponse)
+def trade_suggest_route(session_id: str, req: TradeSuggestRequest):
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found or expired.')
+
+    try:
+        return run_trade_suggest(
+            session,
+            player_assignments=req.player_assignments,
+            my_team=req.my_team,
+            their_team=req.their_team,
+            combo_params=req.combo_params,
+            your_threshold=req.your_differential_threshold,
+            their_threshold=req.their_differential_threshold,
+        )
+    except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 

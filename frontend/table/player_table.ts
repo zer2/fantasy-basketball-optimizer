@@ -2,7 +2,7 @@
 // Renders the H-score candidate table: headers, player rows, expand buttons.
 // Reads current player and category state from app_state.ts.
 
-import { stat_styler_primary, stat_styler_secondary } from '../styler_functions.js'
+import { stat_styler_primary, stat_styler_secondary } from '../styles/styler_functions.js'
 import { ExpandView } from './expand_view.js'
 import { Player } from '../types.js'
 import { getCategories } from '../app_state.js'

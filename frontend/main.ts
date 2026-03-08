@@ -4,8 +4,9 @@
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn } from './helper_functions.js'
-import { getCandidatePlayers } from './app_state.js'
+import { getCandidatePlayers, setSportConfig } from './app_state.js'
 import { createOrPatchSession, runEvaluate } from './api/session.js'
+import { fetchConfig } from './api/client.js'
 import { buildTable } from './table/player_table.js'
 import { initLayout, reapplyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
@@ -17,6 +18,18 @@ import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
 import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
+
+// ─── Async init: fetch config, then build sidebar ────────────────────────────
+
+;(async () => {
+
+// Fetch sport config before rendering sidebar so defaults come from parameters.yaml
+try {
+    const config = await fetchConfig('NBA')
+    setSportConfig(config)
+} catch (err) {
+    console.error('Failed to fetch config; using hard-coded fallbacks:', err)
+}
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -129,3 +142,5 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
         reapplyLayout()
     }, 600)
 })
+
+})()

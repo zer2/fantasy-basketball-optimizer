@@ -2,70 +2,83 @@
 // Mirrors player_stat_param_popover() + algorithm_param_popover()
 //   in src/parameter_collection/parameters.py
 //
-// Renamed from parameters.py to model_parameters.ts to better reflect
-// that this covers all mathematical model parameters, not just player stats.
+// Defaults are loaded from the backend config (parameters.yaml) via
+// getSportConfig(). The config already applies the active punting preset
+// (e.g. "Moderate punting") so omega/gamma/n_iterations reflect the
+// preset defaults rather than the raw option defaults.
 
 import { ModelParameters } from '../types.js'
+import { getSportConfig } from '../app_state.js'
 
 interface ParamSpec {
     id:      string
+    key:     string        // key in config.options (e.g. 'omega', 'S')
     label:   string
     caption: string
-    default: number
-    min:     number
-    max:     number | null
+    fallback: number       // used if config is unavailable
     step:    number
 }
 
 // S_σ is shown only in Auction Mode; kept separate so it can be toggled independently.
 const S_SPEC: ParamSpec = {
-    id: 'mp-s', label: 'S\u03C3 (SAVOR)', step: 1,
-    default: 10, min: 0, max: 200,
+    id: 'mp-s', key: 'S', label: 'S\u03C3 (SAVOR)', step: 1,
+    fallback: 10,
     caption: 'SAVOR noise parameter. Roughly represents the standard deviation of dollar values expected for players during the season. Higher values down-weight low-dollar players more aggressively.',
 }
 
 const PARAM_SPECS: ParamSpec[] = [
     {
-        id: 'mp-upsilon', label: 'υ (upsilon)', step: 0.05,
-        default: 1.0, min: 0.0, max: 1.0,
+        id: 'mp-upsilon', key: 'upsilon', label: 'υ (upsilon)', step: 0.05,
+        fallback: 1.0,
         caption: 'Scales injury rates down. At 1.0 full projected injury rates apply; at 0.0 all players are treated as healthy.',
     },
     {
-        id: 'mp-psi', label: 'ψ (psi)', step: 0.05,
-        default: 0.8, min: 0.0, max: 1.0,
+        id: 'mp-psi', key: 'psi', label: 'ψ (psi)', step: 0.05,
+        fallback: 0.8,
         caption: 'Fraction of missed games assumed to be replaced by a replacement-level player.',
     },
     {
-        id: 'mp-chi', label: 'χ (chi)', step: 0.05,
-        default: 0.6, min: 0.0, max: 1.0,
+        id: 'mp-chi', key: 'chi', label: 'χ (chi)', step: 0.05,
+        fallback: 0.6,
         caption: 'Estimated season-long variance relative to empirical week-to-week variance (for Rotisserie).',
     },
     {
-        id: 'mp-aleph', label: 'ℵ (aleph)', step: 0.05,
-        default: 0.2, min: 0.0, max: 1.0,
+        id: 'mp-aleph', key: 'aleph', label: 'ℵ (aleph)', step: 0.05,
+        fallback: 0.2,
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
-        id: 'mp-omega', label: 'ω (omega)', step: 0.05,
-        default: 0.7, min: 0.0, max: 2.0,
+        id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
+        fallback: 0.7,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
     {
-        id: 'mp-gamma', label: 'γ (gamma)', step: 0.05,
-        default: 0.25, min: 0.0, max: 1.0,
+        id: 'mp-gamma', key: 'gamma', label: 'γ (gamma)', step: 0.05,
+        fallback: 0.25,
         caption: 'Complements omega. Higher values require more general value to be sacrificed to pursue a punting strategy.',
     },
     {
-        id: 'mp-beth', label: 'ב (beth)', step: 0.5,
-        default: 3, min: 0.0, max: null,
+        id: 'mp-beth', key: 'beth', label: 'ב (beth)', step: 0.5,
+        fallback: 3,
         caption: "Bayesian shrinkage applied to your team's projected stats. Higher values pull projections closer to the average.",
     },
     {
-        id: 'mp-n-iterations', label: 'Iterations', step: 1,
-        default: 30, min: 0, max: 10000,
+        id: 'mp-n-iterations', key: 'n_iterations', label: 'Iterations', step: 1,
+        fallback: 30,
         caption: 'Number of gradient descent iterations. More iterations improve convergence but increase compute time.',
     },
 ]
+
+/** Resolves the effective default, min, and max for a parameter from the config. */
+function resolveSpec(spec: ParamSpec): { default: number; min: number; max: number | null } {
+    const config = getSportConfig()
+    const opt = config?.options?.[spec.key]
+    return {
+        default: opt?.default ?? spec.fallback,
+        min:     opt?.min     ?? 0,
+        max:     opt?.max     ?? null,
+    }
+}
 
 /**
  * Renders all model parameters as a compact 2-column grid of inputs with
@@ -93,6 +106,8 @@ export function renderModelParameters(container: HTMLElement): void {
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
 function makeParamItem(spec: ParamSpec): HTMLElement {
+    const resolved = resolveSpec(spec)
+
     const item = document.createElement('div')
     item.className = 'param-item'
 
@@ -115,10 +130,10 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
     input.type = 'number'
     input.id = spec.id
     input.className = 'sidebar-input'
-    input.min = String(spec.min)
-    if (spec.max !== null) input.max = String(spec.max)
+    input.min = String(resolved.min)
+    if (resolved.max !== null) input.max = String(resolved.max)
     input.step = String(spec.step)
-    input.value = String(spec.default)
+    input.value = String(resolved.default)
 
     item.append(labelRow, input)
     return item

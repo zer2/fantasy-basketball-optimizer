@@ -2,7 +2,7 @@
 // HTTP client for the Fantasy Basketball Optimizer backend.
 // All fetch calls go through this module; callers receive typed results.
 
-import { Player, PlayerGScore, SessionRequest } from '../types.js'
+import { Player, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
 
 export const BASE_URL = 'http://127.0.0.1:8000'
 
@@ -48,6 +48,18 @@ export function candidatesToPlayers(candidates: any[]): Player[] {
             orig_dollar_g: c.auction_values.orig_dollar_g,
         } : undefined,
     }))
+}
+
+// ── GET /config/{sport} ──────────────────────────────────────────────────────
+
+/** Fetches sport-specific configuration (defaults, categories, positions) from parameters.yaml. */
+export async function fetchConfig(sport: string): Promise<SportConfig> {
+    const res = await fetch(`${BASE_URL}/config/${encodeURIComponent(sport)}`)
+    if (!res.ok) {
+        const detail = await res.text()
+        throw new Error(`Config fetch failed (${res.status}): ${detail}`)
+    }
+    return res.json()
 }
 
 // ── POST /data/upload ─────────────────────────────────────────────────────────
@@ -148,6 +160,84 @@ export async function evaluate(
     if (!res.ok) {
         const detail = await res.text()
         throw new Error(`Evaluate failed (${res.status}): ${detail}`)
+    }
+    return res.json()
+}
+
+// ── POST /sessions/{id}/trade/analyze ────────────────────────────────────────
+
+export interface TeamHScore {
+    h_score: number
+    rates: number[]
+}
+
+export interface TeamTradeResult {
+    pre: TeamHScore
+    post: TeamHScore
+}
+
+export interface TradeAnalyzeResponse {
+    your_team: TeamTradeResult | null
+    their_team: TeamTradeResult | null
+    error: string | null
+}
+
+/** Analyzes a trade and returns pre/post H-scores for both teams. */
+export async function analyzeTrade(
+    sessionId: string,
+    req: {
+        player_assignments: Record<string, string[]>
+        my_team: string
+        their_team: string
+        my_trade: string[]
+        their_trade: string[]
+    },
+): Promise<TradeAnalyzeResponse> {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/trade/analyze`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(req),
+    })
+    if (!res.ok) {
+        const detail = await res.text()
+        throw new Error(`Trade analyze failed (${res.status}): ${detail}`)
+    }
+    return res.json()
+}
+
+// ── POST /sessions/{id}/trade/suggest ────────────────────────────────────────
+
+export interface TradeSuggestion {
+    send: string[]
+    receive: string[]
+    your_score: number
+    their_score: number
+}
+
+export interface TradeSuggestResponse {
+    suggestions: TradeSuggestion[]
+}
+
+/** Generates trade suggestions for two teams. May take 10-30s. */
+export async function suggestTrades(
+    sessionId: string,
+    req: {
+        player_assignments: Record<string, string[]>
+        my_team: string
+        their_team: string
+        combo_params: { n_traded: number; n_received: number; threshold: number }[]
+        your_differential_threshold: number
+        their_differential_threshold: number
+    },
+): Promise<TradeSuggestResponse> {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(req),
+    })
+    if (!res.ok) {
+        const detail = await res.text()
+        throw new Error(`Trade suggest failed (${res.status}): ${detail}`)
     }
     return res.json()
 }

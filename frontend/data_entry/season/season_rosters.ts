@@ -4,7 +4,7 @@
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayers, getGScoreByName, getCategories } from '../../app_state.js'
-import { stat_styler_primary } from '../../styler_functions.js'
+import { stat_styler_primary } from '../../styles/styler_functions.js'
 
 /** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
@@ -77,6 +77,66 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
         }
         selects.push(rowSelects)
     }
+
+    // ── Copy support: copy the full grid as tab/newline-separated text ───
+    table.addEventListener('copy', (e: ClipboardEvent) => {
+        // Only intercept when focus is inside the table body
+        const active = document.activeElement
+        if (!active || !table.contains(active)) return
+
+        const lines: string[] = []
+        for (let r = 0; r < nPicks; r++) {
+            const cols: string[] = []
+            for (let d = 0; d < nDrafters; d++) {
+                cols.push(selects[r]?.[d]?.getValue() ?? '')
+            }
+            lines.push(cols.join('\t'))
+        }
+
+        e.preventDefault()
+        e.clipboardData?.setData('text/plain', lines.join('\n'))
+    })
+
+    // ── Paste support: paste tab/newline-separated data into the grid ────
+    table.addEventListener('paste', (e: ClipboardEvent) => {
+        const text = e.clipboardData?.getData('text/plain')
+        if (!text) return
+
+        // Find which cell is focused
+        const active = document.activeElement
+        if (!active) return
+        const cell = active.closest('td')
+        if (!cell) return
+        const row = cell.parentElement as HTMLTableRowElement
+        if (!row) return
+
+        const startRow = row.rowIndex - 1  // subtract 1 for thead row
+        const startCol = cell.cellIndex - 1 // subtract 1 for pick label column
+        if (startRow < 0 || startCol < 0) return
+
+        const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd().split('\n')
+
+        let changed = false
+        for (let dr = 0; dr < lines.length; dr++) {
+            const r = startRow + dr
+            if (r >= nPicks) break
+            const values = lines[dr].split('\t')
+            for (let dc = 0; dc < values.length; dc++) {
+                const d = startCol + dc
+                if (d >= nDrafters) break
+                const val = values[dc].trim()
+                if (val && selects[r]?.[d]) {
+                    selects[r][d].setValue(val)
+                    changed = true
+                }
+            }
+        }
+
+        if (changed) {
+            e.preventDefault()
+            rebuildInspector()
+        }
+    })
 
     scroll.append(table)
     leftEl.append(scroll)

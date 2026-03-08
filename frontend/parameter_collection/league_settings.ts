@@ -4,6 +4,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeNumberInput, makeSidebarToggle } from '../helper_functions.js'
+import { getSportConfig } from '../app_state.js'
 
 export type DraftMode = 'Draft Mode' | 'Auction Mode' | 'Season Mode'
 export type Platform = 'Enter your own data' | 'Retrieve from Yahoo' | 'Retrieve from Fantrax' | 'Retrieve from ESPN'
@@ -20,6 +21,9 @@ const PLATFORM_OPTIONS: Platform[] = [
  * Layout: 2-column grid for compact items, followed by full-width items.
  */
 export function renderLeagueSettings(container: HTMLElement): void {
+    const config = getSportConfig()
+    const nDraftersDefault = config?.options?.n_drafters?.default ?? 12
+    const nPicksDefault    = config?.options?.n_picks?.default    ?? 13
 
     const grid = document.createElement('div')
     grid.className = 'ls-grid'
@@ -63,14 +67,14 @@ export function renderLeagueSettings(container: HTMLElement): void {
     // ── Number of drafters (left col) ─────────────────────────────────────
     const draftersCell = makeCell()
     draftersCell.append(makeLabel('ls-n-drafters', 'Drafters'))
-    const nDraftersInput = makeNumberInput('ls-n-drafters', 12, 2)
+    const nDraftersInput = makeNumberInput('ls-n-drafters', nDraftersDefault, 2)
     draftersCell.append(nDraftersInput)
     grid.append(draftersCell)
 
     // ── Picks per drafter (right col) ─────────────────────────────────────
     const picksCell = makeCell()
     picksCell.append(makeLabel('ls-n-picks', 'Picks / drafter'))
-    picksCell.append(makeNumberInput('ls-n-picks', 13, 1))
+    picksCell.append(makeNumberInput('ls-n-picks', nPicksDefault, 1))
     grid.append(picksCell)
 
     // ── Budget per team (left col, Auction Mode only) ─────────────────────
@@ -100,7 +104,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     teamNamesInput.id = 'ls-team-names'
     teamNamesInput.className = 'sidebar-input'
     teamNamesInput.rows = 4
-    teamNamesInput.value = defaultTeamNames(12)
+    teamNamesInput.value = defaultTeamNames(nDraftersDefault)
     container.append(teamNamesInput)
 
     // Re-fill team names when drafter count changes

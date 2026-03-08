@@ -216,6 +216,7 @@ export function renderMultiselect(
 export interface MultiSelectWidget {
     element:     HTMLElement
     getSelected: () => string[]
+    setSelected: (values: string[]) => void
     onChange:    (cb: () => void) => void
 }
 
@@ -236,18 +237,30 @@ export function makeMultiSelectWidget(
     lbl.textContent = label
     wrap.append(lbl)
 
-    const selected = renderMultiselect(wrap, options, [])
+    let selected = renderMultiselect(wrap, options, [])
 
     const callbacks: (() => void)[] = []
-    const inputArea = wrap.querySelector('.ms-input-area')
-    if (inputArea) {
-        new MutationObserver(() => callbacks.forEach(cb => cb()))
-            .observe(inputArea, { childList: true })
+
+    function observeInputArea(): void {
+        const inputArea = wrap.querySelector('.ms-input-area')
+        if (inputArea) {
+            new MutationObserver(() => callbacks.forEach(cb => cb()))
+                .observe(inputArea, { childList: true })
+        }
     }
+    observeInputArea()
 
     return {
         element:     wrap,
         getSelected: () => [...selected],
+        setSelected: (values: string[]) => {
+            // Remove the old multiselect container and re-render with new defaults
+            const oldContainer = wrap.querySelector('.ms-container')
+            if (oldContainer) oldContainer.remove()
+            selected = renderMultiselect(wrap, options, values)
+            observeInputArea()
+            callbacks.forEach(cb => cb())
+        },
         onChange:    (cb) => callbacks.push(cb),
     }
 }

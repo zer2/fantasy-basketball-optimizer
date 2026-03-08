@@ -2,7 +2,7 @@
 // Builds the expandable detail panel beneath each player row in the main table.
 // Mirrors the detail panels in the original Streamlit app.
 
-import { stat_styler_primary, stat_styler_tertiary} from '../styler_functions.js'
+import { stat_styler_primary, stat_styler_tertiary} from '../styles/styler_functions.js'
 import { Player, FlexAllocations, Roster } from '../types.js'
 
 const POSITION_NAMES: Record<string, string> = {

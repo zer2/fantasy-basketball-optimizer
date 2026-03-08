@@ -4,12 +4,14 @@
 //   1. Team selectors (your team / counterparty)
 //   2. Player multi-selects (send / receive) + result sub-tabs (H-score / G-score)
 //   3. Suggested trades table
-//
-// Backend integration is stubbed — the UI structure is complete.
 
 import { makeCustomSelect } from '../../custom_select.js'
-import { makeMultiSelectWidget } from '../../helper_functions.js'
-import { getPlayerByName, getCategories } from '../../app_state.js'
+import { makeMultiSelectWidget, MultiSelectWidget } from '../../helper_functions.js'
+import { getGScoreByName, getCategories } from '../../app_state.js'
+import { stat_styler_primary } from '../../styles/styler_functions.js'
+import { getTradeParameters } from '../../parameter_collection/trade_parameters.js'
+import { runTradeAnalyze, runTradeSuggest } from '../../api/session.js'
+import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,21 +44,20 @@ function readRosterAssignments(): Record<string, string[]> {
 
 // ─── G-score comparison table ────────────────────────────────────────────────
 
-/** Builds a G-score comparison table for the selected send/receive players.
- *  Uses actual G-score data from getPlayers() when available. */
+/** Builds a G-score comparison table for the selected send/receive players. */
 function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
     const container = document.createElement('div')
     container.className = 'trade-gscore-section'
 
-    const playerByName = getPlayerByName()
+    const gScoreMap = getGScoreByName()
     const categories = getCategories()
 
     type Row = { label: string; total: number; values: number[] }
 
     function getPlayerGRow(name: string): Row | null {
-        const p = playerByName.get(name)
-        if (!p) return null
-        return p.g_score_rows.find((r: Row) => r.label === name) ?? null
+        const gs = gScoreMap.get(name)
+        if (!gs) return null
+        return { label: gs.name, total: gs.total, values: gs.values }
     }
 
     const sentRows:     Row[] = []
@@ -109,9 +110,11 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
         labelCell.className = 'trade-row-label'
         const totalCell = tr.insertCell()
         totalCell.textContent = row.total.toFixed(2)
+        totalCell.style.cssText = stat_styler_primary(row.total, 60, 0)
         for (const v of row.values) {
             const td = tr.insertCell()
             td.textContent = v.toFixed(2)
+            td.style.cssText = stat_styler_primary(v, 60, 0)
         }
     }
 
@@ -131,22 +134,236 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
     return container
 }
 
-// ─── H-score stub ────────────────────────────────────────────────────────────
+// ─── H-score trade analysis ─────────────────────────────────────────────────
 
-function buildHScoreStub(): HTMLElement {
-    const el = document.createElement('div')
-    el.className = 'trade-hscore-stub'
-    el.textContent = 'H-score trade analysis will appear here once the backend is connected.'
-    return el
+/** Builds the H-score trade result display with pre/post comparison for both teams. */
+function buildHScoreResult(
+    pane: HTMLElement,
+    assignments: Record<string, string[]>,
+    yourTeam: string,
+    theirTeam: string,
+    sent: string[],
+    received: string[],
+): void {
+    pane.innerHTML = ''
+
+    const loading = document.createElement('div')
+    loading.className = 'trade-hscore-stub'
+    loading.textContent = 'Analyzing trade...'
+    pane.append(loading)
+
+    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received)
+        .then(resp => renderHScoreResult(pane, resp))
+        .catch(err => {
+            pane.innerHTML = ''
+            const msg = document.createElement('div')
+            msg.className = 'trade-hscore-stub'
+            msg.textContent = `Error: ${err.message}`
+            pane.append(msg)
+        })
 }
 
-// ─── Suggestion table stub ───────────────────────────────────────────────────
+function renderHScoreResult(pane: HTMLElement, resp: TradeAnalyzeResponse): void {
+    pane.innerHTML = ''
 
-function buildSuggestionStub(): HTMLElement {
-    const el = document.createElement('div')
-    el.className = 'trade-suggestion-stub'
-    el.textContent = 'Suggested trades will appear here once the backend is connected.'
-    return el
+    if (resp.error) {
+        const msg = document.createElement('div')
+        msg.className = 'trade-hscore-stub'
+        msg.textContent = resp.error
+        pane.append(msg)
+        return
+    }
+
+    if (!resp.your_team || !resp.their_team) return
+
+    const categories = getCategories()
+    const yourImproved = resp.your_team.post.h_score > resp.your_team.pre.h_score
+    const theirImproved = resp.their_team.post.h_score > resp.their_team.pre.h_score
+
+    // Sub-tabs: Your Team / Their Team
+    const tabNav = document.createElement('div')
+    tabNav.className = 'trade-tab-nav'
+
+    const yourBtn = document.createElement('button')
+    yourBtn.type = 'button'
+    yourBtn.className = 'trade-tab-btn active'
+    yourBtn.textContent = `Your Team ${yourImproved ? '\u{1F44D}' : '\u{1F44E}'}`
+
+    const theirBtn = document.createElement('button')
+    theirBtn.type = 'button'
+    theirBtn.className = 'trade-tab-btn'
+    theirBtn.textContent = `Their Team ${theirImproved ? '\u{1F44D}' : '\u{1F44E}'}`
+
+    tabNav.append(yourBtn, theirBtn)
+    pane.append(tabNav)
+
+    const yourPane = document.createElement('div')
+    const theirPane = document.createElement('div')
+    theirPane.style.display = 'none'
+    pane.append(yourPane, theirPane)
+
+    yourBtn.addEventListener('click', () => {
+        yourBtn.classList.add('active');  theirBtn.classList.remove('active')
+        yourPane.style.display = '';      theirPane.style.display = 'none'
+    })
+    theirBtn.addEventListener('click', () => {
+        theirBtn.classList.add('active'); yourBtn.classList.remove('active')
+        theirPane.style.display = '';     yourPane.style.display = 'none'
+    })
+
+    yourPane.append(buildHScoreComparisonTable(resp.your_team.pre, resp.your_team.post, categories))
+    theirPane.append(buildHScoreComparisonTable(resp.their_team.pre, resp.their_team.post, categories))
+}
+
+function buildHScoreComparisonTable(
+    pre: { h_score: number; rates: number[] },
+    post: { h_score: number; rates: number[] },
+    categories: string[],
+): HTMLTableElement {
+    const table = document.createElement('table')
+    table.className = 'trade-result-table'
+
+    const thead = table.createTHead()
+    const hrow = thead.insertRow()
+    hrow.insertCell().textContent = ''
+    const hTh = document.createElement('th')
+    hTh.textContent = 'H-score'
+    hrow.append(hTh)
+    for (const cat of categories) {
+        const th = document.createElement('th')
+        th.textContent = cat
+        hrow.append(th)
+    }
+
+    const tbody = table.createTBody()
+
+    function addRow(label: string, hScore: number, rates: number[]): void {
+        const tr = tbody.insertRow()
+        const labelCell = tr.insertCell()
+        labelCell.textContent = label
+        labelCell.className = 'trade-row-label'
+
+        const hCell = tr.insertCell()
+        hCell.textContent = (hScore * 100).toFixed(2) + '%'
+        hCell.style.cssText = stat_styler_primary(hScore - 0.5, 200, 0)
+
+        for (const rate of rates) {
+            const td = tr.insertCell()
+            td.textContent = (rate * 100).toFixed(1) + '%'
+            td.style.cssText = stat_styler_primary(rate - 0.5, 200, 0)
+        }
+    }
+
+    addRow('Pre-trade', pre.h_score, pre.rates)
+    addRow('Post-trade', post.h_score, post.rates)
+
+    return table
+}
+
+// ─── Suggested trades ───────────────────────────────────────────────────────
+
+function runSuggestionSearch(
+    resultsArea: HTMLElement,
+    comboSel: MultiSelectWidget,
+    assignments: Record<string, string[]>,
+    yourTeam: string,
+    theirTeam: string,
+    sendSel: MultiSelectWidget,
+    receiveSel: MultiSelectWidget,
+): void {
+    resultsArea.innerHTML = ''
+    const { combo_params, your_differential_threshold, their_differential_threshold } = getTradeParameters()
+
+    const selected = comboSel.getSelected()
+    if (selected.length === 0) {
+        const msg = document.createElement('div')
+        msg.className = 'trade-suggestion-stub'
+        msg.textContent = 'Select at least one trade combination.'
+        resultsArea.append(msg)
+        return
+    }
+
+    // Filter combo_params to only the selected ones
+    const filteredCombos = combo_params.filter(cp =>
+        selected.includes(`${cp.n_traded} for ${cp.n_received}`)
+    )
+
+    const loading = document.createElement('div')
+    loading.className = 'trade-suggestion-stub'
+    loading.textContent = 'Finding suggested trades...'
+    resultsArea.append(loading)
+
+    runTradeSuggest(
+        assignments, yourTeam, theirTeam,
+        filteredCombos, your_differential_threshold, their_differential_threshold,
+    )
+        .then(resp => {
+            loading.remove()
+            if (resp.suggestions.length === 0) {
+                const msg = document.createElement('div')
+                msg.className = 'trade-suggestion-stub'
+                msg.textContent = 'No promising trades found.'
+                resultsArea.append(msg)
+                return
+            }
+            resultsArea.append(buildSuggestionTable(resp.suggestions, sendSel, receiveSel))
+        })
+        .catch(err => {
+            loading.remove()
+            const msg = document.createElement('div')
+            msg.className = 'trade-suggestion-stub'
+            msg.textContent = `Error: ${err.message}`
+            resultsArea.append(msg)
+        })
+}
+
+function buildSuggestionTable(
+    suggestions: TradeSuggestion[],
+    sendSel: MultiSelectWidget,
+    receiveSel: MultiSelectWidget,
+): HTMLTableElement {
+    const table = document.createElement('table')
+    table.className = 'trade-result-table'
+
+    const thead = table.createTHead()
+    const hrow = thead.insertRow()
+    for (const header of ['Send', 'Receive', 'Your Score', 'Their Score']) {
+        const th = document.createElement('th')
+        th.textContent = header
+        if (header === 'Send' || header === 'Receive') th.style.textAlign = 'left'
+        hrow.append(th)
+    }
+
+    const tbody = table.createTBody()
+
+    for (const sug of suggestions) {
+        const tr = tbody.insertRow()
+        tr.style.cursor = 'pointer'
+
+        const sendCell = tr.insertCell()
+        sendCell.textContent = sug.send.join(', ')
+        sendCell.style.textAlign = 'left'
+
+        const recvCell = tr.insertCell()
+        recvCell.textContent = sug.receive.join(', ')
+        recvCell.style.textAlign = 'left'
+
+        const yourCell = tr.insertCell()
+        yourCell.textContent = (sug.your_score * 100).toFixed(2) + '%'
+        yourCell.style.cssText = stat_styler_primary(sug.your_score, 15000, 0)
+
+        const theirCell = tr.insertCell()
+        theirCell.textContent = (sug.their_score * 100).toFixed(2) + '%'
+        theirCell.style.cssText = stat_styler_primary(sug.their_score, 15000, 0)
+
+        // Clicking a suggestion populates the send/receive selectors
+        tr.addEventListener('click', () => {
+            sendSel.setSelected(sug.send)
+            receiveSel.setSelected(sug.receive)
+        })
+    }
+
+    return table
 }
 
 // ─── Main render ─────────────────────────────────────────────────────────────
@@ -216,6 +433,31 @@ export function renderSeasonTrading(container: HTMLElement): void {
     const bodyArea = document.createElement('div')
     container.append(bodyArea)
 
+    // ── Suggested trades (persists across team changes) ──────────────────
+
+    const divider2 = document.createElement('hr')
+    divider2.className = 'trade-divider'
+    container.append(divider2)
+
+    const suggestHeader = document.createElement('div')
+    suggestHeader.className = 'trade-suggest-header'
+    suggestHeader.textContent = 'Suggested trades'
+    container.append(suggestHeader)
+
+    // Combo filter multiselect — created once, persists across team changes
+    const { combo_params } = getTradeParameters()
+    const comboOptions = combo_params.map(cp => `${cp.n_traded} for ${cp.n_received}`)
+    const comboSel = makeMultiSelectWidget('Trade combinations to search', comboOptions)
+    comboSel.setSelected([comboOptions[0]])
+    container.append(comboSel.element)
+
+    const suggestResults = document.createElement('div')
+    container.append(suggestResults)
+
+    // Track current send/receive selectors so combo change can re-trigger search
+    let currentSendSel: MultiSelectWidget | null = null
+    let currentReceiveSel: MultiSelectWidget | null = null
+
     function rebuildBody(): void {
         bodyArea.innerHTML = ''
 
@@ -245,6 +487,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
 
         const sendSel    = makeMultiSelectWidget('Which players are you trading?',   yourPlayers)
         const receiveSel = makeMultiSelectWidget('Which players are you receiving?', theirPlayers)
+        currentSendSel = sendSel
+        currentReceiveSel = receiveSel
 
         leftCol.append(sendSel.element)
         leftCol.append(receiveSel.element)
@@ -302,7 +546,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
                 return
             }
 
-            hPane.append(buildHScoreStub())
+            buildHScoreResult(hPane, assignments, yourTeam, theirTeam, sent, received)
             gPane.append(buildGScoreTable(sent, received))
         }
 
@@ -313,21 +557,18 @@ export function renderSeasonTrading(container: HTMLElement): void {
         bodyRow.append(rightCol)
         bodyArea.append(bodyRow)
 
-        // ── Divider + Suggested trades ───────────────────────────────────────
-
-        const divider2 = document.createElement('hr')
-        divider2.className = 'trade-divider'
-        bodyArea.append(divider2)
-
-        const suggestHeader = document.createElement('div')
-        suggestHeader.className = 'trade-suggest-header'
-        suggestHeader.textContent = 'Suggested trades'
-        bodyArea.append(suggestHeader)
-
-        bodyArea.append(buildSuggestionStub())
+        // Trigger suggestion search for current teams
+        runSuggestionSearch(suggestResults, comboSel, assignments, yourTeam, theirTeam, sendSel, receiveSel)
     }
 
     rebuildBody()
+
+    comboSel.onChange(() => {
+        if (!currentSendSel || !currentReceiveSel) return
+        const yourTeam  = yourTeamSel.getValue() || fullTeams[0]
+        const theirTeam = theirTeamSel.getValue() || fullTeams[1]
+        runSuggestionSearch(suggestResults, comboSel, assignments, yourTeam, theirTeam, currentSendSel, currentReceiveSel)
+    })
     yourTeamSel.element.addEventListener('change', () => {
         const yourTeam = yourTeamSel.getValue()
         theirTeamSel.setOptions(

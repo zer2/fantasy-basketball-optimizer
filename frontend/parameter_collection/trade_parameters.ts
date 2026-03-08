@@ -41,7 +41,7 @@ export function renderTradeParameters(container: HTMLElement): void {
 
     // Their threshold
     container.append(makeLabel('tp-their-threshold', 'Counterparty threshold (%)'))
-    container.append(makeNumberInput('tp-their-threshold', -20))
+    container.append(makeNumberInput('tp-their-threshold', -0.2))
 
     const theirCaption = document.createElement('div')
     theirCaption.className = 'sidebar-caption'

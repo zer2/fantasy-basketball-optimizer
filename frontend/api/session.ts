@@ -140,6 +140,72 @@ export async function runEvaluate(): Promise<void> {
 }
 
 /**
+ * Analyzes a proposed trade, returning pre/post H-scores for both teams.
+ * Ensures a session exists before calling the backend.
+ */
+export async function runTradeAnalyze(
+    playerAssignments: Record<string, string[]>,
+    myTeam: string,
+    theirTeam: string,
+    myTrade: string[],
+    theirTrade: string[],
+): Promise<api.TradeAnalyzeResponse> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            await ensureSession()
+            return await api.analyzeTrade(sessionId!, {
+                player_assignments: playerAssignments,
+                my_team: myTeam,
+                their_team: theirTeam,
+                my_trade: myTrade,
+                their_trade: theirTrade,
+            })
+        } catch (err: any) {
+            if (attempt === 0 && err.message?.includes('(404)')) {
+                sessionId = null
+                continue
+            }
+            throw err
+        }
+    }
+    throw new Error('Trade analyze failed after retry')
+}
+
+/**
+ * Generates trade suggestions for two teams.
+ * Ensures a session exists before calling the backend.
+ */
+export async function runTradeSuggest(
+    playerAssignments: Record<string, string[]>,
+    myTeam: string,
+    theirTeam: string,
+    comboParams: { n_traded: number; n_received: number; threshold: number }[],
+    yourThreshold: number,
+    theirThreshold: number,
+): Promise<api.TradeSuggestResponse> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            await ensureSession()
+            return await api.suggestTrades(sessionId!, {
+                player_assignments: playerAssignments,
+                my_team: myTeam,
+                their_team: theirTeam,
+                combo_params: comboParams,
+                your_differential_threshold: yourThreshold,
+                their_differential_threshold: theirThreshold,
+            })
+        } catch (err: any) {
+            if (attempt === 0 && err.message?.includes('(404)')) {
+                sessionId = null
+                continue
+            }
+            throw err
+        }
+    }
+    throw new Error('Trade suggest failed after retry')
+}
+
+/**
  * Runs evaluate for waiver wire analysis with a caller-supplied roster state.
  * Unlike runEvaluate, the caller is responsible for passing modified player_assignments
  * (with the dropped player removed from their team) so they appear as a free-agent candidate.

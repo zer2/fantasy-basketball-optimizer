@@ -2,7 +2,7 @@
 Pipeline orchestration for the 5-step initialization chain.
 
 Steps:
-  1. Load player_stats_v0 from mock / uploaded CSV → session.v0_clean
+  1. Load player_stats_v0 from CSV / Snowflake → session.v0_clean
   2. drop_injured_players → session.v1_clean
   3. make_upsilon_adjustment → session.v2
   4. process_player_data → session.info
@@ -18,7 +18,6 @@ import yaml
 import pandas as pd
 
 from backend.session import Session
-from backend.mock_data import make_nba_mock_data
 
 # Parameters file path (relative to the project root)
 _PARAMS_PATH = 'parameters.yaml'
@@ -48,7 +47,6 @@ def run_step1(
     """Load player_stats_v0 into session.v0_clean.
 
     Branches on current_params['data_source_type']:
-      'mock'       — built-in mock data (default)
       'csv'        — single uploaded CSV (csv_bytes + file_type required)
       'historical' — Snowflake historical stats for current_params['season']
       'blended'    — weighted blend of Snowflake sources + any uploaded_dfs
@@ -73,8 +71,8 @@ def run_step1(
             uploaded_dfs  = uploaded_dfs,
         )
 
-    else:  # 'mock'
-        v0 = make_nba_mock_data()
+    else:
+        raise ValueError(f"Unknown data_source_type: {source_type!r}")
 
     session.v0_clean = v0.copy()
 

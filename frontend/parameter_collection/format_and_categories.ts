@@ -1,12 +1,13 @@
 // Collects: scoring_format, categories
 // Mirrors format_popover() in src/parameter_collection/format.py
 //
-// Available categories are sport-level server-side config; hardcoded here for NBA.
-// The categories widget mimics st.multiselect: chips for selected items,
-// text-filter dropdown for adding more.
+// Available categories and defaults are loaded from the backend config
+// (parameters.yaml) via getSportConfig(). Hard-coded fallbacks are used
+// only if the config fetch failed.
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, renderMultiselect } from '../helper_functions.js'
+import { getSportConfig } from '../app_state.js'
 
 const SCORING_FORMAT_OPTIONS: { label: string; value: string }[] = [
     { label: 'Head to Head: Each Category',   value: 'Head to Head: Each Category'   },
@@ -14,16 +15,14 @@ const SCORING_FORMAT_OPTIONS: { label: string; value: string }[] = [
     { label: 'Rotisserie',                    value: 'Rotisserie'                    },
 ]
 
-const ALL_CATEGORIES: string[] = [
-    // Ratio
+const FALLBACK_ALL_CATEGORIES: string[] = [
     'Field Goal %', 'Free Throw %', 'Three %',
-    // Counting
     'Threes', 'Points', 'Rebounds', 'Off Rebounds', 'Def Rebounds',
     'Assists', 'Steals', 'Blocks', 'Turnovers',
     'Double Doubles', 'Field Goals Made', 'Free Throws Made',
 ]
 
-const DEFAULT_CATEGORIES: string[] = [
+const FALLBACK_DEFAULT_CATEGORIES: string[] = [
     'Field Goal %', 'Free Throw %', 'Threes', 'Points',
     'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers',
 ]
@@ -31,13 +30,18 @@ const DEFAULT_CATEGORIES: string[] = [
 // Live reference to the multiselect's selected-items array.
 // renderMultiselect returns the array it mutates, so this reference always
 // reflects the current state without re-querying the DOM.
-let _selectedCategories: string[] = [...DEFAULT_CATEGORIES]
+let _selectedCategories: string[] = []
 
 /**
  * Renders the Format & Categories section: scoring format selector and
  * a chip-style multiselect for stat categories.
  */
 export function renderFormatAndCategories(container: HTMLElement): void {
+    const config = getSportConfig()
+    const allCategories     = config?.all_categories     ?? FALLBACK_ALL_CATEGORIES
+    const defaultCategories = config?.default_categories  ?? FALLBACK_DEFAULT_CATEGORIES
+
+    _selectedCategories = [...defaultCategories]
 
     // Scoring format
     container.append(makeLabel('fc-scoring-format', 'Scoring format'))
@@ -56,8 +60,8 @@ export function renderFormatAndCategories(container: HTMLElement): void {
 
     _selectedCategories = renderMultiselect(
         container,
-        ALL_CATEGORIES,
-        DEFAULT_CATEGORIES,
+        allCategories,
+        defaultCategories,
     )
 }
 

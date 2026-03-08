@@ -3,7 +3,7 @@
 // Kept in a standalone module with no app-internal imports (only types.ts)
 // so that any module can read the state without creating circular dependencies.
 
-import { Player, PlayerGScore } from './types.js'
+import { Player, PlayerGScore, SportConfig } from './types.js'
 
 let allPlayers:      Player[] = []   // full dataset — only grows, never shrinks
 let candidates:      Player[] = []   // current evaluate output (may be a subset, e.g. waiver free agents)
@@ -50,3 +50,13 @@ export function setGScores(scores: PlayerGScore[]): void {
 
 /** Replaces the category list. Called by session.ts when categories change. */
 export function setCategories(c: string[]): void { categories = c }
+
+// ── Sport config (from GET /config/{sport}) ──────────────────────────────────
+
+let sportConfig: SportConfig | null = null
+
+/** Returns the current sport config, or null if not yet loaded. */
+export function getSportConfig(): SportConfig | null { return sportConfig }
+
+/** Stores the sport config fetched from the backend. */
+export function setSportConfig(c: SportConfig): void { sportConfig = c }

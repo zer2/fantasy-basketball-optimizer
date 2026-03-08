@@ -1,3 +1,24 @@
+// ─── Sport config (from GET /config/{sport}) ─────────────────────────────────
+
+export interface ParamOption {
+    default?: number
+    min: number
+    max: number | null
+}
+
+export interface SportConfig {
+    default_categories: string[]
+    all_categories: string[]
+    options: Record<string, ParamOption>
+    positions: Record<string, { base: Record<string, number>; flex: Record<string, number> }>
+    position_structure: {
+        base_list: string[]
+        flex_list: string[]
+    }
+    punting_defaults: Record<string, Record<string, number>>
+    punting_default: string | null
+}
+
 // ─── Player G-scores (from session creation, pipeline step 4) ────────────────
 
 export interface PlayerGScore {

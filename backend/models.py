@@ -155,3 +155,57 @@ class Candidate(BaseModel):
 class EvaluateResponse(BaseModel):
     iteration: int
     candidates: list[Candidate]
+
+
+# ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────
+
+class TradeAnalyzeRequest(BaseModel):
+    player_assignments: dict[str, list[str]]
+    my_team: str
+    their_team: str
+    my_trade: list[str]
+    their_trade: list[str]
+
+
+class TeamHScore(BaseModel):
+    h_score: float
+    rates: list[float]   # per-category win rates
+
+
+class TeamTradeResult(BaseModel):
+    pre: TeamHScore
+    post: TeamHScore
+
+
+class TradeAnalyzeResponse(BaseModel):
+    your_team: Optional[TeamTradeResult] = None
+    their_team: Optional[TeamTradeResult] = None
+    error: Optional[str] = None
+
+
+# ── /sessions/{id}/trade/suggest ─────────────────────────────────────────────
+
+class ComboParam(BaseModel):
+    n_traded: int
+    n_received: int
+    threshold: float
+
+
+class TradeSuggestRequest(BaseModel):
+    player_assignments: dict[str, list[str]]
+    my_team: str
+    their_team: str
+    combo_params: list[ComboParam]
+    your_differential_threshold: float = 0.0
+    their_differential_threshold: float = -0.20
+
+
+class TradeSuggestion(BaseModel):
+    send: list[str]
+    receive: list[str]
+    your_score: float
+    their_score: float
+
+
+class TradeSuggestResponse(BaseModel):
+    suggestions: list[TradeSuggestion]
