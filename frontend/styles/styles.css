@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
 
+:root { color-scheme: dark; }
+
 /* ─── App layout ─────────────────────────────────────────────────────────── */
 
 #app-layout {
@@ -10,8 +12,8 @@
 #sidebar {
     width: 280px;
     min-width: 280px;
-    background-color: #0e1117;
-    border-right: 1px solid #3d3d55;
+    background-color: light-dark(rgb(240, 242, 246), #0e1117);
+    border-right: 1px solid light-dark(#aaaabc, #3d3d55);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -22,22 +24,22 @@
     width: 100%;
     margin-top: 10px;
     padding: 6px;
-    background: #2a2a3e;
-    border: 1px solid #3d3d55;
+    background: light-dark(#e0e0ee, #2a2a3e);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
-    color: #aaaacc;
+    color: light-dark(#555555, #aaaacc);
     font-family: "Source Sans 3";
     font-size: 0.8rem;
     cursor: pointer;
 }
 
 .section-apply-btn:hover {
-    background: #3d3d55;
-    color: white;
+    background: light-dark(#aaaabc, #3d3d55);
+    color: light-dark(black, white);
 }
 
 .sidebar-title {
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     font-family: "Source Sans 3";
     font-size: 1rem;
     font-weight: 700;
@@ -46,7 +48,7 @@
 
 .sidebar-divider {
     border: none;
-    border-top: 1px solid #3d3d55;
+    border-top: 1px solid light-dark(#aaaabc, #3d3d55);
     margin: 0;
 }
 
@@ -59,11 +61,11 @@
 /* ─── Sidebar sections (collapsible, mirroring Streamlit popovers) ───────── */
 
 .sidebar-section {
-    border-bottom: 1px solid #3d3d55;
+    border-bottom: 1px solid light-dark(#aaaabc, #3d3d55);
 }
 
 .sidebar-section > summary {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-family: "Source Sans 3";
     font-size: 0.85rem;
     font-weight: 500;
@@ -79,7 +81,7 @@
     content: '▶';
     font-size: 0.55rem;
     transition: transform 0.15s;
-    color: #666688;
+    color: light-dark(#999999, #666688);
 }
 
 .sidebar-section[open] > summary::before {
@@ -115,22 +117,22 @@
 /* ─── Sidebar input widgets ──────────────────────────────────────────────── */
 
 .sidebar-label {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-family: "Source Sans 3";
     font-size: 0.78rem;
     margin-top: 6px;
 }
 
 .sidebar-static {
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     font-family: "Source Sans 3";
     font-size: 0.8rem;
 }
 
 .sidebar-input {
-    background-color: #181923;
-    color: lightgrey;
-    border: 1px solid #3d3d55;
+    background-color: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#333333, lightgrey);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
     padding: 4px 8px;
     font-family: "Source Sans 3";
@@ -140,7 +142,7 @@
 }
 
 .sidebar-input:focus {
-    outline: 1px solid #666688;
+    outline: 1px solid light-dark(#999999, #666688);
 }
 
 .sidebar-input[type=number]::-webkit-inner-spin-button,
@@ -154,7 +156,7 @@
 }
 
 .sidebar-caption {
-    color: #666688;
+    color: light-dark(#999999, #666688);
     font-family: "Source Sans 3";
     font-size: 0.73rem;
 }
@@ -174,7 +176,7 @@
     cursor: pointer;
     font-family: "Source Sans 3";
     font-size: 0.8rem;
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     margin-top: 4px;
     user-select: none;
 }
@@ -187,7 +189,7 @@
     position: relative;
     width: 34px;
     height: 18px;
-    background-color: #3d3d55;
+    background-color: light-dark(#c4c4d4, #3d3d55);
     border-radius: 9px;
     flex-shrink: 0;
     transition: background-color 0.2s;
@@ -200,18 +202,18 @@
     left: 3px;
     width: 12px;
     height: 12px;
-    background-color: #666688;
+    background-color: light-dark(#f0f0f4, #666688);
     border-radius: 50%;
     transition: transform 0.2s, background-color 0.2s;
 }
 
 .sidebar-toggle-input:checked ~ .sidebar-toggle-track {
-    background-color: #4a4a8a;
+    background-color: light-dark(#8888bb, #4a4a8a);
 }
 
 .sidebar-toggle-input:checked ~ .sidebar-toggle-track::after {
     transform: translateX(16px);
-    background-color: #aaaaff;
+    background-color: light-dark(#ffffff, #aaaaff);
 }
 
 /* ─── Multiselect (chip-style, mirrors st.multiselect) ──────────────────── */
@@ -227,8 +229,8 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 4px 6px;
-    background-color: #181923;
-    border: 1px solid #3d3d55;
+    background-color: light-dark(rgb(234, 236, 242), #181923);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
     min-height: 30px;
     cursor: text;
@@ -236,15 +238,15 @@
 }
 
 .ms-input-area:focus-within {
-    outline: 1px solid #666688;
+    outline: 1px solid light-dark(#999999, #666688);
 }
 
 .ms-chip {
     display: flex;
     align-items: center;
     gap: 3px;
-    background-color: #3a3a52;
-    color: lightgrey;
+    background-color: light-dark(#dddde8, #3a3a52);
+    color: light-dark(#333333, lightgrey);
     border-radius: 3px;
     padding: 1px 4px 1px 7px;
     font-size: 0.75rem;
@@ -254,7 +256,7 @@
 .ms-chip-remove {
     background: none;
     border: none;
-    color: #aaaaaa;
+    color: light-dark(#555555, #aaaaaa);
     cursor: pointer;
     padding: 0 1px;
     font-size: 0.85rem;
@@ -262,13 +264,13 @@
 }
 
 .ms-chip-remove:hover {
-    color: white;
+    color: light-dark(black, white);
 }
 
 .ms-input {
     background: none;
     border: none;
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     font-family: "Source Sans 3";
     font-size: 0.8rem;
     outline: none;
@@ -278,7 +280,7 @@
 }
 
 .ms-input::placeholder {
-    color: #555577;
+    color: light-dark(#999999, #555577);
 }
 
 .ms-dropdown {
@@ -286,8 +288,8 @@
     top: 100%;
     left: 0;
     right: 0;
-    background-color: #1a1c28;
-    border: 1px solid #3d3d55;
+    background-color: light-dark(rgb(232, 234, 240), #1a1c28);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
     margin-top: 2px;
     z-index: 100;
@@ -297,19 +299,19 @@
 
 .ms-option {
     padding: 5px 10px;
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     cursor: pointer;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
 }
 
 .ms-option:hover {
-    background-color: #3d3d55;
+    background-color: light-dark(#e0e0ee, #3d3d55);
 }
 
 .ms-empty {
     padding: 5px 10px;
-    color: #555577;
+    color: light-dark(#999999, #555577);
     font-size: 0.78rem;
     font-style: italic;
 }
@@ -328,9 +330,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 4px 8px;
-    background-color: #181923;
-    color: lightgrey;
-    border: 1px solid #3d3d55;
+    background-color: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#333333, lightgrey);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
     cursor: pointer;
     user-select: none;
@@ -342,7 +344,7 @@
 
 .cs-trigger:focus,
 .cs-open .cs-trigger {
-    outline: 1px solid #666688;
+    outline: 1px solid light-dark(#999999, #666688);
 }
 
 .cs-search-input {
@@ -350,7 +352,7 @@
     background: transparent;
     border: none;
     outline: none;
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     font-family: "Source Sans 3";
     font-size: 0.8rem;
     padding: 0;
@@ -390,8 +392,8 @@
     top: calc(100% + 2px);
     left: 0;
     right: 0;
-    background-color: #1a1c28;
-    border: 1px solid #3d3d55;
+    background-color: light-dark(rgb(232, 234, 240), #1a1c28);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
     z-index: 200;
     max-height: 200px;
@@ -400,18 +402,18 @@
 
 .cs-option {
     padding: 5px 10px;
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     cursor: pointer;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
 }
 
 .cs-option:hover {
-    background-color: #3d3d55;
+    background-color: light-dark(#e0e0ee, #3d3d55);
 }
 
 .cs-option-selected {
-    background-color: #2a2a3e;
+    background-color: light-dark(#dddde8, #2a2a3e);
     font-weight: 600;
 }
 
@@ -424,7 +426,7 @@
 }
 
 .sidebar-slider-row label {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-size: 0.78rem;
     font-family: "Source Sans 3";
     width: 52px;
@@ -433,11 +435,11 @@
 
 .sidebar-slider-row input[type="range"] {
     flex: 1;
-    accent-color: #666688;
+    accent-color: light-dark(#999999, #666688);
 }
 
 .sidebar-slider-row .slider-value {
-    color: lightgrey;
+    color: light-dark(#333333, lightgrey);
     font-size: 0.78rem;
     font-family: "Source Sans 3";
     width: 30px;
@@ -447,7 +449,7 @@
 
 .sidebar-file-input {
     font-size: 0.75rem;
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-family: "Source Sans 3";
     margin-top: 2px;
     width: 100%;
@@ -474,7 +476,7 @@
 }
 
 .param-label-row label {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-family: "Source Sans 3";
     font-size: 0.78rem;
     flex: 1;
@@ -483,7 +485,7 @@
 .info-btn {
     background: none;
     border: none;
-    color: #666688;
+    color: light-dark(#999999, #666688);
     font-size: 0.7rem;
     cursor: pointer;
     padding: 0 2px;
@@ -492,20 +494,20 @@
 }
 
 .info-btn:hover {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
 }
 
 .js-tooltip {
     position: fixed;
     display: none;
-    background-color: #1e1e2e;
-    color: lightgrey;
+    background-color: light-dark(rgb(230, 232, 239), #1e1e2e);
+    color: light-dark(#333333, lightgrey);
     font-size: 0.72rem;
     font-family: "Source Sans 3";
     font-weight: 400;
     padding: 5px 8px;
     border-radius: 4px;
-    border: 1px solid #3d3d55;
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     width: 220px;
     white-space: normal;
     text-align: left;
@@ -515,7 +517,7 @@
 }
 
 .param-caption {
-    color: #666688;
+    color: light-dark(#999999, #666688);
     font-family: "Source Sans 3";
     font-size: 0.72rem;
     grid-column: 1 / -1;
@@ -533,7 +535,7 @@
 }
 
 .trade-combo-table th {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-weight: 500;
     padding: 3px 4px;
     border: none;
@@ -552,9 +554,9 @@
 
 .trade-add-btn {
     background: none;
-    border: 1px solid #3d3d55;
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
-    color: #666688;
+    color: light-dark(#999999, #666688);
     font-family: "Source Sans 3";
     font-size: 0.75rem;
     padding: 3px 8px;
@@ -563,8 +565,8 @@
 }
 
 .trade-add-btn:hover {
-    color: darkgrey;
-    border-color: #666688;
+    color: light-dark(#555555, darkgrey);
+    border-color: light-dark(#999999, #666688);
 }
 
 /* ─── Slot count grid ────────────────────────────────────────────────────── */
@@ -583,7 +585,7 @@
 }
 
 .slot-row label {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-size: 0.8rem;
     font-family: "Source Sans 3";
     width: 34px;
@@ -597,8 +599,8 @@
 /* ─── Main content ───────────────────────────────────────────────────────── */
 
 .playerpopup {
-    background-color: #181923;
-    color: #666688;
+    background-color: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#999999, #666688);
     border: none;
     cursor: pointer;
     font-size: 0.6rem;
@@ -613,8 +615,8 @@
 }
 
 body {
-    background-color : rgb(14, 17, 23);
-    color : lightgrey
+    background-color: light-dark(rgb(240, 242, 246), rgb(14, 17, 23));
+    color: light-dark(#333333, lightgrey);
 }
 
 
@@ -622,20 +624,20 @@ body {
 
 th {
     padding: 4px 5px;
-    border: 1px solid #3d3d55;
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
 
 }
 
 tr {
-    border: 1px solid #3d3d55;
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
 
 }
 
 #realtable {
     border-radius: 12px;
-    background-color: #3d3d55;
+    background-color: light-dark(#aaaabc, #3d3d55);
     border-collapse: collapse;
-    border: 2px solid #3d3d55;
+    border: 2px solid light-dark(#aaaabc, #3d3d55);
     overflow: hidden; /* This clips the sharp cell corners */
     font-family: "Source Sans 3";
     font-weight: 400;
@@ -647,8 +649,8 @@ tr {
 }
 
 .tableheader {
-    background-color:#181923;
-    color:darkgrey;
+    background-color: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#555555, darkgrey);
     font-weight:500;
     font-size: 0.75rem;
     text-align:left;
@@ -677,13 +679,13 @@ tr {
 }
 
 .playerheader {
-    background-color:rgb(14,17,23);
-    color:darkgrey;
+    background-color: light-dark(rgb(240, 242, 246), rgb(14,17,23));
+    color: light-dark(#555555, darkgrey);
     font-weight:400;
     text-align: left;
     width: 224px;
-    border-top : 2px solid #3d3d55;
-    border-bottom : 2px solid #3d3d55;
+    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
 
 }
 
@@ -696,23 +698,24 @@ tr {
 }
 
 .celltypea {
-    background-color:#2a2a33;
-    color:white;
+    background-color: light-dark(#d8d8e8, #3a3a4a);
+    color: light-dark(black, white);
+
 }
 
 .celltypeb {
-    background-color:#38384A;
-    color:white;
+    background-color: light-dark(#c1c1d2, #48485a);
+    color: light-dark(black, white);
 }
 
 .overallhscore {
-    background-color:#2a2a33;
-    color:white;
+    background-color: light-dark(#c1c1d2, #3a3a4a);
+    color: light-dark(black, white);
     font-weight:400;
     text-align:right;
     padding:5px;
-    border-top : 2px solid #3d3d55;
-    border-bottom : 2px solid #3d3d55;
+    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
 }
 
 .overallhscore:after{
@@ -723,8 +726,8 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top : 2px solid #3d3d55;
-    border-bottom : 2px solid #3d3d55;
+    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
 }
 .categoricalhscore:after{
     content : '%';
@@ -734,52 +737,52 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top : 2px solid #3d3d55;
-    border-bottom : 2px solid #3d3d55;
+    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
 }
 
 .rosterabsent {
-    background-color:#8D8D9E;
-    color:#8D8D9E;
+    background-color: light-dark(#F6F6F6, #8D8D9E);
+    color: light-dark(#F6F6F6, #8D8D9E);
     text-align:center;
 }
 
 .rostercandidate {
-    background-color:rgb(54,90,148);
-    color:white;
+    background-color: light-dark(rgb(175,175,255), rgb(54,90,148));
+    color: light-dark(black, white);
     text-align:center;
 }
 
 .rosteronteam {
-    background-color:rgb(36,48,70);
-    color:white;
+    background-color: light-dark(rgb(220,220,255), rgb(36,48,70));
+    color: light-dark(black, white);
     text-align:center;
 }
 
 .ineligible {
-        background-color:#555566;
-        color:#555566;
+    background-color: light-dark(lightgrey, #555566);
+    color: light-dark(lightgrey, #555566);
 }
 
 .auction-dollar {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top : 2px solid #3d3d55;
-    border-bottom : 2px solid #3d3d55;
+    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
 }
 
 /* ─── Detail panel ───────────────────────────────────────────────────────── */
 
 .panel-cell {
-    background-color: rgb(16, 18, 26);
+    background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26));
     padding: 12px 0;
     border-top: none;
-    border-bottom: 1px solid #555566;
+    border-bottom: 1px solid light-dark(#aaaabc, #555566);
 }
 
 .panel-label {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-size: 0.8rem;
     font-family: "Source Sans 3";
     margin-bottom: 4px;
@@ -801,39 +804,45 @@ tr {
 }
 
 .panel-colspacer {
-    background-color: rgb(16, 18, 26); /* matches .panel-cell — invisible */
+    background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26)); /* matches .panel-cell — invisible */
     border: none;
     padding: 0;
 }
 
+.panel-colspacer-name     { width: 200px; }
+.panel-colspacer-name-sm  { width: 136px; }
+.panel-colspacer-total    { width: 83px; }
+
+.panel-colheader-blank { visibility: hidden; border-top-style: hidden; border-left-style: hidden; }
+
 .panel-colheader {
-    background-color: #181923;
-    color: darkgrey;
+    background-color: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#555555, darkgrey);
     font-weight: 500;
     font-size: 0.75rem;
     text-align: center;
-    border: 1px solid #3d3d55;
+    border: 0.5px solid light-dark(lightgrey, #555566);
 }
 
 .panel-rowlabel {
-    background-color: rgb(14, 17, 23);
-    color: darkgrey;
+    background-color: light-dark(rgb(240, 242, 246), rgb(14, 17, 23));
+    color: light-dark(#555555, darkgrey);
     font-weight: 400;
     padding: 3px 10px;
     text-align: left;
-    border: none;
+    border: 0.5px solid light-dark(lightgrey, #555566);
     white-space: nowrap;
 }
 
 .panel-rowlabel-total {
-    color: darkgrey;
+    color: light-dark(#555555, darkgrey);
     font-weight: 500;
 }
 
 .panel-datacell {
     padding: 3px 8px;
     text-align: right;
-    border: 0.5px solid #555566;
+    border: 0.5px solid light-dark(lightgrey, #555566);
     font-weight: 500;
     white-space: nowrap;
 }
@@ -865,7 +874,7 @@ tr {
 #right-header:not(:empty) {
     padding-bottom: 16px;
     margin-bottom: 16px;
-    border-bottom: 1px solid #3d3d55;
+    border-bottom: 1px solid light-dark(#aaaabc, #3d3d55);
 }
 
 #right-sub-header:not(:empty) {
@@ -894,7 +903,7 @@ tr {
     display: flex;
     gap: 0;
     margin-bottom: 16px;
-    border-bottom: 1px solid #3d3d55;
+    border-bottom: 1px solid light-dark(#aaaabc, #3d3d55);
 }
 
 .season-tab-btn {
@@ -902,7 +911,7 @@ tr {
     border: none;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
-    color: #666688;
+    color: light-dark(#999999, #666688);
     padding: 6px 16px;
     cursor: pointer;
     font-size: 0.9rem;
@@ -910,8 +919,8 @@ tr {
 }
 
 .season-tab-btn.active {
-    color: white;
-    border-bottom-color: #666688;
+    color: light-dark(black, white);
+    border-bottom-color: light-dark(#999999, #666688);
 }
 
 /* ─── Data entry tables ──────────────────────────────────────────────────────── */
@@ -924,30 +933,30 @@ tr {
 }
 
 .entry-table th {
-    background: #181923;
-    color: #aaaaaa;
+    background: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#555555, #aaaaaa);
     padding: 5px 8px;
     text-align: center;
     font-weight: 500;
-    border: 1px solid #3d3d55;
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     white-space: nowrap;
 }
 
 .entry-table td {
-    background: #1a1c28;
-    border: 1px solid #3d3d55;
+    background: light-dark(rgb(232, 234, 240), #1a1c28);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     padding: 2px 4px;
     text-align: center;
-    color: #aaaaaa;
+    color: light-dark(#555555, #aaaaaa);
 }
 
 .entry-table td.current-pick {
-    outline: 2px solid #666688;
+    outline: 2px solid light-dark(#999999, #666688);
     outline-offset: -2px;
 }
 
 .entry-table td.drafted {
-    color: white;
+    color: light-dark(black, white);
     font-size: 0.75rem;
     white-space: nowrap;
     overflow: hidden;
@@ -955,8 +964,8 @@ tr {
 }
 
 .entry-cell-label {
-    background: #181923 !important;
-    color: #aaaaaa !important;
+    background: light-dark(rgb(234, 236, 242), #181923) !important;
+    color: light-dark(#555555, #aaaaaa) !important;
     font-weight: 500;
     width: 48px;
 }
@@ -970,7 +979,7 @@ tr {
 /* ─── Pick control ───────────────────────────────────────────────────────────── */
 
 .pick-control-label {
-    color: #aaaaaa;
+    color: light-dark(#555555, #aaaaaa);
     font-size: 0.85rem;
     margin-bottom: 4px;
 }
@@ -992,16 +1001,16 @@ tr {
 .pick-btn {
     padding: 5px 10px;
     white-space: nowrap;
-    background: #2a2a33;
-    border: 1px solid #3d3d55;
-    color: white;
+    background: light-dark(#e0e0ee, #2a2a33);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    color: light-dark(black, white);
     cursor: pointer;
     font-size: 0.75rem;
     border-radius: 4px;
     font-family: "Source Sans 3";
 }
 
-.pick-btn:hover { background: #3d3d55; }
+.pick-btn:hover { background: light-dark(#aaaabc, #3d3d55); }
 
 /* ─── Auction board ──────────────────────────────────────────────────────────── */
 
@@ -1013,7 +1022,7 @@ tr {
 
 .pick-col-label {
     font-size: 0.75rem;
-    color: #aaaaaa;
+    color: light-dark(#555555, #aaaaaa);
 }
 
 .auction-cost-input {
@@ -1021,10 +1030,10 @@ tr {
     padding: 4px 6px;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
-    background: #1e1e2e;
-    border: 1px solid #3d3d55;
+    background: light-dark(rgb(230, 232, 239), #1e1e2e);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
     border-radius: 4px;
-    color: white;
+    color: light-dark(black, white);
     flex-shrink: 0;
 }
 
@@ -1033,12 +1042,12 @@ tr {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: white;
+    color: light-dark(black, white);
 }
 
 .auction-cell-cost {
     font-size: 0.7rem;
-    color: #8888aa;
+    color: light-dark(#777777, #8888aa);
     margin-top: 1px;
 }
 
@@ -1047,29 +1056,29 @@ tr {
 }
 
 .auction-budget-cell {
-    background: #181923;
-    color: #aaaaaa;
+    background: light-dark(rgb(234, 236, 242), #181923);
+    color: light-dark(#555555, #aaaaaa);
     font-size: 0.78rem;
     font-weight: 500;
     text-align: center;
     padding: 4px 6px;
-    border-top: 1px solid #3d3d55;
+    border-top: 1px solid light-dark(#aaaabc, #3d3d55);
 }
 
 /* ─── Live bar ───────────────────────────────────────────────────────────────── */
 
 .refresh-btn {
     padding: 6px 14px;
-    background: #2a2a33;
-    border: 1px solid #3d3d55;
-    color: white;
+    background: light-dark(#e0e0ee, #2a2a33);
+    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    color: light-dark(black, white);
     cursor: pointer;
     border-radius: 4px;
     font-size: 0.85rem;
     font-family: "Source Sans 3";
 }
 
-.refresh-btn:hover { background: #3d3d55; }
+.refresh-btn:hover { background: light-dark(#aaaabc, #3d3d55); }
 
 /* ─── Seat selector ──────────────────────────────────────────────────────────── */
 
@@ -1096,7 +1105,7 @@ tr {
 /* ─── Team display stub ──────────────────────────────────────────────────────── */
 
 .team-display-stub {
-    color: #555577;
+    color: light-dark(#999999, #555577);
     font-size: 0.8rem;
     margin-top: 12px;
     font-style: italic;
@@ -1105,7 +1114,7 @@ tr {
 /* ─── Coming soon ────────────────────────────────────────────────────────────── */
 
 .coming-soon {
-    color: #555577;
+    color: light-dark(#999999, #555577);
     font-style: italic;
     padding: 24px 0;
 }
@@ -1124,7 +1133,7 @@ tr {
 
 .trade-divider {
     border: none;
-    border-top: 1px solid #333355;
+    border-top: 1px solid light-dark(#aaaabc, #333355);
     margin: 16px 0;
 }
 
@@ -1143,7 +1152,7 @@ tr {
 .trade-tab-nav {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid #333355;
+    border-bottom: 1px solid light-dark(#aaaabc, #333355);
     margin-bottom: 10px;
 }
 
@@ -1151,14 +1160,14 @@ tr {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
-    color: #778;
+    color: light-dark(#999999, #778);
     padding: 6px 16px;
     cursor: pointer;
     font-size: 0.8rem;
 }
 .trade-tab-btn.active {
-    color: #dde;
-    border-bottom-color: #5577cc;
+    color: light-dark(#333333, #dde);
+    border-bottom-color: light-dark(#6666bb, #5577cc);
 }
 
 .trade-tab-pane { min-height: 60px; }
@@ -1173,17 +1182,17 @@ tr {
 .trade-result-table td {
     padding: 3px 6px;
     text-align: right;
-    border-bottom: 1px solid #222244;
+    border-bottom: 1px solid light-dark(#aaaabc, #222244);
 }
-.trade-result-table th { color: #889; font-weight: 500; }
-.trade-row-label { text-align: left !important; color: #aab; font-weight: 500; }
-.trade-row-subtotal td { border-top: 1px solid #444466; font-weight: 600; color: #bbc; }
-.trade-row-diff td     { border-top: 2px solid #555577; font-weight: 700; color: #dde; }
+.trade-result-table th { color: light-dark(#999999, #889); font-weight: 500; }
+.trade-row-label { text-align: left !important; color: light-dark(#555555, #aab); font-weight: 500; }
+.trade-row-subtotal td { border-top: 1px solid light-dark(#aaaabc, #444466); font-weight: 600; color: light-dark(#333333, #bbc); }
+.trade-row-diff td     { border-top: 2px solid light-dark(#999999, #555577); font-weight: 700; color: light-dark(#222222, #dde); }
 
 /* Stubs */
 .trade-hscore-stub,
 .trade-suggestion-stub {
-    color: #555577;
+    color: light-dark(#999999, #555577);
     font-style: italic;
     font-size: 0.8rem;
     padding: 12px 0;
@@ -1192,7 +1201,7 @@ tr {
 .trade-suggest-header {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #bbc;
+    color: light-dark(#333333, #bbc);
     margin-bottom: 8px;
 }
 

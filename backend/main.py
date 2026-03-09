@@ -409,6 +409,7 @@ def trade_analyze_route(session_id: str, req: TradeAnalyzeRequest):
             their_team=req.their_team,
             my_trade=req.my_trade,
             their_trade=req.their_trade,
+            ignore_position_check=req.ignore_position_check,
         )
     except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
@@ -431,6 +432,7 @@ def trade_suggest_route(session_id: str, req: TradeSuggestRequest):
             combo_params=req.combo_params,
             your_threshold=req.your_differential_threshold,
             their_threshold=req.their_differential_threshold,
+            ignore_position_check=req.ignore_position_check,
         )
     except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())

@@ -3,7 +3,7 @@
 // initializes the layout, and triggers the first backend evaluation.
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
-import { createSection, addApplyBtn } from './helper_functions.js'
+import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
 import { getCandidatePlayers, setSportConfig } from './app_state.js'
 import { createOrPatchSession, runEvaluate } from './api/session.js'
 import { fetchConfig } from './api/client.js'
@@ -11,6 +11,8 @@ import { buildTable } from './table/player_table.js'
 import { initLayout, reapplyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
+import { pref, savePref } from './preferences.js'
+import { setTheme } from './styles/styler_functions.js'
 
 import { renderLeagueSettings, getLeagueSettings } from './parameter_collection/league_settings.js'
 import { renderFormatAndCategories, getFormatAndCategories } from './parameter_collection/format_and_categories.js'
@@ -77,6 +79,20 @@ const tradeSection = createSection(sidebarSections, 'Trade Parameters')
 renderTradeParameters(tradeSection)
 // Trade parameters target a future endpoint; no backend call yet.
 addApplyBtn(tradeSection, () => {})
+
+// ── Display section (theme toggle) ───────────────────────────────────────────
+const displaySection = createSection(sidebarSections, 'Display')
+const themeToggle = makeSidebarToggle('theme-toggle', 'Light mode', 'Dark mode')
+displaySection.append(themeToggle)
+const themeInput = document.getElementById('theme-toggle') as HTMLInputElement
+const savedLight = pref('light_mode', false)
+themeInput.checked = savedLight
+setTheme(savedLight ? 'light' : 'dark')
+themeInput.addEventListener('change', () => {
+    const isLight = themeInput.checked
+    savePref('light_mode', isLight)
+    setTheme(isLight ? 'light' : 'dark')
+})
 
 // All sections are fully built; reveal the sidebar in one repaint
 sidebar.style.visibility = ''

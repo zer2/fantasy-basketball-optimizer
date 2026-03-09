@@ -208,6 +208,7 @@ function activateSeasonTab(tabId: string): void {
 
         const rightHeader = document.getElementById('right-header')!
         rightHeader.innerHTML = ''
+        rightHeader.style.maxWidth = (document.getElementById('realtable') as HTMLTableElement).style.width
         document.getElementById('right-footer')!.innerHTML = ''
         renderWaiverControls(rightHeader)
 

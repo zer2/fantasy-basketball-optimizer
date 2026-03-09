@@ -159,6 +159,7 @@ export async function runTradeAnalyze(
     theirTeam: string,
     myTrade: string[],
     theirTrade: string[],
+    ignorePositionCheck?: boolean,
 ): Promise<api.TradeAnalyzeResponse> {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -169,6 +170,7 @@ export async function runTradeAnalyze(
                 their_team: theirTeam,
                 my_trade: myTrade,
                 their_trade: theirTrade,
+                ignore_position_check: ignorePositionCheck,
             })
         } catch (err: any) {
             if (attempt === 0 && err.message?.includes('(404)')) {
@@ -192,6 +194,7 @@ export async function runTradeSuggest(
     comboParams: { n_traded: number; n_received: number; threshold: number }[],
     yourThreshold: number,
     theirThreshold: number,
+    ignorePositionCheck?: boolean,
 ): Promise<api.TradeSuggestResponse> {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -203,6 +206,7 @@ export async function runTradeSuggest(
                 combo_params: comboParams,
                 your_differential_threshold: yourThreshold,
                 their_differential_threshold: theirThreshold,
+                ignore_position_check: ignorePositionCheck,
             })
         } catch (err: any) {
             if (attempt === 0 && err.message?.includes('(404)')) {

@@ -152,7 +152,8 @@ function buildHScoreResult(
     loading.textContent = 'Analyzing trade...'
     pane.append(loading)
 
-    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received)
+    const { ignore_position_check } = getTradeParameters()
+    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, ignore_position_check)
         .then(resp => renderHScoreResult(pane, resp))
         .catch(err => {
             pane.innerHTML = ''
@@ -272,7 +273,7 @@ function runSuggestionSearch(
     receiveSel: MultiSelectWidget,
 ): void {
     resultsArea.innerHTML = ''
-    const { combo_params, your_differential_threshold, their_differential_threshold } = getTradeParameters()
+    const { combo_params, your_differential_threshold, their_differential_threshold, ignore_position_check } = getTradeParameters()
 
     const selected = comboSel.getSelected()
     if (selected.length === 0) {
@@ -296,6 +297,7 @@ function runSuggestionSearch(
     runTradeSuggest(
         assignments, yourTeam, theirTeam,
         filteredCombos, your_differential_threshold, their_differential_threshold,
+        ignore_position_check,
     )
         .then(resp => {
             loading.remove()

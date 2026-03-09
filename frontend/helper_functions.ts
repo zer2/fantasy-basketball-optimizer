@@ -78,7 +78,7 @@ export function makeNumberInput(id: string, defaultValue: number, min?: number):
  *
  * @returns The outer `<label>` element — append it directly to the container.
  */
-export function makeSidebarToggle(id: string, labelText: string): HTMLLabelElement {
+export function makeSidebarToggle(id: string, rightText: string, leftText?: string): HTMLLabelElement {
     const row = document.createElement('label')
     row.className = 'sidebar-toggle-row'
 
@@ -87,13 +87,19 @@ export function makeSidebarToggle(id: string, labelText: string): HTMLLabelEleme
     input.className = 'sidebar-toggle-input'
     input.id = id
 
+    if (leftText) {
+        const leftSpan = document.createElement('span')
+        leftSpan.textContent = leftText
+        row.append(leftSpan)
+    }
+
     const track = document.createElement('span')
     track.className = 'sidebar-toggle-track'
 
-    const textSpan = document.createElement('span')
-    textSpan.textContent = labelText
+    const rightSpan = document.createElement('span')
+    rightSpan.textContent = rightText
 
-    row.append(input, track, textSpan)
+    row.append(input, track, rightSpan)
     return row
 }
 

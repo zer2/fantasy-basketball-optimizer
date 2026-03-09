@@ -143,8 +143,9 @@ export function makeCustomSelect(
 
     // ── Event wiring ───────────────────────────────────────────────────────
 
-    // Clicking the arrow toggles; clicking the input opens if closed.
-    arrow.addEventListener('mousedown', e => {
+    // Clicking anywhere on the trigger toggles the dropdown.
+    trigger.addEventListener('mousedown', e => {
+        if (e.target === searchInput) return   // let the search input handle its own focus
         e.preventDefault()
         if (dropdown.hidden) { searchInput.focus(); open() } else { close(); searchInput.blur() }
     })

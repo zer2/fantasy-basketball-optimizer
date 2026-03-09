@@ -165,6 +165,7 @@ class TradeAnalyzeRequest(BaseModel):
     their_team: str
     my_trade: list[str]
     their_trade: list[str]
+    ignore_position_check: bool = False
 
 
 class TeamHScore(BaseModel):
@@ -198,6 +199,7 @@ class TradeSuggestRequest(BaseModel):
     combo_params: list[ComboParam]
     your_differential_threshold: float = 0.0
     their_differential_threshold: float = -0.20
+    ignore_position_check: bool = False
 
 
 class TradeSuggestion(BaseModel):

@@ -112,10 +112,9 @@ function makePanelLabel(text: string, paddingLeft?: string): HTMLDivElement {
 }
 
 /** Creates an invisible `<th>` spacer used to lock column widths in panel tables. */
-function makeSpacerTh(width?: string): HTMLTableCellElement {
+function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
     let th = document.createElement('th');
-    th.className = 'panel-colspacer';
-    if (width) th.style.width = width;
+    th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer';
     return th;
 }
 
@@ -137,13 +136,13 @@ function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivEleme
     let thead = table.createTHead();
     let spacerRow = thead.insertRow(-1);
     spacerRow.style.border = 'none';
-    spacerRow.appendChild(makeSpacerTh('136px'));
-    spacerRow.appendChild(makeSpacerTh('83px'));
+    spacerRow.appendChild(makeSpacerTh('panel-colspacer-name-sm'));
+    spacerRow.appendChild(makeSpacerTh('panel-colspacer-total'));
     for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh());
 
     // Row 2: visible column headers.
     let headerRow = thead.insertRow(-1);
-    headerRow.appendChild(makeSpacerTh()); // invisible label cell
+    headerRow.appendChild(makeSpacerTh('panel-colheader-blank')); // hidden label cell
     let totalTh = document.createElement('th');
     totalTh.className = 'panel-colheader';
     totalTh.textContent = 'Total';
@@ -242,7 +241,7 @@ function makeFlexAllocationsTable(flexData: FlexAllocations, noMargin = false): 
 
     let headerRow = table.createTHead().insertRow(-1);
     let emptyTh = document.createElement('th');
-    emptyTh.className = 'panel-colspacer';
+    emptyTh.className = 'panel-colspacer panel-colheader-blank';
     emptyTh.style.width = '110px';
     headerRow.appendChild(emptyTh);
     for (let pos of flexData.base_positions) {
@@ -369,7 +368,7 @@ function makeRosterGrid(roster: Roster): HTMLDivElement {
 
     let headerRow = table.createTHead().insertRow(-1);
     let emptyTh = document.createElement('th');
-    emptyTh.className = 'panel-colspacer';
+    emptyTh.className = 'panel-colspacer panel-colheader-blank';
     emptyTh.style.width = '90px';
     headerRow.appendChild(emptyTh);
     for (let type of posTypes) {

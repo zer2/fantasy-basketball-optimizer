@@ -1,92 +1,109 @@
-/**
-* Determines a CSS style for a cell based on the difference between value and middle.
-* Color scheme: muted teal for positive, muted magenta-purple for negative.
-* Dark blue-grey baseline, intensity capped to stay cohesive with the sidebar palette.
-* Used for category-level win rates and G-score category cells.
-*
-* @param {number} value - The value of the cell
-* @param {number} multiplier - Scales the intensity of color relative to (value - middle)
-* @param {number} middle - The neutral value that maps to the default dark color
-* @returns {string} A CSS style string
-*/
-export function stat_styler_primary(value: number, multiplier: number, middle: number): string {
-    if (value == -999) {
-        return 'background-color:#8D8D9E;color:#8D8D9E;';
-    }
-    let raw_intensity = (value - middle) * multiplier;
-    let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 110);
+// styles/styler_functions.ts
+// Dual-mode stat-cell stylers.  Every public function emits a CSS string
+// containing light-dark() pairs for both themes, so toggling color-scheme
+// on :root instantly updates every cell with zero DOM rebuilds.
 
-    let r = raw_intensity > 0 ? 55 : 55 + intensity;
-    let g = raw_intensity > 0 ? 55 + intensity : 55;
-    let b = 70 + Math.round(intensity * 0.7);
+type RGB = [number, number, number]
 
-    return final_formatter(r, g, b);
+// ─── Dark styler (original) ──────────────────────────────────────────────────
+
+function darkPrimary(value: number, multiplier: number, middle: number): RGB {
+    const raw = (value - middle) * multiplier
+    const intensity = Math.min(Math.round(Math.abs(raw)), 110)
+    return [
+        raw > 0 ? 55 : 55 + intensity,
+        raw > 0 ? 55 + intensity : 55,
+        70 + Math.round(intensity * 0.7),
+    ]
 }
 
-/**
-* Color scheme: muted gold for positive, muted amber-orange for negative.
-* Used for overall totals and differences.
-*
-* @param {number} value - The value of the cell
-* @param {number} multiplier - Scales the intensity of color relative to (value - middle)
-* @param {number} middle - The neutral value
-* @returns {string} A CSS style string
-*/
-export function stat_styler_secondary(value: number, multiplier: number, middle: number): string {
-    if (value == -999) {
-        return 'background-color:#8D8D9E;color:#8D8D9E;';
-    }
-    let raw_intensity = (value - middle) * multiplier;
-    let intensity = Math.min(Math.round(Math.abs(raw_intensity)), 150);
-
-    let r, g, b;
-    if (raw_intensity > 0) {
-        r = 80 + Math.round(intensity * 0.53);
-        g = 80 + Math.round(intensity * 0.5);
-        b = 80;
+function darkSecondary(value: number, multiplier: number, middle: number): RGB {
+    const raw = (value - middle) * multiplier
+    const intensity = Math.min(Math.round(Math.abs(raw)), 150)
+    if (raw > 0) {
+        return [80 + Math.round(intensity * 0.53), 80 + Math.round(intensity * 0.5), 80]
     } else {
-        r = 80 + Math.round(intensity * 0.67);
-        g = 80 + Math.round(intensity * 0.2);
-        b = 80;
+        return [80 + Math.round(intensity * 0.67), 80 + Math.round(intensity * 0.2), 80]
     }
-    return final_formatter(r, g, b);
 }
 
-/**
-* Color scheme: muted steel-blue shades.
-* Used for algorithm decisions like category weights.
-*
-* @param {number} value - The value of the cell
-* @param {number} multiplier - Scales the intensity of color relative to (value - middle)
-* @param {number} middle - The neutral value. Values below middle have minimal color effect.
-* @returns {string} A CSS style string
-*/
+function darkTertiary(value: number, multiplier: number, middle: number): RGB {
+    const raw = Math.round((value - middle) * multiplier)
+    const intensity = Math.min(Math.abs(raw), 130)
+    return [
+        raw > 0 ? 28 + Math.round(intensity / 6) : 28 - Math.round(intensity / 60),
+        raw > 0 ? 34 + Math.round(intensity / 2) : 34 - Math.round(intensity / 20),
+        raw > 0 ? 46 + Math.round(intensity * 0.7) : 46 - Math.round(intensity / 10),
+    ]
+}
+
+// ─── Light styler ────────────────────────────────────────────────────────────
+// SAT controls how vivid the colors get (0 = greyscale, 1 = full saturation)
+const SAT = 0.7
+
+function lightPrimary(value: number, multiplier: number, middle: number): RGB {
+    const raw = (value - middle) * multiplier
+    const i = Math.round(Math.min(Math.round(Math.abs(raw)), 130) * SAT)
+    return [
+        raw > 0 ? 255 - i : 255,
+        raw > 0 ? 255 : 255 - i,
+        raw > 0 ? 255 - i : 255 - i,
+    ]
+}
+
+function lightSecondary(value: number, multiplier: number, middle: number): RGB {
+    const raw = (value - middle) * multiplier
+    const i = Math.round(Math.min(Math.round(Math.abs(raw)), 140) * SAT)
+    return [255, raw > 0 ? 255 : 255 - i, raw > 0 ? 255 - i : 255]
+}
+
+function lightTertiary(value: number, multiplier: number, middle: number): RGB {
+    const raw = (value - middle) * multiplier
+    const i = Math.round(Math.min(Math.round(Math.abs(raw)), 100) * SAT)
+    return [
+        raw > 0 ? 240 - i : 240 + Math.round(i / 10),
+        raw > 0 ? 240 - i : 240 + Math.round(i / 10),
+        240,
+    ]
+}
+
+// ─── Public exports (light-dark dual output) ─────────────────────────────────
+
+export function stat_styler_primary(value: number, multiplier: number, middle: number): string {
+    if (value == -999) return sentinel('#F6F6F6', '#8D8D9E')
+    return formatDual(lightPrimary(value, multiplier, middle), darkPrimary(value, multiplier, middle))
+}
+
+export function stat_styler_secondary(value: number, multiplier: number, middle: number): string {
+    if (value == -999) return sentinel('#F6F6F6', '#8D8D9E')
+    return formatDual(lightSecondary(value, multiplier, middle), darkSecondary(value, multiplier, middle))
+}
+
 export function stat_styler_tertiary(value: number, multiplier: number, middle: number): string {
-    if (value == -999) {
-        return 'background-color:#555566;color:#555566;';
-    }
-    let raw_intensity = Math.round((value - middle) * multiplier);
-    let intensity = Math.min(Math.abs(raw_intensity), 130);
-
-    let r = raw_intensity > 0 ? 28 + Math.round(intensity / 6) : 28 - Math.round(intensity / 60);
-    let g = raw_intensity > 0 ? 34 + Math.round(intensity / 2) : 34 - Math.round(intensity / 20);
-    let b = raw_intensity > 0 ? 46 + Math.round(intensity * 0.7) : 46 - Math.round(intensity / 10);
-
-    return final_formatter(r, g, b);
+    if (value == -999) return sentinel('#F6F6F6', '#555566')
+    return formatDual(lightTertiary(value, multiplier, middle), darkTertiary(value, multiplier, middle))
 }
 
-/**
-* Returns a CSS string for an RGB background, choosing black or white text for contrast.
-*
-* @param {number} r - Red channel (0–255)
-* @param {number} g - Green channel (0–255)
-* @param {number} b - Blue channel (0–255)
-* @returns {string} A CSS style string
-*/
-function final_formatter(r: number, g: number, b: number): string {
-    // Formula adapted from:
-    // https://stackoverflow.com/questions/3942878/how-to-decide-font-color-in-white-or-black-depending-on-background-color
-    let darkness_value = r * 0.299 + g * 0.587 + b * 0.114;
-    let tc = (darkness_value > 150) ? 'black' : 'white';
-    return `color:${tc};background-color:rgb(${r},${g},${b});`;
+// ─── Theme switching ─────────────────────────────────────────────────────────
+
+export function setTheme(theme: 'dark' | 'light'): void {
+    document.documentElement.style.colorScheme = theme
+}
+
+// ─── Formatting helpers ──────────────────────────────────────────────────────
+
+function textColor(r: number, g: number, b: number): string {
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 150 ? 'black' : 'white'
+}
+
+function rgb(c: RGB): string { return `rgb(${c[0]},${c[1]},${c[2]})` }
+
+function formatDual(light: RGB, dark: RGB): string {
+    const ltc = textColor(...light)
+    const dtc = textColor(...dark)
+    return `color:light-dark(${ltc},${dtc});background-color:light-dark(${rgb(light)},${rgb(dark)});`
+}
+
+function sentinel(light: string, dark: string): string {
+    return `background-color:light-dark(${light},${dark});color:light-dark(${light},${dark});`
 }

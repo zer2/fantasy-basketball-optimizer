@@ -221,8 +221,8 @@ function buildTeamGScoreTable(
     const tHead = tbl.createTHead()
     const spacerRow = tHead.insertRow(-1)
     spacerRow.style.border = 'none'
-    spacerRow.appendChild(makeSpacerTh('136px'))  // player name
-    spacerRow.appendChild(makeSpacerTh('83px'))   // total
+    spacerRow.appendChild(makeSpacerTh('panel-colspacer-name'))
+    spacerRow.appendChild(makeSpacerTh('panel-colspacer-total'))
     for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh())
 
     // Header row
@@ -288,9 +288,8 @@ function buildTeamGScoreTable(
 }
 
 /** Creates an invisible `<th>` spacer to lock column widths in panel tables. */
-function makeSpacerTh(width?: string): HTMLTableCellElement {
+function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
     const th = document.createElement('th')
-    th.className = 'panel-colspacer'
-    if (width) th.style.width = width
+    th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
     return th
 }

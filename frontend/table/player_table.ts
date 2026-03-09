@@ -98,7 +98,7 @@ export function buildTable(players: Player[]): void {
                 for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
                     const cell = row.insertCell(-1)
                     cell.textContent = String(val.toFixed(1))
-                    cell.className = 'auction-dollar celltypea'
+                    cell.className = 'auction-dollar celltypeb'
                 }
             } else {
                 // Auction values not yet available (e.g. stale results from draft mode).

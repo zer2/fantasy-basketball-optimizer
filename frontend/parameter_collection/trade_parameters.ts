@@ -3,7 +3,7 @@
 // Note: these parameters are not part of POST /sessions; they will be used
 // by a future trade evaluation endpoint.
 
-import { makeLabel, makeNumberInput } from '../helper_functions.js'
+import { makeLabel, makeNumberInput, makeSidebarToggle } from '../helper_functions.js'
 import { pref, savePref } from '../preferences.js'
 
 export interface TradeComboRow {
@@ -16,6 +16,7 @@ export interface TradeParameters {
     your_differential_threshold:  number
     their_differential_threshold: number
     combo_params:                 TradeComboRow[]
+    ignore_position_check:        boolean
 }
 
 const DEFAULT_COMBOS: TradeComboRow[] = [
@@ -109,6 +110,14 @@ export function renderTradeParameters(container: HTMLElement): void {
         saveCombos()
     })
     container.append(addBtn)
+
+    // Ignore position check toggle
+    const posToggle = makeSidebarToggle('tp-ignore-position', 'Ignore position requirement for trades')
+    const posInput = posToggle.querySelector('input') as HTMLInputElement
+    posInput.checked = pref('tp_ignore_position', false)
+    posInput.addEventListener('change', () => savePref('tp_ignore_position', posInput.checked))
+    container.append(posToggle)
+
 }
 
 /** Appends one editable (traded, received, threshold) row to the combo table body. */
@@ -163,5 +172,8 @@ export function getTradeParameters(): TradeParameters {
         }
     })
 
-    return { your_differential_threshold, their_differential_threshold, combo_params }
+    const ignore_position_check =
+        (document.getElementById('tp-ignore-position') as HTMLInputElement).checked
+
+    return { your_differential_threshold, their_differential_threshold, combo_params, ignore_position_check }
 }

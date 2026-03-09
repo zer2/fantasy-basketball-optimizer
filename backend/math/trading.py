@@ -31,6 +31,7 @@ def analyze_trade(
     team_2: str,
     team_2_trade: list[str],
     n_iterations: int,
+    ignore_position_check: bool = False,
 ) -> Optional[dict]:
     """Compute pre/post H-scores for both teams after a trade.
 
@@ -44,13 +45,14 @@ def analyze_trade(
     post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
 
     # Check position eligibility for both teams
-    team_1_positions = info['Positions'].loc[post_trade_team_1]
-    if not check_team_eligibility(team_1_positions):
-        return None
+    if not ignore_position_check:
+        team_1_positions = info['Positions'].loc[post_trade_team_1]
+        if not check_team_eligibility(team_1_positions):
+            return None
 
-    team_2_positions = info['Positions'].loc[post_trade_team_2]
-    if not check_team_eligibility(team_2_positions):
-        return None
+        team_2_positions = info['Positions'].loc[post_trade_team_2]
+        if not check_team_eligibility(team_2_positions):
+            return None
 
     post_trade_assignments = player_assignments.copy()
     post_trade_assignments[team_1] = post_trade_team_1
@@ -107,6 +109,7 @@ def run_trade_analyze(
     their_team: str,
     my_trade: list[str],
     their_trade: list[str],
+    ignore_position_check: bool = False,
 ) -> TradeAnalyzeResponse:
     """Public entry point for the trade/analyze endpoint."""
     if len(my_trade) == 0 or len(their_trade) == 0:
@@ -116,7 +119,7 @@ def run_trade_analyze(
         return TradeAnalyzeResponse(error="Too lopsided of a trade!")
 
     n_iterations = session.current_params.get('n_iterations', 30)
-    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations)
+    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, ignore_position_check)
 
     if result is None:
         return TradeAnalyzeResponse(
@@ -257,6 +260,7 @@ def _make_combo_df(
     my_team: str,
     their_team: str,
     player_assignments: dict[str, list[str]],
+    ignore_position_check: bool = False,
 ) -> pd.DataFrame:
     """Evaluate each trade combo and return a DataFrame sorted by Your Score."""
     H = session.H
@@ -270,6 +274,7 @@ def _make_combo_df(
             session, player_assignments,
             my_team, my_trade, their_team, their_trade,
             n_iterations=1,
+            ignore_position_check=ignore_position_check,
         )
 
         if result is not None:
@@ -319,6 +324,7 @@ def run_trade_suggest(
     combo_params: list[ComboParam],
     your_threshold: float,
     their_threshold: float,
+    ignore_position_check: bool = False,
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
     H = session.H
@@ -357,7 +363,7 @@ def run_trade_suggest(
     all_combos = pd.concat(all_combo_frames, ignore_index=True)
 
     # Step 4: evaluate each combo
-    df = _make_combo_df(session, all_combos, my_team, their_team, player_assignments)
+    df = _make_combo_df(session, all_combos, my_team, their_team, player_assignments, ignore_position_check)
 
     # Step 5: filter by thresholds
     mask = (df['Your Score'] > your_threshold) & (df['Their Score'] > their_threshold)
