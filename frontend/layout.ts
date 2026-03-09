@@ -8,11 +8,14 @@ import { renderSeasonRosters } from './data_entry/season/season_rosters.js'
 import { renderSeasonTrading } from './data_entry/season/season_trading.js'
 import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { makeCustomSelect }    from './custom_select.js'
+import { getAuctionState }     from './data_entry/auction_entry.js'
+import { renderTeamGScoreTable } from './table/gscore_table.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 let seasonNavBuilt  = false
 let currentSeasonTab = ''   // tracks active season tab; '' means no tab activated yet
+let currentAuctionTab = 'candidates'  // 'candidates' or 'my-team'
 let currentSeat     = ''
 let _onEvaluate: (() => void | Promise<void>) | undefined
 
@@ -90,10 +93,21 @@ function showOwnDataLayout(mode: string): void {
     // Seat selector lives below the divider, directly above the H-score table
     renderSeatSelector(rightSubHeader)
 
-    const stub = document.createElement('div')
-    stub.className   = 'team-display-stub'
-    stub.textContent = 'Team statistics will appear here once the backend is connected.'
-    rightFooter.append(stub)
+    // Auction Mode: add Candidates / My Team tab bar
+    if (mode === 'Auction Mode') {
+        currentAuctionTab = 'candidates'
+        buildAuctionTabBar(rightSubHeader)
+
+        // Refresh G-score table when the auction board changes (pick/undo/clear)
+        rightHeader.addEventListener('auction-board-change', () => {
+            if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+        })
+    } else {
+        hide('auction-gscore')
+        show('realtable')
+    }
+
+    rightFooter.innerHTML = ''
 }
 
 // ─── Live-platform layout (Draft or Auction) ──────────────────────────────────
@@ -216,6 +230,59 @@ function activateSeasonTab(tabId: string): void {
     }
 }
 
+// ─── Auction tab bar (Candidates / My Team) ──────────────────────────────
+
+/** Creates the auction tab buttons in the given container. */
+function buildAuctionTabBar(container: HTMLElement): void {
+    const bar = document.createElement('div')
+    bar.className = 'auction-tab-bar'
+
+    for (const tab of [
+        { id: 'candidates', label: 'Candidates' },
+        { id: 'my-team',    label: 'My Team' },
+    ]) {
+        const btn = document.createElement('button')
+        btn.className   = 'season-tab-btn'   // reuse season tab styling
+        btn.textContent = tab.label
+        btn.dataset.tab = tab.id
+        if (tab.id === currentAuctionTab) btn.classList.add('active')
+        btn.addEventListener('click', () => activateAuctionTab(tab.id))
+        bar.append(btn)
+    }
+
+    container.append(bar)
+}
+
+/** Switches between the H-score candidate table and the My Team G-score view. */
+function activateAuctionTab(tabId: string): void {
+    currentAuctionTab = tabId
+
+    // Update active button styling
+    document.querySelectorAll('.auction-tab-bar .season-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', (btn as HTMLElement).dataset.tab === tabId)
+    })
+
+    if (tabId === 'candidates') {
+        show('realtable')
+        hide('auction-gscore')
+    } else {
+        hide('realtable')
+        show('auction-gscore')
+        refreshAuctionGScore()
+    }
+}
+
+/** Rebuilds the G-score table for the current seat's auction picks. */
+function refreshAuctionGScore(): void {
+    const container = document.getElementById('auction-gscore')
+    if (!container) return
+    const seat = currentSeat
+    if (!seat) { container.innerHTML = ''; return }
+    const { player_assignments } = getAuctionState()
+    const playerNames = player_assignments[seat] ?? []
+    renderTeamGScoreTable(playerNames, container)
+}
+
 // ─── Seat selector ────────────────────────────────────────────────────────────
 
 /** Builds the "Which team are you?" selector. Changing the seat triggers an immediate re-evaluate. */
@@ -233,9 +300,13 @@ function renderSeatSelector(container: HTMLElement): void {
         'seat-select',
         teamNames.map(n => ({ value: n, label: n })),
     )
+    // Initialize currentSeat to the first team if not yet set
+    if (!currentSeat && teamNames.length > 0) currentSeat = teamNames[0]
     if (currentSeat) sel.setValue(currentSeat)
     sel.element.addEventListener('change', () => {
         currentSeat = sel.getValue() ?? ''
+        // Refresh G-score table if the My Team tab is active
+        if (currentAuctionTab === 'my-team') refreshAuctionGScore()
         // Re-evaluate immediately when the user switches their seat
         if (_onEvaluate) {
             const result = _onEvaluate()

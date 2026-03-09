@@ -80,6 +80,9 @@ export function renderAuctionEntry(
     container.innerHTML = ''
     container.append(buildPickControl(container))
     container.append(buildAuctionBoard())
+
+    // Notify layout that the board changed so the G-score tab can refresh
+    container.dispatchEvent(new CustomEvent('auction-board-change', { bubbles: true }))
 }
 
 // ─── Pick control ─────────────────────────────────────────────────────────────
