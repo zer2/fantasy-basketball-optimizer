@@ -312,9 +312,10 @@ def _build_candidates(
 
         roster = (
             None if no_position_data
-            else _build_roster(
-                player, my_players, player_position_map, slot_names, slot_counts,
-                position_structure,
+            else _roster_from_precomputed(
+                player, my_players,
+                h_score_result['Rosters'].loc[player].values,
+                slot_names,
             )
         )
 
@@ -537,6 +538,40 @@ def _build_flex_allocations(
 
 # ── Roster assignment ─────────────────────────────────────────────────────────
 
+def _roster_from_precomputed(
+    candidate: str,
+    my_players: list[str],
+    rosters_row: np.ndarray,
+    slot_names: list[str],
+) -> Roster:
+    """Build Roster display from the pre-computed slot assignments in h_score_result['Rosters'].
+
+    rosters_row[j] is the slot index assigned to player j in the ordering
+    [team_so_far[0], ..., team_so_far[-1], candidate, future_player[0], ...].
+    Columns beyond len(my_players) + 1 are future hypothetical players and are ignored.
+    """
+    n_team_so_far = len(my_players)
+    assignments: dict[str, RosterAssignment | None] = {slot: None for slot in slot_names}
+
+    for i, player_name in enumerate(my_players):
+        slot_idx = int(rosters_row[i])
+        if 0 <= slot_idx < len(slot_names):
+            assignments[slot_names[slot_idx]] = RosterAssignment(
+                name=_last_name(player_name),
+                is_candidate=False,
+            )
+
+    if n_team_so_far < len(rosters_row):
+        candidate_slot_idx = int(rosters_row[n_team_so_far])
+        if 0 <= candidate_slot_idx < len(slot_names):
+            assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
+                name=_last_name(candidate),
+                is_candidate=True,
+            )
+
+    return Roster(slots=slot_names, assignments=assignments)
+
+
 def _make_slot_names(slot_counts: dict, position_structure: dict) -> list[str]:
     """Return slot IDs in canonical order: base positions then flex.
 
@@ -559,107 +594,5 @@ def _make_slot_names(slot_counts: dict, position_structure: dict) -> list[str]:
             slot_list.append(f"{position_type}{i}")
     return slot_list
 
-
-def _build_roster(
-    candidate: str,
-    my_players: list[str],
-    player_position_map: pd.Series,
-    slot_names: list[str],
-    slot_counts: dict,
-    position_structure: dict,
-) -> Roster:
-    """Compute the optimal slot assignment for the current team plus one candidate.
-
-    Uses the Hungarian algorithm (linear_sum_assignment) to find the maximum
-    cardinality matching between players and slots given position eligibility
-    constraints.  The eligibility matrix is encoded with 0 (eligible) and -inf
-    (ineligible) so that the maximisation objective counts matched eligible pairs
-    while forbidding ineligible assignments entirely.
-
-    Args:
-        candidate:           The candidate player being evaluated.
-        my_players:          Players already on the user's team.
-        player_position_map: pd.Series mapping player name → list of eligible position codes.
-        slot_names:          Ordered slot ID strings (from _make_slot_names).
-        slot_counts:         Dict mapping position code → number of slots.
-        position_structure:  Dict with 'base_list' and 'flex' describing eligibility rules.
-
-    Returns:
-        Roster object with slots list and assignments dict (slot → RosterAssignment or None).
-    """
-    from scipy.optimize import linear_sum_assignment
-
-    total_slots       = len(slot_names)
-    roster_candidates = my_players + [candidate]  # candidate appended last for easy identification
-    n_roster_candidates = len(roster_candidates)
-
-    if n_roster_candidates == 0:
-        return Roster(slots=slot_names, assignments={slot: None for slot in slot_names})
-
-    # Build eligibility matrix: rows = players, cols = slots.
-    # 0 means eligible, -inf means ineligible.
-    # The maximisation of this matrix maximises the number of matched eligible pairs.
-    eligibility            = np.full((n_roster_candidates, total_slots), -np.inf)
-    base_list              = position_structure['base_list']
-    flex_position_details  = position_structure['flex']
-    slot_position_types    = _expand_slots(slot_counts, position_structure)
-
-    for player_idx, player_name in enumerate(roster_candidates):
-        raw_positions = player_position_map.get(player_name)
-        if raw_positions is None:
-            continue
-        player_positions = raw_positions if isinstance(raw_positions, list) else list(raw_positions)
-
-        for slot_idx, slot_position_type in enumerate(slot_position_types):
-            if slot_position_type in base_list:
-                # Base slot: player must explicitly hold this position.
-                eligible = slot_position_type in player_positions
-            else:
-                # Flex slot: player must hold at least one of the flex type's base positions.
-                eligible_bases = flex_position_details.get(slot_position_type, {}).get('bases', [])
-                eligible = any(base_pos in player_positions for base_pos in eligible_bases)
-
-            if eligible:
-                eligibility[player_idx, slot_idx] = 0
-
-    try:
-        matched_player_indices, matched_slot_indices = linear_sum_assignment(
-            eligibility, maximize=True
-        )
-    except Exception:
-        return Roster(slots=slot_names, assignments={slot: None for slot in slot_names})
-
-    assignments: dict[str, RosterAssignment | None] = {slot: None for slot in slot_names}
-    for player_idx, slot_idx in zip(matched_player_indices, matched_slot_indices):
-        if eligibility[player_idx, slot_idx] == 0:  # 0 confirms eligibility was satisfied
-            player_name = roster_candidates[player_idx]
-            assignments[slot_names[slot_idx]] = RosterAssignment(
-                name         = _last_name(player_name),
-                is_candidate = (player_name == candidate),
-            )
-
-    return Roster(slots=slot_names, assignments=assignments)
-
-
-def _expand_slots(slot_counts: dict, position_structure: dict) -> list[str]:
-    """Return a flat list of position types, one entry per slot (in canonical order).
-
-    Used to map a slot index to its position type without constructing the full
-    slot name strings.  For example, two PG slots and one UTIL slot yields
-    ['PG', 'PG', 'UTIL'].
-
-    Args:
-        slot_counts:        Dict mapping position code → number of roster slots.
-        position_structure: Dict with 'base_list' and 'flex_list' for ordering.
-
-    Returns:
-        Flat list of position type strings, one entry per slot.
-    """
-    position_order = position_structure['base_list'] + position_structure['flex_list']
-    slot_position_types: list[str] = []
-    for position_type in position_order:
-        slot_count = slot_counts.get(position_type, 0)
-        slot_position_types.extend([position_type] * slot_count)
-    return slot_position_types
 
 

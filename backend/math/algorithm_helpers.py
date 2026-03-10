@@ -3,10 +3,11 @@ Backend-only copy of src/math/algorithm_helpers.py.
 
 Changes vs original:
 - `import streamlit as st` removed.
-- @st.cache_data() decorators removed from get_win_grid / get_tie_grid.
+- @st.cache_data() replaced with @functools.lru_cache on get_win_grid / get_tie_grid.
 The original src/ file is untouched.
 """
 
+import functools
 import pandas as pd
 from scipy.stats import norm
 import numpy as np

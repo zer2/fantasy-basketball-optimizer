@@ -65,76 +65,56 @@ export function buildTable(players: Player[]): void {
         headerRow.append(th)
     }
 
-    // ── Player rows ─────────────────────────────────────────────────────────
+    // ── Player rows (built as HTML string for performance) ───────────────────
+    // Hoisted outside the loop to avoid repeated lookups in roto mode.
+    const nDrafters  = isRoto ? getLeagueSettings().n_drafters : 0
+    const rotoMiddle = (nDrafters - 1) / 2 + 1
+
+    let html = ''
     for (const [i, player] of players.entries()) {
-        const row = table.insertRow(-1)
+        html += `<tr>`
 
         // Player name cell with expand button
-        const nameCell = document.createElement('th')
-        nameCell.innerHTML = `
-            <div class='playerheaderdiv'>
-                <div style="width:80%">${player.name}</div>
-                <div style="width:20%">
-                    <button class='playerpopup' id='PP${i}'>▶</button>
-                </div>
-            </div>`
-        nameCell.className = 'playerheader'
-        row.append(nameCell)
-
-        const button = nameCell.querySelector(`#PP${i}.playerpopup`) as HTMLButtonElement
-        button.addEventListener('click', () => ExpandView(i, player, categories, totalCols))
+        html += `<th class='playerheader'><div class='playerheaderdiv'><div style="width:80%">${player.name}</div><div style="width:20%"><button class='playerpopup' id='PP${i}'>▶</button></div></div></th>`
 
         // Score column(s)
         if (isAuction) {
             const av = player.auction_values
             if (av) {
                 const diff = av.your_dollar - av.gnrc_dollar
-
-                const diffCell = row.insertCell(-1)
-                diffCell.textContent = diff.toFixed(1)
-                diffCell.style.cssText = stat_styler_secondary(diff, 10, 0)
-                diffCell.className = 'auction-dollar'
-
+                html += `<td class='auction-dollar' style='${stat_styler_secondary(diff, 10, 0)}'>${diff.toFixed(1)}</td>`
                 for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
-                    const cell = row.insertCell(-1)
-                    cell.textContent = String(val.toFixed(1))
-                    cell.className = 'auction-dollar celltypeb'
+                    html += `<td class='auction-dollar celltypeb'>${val.toFixed(1)}</td>`
                 }
             } else {
-                // Auction values not yet available (e.g. stale results from draft mode).
-                // Insert empty cells to keep column count correct; runEvaluate will refresh.
-                for (let i = 0; i < 4; i++) {
-                    const cell = row.insertCell(-1)
-                    cell.textContent = '—'
-                    cell.className = 'auction-dollar'
-                }
+                for (let j = 0; j < 4; j++) html += `<td class='auction-dollar'>—</td>`
             }
         } else {
-            const hscoreCell = row.insertCell(-1)
-            hscoreCell.className = 'overallhscore'
-            hscoreCell.textContent = player.h_score.toFixed(1)
+            html += `<td class='overallhscore'>${player.h_score.toFixed(1)}</td>`
         }
 
         // Category win rate cells
         for (const value of player.win_rates) {
-            const cell = row.insertCell(-1)
             if (isRoto) {
-                const n = getLeagueSettings().n_drafters
-                const rotoValue = 1 + (value / 100) * (n - 1)
-                const rotoMiddle = (n - 1) / 2 + 1
-                cell.textContent = rotoValue.toFixed(1)
-                cell.style.cssText = stat_styler_primary(rotoValue, 3 * (n - 1), rotoMiddle)
-                cell.className = 'categoricalRotoHscore'
+                const rotoValue = 1 + (value / 100) * (nDrafters - 1)
+                html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, 3 * (nDrafters - 1), rotoMiddle)}'>${rotoValue.toFixed(1)}</td>`
             } else {
-                cell.textContent = value.toFixed(1)
-                cell.style.cssText = stat_styler_primary(value, 3, 50)
-                cell.className = 'categoricalhscore'
+                html += `<td class='categoricalhscore' style='${stat_styler_primary(value, 3, 50)}'>${value.toFixed(1)}</td>`
             }
         }
 
+        html += `</tr>`
+
         // Expansion row (hidden until button clicked)
-        const expandedRow = table.insertRow(-1)
-        expandedRow.className = `expandedview EV${i}`
-        expandedRow.style.display = 'none'
+        html += `<tr class='expandedview EV${i}' style='display:none'></tr>`
+    }
+
+    const tbody = table.createTBody()
+    tbody.innerHTML = html
+
+    // Attach expand button listeners (cheap second pass — no DOM mutations)
+    for (const [i, player] of players.entries()) {
+        ;(document.getElementById(`PP${i}`) as HTMLButtonElement)
+            .addEventListener('click', () => ExpandView(i, player, categories, totalCols))
     }
 }
