@@ -19,7 +19,6 @@ COPY __init__.py .
 
 # Data files referenced at runtime
 COPY parameters.yaml .
-COPY src/data_retrieval/ src/data_retrieval/
 
 # Frontend static assets
 COPY frontend/app.html frontend/app.html
@@ -27,4 +26,4 @@ COPY frontend/styles/  frontend/styles/
 COPY --from=frontend-builder /build/frontend/dist/ frontend/dist/
 
 EXPOSE 8080
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

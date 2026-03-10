@@ -15,7 +15,7 @@ from backend.models import (
     Candidate, GScoreRow, FlexAllocations, FlexRow,
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
-from src.math.algorithm_helpers import auction_value_adjuster
+from backend.math.algorithm_helpers import auction_value_adjuster
 
 # Matches a trailing position suffix such as " (C,PF)", " (PG,SG)", " (PF/C)".
 # Format is a space followed by a parenthesised, comma/slash-separated list of

@@ -210,6 +210,18 @@ def check_single_player_eligibility(
     return bool(all(all_res >= 0))
 
 
+def check_team_eligibility(team: list, pos_cfg: PositionConfig) -> bool:
+    """Checks if a full team satisfies position constraints."""
+    if len(team) == 0:
+        return True
+    team_array = get_player_rows(team, pos_cfg)
+    try:
+        linear_sum_assignment(team_array, maximize=True)
+        return True
+    except Exception:
+        return False
+
+
 def check_all_player_eligibility(
     players: list,
     team_so_far: list,

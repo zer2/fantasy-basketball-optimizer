@@ -18,7 +18,7 @@ from backend.models import (
     TeamHScore, TeamTradeResult, TradeAnalyzeResponse,
     TradeSuggestion, TradeSuggestResponse, ComboParam,
 )
-from src.math.position_optimization import check_team_eligibility
+from backend.math.position_optimization import check_team_eligibility
 
 
 # ── Core trade analysis ──────────────────────────────────────────────────────
@@ -46,12 +46,13 @@ def analyze_trade(
 
     # Check position eligibility for both teams
     if not ignore_position_check:
+        pos_cfg = session.H._pos_cfg
         team_1_positions = info['Positions'].loc[post_trade_team_1]
-        if not check_team_eligibility(team_1_positions):
+        if not check_team_eligibility(team_1_positions, pos_cfg):
             return None
 
         team_2_positions = info['Positions'].loc[post_trade_team_2]
-        if not check_team_eligibility(team_2_positions):
+        if not check_team_eligibility(team_2_positions, pos_cfg):
             return None
 
     post_trade_assignments = player_assignments.copy()

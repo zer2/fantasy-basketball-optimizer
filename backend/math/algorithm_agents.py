@@ -17,7 +17,7 @@ import pandas as pd
 from scipy.stats import norm
 from itertools import combinations
 
-from src.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
+from backend.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
 from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
@@ -122,9 +122,9 @@ class HAgent:
 
             # ── correlations (replaces get_correlations()) ────────────────────
             if sport == 'NBA':
-                rho = pd.read_csv('src/data_retrieval/basketball_correlations.csv').set_index('Category')
+                rho = pd.read_csv('backend/data/basketball_correlations.csv').set_index('Category')
             else:
-                rho = pd.read_csv('src/data_retrieval/baseball_correlations.csv').set_index('Category')
+                rho = pd.read_csv('backend/data/baseball_correlations.csv').set_index('Category')
 
             counting_stats_all = params['counting-statistics']
             rho.loc[counting_stats_all, counting_stats_all] = np.clip(
@@ -141,7 +141,7 @@ class HAgent:
 
             # ── max_info (replaces get_max_info()) ────────────────────────────
             if self.n_drafters <= 21:
-                max_table = pd.read_csv('src/data_retrieval/max_table.csv')
+                max_table = pd.read_csv('backend/data/max_table.csv')
                 info_row = max_table.set_index('N').loc[self.n_drafters - 1]
                 self.max_ev, self.max_var = float(info_row['EV(X)']), float(info_row['VAR(X)'])
             else:
