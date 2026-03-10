@@ -14,7 +14,8 @@ from typing import Optional
 import yaml
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.session import create_session, get_session, delete_session
 from backend.pipeline import run_pipeline, _parse_projection_csv
@@ -446,3 +447,13 @@ def delete_session_route(session_id: str):
     if not found:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Static frontend ────────────────────────────────────────────────────────────
+
+@app.get('/', include_in_schema=False)
+def serve_index():
+    return FileResponse('frontend/app.html')
+
+app.mount('/styles', StaticFiles(directory='frontend/styles'), name='styles')
+app.mount('/dist',   StaticFiles(directory='frontend/dist'),   name='dist')
