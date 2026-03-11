@@ -54,7 +54,7 @@ function lowestGRankPlayer(playerNames: string[]): string | null {
 function highlightDropPlayer(dropPlayer: string): void {
     const players = getCandidatePlayers()
     const idx = players.findIndex(p => p.name === dropPlayer)
-    const table = document.getElementById('realtable') as HTMLTableElement
+    const table = document.getElementById('hscoretable') as HTMLTableElement
     // table.rows[0] is the thead header; player rows start at 1, interleaved with expand rows
     table.rows[1 + idx * 2].cells[0].classList.add('waiver-drop-highlight')
 }

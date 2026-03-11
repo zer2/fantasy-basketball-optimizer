@@ -99,7 +99,7 @@ sidebar.style.visibility = ''
 
 // ─── Mode change: rebuild table and sync session ───────────────────────────
 // Registered before initLayout so buildTable fires before applyLayout on mode
-// change, ensuring realtable.style.width is correct when applyLayout reads it.
+// change, ensuring hscoretable.style.width is correct when applyLayout reads it.
 //
 // When switching to Auction Mode the existing session must be patched with
 // cash_per_team; without it the backend cannot compute auction dollar values.
@@ -137,7 +137,7 @@ runEvaluate().catch(err => console.error('Initial load failed:', err))
 
 // ── League settings auto-update ───────────────────────────────────────────
 // Number inputs fire on 'change' (when focus leaves); buildTable runs first to
-// set realtable.style.width before reapplyLayout reads it.
+// set hscoretable.style.width before reapplyLayout reads it.
 for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     document.getElementById(id)!.addEventListener('change', () => {
         buildTable(getCandidatePlayers())

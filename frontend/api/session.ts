@@ -10,7 +10,7 @@ import { getFormatAndCategories } from '../parameter_collection/format_and_categ
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
-import { reapplyLayout, getCurrentSeat } from '../layout.js'
+import { reapplyLayout, getCurrentSeat, setEvaluating } from '../layout.js'
 import { getDraftState } from '../data_entry/draft_board.js'
 import { getAuctionState } from '../data_entry/auction_entry.js'
 import { buildTable } from '../table/player_table.js'
@@ -21,6 +21,9 @@ import * as api from './client.js'
 let sessionId: string | null = null
 // Tracks the in-flight evaluate request so it can be aborted when a newer one starts.
 let evaluateController: AbortController | null = null
+// Incremented on each new evaluate call; lets the finally block avoid hiding the
+// indicator when a newer call has already shown it.
+let evaluateGeneration = 0
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -111,41 +114,55 @@ export async function runEvaluate(): Promise<void> {
     if (evaluateController) evaluateController.abort()
     evaluateController = new AbortController()
     const { signal } = evaluateController
+    const generation = ++evaluateGeneration
+    setEvaluating(true)
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            await ensureSession()
+    try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                await ensureSession()
 
-            // Default to the first team name if no seat has been chosen yet
-            const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
-            const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+                // Default to the first team name if no seat has been chosen yet
+                const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
+                const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
 
-            let evalReq: Parameters<typeof api.evaluate>[1]
-            if (mode === 'Auction Mode') {
-                const { player_assignments, remaining_cash } = getAuctionState()
-                evalReq = { player_assignments, my_team_id: seat, remaining_cash }
-            } else {
-                const { player_assignments } = getDraftState()
-                evalReq = { player_assignments, my_team_id: seat }
+                let evalReq: Parameters<typeof api.evaluate>[1]
+                if (mode === 'Auction Mode') {
+                    const { player_assignments, remaining_cash } = getAuctionState()
+                    evalReq = { player_assignments, my_team_id: seat, remaining_cash }
+                } else {
+                    const { player_assignments } = getDraftState()
+                    evalReq = { player_assignments, my_team_id: seat }
+                }
+
+                // If my team is already full, show no candidates.
+                const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
+                if (myTeamSize >= getLeagueSettings().n_picks) {
+                    buildTable([])
+                    reapplyLayout()
+                    return
+                }
+
+                const resp = await api.evaluate(sessionId!, evalReq, signal)
+                const players = api.candidatesToPlayers(resp.candidates)
+                setAllPlayers(players)
+                if (mode !== 'Season Mode') {
+                    buildTable(players)
+                    reapplyLayout()
+                }
+                return
+            } catch (err: any) {
+                if (err.name === 'AbortError') return  // superseded by a newer call
+                if (attempt === 0 && err.message?.includes('(404)')) {
+                    // Session expired; reset so ensureSession() creates a fresh one.
+                    sessionId = null
+                    continue
+                }
+                throw err
             }
-
-            const resp = await api.evaluate(sessionId!, evalReq, signal)
-            const players = api.candidatesToPlayers(resp.candidates)
-            setAllPlayers(players)
-            if (mode !== 'Season Mode') {
-                buildTable(players)
-                reapplyLayout()
-            }
-            return
-        } catch (err: any) {
-            if (err.name === 'AbortError') return  // superseded by a newer call
-            if (attempt === 0 && err.message?.includes('(404)')) {
-                // Session expired; reset so ensureSession() creates a fresh one.
-                sessionId = null
-                continue
-            }
-            throw err
         }
+    } finally {
+        if (evaluateGeneration === generation) setEvaluating(false)
     }
 }
 
@@ -229,22 +246,27 @@ export async function runWaiverEvaluate(
     playerAssignments: Record<string, string[]>,
     myTeamId: string,
 ): Promise<void> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            await ensureSession()
-            const resp = await api.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
-            const players = api.candidatesToPlayers(resp.candidates)
+    setEvaluating(true)
+    try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                await ensureSession()
+                const resp = await api.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
+                const players = api.candidatesToPlayers(resp.candidates)
 
-            setCandidates(players)
-            buildTable(players)
-            return
-        } catch (err: any) {
-            if (attempt === 0 && err.message?.includes('(404)')) {
-                sessionId = null
-                continue
+                setCandidates(players)
+                buildTable(players)
+                return
+            } catch (err: any) {
+                if (attempt === 0 && err.message?.includes('(404)')) {
+                    sessionId = null
+                    continue
+                }
+                throw err
             }
-            throw err
         }
+    } finally {
+        setEvaluating(false)
     }
 }
 

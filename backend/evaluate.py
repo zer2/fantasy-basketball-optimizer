@@ -17,19 +17,13 @@ from backend.models import (
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
 
-# Matches a trailing position suffix such as " (C,PF)", " (PG,SG)", " (PF/C)".
-# Format is a space followed by a parenthesised, comma/slash-separated list of
-# uppercase position codes, e.g. "(C,PF)" or "(PG/SG)".
-_POSITION_SUFFIX_RE = re.compile(r'\s+\([A-Z,/]+\)$')
-
-
 def _last_name(player_full_name: str) -> str:
     """Return the player's last name, stripping any trailing position suffix.
 
     For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
     "Nikola Jokic" → "Jokic".
     """
-    return player_full_name.split(' (')[0].split(' ')[-1]
+    return ' '.join(player_full_name.split(' (')[0].split(' ')[1:])
 
 
 # ── Public entry point ────────────────────────────────────────────────────────

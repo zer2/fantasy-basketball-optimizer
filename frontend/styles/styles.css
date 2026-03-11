@@ -633,7 +633,7 @@ tr {
 
 }
 
-#realtable {
+#hscoretable {
     border-radius: 12px;
     background-color: light-dark(#aaaabc, #3d3d55);
     border-collapse: collapse;
@@ -659,22 +659,22 @@ tr {
 }
 
 /* 1. Top-Left Corner */
-#realtable > thead > tr:first-child > :first-child {
+#hscoretable > thead > tr:first-child > :first-child {
   border-top-left-radius: 12px;
 }
 
 /* 2. Top-Right Corner */
-#realtable > thead > tr:first-child > :last-child {
+#hscoretable > thead > tr:first-child > :last-child {
   border-top-right-radius: 12px;
 }
 
 /* 3. Bottom-Left Corner */
-#realtable > tbody > tr:last-child > :first-child {
+#hscoretable > tbody > tr:last-child > :first-child {
   border-bottom-left-radius: 12px;
 }
 
 /* 4. Bottom-Right Corner */
-#realtable > tbody > tr:last-child > :last-child {
+#hscoretable > tbody > tr:last-child > :last-child {
   border-bottom-right-radius: 12px;
 }
 
@@ -801,7 +801,16 @@ tr {
     font-size: 0.8rem;
     line-height: 1.5;
     width: 100%;
+    border-radius: 12px;
+    background-color: light-dark(#aaaabc, #3d3d55);
+    border: 2px solid light-dark(#aaaabc, #3d3d55);
+    overflow: hidden;
 }
+
+.panel-table > thead > tr:first-child > :first-child { border-top-left-radius: 12px; }
+.panel-table > thead > tr:first-child > :last-child  { border-top-right-radius: 12px; }
+.panel-table > tbody > tr:last-child > :first-child  { border-bottom-left-radius: 12px; }
+.panel-table > tbody > tr:last-child > :last-child   { border-bottom-right-radius: 12px; }
 
 .panel-colspacer {
     background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26)); /* matches .panel-cell — invisible */
@@ -981,7 +990,8 @@ tr {
 .pick-control-label {
     color: light-dark(#555555, #aaaaaa);
     font-size: 0.85rem;
-    margin-bottom: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .pick-control-row {
@@ -990,6 +1000,15 @@ tr {
     align-items: flex-end;
     margin-top: 6px;
     margin-bottom: 12px;
+}
+
+.pick-control-row:has(> .pick-control-label) {
+    align-items: center;
+}
+
+.pick-control-row .cs-wrapper,
+.seat-selector-wrap .cs-wrapper {
+    width: 280px;
 }
 
 .pick-control-buttons {
@@ -1084,6 +1103,32 @@ tr {
 
 .seat-selector-wrap {
     margin-bottom: 8px;
+}
+
+/* ─── Evaluate in-progress indicator ─────────────────────────────────────────── */
+
+.eval-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: light-dark(#666688, #9999bb);
+    visibility: hidden;
+}
+
+.eval-indicator::before {
+    content: '';
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid light-dark(#9999cc, #6666aa);
+    border-top-color: transparent;
+    animation: eval-spin 0.65s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes eval-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ─── Waiver controls bar ────────────────────────────────────────────────────── */

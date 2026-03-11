@@ -2,7 +2,7 @@
 // Manages the main-content area layout based on mode (Draft / Auction / Season)
 // and platform (own data vs. live).  Call initLayout() once after the sidebar is built.
 
-import { renderDraftBoard }    from './data_entry/draft_board.js'
+import { renderDraftBoard, getDraftState } from './data_entry/draft_board.js'
 import { renderAuctionEntry }  from './data_entry/auction_entry.js'
 import { renderSeasonRosters } from './data_entry/season/season_rosters.js'
 import { renderSeasonTrading } from './data_entry/season/season_trading.js'
@@ -16,6 +16,7 @@ import { renderTeamGScoreTable } from './table/gscore_table.js'
 let seasonNavBuilt  = false
 let currentSeasonTab = ''   // tracks active season tab; '' means no tab activated yet
 let currentAuctionTab = 'candidates'  // 'candidates' or 'my-team'
+let currentDraftTab   = 'candidates'  // 'candidates' or 'my-team'
 let currentSeat     = ''
 let _onEvaluate: (() => void | Promise<void>) | undefined
 
@@ -80,7 +81,7 @@ function showOwnDataLayout(mode: string): void {
     rightFooter.innerHTML    = ''
 
     // Align data-entry section, seat selector, and divider to the H-score table width
-    const hscoreW = (document.getElementById('realtable') as HTMLTableElement).style.width
+    const hscoreW = getHscoreWidth()
     rightHeader.style.maxWidth    = hscoreW
     rightSubHeader.style.maxWidth = hscoreW
 
@@ -93,10 +94,10 @@ function showOwnDataLayout(mode: string): void {
     // Seat selector lives below the divider, directly above the H-score table
     renderSeatSelector(rightSubHeader)
 
-    // Auction Mode: add Candidates / My Team tab bar
+    // Add Candidates / My Team tab bar for both Draft and Auction Mode
     if (mode === 'Auction Mode') {
-        currentAuctionTab = 'candidates'
         buildAuctionTabBar(rightSubHeader)
+        activateAuctionTab(currentAuctionTab)
 
         // Refresh G-score table when the auction board changes (pick/undo/clear)
         rightHeader.addEventListener('auction-board-change', () => {
@@ -104,7 +105,8 @@ function showOwnDataLayout(mode: string): void {
         })
     } else {
         hide('auction-gscore')
-        show('realtable')
+        buildDraftTabBar(rightSubHeader)
+        activateDraftTab(currentDraftTab)
     }
 
     rightFooter.innerHTML = ''
@@ -129,7 +131,7 @@ function showLiveLayout(): void {
     rightSubHeader.innerHTML = ''
     rightFooter.innerHTML    = ''
 
-    const hscoreW = (document.getElementById('realtable') as HTMLTableElement).style.width
+    const hscoreW = getHscoreWidth()
     rightSubHeader.style.maxWidth = hscoreW
 
     renderSeatSelector(rightSubHeader)
@@ -208,7 +210,7 @@ function activateSeasonTab(tabId: string): void {
 
         const rightHeader = document.getElementById('right-header')!
         rightHeader.innerHTML = ''
-        rightHeader.style.maxWidth = (document.getElementById('realtable') as HTMLTableElement).style.width
+        rightHeader.style.maxWidth = getHscoreWidth()
         document.getElementById('right-footer')!.innerHTML = ''
         renderWaiverControls(rightHeader)
 
@@ -229,6 +231,59 @@ function activateSeasonTab(tabId: string): void {
         const rostersRight = document.getElementById('rosters-right')!
         renderSeasonRosters(rostersLeft, rostersRight)
     }
+}
+
+// ─── Draft tab bar (Candidates / My Team) ────────────────────────────────
+
+/** Creates the draft tab buttons in the given container. */
+function buildDraftTabBar(container: HTMLElement): void {
+    const bar = document.createElement('div')
+    bar.className = 'draft-tab-bar'
+
+    for (const tab of [
+        { id: 'candidates', label: 'Candidates' },
+        { id: 'my-team',    label: 'My Team' },
+    ]) {
+        const btn = document.createElement('button')
+        btn.className   = 'season-tab-btn'
+        btn.textContent = tab.label
+        btn.dataset.tab = tab.id
+        if (tab.id === currentDraftTab) btn.classList.add('active')
+        btn.addEventListener('click', () => activateDraftTab(tab.id))
+        bar.append(btn)
+    }
+
+    container.append(bar)
+}
+
+/** Switches between the H-score candidate table and the My Team G-score view. */
+function activateDraftTab(tabId: string): void {
+    currentDraftTab = tabId
+
+    document.querySelectorAll('.draft-tab-bar .season-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', (btn as HTMLElement).dataset.tab === tabId)
+    })
+
+    if (tabId === 'candidates') {
+        show('hscoretable')
+        hide('draft-gscore')
+    } else {
+        hide('hscoretable')
+        show('draft-gscore')
+        refreshDraftGScore()
+    }
+}
+
+/** Rebuilds the G-score table for the current seat's draft picks. */
+function refreshDraftGScore(): void {
+    const container = document.getElementById('draft-gscore')
+    if (!container) return
+    const seat = currentSeat
+    if (!seat) { container.innerHTML = ''; return }
+    const { player_assignments } = getDraftState()
+    const playerNames = player_assignments[seat] ?? []
+    const width = getHscoreWidth()
+    renderTeamGScoreTable(playerNames, container, width)
 }
 
 // ─── Auction tab bar (Candidates / My Team) ──────────────────────────────
@@ -264,10 +319,10 @@ function activateAuctionTab(tabId: string): void {
     })
 
     if (tabId === 'candidates') {
-        show('realtable')
+        show('hscoretable')
         hide('auction-gscore')
     } else {
-        hide('realtable')
+        hide('hscoretable')
         show('auction-gscore')
         refreshAuctionGScore()
     }
@@ -281,10 +336,17 @@ function refreshAuctionGScore(): void {
     if (!seat) { container.innerHTML = ''; return }
     const { player_assignments } = getAuctionState()
     const playerNames = player_assignments[seat] ?? []
-    renderTeamGScoreTable(playerNames, container)
+    const width = getHscoreWidth()
+    renderTeamGScoreTable(playerNames, container, width)
 }
 
 // ─── Seat selector ────────────────────────────────────────────────────────────
+
+/** Shows or hides the "Updating..." spinner next to the seat selector. */
+export function setEvaluating(active: boolean): void {
+    const el = document.getElementById('eval-indicator')
+    if (el) (el as HTMLElement).style.visibility = active ? 'visible' : 'hidden'
+}
 
 /** Builds the "Which team are you?" selector. Changing the seat triggers an immediate re-evaluate. */
 function renderSeatSelector(container: HTMLElement): void {
@@ -292,15 +354,25 @@ function renderSeatSelector(container: HTMLElement): void {
     const wrap = document.createElement('div')
     wrap.className = 'seat-selector-wrap'
 
-    const label = document.createElement('div')
-    label.className   = 'pick-control-label'
-    label.textContent = 'Which team are you?'
-    wrap.append(label)
-
     const sel = makeCustomSelect(
         'seat-select',
         teamNames.map(n => ({ value: n, label: n })),
     )
+
+    const indicator = document.createElement('span')
+    indicator.id        = 'eval-indicator'
+    indicator.className = 'eval-indicator'
+    indicator.textContent = 'Updating...'
+
+    const label = document.createElement('div')
+    label.className   = 'pick-control-label'
+    label.textContent = 'Which team are you?'
+
+    const selRow = document.createElement('div')
+    selRow.style.cssText = 'display:flex;align-items:center;gap:10px'
+    selRow.append(label, sel.element, indicator)
+    wrap.append(selRow)
+
     // Initialize currentSeat to the first team if not yet set
     if (!currentSeat && teamNames.length > 0) currentSeat = teamNames[0]
     if (currentSeat) sel.setValue(currentSeat)
@@ -308,18 +380,25 @@ function renderSeatSelector(container: HTMLElement): void {
         currentSeat = sel.getValue() ?? ''
         // Refresh G-score table if the My Team tab is active
         if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+        if (currentDraftTab   === 'my-team') refreshDraftGScore()
         // Re-evaluate immediately when the user switches their seat
         if (_onEvaluate) {
             const result = _onEvaluate()
             if (result instanceof Promise) result.catch(err => console.error('Evaluate failed:', err))
         }
     })
-    wrap.append(sel.element)
 
     container.append(wrap)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Returns the H-score table's current width string.
+ *  Falls back to getComputedStyle when the inline style isn't set yet (initial load). */
+function getHscoreWidth(): string {
+    const el = document.getElementById('hscoretable') as HTMLTableElement
+    return el.style.width || getComputedStyle(el).width
+}
 
 function readTeamNames(): string[] {
     return (document.getElementById('ls-team-names') as HTMLTextAreaElement)

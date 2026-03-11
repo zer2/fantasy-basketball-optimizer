@@ -9,7 +9,7 @@ import { getCategories } from '../app_state.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 
-const table = document.getElementById('realtable') as HTMLTableElement
+const table = document.getElementById('hscoretable') as HTMLTableElement
 
 /** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
 export function buildTable(players: Player[]): void {

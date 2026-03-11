@@ -81,16 +81,16 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 
     const isDone = pickRow >= nPicks
 
+    // Inline row: label + player select + action buttons on the same line
+    const row = document.createElement('div')
+    row.className = 'pick-control-row'
+
     const label = document.createElement('div')
     label.className = 'pick-control-label'
     label.textContent = isDone
         ? 'Draft complete'
         : `Select Pick ${pickRow + 1} for ${teamNames[pickDrafter] ?? `Drafter ${pickDrafter + 1}`}`
-    wrap.append(label)
-
-    // Inline row: player select + action buttons on the same line
-    const row = document.createElement('div')
-    row.className = 'pick-control-row'
+    row.append(label)
 
     const available = getAvailablePlayers()
     const sel = makeCustomSelect('draft-pick-select', available.map(n => ({ value: n, label: n })))

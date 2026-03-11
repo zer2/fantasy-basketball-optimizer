@@ -10,7 +10,7 @@ import { stat_styler_primary } from '../styles/styler_functions.js'
  * team totals row.  Styled to match the season roster inspector tables.
  * Clears and replaces `container` contents on each call.
  */
-export function renderTeamGScoreTable(playerNames: string[], container: HTMLElement): void {
+export function renderTeamGScoreTable(playerNames: string[], container: HTMLElement, width?: string): void {
     container.innerHTML = ''
     const categories = getCategories()
     const gScoreMap  = getGScoreByName()
@@ -30,6 +30,7 @@ export function renderTeamGScoreTable(playerNames: string[], container: HTMLElem
     const tbl = document.createElement('table')
     tbl.className = 'panel-table'
     tbl.style.tableLayout = 'fixed'
+    if (width) tbl.style.width = width
 
     // Spacer row to lock column widths
     const tHead = tbl.createTHead()
