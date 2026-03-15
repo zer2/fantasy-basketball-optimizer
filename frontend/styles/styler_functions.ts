@@ -69,6 +69,8 @@ function lightTertiary(value: number, multiplier: number, middle: number): RGB {
 
 // ─── Public exports (light-dark dual output) ─────────────────────────────────
 
+//ZR: The '-999' thing was a hack for streamlit, originally. We can probably clean it up by 
+//explicitly setting a different class for the ineligible values, and not calling these functions
 export function stat_styler_primary(value: number, multiplier: number, middle: number): string {
     if (value == -999) return sentinel('#F6F6F6', '#8D8D9E')
     return formatDual(lightPrimary(value, multiplier, middle), darkPrimary(value, multiplier, middle))

@@ -5,6 +5,10 @@
 import { stat_styler_primary, stat_styler_tertiary} from '../styles/styler_functions.js'
 import { Player, FlexAllocations, Roster } from '../types.js'
 
+//ZR: Why are these defined manually? They can be found from parameters.yaml
+//Although the 'full names' defined in parameters.yaml are pluralized, because 
+//for streamlit they were used for the position structure inputs. For this version 
+//of the code we can change parameters.yaml to not be plural and use them here 
 const POSITION_NAMES: Record<string, string> = {
     PG:   'Point Guard',
     SG:   'Shooting Guard',
@@ -16,10 +20,18 @@ const POSITION_NAMES: Record<string, string> = {
     Util: 'Utility',
 }
 
+//ZR:This doesn't need to exist as its own function. We can just use POSITION_NAMES[p]
+
 /** Expands a position abbreviation to its full name, e.g. "PG" → "Point Guard". */
 function expandPosition(abbr: string): string {
     return POSITION_NAMES[abbr] ?? abbr
 }
+
+
+//ZR: Is there ever a reason for the flex label to not have a dash? I do not believe so. 
+//Therefore I believe the if statement is not necessary 
+//Also: Why don't we just use the long labels everywhere internally? I think 
+//the tiny cost of longer strings is miniscule  
 
 /**
  * Expands flex slot row labels by expanding the position prefix.
@@ -31,6 +43,14 @@ function expandFlexLabel(label: string): string {
     return expandPosition(label.slice(0, dashIdx)) + label.slice(dashIdx)
 }
 
+
+//ZR: totalCols is not included in the parameter list- why? Do we need it? 
+//There is almost certainly a cleaner way to impute the total number of cols. 
+//which is defined on line 31 of player_table.ts. It just need to know isAuction
+//isAuction could probably be taken as a parameter. Perhaps that would be the cleanest? 
+//This function also checks if the current mode is auction by checking if 
+//playerData.auction_values. Using that is another option. But we should be consistent 
+
 /**
  * Toggles the expandable detail panel for a player row.
  * On expand: builds G-score, category weights, flex allocations, and roster tables.
@@ -40,8 +60,13 @@ function expandFlexLabel(label: string): string {
  * @param playerData  - Full player data object
  * @param categories  - Ordered list of category names matching the table columns
  */
-export function ExpandView(playerIndex: number, playerData: Player, categories: string[], totalCols: number): void {
+export function ExpandView(playerIndex: number
+                            , playerData: Player
+                            , categories: string[]
+                            , totalCols: number): void {
 
+    //ZR: This PP{playerIndex} structure is probably bad. This should probably use a data attribute
+    // instead, because it does not feel like a class? 
     let evpopup = document.querySelector(`#PP${playerIndex}.playerpopup`) as HTMLButtonElement;
     let expandedRow = document.querySelector(`.EV${playerIndex}.expandedview`) as HTMLTableRowElement;
 
@@ -62,7 +87,6 @@ export function ExpandView(playerIndex: number, playerData: Player, categories: 
 
         cell.appendChild(makePanelLabel('G-score expectations (difference vs. other teams)', '60px'));
         cell.appendChild(makeGScoreTable(playerData, categories));
-
 
         if (playerData.category_weights) {
             cell.appendChild(makePanelLabel('Category strategy', '60px'));
@@ -187,6 +211,8 @@ function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivEleme
 // ─── Category weights table ───────────────────────────────────────────────────
 // Single data row: algorithm weight assigned to each category for future picks.
 // Values are percentages; '%' suffix is added by CSS .panel-weight::after.
+
+//ZR: A lot of manually setting CSS properties: should be managed with classes 
 
 /**
  * Builds the category weights table showing how the algorithm weights each
@@ -343,13 +369,15 @@ function makeAuctionValuesTable(playerData: Player): HTMLTableElement {
 // Rows: depth level (1st slot, 2nd slot, …); Cols: all position types (PG…Util).
 // Base-position cols align with the flex allocations table above.
 
+//ZR: This logic to find the roster slots seems unnecessarily complicated. 
+//The exact roster assignments are derived from the user inputs. I think you could use 
+//getSlotCounts from frontend/parameter_collection/trade_parameters.ts
+
 /**
  * Builds the roster grid showing which players are assigned to each slot,
  * and highlights the candidate player being evaluated.
  */
 function makeRosterGrid(roster: Roster): HTMLDivElement {
-
-    console.log(roster)
 
     // Derive ordered position types by stripping trailing digits (e.g. "PG1" → "PG")
     let posTypes: string[] = [];

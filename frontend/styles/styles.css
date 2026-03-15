@@ -801,16 +801,19 @@ tr {
     font-size: 0.8rem;
     line-height: 1.5;
     width: 100%;
+}
+
+.panel-table--rounded {
     border-radius: 12px;
     background-color: light-dark(#aaaabc, #3d3d55);
     border: 2px solid light-dark(#aaaabc, #3d3d55);
     overflow: hidden;
 }
 
-.panel-table > thead > tr:first-child > :first-child { border-top-left-radius: 12px; }
-.panel-table > thead > tr:first-child > :last-child  { border-top-right-radius: 12px; }
-.panel-table > tbody > tr:last-child > :first-child  { border-bottom-left-radius: 12px; }
-.panel-table > tbody > tr:last-child > :last-child   { border-bottom-right-radius: 12px; }
+.panel-table--rounded > thead > tr:first-child > :first-child { border-top-left-radius: 12px; }
+.panel-table--rounded > thead > tr:first-child > :last-child  { border-top-right-radius: 12px; }
+.panel-table--rounded > tbody > tr:last-child > :first-child  { border-bottom-left-radius: 12px; }
+.panel-table--rounded > tbody > tr:last-child > :last-child   { border-bottom-right-radius: 12px; }
 
 .panel-colspacer {
     background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26)); /* matches .panel-cell — invisible */

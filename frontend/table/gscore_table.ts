@@ -28,7 +28,7 @@ export function renderTeamGScoreTable(playerNames: string[], container: HTMLElem
     // ── Build table ──────────────────────────────────────────────────────────
 
     const tbl = document.createElement('table')
-    tbl.className = 'panel-table'
+    tbl.className = 'panel-table panel-table--rounded'
     tbl.style.tableLayout = 'fixed'
     if (width) tbl.style.width = width
 
