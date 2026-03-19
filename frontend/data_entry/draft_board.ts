@@ -3,7 +3,7 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getCandidatePlayers } from '../app_state.js'
+import { getPlayers } from '../app_state.js'
 import { makeDebouncer, Debouncer } from '../helper_functions.js'
 import { runEvaluate } from '../api/session.js'
 import {
@@ -76,7 +76,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     row.append(label)
 
     const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
-    const available  = getCandidatePlayers().map(p => p.name).filter(n => !draftedSet.has(n))
+    const available  = getPlayers().map(p => p.name).filter(n => !draftedSet.has(n))
     const sel = makeCustomSelect('draft-pick-select', available.map(n => ({ value: n, label: n })))
     sel.element.style.flex = '1'
     row.append(sel.element)

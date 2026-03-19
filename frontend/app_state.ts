@@ -26,6 +26,13 @@ export function setAllPlayers(p: Player[]): void {
     candidates      = p
 }
 
+/** Replaces only the base player list (allPlayers + name map) without touching candidates.
+ *  Call with the empty-board evaluate result so the draft dropdown always shows base H-score ordering. */
+export function setBasePlayers(p: Player[]): void {
+    allPlayers      = p
+    allPlayerByName = new Map(p.map(pl => [pl.name, pl]))
+}
+
 /** Replaces only the candidate list. Call after a partial evaluate (e.g. waiver wire)
  *  where allPlayers should not change. */
 export function setCandidates(p: Player[]): void {

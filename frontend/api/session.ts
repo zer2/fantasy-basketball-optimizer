@@ -3,8 +3,8 @@
 // Owns the session ID, abort controller, and the updateTable bridge between
 // backend responses and the player table.
 
-import { SessionRequest } from '../types.js'
-import { setAllPlayers, setCandidates, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
+import { Player, SessionRequest } from '../types.js'
+import { setBasePlayers, setCandidates, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
@@ -33,6 +33,10 @@ let evaluateController: AbortController | null = null
 // Incremented on each new evaluate call; lets the finally block avoid hiding the
 // indicator when a newer call has already shown it.
 let evaluateGeneration = 0
+// Caches the empty-board evaluate result per session ID so the draft dropdown always
+// shows base H-score ordering regardless of how many picks have been made.
+// Keyed by session ID; invalidated whenever the session is patched (parameters changed).
+const basePlayersBySession: Map<string, Player[]> = new Map()
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -74,6 +78,8 @@ export async function createOrPatchSession(
     }
     try {
         await client.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
+        // Parameters changed — cached base result is now stale.
+        basePlayersBySession.delete(sessionId)
     } catch (err: any) {
         if (!err.message?.includes('(404)')) throw err
         // Session expired; rebuild from current sidebar state.
@@ -133,6 +139,25 @@ export async function runEvaluate(): Promise<void> {
                     evalReq = { player_assignments, my_team_id: seat }
                 }
 
+                // If the base result is not yet cached for this session, fetch it now.
+                // When the board is non-empty this requires a separate empty-board evaluate;
+                // when the board is already empty the result below will serve as the base.
+                const boardIsEmpty = Object.values(evalReq.player_assignments).flat().length === 0
+                if (!basePlayersBySession.has(sessionId!) && !boardIsEmpty) {
+                    // Use generic team names so the base evaluate is independent of configured team names.
+                    const { n_drafters } = getLeagueSettings()
+                    const genericTeams   = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
+                    const emptyAssignments: Record<string, string[]> = Object.fromEntries(
+                        genericTeams.map(name => [name, []])
+                    )
+                    const baseResp = await client.evaluate(
+                        sessionId!
+                    ,   { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
+                    ,   signal
+                    )
+                    basePlayersBySession.set(sessionId!, client.candidatesToPlayers(baseResp.candidates))
+                }
+
                 // If my team is already full, show no candidates.
                 const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
                 if (myTeamSize >= getLeagueSettings().n_picks) {
@@ -142,7 +167,16 @@ export async function runEvaluate(): Promise<void> {
 
                 const resp = await client.evaluate(sessionId!, evalReq, signal)
                 const players = client.candidatesToPlayers(resp.candidates)
-                setAllPlayers(players)
+
+                // Cache the base result if the board was empty (this result IS the base).
+                if (!basePlayersBySession.has(sessionId!)) {
+                    basePlayersBySession.set(sessionId!, players)
+                }
+
+                // Base ordering drives the draft dropdown; current candidates drive the table.
+                setBasePlayers(basePlayersBySession.get(sessionId!)!)
+                setCandidates(players)
+
                 if (mode !== 'Season Mode') {
                     buildTable(players)
                 }
