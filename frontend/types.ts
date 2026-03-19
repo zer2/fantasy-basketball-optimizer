@@ -15,6 +15,7 @@ export interface SportConfig {
         base_list: string[]
         flex_list: string[]
     }
+    position_names: Record<string, string>
     punting_defaults: Record<string, Record<string, number>>
     punting_default: string | null
 }

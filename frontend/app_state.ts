@@ -9,11 +9,6 @@ let allPlayers:      Player[] = []   // full dataset — only grows, never shrin
 let candidates:      Player[] = []   // current evaluate output (may be a subset, e.g. waiver free agents)
 let allPlayerByName: Map<string, Player> = new Map()
 let gScoreByName:    Map<string, PlayerGScore> = new Map()
-let categories: string[] = [
-    'Field Goal %', 'Free Throw %', 'Threes', 'Points',
-    'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers',
-]
-
 /** Returns every player in the loaded dataset, regardless of draft/waiver state. */
 export function getPlayers(): Player[] { return allPlayers }
 
@@ -22,9 +17,6 @@ export function getCandidatePlayers(): Player[] { return candidates }
 
 /** Returns a name → Player map for every player in the full dataset. */
 export function getPlayerByName(): Map<string, Player> { return allPlayerByName }
-
-/** Returns the current list of scoring category names (e.g. "Points", "Rebounds"). */
-export function getCategories(): string[] { return categories }
 
 /** Replaces the full player dataset. Call after a full evaluate (draft/auction/season).
  *  Also updates candidates, since a full evaluate's candidate list = the full pool. */
@@ -68,8 +60,15 @@ export function setPlayersFromGScores(): void {
     candidates = allPlayers
 }
 
-/** Replaces the category list. Called by session.ts when categories change. */
-export function setCategories(c: string[]): void { categories = c }
+// ── Seat selector state ───────────────────────────────────────────────────────
+
+let currentSeat: string | null = null
+
+/** Returns the currently selected seat (team name), or null if none selected. */
+export function getCurrentSeat(): string | null { return currentSeat }
+
+/** Sets the currently selected seat (team name). */
+export function setCurrentSeat(seat: string | null): void { currentSeat = seat }
 
 // ── Sport config (from GET /config/{sport}) ──────────────────────────────────
 
@@ -80,3 +79,6 @@ export function getSportConfig(): SportConfig | null { return sportConfig }
 
 /** Stores the sport config fetched from the backend. */
 export function setSportConfig(c: SportConfig): void { sportConfig = c }
+
+/** Returns the position abbreviation → full name map (e.g. "PG" → "Point Guard"). */
+export function getPositionNames(): Record<string, string> { return sportConfig?.position_names ?? {} }

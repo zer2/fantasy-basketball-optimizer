@@ -5,22 +5,22 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { getCandidatePlayers } from '../app_state.js'
 import { makeDebouncer, Debouncer } from '../helper_functions.js'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface AuctionPick { player: string; cost: number }
+import { runEvaluate } from '../api/session.js'
+import {
+    AuctionConfig,
+    getPicks, getTeamNames, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
+    resetAuctionState, applyAuctionConfig,
+    recordAuctionPick, undoLastAuctionPick, clearAllAuctionPicks,
+} from './auction_state.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-let picks: (AuctionPick | null)[][] = []   // [row][drafter]
-let history: [number, number][]     = []   // undo stack: [row, drafter]
-let teamNames:  string[] = []
-let nDrafters = 0
-let nPicks    = 0
-let cashPerTeam = 0
-let configKey = ''
-let _onPick: (() => void | Promise<void>) | undefined
 let _debouncer: Debouncer | null = null
+
+const ROUND_W = 46
+const TEAM_W  = 85
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Clears the auction board state. Call when the player pool changes (e.g. data source switch)
@@ -28,53 +28,19 @@ let _debouncer: Debouncer | null = null
  * The next renderAuctionEntry call will reinitialise from current sidebar values.
  */
 export function resetAuctionEntry(): void {
-    picks     = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
-    history   = []
-    configKey = ''
+    resetAuctionState()
     _debouncer?.cancel()
 }
 
-const ROUND_W = 46
-const TEAM_W  = 85
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/** Returns the current auction state for use in /evaluate requests. */
-export function getAuctionState(): {
-    player_assignments: Record<string, string[]>
-    remaining_cash: Record<string, number>
-} {
-    const player_assignments: Record<string, string[]> = {}
-    const remaining_cash: Record<string, number> = {}
-    for (let d = 0; d < nDrafters; d++) {
-        const name = teamNames[d] ?? `Drafter ${d + 1}`
-        const teamPicks = picks.map(row => row[d]).filter(Boolean) as AuctionPick[]
-        player_assignments[name] = teamPicks.map(p => p.player)
-        const spent = teamPicks.reduce((sum, p) => sum + p.cost, 0)
-        remaining_cash[name] = cashPerTeam - spent
-    }
-    return { player_assignments, remaining_cash }
-}
-
-/** Renders the auction entry UI into the container. Resets state if sidebar config changed. Calls onPick (debounced) after each auction action. */
-export function renderAuctionEntry(
-    container: HTMLElement,
-    onPick?: () => void | Promise<void>,
-): void {
-    if (onPick !== undefined) {
-        _onPick = onPick
-        _debouncer = makeDebouncer(() => { _onPick?.() })
+/** Renders the auction entry UI into the container. Resets state if sidebar config changed. */
+export function renderAuctionEntry(container: HTMLElement): void {
+    if (!_debouncer) {
+        _debouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Auction evaluate failed:', err)) })
     }
     const cfg = readAuctionConfig()
 
-    if (cfg.key !== configKey) {
-        picks       = Array.from({ length: cfg.nPicks }, () => Array(cfg.nDrafters).fill(null))
-        history     = []
-        teamNames   = cfg.teamNames
-        nDrafters   = cfg.nDrafters
-        nPicks      = cfg.nPicks
-        cashPerTeam = cfg.cashPerTeam
-        configKey   = cfg.key
+    if (cfg.key !== getConfigKey()) {
+        applyAuctionConfig(cfg)
     }
 
     container.innerHTML = ''
@@ -95,7 +61,8 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     row.className = 'pick-control-row'
 
     // Player dropdown — grows to fill available space
-    const available = getAvailablePlayers()
+    const pickedSet = new Set(getPicks().flat().filter(Boolean).map(p => p!.player))
+    const available = getCandidatePlayers().map(p => p.name).filter(n => !pickedSet.has(n))
     const playerSel = makeCustomSelect(
         'auction-pick-player',
         [{ value: '', label: '' }, ...available.map(n => ({ value: n, label: n }))],
@@ -116,7 +83,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     // Team dropdown — grows to fill available space
     const teamSel = makeCustomSelect(
         'auction-pick-team',
-        [{ value: '', label: '' }, ...teamNames.map(n => ({ value: n, label: n }))],
+        [{ value: '', label: '' }, ...getTeamNames().map(n => ({ value: n, label: n }))],
     )
     teamSel.element.style.width = '100%'
     const teamCol = makePickCol('Drafter', teamSel.element)
@@ -134,11 +101,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         const team   = teamSel.getValue()
         const cost   = parseFloat(costInput.value)
         if (!player || !team || isNaN(cost) || cost <= 0) return
-        const dIdx    = teamNames.indexOf(team)
-        const emptyRow = picks.findIndex(r => r[dIdx] === null)
-        if (emptyRow === -1) return   // team is full
-        picks[emptyRow][dIdx] = { player, cost }
-        history.push([emptyRow, dIdx])
+        const drafterIndex = getTeamNames().indexOf(team)
+        const succeeded    = recordAuctionPick(player, cost, drafterIndex)
+        if (!succeeded) return   // team is full
         renderAuctionEntry(container)
         _debouncer?.fire()
     })
@@ -146,11 +111,10 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const undoBtn = document.createElement('button')
     undoBtn.className   = 'pick-btn'
     undoBtn.textContent = 'Undo previous selection'
-    undoBtn.disabled    = history.length === 0
+    undoBtn.disabled    = getHistory().length === 0
     undoBtn.addEventListener('click', () => {
-        const last = history.pop()
-        if (!last) return
-        picks[last[0]][last[1]] = null
+        const undone = undoLastAuctionPick()
+        if (!undone) return
         renderAuctionEntry(container)
         _debouncer?.fire()
     })
@@ -159,8 +123,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     clearBtn.className   = 'pick-btn'
     clearBtn.textContent = 'Clear auction board'
     clearBtn.addEventListener('click', () => {
-        picks   = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
-        history = []
+        clearAllAuctionPicks()
         renderAuctionEntry(container)
     })
 
@@ -176,6 +139,12 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 function buildAuctionBoard(): HTMLElement {
     const scroll = document.createElement('div')
     scroll.className = 'entry-table-scroll'
+
+    const nPicks      = getNPicks()
+    const nDrafters   = getNDrafters()
+    const teamNames   = getTeamNames()
+    const picks       = getPicks()
+    const cashPerTeam = getCashPerTeam()
 
     const table = document.createElement('table')
     table.className    = 'entry-table'
@@ -256,26 +225,17 @@ function makePickCol(labelText: string, input: HTMLElement): HTMLElement {
     return col
 }
 
-/** Returns player names that have not yet been auctioned. */
-function getAvailablePlayers(): string[] {
-    const allPlayers = getCandidatePlayers().map(p => p.name)
-    const pickedSet  = new Set(
-        picks.flat().filter(Boolean).map(p => (p as AuctionPick).player),
-    )
-    return allPlayers.filter(n => !pickedSet.has(n))
-}
 
 /** Reads current sidebar league settings and returns them with a composite key for change detection. */
-function readAuctionConfig(): {
-    nDrafters: number; nPicks: number; cashPerTeam: number
-    teamNames: string[]; key: string
-} {
-    const nD   = parseInt((document.getElementById('ls-n-drafters')   as HTMLInputElement).value)  || 12
-    const nP   = parseInt((document.getElementById('ls-n-picks')       as HTMLInputElement).value)  || 13
-    const cash = parseInt((document.getElementById('ls-cash-per-team') as HTMLInputElement).value)  || 200
+function readAuctionConfig(): AuctionConfig {
+    const nD   = parseInt((document.getElementById('ls-n-drafters')   as HTMLInputElement).value) || 12
+    const nP   = parseInt((document.getElementById('ls-n-picks')       as HTMLInputElement).value) || 13
+    const cash = parseInt((document.getElementById('ls-cash-per-team') as HTMLInputElement).value) || 200
     const src  = (document.getElementById('ps-data-type') as HTMLInputElement).value
     const names = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
-    return { nDrafters: nD, nPicks: nP, cashPerTeam: cash, teamNames: names,
-             key: `${nD}:${nP}:${cash}:${src}:${names.join(',')}` }
+    return {
+        nDrafters: nD, nPicks: nP, cashPerTeam: cash, teamNames: names,
+        key: `${nD}:${nP}:${cash}:${src}:${names.join(',')}`,
+    }
 }

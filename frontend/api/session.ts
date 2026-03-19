@@ -4,17 +4,26 @@
 // backend responses and the player table.
 
 import { SessionRequest } from '../types.js'
-import { setAllPlayers, setCandidates, setCategories, setGScores, setPlayersFromGScores } from '../app_state.js'
+import { setAllPlayers, setCandidates, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
-import { reapplyLayout, getCurrentSeat, setEvaluating } from '../layout.js'
-import { getDraftState } from '../data_entry/draft_board.js'
-import { getAuctionState } from '../data_entry/auction_entry.js'
+import { getDraftState } from '../data_entry/draft_state.js'
+import { getAuctionState } from '../data_entry/auction_state.js'
 import { buildTable } from '../table/player_table.js'
-import * as api from './client.js'
+import * as client from './client.js'
+
+// ─── Local UI helpers ─────────────────────────────────────────────────────────
+// Direct DOM access for the eval indicator, avoiding a circular dependency with
+// layout.ts (which imports runEvaluate from this module).
+
+function setEvaluating(active: boolean): void {
+    const el = document.getElementById('eval-indicator') as HTMLElement
+    el.classList.toggle('evaluating', active)
+    el.textContent = active ? 'Updating...' : 'Updated'
+}
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
@@ -27,17 +36,15 @@ let evaluateGeneration = 0
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-/**
- * Collects all sidebar parameter values and assembles a `SessionRequest` object
- * ready to POST to `/sessions`.
- */
-export function buildSessionRequest(): SessionRequest {
+// Reads all sidebar parameters, POSTs to /sessions, and stores the returned session ID and G-scores.
+// Every code path that needs a new session calls this.
+async function startFreshSession(signal?: AbortSignal): Promise<void> {
     const { sport, platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     const { scoring_format, categories } = getFormatAndCategories()
     const { data_source, injured_players } = getPlayerStatsParams()
     const league: SessionRequest['league'] = { sport, n_drafters, n_picks, scoring_format, categories }
     if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
-    return {
+    const req: SessionRequest = {
         league,
         platform,
         slot_counts: getSlotCounts(),
@@ -46,6 +53,9 @@ export function buildSessionRequest(): SessionRequest {
         injured_players,
         // my_team_id comes from the seat selector in the main content area
     }
+    const resp = await client.createSession(req, signal)
+    sessionId = resp.session_id
+    setGScores(resp.g_scores)
 }
 
 /**
@@ -59,24 +69,16 @@ export async function createOrPatchSession(
     signal?: AbortSignal,
 ): Promise<void> {
     if (!sessionId) {
-        const req = buildSessionRequest()
-        const resp = await api.createSession(req, signal)
-        sessionId = resp.session_id
-        setCategories(resp.categories)
-        setGScores(resp.g_scores)
+        await startFreshSession(signal)
         return
     }
     try {
-        await api.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
+        await client.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
     } catch (err: any) {
         if (!err.message?.includes('(404)')) throw err
         // Session expired; rebuild from current sidebar state.
         sessionId = null
-        const req = buildSessionRequest()
-        const resp = await api.createSession(req, signal)
-        sessionId = resp.session_id
-        setCategories(resp.categories)
-        setGScores(resp.g_scores)
+        await startFreshSession(signal)
     }
 }
 
@@ -86,11 +88,17 @@ export async function createOrPatchSession(
  */
 async function ensureSession(): Promise<void> {
     if (sessionId) return
-    const req = buildSessionRequest()
-    const resp = await api.createSession(req)
-    sessionId = resp.session_id
-    setCategories(resp.categories)
-    setGScores(resp.g_scores)
+    await startFreshSession()
+}
+
+/**
+ * Initialises Season Mode: ensures a session exists so G-scores are available,
+ * then builds minimal Player objects for the roster dropdowns.
+ * Separate from runEvaluate because Season Mode does not run the H-score algorithm.
+ */
+export async function runSeasonInit(): Promise<void> {
+    await ensureSession()
+    setPlayersFromGScores()
 }
 
 /**
@@ -99,16 +107,6 @@ async function ensureSession(): Promise<void> {
  * Retries once if the session has expired (404), creating a fresh session first.
  */
 export async function runEvaluate(): Promise<void> {
-    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
-    if (mode === 'Season Mode') {
-        // Season Mode uses its own evaluate flow (runWaiverEvaluate).
-        // Just ensure the session exists so G-scores are loaded, then
-        // build minimal Player objects for the roster dropdowns.
-        await ensureSession()
-        setPlayersFromGScores()
-        return
-    }
-
     // Abort any in-flight evaluate request so the backend is only computing
     // the most recent draft state, not every intermediate pick.
     if (evaluateController) evaluateController.abort()
@@ -126,7 +124,7 @@ export async function runEvaluate(): Promise<void> {
                 const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
                 const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
 
-                let evalReq: Parameters<typeof api.evaluate>[1]
+                let evalReq: Parameters<typeof client.evaluate>[1]
                 if (mode === 'Auction Mode') {
                     const { player_assignments, remaining_cash } = getAuctionState()
                     evalReq = { player_assignments, my_team_id: seat, remaining_cash }
@@ -139,16 +137,14 @@ export async function runEvaluate(): Promise<void> {
                 const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
                 if (myTeamSize >= getLeagueSettings().n_picks) {
                     buildTable([])
-                    reapplyLayout()
                     return
                 }
 
-                const resp = await api.evaluate(sessionId!, evalReq, signal)
-                const players = api.candidatesToPlayers(resp.candidates)
+                const resp = await client.evaluate(sessionId!, evalReq, signal)
+                const players = client.candidatesToPlayers(resp.candidates)
                 setAllPlayers(players)
                 if (mode !== 'Season Mode') {
                     buildTable(players)
-                    reapplyLayout()
                 }
                 return
             } catch (err: any) {
@@ -177,11 +173,11 @@ export async function runTradeAnalyze(
     myTrade: string[],
     theirTrade: string[],
     ignorePositionCheck?: boolean,
-): Promise<api.TradeAnalyzeResponse> {
+): Promise<client.TradeAnalyzeResponse> {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             await ensureSession()
-            return await api.analyzeTrade(sessionId!, {
+            return await client.analyzeTrade(sessionId!, {
                 player_assignments: playerAssignments,
                 my_team: myTeam,
                 their_team: theirTeam,
@@ -212,11 +208,11 @@ export async function runTradeSuggest(
     yourThreshold: number,
     theirThreshold: number,
     ignorePositionCheck?: boolean,
-): Promise<api.TradeSuggestResponse> {
+): Promise<client.TradeSuggestResponse> {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             await ensureSession()
-            return await api.suggestTrades(sessionId!, {
+            return await client.suggestTrades(sessionId!, {
                 player_assignments: playerAssignments,
                 my_team: myTeam,
                 their_team: theirTeam,
@@ -251,8 +247,8 @@ export async function runWaiverEvaluate(
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
                 await ensureSession()
-                const resp = await api.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
-                const players = api.candidatesToPlayers(resp.candidates)
+                const resp = await client.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
+                const players = client.candidatesToPlayers(resp.candidates)
 
                 setCandidates(players)
                 buildTable(players)

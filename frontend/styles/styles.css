@@ -821,9 +821,16 @@ tr {
     padding: 0;
 }
 
-.panel-colspacer-name     { width: 200px; }
-.panel-colspacer-name-sm  { width: 136px; }
-.panel-colspacer-total    { width: 83px; }
+.panel-colspacer-name         { width: 200px; }
+.panel-colspacer-name-sm      { width: 136px; }
+.panel-colspacer-total        { width: 83px; }
+.panel-colspacer-weights      { width: 219px; }  /* weights table: combined name+total label column */
+.panel-colspacer-flex-label   { width: 110px; }  /* flex allocations table: row label column */
+.panel-colspacer-pos          { width: 90px; }   /* flex/roster tables: per-position columns */
+.panel-colspacer-dollar       { width: 72px; }   /* auction values table: label and value columns */
+
+.panel-indent   { margin-left: 100px; }
+.panel-flex-row { display: flex; gap: 32px; align-items: flex-start; margin-left: 100px; }
 
 .panel-colheader-blank { visibility: hidden; border-top-style: hidden; border-left-style: hidden; }
 
@@ -884,13 +891,27 @@ tr {
 }
 
 #right-header:not(:empty) {
-    padding-bottom: 16px;
     margin-bottom: 16px;
-    border-bottom: 1px solid light-dark(#aaaabc, #3d3d55);
 }
 
-#right-sub-header:not(:empty) {
+#tab-row {
+    display: flex;
+    align-items: center;
     margin-bottom: 12px;
+}
+
+#seat-selector-container {
+    flex: 1;
+    min-width: 0;
+}
+
+#right-sub-header {
+    margin-left: auto;
+}
+
+.pick-btn.active {
+    background: light-dark(#aaaabc, #3d3d55);
+    border-color: light-dark(#888899, #555577);
 }
 
 #season-rosters-row {
@@ -1011,13 +1032,14 @@ tr {
 
 .pick-control-row .cs-wrapper,
 .seat-selector-wrap .cs-wrapper {
-    width: 280px;
+    min-width: 0;
 }
 
 .pick-control-buttons {
     display: flex;
     gap: 6px;
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 .pick-btn {
@@ -1108,15 +1130,30 @@ tr {
     margin-bottom: 8px;
 }
 
+.draft-tab-bar,
+.auction-tab-bar {
+    display: flex;
+    gap: 6px;
+}
+
+.seat-selector-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 /* ─── Evaluate in-progress indicator ─────────────────────────────────────────── */
 
 .eval-indicator {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     font-size: 0.9rem;
-    color: light-dark(#666688, #9999bb);
-    visibility: hidden;
+    color: light-dark(#aaaaaa, #666688);
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: 130px;
 }
 
 .eval-indicator::before {
@@ -1124,10 +1161,17 @@ tr {
     width: 11px;
     height: 11px;
     border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.eval-indicator.evaluating {
+    color: light-dark(#666688, #9999bb);
+}
+
+.eval-indicator.evaluating::before {
     border: 2px solid light-dark(#9999cc, #6666aa);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;
-    flex-shrink: 0;
 }
 
 @keyframes eval-spin {

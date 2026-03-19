@@ -197,15 +197,23 @@ def get_config_route(sport: str):
                 options[key] = dict(options[key])
                 options[key]['default'] = value
 
+    pos_struct = p.get('position_structure', {})
+    position_names = {}
+    for abbr, info in pos_struct.get('base', {}).items():
+        position_names[abbr] = info.get('full_str', abbr)
+    for abbr, info in pos_struct.get('flex', {}).items():
+        position_names[abbr] = info.get('full_str', abbr)
+
     return {
         'default_categories': p.get('default-categories', []),
         'all_categories': all_categories,
         'options': options,
         'positions': raw_options.get('positions', {}),
         'position_structure': {
-            'base_list': p.get('position_structure', {}).get('base_list', []),
-            'flex_list': p.get('position_structure', {}).get('flex_list', []),
+            'base_list': pos_struct.get('base_list', []),
+            'flex_list': pos_struct.get('flex_list', []),
         },
+        'position_names': position_names,
         'punting_defaults': punting_defaults,
         'punting_default': punting_default,
     }

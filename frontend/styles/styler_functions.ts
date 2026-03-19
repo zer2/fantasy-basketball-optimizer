@@ -21,9 +21,13 @@ function darkSecondary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
     const intensity = Math.min(Math.round(Math.abs(raw)), 150)
     if (raw > 0) {
-        return [80 + Math.round(intensity * 0.53), 80 + Math.round(intensity * 0.5), 80]
+        return [80 + Math.round(intensity * 0.53)
+            , 80 + Math.round(intensity * 0.5)
+            , 80]
     } else {
-        return [80 + Math.round(intensity * 0.67), 80 + Math.round(intensity * 0.2), 80]
+        return [80 + Math.round(intensity * 0.67)
+            , 80 + Math.round(intensity * 0.2)
+            , 80]
     }
 }
 
@@ -69,21 +73,25 @@ function lightTertiary(value: number, multiplier: number, middle: number): RGB {
 
 // ─── Public exports (light-dark dual output) ─────────────────────────────────
 
-//ZR: The '-999' thing was a hack for streamlit, originally. We can probably clean it up by 
-//explicitly setting a different class for the ineligible values, and not calling these functions
-export function stat_styler_primary(value: number, multiplier: number, middle: number): string {
-    if (value == -999) return sentinel('#F6F6F6', '#8D8D9E')
-    return formatDual(lightPrimary(value, multiplier, middle), darkPrimary(value, multiplier, middle))
+export function stat_styler_primary(value: number
+                                    , multiplier: number
+                                    , middle: number): string {
+    return formatDual(lightPrimary(value, multiplier, middle)
+                      , darkPrimary(value, multiplier, middle))
 }
 
-export function stat_styler_secondary(value: number, multiplier: number, middle: number): string {
-    if (value == -999) return sentinel('#F6F6F6', '#8D8D9E')
-    return formatDual(lightSecondary(value, multiplier, middle), darkSecondary(value, multiplier, middle))
+export function stat_styler_secondary(value: number
+                                    , multiplier: number
+                                    , middle: number): string {
+    return formatDual(lightSecondary(value, multiplier, middle)
+                      , darkSecondary(value, multiplier, middle))
 }
 
-export function stat_styler_tertiary(value: number, multiplier: number, middle: number): string {
-    if (value == -999) return sentinel('#F6F6F6', '#555566')
-    return formatDual(lightTertiary(value, multiplier, middle), darkTertiary(value, multiplier, middle))
+export function stat_styler_tertiary(value: number
+                                    , multiplier: number
+                                    , middle: number): string {
+    return formatDual(lightTertiary(value, multiplier, middle)
+                      , darkTertiary(value, multiplier, middle))
 }
 
 // ─── Theme switching ─────────────────────────────────────────────────────────
@@ -94,18 +102,14 @@ export function setTheme(theme: 'dark' | 'light'): void {
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
 
-function textColor(r: number, g: number, b: number): string {
+function pickTextColor(r: number, g: number, b: number): string {
     return (r * 0.299 + g * 0.587 + b * 0.114) > 150 ? 'black' : 'white'
 }
 
-function rgb(c: RGB): string { return `rgb(${c[0]},${c[1]},${c[2]})` }
+function formatRgb(c: RGB): string { return `rgb(${c[0]},${c[1]},${c[2]})` }
 
 function formatDual(light: RGB, dark: RGB): string {
-    const ltc = textColor(...light)
-    const dtc = textColor(...dark)
-    return `color:light-dark(${ltc},${dtc});background-color:light-dark(${rgb(light)},${rgb(dark)});`
-}
-
-function sentinel(light: string, dark: string): string {
-    return `background-color:light-dark(${light},${dark});color:light-dark(${light},${dark});`
+    const lightTextColor = pickTextColor(...light)
+    const darkTextColor  = pickTextColor(...dark)
+    return `color:light-dark(${lightTextColor},${darkTextColor});background-color:light-dark(${formatRgb(light)},${formatRgb(dark)});`
 }

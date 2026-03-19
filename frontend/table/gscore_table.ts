@@ -2,7 +2,8 @@
 // Renders a G-score breakdown table for a list of players.
 // Used by Auction Mode's "My Team" tab and potentially by Season Mode roster inspection.
 
-import { getGScoreByName, getCategories } from '../app_state.js'
+import { getGScoreByName } from '../app_state.js'
+import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../styles/styler_functions.js'
 
 /**
@@ -10,20 +11,22 @@ import { stat_styler_primary } from '../styles/styler_functions.js'
  * team totals row.  Styled to match the season roster inspector tables.
  * Clears and replaces `container` contents on each call.
  */
-export function renderTeamGScoreTable(playerNames: string[], container: HTMLElement, width?: string): void {
+export function renderTeamGScoreTable(playerNames: string[]
+                                    , container: HTMLElement
+                                    , width?: string): void {
     container.innerHTML = ''
-    const categories = getCategories()
+    const categories = getFormatAndCategories().categories
     const gScoreMap  = getGScoreByName()
 
     // Collect G-scores for each player
     const rows: { name: string; values: number[]; total: number }[] = []
+    if (playerNames.length === 0) return
+
     for (const name of playerNames) {
         const gs = gScoreMap.get(name)
-        if (!gs) continue
+        if (!gs) throw new Error(`G-score not found for player: ${name}`)
         rows.push({ name: gs.name, values: gs.values, total: gs.total })
     }
-
-    if (rows.length === 0) return
 
     // ── Build table ──────────────────────────────────────────────────────────
 

@@ -4,10 +4,17 @@
 
 import { Player, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
 
+
+// Empty string = same-origin deployment (frontend and backend served from the same host).
+// Change to an absolute URL (e.g. 'https://api.example.com') if the frontend
+// and backend are ever deployed on different origins.
 export const BASE_URL = ''
 
 // ── Map backend Candidate → frontend Player ────────────────────────────────────
 
+
+// Adapter between backend snake_case Candidate objects and frontend camelCase Player objects.
+// The backend follows Python naming conventions; this is the single place where that translation happens.
 /** Converts raw backend Candidate objects to frontend Player objects, remapping snake_case keys to camelCase. */
 export function candidatesToPlayers(candidates: any[]): Player[] {
     return candidates.map((c, i) => ({
@@ -115,10 +122,7 @@ export async function createSession(
 
 // ── PATCH /sessions/{id} ──────────────────────────────────────────────────────
 
-/* This function might fail if it is called by itself, outside of CreateorPatchSession.
-That function has logic to handle the potential for this function to fail due to 
-an expired session
-*/
+/** Patches an existing session. Only call via `createOrPatchSession`, which handles 404 (expired session) recovery. */
 export async function patchSession(
     sessionId: string,
     req: Record<string, unknown>,

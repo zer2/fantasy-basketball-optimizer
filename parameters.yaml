@@ -305,16 +305,16 @@ NBA:
       - PF
       - C
     base:
-      PG : 
-        full_str: Point Guards
-      SG : 
-        full_str: Shooting Guards
-      SF : 
-        full_str: Small Forwards
-      PF : 
-        full_str: Power Forwards
-      C : 
-        full_str: Centers
+      PG :
+        full_str: Point Guard
+      SG :
+        full_str: Shooting Guard
+      SF :
+        full_str: Small Forward
+      PF :
+        full_str: Power Forward
+      C :
+        full_str: Center
     flex_list :
     - G
     - F
@@ -327,17 +327,17 @@ NBA:
         - SF
         - PF
         - C
-        full_str: Utilities
-      G : 
-        bases: 
+        full_str: Utility
+      G :
+        bases:
         - PG
         - SG
-        full_str: Guards
-      F: 
-        bases: 
+        full_str: Guard
+      F:
+        bases:
         - SF
         - PF
-        full_str: Forwards
+        full_str: Forward
   punting_defaults :
     No dynamic optimization :
       omega : 0.0 

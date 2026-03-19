@@ -5,3 +5,4 @@
 - Wherever possible (e.g. not the stat styler functions) CSS should be derived from styles.css
 - Parameter should be framed in the positive. E.g. 'usemargin' instead of 'nomargin'
 - Variable names should be descriptive. Except in one-liners like lamdba functions, let's never use any abbreviations 
+- No circular dependenies or clumsy fixes for circular dependencies, like loading functions as parameters from other functions 

@@ -5,17 +5,17 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { getCandidatePlayers } from '../app_state.js'
 import { makeDebouncer, Debouncer } from '../helper_functions.js'
+import { runEvaluate } from '../api/session.js'
+import {
+    DraftConfig,
+    getPickRow, getPickDrafter, getDrafted, getTeamNames, getNDrafters, getNPicks, getConfigKey,
+    resetDraftState, applyDraftConfig,
+    recordDraftPick, clearDraftPick, clearAllDraftPicks,
+    advanceDraftPick, goBackDraftPick,
+} from './draft_state.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-let pickRow     = 0
-let pickDrafter = 0
-let drafted: (string | null)[][] = []   // [row][drafter], null = not yet picked
-let teamNames:  string[] = []
-let nDrafters = 0
-let nPicks    = 0
-let configKey = ''   // detects sidebar changes that require a reset
-let _onPick: (() => void | Promise<void>) | undefined
 let _debouncer: Debouncer | null = null
 
 const ROUND_W = 46   // px — Round label column
@@ -29,43 +29,20 @@ const TEAM_W  = 85   // px — per-drafter column
  * The next renderDraftBoard call will reinitialise from current sidebar values.
  */
 export function resetDraftBoard(): void {
-    pickRow     = 0
-    pickDrafter = 0
-    drafted     = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
-    configKey   = ''
+    resetDraftState()
     _debouncer?.cancel()
 }
 
-/** Returns the current draft state for use in /evaluate requests. */
-export function getDraftState(): { player_assignments: Record<string, string[]> } {
-    const player_assignments: Record<string, string[]> = {}
-    for (let d = 0; d < nDrafters; d++) {
-        const name = teamNames[d] ?? `Drafter ${d + 1}`
-        player_assignments[name] = drafted.map(row => row[d]).filter(Boolean) as string[]
-    }
-    return { player_assignments }
-}
-
-/** Renders the draft board UI into the container. Resets state if sidebar config changed. Calls onPick (debounced) after each draft action. */
-export function renderDraftBoard(
-    container: HTMLElement,
-    onPick?: () => void | Promise<void>,
-): void {
-    if (onPick !== undefined) {
-        _onPick = onPick
-        _debouncer = makeDebouncer(() => { _onPick?.() })
+/** Renders the draft board UI into the container. Resets state if sidebar config changed. */
+export function renderDraftBoard(container: HTMLElement): void {
+    if (!_debouncer) {
+        _debouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Draft evaluate failed:', err)) })
     }
     const cfg = readDraftConfig()
 
     // Reset state if league settings changed (different drafter/pick counts or teams)
-    if (cfg.key !== configKey) {
-        pickRow     = 0
-        pickDrafter = 0
-        drafted     = Array.from({ length: cfg.nPicks }, () => Array(cfg.nDrafters).fill(null))
-        teamNames   = cfg.teamNames
-        nDrafters   = cfg.nDrafters
-        nPicks      = cfg.nPicks
-        configKey   = cfg.key
+    if (cfg.key !== getConfigKey()) {
+        applyDraftConfig(cfg)
     }
 
     container.innerHTML = ''
@@ -78,6 +55,12 @@ export function renderDraftBoard(
 /** Builds the pick control row: player dropdown, lock-in / undo / clear buttons. */
 function buildPickControl(container: HTMLElement): HTMLElement {
     const wrap = document.createElement('div')
+
+    const pickRow     = getPickRow()
+    const pickDrafter = getPickDrafter()
+    const nPicks      = getNPicks()
+    const nDrafters   = getNDrafters()
+    const teamNames   = getTeamNames()
 
     const isDone = pickRow >= nPicks
 
@@ -92,8 +75,10 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         : `Select Pick ${pickRow + 1} for ${teamNames[pickDrafter] ?? `Drafter ${pickDrafter + 1}`}`
     row.append(label)
 
-    const available = getAvailablePlayers()
+    const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
+    const available  = getCandidatePlayers().map(p => p.name).filter(n => !draftedSet.has(n))
     const sel = makeCustomSelect('draft-pick-select', available.map(n => ({ value: n, label: n })))
+    sel.element.style.flex = '1'
     row.append(sel.element)
 
     const btns = document.createElement('div')
@@ -105,9 +90,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     lockBtn.disabled = isDone || available.length === 0
     lockBtn.addEventListener('click', () => {
         const chosen = sel.getValue()
-        if (!chosen || isDone) return
-        drafted[pickRow][pickDrafter] = chosen
-        advance()
+        if (!chosen || getPickRow() >= getNPicks()) return
+        recordDraftPick(getPickRow(), getPickDrafter(), chosen)
+        advanceDraftPick()
         renderDraftBoard(container)
         _debouncer?.fire()
     })
@@ -117,27 +102,19 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     undoBtn.textContent = 'Undo previous selection'
     undoBtn.disabled = pickRow === 0 && pickDrafter === 0
     undoBtn.addEventListener('click', () => {
-        goBack()
-        drafted[pickRow][pickDrafter] = null
+        goBackDraftPick()
+        clearDraftPick(getPickRow(), getPickDrafter())
         renderDraftBoard(container)
         _debouncer?.fire()
-
     })
 
     const clearBtn = document.createElement('button')
     clearBtn.className = 'pick-btn'
     clearBtn.textContent = 'Clear draft board'
     clearBtn.addEventListener('click', () => {
-        pickRow = 0
-        pickDrafter = 0
-        drafted = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
+        clearAllDraftPicks()
         renderDraftBoard(container)
-        if (_onPick) {
-            const result = _onPick()
-            if (result instanceof Promise) {
-                result.catch(err => console.error('Evaluate after clear failed:', err))
-            }
-        }
+        runEvaluate().catch(err => console.error('Evaluate after clear failed:', err))
     })
 
     btns.append(lockBtn, undoBtn, clearBtn)
@@ -152,6 +129,13 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 function buildDraftBoard(): HTMLElement {
     const scroll = document.createElement('div')
     scroll.className = 'entry-table-scroll'
+
+    const nPicks    = getNPicks()
+    const nDrafters = getNDrafters()
+    const teamNames = getTeamNames()
+    const drafted   = getDrafted()
+    const pickRow   = getPickRow()
+    const pickDrafter = getPickDrafter()
 
     const table = document.createElement('table')
     table.className    = 'entry-table'
@@ -181,7 +165,7 @@ function buildDraftBoard(): HTMLElement {
         roundCell.textContent = String(r + 1)
 
         for (let d = 0; d < nDrafters; d++) {
-            const cell = row.insertCell()
+            const cell   = row.insertCell()
             const player = drafted[r][d]
             if (player) {
                 cell.textContent = player
@@ -198,48 +182,8 @@ function buildDraftBoard(): HTMLElement {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Returns player names that have not yet been drafted. */
-function getAvailablePlayers(): string[] {
-    const allPlayers = getCandidatePlayers().map(p => p.name)
-    const draftedSet = new Set(drafted.flat().filter(Boolean) as string[])
-    return allPlayers.filter(n => !draftedSet.has(n))
-}
-
-/** Advance pick position in serpentine order. */
-function advance(): void {
-    const isForward = pickRow % 2 === 0   // even rounds: left→right
-    if (isForward) {
-        if (pickDrafter < nDrafters - 1) { pickDrafter++; return }
-    } else {
-        if (pickDrafter > 0) { pickDrafter--; return }
-    }
-    // Move to next round
-    if (pickRow < nPicks - 1) {
-        pickRow++
-        pickDrafter = pickRow % 2 === 0 ? 0 : nDrafters - 1
-    } else {
-        pickRow = nPicks   // draft complete sentinel
-    }
-}
-
-/** Move pick position back one step in serpentine order. */
-function goBack(): void {
-    if (pickRow >= nPicks) { pickRow = nPicks - 1 }
-    const isForward = pickRow % 2 === 0
-    if (isForward) {
-        if (pickDrafter > 0) { pickDrafter--; return }
-    } else {
-        if (pickDrafter < nDrafters - 1) { pickDrafter++; return }
-    }
-    if (pickRow > 0) {
-        pickRow--
-        const prevForward = pickRow % 2 === 0
-        pickDrafter = prevForward ? nDrafters - 1 : 0
-    }
-}
-
 /** Reads current sidebar league settings and returns them with a composite key for change detection. */
-function readDraftConfig(): { nDrafters: number; nPicks: number; teamNames: string[]; key: string } {
+function readDraftConfig(): DraftConfig {
     const nD  = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
     const nP  = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
     const src = (document.getElementById('ps-data-type') as HTMLInputElement).value
@@ -247,4 +191,3 @@ function readDraftConfig(): { nDrafters: number; nPicks: number; teamNames: stri
         .value.split('\n').map(s => s.trim()).filter(Boolean)
     return { nDrafters: nD, nPicks: nP, teamNames: names, key: `${nD}:${nP}:${src}:${names.join(',')}` }
 }
-

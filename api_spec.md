@@ -351,8 +351,8 @@ should convert to `camelCase` when mapping to the `Player` interface (e.g.
 `is_total` → `isTotal`, `is_candidate` → `isCandidate`).
 
 **Ineligible flex slots:** The API uses JSON `null` for ineligible positions in
-`flex_allocations.values`. The frontend sentinel is `-999`. The mapping layer should
-convert `null → -999` before passing values to styler functions.
+`flex_allocations.values`. The frontend handles `null` directly at the call site
+(see `expand_view.ts`) and never passes ineligible cells to stat_styler functions.
 
 **Candidate ordering:** Candidates in the `/evaluate` response are sorted by `h_score`
 descending. `h_rank` is included explicitly for convenience but equals array index + 1.
