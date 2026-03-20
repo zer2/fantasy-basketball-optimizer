@@ -1,240 +1,214 @@
-from src.math.algorithm_agents import HAgent
-from src.math.algorithm_helpers import auction_value_adjuster, savor_calculation, combinatorial_calculation, calculate_tipping_points
-from streamlit.testing.v1 import AppTest
-import numpy as np 
+# testing_files/test_algorithms.py
+# Adapted from the original Streamlit-based test_algorithms.py.
+# Tests backend math via the FastAPI TestClient instead of AppTest.
+#
+# Pure-math tests (combinatorial, tipping_point, savor) require no session setup.
+# Gradient tests create a session through the API to obtain session.info, then
+# build HAgent instances directly for targeted testing.
+
+import numpy as np
 import pandas as pd
-from scipy.stats import norm
+import yaml
+from fastapi.testclient import TestClient
+
+from backend.main import app
+from backend.session import get_session
+from backend.math.algorithm_agents import HAgent
+from backend.math.algorithm_helpers import (
+    combinatorial_calculation
+    , calculate_tipping_points
+    , savor_calculation
+)
+
+client = TestClient(app)
+
+_PARAMS_PATH = 'parameters.yaml'
+
+
+def _load_default_options() -> dict:
+    with open(_PARAMS_PATH) as f:
+        return yaml.safe_load(f)['NBA']['options']
+
+
+def _create_session() -> tuple[str, dict]:
+    """POST /sessions with default NBA mock parameters.
+    Returns (session_id, info) where info is the processed player data dict.
+    """
+    response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    assert response.status_code == 201, response.text
+    session_id = response.json()['session_id']
+    session = get_session(session_id)
+    return session_id, session.info
+
+
+def _build_h_agent(info: dict, scoring_format: str) -> HAgent:
+    opts = _load_default_options()
+    with open(_PARAMS_PATH) as f:
+        all_params = yaml.safe_load(f)
+    sport_params = all_params['NBA']
+    slot_counts  = opts.get('positions', {}).get('default', {})
+
+    return HAgent(
+        info           = info
+        , omega        = opts['omega']['default']
+        , gamma        = opts['gamma']['default']
+        , n_picks      = opts['n_picks']['default']
+        , n_drafters   = opts['n_drafters']['default']
+        , dynamic      = True
+        , scoring_format = scoring_format
+        , sport        = 'NBA'
+        , params       = sport_params
+        , slot_counts  = slot_counts
+        , beth         = opts['beth']['default']
+    )
+
+
+# ─── Gradient tests ───────────────────────────────────────────────────────────
 
 def test_x_mu_gradients():
-    """Make sure the H-score calculations for x_mu are working"""
-    at = AppTest.from_file("../app.py").run(timeout = 300)
-
-    info = at.session_state.info
-
-    H = HAgent(info = info
-        , omega = at.number_input('omega').value
-        , gamma = at.number_input('gamma').value
-        , alpha = at.number_input('alpha').value
-        , beta = at.number_input('beta').value
-        , n_picks = at.number_input('n_picks').value
-        , n_drafters = at.number_input('n_drafters').value
-        , beth = at.number_input('beth').value
-        , scoring_format = 'Head to Head: Most Categories'
-        , dynamic = True)
+    """H-score gradient checks for Head to Head: Most Categories scoring format."""
+    _, info = _create_session()
+    H = _build_h_agent(info, 'Head to Head: Most Categories')
 
     c_list = [
-            np.array([1/8] * 8 + [0]).reshape(1,9)
-            ,np.array([1/4]*4 + [0] * 5).reshape(1,9)
-            ,np.array([1/10] * 8 + [2/10]).reshape(1,9)
-            ,np.array([[[0.1] + [0.15] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
-                            + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]]).reshape(11,9)
-             ]
-
-    #check gradients
-
-    for c in c_list:
-
-        L = np.array([H.L] * len(c))
-
-        #x_mu_long = H.get_x_mu_long_form(c)
-        #x_mu_simplified = H.get_x_mu_simplified_form(c)
-
-        #assert x_mu_long.shape == x_mu_simplified.shape
-        #assert (abs(x_mu_long - x_mu_simplified) < 0.01).all(        
-        check_all_gradients(c, L,H.get_term_two, H.get_del_term_two)
-        check_all_gradients(c, L,H.get_term_five_a, H.get_del_term_five_a)
-
-        check_all_gradients(c, L,H.get_term_five_b, H.get_del_term_five_b)
-
-        check_all_gradients(c, L,H.get_term_four, H.get_del_term_four)
-        check_all_gradients(c, L,H.get_terms_four_five, H.get_del_terms_four_five)
-        check_all_gradients(c, L,H.get_last_three_terms, H.get_del_last_three_terms)
-        check_all_gradients(c, L,H.get_last_four_terms, H.get_del_last_four_terms)
-        check_all_gradients(c, L,H.get_x_mu_simplified_form, H.get_del_full)
-
-        check_all_gradients(c, L,H.get_term_five, H.get_del_term_five)
-
-def test_objective_gradients():
-    """Make sure the H-score calculations for x_mu are working"""
-    at = AppTest.from_file("../app.py").run(timeout = 300)
-    #at.selectbox('scoring_format').input('Rotisserie')
-
-    info = at.session_state.info
-
-    assert at.session_state.params is not None
-    assert at.session_state
-
-    H = HAgent(info = info
-        , omega = at.number_input('omega').value
-        , gamma = at.number_input('gamma').value
-        , alpha = at.number_input('alpha').value
-        , beta = at.number_input('beta').value
-        , n_picks = at.number_input('n_picks').value
-        , n_drafters = at.number_input('n_drafters').value
-        , beth = at.number_input('beth').value
-        , scoring_format = 'Rotisserie'
-        , dynamic = True)
-
-    #we're ok failing the c
-
-    c_list = [  np.array([[[0.1] + [0.2] + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-                , np.array([[[0.2] + [0.1] + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-                , np.array([[[0.1] + [0.201] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-                , np.array([[[0.1] + [0.15] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-                , np.array([[[0.1] + [0.2] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-                 , np.array([[[0.1] + [0.15] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
-                            + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
-                 #, np.array([[[0.1] + [0.2] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
-                #            + [[0.1] + [0.2] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
-                #, np.array([ [[0.5]*11] * 9])
-                #, np.array([[[0.4]*11] * 5 + [[0.5]*11] * 4])
-                #, np.array([[[0.1] + [0.1] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
-                #            + [[0.1] + [0.1] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
-                #, np.array([[[0.3]*9 + [0.7]*2] * 7 + [[0.6]*11] * 1 + [[0.9]*11] * 1])
-                #, np.array([[[0.7]*9 + [0.3]*2] * 7 + [[0.6]*11] * 1 + [[0.9]*11] * 1])
-                #, np.array([[[0.7]*6 + [0.3]*5] * 7 + [[0.6]*11] * 1 + [[0.9]*11] * 1])
-                #, np.array([[[0.4]*11] * 5 + [[0.5]*11] * 4])
-                #, np.array([[[0.4]*11]* 7 + [[0.6]*11] * 1 + [[0.9]*11] * 1])
-                #, np.array([[[0.3]*6 + [0.7]*5] * 5 + [[0.5]*11] * 4])
+        np.array([1/8] * 8 + [0]).reshape(1, 9)
+        , np.array([1/4] * 4 + [0] * 5).reshape(1, 9)
+        , np.array([1/10] * 8 + [2/10]).reshape(1, 9)
+        , np.array([[[0.1] + [0.15] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
+                    + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]]).reshape(11, 9)
     ]
 
-    #check gradients
+    for c in c_list:
+        L = np.array([H.L] * len(c))
+        _check_all_gradients(c, L, H.get_term_two,          H.get_del_term_two)
+        _check_all_gradients(c, L, H.get_term_five_a,       H.get_del_term_five_a)
+        _check_all_gradients(c, L, H.get_term_five_b,       H.get_del_term_five_b)
+        _check_all_gradients(c, L, H.get_term_four,         H.get_del_term_four)
+        _check_all_gradients(c, L, H.get_terms_four_five,   H.get_del_terms_four_five)
+        _check_all_gradients(c, L, H.get_last_three_terms,  H.get_del_last_three_terms)
+        _check_all_gradients(c, L, H.get_last_four_terms,   H.get_del_last_four_terms)
+        _check_all_gradients(c, L, H.get_x_mu_simplified_form, H.get_del_full)
+        _check_all_gradients(c, L, H.get_term_five,         H.get_del_term_five)
+
+
+def test_objective_gradients():
+    """Rotisserie objective gradient checks."""
+    _, info = _create_session()
+    H = _build_h_agent(info, 'Rotisserie')
+
+    c_list = [
+        np.array([[[0.1] + [0.2]  + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.2] + [0.1]  + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.201] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.2]  + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
+                    + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
+    ]
 
     def rotisserie_objective(cdf_estimates):
-        res = H.get_objective_and_pdf_weights_rotisserie(
-                        cdf_estimates
-                        , 1
-                        , None
-                        , False) 
-        return res
+        return H.get_objective_and_pdf_weights_rotisserie(cdf_estimates, 1, None, False)
 
     def rotisserie_gradient(cdf_estimates):
-        
-        res = H.get_objective_and_pdf_weights_rotisserie(
-                        cdf_estimates
-                        , 1
-                        , None
-                        , True
-                        , True) 
-        return res
+        return H.get_objective_and_pdf_weights_rotisserie(cdf_estimates, 1, None, True, True)
 
     for c in c_list:
+        _check_all_gradients_2(c, rotisserie_objective, rotisserie_gradient)
 
-        print('CHECKING NEXT. C = ')
-        print(c)
-        check_all_gradients_2(c, rotisserie_objective, rotisserie_gradient)
 
+# ─── Pure math tests ──────────────────────────────────────────────────────────
 
 def test_combinatorial_calculation():
-    c = np.array([[[1/2,0]]*9] * 2)
+    c = np.array([[[1/2, 0]] * 9] * 2)
+    result          = combinatorial_calculation(c, 1 - c)
+    expected_result = np.array([[1/2, 0], [1/2, 0]])
+    assert (abs(result - expected_result) < 0.01).all()
 
-    res = combinatorial_calculation(c, 1 -c)
-
-    expected_result = np.array([[1/2,0],[1/2,0]])
-
-    assert (abs(res - expected_result) < 0.01).all()
 
 def test_tipping_point_calculation():
-    x = np.array([[[1/2,0]]*9] * 2)
+    x               = np.array([[[1/2, 0]] * 9] * 2)
+    result          = calculate_tipping_points(x)
+    expected_result = np.array([[[0.2734, 0]] * 9] * 2)
+    assert (abs(result - expected_result) < 0.01).all()
 
-    res = calculate_tipping_points(x)
 
-    expected_result = np.array([[[0.2734,0]] * 9] * 2)
+def test_savor_calculation():
+    values = pd.Series([1, 2, 3, 4, 5]).sort_values(ascending=False)
+    noise  = 2
 
-    assert (abs(res - expected_result) < 0.01).all()
+    savor_result = savor_calculation(values, noise)
 
-def check_all_gradients(c, L, func, del_func):
+    replacement_ev = np.mean(np.clip(np.random.normal(scale=noise, size=100_000), 0, None))
+
+    def estimate_player_value(mean: float) -> float:
+        return np.mean(np.clip(np.random.normal(loc=mean, scale=noise, size=100_000), 0, None))
+
+    player_net_evs = np.clip(
+        np.array([estimate_player_value(x) - replacement_ev for x in values])
+        , 0, None
+    )
+    regularized_simulated = player_net_evs / player_net_evs.sum()
+    regularized_savor     = savor_result / savor_result.sum()
+
+    assert all(abs(regularized_simulated - regularized_savor) < 0.01)
+
+
+# ─── Gradient check helpers ───────────────────────────────────────────────────
+
+def _check_all_gradients(c, L, func, del_func):
     for j in range(9):
-        check_gradient(c, L, func, del_func, j)
+        _check_gradient(c, L, func, del_func, j)
 
-def check_all_gradients_2(c, func, del_func):
 
-    check_gradient_2(c, func, del_func)
+def _check_all_gradients_2(c, func, del_func):
+    _check_gradient_2(c, func, del_func)
 
-def check_gradient(c, L, func, del_func, term):
 
-    h = 0.0000001
-    old = func(c, L)
-    c2 = c.copy()
+def _check_gradient(c, L, func, del_func, term: int):
+    h         = 0.0000001
+    old       = func(c, L)
+    c2        = c.copy()
+    c2[0, term] = c2[0, term] + h
+    new       = func(c2, L)
 
-    c2[0,term] = c2[0,term] + h
-
-    new = func(c2, L)
-    del_real = (new - old)/h
+    del_real        = (new - old) / h
     del_theoretical = del_func(c, L)
 
-    if del_real.shape[0] > 1: 
-        del_real = del_real[0,:,:]
+    if del_real.shape[0] > 1:
+        del_real = del_real[0, :, :]
 
-    if del_theoretical.shape[0] > 1: 
-        del_theoretical = np.expand_dims(del_theoretical[0,:,:], axis = 0)
+    if del_theoretical.shape[0] > 1:
+        del_theoretical = np.expand_dims(del_theoretical[0, :, :], axis=0)
 
-    if del_theoretical.shape == (1,1,9):
-        res = del_theoretical[:,:,term]
-    elif del_theoretical.shape == (1,9,9):
-        res = del_theoretical[:,:,term].reshape(9,1)
-    elif del_theoretical.shape == (1,9,9,9):
-        res = del_theoretical[:,:,:,term].reshape(1,9,9)
+    if del_theoretical.shape == (1, 1, 9):
+        result = del_theoretical[:, :, term]
+    elif del_theoretical.shape == (1, 9, 9):
+        result = del_theoretical[:, :, term].reshape(9, 1)
+    elif del_theoretical.shape == (1, 9, 9, 9):
+        result = del_theoretical[:, :, :, term].reshape(1, 9, 9)
+    else:
+        result = del_theoretical
 
-    assert (abs(del_real - res) < 0.01).all()
+    assert (abs(del_real - result) < 0.01).all()
 
-def check_gradient_2(c, func, del_func):
-    h = 0.0001
 
+def _check_gradient_2(c, func, del_func):
+    h   = 0.0001
     old = func(c)
 
-    #print('Objective value:')
-    #print(old)
-
     all_del_real = []
-    all_res = []
+    all_results  = []
 
     for term in range(9):
         c2 = c.copy()
-
-        c2[0,term,0] = c2[0,term,0] + h
-
-        new = func(c2)
-        del_real = (new - old)/h
+        c2[0, term, 0] = c2[0, term, 0] + h
+        new            = func(c2)
+        del_real       = (new - old) / h
         del_theoretical = del_func(c)
+        all_del_real.append(del_real)
+        all_results.append(del_theoretical[0, term, 0])
 
-        res = del_theoretical[0,term,0]
-        
-        all_del_real = all_del_real + [del_real]
-        all_res = all_res + [res]
+    all_del_real_normalized = np.array(all_del_real).reshape(9, 1) / sum(all_del_real)
+    all_results_normalized  = np.array(all_results).reshape(9, 1)  / sum(all_del_real)
 
-    all_del_real_normalized = np.array(all_del_real).reshape(9,1)/sum(all_del_real)
-    all_res_normalized = np.array(all_res).reshape(9,1)/sum(all_del_real)
-
-    assert (abs(all_del_real_normalized - all_res_normalized) < 0.001).all()
-
-def test_savor_calculation():
-    values = pd.Series([1,2,3,4,5]).sort_values(ascending = False)
-    noise = 2
-
-    #calculate the result by theory 
-    savor_result = savor_calculation(values
-                    , noise)
-
-    #calculate the result with simulation
-    replacement_ev = np.mean(np.clip(np.random.normal(scale = noise
-                                                        , size = 100000)
-                                    ,0,None))
-
-    def estimate_player_value(mean):
-        return np.mean(np.clip(np.random.normal(loc = mean
-                                                        ,scale = noise
-                                                        , size = 100000)
-                            ,0,None))
-
-    player_net_evs = np.clip(np.array([estimate_player_value(x) - replacement_ev \
-                            for x in values])
-                            ,0,None)
-
-    regularized_player_net_evs = player_net_evs/player_net_evs.sum()
-    regularized_savor = savor_result/savor_result.sum()
-
-    assert all(abs(regularized_player_net_evs - regularized_savor) < .01)
-
-
-
+    assert (abs(all_del_real_normalized - all_results_normalized) < 0.001).all()

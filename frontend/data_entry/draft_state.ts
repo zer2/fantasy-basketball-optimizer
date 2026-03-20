@@ -5,10 +5,11 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DraftConfig {
-    nDrafters: number
-    nPicks:    number
-    teamNames: string[]
-    key:       string
+    nDrafters:           number
+    nPicks:              number
+    teamNames:           string[]
+    thirdRoundReversal:  boolean
+    key:                 string
 }
 
 // ─── Module state ─────────────────────────────────────────────────────────────
@@ -16,9 +17,10 @@ export interface DraftConfig {
 let pickRow     = 0
 let pickDrafter = 0
 let drafted: (string | null)[][] = []   // [row][drafter], null = not yet picked
-let teamNames:  string[] = []
-let nDrafters = 0
-let nPicks    = 0
+let teamNames:          string[]
+let nDrafters:          number
+let nPicks:             number
+let thirdRoundReversal: boolean
 let configKey = ''   // detects sidebar changes that require a reset
 
 // ─── Getters ──────────────────────────────────────────────────────────────────
@@ -27,8 +29,8 @@ export function getPickRow():     number              { return pickRow     }
 export function getPickDrafter(): number              { return pickDrafter }
 export function getDrafted():     (string | null)[][] { return drafted     }
 export function getTeamNames():   string[]            { return teamNames   }
-export function getNDrafters():   number              { return nDrafters   }
-export function getNPicks():      number              { return nPicks      }
+export function getNDrafters(): number { return nDrafters }
+export function getNPicks():    number { return nPicks    }
 export function getConfigKey():   string              { return configKey   }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -46,10 +48,11 @@ export function applyDraftConfig(cfg: DraftConfig): void {
     pickRow     = 0
     pickDrafter = 0
     drafted     = Array.from({ length: cfg.nPicks }, () => Array(cfg.nDrafters).fill(null))
-    teamNames   = cfg.teamNames
-    nDrafters   = cfg.nDrafters
-    nPicks      = cfg.nPicks
-    configKey   = cfg.key
+    teamNames          = cfg.teamNames
+    nDrafters          = cfg.nDrafters
+    nPicks             = cfg.nPicks
+    thirdRoundReversal = cfg.thirdRoundReversal
+    configKey          = cfg.key
 }
 
 // ─── Pick mutations ───────────────────────────────────────────────────────────
@@ -70,9 +73,24 @@ export function clearAllDraftPicks(): void {
 
 // ─── Pick position navigation ─────────────────────────────────────────────────
 
+/** Returns whether the given row goes left→right (forward) under the current reversal setting. */
+function isForwardRow(row: number): boolean {
+    if (thirdRoundReversal) {
+        return row < 2 ? row % 2 === 0 : row % 2 === 1
+    }
+    return row % 2 === 0
+}
+
 /** Advance pick position one step in serpentine order. */
 export function advanceDraftPick(): void {
-    const isForward = pickRow % 2 === 0   // even rounds: left→right
+    // Third-round reversal: end of row 1 jumps directly to row 2 at the far end
+    if (thirdRoundReversal && pickRow === 1 && pickDrafter === 0) {
+        pickRow     = 2
+        pickDrafter = nDrafters - 1
+        return
+    }
+
+    const isForward = isForwardRow(pickRow)
     if (isForward) {
         if (pickDrafter < nDrafters - 1) { pickDrafter++; return }
     } else {
@@ -81,7 +99,7 @@ export function advanceDraftPick(): void {
     // Move to next round
     if (pickRow < nPicks - 1) {
         pickRow++
-        pickDrafter = pickRow % 2 === 0 ? 0 : nDrafters - 1
+        pickDrafter = isForwardRow(pickRow) ? 0 : nDrafters - 1
     } else {
         pickRow = nPicks   // draft complete sentinel
     }
@@ -90,7 +108,15 @@ export function advanceDraftPick(): void {
 /** Move pick position back one step in serpentine order. */
 export function goBackDraftPick(): void {
     if (pickRow >= nPicks) { pickRow = nPicks - 1 }
-    const isForward = pickRow % 2 === 0
+
+    // Third-round reversal: start of row 2 jumps back to end of row 1
+    if (thirdRoundReversal && pickRow === 2 && pickDrafter === nDrafters - 1) {
+        pickRow     = 1
+        pickDrafter = 0
+        return
+    }
+
+    const isForward = isForwardRow(pickRow)
     if (isForward) {
         if (pickDrafter > 0) { pickDrafter--; return }
     } else {
@@ -98,8 +124,7 @@ export function goBackDraftPick(): void {
     }
     if (pickRow > 0) {
         pickRow--
-        const prevForward = pickRow % 2 === 0
-        pickDrafter = prevForward ? nDrafters - 1 : 0
+        pickDrafter = isForwardRow(pickRow) ? nDrafters - 1 : 0
     }
 }
 

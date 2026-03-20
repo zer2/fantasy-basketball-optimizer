@@ -8,7 +8,7 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { makeMultiSelectWidget, MultiSelectWidget } from '../../helper_functions.js'
 import { getGScoreByName } from '../../app_state.js'
-import { getFormatAndCategories } from '../../parameter_collection/format_and_categories.js'
+import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { getTradeParameters } from '../../parameter_collection/trade_parameters.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/session.js'
@@ -51,7 +51,7 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
     container.className = 'trade-gscore-section'
 
     const gScoreMap = getGScoreByName()
-    const categories = getFormatAndCategories().categories
+    const categories = getSelectedCategories()
 
     type Row = { label: string; total: number; values: number[] }
 
@@ -178,7 +178,7 @@ function renderHScoreResult(pane: HTMLElement, resp: TradeAnalyzeResponse): void
 
     if (!resp.your_team || !resp.their_team) return
 
-    const categories = getFormatAndCategories().categories
+    const categories = getSelectedCategories()
     const yourImproved = resp.your_team.post.h_score > resp.your_team.pre.h_score
     const theirImproved = resp.their_team.post.h_score > resp.their_team.pre.h_score
 

@@ -4,7 +4,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { getPlayers } from '../app_state.js'
-import { makeDebouncer, Debouncer } from '../helper_functions.js'
+import { makeDebouncer } from '../helper_functions.js'
 import { runEvaluate } from '../api/session.js'
 import {
     DraftConfig,
@@ -16,7 +16,7 @@ import {
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-let _debouncer: Debouncer | null = null
+const _draftDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Draft evaluate failed:', err)) })
 
 const ROUND_W = 46   // px — Round label column
 const TEAM_W  = 85   // px — per-drafter column
@@ -30,14 +30,11 @@ const TEAM_W  = 85   // px — per-drafter column
  */
 export function resetDraftBoard(): void {
     resetDraftState()
-    _debouncer?.cancel()
+    _draftDebouncer?.cancel()
 }
 
 /** Renders the draft board UI into the container. Resets state if sidebar config changed. */
 export function renderDraftBoard(container: HTMLElement): void {
-    if (!_debouncer) {
-        _debouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Draft evaluate failed:', err)) })
-    }
     const cfg = readDraftConfig()
 
     // Reset state if league settings changed (different drafter/pick counts or teams)
@@ -59,7 +56,6 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const pickRow     = getPickRow()
     const pickDrafter = getPickDrafter()
     const nPicks      = getNPicks()
-    const nDrafters   = getNDrafters()
     const teamNames   = getTeamNames()
 
     const isDone = pickRow >= nPicks
@@ -94,7 +90,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         recordDraftPick(getPickRow(), getPickDrafter(), chosen)
         advanceDraftPick()
         renderDraftBoard(container)
-        _debouncer?.fire()
+        _draftDebouncer?.fire()
     })
 
     const undoBtn = document.createElement('button')
@@ -105,7 +101,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         goBackDraftPick()
         clearDraftPick(getPickRow(), getPickDrafter())
         renderDraftBoard(container)
-        _debouncer?.fire()
+        _draftDebouncer?.fire()
     })
 
     const clearBtn = document.createElement('button')
@@ -187,7 +183,12 @@ function readDraftConfig(): DraftConfig {
     const nD  = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
     const nP  = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
     const src = (document.getElementById('ps-data-type') as HTMLInputElement).value
+    const trr = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
     const names = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
-    return { nDrafters: nD, nPicks: nP, teamNames: names, key: `${nD}:${nP}:${src}:${names.join(',')}` }
+    return { nDrafters: nD
+        , nPicks: nP
+        , teamNames: names
+        , thirdRoundReversal: trr
+        , key: `${nD}:${nP}:${src}:${trr}:${names.join(',')}` }
 }

@@ -267,7 +267,8 @@ class HAgent:
             else: 
                 pos_avg_array = 0 #not an array, but this will work fine
 
-            pos_avg_array = 0 #Hack, to keep things consistent. ZR 
+            #ZR: Below is a hack, to keep things consistent with streamlit. Uncomment it for testing
+            #pos_avg_array = 0 
 
             initial_category_weights = (
                 (diff_means + x_scores_available_array - pos_avg_array)

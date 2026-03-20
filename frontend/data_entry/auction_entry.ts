@@ -4,7 +4,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { getCandidatePlayers } from '../app_state.js'
-import { makeDebouncer, Debouncer } from '../helper_functions.js'
+import { makeDebouncer } from '../helper_functions.js'
 import { runEvaluate } from '../api/session.js'
 import {
     AuctionConfig,
@@ -15,7 +15,7 @@ import {
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
-let _debouncer: Debouncer | null = null
+const _auctionDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Auction evaluate failed:', err)) })
 
 const ROUND_W = 46
 const TEAM_W  = 85
@@ -29,14 +29,11 @@ const TEAM_W  = 85
  */
 export function resetAuctionEntry(): void {
     resetAuctionState()
-    _debouncer?.cancel()
+    _auctionDebouncer?.cancel()
 }
 
 /** Renders the auction entry UI into the container. Resets state if sidebar config changed. */
 export function renderAuctionEntry(container: HTMLElement): void {
-    if (!_debouncer) {
-        _debouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Auction evaluate failed:', err)) })
-    }
     const cfg = readAuctionConfig()
 
     if (cfg.key !== getConfigKey()) {
@@ -105,7 +102,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         const succeeded    = recordAuctionPick(player, cost, drafterIndex)
         if (!succeeded) return   // team is full
         renderAuctionEntry(container)
-        _debouncer?.fire()
+        _auctionDebouncer?.fire()
     })
 
     const undoBtn = document.createElement('button')
@@ -116,7 +113,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         const undone = undoLastAuctionPick()
         if (!undone) return
         renderAuctionEntry(container)
-        _debouncer?.fire()
+        _auctionDebouncer?.fire()
     })
 
     const clearBtn = document.createElement('button')

@@ -1,18 +1,139 @@
-from streamlit.testing.v1 import AppTest
+# testing_files/test_app_setup.py
+# Adapted from the original Streamlit-based test_app_setup.py.
+# Tests the FastAPI backend via TestClient instead of AppTest.
+#
+# Covers:
+#   - GET /config/NBA  returns correct structure and defaults
+#   - POST /sessions   creates a session with expected defaults
+#   - POST /sessions/{id}/evaluate  returns a valid candidate list
 
-def test_draft_defaults():
-    """Make sure the draft mode is set up correctly in terms of default parameters"""
-    at = AppTest.from_file("../app.py").run(timeout = 300)
+import yaml
+from fastapi.testclient import TestClient
 
-    #make sure parameters are initialized correctly
-    assert not at.session_state.run_h_score
-    assert at.session_state.mode == 'Draft Mode'
-    assert at.session_state.params is not None
+from backend.main import app
+from backend.session import get_session
 
-    #make sure that the defaults for the options page are set up correctly 
-    for option_name in ['n_drafters','n_picks','psi','nu','omega','gamma','alpha','beta','n_iterations']:
-        assert at.number_input(option_name).value == at.session_state.params['options'][option_name]['default']
-        assert at.number_input(option_name).min == at.session_state.params['options'][option_name]['min']
-        assert at.number_input(option_name).max == at.session_state.params['options'][option_name]['max']
+client = TestClient(app)
 
-    #check what tabs are available? is that possible?
+_PARAMS_PATH = 'parameters.yaml'
+
+NUMERIC_OPTIONS = [
+    'n_drafters', 'n_picks', 'psi', 'omega', 'gamma', 'beth', 'n_iterations'
+]
+
+
+def _load_params() -> dict:
+    with open(_PARAMS_PATH) as f:
+        return yaml.safe_load(f)
+
+
+def test_config_defaults():
+    """GET /config/NBA returns all expected numeric options with correct defaults, min, and max."""
+    response = client.get('/config/NBA')
+    assert response.status_code == 200
+
+    body    = response.json()
+    options = body['options']
+
+    all_params   = _load_params()
+    yaml_options = all_params['NBA']['options']
+
+    for option_name in NUMERIC_OPTIONS:
+        assert option_name in options, f'Missing option: {option_name}'
+        assert options[option_name]['default'] == yaml_options[option_name]['default']
+        assert options[option_name]['min']     == yaml_options[option_name]['min']
+        assert options[option_name]['max']     == yaml_options[option_name]['max']
+
+
+def test_config_categories():
+    """GET /config/NBA returns non-empty default and all_categories lists."""
+    response = client.get('/config/NBA')
+    assert response.status_code == 200
+
+    body = response.json()
+    assert len(body['default_categories']) > 0
+    assert len(body['all_categories'])     > 0
+    assert set(body['default_categories']).issubset(set(body['all_categories']))
+
+
+def test_config_unknown_sport():
+    """GET /config for an unknown sport returns 400."""
+    response = client.get('/config/BASEBALL')
+    assert response.status_code == 400
+
+
+def test_session_creation_defaults():
+    """POST /sessions with default NBA mock parameters creates a session and returns G-scores."""
+    response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    assert response.status_code == 201
+
+    body = response.json()
+    assert 'session_id' in body
+    assert body['n_players_loaded'] > 0
+    assert len(body['categories'])  > 0
+    assert len(body['g_scores'])    > 0
+
+    # Every G-score entry should have a name, total, and per-category values
+    for entry in body['g_scores']:
+        assert 'name'   in entry
+        assert 'total'  in entry
+        assert 'values' in entry
+        assert len(entry['values']) == len(body['categories'])
+
+
+def test_session_creation_stores_correct_params():
+    """POST /sessions stores default parameter values matching parameters.yaml."""
+    all_params   = _load_params()
+    yaml_options = all_params['NBA']['options']
+
+    response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    assert response.status_code == 201
+
+    session = get_session(response.json()['session_id'])
+    cp      = session.current_params
+
+    assert cp['sport']      == 'NBA'
+    assert cp['n_drafters'] == yaml_options['n_drafters']['default']
+    assert cp['n_picks']    == yaml_options['n_picks']['default']
+
+
+def test_evaluate_empty_board():
+    """POST /sessions + evaluate with an empty board returns a valid candidate list."""
+    session_response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+
+    evaluate_response = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={
+            'player_assignments': {'Team 1': []}
+            , 'my_team_id': 'Team 1'
+        }
+    )
+    assert evaluate_response.status_code == 200
+
+    body       = evaluate_response.json()
+    candidates = body['candidates']
+    assert len(candidates) > 0
+
+    # Candidates should be in descending H-score order
+    h_scores = [c['h_score'] for c in candidates]
+    assert h_scores == sorted(h_scores, reverse=True)
+
+    # Each candidate should have a name, position, and G-score rows
+    for candidate in candidates:
+        assert candidate['name']   != ''
+        assert candidate['position'] != ''
+        assert len(candidate['g_score_rows']) > 0
+
+
+def test_evaluate_nonexistent_session():
+    """Evaluate against a session ID that does not exist returns 404."""
+    response = client.post(
+        '/sessions/doesnotexist/evaluate'
+        , json={
+            'player_assignments': {'Team 1': []}
+            , 'my_team_id': 'Team 1'
+        }
+    )
+    assert response.status_code == 404

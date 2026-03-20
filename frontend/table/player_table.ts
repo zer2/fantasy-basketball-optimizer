@@ -5,7 +5,7 @@
 import { stat_styler_primary, stat_styler_secondary } from '../styles/styler_functions.js'
 import { toggleExpandView } from './expand_view.js'
 import { Player } from '../types.js'
-import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
+import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
@@ -25,15 +25,15 @@ const CAT_COL_W    = 90   // desired minimum width per category column
 export function computeHscoreTableWidth(): string {
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
     const nScoreCols = isAuction ? 4 : 1
-    const categories = getFormatAndCategories().categories
+    const categories = getSelectedCategories()
     return (PLAYER_COL_W + nScoreCols * SCORE_COL_W + categories.length * CAT_COL_W) + 'px'
 }
 
 /** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
 export function buildTable(players: Player[]): void {
-    const categories = getFormatAndCategories().categories
+    const categories = getSelectedCategories()
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
-    const isRoto     = getFormatAndCategories().scoring_format === 'Rotisserie'
+    const isRoto     = getScoringFormat() === 'Rotisserie'
 
     table.style.width = computeHscoreTableWidth()
 

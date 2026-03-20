@@ -13,6 +13,7 @@ import { renderTeamGScoreTable } from './table/gscore_table.js'
 import { computeHscoreTableWidth } from './table/player_table.js'
 import { getLeagueSettings } from './parameter_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
+import { getFullTeamResult } from './api/session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -20,6 +21,13 @@ let seasonNavBuilt    = false
 let currentSeasonTab: string | null = null  // null means no tab activated yet
 let currentAuctionTab = 'candidates'
 let currentDraftTab   = 'candidates'
+
+// Refresh the active "my team" panel when session.ts signals that the full-team
+// H-score result has arrived (dispatched after the evaluate await resolves).
+document.addEventListener('full-team-result-updated', () => {
+    if (currentDraftTab   === 'my-team') refreshDraftGScore()
+    if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+})
 
 export function getCurrentAuctionTab(): string { return currentAuctionTab }
 export function getCurrentDraftTab():   string { return currentDraftTab   }
@@ -273,6 +281,7 @@ export function refreshDraftGScore(): void {
         player_assignments[getCurrentSeat() ?? ''] ?? []
         , document.getElementById('draft-gscore')!
         , computeHscoreTableWidth()
+        , getFullTeamResult()
     )
 }
 
@@ -282,6 +291,7 @@ export function refreshAuctionGScore(): void {
         player_assignments[getCurrentSeat() ?? ''] ?? []
         , document.getElementById('auction-gscore')!
         , computeHscoreTableWidth()
+        , getFullTeamResult()
     )
 }
 

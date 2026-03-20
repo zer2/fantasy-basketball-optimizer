@@ -102,27 +102,17 @@ export function renderLeagueSettings(container: HTMLElement): void {
     trrCheckbox.checked = pref('third_round_reversal', false)
     trrCheckbox.addEventListener('change', () => savePref('third_round_reversal', trrCheckbox.checked))
 
-    // Apply mode-dependent visibility for restored mode
-    const restoredMode = modeSelect.getValue()
-    cashCell.style.display = restoredMode === 'Auction Mode' ? '' : 'none'
-    trrToggle.style.display = restoredMode === 'Draft Mode' ? '' : 'none'
-
-    modeSelect.element.addEventListener('change', () => {
-        const mode = modeSelect.getValue()
-        cashCell.style.display = mode === 'Auction Mode' ? '' : 'none'
-        trrToggle.style.display = mode === 'Draft Mode' ? '' : 'none'
-        if (mode !== 'Draft Mode') trrCheckbox.checked = false
-    })
-
-    // ── Team names textarea (full-width) ───────────────────────────────────
-    container.append(makeLabel('ls-team-names', 'Team names (one per line)'))
+    // ── Team names textarea (full-width, own-data only) ───────────────────
+    const teamNamesWrap = document.createElement('div')
+    teamNamesWrap.append(makeLabel('ls-team-names', 'Team names (one per line)'))
     const teamNamesInput = document.createElement('textarea')
     teamNamesInput.id = 'ls-team-names'
     teamNamesInput.className = 'sidebar-input'
     teamNamesInput.rows = 4
     teamNamesInput.value = pref('team_names', defaultTeamNames(pref('n_drafters', nDraftersDefault)))
     teamNamesInput.addEventListener('input', () => savePref('team_names', teamNamesInput.value))
-    container.append(teamNamesInput)
+    teamNamesWrap.append(teamNamesInput)
+    container.append(teamNamesWrap)
 
     // Re-fill team names when drafter count changes
     nDraftersInput.addEventListener('change', () => {
@@ -132,6 +122,25 @@ export function renderLeagueSettings(container: HTMLElement): void {
             savePref('team_names', teamNamesInput.value)
         }
     })
+
+    // ── Own-data-dependent and mode-dependent visibility ──────────────────
+    function updateVisibility(): void {
+        const isOwnData = platformSelect.getValue() === 'Enter your own data'
+        const mode      = modeSelect.getValue()
+        cashCell.style.display       = mode === 'Auction Mode' ? '' : 'none'
+        trrToggle.style.display      = isOwnData && mode === 'Draft Mode' ? '' : 'none'
+        teamNamesWrap.style.display  = isOwnData ? '' : 'none'
+        if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
+    }
+
+    updateVisibility()
+    modeSelect.element.addEventListener('change', updateVisibility)
+    platformSelect.element.addEventListener('change', updateVisibility)
+}
+
+export function getTeamNames(): string[] {
+    return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
+        .value.split('\n').map(s => s.trim()).filter(Boolean)
 }
 
 /**

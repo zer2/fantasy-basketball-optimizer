@@ -6,7 +6,7 @@
 import { Player, SessionRequest } from '../types.js'
 import { setBasePlayers, setCandidates, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
-import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
+import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
@@ -37,6 +37,17 @@ let evaluateGeneration = 0
 // shows base H-score ordering regardless of how many picks have been made.
 // Keyed by session ID; invalidated whenever the session is patched (parameters changed).
 const basePlayersBySession: Map<string, Player[]> = new Map()
+// Stores the H-score result from the most recent full-team evaluate call.
+// Set when my team is complete; null at all other times.
+let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
+
+export function getFullTeamResult(): { h_score: number; win_rates: number[] } | null {
+    return latestFullTeamResult
+}
+
+export function clearFullTeamResult(): void {
+    latestFullTeamResult = null
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -44,7 +55,8 @@ const basePlayersBySession: Map<string, Player[]> = new Map()
 // Every code path that needs a new session calls this.
 async function startFreshSession(signal?: AbortSignal): Promise<void> {
     const { sport, platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-    const { scoring_format, categories } = getFormatAndCategories()
+    const scoring_format = getScoringFormat()
+    const categories     = getSelectedCategories()
     const { data_source, injured_players } = getPlayerStatsParams()
     const league: SessionRequest['league'] = { sport, n_drafters, n_picks, scoring_format, categories }
     if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
@@ -80,6 +92,7 @@ export async function createOrPatchSession(
         await client.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
         // Parameters changed — cached base result is now stale.
         basePlayersBySession.delete(sessionId)
+        latestFullTeamResult = null
     } catch (err: any) {
         if (!err.message?.includes('(404)')) throw err
         // Session expired; rebuild from current sidebar state.
@@ -158,12 +171,24 @@ export async function runEvaluate(): Promise<void> {
                     basePlayersBySession.set(sessionId!, client.candidatesToPlayers(baseResp.candidates))
                 }
 
-                // If my team is already full, show no candidates.
                 const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
                 if (myTeamSize >= getLeagueSettings().n_picks) {
+                    // Clear immediately so no stale result is shown while the request is in-flight.
+                    latestFullTeamResult = null
+                    // Evaluate with the full team; the backend returns one candidate
+                    // representing the team's overall H-score.
+                    const fullTeamResp = await client.evaluate(sessionId!, evalReq, signal)
+                    if (fullTeamResp.candidates.length > 0) {
+                        latestFullTeamResult = {
+                            h_score:   fullTeamResp.candidates[0].h_score,
+                            win_rates: fullTeamResp.candidates[0].win_rates,
+                        }
+                        document.dispatchEvent(new Event('full-team-result-updated'))
+                    }
                     buildTable([])
                     return
                 }
+                latestFullTeamResult = null
 
                 const resp = await client.evaluate(sessionId!, evalReq, signal)
                 const players = client.candidatesToPlayers(resp.candidates)

@@ -3,7 +3,8 @@
 // Used by Auction Mode's "My Team" tab and potentially by Season Mode roster inspection.
 
 import { getGScoreByName } from '../app_state.js'
-import { getFormatAndCategories } from '../parameter_collection/format_and_categories.js'
+import { getSelectedCategories, getScoringFormat } from '../parameter_collection/format_and_categories.js'
+import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../styles/styler_functions.js'
 
 /**
@@ -11,11 +12,14 @@ import { stat_styler_primary } from '../styles/styler_functions.js'
  * team totals row.  Styled to match the season roster inspector tables.
  * Clears and replaces `container` contents on each call.
  */
-export function renderTeamGScoreTable(playerNames: string[]
-                                    , container: HTMLElement
-                                    , width?: string): void {
+export function renderTeamGScoreTable(
+    playerNames: string[]
+  , container: HTMLElement
+  , width?: string
+  , fullTeamResult?: { h_score: number; win_rates: number[] } | null
+): void {
     container.innerHTML = ''
-    const categories = getFormatAndCategories().categories
+    const categories = getSelectedCategories()
     const gScoreMap  = getGScoreByName()
 
     // Collect G-scores for each player
@@ -103,6 +107,58 @@ export function renderTeamGScoreTable(playerNames: string[]
     }
 
     container.appendChild(tbl)
+
+    if (!fullTeamResult) return
+
+    // ── H-score table (separate, columns aligned to the G-score table above) ──
+
+    const isRoto    = getScoringFormat() === 'Rotisserie'
+    const nDrafters = isRoto ? getLeagueSettings().n_drafters : 0
+    const rotoMiddle = (nDrafters - 1) / 2 + 1
+
+    const hScoreTbl = document.createElement('table')
+    hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
+    hScoreTbl.style.tableLayout = 'fixed'
+    if (width) hScoreTbl.style.width = width
+
+    // colgroup sets column widths to match the G-score table without a spacer row,
+    // so there is no gap between the outer border and the first data row.
+    const colgroup = document.createElement('colgroup')
+    const nameCol  = document.createElement('col')
+    nameCol.style.width = '200px'   // matches .panel-colspacer-name
+    const totalCol = document.createElement('col')
+    totalCol.style.width = '83px'   // matches .panel-colspacer-total
+    colgroup.append(nameCol, totalCol)
+    for (let i = 0; i < categories.length; i++) colgroup.appendChild(document.createElement('col'))
+    hScoreTbl.appendChild(colgroup)
+
+    const hScoreTBody = hScoreTbl.createTBody()
+    const hScoreRow = hScoreTBody.insertRow(-1)
+
+    const hScoreLabel = document.createElement('th')
+    hScoreLabel.className = 'panel-rowlabel'
+    hScoreLabel.textContent = 'H-Score (est. win rate)'
+    hScoreRow.appendChild(hScoreLabel)
+
+    const hScoreTotalCell = hScoreRow.insertCell(-1)
+    hScoreTotalCell.textContent = fullTeamResult.h_score.toFixed(1)
+    hScoreTotalCell.className = 'overallhscore'
+
+    for (const winRate of fullTeamResult.win_rates) {
+        const cell = hScoreRow.insertCell(-1)
+        if (isRoto) {
+            const rotoValue = 1 + (winRate / 100) * (nDrafters - 1)
+            cell.textContent = rotoValue.toFixed(1)
+            cell.className = 'categoricalRotoHscore'
+            cell.style.cssText = stat_styler_primary(rotoValue, 3 * (nDrafters - 1), rotoMiddle)
+        } else {
+            cell.textContent = winRate.toFixed(1)
+            cell.className = 'categoricalhscore'
+            cell.style.cssText = stat_styler_primary(winRate, 3, 50)
+        }
+    }
+
+    container.appendChild(hScoreTbl)
 }
 
 /** Creates an invisible `<th>` spacer to lock column widths in panel tables. */

@@ -4,7 +4,7 @@
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayers, getGScoreByName } from '../../app_state.js'
-import { getFormatAndCategories } from '../../parameter_collection/format_and_categories.js'
+import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
 
 /** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
@@ -197,7 +197,7 @@ function buildTeamGScoreTable(
     container: HTMLElement,
 ): void {
     container.innerHTML = ''
-    const categories = getFormatAndCategories().categories
+    const categories = getSelectedCategories()
     const gScoreMap  = getGScoreByName()
 
     // Collect G-scores for players on this team

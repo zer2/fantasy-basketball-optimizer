@@ -5,7 +5,7 @@
 
 import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
 import { getCandidatePlayers, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
-import { createOrPatchSession, runEvaluate, runSeasonInit } from './api/session.js'
+import { createOrPatchSession, runEvaluate, runSeasonInit, clearFullTeamResult } from './api/session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTable } from './table/player_table.js'
 import { applyLayout, getCurrentAuctionTab, getCurrentDraftTab, refreshAuctionGScore, refreshDraftGScore } from './layout.js'
@@ -15,8 +15,8 @@ import { makeCustomSelect } from './custom_select.js'
 import { pref, savePref } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
 
-import { renderLeagueSettings, getLeagueSettings } from './parameter_collection/league_settings.js'
-import { renderFormatAndCategories, getFormatAndCategories } from './parameter_collection/format_and_categories.js'
+import { renderLeagueSettings, getLeagueSettings, getTeamNames } from './parameter_collection/league_settings.js'
+import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
@@ -34,91 +34,19 @@ function runModeEval(): Promise<void> {
 ;(async () => {
 
 // Fetch sport config before rendering sidebar so defaults come from parameters.yaml
-try {
-    const config = await fetchConfig('NBA')
-    setSportConfig(config)
-} catch (err) {
-    console.error('Failed to fetch config; using hard-coded fallbacks:', err)
-}
-
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
+const config = await fetchConfig('NBA')
+setSportConfig(config)
 
 const sidebar = document.getElementById('sidebar') as HTMLElement
 const sidebarSections = document.getElementById('sidebar-sections')!
 
+// ─── 1. League Settings ───────────────────────────────────────────────────────
+
 renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
-// League Settings auto-updates via listeners added after initLayout() below.
 
-const playerStatsSection = createSection(sidebarSections, 'Player Stats')
-renderPlayerStats(playerStatsSection)
-addApplyBtn(playerStatsSection, async () => {
-    const { data_source, injured_players } = getPlayerStatsParams()
-    resetDraftBoard()
-    resetAuctionEntry()
-    await createOrPatchSession(1, { data_source, injured_players })
-    await runModeEval()
-    applyLayout()
-})
-
-const formatSection = createSection(sidebarSections, 'Format & Categories')
-renderFormatAndCategories(formatSection)
-addApplyBtn(formatSection, async () => {
-    const { scoring_format, categories } = getFormatAndCategories()
-    await createOrPatchSession(4, { league: { scoring_format, categories } })
-    await runModeEval()
-    applyLayout()
-})
-
-const modelSection = createSection(sidebarSections, 'Model Parameters')
-renderModelParameters(modelSection)
-addApplyBtn(modelSection, async () => {
-    const parameters = getModelParameters()
-    await createOrPatchSession(3, { parameters })
-    await runModeEval()
-    applyLayout()
-})
-
-const slotSection = createSection(sidebarSections, 'Position Parameters')
-renderSlotCounts(slotSection)
-addApplyBtn(slotSection, async () => {
-    const slot_counts = getSlotCounts()
-    await createOrPatchSession(4, { slot_counts })
-    await runModeEval()
-    applyLayout()
-})
-
-const tradeSection = createSection(sidebarSections, 'Trade Parameters')
-renderTradeParameters(tradeSection)
-// Trade parameters target a future endpoint; no backend call yet.
-addApplyBtn(tradeSection, () => {})
-
-// ── Display section (theme toggle) ───────────────────────────────────────────
-const displaySection = createSection(sidebarSections, 'Display')
-const themeToggle = makeSidebarToggle('theme-toggle', 'Light mode', 'Dark mode')
-displaySection.append(themeToggle)
-const themeInput = document.getElementById('theme-toggle') as HTMLInputElement
-const savedLight = pref('light_mode', false)
-themeInput.checked = savedLight
-setTheme(savedLight ? 'light' : 'dark')
-themeInput.addEventListener('change', () => {
-    const isLight = themeInput.checked
-    savePref('light_mode', isLight)
-    setTheme(isLight ? 'light' : 'dark')
-})
-
-// All sections are fully built; reveal the sidebar in one repaint
-sidebar.style.visibility = ''
-
-// ─── Persistent seat selector ─────────────────────────────────────────────────
-// Rendered once into the fixed DOM element; layout.ts shows/hides the container.
-
-function readTeamNames(): string[] {
-    return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
-}
-
+// Seat selector: rendered once into the fixed DOM element; layout.ts shows/hides the container.
 const seatSelectorContainer = document.getElementById('seat-selector-container') as HTMLElement
-const initialTeamNames = readTeamNames()
+const initialTeamNames = getTeamNames()
 const seatSelect = makeCustomSelect(
     'seat-select',
     initialTeamNames.map(name => ({ value: name, label: name })),
@@ -145,6 +73,7 @@ if (initialTeamNames.length > 0) {
 
 seatSelect.element.addEventListener('change', () => {
     setCurrentSeat(seatSelect.getValue() ?? null)
+    clearFullTeamResult()
     if (getCurrentAuctionTab() === 'my-team') refreshAuctionGScore()
     if (getCurrentDraftTab()   === 'my-team') refreshDraftGScore()
     runModeEval()
@@ -152,15 +81,11 @@ seatSelect.element.addEventListener('change', () => {
         .catch(err => console.error('Seat change evaluate failed:', err))
 })
 
-// ─── Mode change: rebuild table and sync session ───────────────────────────
-// Registered before applyLayout so buildTable fires first, ensuring
+// Mode change: rebuild table and sync session.
+// Registered before the applyLayout listener so buildTable fires first, ensuring
 // hscoretable.style.width is correct when applyLayout reads it.
-//
-// When switching to Auction Mode the existing session must be patched with
-// cash_per_team; without it the backend cannot compute auction dollar values.
-//
-// Uses an AbortController so rapid mode switches cancel stale backend calls
-// instead of letting them pile up.
+// When switching to Auction Mode, patch cash_per_team so the backend can compute dollar values.
+// AbortController cancels stale backend calls on rapid mode switches.
 let modeChangeController: AbortController | null = null
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
     if (modeChangeController) modeChangeController.abort()
@@ -182,22 +107,10 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
             console.error('Mode change failed:', err)
         })
 })
-
-applyLayout()
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', applyLayout)
 document.getElementById('ls-platform')!.parentElement!.addEventListener('change', applyLayout)
 
-// Initial build (empty; will be populated once the backend responds on load)
-buildTable(getCandidatePlayers())
-
-// Run all backend steps immediately on page load
-runModeEval()
-    .then(() => applyLayout())
-    .catch(err => console.error('Initial load failed:', err))
-
-// ── League settings auto-update ───────────────────────────────────────────
-// Number inputs fire on 'change' (when focus leaves); buildTable runs first to
-// set hscoretable.style.width before reapplyLayout reads it.
+// Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
 // AbortController cancels stale calls if the user changes multiple fields quickly.
 let leagueSettingsController: AbortController | null = null
 for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
@@ -218,12 +131,12 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     })
 }
 
-// Team names debounce: wait 600 ms after last keystroke to avoid flicker while typing.
+// Team names: debounce 600 ms after last keystroke to avoid flicker while typing.
 let teamNamesTimer: ReturnType<typeof setTimeout> | null = null
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
     if (teamNamesTimer) clearTimeout(teamNamesTimer)
     teamNamesTimer = setTimeout(() => {
-        const updatedTeamNames = readTeamNames()
+        const updatedTeamNames = getTeamNames()
         seatSelect.setOptions(updatedTeamNames.map(name => ({ value: name, label: name })))
         if (getCurrentSeat() === null && updatedTeamNames.length > 0) {
             setCurrentSeat(updatedTeamNames[0])
@@ -233,5 +146,82 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
         applyLayout()
     }, 600)
 })
+
+// ─── 2. Player Stats ──────────────────────────────────────────────────────────
+
+const playerStatsSection = createSection(sidebarSections, 'Player Stats')
+renderPlayerStats(playerStatsSection)
+addApplyBtn(playerStatsSection, async () => {
+    const { data_source, injured_players } = getPlayerStatsParams()
+    resetDraftBoard()
+    resetAuctionEntry()
+    await createOrPatchSession(1, { data_source, injured_players })
+    await runModeEval()
+    applyLayout()
+})
+
+// ─── 3. Format & Categories ───────────────────────────────────────────────────
+
+const formatSection = createSection(sidebarSections, 'Format & Categories')
+renderFormatAndCategories(formatSection)
+addApplyBtn(formatSection, async () => {
+    await createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } })
+    await runModeEval()
+    applyLayout()
+})
+
+// ─── 4. Model Parameters ──────────────────────────────────────────────────────
+
+const modelSection = createSection(sidebarSections, 'Model Parameters')
+renderModelParameters(modelSection)
+addApplyBtn(modelSection, async () => {
+    const parameters = getModelParameters()
+    await createOrPatchSession(3, { parameters })
+    await runModeEval()
+    applyLayout()
+})
+
+// ─── 5. Position Parameters ───────────────────────────────────────────────────
+
+const slotSection = createSection(sidebarSections, 'Position Parameters')
+renderSlotCounts(slotSection)
+addApplyBtn(slotSection, async () => {
+    const slot_counts = getSlotCounts()
+    await createOrPatchSession(4, { slot_counts })
+    await runModeEval()
+    applyLayout()
+})
+
+// ─── 6. Trade Parameters ──────────────────────────────────────────────────────
+
+const tradeSection = createSection(sidebarSections, 'Trade Parameters')
+renderTradeParameters(tradeSection)
+// Trade parameters target a future endpoint; no backend call yet.
+addApplyBtn(tradeSection, () => {})
+
+// ─── 7. Display ───────────────────────────────────────────────────────────────
+
+const displaySection = createSection(sidebarSections, 'Display')
+const themeToggle = makeSidebarToggle('theme-toggle', 'Light mode', 'Dark mode')
+displaySection.append(themeToggle)
+const themeInput = document.getElementById('theme-toggle') as HTMLInputElement
+const savedLight = pref('light_mode', false)
+themeInput.checked = savedLight
+setTheme(savedLight ? 'light' : 'dark')
+themeInput.addEventListener('change', () => {
+    const isLight = themeInput.checked
+    savePref('light_mode', isLight)
+    setTheme(isLight ? 'light' : 'dark')
+})
+
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+
+// All sections are fully built; reveal the sidebar in one repaint
+sidebar.style.visibility = ''
+
+applyLayout()
+runModeEval()
+    .then(() => applyLayout())
+    .catch(err => console.error('Initial load failed:', err))
 
 })()

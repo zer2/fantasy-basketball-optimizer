@@ -18,10 +18,10 @@ export interface AuctionConfig {
 
 let picks:     (AuctionPick | null)[][] = []   // [row][drafter]
 let history:   [number, number][]       = []   // undo stack: [row, drafter]
-let teamNames: string[] = []
-let nDrafters   = 0
-let nPicks      = 0
-let cashPerTeam = 0
+let teamNames: string[]
+let nDrafters:   number
+let nPicks:      number
+let cashPerTeam: number
 let configKey   = ''   // detects sidebar changes that require a reset
 
 // ─── Getters ──────────────────────────────────────────────────────────────────

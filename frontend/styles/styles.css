@@ -815,6 +815,8 @@ tr {
 .panel-table--rounded > tbody > tr:last-child > :first-child  { border-bottom-left-radius: 12px; }
 .panel-table--rounded > tbody > tr:last-child > :last-child   { border-bottom-right-radius: 12px; }
 
+.panel-table--top-gap { margin-top: 16px; }
+
 .panel-colspacer {
     background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26)); /* matches .panel-cell — invisible */
     border: none;

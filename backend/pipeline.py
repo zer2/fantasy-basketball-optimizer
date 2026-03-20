@@ -14,10 +14,23 @@ No session_context or _SessionState: each step reads/writes session fields direc
 from __future__ import annotations
 
 import io
+import time
+import threading
 import yaml
 import pandas as pd
 
 from backend.session import Session
+
+
+# ── v0_clean cache ────────────────────────────────────────────────────────────
+# Caches the output of run_step1 (loaded + processed player stats) independently
+# of session ID, keyed by data source parameters.  This avoids re-querying
+# Snowflake and re-processing the DataFrame every time a new session is created
+# with the same data source.
+
+_v0_cache: dict[tuple, tuple[float, pd.DataFrame]] = {}
+_v0_cache_lock = threading.Lock()
+_V0_CACHE_TTL = 24 * 3600  # 24 hours
 
 # Parameters file path (relative to the project root)
 _PARAMS_PATH = 'parameters.yaml'
@@ -38,6 +51,25 @@ def _sport_params(session: Session) -> tuple[dict, dict, str]:
 
 # ── Step 1: load player data ──────────────────────────────────────────────────
 
+def _v0_cache_key(cp: dict) -> tuple | None:
+    """Return a hashable cache key for v0_clean based on data source params.
+
+    Returns None for CSV uploads (not cacheable by params alone).
+    """
+    source_type = cp['data_source_type']
+    sport = cp.get('sport', '')
+    if source_type == 'historical':
+        return (sport, 'historical', cp.get('season') or '2024-25')
+    if source_type == 'blended':
+        blend_weights = cp.get('blend_weights', {})
+        # Only Snowflake-backed sources are cacheable; uploaded DFs are session-specific
+        snowflake_keys = tuple(sorted(
+            (k, v) for k, v in blend_weights.items() if k not in ('HTB', 'BBM')
+        ))
+        return (sport, 'blended', snowflake_keys)
+    return None
+
+
 def run_step1(
     session: Session,
     csv_bytes: bytes | None = None,
@@ -50,10 +82,22 @@ def run_step1(
       'csv'        — single uploaded CSV (csv_bytes + file_type required)
       'historical' — Snowflake historical stats for current_params['season']
       'blended'    — weighted blend of Snowflake sources + any uploaded_dfs
+
+    Results for Snowflake-backed sources are cached at the module level for
+    24 hours so repeated session creations with the same data source skip the
+    Snowflake round-trip entirely.
     """
     _, params, _ = _sport_params(session)
     cp = session.current_params
     source_type = cp['data_source_type']
+    cache_key = _v0_cache_key(cp)
+
+    if cache_key is not None:
+        with _v0_cache_lock:
+            entry = _v0_cache.get(cache_key)
+            if entry is not None and time.time() - entry[0] < _V0_CACHE_TTL:
+                session.v0_clean = entry[1].copy()
+                return
 
     if source_type == 'csv':
         v0 = _parse_projection_csv(csv_bytes, file_type, params)
@@ -73,6 +117,10 @@ def run_step1(
 
     else:
         raise ValueError(f"Unknown data_source_type: {source_type!r}")
+
+    if cache_key is not None:
+        with _v0_cache_lock:
+            _v0_cache[cache_key] = (time.time(), v0.copy())
 
     session.v0_clean = v0.copy()
 
