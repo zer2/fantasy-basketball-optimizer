@@ -4,7 +4,7 @@
 // backend responses and the player table.
 
 import { Player, SessionRequest } from '../types.js'
-import { setBasePlayers, setCandidates, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
+import { setBasePlayers, setCandidates, getCandidatePlayers, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
@@ -125,7 +125,13 @@ export async function runSeasonInit(): Promise<void> {
  * updates the candidate table with the response.
  * Retries once if the session has expired (404), creating a fresh session first.
  */
-export async function runEvaluate(): Promise<void> {
+/**
+ * Fetches candidates from the backend for the current draft/auction state and
+ * updates app state (candidates, base players, full-team result).
+ * Does NOT rebuild the candidate table — call buildTable(getCandidatePlayers()) afterwards if needed.
+ * Retries once if the session has expired (404), creating a fresh session first.
+ */
+export async function fetchCandidates(): Promise<void> {
     // Abort any in-flight evaluate request so the backend is only computing
     // the most recent draft state, not every intermediate pick.
     if (evaluateController) evaluateController.abort()
@@ -185,7 +191,7 @@ export async function runEvaluate(): Promise<void> {
                         }
                         document.dispatchEvent(new Event('full-team-result-updated'))
                     }
-                    buildTable([])
+                    setCandidates([])
                     return
                 }
                 latestFullTeamResult = null
@@ -201,10 +207,6 @@ export async function runEvaluate(): Promise<void> {
                 // Base ordering drives the draft dropdown; current candidates drive the table.
                 setBasePlayers(basePlayersBySession.get(sessionId!)!)
                 setCandidates(players)
-
-                if (mode !== 'Season Mode') {
-                    buildTable(players)
-                }
                 return
             } catch (err: any) {
                 if (err.name === 'AbortError') return  // superseded by a newer call
@@ -218,6 +220,18 @@ export async function runEvaluate(): Promise<void> {
         }
     } finally {
         if (evaluateGeneration === generation) setEvaluating(false)
+    }
+}
+
+/**
+ * Fetches candidates and rebuilds the candidate table.
+ * Equivalent to fetchCandidates() followed by buildTable(getCandidatePlayers()).
+ */
+export async function runEvaluate(): Promise<void> {
+    await fetchCandidates()
+    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+    if (mode !== 'Season Mode') {
+        buildTable(getCandidatePlayers())
     }
 }
 

@@ -9,6 +9,7 @@ let allPlayers:      Player[] = []   // full dataset — only grows, never shrin
 let candidates:      Player[] = []   // current evaluate output (may be a subset, e.g. waiver free agents)
 let allPlayerByName: Map<string, Player> = new Map()
 let gScoreByName:    Map<string, PlayerGScore> = new Map()
+let playerNamesByGScore: string[] = []   // player names sorted descending by G-score total
 /** Returns every player in the loaded dataset, regardless of draft/waiver state. */
 export function getPlayers(): Player[] { return allPlayers }
 
@@ -42,9 +43,14 @@ export function setCandidates(p: Player[]): void {
 /** Returns the name → PlayerGScore map (raw G-scores from the pipeline). */
 export function getGScoreByName(): Map<string, PlayerGScore> { return gScoreByName }
 
-/** Replaces the G-score map. Called by session.ts after session creation. */
+/** Returns player names sorted descending by G-score total (pre-computed at session creation). */
+export function getPlayerNamesByGScore(): string[] { return playerNamesByGScore }
+
+/** Replaces the G-score map. Called by session.ts after session creation.
+ *  `scores` arrives from the backend already sorted by total descending. */
 export function setGScores(scores: PlayerGScore[]): void {
-    gScoreByName = new Map(scores.map(s => [s.name, s]))
+    gScoreByName        = new Map(scores.map(s => [s.name, s]))
+    playerNamesByGScore = scores.map(s => s.name)
 }
 
 /**

@@ -9,6 +9,9 @@ import { pref, savePref } from '../preferences.js'
 
 export type DraftMode = 'Draft Mode' | 'Auction Mode' | 'Season Mode'
 export type Platform = 'Enter your own data' | 'Retrieve from Yahoo' | 'Retrieve from Fantrax' | 'Retrieve from ESPN'
+export type DrafterMode = 'Manual input' | 'H-scoring' | 'G-scoring'
+
+const DRAFTER_MODE_OPTIONS: DrafterMode[] = ['Manual input', 'H-scoring', 'G-scoring']
 
 const PLATFORM_OPTIONS: Platform[] = [
     'Enter your own data',
@@ -102,25 +105,89 @@ export function renderLeagueSettings(container: HTMLElement): void {
     trrCheckbox.checked = pref('third_round_reversal', false)
     trrCheckbox.addEventListener('change', () => savePref('third_round_reversal', trrCheckbox.checked))
 
-    // ── Team names textarea (full-width, own-data only) ───────────────────
+    // ── Team names list + per-drafter mode dropdowns (own-data only) ──────
+    // A hidden textarea keeps #ls-team-names in the DOM so all existing
+    // readers (draft_board, season modules, main.ts) continue to work.
+    // The visible UI is a scrollable list of rows: [editable name] [mode ▼]
     const teamNamesWrap = document.createElement('div')
-    teamNamesWrap.append(makeLabel('ls-team-names', 'Team names (one per line)'))
-    const teamNamesInput = document.createElement('textarea')
-    teamNamesInput.id = 'ls-team-names'
-    teamNamesInput.className = 'sidebar-input'
-    teamNamesInput.rows = 4
-    teamNamesInput.value = pref('team_names', defaultTeamNames(pref('n_drafters', nDraftersDefault)))
-    teamNamesInput.addEventListener('input', () => savePref('team_names', teamNamesInput.value))
-    teamNamesWrap.append(teamNamesInput)
+    teamNamesWrap.append(makeLabel('ls-team-names-label', 'Teams'))
+
+    const hiddenNamesTextarea = document.createElement('textarea')
+    hiddenNamesTextarea.id    = 'ls-team-names'
+    hiddenNamesTextarea.style.display = 'none'
+    hiddenNamesTextarea.value = pref('team_names', defaultTeamNames(pref('n_drafters', nDraftersDefault)))
+    teamNamesWrap.append(hiddenNamesTextarea)
+
+    const teamNamesList = document.createElement('div')
+    teamNamesList.className = 'team-names-list'
+    teamNamesWrap.append(teamNamesList)
     container.append(teamNamesWrap)
 
-    // Re-fill team names when drafter count changes
+    /** Sync visible inputs → hidden textarea, persist, and notify main.ts. */
+    function syncTeamNames(): void {
+        const n     = parseInt(nDraftersInput.value) || 12
+        const names = Array.from({ length: n }, (_, i) => {
+            const el = document.getElementById(`ls-team-name-${i}`) as HTMLInputElement | null
+            return el?.value ?? ''
+        })
+        hiddenNamesTextarea.value = names.join('\n')
+        savePref('team_names', hiddenNamesTextarea.value)
+        hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+
+    /** Rebuild the visible rows. Pass resetToDefaults=true when n_drafters changes. */
+    function rebuildTeamNameRows(resetToDefaults: boolean): void {
+        const n = parseInt(nDraftersInput.value) || 12
+
+        const names: string[] = []
+        if (resetToDefaults) {
+            for (let i = 0; i < n; i++) names.push(`Drafter ${i + 1}`)
+        } else {
+            const saved = hiddenNamesTextarea.value.split('\n').map(s => s.trim())
+            for (let i = 0; i < n; i++) {
+                const existing = document.getElementById(`ls-team-name-${i}`) as HTMLInputElement | null
+                names.push(existing?.value.trim() || saved[i] || `Drafter ${i + 1}`)
+            }
+        }
+
+        teamNamesList.innerHTML = ''
+
+        for (let i = 0; i < n; i++) {
+            const row = document.createElement('div')
+            row.className = 'team-name-row'
+
+            const nameInput = document.createElement('input')
+            nameInput.type      = 'text'
+            nameInput.id        = `ls-team-name-${i}`
+            nameInput.className = 'team-name-input'
+            nameInput.value     = names[i]
+            nameInput.addEventListener('input', syncTeamNames)
+            row.append(nameInput)
+
+            const savedMode = pref(`drafter_mode_${i}`, 'Manual input') as DrafterMode
+            const drafterModeSelect = makeCustomSelect(
+                `ls-drafter-mode-${i}`
+              , DRAFTER_MODE_OPTIONS.map(m => ({ value: m, label: m }))
+              , savedMode
+            )
+            drafterModeSelect.element.classList.add('drafter-mode-cell')
+            drafterModeSelect.element.addEventListener('change', () => {
+                savePref(`drafter_mode_${i}`, drafterModeSelect.getValue())
+            })
+            row.append(drafterModeSelect.element)
+
+            teamNamesList.append(row)
+        }
+
+        hiddenNamesTextarea.value = names.join('\n')
+        savePref('team_names', hiddenNamesTextarea.value)
+    }
+
+    rebuildTeamNameRows(false)
+
     nDraftersInput.addEventListener('change', () => {
         const n = parseInt(nDraftersInput.value)
-        if (!isNaN(n) && n > 0) {
-            teamNamesInput.value = defaultTeamNames(n)
-            savePref('team_names', teamNamesInput.value)
-        }
+        if (!isNaN(n) && n > 0) rebuildTeamNameRows(true)
     })
 
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
@@ -131,6 +198,12 @@ export function renderLeagueSettings(container: HTMLElement): void {
         trrToggle.style.display      = isOwnData && mode === 'Draft Mode' ? '' : 'none'
         teamNamesWrap.style.display  = isOwnData ? '' : 'none'
         if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
+
+        // Show drafter mode dropdowns only in Draft Mode + own data
+        const showModes = isOwnData && mode === 'Draft Mode'
+        teamNamesList.querySelectorAll<HTMLElement>('.drafter-mode-cell').forEach(el => {
+            el.style.display = showModes ? '' : 'none'
+        })
     }
 
     updateVisibility()
@@ -141,6 +214,21 @@ export function renderLeagueSettings(container: HTMLElement): void {
 export function getTeamNames(): string[] {
     return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
+}
+
+export function getDrafterMode(index: number): DrafterMode {
+    const el = document.getElementById(`ls-drafter-mode-${index}`) as HTMLInputElement | null
+    return (el?.value as DrafterMode) ?? 'Manual input'
+}
+
+export function getDrafterModes(): DrafterMode[] {
+    const modes: DrafterMode[] = []
+    let i = 0
+    while (document.getElementById(`ls-drafter-mode-${i}`)) {
+        modes.push(getDrafterMode(i))
+        i++
+    }
+    return modes
 }
 
 /**

@@ -131,7 +131,7 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     })
 }
 
-// Team names: debounce 600 ms after last keystroke to avoid flicker while typing.
+// : debounce 600 ms after last keystroke to avoid flicker while typing.
 let teamNamesTimer: ReturnType<typeof setTimeout> | null = null
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
     if (teamNamesTimer) clearTimeout(teamNamesTimer)
