@@ -7,21 +7,21 @@ The waiver wire tab evaluates whether an available player might fit better on an
 
 ![](img/hwaiver.png)
 /// caption
-Substitution H-scores for a synthetic team with Derrick Jones Jr. on it, based on the 2024-25 season
+Substitution H-scores for a synthetic team with Max Christie on it, based on the 2024-25 season
 ///
 
 The player who is a candidate to be dropped is removed from the team, and H-scores are calculated for all available players plus the drop candidate. The drop candidate is highlighted in blue. Players who do not fit the position structure of the team are filtered out and their H-scores are not shown. 
 
-These H-scores are relatively simple to calculate, because all other players are known and there is no need to strategize around future draft picks. For that reason, the algorithm does not iterate at all and results are shown immediately. The H-score details tab would not be relevant and is not provided. 
+These H-scores are relatively simple to calculate, because all other players are known and there is no need to strategize around future draft picks. For that reason, the algorithm does not iterate at all and results are shown immediately. 
 
-A corresponding view is available for G-scores. 
+G-score expectation breakdowns are available through the dropdown arrow. 
 
-![](img/gwaiver.png)
+![](img/hwaiverexp.png)
 /// caption
-G-scores for available players compared to Derrick Jones Jr., based on the 2024-25 season
+A breakdown of how Max Christie contributes to the team in terms of G-score
 ///
 
-The G-scores shown are the scores of the individual players, not what the scores would be for the team if that player was added. 
+Waiver players generally have negative overall G-score value, because they are below average for fantasy. 
 
 ## Trading tab
 
@@ -35,7 +35,7 @@ The trade analysis module analyzes trades proposed by the user.
 
 The thumbs on the H-score tab for 'Your Team' and 'Their Team' indicate whether a trade improves a team's H-score or not. Thumbs up means the trade is beneficial, thumbs down means the trade is not beneficial. This can also be seen by whether the H-score is higher before or after the trade. 
 
-Trades in which the same number of players is sent and received are relatively simple to analyze. First, players are switched, then both teams are checked for position structure. If either team is ineligible, then no results will be shown. Otherwise, H-scores are recomputed and compared against the previous H-scores. 
+Trades in which the same number of players is sent and received are relatively simple to analyze. First, players are switched, then both teams are checked for position structure (unless the user specified that position structure should be ignored for trading). If either team is ineligible, then no results will be shown. Otherwise, H-scores are recomputed and compared against the previous H-scores. 
 
 Asymmetrical trades can also be analyzed, though the methodology is more complicated and less reliable. The post-trade team that goes down in number of players is scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. The post-trade team that goes up in players is scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score. The players chosen for addition/removal through these calculations are not shown. 
 
@@ -98,4 +98,6 @@ Generally draft results can be copy-pasted from the drafting view into an Excel 
 
 ![](img/rosterinspection.png)
 
-Individual teams can be analyzed in terms of G-score. H-scores are not provided in this view. 
+Individual teams can be analyzed in terms of G-score. H-scores are also provided below the table, based on how the team matches up against its opponents. 
+
+![](img/rosterh.png)

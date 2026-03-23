@@ -103,7 +103,7 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
 
     const tbody = table.createTBody()
 
-    function addRow(label: string, row: Row, cssClass: string): void {
+    function addRow(label: string, row: Row, cssClass: string, useGradient: boolean): void {
         const tr = tbody.insertRow()
         tr.className = cssClass
         const labelCell = tr.insertCell()
@@ -111,25 +111,33 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
         labelCell.className = 'trade-row-label'
         const totalCell = tr.insertCell()
         totalCell.textContent = row.total.toFixed(2)
-        totalCell.style.cssText = stat_styler_primary(row.total, 60, 0)
+        if (useGradient) {
+            totalCell.style.cssText = stat_styler_primary(row.total, 60, 0)
+        } else {
+            totalCell.className = 'celltypeb'
+        }
         for (const v of row.values) {
             const td = tr.insertCell()
             td.textContent = v.toFixed(2)
-            td.style.cssText = stat_styler_primary(v, 60, 0)
+            if (useGradient) {
+                td.style.cssText = stat_styler_primary(v, 60, 0)
+            } else {
+                td.className = 'celltypeb'
+            }
         }
     }
 
     for (let i = 0; i < sent.length; i++) {
-        if (sentRows[i]) addRow(sent[i], sentRows[i], 'trade-row-sent')
+        if (sentRows[i]) addRow(sent[i], sentRows[i], 'trade-row-sent', true)
     }
-    addRow('Total Sent', sentTotal, 'trade-row-subtotal')
+    addRow('Total Sent', sentTotal, 'trade-row-subtotal', false)
 
     for (let i = 0; i < received.length; i++) {
-        if (receivedRows[i]) addRow(received[i], receivedRows[i], 'trade-row-received')
+        if (receivedRows[i]) addRow(received[i], receivedRows[i], 'trade-row-received', true)
     }
-    addRow('Total Received', recvTotal, 'trade-row-subtotal')
+    addRow('Total Received', recvTotal, 'trade-row-subtotal', false)
 
-    addRow('Total Difference', diff, 'trade-row-diff')
+    addRow('Total Difference', diff, 'trade-row-diff', true)
 
     container.append(table)
     return container
@@ -371,8 +379,12 @@ function buildSuggestionTable(
 
 // ─── Main render ─────────────────────────────────────────────────────────────
 
+let tradingBuilt = false
+
 /** Renders the full Trading tab into the given container element. */
 export function renderSeasonTrading(container: HTMLElement): void {
+    if (tradingBuilt) return
+    tradingBuilt = true
     container.innerHTML = ''
 
     const teamNames   = readTeamNames()

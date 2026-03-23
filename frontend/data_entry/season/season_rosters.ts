@@ -4,8 +4,10 @@
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayers, getGScoreByName } from '../../app_state.js'
-import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
+import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
+import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
+import { evaluateTeamHScore } from '../../api/session.js'
 
 /** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
@@ -167,7 +169,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
         const selectedTeam = teamSel.getValue()
         const teamIdx = teamNames.indexOf(selectedTeam)
         if (teamIdx < 0) { tableContainer.innerHTML = ''; return }
-        buildTeamGScoreTable(teamIdx, selects, nPicks, tableContainer)
+        buildTeamGScoreTable(teamIdx, selects, nPicks, teamNames, tableContainer)
     }
 
     // Rebuild when the team selector changes
@@ -188,14 +190,16 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
 /**
  * Builds a G-score table for the selected team: one row per rostered player
- * plus a totals row.  Styled to match the expanded-view G-score tables.
+ * plus a totals row, followed by an H-score row fetched from the backend.
+ * Styled to match the expanded-view G-score tables.
  */
-function buildTeamGScoreTable(
+async function buildTeamGScoreTable(
     teamIdx: number,
     selects: CustomSelect[][],
     nPicks: number,
+    teamNames: string[],
     container: HTMLElement,
-): void {
+): Promise<void> {
     container.innerHTML = ''
     const categories = getSelectedCategories()
     const gScoreMap  = getGScoreByName()
@@ -212,7 +216,7 @@ function buildTeamGScoreTable(
 
     if (rows.length === 0) return
 
-    // ── Build table ──────────────────────────────────────────────────────────
+    // ── Build G-score table ──────────────────────────────────────────────────
 
     const tbl = document.createElement('table')
     tbl.className = 'panel-table'
@@ -286,6 +290,71 @@ function buildTeamGScoreTable(
     }
 
     container.appendChild(tbl)
+
+    // ── H-score row (fetched from backend, only for full rosters) ────────────
+
+    if (rows.length < nPicks) return
+
+    const nDrafters = teamNames.length
+    const playerAssignments: Record<string, string[]> = {}
+    for (let d = 0; d < nDrafters; d++) {
+        const team = teamNames[d]
+        const players: string[] = []
+        for (let r = 0; r < nPicks; r++) {
+            const name = selects[r][d].getValue()
+            if (name) players.push(name)
+        }
+        playerAssignments[team] = players
+    }
+
+    const teamName = teamNames[teamIdx]
+    const result = await evaluateTeamHScore(playerAssignments, teamName)
+    if (!result) return
+
+    const isRoto     = getScoringFormat() === 'Rotisserie'
+    const rotoNDrafters = isRoto ? getLeagueSettings().n_drafters : 0
+    const rotoMiddle = (rotoNDrafters - 1) / 2 + 1
+
+    const hScoreTbl = document.createElement('table')
+    hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
+    hScoreTbl.style.tableLayout = 'fixed'
+
+    const colgroup = document.createElement('colgroup')
+    const nameCol  = document.createElement('col')
+    nameCol.style.width = '200px'
+    const totalCol = document.createElement('col')
+    totalCol.style.width = '83px'
+    colgroup.append(nameCol, totalCol)
+    for (let i = 0; i < categories.length; i++) colgroup.appendChild(document.createElement('col'))
+    hScoreTbl.appendChild(colgroup)
+
+    const hScoreTBody = hScoreTbl.createTBody()
+    const hScoreRow = hScoreTBody.insertRow(-1)
+
+    const hScoreLabel = document.createElement('th')
+    hScoreLabel.className = 'panel-rowlabel'
+    hScoreLabel.textContent = 'H-Score (est. win rate)'
+    hScoreRow.appendChild(hScoreLabel)
+
+    const hScoreTotalCell = hScoreRow.insertCell(-1)
+    hScoreTotalCell.textContent = result.h_score.toFixed(1)
+    hScoreTotalCell.className = 'overallhscore'
+
+    for (const winRate of result.win_rates) {
+        const cell = hScoreRow.insertCell(-1)
+        if (isRoto) {
+            const rotoValue = 1 + (winRate / 100) * (rotoNDrafters - 1)
+            cell.textContent = rotoValue.toFixed(1)
+            cell.className = 'categoricalRotoHscore'
+            cell.style.cssText = stat_styler_primary(rotoValue, 3 * (rotoNDrafters - 1), rotoMiddle)
+        } else {
+            cell.textContent = winRate.toFixed(1)
+            cell.className = 'categoricalhscore'
+            cell.style.cssText = stat_styler_primary(winRate, 3, 50)
+        }
+    }
+
+    container.appendChild(hScoreTbl)
 }
 
 /** Creates an invisible `<th>` spacer to lock column widths in panel tables. */

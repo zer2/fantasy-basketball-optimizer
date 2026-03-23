@@ -86,7 +86,7 @@ export function buildTable(players: Player[]): void {
         html += `<tr>`
 
         // Player name cell with expand button
-        html += `<th class='playerheader'><div class='playerheaderdiv'><div style="width:80%">${player.name}</div><div style="width:20%"><button class='playerpopup'>▶</button></div></div></th>`
+        html += `<th class='playerheader'><div class='playerheaderdiv'><div style="width:88%">${player.name}</div><div style="width:12%"><button class='playerpopup'>▶</button></div></div></th>`
 
         // Score column(s)
         if (isAuction) {

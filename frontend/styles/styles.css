@@ -12,8 +12,8 @@
 #sidebar {
     width: 280px;
     min-width: 280px;
-    background-color: light-dark(rgb(240, 242, 246), #0e1117);
-    border-right: 1px solid light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(rgb(248, 248, 250), #0e1117);
+    border-right: 1px solid light-dark(#8080a0, #3d3d55);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -24,8 +24,8 @@
     width: 100%;
     margin-top: 10px;
     padding: 6px;
-    background: light-dark(#e0e0ee, #2a2a3e);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background: light-dark(#eaeaee, #2a2a3e);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     color: light-dark(#555555, #aaaacc);
     font-family: "Source Sans 3";
@@ -34,7 +34,7 @@
 }
 
 .section-apply-btn:hover {
-    background: light-dark(#aaaabc, #3d3d55);
+    background: light-dark(#8080a0, #3d3d55);
     color: light-dark(black, white);
 }
 
@@ -48,7 +48,7 @@
 
 .sidebar-divider {
     border: none;
-    border-top: 1px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 1px solid light-dark(#8080a0, #3d3d55);
     margin: 0;
 }
 
@@ -61,7 +61,7 @@
 /* ─── Sidebar sections (collapsible, mirroring Streamlit popovers) ───────── */
 
 .sidebar-section {
-    border-bottom: 1px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 1px solid light-dark(#8080a0, #3d3d55);
 }
 
 .sidebar-section > summary {
@@ -117,8 +117,8 @@
 /* ─── Team names list (replaces textarea; rows = name input + mode dropdown) */
 
 .team-names-list {
-    background-color: light-dark(rgb(234, 236, 242), #181923);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     max-height: 116px;
     overflow-y: auto;
@@ -179,9 +179,9 @@
 }
 
 .sidebar-input {
-    background-color: light-dark(rgb(234, 236, 242), #181923);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#333333, lightgrey);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     padding: 4px 8px;
     font-family: "Source Sans 3";
@@ -278,8 +278,8 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 4px 6px;
-    background-color: light-dark(rgb(234, 236, 242), #181923);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     min-height: 30px;
     cursor: text;
@@ -294,7 +294,7 @@
     display: flex;
     align-items: center;
     gap: 3px;
-    background-color: light-dark(#dddde8, #3a3a52);
+    background-color: light-dark(#e5e5ea, #3a3a52);
     color: light-dark(#333333, lightgrey);
     border-radius: 3px;
     padding: 1px 4px 1px 7px;
@@ -337,8 +337,8 @@
     top: 100%;
     left: 0;
     right: 0;
-    background-color: light-dark(rgb(232, 234, 240), #1a1c28);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(rgb(240, 240, 244), #1a1c28);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     margin-top: 2px;
     z-index: 100;
@@ -355,7 +355,7 @@
 }
 
 .ms-option:hover {
-    background-color: light-dark(#e0e0ee, #3d3d55);
+    background-color: light-dark(#eaeaee, #3d3d55);
 }
 
 .ms-empty {
@@ -379,9 +379,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 4px 8px;
-    background-color: light-dark(rgb(234, 236, 242), #181923);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#333333, lightgrey);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     cursor: pointer;
     user-select: none;
@@ -441,8 +441,8 @@
     top: calc(100% + 2px);
     left: 0;
     right: 0;
-    background-color: light-dark(rgb(232, 234, 240), #1a1c28);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(rgb(240, 240, 244), #1a1c28);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     z-index: 200;
     max-height: 200px;
@@ -458,11 +458,11 @@
 }
 
 .cs-option:hover {
-    background-color: light-dark(#e0e0ee, #3d3d55);
+    background-color: light-dark(#eaeaee, #3d3d55);
 }
 
 .cs-option-selected {
-    background-color: light-dark(#dddde8, #2a2a3e);
+    background-color: light-dark(#e5e5ea, #2a2a3e);
     font-weight: 600;
 }
 
@@ -549,14 +549,14 @@
 .js-tooltip {
     position: fixed;
     display: none;
-    background-color: light-dark(rgb(230, 232, 239), #1e1e2e);
+    background-color: light-dark(rgb(238, 238, 243), #1e1e2e);
     color: light-dark(#333333, lightgrey);
     font-size: 0.72rem;
     font-family: "Source Sans 3";
     font-weight: 400;
     padding: 5px 8px;
     border-radius: 4px;
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     width: 220px;
     white-space: normal;
     text-align: left;
@@ -603,7 +603,7 @@
 
 .trade-add-btn {
     background: none;
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     color: light-dark(#999999, #666688);
     font-family: "Source Sans 3";
@@ -648,7 +648,7 @@
 /* ─── Main content ───────────────────────────────────────────────────────── */
 
 .playerpopup {
-    background-color: light-dark(rgb(234, 236, 242), #181923);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#999999, #666688);
     border: none;
     cursor: pointer;
@@ -664,7 +664,7 @@
 }
 
 body {
-    background-color: light-dark(rgb(240, 242, 246), rgb(14, 17, 23));
+    background-color: light-dark(#ffffff, rgb(14, 17, 23));
     color: light-dark(#333333, lightgrey);
 }
 
@@ -673,20 +673,20 @@ body {
 
 th {
     padding: 4px 5px;
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
 
 }
 
 tr {
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
 
 }
 
 #hscoretable {
     border-radius: 12px;
-    background-color: light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(#8080a0, #3d3d55);
     border-collapse: collapse;
-    border: 2px solid light-dark(#aaaabc, #3d3d55);
+    border: 2px solid light-dark(#8080a0, #3d3d55);
     overflow: hidden; /* This clips the sharp cell corners */
     font-family: "Source Sans 3";
     font-weight: 400;
@@ -698,7 +698,7 @@ tr {
 }
 
 .tableheader {
-    background-color: light-dark(rgb(234, 236, 242), #181923);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#555555, darkgrey);
     font-weight:500;
     font-size: 0.75rem;
@@ -728,13 +728,13 @@ tr {
 }
 
 .playerheader {
-    background-color: light-dark(rgb(240, 242, 246), rgb(14,17,23));
+    background-color: light-dark(rgb(248, 248, 250), rgb(14,17,23));
     color: light-dark(#555555, darkgrey);
     font-weight:400;
     text-align: left;
     width: 224px;
-    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
-    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 2px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
 
 }
 
@@ -747,24 +747,24 @@ tr {
 }
 
 .celltypea {
-    background-color: light-dark(#d8d8e8, #3a3a4a);
+    background-color: light-dark(#e0e0e6, #3a3a4a);
     color: light-dark(black, white);
 
 }
 
 .celltypeb {
-    background-color: light-dark(#c1c1d2, #48485a);
+    background-color: light-dark(#cccccc, #48485a);
     color: light-dark(black, white);
 }
 
 .overallhscore {
-    background-color: light-dark(#c1c1d2, #3a3a4a);
+    background-color: light-dark(#ededf0, #3a3a4a);
     color: light-dark(black, white);
     font-weight:400;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
-    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 2px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
 }
 
 .overallhscore:after{
@@ -775,8 +775,8 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
-    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 2px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
 }
 .categoricalhscore:after{
     content : '%';
@@ -786,8 +786,8 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
-    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 2px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
 }
 
 .rosterabsent {
@@ -817,17 +817,17 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#aaaabc, #3d3d55);
-    border-bottom: 2px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 2px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
 }
 
 /* ─── Detail panel ───────────────────────────────────────────────────────── */
 
 .panel-cell {
-    background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26));
+    background-color: light-dark(rgb(248, 248, 250), rgb(16, 18, 26));
     padding: 12px 0;
     border-top: none;
-    border-bottom: 1px solid light-dark(#aaaabc, #555566);
+    border-bottom: 1px solid light-dark(#8080a0, #555566);
 }
 
 .panel-label {
@@ -854,8 +854,8 @@ tr {
 
 .panel-table--rounded {
     border-radius: 12px;
-    background-color: light-dark(#aaaabc, #3d3d55);
-    border: 2px solid light-dark(#aaaabc, #3d3d55);
+    background-color: light-dark(#8080a0, #3d3d55);
+    border: 2px solid light-dark(#8080a0, #3d3d55);
     overflow: hidden;
 }
 
@@ -867,7 +867,7 @@ tr {
 .panel-table--top-gap { margin-top: 16px; }
 
 .panel-colspacer {
-    background-color: light-dark(rgb(240, 242, 246), rgb(16, 18, 26)); /* matches .panel-cell — invisible */
+    background-color: light-dark(rgb(248, 248, 250), rgb(16, 18, 26)); /* matches .panel-cell — invisible */
     border: none;
     padding: 0;
 }
@@ -886,7 +886,7 @@ tr {
 .panel-colheader-blank { visibility: hidden; border-top-style: hidden; border-left-style: hidden; }
 
 .panel-colheader {
-    background-color: light-dark(rgb(234, 236, 242), #181923);
+    background-color: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#555555, darkgrey);
     font-weight: 500;
     font-size: 0.75rem;
@@ -895,7 +895,7 @@ tr {
 }
 
 .panel-rowlabel {
-    background-color: light-dark(rgb(240, 242, 246), rgb(14, 17, 23));
+    background-color: light-dark(#ffffff, rgb(14, 17, 23));
     color: light-dark(#555555, darkgrey);
     font-weight: 400;
     padding: 3px 10px;
@@ -961,7 +961,7 @@ tr {
 }
 
 .pick-btn.active {
-    background: light-dark(#aaaabc, #3d3d55);
+    background: light-dark(#8080a0, #3d3d55);
     border-color: light-dark(#888899, #555577);
 }
 
@@ -987,7 +987,7 @@ tr {
     display: flex;
     gap: 0;
     margin-bottom: 16px;
-    border-bottom: 1px solid light-dark(#aaaabc, #3d3d55);
+    border-bottom: 1px solid light-dark(#8080a0, #3d3d55);
 }
 
 .season-tab-btn {
@@ -1017,18 +1017,18 @@ tr {
 }
 
 .entry-table th {
-    background: light-dark(rgb(234, 236, 242), #181923);
+    background: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#555555, #aaaaaa);
     padding: 5px 8px;
     text-align: center;
     font-weight: 500;
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     white-space: nowrap;
 }
 
 .entry-table td {
-    background: light-dark(rgb(232, 234, 240), #1a1c28);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background: light-dark(#ffffff, #1a1c28);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     padding: 2px 4px;
     text-align: center;
     color: light-dark(#555555, #aaaaaa);
@@ -1048,7 +1048,7 @@ tr {
 }
 
 .entry-cell-label {
-    background: light-dark(rgb(234, 236, 242), #181923) !important;
+    background: light-dark(rgb(242, 242, 246), #181923) !important;
     color: light-dark(#555555, #aaaaaa) !important;
     font-weight: 500;
     width: 48px;
@@ -1096,8 +1096,8 @@ tr {
 .pick-btn {
     padding: 5px 10px;
     white-space: nowrap;
-    background: light-dark(#e0e0ee, #2a2a33);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background: light-dark(#eaeaee, #2a2a33);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     color: light-dark(black, white);
     cursor: pointer;
     font-size: 0.75rem;
@@ -1105,7 +1105,7 @@ tr {
     font-family: "Source Sans 3";
 }
 
-.pick-btn:hover { background: light-dark(#aaaabc, #3d3d55); }
+.pick-btn:hover { background: light-dark(#8080a0, #3d3d55); }
 
 /* ─── Auction board ──────────────────────────────────────────────────────────── */
 
@@ -1125,8 +1125,8 @@ tr {
     padding: 4px 6px;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
-    background: light-dark(rgb(230, 232, 239), #1e1e2e);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background: light-dark(rgb(238, 238, 243), #1e1e2e);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     border-radius: 4px;
     color: light-dark(black, white);
     flex-shrink: 0;
@@ -1151,21 +1151,21 @@ tr {
 }
 
 .auction-budget-cell {
-    background: light-dark(rgb(234, 236, 242), #181923);
+    background: light-dark(rgb(242, 242, 246), #181923);
     color: light-dark(#555555, #aaaaaa);
     font-size: 0.78rem;
     font-weight: 500;
     text-align: center;
     padding: 4px 6px;
-    border-top: 1px solid light-dark(#aaaabc, #3d3d55);
+    border-top: 1px solid light-dark(#8080a0, #3d3d55);
 }
 
 /* ─── Live bar ───────────────────────────────────────────────────────────────── */
 
 .refresh-btn {
     padding: 6px 14px;
-    background: light-dark(#e0e0ee, #2a2a33);
-    border: 1px solid light-dark(#aaaabc, #3d3d55);
+    background: light-dark(#eaeaee, #2a2a33);
+    border: 1px solid light-dark(#8080a0, #3d3d55);
     color: light-dark(black, white);
     cursor: pointer;
     border-radius: 4px;
@@ -1173,7 +1173,7 @@ tr {
     font-family: "Source Sans 3";
 }
 
-.refresh-btn:hover { background: light-dark(#aaaabc, #3d3d55); }
+.refresh-btn:hover { background: light-dark(#8080a0, #3d3d55); }
 
 /* ─── Seat selector ──────────────────────────────────────────────────────────── */
 
@@ -1280,7 +1280,7 @@ tr {
 
 .trade-divider {
     border: none;
-    border-top: 1px solid light-dark(#aaaabc, #333355);
+    border-top: 1px solid light-dark(#8080a0, #333355);
     margin: 16px 0;
 }
 
@@ -1299,7 +1299,7 @@ tr {
 .trade-tab-nav {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid light-dark(#aaaabc, #333355);
+    border-bottom: 1px solid light-dark(#8080a0, #333355);
     margin-bottom: 10px;
 }
 
@@ -1329,11 +1329,11 @@ tr {
 .trade-result-table td {
     padding: 3px 6px;
     text-align: right;
-    border-bottom: 1px solid light-dark(#aaaabc, #222244);
+    border-bottom: 1px solid light-dark(#8080a0, #222244);
 }
 .trade-result-table th { color: light-dark(#999999, #889); font-weight: 500; }
 .trade-row-label { text-align: left !important; color: light-dark(#555555, #aab); font-weight: 500; }
-.trade-row-subtotal td { border-top: 1px solid light-dark(#aaaabc, #444466); font-weight: 600; color: light-dark(#333333, #bbc); }
+.trade-row-subtotal td { border-top: 1px solid light-dark(#8080a0, #444466); font-weight: 600; }
 .trade-row-diff td     { border-top: 2px solid light-dark(#999999, #555577); font-weight: 700; color: light-dark(#222222, #dde); }
 
 /* Stubs */

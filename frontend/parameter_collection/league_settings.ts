@@ -99,7 +99,6 @@ export function renderLeagueSettings(container: HTMLElement): void {
     // ── Third round reversal toggle (full-width, Draft Mode only) ─────────
     const trrToggle = makeSidebarToggle('ls-third-round-reversal', 'Third round reversal')
     trrToggle.id = 'ls-trr-row'
-    container.append(trrToggle)
 
     const trrCheckbox = trrToggle.querySelector('input') as HTMLInputElement
     trrCheckbox.checked = pref('third_round_reversal', false)
@@ -122,6 +121,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     teamNamesList.className = 'team-names-list'
     teamNamesWrap.append(teamNamesList)
     container.append(teamNamesWrap)
+    container.append(trrToggle)
 
     /** Sync visible inputs → hidden textarea, persist, and notify main.ts. */
     function syncTeamNames(): void {

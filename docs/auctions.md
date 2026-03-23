@@ -14,7 +14,7 @@ When the selected mode is 'auction', the website will provide analysis for eithe
 
 ![](img/mauction.png)
 
-Player selection information can be entered into the editable table. Analysis will not begin until the 'Lock in' button is pressed; this is to allow for multiple updates without running H-scoring every time. 
+Player selection information can be entered into the table through the selectors above it. 
 
 ### Live connection 
 

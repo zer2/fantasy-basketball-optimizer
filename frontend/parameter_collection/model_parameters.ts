@@ -22,7 +22,7 @@ interface ParamSpec {
 
 // S_σ is shown only in Auction Mode; kept separate so it can be toggled independently.
 const S_SPEC: ParamSpec = {
-    id: 'mp-s', key: 'S', label: 'S\u03C3 (SAVOR)', step: 1,
+    id: 'mp-s', key: 'S', label: 'S<sub>\u03C3</sub> (SAVOR)', step: 1,
     fallback: 10,
     caption: 'SAVOR noise parameter. Roughly represents the standard deviation of dollar values expected for players during the season. Higher values down-weight low-dollar players more aggressively.',
 }
@@ -97,11 +97,12 @@ export function renderModelParameters(container: HTMLElement): void {
 
     // S_σ is only relevant in Auction Mode; hidden otherwise.
     const sItem = makeParamItem(S_SPEC)
-    sItem.style.display = 'none'
+    const isAuction = () => (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
+    sItem.style.display = isAuction() ? '' : 'none'
     grid.append(sItem)
 
     document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
-        sItem.style.display = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode' ? '' : 'none'
+        sItem.style.display = isAuction() ? '' : 'none'
     })
 }
 
@@ -117,7 +118,7 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
 
     const label = document.createElement('label')
     label.htmlFor = spec.id
-    label.textContent = spec.label
+    label.innerHTML = spec.label
     labelRow.append(label)
 
     const infoBtn = document.createElement('button')

@@ -339,3 +339,20 @@ export async function runWaiverEvaluate(
     }
 }
 
+/**
+ * Evaluates the full-team H-score for a specific team given roster assignments.
+ * Returns h_score and per-category win rates, or null if the backend returns no candidates.
+ */
+export async function evaluateTeamHScore(
+    playerAssignments: Record<string, string[]>
+  , teamId: string
+): Promise<{ h_score: number; win_rates: number[] } | null> {
+    await ensureSession()
+    const resp = await client.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: teamId })
+    if (resp.candidates.length === 0) return null
+    return {
+        h_score:   resp.candidates[0].h_score,
+        win_rates: resp.candidates[0].win_rates,
+    }
+}
+

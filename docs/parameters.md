@@ -48,9 +48,7 @@ The H-score parameters are inputs to the H-scoring procedure. They control the d
 
 ## Trade parameters 
 
-![](img/tp1.png)
-
-![](img/tp2.png)
+![](img/tp3.png)
 
 The trade parameters limit which potential trades are considered for suggestions. See the [section on trade suggestions](season.md/#trade-suggestions) for the implications of these parameters.
 

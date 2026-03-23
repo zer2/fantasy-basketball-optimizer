@@ -63,6 +63,7 @@ function showOwnDataLayout(mode: string): void {
     hide('season-trading-row')
 
     show('content-row')
+    show('eval-indicator')
 
     const rightHeader    = document.getElementById('right-header')!
     const rightSubHeader = document.getElementById('right-sub-header')!
@@ -107,6 +108,7 @@ function showLiveLayout(): void {
     hide('season-trading-row')
 
     show('content-row')
+    show('eval-indicator')
 
     const rightHeader    = document.getElementById('right-header')!
     const rightSubHeader = document.getElementById('right-sub-header')!
@@ -131,6 +133,7 @@ function showSeasonLayout(): void {
     hide('live-bar')
     hide('left-panel')
     hide('seat-selector-container')
+    hide('eval-indicator')
 
     // Clear sub-header so the tab bar from draft/auction mode doesn't bleed in
     const rightSubHeader = document.getElementById('right-sub-header')!

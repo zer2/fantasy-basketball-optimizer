@@ -29,9 +29,8 @@ export function renderPlayerStats(container: HTMLElement): void {
     const typeSelect = makeCustomSelect(
         'ps-data-type',
         [
-            { value: 'blended',   label: 'Projections (Snowflake)'  },
-            { value: 'historical', label: 'Historical (Snowflake)'  },
-            { value: 'mock',      label: 'Mock data (no Snowflake)' },
+            { value: 'blended',   label: 'Projections'  },
+            { value: 'historical', label: 'Historical'  },
         ],
         pref('data_source_type', 'blended'),
     )

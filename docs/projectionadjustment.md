@@ -32,8 +32,8 @@ Since this adjustment is made before any gradient descent is performed, as the p
 
 Say that there are prior expectations that 
 
-- The team's average win rate across all categories is approximately 50%, with Normally distributed error. 
-- H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error. 
+- H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error $\epsilon_a$. 
+- The team's true average win rate across all categories is a random variable with mean 50% and Normally distributed error $\epsilon_b$. 
 
 This information provides a Bayesian framework for re-calculating adjusted category-level win rates. 
 
@@ -56,7 +56,7 @@ $$
 \left[ \prod_c \phi \left(\frac{w^*_c - w_c}{\epsilon_a} \right) \right] \left[ \phi \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n } \right) \right]
 $$
 
-The important thing is what has the maximal likelihood, not what that likelihood is. So it is fine to convert this to log odds, which are 
+Taking the natural logarithm of both sides (converting to log odds) simplifies the expression to 
 
 $$
 \left[ \sum_c \left(\frac{w^*_c - w_c}{\epsilon_a} \right)^2 \right] +  \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)^2 
@@ -90,7 +90,7 @@ $$
 w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{ n^2} \right) }{1 + \frac{\beth}{ n^2}}
 $$
 
-This expression is the best for gleaning intution behind the adjustment. When the average win rate is high, a larger quantity is subtracted out from all the win rates. If the win rates are all 50%, the numerator becomes $\frac{1}{2} + \frac{\beth}{2n}$, cancelling with the denominator and keeping win rates constant. Higher values of $\beth$ increase the importance of the distortion term and decrease the importance of the original win rate.
+This expression is the best for gleaning intution behind the adjustment. When the average win rate is high, a larger quantity is subtracted out from all the win rates. If the win rates are all 50%, the numerator becomes $\frac{1}{2} + \frac{\beth}{2n}$, cancelling with the denominator and keeping win rates 50%. Higher values of $\beth$ increase the importance of the distortion term and decrease the importance of the original win rate.
 
 While being relatively interpretable, this expression unfortunately cannot be used directly because all of the $w^*_c$ values are unknowns. Some linear algebra is required with the vector forms of $w$ and $w^*$. 
 

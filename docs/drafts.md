@@ -1,6 +1,6 @@
 # Draft Mode
 
-H-scores and G-scores are designed directly for drafts, so they can be applied to drafts without modification.
+The papers which motivate this website were written with drafting in mind, allowing them to be applied directly to drafting. 
 
 ## Using draft mode
 
@@ -12,7 +12,7 @@ With manual entry, draft picks are entered through the website.
 
 The 'Lock in selection' button puts the player shown in the dropdown into the next draft slot. Picks go in a snake order and cannot be skipped. 
 
-The default order in which players are listed in the dropdown is by total G-score. The top player on the list is the default selection. So if 'Lock in selection' is pressed multiple times in succession, available players are taken in G-score order. 
+The default order in which players are listed in the dropdown is by base H-score. The top player on the list is the default selection. So if 'Lock in selection' is pressed multiple times in succession, available players are taken in G-score order. 
 
 The table below the player selection dropdown shows which players have been taken by which drafters. 
 

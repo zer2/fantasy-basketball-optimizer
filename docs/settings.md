@@ -50,7 +50,14 @@ There are three available modes.
 
 ### Other info
 
-If draft data is being input manually, the number of drafters, the number of picks per drafter, and the team names of the drafters are also inputs. 
+![](img/moreinfo.png)
+
+If draft data is being input manually, a number of additional inputs are required.They are 
+
+- The number of drafters and the number of picks per drafter
+- The team names of the drafters and their autodraft settings. Possible autodraft modes are manual entry (the default), H-scoring, or G-scoring. With H-scoring, the algorithm is run for every drafter, which takes some time. G-scoring autodrafting simply chooses players in total G-score order. 
+- A third round reversal toggle. Third round reversal is a common draft setting, wherein the draft order stays the same between the second and third round, instead of snaking. This is designed to limit the advantage of early picks. 
+
 
 ## Player statistics 
 
@@ -74,7 +81,7 @@ Projections are combined between different sources by taking weighted means acco
 
 ### Historical 
 
-Historical data is available for manual entry drafts. 
+Historical data from past seasons is available for manual entry drafts. 
 
 ![alt text](img/historical.png)
 

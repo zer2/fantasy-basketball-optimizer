@@ -55,7 +55,7 @@ export function renderSlotCounts(container: HTMLElement): void {
 
     const warning = document.createElement('div')
     warning.className = 'sidebar-caption'
-    warning.textContent = 'Slot counts must sum to the number of starter slots (picks minus bench).'
+    warning.textContent = 'The H-scoring algorithm will choose players assuming that its team ultimately needs to fit this structre'
     container.append(warning)
 
     const grid = document.createElement('div')
