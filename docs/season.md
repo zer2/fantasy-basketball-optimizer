@@ -83,8 +83,6 @@ Rosters can be manually input or edited on this tab. It is unneccesary if roster
 
 ![](img/rosters.png)
 
-Information from the roster table will only flow through to other components after the 'Lock in' button is pressed. This is to prevent the website from continually updating itself while many players are being added at the same time. 
-
 Only players from the loaded dataset can be added to the roster table, which are shown on a searchable drop-down for each cell. The same player can be added multiple times.
 
 ![](img/rosterjokic.png)
@@ -92,7 +90,7 @@ Only players from the loaded dataset can be added to the roster table, which are
 Nikola Jokic is still shown as an option after already being taken by another team
 ///
 
-Generally draft results can be copy-pasted from the drafting view into an Excel and then into this table, so long as the dataset of valid players remains the same. Occasionally there are bugs with copy-pasting into the rosters table, such as the first column not being copied over. In that case, the few remaining players can be entered by hand. 
+Generally draft results can be copy-pasted from the drafting view into an Excel and then into this table, so long as the dataset of valid players remains the same.
 
 ### Roster inspection
 

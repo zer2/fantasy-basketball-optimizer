@@ -41,9 +41,10 @@ export interface CustomSelect {
  * @param defaultValue - Initially selected value; falls back to `options[0]` if omitted
  */
 export function makeCustomSelect(
-    id:           string,
-    options:      CustomSelectOption[],
-    defaultValue?: string,
+    id:           string
+  , options:      CustomSelectOption[]
+  , defaultValue?: string
+  , doubleClickToOpen?: boolean
 ): CustomSelect {
 
     let currentOptions = [...options]
@@ -68,6 +69,7 @@ export function makeCustomSelect(
     searchInput.type      = 'text'
     searchInput.className = 'cs-search-input'
     searchInput.autocomplete = 'off'
+    searchInput.spellcheck   = false
 
     const arrow = document.createElement('span')
     arrow.className   = 'cs-arrow'
@@ -139,20 +141,32 @@ export function makeCustomSelect(
         wrapper.classList.remove('cs-open')
         searchInput.value       = getLabelFor(currentValue)
         searchInput.placeholder = ''
+        if (doubleClickToOpen) searchInput.readOnly = true
     }
 
     // ── Event wiring ───────────────────────────────────────────────────────
 
-    // Clicking anywhere on the trigger toggles the dropdown.
-    trigger.addEventListener('mousedown', e => {
-        if (e.target === searchInput) return   // let the search input handle its own focus
-        e.preventDefault()
-        if (dropdown.hidden) { searchInput.focus(); open() } else { close(); searchInput.blur() }
-    })
+    if (doubleClickToOpen) {
+        // Double-click mode: single click just focuses (for copy/paste);
+        // double-click opens the dropdown for editing.
+        searchInput.readOnly = true
+        trigger.addEventListener('dblclick', () => {
+            searchInput.readOnly = false
+            searchInput.focus()
+            open()
+        })
+    } else {
+        // Default: single click toggles the dropdown.
+        trigger.addEventListener('mousedown', e => {
+            if (e.target === searchInput) return
+            e.preventDefault()
+            if (dropdown.hidden) { searchInput.focus(); open() } else { close(); searchInput.blur() }
+        })
 
-    searchInput.addEventListener('focus', () => {
-        if (dropdown.hidden) open()
-    })
+        searchInput.addEventListener('focus', () => {
+            if (dropdown.hidden) open()
+        })
+    }
 
     searchInput.addEventListener('input', () => {
         if (dropdown.hidden) open()

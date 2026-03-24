@@ -55,7 +55,10 @@ export function renderSlotCounts(container: HTMLElement): void {
 
     const warning = document.createElement('div')
     warning.className = 'sidebar-caption'
-    warning.textContent = 'The H-scoring algorithm will choose players assuming that its team ultimately needs to fit this structre'
+    warning.textContent = `The H-scoring algorithm will choose players assuming that 
+                            its team ultimately needs to fit this structure. This 
+                            includes players who will start on the bench, but will
+                            be rotated to real slots when they have games.`
     container.append(warning)
 
     const grid = document.createElement('div')
@@ -85,7 +88,7 @@ export function renderSlotCounts(container: HTMLElement): void {
     }
 
     // Bench slots
-    container.append(makeLabel('sc-bench-slots', 'Bench slots'))
+    container.append(makeLabel('sc-bench-slots', 'Perma-bench slots'))
 
     const benchCaption = document.createElement('div')
     benchCaption.className = 'sidebar-caption'

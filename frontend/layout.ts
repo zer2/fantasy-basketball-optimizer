@@ -184,7 +184,7 @@ function buildSeasonNav(): void {
 function activateSeasonTab(tabId: string): void {
     currentSeasonTab = tabId
 
-    document.querySelectorAll('.pick-btn').forEach(btn => {
+    document.querySelectorAll('.season-tab-btn').forEach(btn => {
         btn.classList.toggle('active', (btn as HTMLElement).dataset.tab === tabId)
     })
 

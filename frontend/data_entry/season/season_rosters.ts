@@ -68,10 +68,11 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
         for (let d = 0; d < nDrafters; d++) {
             const cell = row.insertCell()
             const sel  = makeCustomSelect(
-                `sr-player-${r}-${d}`,
-                [...blankOption, ...playerNames.map(n => ({ value: n, label: n }))],
+                `sr-player-${r}-${d}`
+              , [...blankOption, ...playerNames.map(n => ({ value: n, label: n }))]
+              , undefined
+              , true
             )
-            sel.element.style.fontSize = '0.75rem'
             // Pre-fill from snake draft if a player is available for this slot
             const prefill = snakeDraft[d]?.[r]
             if (prefill) sel.setValue(prefill)
@@ -81,63 +82,134 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
         selects.push(rowSelects)
     }
 
-    // ── Copy support: copy the full grid as tab/newline-separated text ───
-    table.addEventListener('copy', (e: ClipboardEvent) => {
-        // Only intercept when focus is inside the table body
-        const active = document.activeElement
-        if (!active || !table.contains(active)) return
+    // ── Excel-style cell selection + Copy/Paste ────────────────────────────────
 
-        const lines: string[] = []
-        for (let r = 0; r < nPicks; r++) {
-            const cols: string[] = []
-            for (let d = 0; d < nDrafters; d++) {
-                cols.push(selects[r]?.[d]?.getValue() ?? '')
-            }
-            lines.push(cols.join('\t'))
+    // Selection range (grid coordinates, not DOM indices)
+    let anchorRow = 0, anchorCol = 0
+    let focusRow  = 0, focusCol  = 0
+
+    function selectionBounds() {
+        return {
+            r1: Math.min(anchorRow, focusRow)
+          , r2: Math.max(anchorRow, focusRow)
+          , c1: Math.min(anchorCol, focusCol)
+          , c2: Math.max(anchorCol, focusCol)
         }
+    }
 
-        e.preventDefault()
-        e.clipboardData?.setData('text/plain', lines.join('\n'))
+    function clearSelectionHighlight(): void {
+        table.querySelectorAll('.entry-cell-selected').forEach(el =>
+            el.classList.remove('entry-cell-selected')
+        )
+    }
+
+    function applySelectionHighlight(): void {
+        clearSelectionHighlight()
+        const { r1, r2, c1, c2 } = selectionBounds()
+        for (let r = r1; r <= r2; r++) {
+            for (let c = c1; c <= c2; c++) {
+                // tbody row r, cell c+1 (cell 0 is the pick label)
+                const cell = tbody.rows[r]?.cells[c + 1]
+                if (cell) cell.classList.add('entry-cell-selected')
+            }
+        }
+    }
+
+    /** Resolves a click target to grid coordinates, or null if outside data cells. */
+    function cellCoordsFromEvent(e: MouseEvent): { row: number; col: number } | null {
+        const td = (e.target as HTMLElement).closest('td') as HTMLTableCellElement | null
+        if (!td || !tbody.contains(td)) return null
+        const tr = td.parentElement as HTMLTableRowElement
+        const col = td.cellIndex - 1   // subtract pick label column
+        const row = tr.rowIndex - 1     // subtract thead row
+        if (row < 0 || col < 0 || row >= nPicks || col >= nDrafters) return null
+        return { row, col }
+    }
+
+    let dragging = false
+
+    table.addEventListener('mousedown', (e: MouseEvent) => {
+        const coords = cellCoordsFromEvent(e)
+        if (!coords) return
+        if (e.shiftKey) {
+            e.preventDefault()
+            focusRow = coords.row
+            focusCol = coords.col
+        } else {
+            anchorRow = coords.row
+            anchorCol = coords.col
+            focusRow  = coords.row
+            focusCol  = coords.col
+            dragging  = true
+        }
+        applySelectionHighlight()
     })
 
-    // ── Paste support: paste tab/newline-separated data into the grid ────
-    table.addEventListener('paste', (e: ClipboardEvent) => {
-        const text = e.clipboardData?.getData('text/plain')
-        if (!text) return
+    table.addEventListener('mousemove', (e: MouseEvent) => {
+        if (!dragging) return
+        const coords = cellCoordsFromEvent(e)
+        if (!coords) return
+        if (coords.row !== focusRow || coords.col !== focusCol) {
+            focusRow = coords.row
+            focusCol = coords.col
+            applySelectionHighlight()
+        }
+    })
 
-        // Find which cell is focused
-        const active = document.activeElement
-        if (!active) return
-        const cell = active.closest('td')
-        if (!cell) return
-        const row = cell.parentElement as HTMLTableRowElement
-        if (!row) return
+    document.addEventListener('mouseup', () => { dragging = false })
 
-        const startRow = row.rowIndex - 1  // subtract 1 for thead row
-        const startCol = cell.cellIndex - 1 // subtract 1 for pick label column
-        if (startRow < 0 || startCol < 0) return
+    table.addEventListener('keydown', (e: KeyboardEvent) => {
+        const ctrl = e.ctrlKey || e.metaKey
+        if (!ctrl) return
 
-        const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd().split('\n')
-
-        let changed = false
-        for (let dr = 0; dr < lines.length; dr++) {
-            const r = startRow + dr
-            if (r >= nPicks) break
-            const values = lines[dr].split('\t')
-            for (let dc = 0; dc < values.length; dc++) {
-                const d = startCol + dc
-                if (d >= nDrafters) break
-                const val = values[dc].trim()
-                if (val && selects[r]?.[d]) {
-                    selects[r][d].setValue(val)
-                    changed = true
-                }
-            }
+        if (e.key === 'a') {
+            // Select all data cells
+            e.preventDefault()
+            anchorRow = 0; anchorCol = 0
+            focusRow = nPicks - 1; focusCol = nDrafters - 1
+            applySelectionHighlight()
+            return
         }
 
-        if (changed) {
+        if (e.key === 'c') {
             e.preventDefault()
-            rebuildInspector()
+            const { r1, r2, c1, c2 } = selectionBounds()
+            const lines: string[] = []
+            for (let r = r1; r <= r2; r++) {
+                const cols: string[] = []
+                for (let c = c1; c <= c2; c++) {
+                    cols.push(selects[r]?.[c]?.getValue() ?? '')
+                }
+                lines.push(cols.join('\t'))
+            }
+            navigator.clipboard.writeText(lines.join('\n'))
+
+        } else if (e.key === 'v') {
+            e.preventDefault()
+            const { r1, c1 } = selectionBounds()
+
+            navigator.clipboard.readText().then(text => {
+                if (!text) return
+                const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd().split('\n')
+
+                let changed = false
+                for (let dr = 0; dr < lines.length; dr++) {
+                    const r = r1 + dr
+                    if (r >= nPicks) break
+                    const values = lines[dr].split('\t')
+                    for (let dc = 0; dc < values.length; dc++) {
+                        const d = c1 + dc
+                        if (d >= nDrafters) break
+                        const val = values[dc].trim()
+                        if (selects[r]?.[d]) {
+                            selects[r][d].setValue(val)
+                            changed = true
+                        }
+                    }
+                }
+
+                if (changed) rebuildInspector()
+            })
         }
     })
 
