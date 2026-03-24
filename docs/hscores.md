@@ -10,8 +10,6 @@ The H-scoring algorithm has three [input parameters](parameters.md/#h-score-para
 
 $\omega$ and $\gamma$ control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. 
 
-The H-scoring algorithm runs for the specified number of iterations. Additional iterations increase the precision of H-scoring, at the cost of longer computation. In practice thirty iterations, the default, works reasonably well.  
-
 ## H-score table
 
 The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. 
@@ -21,7 +19,9 @@ The H-score table for candidate evaluation lists players in order of their H-sco
 Top Each Category H-scores for the first pick, 2024-25 season
 ///
 
-H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is refreshed once every fifteen iterations. Also, only the top thirty players by H-score are shown until the last iteration, at which point all players are shown. 
+H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is only refreshed once the algorithm has completed the specified number of iterations. 
+
+In general, the algorithm will take a second or two to complete. It will take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake. 
 
 One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately. 
 

@@ -4,11 +4,7 @@ It is well-understood that player value in category leagues is dependent on cont
 
 The website uses G-scores as a measure of static value. G-scores are a variant of the traditional Z-score metric, as described in my [first paper](https://arxiv.org/abs/2307.02188). See also the [justification section of this page](#justification) for a relatively simple explanation. 
 
-## G-score table
-
-![alt text](img/gcand.png)
-
-During auctions and drafts, a tab will be available with the G-score table for available players. It includes the categorical components of G-scores as well.
+G-scores are used in a few places on the site. The main one is the team table, which summarizes teams using G-scores
 
 ## Team table
 

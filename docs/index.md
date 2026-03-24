@@ -1,4 +1,4 @@
-This is documentation for a [website](https://fantasy-basketball-optimizer-y9jt7t3ypmiejsyjkeayx6.streamlit.app/) which applies algorithms to category-based fantasy basketball. The algorithms are described in these papers: 
+This is documentation for a [website](https://fantasy-basketball-optimizer-281850565831.us-east1.run.app/) which applies algorithms to category-based fantasy basketball. The algorithms are described in these papers: 
 
 - [Improving algorithms for fantasy basketball](https://arxiv.org/abs/2307.02188)
 - [Dynamic algorithms for fantasy basketball](https://arxiv.org/abs/2409.09884)

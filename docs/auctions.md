@@ -36,32 +36,29 @@ A well-known heuristic for quantifying auction value is described in many places
 
 This process ensures both that players' dollar values proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
 
-Auction mode uses this process to quantify player value in a few ways.
+Auction mode uses this process to quantify player value in a few ways. They are all shown in the detailed drop-down for auction candidates.
+
+![](img/auctiondetail.png)
 
 ### Converting G-score value to dollar value 
 
-Two kinds of dollar values are presented for G-scores
-
-![](img/gdollars.png)
-/// caption
-G-score-based $ values in a synthetic draft context
-///
-
-'Orig. $' value, or original value, is the same as the auction value heuristic described above. Original values do not change during auctions, and can be helpful as objective benchmarks that quantify how good deals are in the abstract. 
+Two kinds of dollar values are presented for G-scores. 'Orig. $' value, or original value, is exactly the auction value heuristic described above applied to total G-score. Original values do not change during auctions, and can be helpful as objective benchmarks that quantify how good deals are in the abstract. 
 
 'Gnrc. $' value, or generic value, is a variant which is recomputed as players are taken and the amount of available money decreases. For example if two players out of 156 have been taken for $200 total, those two players are removed from the list, the replacement-level value becomes the 155th-highest score, and 200 dollars are removed from the amount of total dollars available. The same process as for original value is then applied using the modified inputs. Generic value may be useful strategically because it reflects whether other managers have been under- or over-spending. E.g. if managers have been underspending, it implicitly takes into account the fact that some managers have excess money and will be able to pay more for remaining players. 
 
 ### Converting H-score value to dollar value 
 
-H-scores are probabilities, not general values. They are converted into dollar values with two steps
-
-1. It is estimated how much money it would take to improve winning chances by the same amount as taking the player
-2. Those monetary estimates are refined into dollar values with the auction value heuristic as described previously
+The dollar estimates based on H-scores are shown in the main candidate table, along with category-level H-scores. 
 
 ![alt text](img/hdollars.png)
 /// caption
 H-score-based $ values in a synthetic draft context
 ///
+
+H-scores are probabilities, not general values. They are converted into dollar values with two steps
+
+1. It is estimated how much money it would take to improve winning chances by the same amount as taking the player
+2. Those monetary estimates are refined into dollar values with the auction value heuristic as described previously
 
 The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. The lack of context also means that they are imprecise approximations of real player value.
 
