@@ -42,32 +42,31 @@ function darkTertiary(value: number, multiplier: number, middle: number): RGB {
 }
 
 // ─── Light styler ────────────────────────────────────────────────────────────
-// SAT controls how vivid the colors get (0 = greyscale, 1 = full saturation)
-const SAT = 0.7
+// Matches the Streamlit LightStyler: white base, full-range subtraction
 
 function lightPrimary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
-    const i = Math.round(Math.min(Math.round(Math.abs(raw)), 130) * SAT)
+    const intensity = Math.min(Math.round(Math.abs(raw)), 255)
     return [
-        raw > 0 ? 255 - i : 255,
-        raw > 0 ? 255 : 255 - i,
-        raw > 0 ? 255 - i : 255 - i,
+        raw > 0 ? 255 - intensity : 255,
+        raw > 0 ? 255 : 255 - intensity,
+        raw > 0 ? 255 - intensity : 255 - intensity,
     ]
 }
 
 function lightSecondary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
-    const i = Math.round(Math.min(Math.round(Math.abs(raw)), 140) * SAT)
-    return [255, raw > 0 ? 255 : 255 - i, raw > 0 ? 255 - i : 255]
+    const intensity = Math.min(Math.round(Math.abs(raw)), 255)
+    return [255, raw > 0 ? 255 : 255 - intensity, raw > 0 ? 255 - intensity : 255]
 }
 
 function lightTertiary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
-    const i = Math.round(Math.min(Math.round(Math.abs(raw)), 100) * SAT)
+    const intensity = Math.min(Math.round(Math.abs(raw)), 100)
     return [
-        raw > 0 ? 240 - i : 240 + Math.round(i / 10),
-        raw > 0 ? 240 - i : 240 + Math.round(i / 10),
-        240,
+        255 - intensity,
+        255 - intensity,
+        255,
     ]
 }
 

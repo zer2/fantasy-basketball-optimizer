@@ -12,8 +12,8 @@
 #sidebar {
     width: 280px;
     min-width: 280px;
-    background-color: light-dark(rgb(248, 248, 250), #0e1117);
-    border-right: 1px solid light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#ffffff, #0e1117);
+    border-right: 1px solid light-dark(#e5e5e5, #3d3d55);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -24,8 +24,8 @@
     width: 100%;
     margin-top: 10px;
     padding: 6px;
-    background: light-dark(#eaeaee, #2a2a3e);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background: light-dark(#efefef, #2a2a3e);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     color: light-dark(#555555, #aaaacc);
     font-family: "Source Sans 3";
@@ -34,7 +34,7 @@
 }
 
 .section-apply-btn:hover {
-    background: light-dark(#8080a0, #3d3d55);
+    background: light-dark(#e5e5e5, #3d3d55);
     color: light-dark(black, white);
 }
 
@@ -48,7 +48,7 @@
 
 .sidebar-divider {
     border: none;
-    border-top: 1px solid light-dark(#8080a0, #3d3d55);
+    border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
     margin: 0;
 }
 
@@ -61,7 +61,7 @@
 /* ─── Sidebar sections (collapsible, mirroring Streamlit popovers) ───────── */
 
 .sidebar-section {
-    border-bottom: 1px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 1px solid light-dark(#e5e5e5, #3d3d55);
 }
 
 .sidebar-section > summary {
@@ -117,8 +117,8 @@
 /* ─── Team names list (replaces textarea; rows = name input + mode dropdown) */
 
 .team-names-list {
-    background-color: light-dark(rgb(242, 242, 246), #181923);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#fafafa, #181923);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     max-height: 116px;
     overflow-y: auto;
@@ -133,7 +133,7 @@
 }
 
 .team-name-row:not(:last-child) {
-    border-bottom: 1px solid light-dark(#ddddea, #2a2c3a);
+    border-bottom: 1px solid light-dark(#f0f0f0, #2a2c3a);
 }
 
 .team-name-input {
@@ -179,9 +179,9 @@
 }
 
 .sidebar-input {
-    background-color: light-dark(rgb(242, 242, 246), #181923);
+    background-color: light-dark(#fafafa, #181923);
     color: light-dark(#333333, lightgrey);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     padding: 4px 8px;
     font-family: "Source Sans 3";
@@ -238,7 +238,7 @@
     position: relative;
     width: 34px;
     height: 18px;
-    background-color: light-dark(#c4c4d4, #3d3d55);
+    background-color: light-dark(#e5e5e5, #3d3d55);
     border-radius: 9px;
     flex-shrink: 0;
     transition: background-color 0.2s;
@@ -251,13 +251,13 @@
     left: 3px;
     width: 12px;
     height: 12px;
-    background-color: light-dark(#f0f0f4, #666688);
+    background-color: light-dark(#f0f0f0, #666688);
     border-radius: 50%;
     transition: transform 0.2s, background-color 0.2s;
 }
 
 .sidebar-toggle-input:checked ~ .sidebar-toggle-track {
-    background-color: light-dark(#8888bb, #4a4a8a);
+    background-color: light-dark(#888888, #4a4a8a);
 }
 
 .sidebar-toggle-input:checked ~ .sidebar-toggle-track::after {
@@ -278,8 +278,8 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 4px 6px;
-    background-color: light-dark(rgb(242, 242, 246), #181923);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#fafafa, #181923);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     min-height: 30px;
     cursor: text;
@@ -294,7 +294,7 @@
     display: flex;
     align-items: center;
     gap: 3px;
-    background-color: light-dark(#e5e5ea, #3a3a52);
+    background-color: light-dark(#e5e5e5, #3a3a52);
     color: light-dark(#333333, lightgrey);
     border-radius: 3px;
     padding: 1px 4px 1px 7px;
@@ -337,8 +337,8 @@
     top: 100%;
     left: 0;
     right: 0;
-    background-color: light-dark(rgb(240, 240, 244), #1a1c28);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#f8f8f8, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     margin-top: 2px;
     z-index: 100;
@@ -355,7 +355,7 @@
 }
 
 .ms-option:hover {
-    background-color: light-dark(#eaeaee, #3d3d55);
+    background-color: light-dark(#fafafa, #3d3d55);
 }
 
 .ms-empty {
@@ -379,9 +379,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 4px 8px;
-    background-color: light-dark(rgb(242, 242, 246), #181923);
+    background-color: light-dark(#fafafa, #181923);
     color: light-dark(#333333, lightgrey);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     cursor: pointer;
     user-select: none;
@@ -441,8 +441,8 @@
     top: calc(100% + 2px);
     left: 0;
     right: 0;
-    background-color: light-dark(rgb(240, 240, 244), #1a1c28);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#f8f8f8, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     z-index: 200;
     max-height: 200px;
@@ -458,11 +458,11 @@
 }
 
 .cs-option:hover {
-    background-color: light-dark(#eaeaee, #3d3d55);
+    background-color: light-dark(#fafafa, #3d3d55);
 }
 
 .cs-option-selected {
-    background-color: light-dark(#e5e5ea, #2a2a3e);
+    background-color: light-dark(#e5e5e5, #2a2a3e);
     font-weight: 600;
 }
 
@@ -549,14 +549,14 @@
 .js-tooltip {
     position: fixed;
     display: none;
-    background-color: light-dark(rgb(238, 238, 243), #1e1e2e);
+    background-color: light-dark(#f6f6f6, #1e1e2e);
     color: light-dark(#333333, lightgrey);
     font-size: 0.72rem;
     font-family: "Source Sans 3";
     font-weight: 400;
     padding: 5px 8px;
     border-radius: 4px;
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     width: 220px;
     white-space: normal;
     text-align: left;
@@ -603,7 +603,7 @@
 
 .trade-add-btn {
     background: none;
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     color: light-dark(#999999, #666688);
     font-family: "Source Sans 3";
@@ -648,7 +648,7 @@
 /* ─── Main content ───────────────────────────────────────────────────────── */
 
 .playerpopup {
-    background-color: light-dark(rgb(242, 242, 246), #181923);
+    background-color: light-dark(#fafafa, #181923);
     color: light-dark(#999999, #666688);
     border: none;
     cursor: pointer;
@@ -673,20 +673,20 @@ body {
 
 th {
     padding: 4px 5px;
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
 
 }
 
 tr {
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
 
 }
 
 #hscoretable {
     border-radius: 12px;
-    background-color: light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#e5e5e5, #3d3d55);
     border-collapse: collapse;
-    border: 2px solid light-dark(#8080a0, #3d3d55);
+    border: 2px solid light-dark(#e5e5e5, #3d3d55);
     overflow: hidden; /* This clips the sharp cell corners */
     font-family: "Source Sans 3";
     font-weight: 400;
@@ -698,7 +698,7 @@ tr {
 }
 
 .tableheader {
-    background-color: light-dark(rgb(242, 242, 246), #181923);
+    background-color: light-dark(#fafafa, #181923);
     color: light-dark(#555555, darkgrey);
     font-weight:500;
     font-size: 0.75rem;
@@ -728,13 +728,13 @@ tr {
 }
 
 .playerheader {
-    background-color: light-dark(rgb(248, 248, 250), rgb(14,17,23));
+    background-color: light-dark(#ffffff, rgb(14,17,23));
     color: light-dark(#555555, darkgrey);
     font-weight:400;
     text-align: left;
     width: 224px;
-    border-top: 2px solid light-dark(#8080a0, #3d3d55);
-    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
 
 }
 
@@ -747,24 +747,24 @@ tr {
 }
 
 .celltypea {
-    background-color: light-dark(#e0e0e6, #3a3a4a);
+    background-color: light-dark(#e8e8e8, #3a3a4a);
     color: light-dark(black, white);
 
 }
 
 .celltypeb {
-    background-color: light-dark(#cccccc, #48485a);
+    background-color: light-dark(#e1e1e1, #48485a);
     color: light-dark(black, white);
 }
 
 .overallhscore {
-    background-color: light-dark(#ededf0, #3a3a4a);
+    background-color: light-dark(#e8e8e8, #3a3a4a);
     color: light-dark(black, white);
     font-weight:400;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#8080a0, #3d3d55);
-    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
 }
 
 .overallhscore:after{
@@ -775,8 +775,8 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#8080a0, #3d3d55);
-    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
 }
 .categoricalhscore:after{
     content : '%';
@@ -786,8 +786,8 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#8080a0, #3d3d55);
-    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
 }
 
 .rosterabsent {
@@ -817,17 +817,17 @@ tr {
     font-weight:500;
     text-align:right;
     padding:5px;
-    border-top: 2px solid light-dark(#8080a0, #3d3d55);
-    border-bottom: 2px solid light-dark(#8080a0, #3d3d55);
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
 }
 
 /* ─── Detail panel ───────────────────────────────────────────────────────── */
 
 .panel-cell {
-    background-color: light-dark(rgb(248, 248, 250), rgb(16, 18, 26));
+    background-color: light-dark(#ffffff, rgb(16, 18, 26));
     padding: 12px 0;
     border-top: none;
-    border-bottom: 1px solid light-dark(#8080a0, #555566);
+    border-bottom: 1px solid light-dark(#e0e0e0, #555566);
 }
 
 .panel-label {
@@ -854,8 +854,8 @@ tr {
 
 .panel-table--rounded {
     border-radius: 12px;
-    background-color: light-dark(#8080a0, #3d3d55);
-    border: 2px solid light-dark(#8080a0, #3d3d55);
+    background-color: light-dark(#e5e5e5, #3d3d55);
+    border: 2px solid light-dark(#e5e5e5, #3d3d55);
     overflow: hidden;
 }
 
@@ -867,7 +867,7 @@ tr {
 .panel-table--top-gap { margin-top: 16px; }
 
 .panel-colspacer {
-    background-color: light-dark(rgb(248, 248, 250), rgb(16, 18, 26)); /* matches .panel-cell — invisible */
+    background-color: light-dark(#ffffff, rgb(16, 18, 26)); /* matches .panel-cell — invisible */
     border: none;
     padding: 0;
 }
@@ -886,12 +886,12 @@ tr {
 .panel-colheader-blank { visibility: hidden; border-top-style: hidden; border-left-style: hidden; }
 
 .panel-colheader {
-    background-color: light-dark(rgb(242, 242, 246), #181923);
+    background-color: light-dark(#fafafa, #181923);
     color: light-dark(#555555, darkgrey);
     font-weight: 500;
     font-size: 0.75rem;
     text-align: center;
-    border: 0.5px solid light-dark(lightgrey, #555566);
+    border: 0.5px solid light-dark(#eeeeee, #555566);
 }
 
 .panel-rowlabel {
@@ -900,7 +900,7 @@ tr {
     font-weight: 400;
     padding: 3px 10px;
     text-align: left;
-    border: 0.5px solid light-dark(lightgrey, #555566);
+    border: 0.5px solid light-dark(#eeeeee, #555566);
     white-space: nowrap;
 }
 
@@ -912,7 +912,7 @@ tr {
 .panel-datacell {
     padding: 3px 8px;
     text-align: right;
-    border: 0.5px solid light-dark(lightgrey, #555566);
+    border: 0.5px solid light-dark(#eeeeee, #555566);
     font-weight: 500;
     white-space: nowrap;
 }
@@ -961,8 +961,9 @@ tr {
 }
 
 .pick-btn.active {
-    background: light-dark(#8080a0, #3d3d55);
-    border-color: light-dark(#888899, #555577);
+    background: light-dark(#e5e5e5, #3d3d55);
+    border-color: light-dark(#aaaaaa, #555577);
+    color: light-dark(#333333, white);
 }
 
 #season-rosters-row {
@@ -987,7 +988,7 @@ tr {
     display: flex;
     gap: 0;
     margin-bottom: 16px;
-    border-bottom: 1px solid light-dark(#8080a0, #3d3d55);
+    border-bottom: 1px solid light-dark(#e5e5e5, #3d3d55);
 }
 
 .season-tab-btn {
@@ -1027,18 +1028,18 @@ tr {
 }
 
 .entry-table th {
-    background: light-dark(rgb(242, 242, 246), #181923);
+    background: light-dark(#fafafa, #181923);
     color: light-dark(#555555, #aaaaaa);
     padding: 5px 8px;
     text-align: center;
     font-weight: 500;
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     white-space: nowrap;
 }
 
 .entry-table td {
     background: light-dark(#ffffff, #1a1c28);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     padding: 0;
     text-align: center;
     color: light-dark(#555555, #aaaaaa);
@@ -1072,7 +1073,7 @@ tr {
 }
 
 .entry-cell-label {
-    background: light-dark(rgb(242, 242, 246), #181923) !important;
+    background: light-dark(#fafafa, #181923) !important;
     color: light-dark(#555555, #aaaaaa) !important;
     font-weight: 500;
     width: 48px;
@@ -1125,8 +1126,8 @@ tr {
 .pick-btn {
     padding: 5px 10px;
     white-space: nowrap;
-    background: light-dark(#eaeaee, #2a2a33);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background: light-dark(#efefef, #2a2a33);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     color: light-dark(black, white);
     cursor: pointer;
     font-size: 0.75rem;
@@ -1134,7 +1135,7 @@ tr {
     font-family: "Source Sans 3";
 }
 
-.pick-btn:hover { background: light-dark(#8080a0, #3d3d55); }
+.pick-btn:hover { background: light-dark(#e5e5e5, #3d3d55); }
 
 /* ─── Auction board ──────────────────────────────────────────────────────────── */
 
@@ -1154,8 +1155,8 @@ tr {
     padding: 4px 6px;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
-    background: light-dark(rgb(238, 238, 243), #1e1e2e);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background: light-dark(#f6f6f6, #1e1e2e);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     color: light-dark(black, white);
     flex-shrink: 0;
@@ -1180,21 +1181,21 @@ tr {
 }
 
 .auction-budget-cell {
-    background: light-dark(rgb(242, 242, 246), #181923);
+    background: light-dark(#fafafa, #181923);
     color: light-dark(#555555, #aaaaaa);
     font-size: 0.78rem;
     font-weight: 500;
     text-align: center;
     padding: 4px 6px;
-    border-top: 1px solid light-dark(#8080a0, #3d3d55);
+    border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
 }
 
 /* ─── Live bar ───────────────────────────────────────────────────────────────── */
 
 .refresh-btn {
     padding: 6px 14px;
-    background: light-dark(#eaeaee, #2a2a33);
-    border: 1px solid light-dark(#8080a0, #3d3d55);
+    background: light-dark(#efefef, #2a2a33);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
     color: light-dark(black, white);
     cursor: pointer;
     border-radius: 4px;
@@ -1202,7 +1203,7 @@ tr {
     font-family: "Source Sans 3";
 }
 
-.refresh-btn:hover { background: light-dark(#8080a0, #3d3d55); }
+.refresh-btn:hover { background: light-dark(#e5e5e5, #3d3d55); }
 
 /* ─── Seat selector ──────────────────────────────────────────────────────────── */
 
@@ -1249,7 +1250,7 @@ tr {
 }
 
 .eval-indicator.evaluating::before {
-    border: 2px solid light-dark(#9999cc, #6666aa);
+    border: 2px solid light-dark(#999999, #6666aa);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;
 }
@@ -1309,7 +1310,7 @@ tr {
 
 .trade-divider {
     border: none;
-    border-top: 1px solid light-dark(#8080a0, #333355);
+    border-top: 1px solid light-dark(#e0e0e0, #333355);
     margin: 16px 0;
 }
 
@@ -1328,7 +1329,7 @@ tr {
 .trade-tab-nav {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid light-dark(#8080a0, #333355);
+    border-bottom: 1px solid light-dark(#e0e0e0, #333355);
     margin-bottom: 10px;
 }
 
@@ -1343,7 +1344,7 @@ tr {
 }
 .trade-tab-btn.active {
     color: light-dark(#333333, #dde);
-    border-bottom-color: light-dark(#6666bb, #5577cc);
+    border-bottom-color: light-dark(#666666, #5577cc);
 }
 
 .trade-tab-pane { min-height: 60px; }
@@ -1358,12 +1359,12 @@ tr {
 .trade-result-table td {
     padding: 3px 6px;
     text-align: right;
-    border-bottom: 1px solid light-dark(#8080a0, #222244);
+    border-bottom: 1px solid light-dark(#e0e0e0, #222244);
 }
 .trade-result-table th { color: light-dark(#999999, #889); font-weight: 500; }
 .trade-row-label { text-align: left !important; color: light-dark(#555555, #aab); font-weight: 500; }
-.trade-row-subtotal td { border-top: 1px solid light-dark(#8080a0, #444466); font-weight: 600; }
-.trade-row-diff td     { border-top: 2px solid light-dark(#999999, #555577); font-weight: 700; color: light-dark(#222222, #dde); }
+.trade-row-subtotal td { border-top: 1px solid light-dark(#e0e0e0, #444466); font-weight: 600; }
+.trade-row-diff td     { border-top: 2px solid light-dark(#e0e0e0, #555577); font-weight: 700; color: light-dark(#222222, #dde); }
 
 /* Stubs */
 .trade-hscore-stub,
