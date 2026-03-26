@@ -19,19 +19,35 @@ The H-score table for candidate evaluation lists players in order of their H-sco
 Top Each Category H-scores for the first pick, 2024-25 season
 ///
 
-H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is only refreshed once the algorithm has completed the specified number of iterations. 
+H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is only refreshed once the algorithm has completed the specified number of iterations. In general, the algorithm will take a second or two to complete. It will take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake. 
 
-In general, the algorithm will take a second or two to complete. It will take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake. 
+### Overall H-scores
+
+The overall H-score is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. 
 
 One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately. 
+
+Different kinds of categories deal with fantasy points differently, and necessitate different formulations for the overall H-score. In "Each Category", teams rotate opponents weekly and keep all the fantasy points they win. For that format, the H-score is defined average expected win rate across categories. 
+
+In "Most Categories", teams also rotate opponents, but instead of keeping all of their fantasy points, they get wins for every opponent they get a majority of fantasy points against. To reflect that, switching the format to Most Categories makes the definition of the overall H-score the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).
+
+![alt text](img/hmc.png)
+/// caption
+Top Most Category H-scores for the first pick, 2024-25 season
+///
+
+The table above is based on the same dataset as the Each Category version. The numbers are different because they use the Most Categories objective instead of the Each Category objective. With Most Categories scoring, the algorithm is even more incentivized to punt, and tends to do so to a more extreme degree. Players that benefit strongly from punting like Giannis also end up scoring better (he's fifth either way, but has more distance above Wembanyama in Most Categories).
+
+Rotisserie is another degree more complicated than Most Categories. See the [Roto section](roto.md) for details
+
 
 ### Category-level H-scores
 
 Category-level H-scores are an in important part of the H-scoring process. They are _not direct reflections of the candidate player's characteristics_. Instead, they show what the H-scoring algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates those expectations based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.
 
-Because other factors are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For early picks, the most important factor is the strategy for future draft picks. For example, Shai Gilgeous-Alexander's row above for the first pick in the draft shows a very low probability of winning the Rebound category, despite SGA being a decent rebounder himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing rebounds with future picks.
+Because other picks are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For example, Shai Gilgeous-Alexander's row as a candidate for first pick shows a very low probability of winning the Assist category, despite SGA getting a decent number himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing assists with future picks.
 
-In later draft rounds, the importance of previously chosen players increases and the importance of the strategy for future picks decreases. Also, the strategy for future picks tends to become more stable across players, since the direction of the team is already decided. So categorical H-scores tend to become consistent across players. 
+In later draft rounds, the importance of previously chosen players increases and the importance of the strategy for future picks decreases. Also, the strategy for future picks tends to become more stable across players, since the direction of the team is already decided. So categorical H-scores tend to become more consistent across candidate players as the draft goes on.
 
 ![alt text](img/hec2.png)
 /// caption
@@ -42,25 +58,8 @@ Most of the time, the algorithm punts one or two categories, reflected by low H-
 
 ![alt text](img/HistEC.png)
 /// caption
-This image from the paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It largely either punted categories or tried to be competitive in them
+This image from the second paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It largely either punted categories or tried to be competitive in them
 ///
-
-### Overall H-scores
-
-The overall H-score is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. It is based on the category-level H-scores. 
-
-Different kinds of categories deal with fantasy points differently, and necessitate different formulations for the overall H-score. In "Each Category", teams rotate opponents weekly and keep all the fantasy points they win. For that format, the H-score is defined average expected win rate across categories. 
-
-In "Most Categories", teams also rotate opponents, but instead of keeping all of their fantasy points, they get wins for every opponent they get a majority of fantasy points against. For that format, the average expected win rate is a poor proxy for success. A team that wins five out of nine categories 100% of the time and always loses the others is better for that format than one that wins each category 60% of the time, despite having a lower average expected win rate (56% vs 60%). For that reason, switching the format to Most Categories switches the definition of the overall H-score to the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).
-
-![alt text](img/hmc.png)
-/// caption
-Top Most Category H-scores for the first pick, 2024-25 season
-///
-
-The table above is based on the same dataset as the Each Category version. The numbers, and the order of players, are different because they use the Most Categories objective instead of the Each Category objective. With Most Categories scoring, the algorithm is even more incentivized to punt, and tends to do so to a more extreme degree. Players that benefit strongly from punting like Giannis also end up ranking better (third instead of fifth).
-
-Rotisserie is another degree more complicated than Most Categories. See the [Roto section](roto.md) for details
 
 ## H-score details tab
 
@@ -142,7 +141,7 @@ This kind of problem is called an assignment problem, because slots are being as
 
 ![alt text](img/assignmentproblem.png)
 /// caption
-Example of an assignment matrix from the paper. Previously chosen players accrue rewards of zero because they have already been chosen. Their reward is set to negative infinity for positions they cannot be assigned to so that the algorithm knows it cannot make those assignments
+Example of an assignment matrix from the second paper. Previously chosen players accrue rewards of zero because they have already been chosen. Their reward is set to negative infinity for positions they cannot be assigned to so that the algorithm knows it cannot make those assignments
 ///
 
 There are fast algorithms available for assignment problems, such as the Hungarian algorithm (though H-scoring actually uses a faster variant).
