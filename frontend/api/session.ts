@@ -19,10 +19,11 @@ import * as client from './client.js'
 // Direct DOM access for the eval indicator, avoiding a circular dependency with
 // layout.ts (which imports runEvaluate from this module).
 
-function setEvaluating(active: boolean): void {
+function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating'): void {
     const el = document.getElementById('eval-indicator') as HTMLElement
-    el.classList.toggle('evaluating', active)
-    el.textContent = active ? 'Updating...' : 'Updated'
+    el.classList.toggle('evaluating', state === 'evaluating')
+    el.classList.toggle('fetching', state === 'fetching')
+    el.textContent = state === 'fetching' ? 'Fetching...' : state === 'evaluating' ? 'Updating...' : 'Updated'
 }
 
 // ─── Module state ────────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ async function startFreshSession(signal?: AbortSignal): Promise<void> {
         injured_players,
         // my_team_id comes from the seat selector in the main content area
     }
+    setIndicatorState('fetching')
     const resp = await client.createSession(req, signal)
     sessionId = resp.session_id
     setGScores(resp.g_scores)
@@ -117,6 +119,7 @@ async function ensureSession(): Promise<void> {
  */
 export async function runSeasonInit(): Promise<void> {
     await ensureSession()
+    setIndicatorState('idle')
     setPlayersFromGScores()
 }
 
@@ -138,12 +141,13 @@ export async function fetchCandidates(): Promise<void> {
     evaluateController = new AbortController()
     const { signal } = evaluateController
     const generation = ++evaluateGeneration
-    setEvaluating(true)
+    setIndicatorState('evaluating')
 
     try {
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
                 await ensureSession()
+                setIndicatorState('evaluating')
 
                 // Default to the first team name if no seat has been chosen yet
                 const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
@@ -219,7 +223,7 @@ export async function fetchCandidates(): Promise<void> {
             }
         }
     } finally {
-        if (evaluateGeneration === generation) setEvaluating(false)
+        if (evaluateGeneration === generation) setIndicatorState('idle')
     }
 }
 
@@ -315,7 +319,7 @@ export async function runWaiverEvaluate(
     playerAssignments: Record<string, string[]>,
     myTeamId: string,
 ): Promise<void> {
-    setEvaluating(true)
+    setIndicatorState('evaluating')
     try {
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
@@ -335,7 +339,7 @@ export async function runWaiverEvaluate(
             }
         }
     } finally {
-        setEvaluating(false)
+        setIndicatorState('idle')
     }
 }
 

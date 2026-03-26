@@ -3,8 +3,8 @@ nav:
   - Home: index.md
   - Settings : settings.md
   - Parameters : parameters.md
+  - H-scoring : hscores.md
   - G-scores : gscores.md
-  - H-scores : hscores.md
   - Rotisserie : roto.md
   - Draft Mode : drafts.md
   - Auction Mode : auctions.md 

@@ -1,6 +1,8 @@
-# H-scores
+# The H-scoring algorithm
 
-H-scoring is a framework introduced in [the second paper](https://arxiv.org/abs/2409.09884) for dynamic player selection. In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the idea of punting (strategicially sacrificing) some categories and over-performing in the rest. It also understands how to work around position requirements, which enforce that e.g. a team must have at least one point guard. See the [optimization section](#optimization) for some mathematical detail on how it works without the academic rigor of the paper. 
+The heart of the website is the H-scoring algorithm as described in [the second paper](https://arxiv.org/abs/2409.09884). It evaluates and ranks players for the website.
+
+ In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the idea of punting (strategicially sacrificing) some categories and over-performing in the rest. It also understands how to work around position requirements, which enforce that e.g. a team must have at least one point guard. See the [optimization section](#optimization) for some mathematical detail on how it works without the academic rigor of the paper. 
 
 Because of its ability to adapt to drafting circumstances, H-scoring arguably offers a more compelling and logical starting point for draft strategy than G-scoring. H-scores are featured on the website as the main way of evaluating players.
 

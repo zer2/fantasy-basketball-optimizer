@@ -1255,6 +1255,16 @@ tr {
     animation: eval-spin 0.65s linear infinite;
 }
 
+.eval-indicator.fetching {
+    color: light-dark(#886644, #bb9955);
+}
+
+.eval-indicator.fetching::before {
+    border: 2px solid light-dark(#aa8844, #997733);
+    border-top-color: transparent;
+    animation: eval-spin 0.65s linear infinite;
+}
+
 @keyframes eval-spin {
     to { transform: rotate(360deg); }
 }

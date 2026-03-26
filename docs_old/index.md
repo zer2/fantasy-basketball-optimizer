@@ -4,7 +4,9 @@ This is documentation for a [website](https://fantasy-basketball-optimizer-y9jt7
 - [Dynamic algorithms for fantasy basketball](https://arxiv.org/abs/2409.09884)
 - [Optimizing for Rotisserie fantasy basketball](https://arxiv.org/abs/2501.00933)
 
-Please note that these algorithms are based on a simplified model of fantasy basketball, ignoring many practical considerations, and there is no guarantee that using them will lead to success. Don't expect to automatically win your league with the algorithms or even to have a better shot than anyone else. The intent of the papers is just to start exploring the math underlying fantasy basketball, and the intent of the website is to have fun playing around with that math :smile:. 
+*Please note that these algorithms are based on a simplified model of fantasy basketball, ignoring many practical considerations, and there is no guarantee that using them will lead to success. Don't expect to automatically win your league with the algorithms or even to have a better shot than anyone else. The intent of the papers is just to start exploring the math underlying fantasy basketball, and the intent of the website is to have fun playing around with that math :smile:. *
+
+![alt text](image.png)
 
 Source code is available [here](https://github.com/zer2/fantasy-basketball-optimizer).
 
