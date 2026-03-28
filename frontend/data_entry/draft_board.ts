@@ -49,8 +49,11 @@ export function renderDraftBoard(container: HTMLElement): void {
     container.append(buildPickControl(container))
     container.append(buildDraftBoard())
 
-    // Auto-fire autopilot when the current drafter is an autopilot drafter and the loop is not already running
-    if (!_autopilotRunning && getPickRow() < getNPicks() && getDrafterMode(getPickDrafter()) !== 'Manual input') {
+    // Auto-fire autopilot when the current drafter is an autopilot drafter and the loop is not already running.
+    // Guard on G-scores being loaded — on initial page render the session hasn't been created yet,
+    // and applyLayout() will re-render once runModeEval() completes, at which point this fires correctly.
+    const dataIsReady = getPlayerNamesByGScore().length > 0
+    if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMode(getPickDrafter()) !== 'Manual input') {
         fireAutopilotPicks(container).catch(err => console.error('Autopilot failed:', err))
     }
 }

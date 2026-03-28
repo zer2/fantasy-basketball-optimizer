@@ -164,12 +164,14 @@ export function renderLeagueSettings(container: HTMLElement): void {
             nameInput.addEventListener('input', syncTeamNames)
             row.append(nameInput)
 
+            const initialMode = resetToDefaults ? 'Manual input' : pref(`drafter_mode_${i}`, 'Manual input') as DrafterMode
             const drafterModeSelect = makeCustomSelect(
                 `ls-drafter-mode-${i}`
               , DRAFTER_MODE_OPTIONS.map(m => ({ value: m, label: m }))
-              , 'Manual input'
+              , initialMode
             )
             drafterModeSelect.element.classList.add('drafter-mode-cell')
+            drafterModeSelect.element.addEventListener('change', () => savePref(`drafter_mode_${i}`, drafterModeSelect.getValue()))
             row.append(drafterModeSelect.element)
 
             teamNamesList.append(row)
