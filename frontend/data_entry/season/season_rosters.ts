@@ -311,7 +311,7 @@ async function buildTeamGScoreTable(
     headerRow.appendChild(totalTh)
     for (const cat of categories) {
         const th = document.createElement('th')
-        th.className = 'panel-colheader'
+        th.className = cat.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
         th.textContent = cat
         headerRow.appendChild(th)
     }

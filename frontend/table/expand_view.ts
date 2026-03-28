@@ -171,7 +171,7 @@ function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivEleme
     headerRow.appendChild(totalHeader)
     for (const category of categories) {
         const categoryHeader = document.createElement('th')
-        categoryHeader.className = 'panel-colheader'
+        categoryHeader.className = category.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
         categoryHeader.textContent = category
         headerRow.appendChild(categoryHeader)
     }

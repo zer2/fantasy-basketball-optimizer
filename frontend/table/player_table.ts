@@ -63,7 +63,7 @@ export function buildTable(players: Player[]): void {
 
     for (const category of categories) {
         const th = document.createElement('th')
-        th.className = 'tableheader'
+        th.className = category.length >= 10 ? 'tableheader colheader-long' : 'tableheader'
         th.textContent = category
         headerRow.append(th)
     }
