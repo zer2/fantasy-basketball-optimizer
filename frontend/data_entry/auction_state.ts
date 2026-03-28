@@ -79,9 +79,11 @@ export function undoLastAuctionPick(): boolean {
     return true
 }
 
-export function clearAllAuctionPicks(): void {
+export function clearAllAuctionPicks(): boolean {
+    const hadPicks = history.length > 0
     picks   = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
     history = []
+    return hadPicks
 }
 
 // ─── Derived state ────────────────────────────────────────────────────────────

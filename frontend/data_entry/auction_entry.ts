@@ -50,7 +50,7 @@ export function renderAuctionEntry(container: HTMLElement): void {
 
 // ─── Pick control ─────────────────────────────────────────────────────────────
 
-/** Builds the auction pick control row: player + cost + team dropdowns, lock-in / undo / clear buttons. */
+/** Builds the auction pick control row: player + drafter + cost inputs, lock-in / undo / clear buttons. */
 function buildPickControl(container: HTMLElement): HTMLElement {
     const wrap = document.createElement('div')
 
@@ -58,7 +58,8 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     row.className = 'pick-control-row'
 
     // Player dropdown — grows to fill available space
-    const pickedSet = new Set(getPicks().flat().filter(Boolean).map(p => p!.player))
+    const currentPicks = getPicks()
+    const pickedSet = new Set(currentPicks.flat().filter(Boolean).map(p => p!.player))
     const available = getCandidatePlayers().map(p => p.name).filter(n => !pickedSet.has(n))
     const playerSel = makeCustomSelect(
         'auction-pick-player',
@@ -69,23 +70,47 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     playerCol.style.flex = '1'
     row.append(playerCol)
 
-    // Cost input — fixed width
-    const costInput = document.createElement('input')
-    costInput.type        = 'number'
-    costInput.min         = '0'
-    costInput.placeholder = '$'
-    costInput.className   = 'auction-cost-input'
-    row.append(makePickCol('Cost', costInput))
-
-    // Team dropdown — grows to fill available space
+    // Drafter dropdown — before cost so the cap makes sense visually; full teams excluded
+    const availableTeams = getTeamNames().filter((_, index) =>
+        currentPicks.some(pickRow => pickRow[index] === null)
+    )
     const teamSel = makeCustomSelect(
         'auction-pick-team',
-        [{ value: '', label: '' }, ...getTeamNames().map(n => ({ value: n, label: n }))],
+        [{ value: '', label: '' }, ...availableTeams.map(n => ({ value: n, label: n }))],
     )
     teamSel.element.style.width = '100%'
     const teamCol = makePickCol('Drafter', teamSel.element)
     teamCol.style.flex = '1'
     row.append(teamCol)
+
+    // Cost input — capped to selected drafter's remaining cash
+    const costInput = document.createElement('input')
+    costInput.type        = 'number'
+    costInput.min         = '1'
+    costInput.placeholder = '$'
+    costInput.className   = 'auction-cost-input'
+
+    function updateCostOverBudget(): void {
+        const max = parseFloat(costInput.max)
+        const cost = parseFloat(costInput.value)
+        costInput.classList.toggle('over-budget', !isNaN(max) && !isNaN(cost) && cost > max)
+    }
+
+    function updateCostMax(): void {
+        const team = teamSel.getValue()
+        if (team) {
+            const drafterIndex = getTeamNames().indexOf(team)
+            const spent = getPicks().reduce((sum, pickRow) => sum + (pickRow[drafterIndex]?.cost ?? 0), 0)
+            costInput.max = String(getCashPerTeam() - spent)
+        } else {
+            costInput.removeAttribute('max')
+        }
+        updateCostOverBudget()
+    }
+
+    costInput.addEventListener('input', updateCostOverBudget)
+    teamSel.element.addEventListener('change', updateCostMax)
+    row.append(makePickCol('Cost', costInput))
 
     const btns = document.createElement('div')
     btns.className = 'pick-control-buttons'
@@ -95,14 +120,19 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     lockBtn.textContent = 'Lock in selection'
     lockBtn.addEventListener('click', () => {
         const player = playerSel.getValue()
-        const team   = teamSel.getValue()
-        const cost   = parseFloat(costInput.value)
-        if (!player || !team || isNaN(cost) || cost <= 0) return
+        if (!player) return
+        const team = teamSel.getValue()
+        if (!team) return
         const drafterIndex = getTeamNames().indexOf(team)
+        const cost = parseFloat(costInput.value)
+        if (isNaN(cost) || cost <= 0) return
+        const spent = getPicks().reduce((sum, pickRow) => sum + (pickRow[drafterIndex]?.cost ?? 0), 0)
+        if (cost > getCashPerTeam() - spent) return
         const succeeded    = recordAuctionPick(player, cost, drafterIndex)
-        if (!succeeded) return   // team is full
-        renderAuctionEntry(container)
-        _auctionDebouncer?.fire()
+        if (succeeded) {
+            renderAuctionEntry(container)
+            _auctionDebouncer?.fire()
+        }
     })
 
     const undoBtn = document.createElement('button')
@@ -111,17 +141,21 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     undoBtn.disabled    = getHistory().length === 0
     undoBtn.addEventListener('click', () => {
         const undone = undoLastAuctionPick()
-        if (!undone) return
-        renderAuctionEntry(container)
-        _auctionDebouncer?.fire()
+        if (undone) {
+            renderAuctionEntry(container)
+            _auctionDebouncer?.fire()
+        }
     })
 
     const clearBtn = document.createElement('button')
     clearBtn.className   = 'pick-btn'
     clearBtn.textContent = 'Clear auction board'
     clearBtn.addEventListener('click', () => {
-        clearAllAuctionPicks()
-        renderAuctionEntry(container)
+        const cleared = clearAllAuctionPicks()
+        if (cleared) {
+            renderAuctionEntry(container)
+            runEvaluate().catch(err => console.error('Evaluate after clear failed:', err))
+        }
     })
 
     btns.append(lockBtn, undoBtn, clearBtn)

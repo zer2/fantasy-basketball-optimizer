@@ -55,8 +55,10 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     // Save categories on chip add/remove (observe DOM mutations on the chip area)
     const inputArea = container.querySelector('.ms-input-area')
     if (inputArea) {
-        new MutationObserver(() => savePref('categories', [..._selectedCategories]))
-            .observe(inputArea, { childList: true })
+        new MutationObserver(() => {
+            savePref('categories', [..._selectedCategories])
+            container.dispatchEvent(new Event('change', { bubbles: true }))
+        }).observe(inputArea, { childList: true })
     }
 }
 

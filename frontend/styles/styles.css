@@ -710,6 +710,13 @@ tr {
     overflow: hidden;
 }
 
+.table-message {
+    text-align: center;
+    padding: 16px;
+    color: light-dark(#555555, #aaaaaa);
+    font-size: 0.85rem;
+}
+
 /* 1. Top-Left Corner */
 #hscoretable > thead > tr:first-child > :first-child {
   border-top-left-radius: 12px;
@@ -1188,6 +1195,10 @@ tr {
     border-radius: 4px;
     color: light-dark(black, white);
     flex-shrink: 0;
+}
+
+.auction-cost-input.over-budget {
+    color: light-dark(#cc2222, #ff6666);
 }
 
 .auction-cell-name {

@@ -3,7 +3,7 @@
 // initializes the layout, and triggers the first backend evaluation.
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
-import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
+import { createSection, addApplyBtn, makeSidebarToggle, makeDebouncer } from './helper_functions.js'
 import { getCandidatePlayers, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { createOrPatchSession, runEvaluate, runSeasonInit, clearFullTeamResult } from './api/session.js'
 import { fetchConfig } from './api/client.js'
@@ -151,35 +151,44 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
 
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
-addApplyBtn(playerStatsSection, async () => {
+const playerStatsDebouncer = makeDebouncer(() => {
     const { data_source, injured_players } = getPlayerStatsParams()
     resetDraftBoard()
     resetAuctionEntry()
-    await createOrPatchSession(1, { data_source, injured_players })
-    await runModeEval()
-    applyLayout()
-})
+    createOrPatchSession(1, { data_source, injured_players })
+        .then(() => runModeEval())
+        .then(() => applyLayout())
+        .catch(err => console.error('Player stats apply failed:', err))
+}, 800)
+playerStatsSection.addEventListener('input',  () => playerStatsDebouncer.fire())
+playerStatsSection.addEventListener('change', () => playerStatsDebouncer.fire())
 
 // ─── 3. Format & Categories ───────────────────────────────────────────────────
 
 const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
-addApplyBtn(formatSection, async () => {
-    await createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } })
-    await runModeEval()
-    applyLayout()
-})
+const formatDebouncer = makeDebouncer(() => {
+    createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } })
+        .then(() => runModeEval())
+        .then(() => applyLayout())
+        .catch(err => console.error('Format & categories apply failed:', err))
+}, 800)
+formatSection.addEventListener('input',  () => formatDebouncer.fire())
+formatSection.addEventListener('change', () => formatDebouncer.fire())
 
 // ─── 4. Model Parameters ──────────────────────────────────────────────────────
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
 renderModelParameters(modelSection)
-addApplyBtn(modelSection, async () => {
+const modelDebouncer = makeDebouncer(() => {
     const parameters = getModelParameters()
-    await createOrPatchSession(3, { parameters })
-    await runModeEval()
-    applyLayout()
-})
+    createOrPatchSession(3, { parameters })
+        .then(() => runModeEval())
+        .then(() => applyLayout())
+        .catch(err => console.error('Model parameters apply failed:', err))
+}, 800)
+modelSection.addEventListener('input',  () => modelDebouncer.fire())
+modelSection.addEventListener('change', () => modelDebouncer.fire())
 
 // ─── 5. Position Parameters ───────────────────────────────────────────────────
 

@@ -12,7 +12,7 @@ import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
-import { buildTable } from '../table/player_table.js'
+import { buildTable, showTableMessage } from '../table/player_table.js'
 import * as client from './client.js'
 
 // ─── Local UI helpers ─────────────────────────────────────────────────────────
@@ -195,7 +195,6 @@ export async function fetchCandidates(): Promise<void> {
                         }
                         document.dispatchEvent(new Event('full-team-result-updated'))
                     }
-                    setCandidates([])
                     return
                 }
                 latestFullTeamResult = null
@@ -235,7 +234,11 @@ export async function runEvaluate(): Promise<void> {
     await fetchCandidates()
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
     if (mode !== 'Season Mode') {
-        buildTable(getCandidatePlayers())
+        if (getFullTeamResult()) {
+            showTableMessage('Your team is full.')
+        } else {
+            buildTable(getCandidatePlayers())
+        }
     }
 }
 

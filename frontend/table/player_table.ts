@@ -23,6 +23,16 @@ function computeContentMinWidth(): string {
     return (PLAYER_COL_W + nScoreCols * SCORE_COL_W + categories.length * CAT_COL_W) + 'px'
 }
 
+/** Clears the candidate table and shows a single centred message row. */
+export function showTableMessage(message: string): void {
+    table.innerHTML = ''
+    const row = table.createTBody().insertRow()
+    const cell = row.insertCell()
+    cell.colSpan = 100
+    cell.className = 'table-message'
+    cell.textContent = message
+}
+
 /** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
 export function buildTable(players: Player[]): void {
     const categories = getSelectedCategories()
