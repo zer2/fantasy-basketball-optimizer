@@ -5,7 +5,7 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { getPlayers, getCandidatePlayers, getPlayerNamesByGScore } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
-import { runEvaluate, fetchCandidates } from '../api/session.js'
+import { runEvaluate, fetchCandidates, setAutopilotIndicator } from '../api/session.js'
 import { getDrafterMode } from '../parameter_collection/league_settings.js'
 import {
     DraftConfig,
@@ -81,6 +81,7 @@ function pickByHScore(): string | null {
 async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     if (_autopilotRunning) return
     _autopilotRunning = true
+    setAutopilotIndicator(true)
     try {
         while (getPickRow() < getNPicks()) {
             const mode = getDrafterMode(getPickDrafter())
@@ -105,6 +106,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
         }
     } finally {
         _autopilotRunning = false
+        setAutopilotIndicator(false)
     }
     // Re-render now that _autopilotRunning is false so the pick control
     // switches back to the normal Manual input state.

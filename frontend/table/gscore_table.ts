@@ -77,7 +77,7 @@ export function renderTeamGScoreTable(
         totalCell.className = 'panel-datacell celltypea'
         teamTotalSum += row.total
 
-        for (let i = 0; i < row.values.length; i++) {
+        for (let i = 0; i < categories.length; i++) {
             const cell = tr.insertCell(-1)
             cell.textContent = row.values[i].toFixed(2)
             cell.style.cssText = stat_styler_primary(row.values[i], 60, 0)

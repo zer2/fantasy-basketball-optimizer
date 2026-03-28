@@ -76,7 +76,7 @@ export function toggleExpandView(
                 ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
                 : nBasePositions
             const nMaxColumns     = Math.max(nBasePositions, nRosterPositionTypes)
-            const positionColumnWidth = Math.max(70, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / nMaxColumns))
+            const positionColumnWidth = Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / nMaxColumns)
 
             if (playerData.auction_values) {
                 // In auction mode, show flex allocations and auction values side-by-side.
@@ -108,14 +108,14 @@ export function toggleExpandView(
                 const containerWidth  = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
                 const INDENT_W        = 100
                 const POSITION_LABEL_W = 110
-                cell.appendChild(makeRosterGrid(playerData.roster, Math.max(70, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5))))
+                cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5)))
             }
         } else if (playerData.roster) {
             const containerWidth  = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
             const INDENT_W        = 100
             const POSITION_LABEL_W = 110
             cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-            cell.appendChild(makeRosterGrid(playerData.roster, Math.max(70, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5))))
+            cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5)))
         }
     }
 }

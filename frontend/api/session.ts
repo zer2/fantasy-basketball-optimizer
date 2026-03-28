@@ -19,11 +19,31 @@ import * as client from './client.js'
 // Direct DOM access for the eval indicator, avoiding a circular dependency with
 // layout.ts (which imports runEvaluate from this module).
 
-function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating'): void {
+type IndicatorState = 'idle' | 'fetching' | 'evaluating' | 'autopiloting'
+
+let currentIndicatorState: IndicatorState = 'idle'
+
+function applyIndicatorDisplay(state: IndicatorState): void {
     const el = document.getElementById('eval-indicator') as HTMLElement
     el.classList.toggle('evaluating', state === 'evaluating')
     el.classList.toggle('fetching', state === 'fetching')
-    el.textContent = state === 'fetching' ? 'Fetching...' : state === 'evaluating' ? 'Updating...' : 'Updated'
+    el.textContent = state === 'fetching'     ? 'Fetching...'
+                   : state === 'evaluating'   ? 'Updating...'
+                   : state === 'autopiloting' ? 'Autopiloting...'
+                   :                           'Updated'
+}
+
+/** Sets the indicator state. Suppressed while autopiloting — the autopilot indicator owns the display. */
+function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating'): void {
+    if (currentIndicatorState === 'autopiloting') return
+    currentIndicatorState = state
+    applyIndicatorDisplay(state)
+}
+
+/** Enters or exits autopilot indicator mode. Bypasses normal suppression. */
+export function setAutopilotIndicator(active: boolean): void {
+    currentIndicatorState = active ? 'autopiloting' : 'idle'
+    applyIndicatorDisplay(currentIndicatorState)
 }
 
 // ─── Module state ────────────────────────────────────────────────────────────

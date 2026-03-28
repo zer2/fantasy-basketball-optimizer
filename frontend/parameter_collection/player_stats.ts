@@ -32,7 +32,7 @@ export function renderPlayerStats(container: HTMLElement): void {
             { value: 'blended',   label: 'Projections'  },
             { value: 'historical', label: 'Historical'  },
         ],
-        pref('data_source_type', 'blended'),
+        pref('data_source_type', 'historical'),
     )
     typeSelect.element.addEventListener('change', () => savePref('data_source_type', typeSelect.getValue()))
     container.append(typeSelect.element)
