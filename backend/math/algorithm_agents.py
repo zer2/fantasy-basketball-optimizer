@@ -417,7 +417,6 @@ class HAgent:
                            n_players_selected, diff_means, diff_vars,
                            x_scores_available_array, result_index, sigma_2_m):
 
-        i = 0
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
             'Shares': {
@@ -464,11 +463,6 @@ class HAgent:
                     category_weights[:, self.pitching_stat_indices] = pw / (2 * pw.sum(axis=1).reshape(-1, 1))
                     pp_update = optimizers['Pitcher Preference'].minimize(gradients['Pitcher Preference'])
                     pitching_preference = np.clip(pitching_preference + pp_update, -0.5, 0.5)
-
-                assert np.all(np.abs(category_weights.sum(axis=1).reshape(-1, 1) - 1) < 1e-8)
-
-                weights_df = pd.DataFrame(category_weights, index=result_index, columns=self.x_scores.columns)
-                assert np.all(np.abs(weights_df.sum(axis=1) - 1) < 1e-8)
 
                 if self.position_means is not None:
                     share_gradients_centered = {

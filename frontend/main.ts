@@ -8,7 +8,7 @@ import { getCandidatePlayers, setSportConfig, getCurrentSeat, setCurrentSeat } f
 import { createOrPatchSession, runEvaluate, runSeasonInit, clearFullTeamResult } from './api/session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTable } from './table/player_table.js'
-import { applyLayout, getCurrentAuctionTab, getCurrentDraftTab, refreshAuctionGScore, refreshDraftGScore } from './layout.js'
+import { applyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
 import { makeCustomSelect } from './custom_select.js'
@@ -74,8 +74,6 @@ if (initialTeamNames.length > 0) {
 seatSelect.element.addEventListener('change', () => {
     setCurrentSeat(seatSelect.getValue() ?? null)
     clearFullTeamResult()
-    if (getCurrentAuctionTab() === 'my-team') refreshAuctionGScore()
-    if (getCurrentDraftTab()   === 'my-team') refreshDraftGScore()
     runModeEval()
         .then(() => applyLayout())
         .catch(err => console.error('Seat change evaluate failed:', err))

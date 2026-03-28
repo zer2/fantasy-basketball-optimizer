@@ -35,6 +35,7 @@ export function showTableMessage(message: string): void {
 
 /** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
 export function buildTable(players: Player[]): void {
+
     const categories = getSelectedCategories()
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
     const isRoto     = getScoringFormat() === 'Rotisserie'

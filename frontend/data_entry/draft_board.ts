@@ -3,9 +3,9 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getPlayers, getCandidatePlayers, getPlayerNamesByGScore } from '../app_state.js'
+import { getPlayers, getCandidatePlayers, getPlayerNamesByGScore, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
-import { runEvaluate, fetchCandidates, setAutopilotIndicator } from '../api/session.js'
+import { runEvaluate, setAutopilotIndicator, clearFullTeamResult } from '../api/session.js'
 import { getDrafterMode } from '../parameter_collection/league_settings.js'
 import {
     DraftConfig,
@@ -82,6 +82,8 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     if (_autopilotRunning) return
     _autopilotRunning = true
     setAutopilotIndicator(true)
+    const userSeat = getCurrentSeat()
+    ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
     try {
         while (getPickRow() < getNPicks()) {
             const mode = getDrafterMode(getPickDrafter())
@@ -91,9 +93,9 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
 
             let player: string | null
             if (mode === 'H-scoring') {
-                // Skip rebuilding the candidate table — autopilot only needs the updated
-                // candidates list to pick from; the table is hidden behind the spinner anyway.
-                await fetchCandidates()
+                clearFullTeamResult()
+                setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Drafter ${getPickDrafter() + 1}`)
+                await runEvaluate()
                 player = pickByHScore()
             } else {
                 player = pickByGScore(draftedSet)
@@ -105,8 +107,10 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
             renderDraftBoard(container)
         }
     } finally {
+        setCurrentSeat(userSeat)
         _autopilotRunning = false
         setAutopilotIndicator(false)
+        ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = ''
     }
     // Re-render now that _autopilotRunning is false so the pick control
     // switches back to the normal Manual input state.

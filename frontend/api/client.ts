@@ -17,7 +17,7 @@ export const BASE_URL = ''
 // The backend follows Python naming conventions; this is the single place where that translation happens.
 /** Converts raw backend Candidate objects to frontend Player objects, remapping snake_case keys to camelCase. */
 export function candidatesToPlayers(candidates: any[]): Player[] {
-    return candidates.map((c, i) => ({
+    return candidates.filter(c => c.h_score != null).map((c, i) => ({
         name:             c.name,
         h_score:          c.h_score,
         h_rank:           c.h_rank,

@@ -144,17 +144,12 @@ export async function runSeasonInit(): Promise<void> {
 }
 
 /**
- * Runs the evaluate endpoint with the current draft / auction state and
- * updates the candidate table with the response.
+ * Runs the evaluate endpoint for the given seat and applies the result to app state:
+ * updates candidates, base players cache, and full-team result.
+ * Does NOT rebuild the candidate table — call runEvaluate() for that.
  * Retries once if the session has expired (404), creating a fresh session first.
  */
-/**
- * Fetches candidates from the backend for the current draft/auction state and
- * updates app state (candidates, base players, full-team result).
- * Does NOT rebuild the candidate table — call buildTable(getCandidatePlayers()) afterwards if needed.
- * Retries once if the session has expired (404), creating a fresh session first.
- */
-export async function fetchCandidates(): Promise<void> {
+async function evaluateSeat(seat: string): Promise<void> {
     // Abort any in-flight evaluate request so the backend is only computing
     // the most recent draft state, not every intermediate pick.
     if (evaluateController) evaluateController.abort()
@@ -169,8 +164,6 @@ export async function fetchCandidates(): Promise<void> {
                 await ensureSession()
                 setIndicatorState('evaluating')
 
-                // Default to the first team name if no seat has been chosen yet
-                const seat = getCurrentSeat() || getLeagueSettings().team_names[0] || 'Drafter 1'
                 const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
 
                 let evalReq: Parameters<typeof client.evaluate>[1]
@@ -247,11 +240,10 @@ export async function fetchCandidates(): Promise<void> {
 }
 
 /**
- * Fetches candidates and rebuilds the candidate table.
- * Equivalent to fetchCandidates() followed by buildTable(getCandidatePlayers()).
+ * Evaluates the current draft/auction state for the current seat and rebuilds the candidate table.
  */
 export async function runEvaluate(): Promise<void> {
-    await fetchCandidates()
+    await evaluateSeat(getCurrentSeat() ?? getLeagueSettings().team_names[0] ?? 'Drafter 1')
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
     if (mode !== 'Season Mode') {
         if (getFullTeamResult()) {

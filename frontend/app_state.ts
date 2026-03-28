@@ -80,8 +80,11 @@ let currentSeat: string | null = null
 /** Returns the currently selected seat (team name), or null if none selected. */
 export function getCurrentSeat(): string | null { return currentSeat }
 
-/** Sets the currently selected seat (team name). */
-export function setCurrentSeat(seat: string | null): void { currentSeat = seat }
+/** Sets the currently selected seat (team name). Dispatches 'seat-changed' so layout can refresh team stats. */
+export function setCurrentSeat(seat: string | null): void {
+    currentSeat = seat
+    document.dispatchEvent(new Event('seat-changed'))
+}
 
 // ── Sport config (from GET /config/{sport}) ──────────────────────────────────
 

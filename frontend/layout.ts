@@ -28,6 +28,12 @@ document.addEventListener('full-team-result-updated', () => {
     if (currentAuctionTab === 'my-team') refreshAuctionGScore()
 })
 
+// Refresh the active "my team" panel whenever the seat changes (including during autopilot).
+document.addEventListener('seat-changed', () => {
+    if (currentDraftTab   === 'my-team') refreshDraftGScore()
+    if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+})
+
 export function getCurrentAuctionTab(): string { return currentAuctionTab }
 export function getCurrentDraftTab():   string { return currentDraftTab   }
 
