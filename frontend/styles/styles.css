@@ -704,7 +704,7 @@ tr {
     background-color: light-dark(#fafafa, #181923);
     color: light-dark(#555555, darkgrey);
     font-weight:500;
-    font-size: 0.65rem;
+    font-size: clamp(0.65rem, 0.65vw, 0.75rem);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -912,7 +912,7 @@ tr {
     background-color: light-dark(#fafafa, #181923);
     color: light-dark(#555555, darkgrey);
     font-weight: 500;
-    font-size: 0.65rem;
+    font-size: clamp(0.65rem, 0.65vw, 0.75rem);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
