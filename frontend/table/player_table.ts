@@ -10,19 +10,13 @@ import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
 
-// ── Column widths (shared between buildTable and computeHscoreTableWidth) ────
+// ── Column widths ────────────────────────────────────────────────────────────
 
-const PLAYER_COL_W = 224
-const SCORE_COL_W  = 72
-const CAT_COL_W    = 90   // desired minimum width per category column
+const PLAYER_COL_W = 175
+const SCORE_COL_W  = 62
+const CAT_COL_W    = 74   // desired minimum width per category column
 
-/**
- * Computes the H-score table width from current sidebar state.
- * Uses backend-confirmed categories if available, otherwise falls back to the
- * sidebar selection — so the result is correct both before and after the first
- * evaluate response.
- */
-export function computeHscoreTableWidth(): string {
+function computeContentMinWidth(): string {
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
     const nScoreCols = isAuction ? 4 : 1
     const categories = getSelectedCategories()
@@ -35,7 +29,9 @@ export function buildTable(players: Player[]): void {
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
     const isRoto     = getScoringFormat() === 'Rotisserie'
 
-    table.style.width = computeHscoreTableWidth()
+    const widthContainer = document.getElementById('panel-content-width-container')!
+    widthContainer.style.minWidth = computeContentMinWidth()
+    table.style.minWidth = ''
 
     table.innerHTML = ''
 
@@ -86,7 +82,7 @@ export function buildTable(players: Player[]): void {
         html += `<tr>`
 
         // Player name cell with expand button
-        html += `<th class='playerheader'><div class='playerheaderdiv'><div style="width:88%">${player.name}</div><div style="width:12%"><button class='playerpopup'>▶</button></div></div></th>`
+        html += `<th class='playerheader'><div class='playerheaderdiv'><span class='playername'>${player.name}</span><button class='playerpopup'>▶</button></div></th>`
 
         // Score column(s)
         if (isAuction) {
@@ -123,10 +119,11 @@ export function buildTable(players: Player[]): void {
     const tbody = table.createTBody()
     tbody.innerHTML = html
 
-    // Attach expand button listeners (cheap second pass — no DOM mutations)
+    // Attach expand listeners to the header div (larger click target) — cheap second pass
     const expandButtons  = Array.from(tbody.querySelectorAll<HTMLButtonElement>('.playerpopup'))
+    const expandDivs     = Array.from(tbody.querySelectorAll<HTMLDivElement>('.playerheaderdiv'))
     const expandedRows   = Array.from(tbody.querySelectorAll<HTMLTableRowElement>('tr.expandedview'))
     for (const [i, player] of players.entries()) {
-        expandButtons[i].addEventListener('click', () => toggleExpandView(expandButtons[i], expandedRows[i], player, categories))
+        expandDivs[i].addEventListener('click', () => toggleExpandView(expandButtons[i], expandedRows[i], player, categories))
     }
 }

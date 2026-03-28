@@ -64,11 +64,25 @@ export function toggleExpandView(
         if (playerData.flex_allocations) {
             cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'))
 
+            // Compute a shared per-position column width so base position columns align
+            // between the flex allocations table and the roster grid beneath it.
+            // Size columns using the wider table (roster, which has extra flex-slot columns)
+            // so both tables fit within the available space.
+            const INDENT_W         = 100   // matches .panel-indent margin-left
+            const POSITION_LABEL_W = 110   // matches .panel-colspacer-position-label
+            const containerWidth   = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
+            const nBasePositions   = playerData.flex_allocations.base_positions.length
+            const nRosterPositionTypes = playerData.roster
+                ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
+                : nBasePositions
+            const nMaxColumns     = Math.max(nBasePositions, nRosterPositionTypes)
+            const positionColumnWidth = Math.max(70, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / nMaxColumns))
+
             if (playerData.auction_values) {
                 // In auction mode, show flex allocations and auction values side-by-side.
                 const sideRow = document.createElement('div')
                 sideRow.className = 'panel-flex-row'
-                sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false))
+                sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false, positionColumnWidth))
 
                 const auctionBlock = document.createElement('div')
                 auctionBlock.appendChild(makePanelLabel('All auction values'))
@@ -77,17 +91,31 @@ export function toggleExpandView(
 
                 cell.appendChild(sideRow)
             } else {
-                cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations))
+                cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true, positionColumnWidth))
+            }
+
+            if (playerData.roster) {
+                cell.appendChild(makePanelLabel('Roster assignments', '60px'))
+                cell.appendChild(makeRosterGrid(playerData.roster, positionColumnWidth))
             }
         } else if (playerData.auction_values) {
             // No position data but in auction mode: still show auction values alone.
             cell.appendChild(makePanelLabel('All auction values', '60px'))
             cell.appendChild(makeAuctionValuesTable(playerData))
-        }
 
-        if (playerData.roster) {
+            if (playerData.roster) {
+                cell.appendChild(makePanelLabel('Roster assignments', '60px'))
+                const containerWidth  = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
+                const INDENT_W        = 100
+                const POSITION_LABEL_W = 110
+                cell.appendChild(makeRosterGrid(playerData.roster, Math.max(70, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5))))
+            }
+        } else if (playerData.roster) {
+            const containerWidth  = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
+            const INDENT_W        = 100
+            const POSITION_LABEL_W = 110
             cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-            cell.appendChild(makeRosterGrid(playerData.roster))
+            cell.appendChild(makeRosterGrid(playerData.roster, Math.max(70, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5))))
         }
     }
 }
@@ -229,20 +257,23 @@ function makeWeightsTable(playerData: Player, categories: string[]): HTMLDivElem
 function makeFlexAllocationsTable(
     flexData: FlexAllocations
     , useMargin = true
+    , positionColumnWidth: number
 ): HTMLDivElement {
     const positionNames = getPositionNames()
+
+    const POSITION_LABEL_W = 110  // matches .panel-colspacer-position-label
 
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
-    table.style.width = (110 + flexData.base_positions.length * 90) + 'px'
+    table.style.width = (POSITION_LABEL_W + flexData.base_positions.length * positionColumnWidth) + 'px'
 
     const headerRow = table.createTHead().insertRow(-1)
-    headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-flex-label'))
+    headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
     for (const basePosition of flexData.base_positions) {
         const positionHeader = document.createElement('th')
         positionHeader.className = 'panel-colheader'
-        positionHeader.style.width = '90px'
+        positionHeader.style.width = positionColumnWidth + 'px'
         positionHeader.textContent = positionNames[basePosition] ?? basePosition
         headerRow.appendChild(positionHeader)
     }
@@ -339,7 +370,7 @@ function makeAuctionValuesTable(playerData: Player): HTMLTableElement {
  * Builds the roster grid showing which players are assigned to each slot,
  * and highlights the candidate player being evaluated.
  */
-function makeRosterGrid(roster: Roster): HTMLDivElement {
+function makeRosterGrid(roster: Roster, positionColumnWidth: number): HTMLDivElement {
     const positionNames = getPositionNames()
 
     // Group slots by position type (e.g. "PG1", "PG2" → type "PG") preserving insertion order.
@@ -352,17 +383,19 @@ function makeRosterGrid(roster: Roster): HTMLDivElement {
     }
     const maxDepth = Math.max(...positionTypes.map(positionType => slotsByType[positionType].length))
 
+    const POSITION_LABEL_W = 110  // matches .panel-colspacer-position-label
+
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
-    table.style.width = (90 + positionTypes.length * 90) + 'px'
+    table.style.width = (POSITION_LABEL_W + positionTypes.length * positionColumnWidth) + 'px'
 
     const headerRow = table.createTHead().insertRow(-1)
-    headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-pos'))
+    headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
     for (const positionType of positionTypes) {
         const positionHeader = document.createElement('th')
         positionHeader.className = 'panel-colheader'
-        positionHeader.style.width = '90px'
+        positionHeader.style.width = positionColumnWidth + 'px'
         positionHeader.textContent = positionNames[positionType] ?? positionType
         headerRow.appendChild(positionHeader)
     }

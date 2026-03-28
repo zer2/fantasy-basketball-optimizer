@@ -15,13 +15,11 @@ import { stat_styler_primary } from '../styles/styler_functions.js'
 export function renderTeamGScoreTable(
     playerNames: string[]
   , container: HTMLElement
-  , width?: string
   , fullTeamResult?: { h_score: number; win_rates: number[] } | null
 ): void {
     container.innerHTML = ''
     const categories = getSelectedCategories()
     const gScoreMap  = getGScoreByName()
-
     // Collect G-scores for each player
     const rows: { name: string; values: number[]; total: number }[] = []
     if (playerNames.length === 0) return
@@ -37,7 +35,7 @@ export function renderTeamGScoreTable(
     const tbl = document.createElement('table')
     tbl.className = 'panel-table panel-table--rounded'
     tbl.style.tableLayout = 'fixed'
-    if (width) tbl.style.width = width
+    tbl.style.width = '100%'
 
     // Spacer row to lock column widths
     const tHead = tbl.createTHead()
@@ -119,7 +117,7 @@ export function renderTeamGScoreTable(
     const hScoreTbl = document.createElement('table')
     hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
     hScoreTbl.style.tableLayout = 'fixed'
-    if (width) hScoreTbl.style.width = width
+    hScoreTbl.style.width = '100%'
 
     // colgroup sets column widths to match the G-score table without a spacer row,
     // so there is no gap between the outer border and the first data row.

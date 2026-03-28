@@ -1,8 +1,10 @@
 # Parameters
 
-Various calculations performed by the website take in parameters that are configurable by the user. They dictate how injury risk is handled, how aggressively the algorithm will punt, and more. 
+Various calculations performed by the website take in parameters that are configurable by the user. They are available through the left sidebar, under the settings.
 
-## Player stat parameters
+![alt text](img/parameters.png)
+
+## Model parameters
 
 ### Injury handling 
 
@@ -16,13 +18,32 @@ The first factor, υ, scales injury rates on a spectrum between per-game value a
 
 The second factor, ψ, controls an adjustment for replacement players. It is assumed that when a player misses a game, they will be replaced by a replacement-level player for that game ψ of the time, and that is incorporated into projections after they have been adjusted for injury rates. A replacement-level player has the total G-score value of the $N$th-highest player, spread across categories, where $N$ is the number of players in the league.  So continuing the previous example, if ψ is $0.75$, then 3% times a replacement player's value is added to the player's projection. The right value for ψ depends on a league's IR rules and how active managers will be in replacing their injured player. It defaults to $0.8$.
 
-### Chi factor 
 
-For Rotisserie leagues, an additional parameter called χ is required.
+### H-score parameters
+
+![](img/puntcontrol.png)
+
+![](img/iterations.png)
+
+The H-score parameters are inputs to the H-scoring procedure. They control the degree to which the algorithm is incentivized to punt, and how long the algorithm runs for. See the [documentation on H-scoring](hscores.md/#parameter-inputs) for more information. 
+
+### Bayesian strength adjustment
+
+![](img/beth.png)
+
+The $\beth$ parameter controls the influence of the [Bayesian strength adjustment](projectionadjustment.md/). Higher values of $\beth$ more aggressively regress the strength of the team towards the average. 
+
+### Rotisserie parameters 
+
+For Rotisserie leagues, two additional parameters are required.
+
+One of them is χ, which controls the estimate of uncertainty in pre-season projections. See the [relevant section on Rotisserie](roto.md/#variance-in-player-performances) for more detail. 
 
 ![](img/chi.png)
 
-χ controls the estimate of uncertainty in pre-season projections. See the [relevant section on Rotisserie](roto.md/#variance-in-player-performances) for more detail. 
+The other is ℵ. ℵ makes a team's category-level performances in counting statistics more correlated than they theoretically would be. The motivation for this is that in reality, some managers will be paying more attention than others, leading to some teams having higher volume across the board. This effect would not be encapsulated within the Rotisserie model's logic without a positive value of ℵ.
+
+![alt text](image.png)
 
 ### Auction noise
 
@@ -32,25 +53,7 @@ For auction drafts, an additional parameter called $S_\sigma$ is required.
 
 $S_\sigma$ quantifies the standard deviation of dollar values for players throughout a season, which is important for the [SAVOR adjustment](auctions.md/#the-savor-adjustment). Roughly speaking it controls the degree to which low-level players are down-weighted for potentially becoming irrelevant. 
 
-### Bayesian strength adjustment
 
-![](img/beth.png)
-
-The $\beth$ parameter controls the influence of the [Bayesian strength adjustment](projectionadjustment.md/). Higher values of $\beth$ more aggressively regress the strength of the team towards the average. 
-
-## H-score parameters
-
-![](img/puntcontrol.png)
-
-![](img/iterations.png)
-
-The H-score parameters are inputs to the H-scoring procedure. They control the degree to which the algorithm is incentivized to punt, and how long the algorithm runs for. See the [documentation on H-scoring](hscores.md/#parameter-inputs) for more information. 
-
-## Trade parameters 
-
-![](img/tp3.png)
-
-The trade parameters limit which potential trades are considered for suggestions. See the [section on trade suggestions](season.md/#trade-suggestions) for the implications of these parameters.
 
 ## Position requirements 
 
@@ -62,3 +65,8 @@ Flex slots like Utilities and Guards can be filled by players of multiple differ
 
 It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accomodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
 
+## Trade parameters 
+
+![](img/tp3.png)
+
+The trade parameters limit which potential trades are considered for suggestions. See the [section on trade suggestions](season.md/#trade-suggestions) for the implications of these parameters.

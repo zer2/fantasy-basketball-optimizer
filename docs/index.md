@@ -1,6 +1,6 @@
-This is documentation for a [website](https://fantasy-basketball-optimizer-281850565831.us-east1.run.app/) which applies an algorithm called [H-scoring](hscores.md) to category-based fantasy basketball. The algorithm provides recommendations for which players to choose, based on their statistical profiles and how they synergize with existing teams. 
+This is documentation for a [website](https://fantasy-basketball-optimizer-281850565831.us-east1.run.app/) which applies an algorithm called [H-scoring](hscores.md) to category-based fantasy basketball. The algorithm provides recommendations for which players to choose based on their statistical profiles and how they synergize with existing teams. 
 
-![alt text](image.png)
+![alt text](img/main.png)
 /// caption
 The website in drafting mode, with manual player entry
 ///
@@ -22,15 +22,15 @@ Throughout the season, teams accumulate statistics based on their real players' 
 
 In category-based leagues, which most fantasy basketball leagues are, the important thing is winning individual categories. There are usually eight or nine categories. Most categories are won by the team that gets more of them, e.g. if my team gets 50 blocks and your team gets 30 blocks, I get a "fantasy point" for winning blocks. 
 
-This simple scoring system belies deceptively tricky mathematics. There is no obvious way to compare the values of categories to each other, making it difficult to quantitatively decide which player is best to take. The motivating force behind the papers is untangling this conundrum and applying rigor to the process of evaluating players. 
+This simple scoring system belies deceptively tricky mathematics. There is no obvious way to compare the values of categories to each other, making it difficult to quantitatively decide which player is best to take, even if player performances can be forecasted reliably. The motivating force behind the papers is untangling this conundrum and applying rigor to the process of evaluating players. 
 
 ## The papers  
 
-Broadly, the papers formulate category-based fantasy basketball as a family of math problems. The first paper establishes some simple building blocks for fantasy basketball, while the second and third flesh out the H-scoring algorithm. All of the methods take projections of player performance as an input. 
+Broadly, the papers formulate category-based fantasy basketball as a family of math problems and analyze how to approach them. The first paper establishes some simple building blocks for fantasy basketball, while the second and third flesh out the H-scoring algorithm. All of the methods take projections of player performance as an input. 
 
-The [first paper](https://arxiv.org/abs/2307.02188) looks at so-called "static" systems, which estimate player value in a vacuum. It provides a mathematical justification for Z-scoring, the traditional metric used by fantasy basketball analysts, and shows a way to improve it. The improved metric, dubbed G-scoring, is used by the website for describing player value statically when that is useful. See also the [G-score](gscores.md) section of documentation. 
+The [first paper](https://arxiv.org/abs/2307.02188) looks at so-called "static" systems, which estimate player value in a vacuum. It provides a mathematical justification for Z-scoring, the traditional metric used by fantasy basketball analysts, and shows a way to improve it. The improved metric, dubbed G-scoring, is used by the website to statically quantify player and team strength on the category level. See also the [G-score](gscores.md) section of documentation. 
 
-The [second paper](https://arxiv.org/abs/2409.09884) discusses how to evaluate players with full context taken into account. The most difficult aspect of context to incorporate is selections from later draft rounds, because nobody can be exactly sure which players will be taken by which manager in the future. The paper's solution is an algorithm called H-scoring which optimizes a heuristic approach to future draft picks for each candidate player. Players can then be ranked according to how well the team would be expected to perform if they were taken, given the appropriate follow-up in later draft rounds. H-scoring is the default way to evaluate players on the website, as discussed in the [Algorithms](hscores.md) section of documentation. 
+The [second paper](https://arxiv.org/abs/2409.09884) introduces H-scoring as a framework for player selection based on context. The key concept is the idea of optimizing a heuristic approach to future draft picks for each candidate player. Players can then be ranked according to how well the team would be expected to perform if they were taken, given the appropriate follow-up in later draft rounds. The [H-scoring](hscores.md) section of documentation has more detail. 
 
 The [third paper](https://arxiv.org/abs/2501.00933) approaches the Rotisserie or "Roto" format. Since this format is so different from the others, adapting H-scoring to it requires another layer of mathematical scaffolding. See also the [Roto](roto.md) section of documentation. 
 

@@ -2,6 +2,9 @@
 
 :root { color-scheme: dark; }
 
+/* Scale all rem-based sizes with viewport width, min 16px (laptop), max 20px (wide desktop) */
+html { font-size: clamp(16px, 0.93vw, 20px); }
+
 /* ─── App layout ─────────────────────────────────────────────────────────── */
 
 #app-layout {
@@ -648,12 +651,12 @@
 /* ─── Main content ───────────────────────────────────────────────────────── */
 
 .playerpopup {
+    flex-shrink: 0;
     background-color: light-dark(#fafafa, #181923);
     color: light-dark(#999999, #666688);
     border: none;
     cursor: pointer;
     font-size: 0.6rem;
-    float: right;
     padding: 2px 4px;
     transition: transform 0.15s;
     line-height: 1;
@@ -690,10 +693,10 @@ tr {
     overflow: hidden; /* This clips the sharp cell corners */
     font-family: "Source Sans 3";
     font-weight: 400;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     line-height: 1.6;
     text-size-adjust: 100%;
-    width: 1050px;
+    width: 100%;
     table-layout: fixed;
 }
 
@@ -701,8 +704,8 @@ tr {
     background-color: light-dark(#fafafa, #181923);
     color: light-dark(#555555, darkgrey);
     font-weight:500;
-    font-size: 0.75rem;
-    text-align:left;
+    font-size: 0.65rem;
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
 }
@@ -731,11 +734,11 @@ tr {
     background-color: light-dark(#ffffff, rgb(14,17,23));
     color: light-dark(#555555, darkgrey);
     font-weight:400;
+    font-size: 0.78rem;
     text-align: left;
     width: 224px;
     border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
     border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
-
 }
 
 .expandedview {
@@ -744,6 +747,17 @@ tr {
 
 .playerheaderdiv {
     display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.playername {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .celltypea {
@@ -758,7 +772,7 @@ tr {
 }
 
 .overallhscore {
-    background-color: light-dark(#e8e8e8, #3a3a4a);
+    background-color: light-dark(#d4d4d4, #3a3a4a);
     color: light-dark(black, white);
     font-weight:400;
     text-align:right;
@@ -799,13 +813,23 @@ tr {
 .rostercandidate {
     background-color: light-dark(rgb(175,175,255), rgb(54,90,148));
     color: light-dark(black, white);
-    text-align:center;
+    text-align: center;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
 }
 
 .rosteronteam {
     background-color: light-dark(rgb(220,220,255), rgb(36,48,70));
     color: light-dark(black, white);
-    text-align:center;
+    text-align: center;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
 }
 
 .ineligible {
@@ -847,7 +871,7 @@ tr {
     border-collapse: collapse;
     font-family: "Source Sans 3";
     font-weight: 400;
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     line-height: 1.5;
     width: 100%;
 }
@@ -876,8 +900,7 @@ tr {
 .panel-colspacer-name-sm      { width: 136px; }
 .panel-colspacer-total        { width: 83px; }
 .panel-colspacer-weights      { width: 219px; }  /* weights table: combined name+total label column */
-.panel-colspacer-flex-label   { width: 110px; }  /* flex allocations table: row label column */
-.panel-colspacer-pos          { width: 90px; }   /* flex/roster tables: per-position columns */
+.panel-colspacer-position-label { width: 110px; }  /* flex allocations + roster grid: row label column */
 .panel-colspacer-dollar       { width: 72px; }   /* auction values table: label and value columns */
 
 .panel-indent   { margin-left: 100px; }
@@ -889,8 +912,10 @@ tr {
     background-color: light-dark(#fafafa, #181923);
     color: light-dark(#555555, darkgrey);
     font-weight: 500;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
     border: 0.5px solid light-dark(#eeeeee, #555566);
 }
 
@@ -939,6 +964,10 @@ tr {
 #candidate-panel {
     flex: 1;
     min-width: 0;
+}
+
+#panel-content-width-container {
+    width: 90%;
 }
 
 #right-header:not(:empty) {
@@ -1021,11 +1050,6 @@ tr {
     display: none;
 }
 
-/* Give each drafter column enough room for full player names */
-.entry-table th:not(:first-child),
-.entry-table td:not(:first-child) {
-    min-width: 140px;
-}
 
 .entry-table th {
     background: light-dark(#fafafa, #181923);
@@ -1066,7 +1090,7 @@ tr {
 
 .entry-table td.drafted {
     color: light-dark(black, white);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

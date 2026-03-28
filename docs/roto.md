@@ -57,10 +57,12 @@ But here's the basic idea:
 
 Say that a team will score $Z$ fantasy points. The expected fantasy point total for an arbitrary opponent algebraically must then be $\frac{P-Z}{|O|}$ where $P$ is the total points up for grabs, and $|O|$ is the number of opponents. 
 
-Say also that the standard deviation of total fantasy points for an arbitrary opponent is known, and can be used to estimate how much better the best opponent will do than the average opponent. Call that value $L$. 
+Say also that the standard deviation of total fantasy points for an arbitrary opponent can be estimated, and can be used to further estimate how much better the best opponent will do than the average opponent. Call the predicted difference between the highest-scoring opponent and the average opponent $L$. 
 
 Then, for a given $Z$, the expected difference between the team and its strongest opponent is $Z - \frac{P-Z}{|O|} - L$, or $\frac{Z(|O| - 1)}{|O|} - \frac{P}{|O|} - L$. The overall expected value is $\frac{E(Z)(|O| - 1)}{|O|} - \frac{P}{|O|} - L$
 
 Some additional math can estimate the standard deviation for the difference. Then, it is possible to invoke the Normal CDF to estimate the probability of the difference being positive, which is the team's victory probability. That provides an outer-level objective function for H-scoring. 
 
 This framework provides some intution for why the Rotisserie algorithm tries not to punt categories. The expected value of the difference is generally negative, because it compares the team to its luckiest opponent. The CDF of a negative value of a Normal distiribution will be much higher if the standard deviation is high, since that increases the probability of abberant values. Therefore, the algorithm prefers to have a highly volatile fantasy point total. Punting decreases volatility. It increases confidence in the end result by determining that one category will be lost, and others will likely be won. A balanced team is more volatile, because it could do badly in everything or well in anything. That's the kind of volatility needed to have a strong chance of winning in Rotisserie. 
+
+An important input into the calculation of standard deviation of fantasy points is how correlated categories are to each other. The more correlated categories are to each other, the higher the standard deviation, because correlations make overwhelmingly high or low totals more likely. This is how ℵ from the [Rotisserie parameters](parameters.md#rotisserie-parameters) influences results. 

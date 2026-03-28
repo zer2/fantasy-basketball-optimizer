@@ -8,7 +8,7 @@ Settings are available for live connections to fantasy providers, customizable p
 
 ### Fantasy sport
 
-For now, this will just be NBA. MLB or WNBA may be added in the future
+For now, the fantasy sport is set to NBA. Theoretically, in the future the methods could be extended to other fantasy sports that use category-based scoring, such as the MLB and WNBA. 
 
 ### Data integration 
 
@@ -42,7 +42,7 @@ FYI there is a bug in the wrapper used for connecting to the Yahoo API, which cr
 
 There are three available modes. 
 
-**Draft mode**: for standard drafts. When drafted players are input manually, only snake drafts are naturally supported. If the drafted players are being pulled via an integration, the website will continually evaluate the best prospects regardless of draft position, so any drafting order will work fine. 
+**Draft mode**: for standard drafts. When drafted players are input manually, only snake drafts (potentially with third round reversal) are natively supported. If the drafted players are being pulled via an integration, the website will continually evaluate the best prospects regardless of draft position, so any drafting order will work fine. 
 
 **Auction mode**: for auction drafts. Users must specify that they are doing an auction for either manual entry or platform integration.
 
@@ -52,18 +52,18 @@ There are three available modes.
 
 ![](img/moreinfo.png)
 
-If draft data is being input manually, a number of additional inputs are required.They are 
+If draft picks are being being input manually, a number of additional inputs are required.They are 
 
 - The number of drafters and the number of picks per drafter
 - The team names of the drafters and their autodraft settings. Possible autodraft modes are manual entry (the default), H-scoring, or G-scoring. With H-scoring, the algorithm is run for every drafter, which takes some time. G-scoring autodrafting simply chooses players in total G-score order. 
-- A third round reversal toggle. Third round reversal is a common draft setting, wherein the draft order stays the same between the second and third round, instead of snaking. This is designed to limit the advantage of early picks. 
+- For snake drafting, a third round reversal toggle. Third round reversal is a common draft setting, wherein the draft order stays the same between the second and third round, instead of snaking. This is designed to limit the advantage of early picks. 
 
 
 ## Player statistics 
 
 Player statistics are an input to the algorithms implemented by the website. They can be sourced either from forward-looking projections or previous NBA seasons.
 
-### Projection
+### Projections
 
 The default for player statistics is to use forward-looking projections. 
 

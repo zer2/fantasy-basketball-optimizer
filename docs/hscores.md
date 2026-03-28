@@ -1,31 +1,40 @@
 # H-scoring
 
-The heart of the website is an algorithmic framework dubbed H-scoring. It is a methodology for evaluating and ranking players based on drafting context, as described in [the second paper](https://arxiv.org/abs/2409.09884).
+The heart of the website is an algorithmic framework dubbed H-scoring. It evaluates and ranks potential player picks based on drafting context, as first described in [this paper](https://arxiv.org/abs/2409.09884).
 
-In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the idea of punting (strategicially sacrificing) some categories and over-performing in the rest. It also understands how to work around position requirements, which enforce that e.g. a team must have at least one point guard. See the [optimization section](#optimization) for some mathematical detail on how it works without the academic rigor of the paper.  
+In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the idea of punting (strategicially sacrificing) some categories and over-performing in the rest. It also understands how to work around position requirements, which enforce that e.g. a team must have at least one point guard. 
 
-## Parameter inputs 
+## Using the H-score table
 
-The H-scoring algorithm has three [input parameters](parameters.md/#h-score-parameters): $\omega$, $\gamma$, and the number of iterations which are configurable by the user.
-
-$\omega$ and $\gamma$ control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. 
-
-## H-score table
-
-The H-score table for candidate evaluation lists players in order of their H-score rank, along with category-level detail. 
+The H-score table for candidate evaluation lists players in order of their H-score rank, along with additional detail. 
 
 ![](img/hec.png)
 /// caption
 Top Each Category H-scores for the first pick, 2024-25 season
 ///
 
-H-scores change as the algorithm runs. Rendering the results for every iteration would slow down the site, so the table is only refreshed once the algorithm has completed the specified number of iterations. In general, the algorithm will take a second or two to complete. It will take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake. 
+One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately. 
+
+### Parameters 
+
+The H-scoring algorithm has three [input parameters](parameters.md/#h-score-parameters)- $\omega$, $\gamma$, and the number of iterations- which are configurable by the user through the sidebar. Different parameter choices will lead to different H-scoring results. 
+
+$\omega$ and $\gamma$ control how the H-scoring algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values were configured based on what worked well in testing. 
+
+The number of iterations essentially determines how many times the algorithm can try improving its results. Theoretically the algorithm will be more precise with more iterations; in practice thirty is probably easily enough. 
+
+### Loading time 
+
+The H-scoring algorithm is not instantenous. In general, the algorithm will take a second or two to complete. It will take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake. 
+
+![](img/updating.png)
+/// caption
+The updating spinner, which indicates that the algorithm is running
+///
 
 ### Overall H-scores
 
 The overall H-score is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. 
-
-One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately. 
 
 Different kinds of categories deal with fantasy points differently, and necessitate different formulations for the overall H-score. In "Each Category", teams rotate opponents weekly and keep all the fantasy points they win. For that format, the H-score is defined average expected win rate across categories. 
 
@@ -39,7 +48,6 @@ Top Most Category H-scores for the first pick, 2024-25 season
 The table above is based on the same dataset as the Each Category version. The numbers are different because they use the Most Categories objective instead of the Each Category objective. With Most Categories scoring, the algorithm is even more incentivized to punt, and tends to do so to a more extreme degree. Players that benefit strongly from punting like Giannis also end up scoring better (he's fifth either way, but has more distance above Wembanyama in Most Categories).
 
 Rotisserie is another degree more complicated than Most Categories. See the [Roto section](roto.md) for details
-
 
 ### Category-level H-scores
 
@@ -61,11 +69,9 @@ Most of the time, the algorithm punts one or two categories, reflected by low H-
 This image from the second paper shows how the H-scoring algorithm actually performed on a category level in a simulation. It largely either punted categories or tried to be competitive in them
 ///
 
-## H-score details tab
+### Detailed drop-down
 
 The main H-score table gives only indirect insight into the strategies that H-scoring wants to use with each candidate player. The H-score details tab explains the strategy for individual players more directly. It is broken down into two parts: expectations, and future strategy.
-
-### Expectations
 
 ![alt text](img/hexp.png)
 /// caption
@@ -75,12 +81,6 @@ Expectations for a team with Giannis as the first pick based on Dyson Daniels as
 The expectation table breaks down the components of the team vs. the average of other teams. It uses [G-scores](gscores.md), an extension to traditional Z-scores, to quantify the value each player has in each category.
 
 'Current diff' represents the G-score differential for the draft so far, including players already drafted in the current round and excluding the candidate player. Teams that have not made their pick for the round are filled in with an estimate of the statistics of their next player. So in this case above, 'Current diff' represents other teams' first two picks vs. Giannis, with estimates for other teams that have only drafted one player. 'Future player diff' is the expected difference between future picks made by the drafter and those made by other teams, based on the strategy adopted by H-scoring. In this case the G-score for Free Throws is heavily negative because the algorithm wants to punt it with future picks. 'Current diff' plus the candidate player plus 'Future player diff' equals the total differential versus other teams, which H-scoring uses to calculate win probabilities.  
-
-The ranks show how the candidate player ranks as a pick in this situation, both by H-score and G-score. This can also be seen through the H-score or G-score main tables, and is included here as a convenience. 
-
-### Future strategy
-
-The future strategy tab shows H-scoring's strategy for future picks.
 
 ![alt text](img/hstrat.png)
 /// caption
@@ -93,7 +93,7 @@ The flex position allocations show how the algorithm expects to use its flex spo
 
 The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. 
 
-## Optimization
+## Mathematical detail 
 
 Warning- math :rotating_light: :abacus: 
 

@@ -10,7 +10,6 @@ import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { getAuctionState }     from './data_entry/auction_state.js'
 import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
-import { computeHscoreTableWidth } from './table/player_table.js'
 import { getLeagueSettings } from './parameter_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import { getFullTeamResult } from './api/session.js'
@@ -72,10 +71,6 @@ function showOwnDataLayout(mode: string): void {
     rightSubHeader.innerHTML = ''
     rightFooter.innerHTML    = ''
 
-    // Align data-entry section and tab row to the H-score table width
-    const hscoreWidth = computeHscoreTableWidth()
-    rightHeader.style.maxWidth = hscoreWidth
-    document.getElementById('tab-row')!.style.maxWidth = hscoreWidth
     show('seat-selector-container')
 
     if (mode === 'Auction Mode') {
@@ -117,7 +112,6 @@ function showLiveLayout(): void {
     rightSubHeader.innerHTML = ''
     rightFooter.innerHTML    = ''
 
-    document.getElementById('tab-row')!.style.maxWidth = computeHscoreTableWidth()
     show('seat-selector-container')
 
     const stub = document.createElement('div')
@@ -195,7 +189,6 @@ function activateSeasonTab(tabId: string): void {
 
         const rightHeader = document.getElementById('right-header')!
         rightHeader.innerHTML = ''
-        rightHeader.style.maxWidth = computeHscoreTableWidth()
         document.getElementById('right-footer')!.innerHTML = ''
         renderWaiverControls(rightHeader)
 
@@ -283,7 +276,6 @@ export function refreshDraftGScore(): void {
     renderTeamGScoreTable(
         player_assignments[getCurrentSeat() ?? ''] ?? []
         , document.getElementById('draft-gscore')!
-        , computeHscoreTableWidth()
         , getFullTeamResult()
     )
 }
@@ -293,7 +285,6 @@ export function refreshAuctionGScore(): void {
     renderTeamGScoreTable(
         player_assignments[getCurrentSeat() ?? ''] ?? []
         , document.getElementById('auction-gscore')!
-        , computeHscoreTableWidth()
         , getFullTeamResult()
     )
 }

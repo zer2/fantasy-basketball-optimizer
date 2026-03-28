@@ -22,7 +22,7 @@ const _draftDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console
 let _autopilotRunning = false
 
 const ROUND_W = 46   // px — Round label column
-const TEAM_W  = 85   // px — per-drafter column
+const TEAM_W  = 70   // px — per-drafter column (min-width floor only; table fills available width)
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
