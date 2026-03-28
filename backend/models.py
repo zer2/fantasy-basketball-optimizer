@@ -94,6 +94,12 @@ class PatchResponse(BaseModel):
     steps_rerun: list[int]
 
 
+# ── /sessions/{id}/g-scores GET ───────────────────────────────────────────────
+
+class GScoresResponse(BaseModel):
+    g_scores: list[PlayerGScore]
+
+
 # ── /sessions/{id}/evaluate ───────────────────────────────────────────────────
 
 class EvaluateRequest(BaseModel):

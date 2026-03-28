@@ -22,7 +22,7 @@ from backend.pipeline import run_pipeline, _parse_projection_csv
 from backend.models import (
     UploadResponse,
     SessionRequest, SessionResponse, PlayerGScore,
-    PatchRequest, PatchResponse,
+    PatchRequest, PatchResponse, GScoresResponse,
     EvaluateRequest, EvaluateResponse,
     TradeAnalyzeRequest, TradeAnalyzeResponse,
     TradeSuggestRequest, TradeSuggestResponse,
@@ -373,6 +373,26 @@ def patch_session_route(session_id: str, req: PatchRequest):
     run_pipeline(session, from_step=req.from_step, csv_bytes=csv_bytes, file_type=file_type_str,
                  uploaded_dfs=uploaded_dfs)
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
+
+
+# ── GET /sessions/{session_id}/g-scores ───────────────────────────────────────
+
+@app.get('/sessions/{session_id}/g-scores', response_model=GScoresResponse)
+def get_g_scores_route(session_id: str):
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found or expired.')
+    categories = session.current_params['categories']
+    g_scores_df = session.info['G-scores']
+    g_scores_list = [
+        PlayerGScore(
+            name=str(name),
+            total=round(float(row['Total']), 2),
+            values=[round(float(row[cat]), 2) for cat in categories],
+        )
+        for name, row in g_scores_df.iterrows()
+    ]
+    return GScoresResponse(g_scores=g_scores_list)
 
 
 # ── POST /sessions/{session_id}/evaluate ──────────────────────────────────────

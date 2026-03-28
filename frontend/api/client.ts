@@ -141,6 +141,19 @@ export async function patchSession(
     return res.json()
 }
 
+// ── GET /sessions/{id}/g-scores ───────────────────────────────────────────────
+
+/** Fetches the current G-scores for a session directly from session state. */
+export async function fetchGScores(sessionId: string): Promise<PlayerGScore[]> {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/g-scores`)
+    if (!res.ok) {
+        const detail = await res.text()
+        throw new Error(`Fetch G-scores failed (${res.status}): ${detail}`)
+    }
+    const data = await res.json()
+    return data.g_scores as PlayerGScore[]
+}
+
 // ── POST /sessions/{id}/evaluate ──────────────────────────────────────────────
 
 /** Runs the H-score algorithm for the given draft/auction state and returns ranked candidates. Supports AbortSignal for cancellation. */

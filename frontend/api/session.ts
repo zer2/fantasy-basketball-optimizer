@@ -111,10 +111,15 @@ export async function createOrPatchSession(
         return
     }
     try {
-        await client.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
+        const patchResp = await client.patchSession(sessionId, { from_step: fromStep, ...patchBody }, signal)
         // Parameters changed — cached base result is now stale.
         basePlayersBySession.delete(sessionId)
         latestFullTeamResult = null
+        // If step 4 (G-scores) was re-run, fetch fresh G-scores directly from session state.
+        if (patchResp.steps_rerun.includes(4)) {
+            const freshGScores = await client.fetchGScores(sessionId)
+            setGScores(freshGScores)
+        }
     } catch (err: any) {
         if (!err.message?.includes('(404)')) throw err
         // Session expired; rebuild from current sidebar state.
