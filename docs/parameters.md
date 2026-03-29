@@ -18,7 +18,6 @@ The first factor, υ, scales injury rates on a spectrum between per-game value a
 
 The second factor, ψ, controls an adjustment for replacement players. It is assumed that when a player misses a game, they will be replaced by a replacement-level player for that game ψ of the time, and that is incorporated into projections after they have been adjusted for injury rates. A replacement-level player has the total G-score value of the $N$th-highest player, spread across categories, where $N$ is the number of players in the league.  So continuing the previous example, if ψ is $0.75$, then 3% times a replacement player's value is added to the player's projection. The right value for ψ depends on a league's IR rules and how active managers will be in replacing their injured player. It defaults to $0.8$.
 
-
 ### H-score parameters
 
 ![](img/puntcontrol.png)
@@ -43,7 +42,7 @@ One of them is χ, which controls the estimate of uncertainty in pre-season proj
 
 The other is ℵ. ℵ makes a team's category-level performances in counting statistics more correlated than they theoretically would be. The motivation for this is that in reality, some managers will be paying more attention than others, leading to some teams having higher volume across the board. This effect would not be encapsulated within the Rotisserie model's logic without a positive value of ℵ.
 
-![alt text](image.png)
+![alt text](img/aleph.png)
 
 ### Auction noise
 
