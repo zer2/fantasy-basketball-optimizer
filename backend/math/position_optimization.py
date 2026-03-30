@@ -62,14 +62,12 @@ def get_player_rows(players: list, pos_cfg: PositionConfig) -> np.ndarray:
     base_list          = position_structure['base_list']
     flex_list          = position_structure['flex_list']
 
-    is_base_position = pd.DataFrame({
-        position_code: np.array([position_code in x for x in players])
-        for position_code in base_list
-    })
+    base_index     = {position_code: i for i, position_code in enumerate(base_list)}
+    is_base        = np.array([[position_code in player for position_code in base_list] for player in players])
 
     base_slots = {
         position_code: np.where(
-            is_base_position[position_code].values.reshape(-1, 1),
+            is_base[:, base_index[position_code]].reshape(-1, 1),
             [[0]       * position_numbers[position_code]] * n_players,
             [[-np.inf] * position_numbers[position_code]] * n_players,
         )
@@ -78,8 +76,8 @@ def get_player_rows(players: list, pos_cfg: PositionConfig) -> np.ndarray:
 
     flex_slots = {
         position_code: np.where(
-            is_base_position[position_structure['flex'][position_code]['bases']]
-            .any(axis=1).values.reshape(-1, 1),
+            is_base[:, [base_index[b] for b in position_structure['flex'][position_code]['bases']]]
+            .any(axis=1).reshape(-1, 1),
             [[0]       * position_numbers[position_code]] * n_players,
             [[-np.inf] * position_numbers[position_code]] * n_players,
         )
@@ -131,11 +129,11 @@ def get_position_array_from_res(res: np.ndarray,
         ).sum(axis=1).astype(float)
 
     for position_code in position_structure['flex_list']:
-        flex_split = position_shares[position_code].mul(
-            position_sums[position_code].reshape(-1, 1)
-        )
+        share_values  = position_shares[position_code].values
+        share_columns = list(position_shares[position_code].columns)
+        flex_split    = share_values * position_sums[position_code].reshape(-1, 1)
         for base_position_code in position_structure['flex'][position_code]['bases']:
-            position_sums[base_position_code] += flex_split.loc[:, base_position_code]
+            position_sums[base_position_code] += flex_split[:, share_columns.index(base_position_code)]
 
     res_main = np.concatenate(
         [[position_sums[p]] for p in position_structure['base_list']], axis=0

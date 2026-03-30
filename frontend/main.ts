@@ -165,28 +165,37 @@ playerStatsSection.addEventListener('change', () => playerStatsDebouncer.fire())
 
 const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
-const formatDebouncer = makeDebouncer(() => {
-    createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } })
-        .then(() => runModeEval())
-        .then(() => applyLayout())
-        .catch(err => console.error('Format & categories apply failed:', err))
-}, 800)
-formatSection.addEventListener('input',  () => formatDebouncer.fire())
-formatSection.addEventListener('change', () => formatDebouncer.fire())
+let formatController: AbortController | null = null
+formatSection.addEventListener('change', () => {
+    if (formatController) formatController.abort()
+    formatController = new AbortController()
+    const { signal } = formatController
+    createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } }, signal)
+        .then(() => { if (!signal.aborted) return runModeEval() })
+        .then(() => { if (!signal.aborted) applyLayout() })
+        .catch(err => {
+            if (err.name === 'AbortError') return
+            console.error('Format & categories apply failed:', err)
+        })
+})
 
 // ─── 4. Model Parameters ──────────────────────────────────────────────────────
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
 renderModelParameters(modelSection)
-const modelDebouncer = makeDebouncer(() => {
-    const parameters = getModelParameters()
-    createOrPatchSession(3, { parameters })
-        .then(() => runModeEval())
-        .then(() => applyLayout())
-        .catch(err => console.error('Model parameters apply failed:', err))
-}, 800)
-modelSection.addEventListener('input',  () => modelDebouncer.fire())
-modelSection.addEventListener('change', () => modelDebouncer.fire())
+let modelController: AbortController | null = null
+modelSection.addEventListener('change', () => {
+    if (modelController) modelController.abort()
+    modelController = new AbortController()
+    const { signal } = modelController
+    createOrPatchSession(3, { parameters: getModelParameters() }, signal)
+        .then(() => { if (!signal.aborted) return runModeEval() })
+        .then(() => { if (!signal.aborted) applyLayout() })
+        .catch(err => {
+            if (err.name === 'AbortError') return
+            console.error('Model parameters apply failed:', err)
+        })
+})
 
 // ─── 5. Position Parameters ───────────────────────────────────────────────────
 

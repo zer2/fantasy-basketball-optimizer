@@ -17,7 +17,7 @@ import pandas as pd
 from scipy.stats import norm
 from itertools import combinations
 
-from backend.math.algorithm_helpers import combinatorial_calculation, calculate_tipping_points
+from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
 from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
@@ -217,8 +217,9 @@ class HAgent:
     def get_h_scores(self,
                      player_assignments: dict,
                      drafter,
+                     n_iterations: int,
                      cash_remaining_per_team: dict = None,
-                     exclusion_list: list = []) -> tuple:
+                     exclusion_list: list = []) -> dict:
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -306,6 +307,7 @@ class HAgent:
             x_scores_available_array,
             x_scores_available.index,
             sigma_2_m,
+            n_iterations,
         )
 
     def get_diff_distributions(self, player_assignments, drafter,
@@ -415,7 +417,8 @@ class HAgent:
 
     def perform_iterations(self, category_weights, position_shares, my_players,
                            n_players_selected, diff_means, diff_vars,
-                           x_scores_available_array, result_index, sigma_2_m):
+                           x_scores_available_array, result_index, sigma_2_m,
+                           n_iterations):
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
@@ -431,23 +434,23 @@ class HAgent:
         else:
             pitching_preference = None
 
-        while True:
+        for _ in range(max(1, n_iterations)):
             category_weights_current  = category_weights
             position_shares_current   = position_shares
 
             if (n_players_selected < self.n_picks - 1) and self.dynamic:
 
-                res = self.get_objective_and_gradient(
+                gradient_result = self.get_objective_and_gradient(
                     category_weights, position_shares, diff_means, diff_vars,
                     x_scores_available_array, result_index, n_players_selected,
                     sigma_2_m, pitching_preference,
                 )
 
-                score               = res['Score']
-                gradients           = res['Gradients']
-                cdf_estimates       = res['CDF-Estimates']
-                expected_future_diff = res['Future-Diffs']
-                rosters             = res['Rosters']
+                score               = gradient_result['Score']
+                gradients           = gradient_result['Gradients']
+                cdf_estimates       = gradient_result['CDF-Estimates']
+                expected_future_diff = gradient_result['Future-Diffs']
+                rosters             = gradient_result['Rosters']
 
                 cat_grad_centered = gradients['Categories'] - gradients['Categories'].mean(axis=1).reshape(-1, 1)
                 cat_updates       = optimizers['Categories'].minimize(cat_grad_centered)
@@ -467,12 +470,12 @@ class HAgent:
                 if self.position_means is not None:
                     share_gradients_centered = {
                         k: grad - grad.mean(axis=1).reshape(-1, 1)
-                        for k, grad in res['Gradients']['Shares'].items()
+                        for k, grad in gradient_result['Gradients']['Shares'].items()
                     }
                     for pos_code, optimizer in optimizers['Shares'].items():
                         share_update = optimizer.minimize(share_gradients_centered[pos_code])
                         position_shares[pos_code] = position_shares[pos_code] + share_update
-                        position_shares[pos_code] = np.clip(position_shares[pos_code], 0, 1)
+                        position_shares[pos_code].values[:] = np.clip(position_shares[pos_code].values, 0, 1)
                         position_shares[pos_code] = position_shares[pos_code].div(
                             position_shares[pos_code].sum(axis=1), axis=0
                         )
@@ -510,51 +513,50 @@ class HAgent:
                 expected_future_diff = None
                 category_weights_current = None
 
-            cdf_means = cdf_estimates.mean(axis=2)
+        cdf_means = cdf_estimates.mean(axis=2)
 
-            if expected_future_diff is not None:
-                expected_diff_means = expected_future_diff.mean(axis=2) + diff_means.mean(axis=2)
-            else:
-                #ZR: This is a bit of a hack. It just gets diff_means into the right shape 
-                expected_diff_means = cdf_means * 0 + diff_means.mean(axis=2)
+        if expected_future_diff is not None:
+            expected_diff_means = expected_future_diff.mean(axis=2) + diff_means.mean(axis=2)
+        else:
+            #ZR: This is a bit of a hack. It just gets diff_means into the right shape
+            expected_diff_means = cdf_means * 0 + diff_means.mean(axis=2)
 
-            future_diff_df = (
-                pd.DataFrame(expected_future_diff.mean(axis=2),
-                             index=result_index, columns=self.x_scores.columns)
-                if expected_future_diff is not None else None
-            )
+        future_diff_df = (
+            pd.DataFrame(expected_future_diff.mean(axis=2),
+                         index=result_index, columns=self.x_scores.columns)
+            if expected_future_diff is not None else None
+        )
 
-            res = {
-                'Scores':  pd.Series(score, index=result_index),
-                'Weights': None if category_weights_current is None else \
-                            pd.DataFrame(category_weights_current, index=result_index,columns=self.x_scores.columns), 
-                'Rates':   pd.DataFrame(cdf_means, index=result_index,
-                                        columns=self.x_scores.columns),
-                'Diff':    (pd.DataFrame(expected_diff_means, index=result_index,
-                                         columns=self.x_scores.columns)
-                            if expected_diff_means is not None else None),
-                'Future-Diff': future_diff_df,
-                'Rosters': pd.DataFrame(rosters, index=result_index) if rosters is not None else
-                           pd.DataFrame(np.zeros((len(result_index), 1)) - 1, index=result_index),
-                'Position-Shares': (
-                    {
-                        pos_code: pd.DataFrame(
-                            position_shares_current[pos_code].values,
-                            index=result_index,
-                            columns=pos_info['bases'],
-                        )
-                        for pos_code, pos_info in self.position_structure['flex'].items()
-                    }
-                    if position_shares_current is not None else
-                    {pos_code: None for pos_code in self.position_structure['flex']}
-                ),
-                'CDFs': [
-                    pd.DataFrame(cdf_estimates[:, :, i], index=result_index,
-                                 columns=list(self.x_scores.columns))
-                    for i in range(self.n_drafters - 1)
-                ],
-            }
-            yield res
+        return {
+            'Scores':  pd.Series(score, index=result_index),
+            'Weights': None if category_weights_current is None else \
+                        pd.DataFrame(category_weights_current, index=result_index, columns=self.x_scores.columns),
+            'Rates':   pd.DataFrame(cdf_means, index=result_index,
+                                    columns=self.x_scores.columns),
+            'Diff':    (pd.DataFrame(expected_diff_means, index=result_index,
+                                     columns=self.x_scores.columns)
+                        if expected_diff_means is not None else None),
+            'Future-Diff': future_diff_df,
+            'Rosters': pd.DataFrame(rosters, index=result_index) if rosters is not None else
+                       pd.DataFrame(np.zeros((len(result_index), 1)) - 1, index=result_index),
+            'Position-Shares': (
+                {
+                    pos_code: pd.DataFrame(
+                        position_shares_current[pos_code].values,
+                        index=result_index,
+                        columns=pos_info['bases'],
+                    )
+                    for pos_code, pos_info in self.position_structure['flex'].items()
+                }
+                if position_shares_current is not None else
+                {pos_code: None for pos_code in self.position_structure['flex']}
+            ),
+            'CDFs': [
+                pd.DataFrame(cdf_estimates[:, :, i], index=result_index,
+                             columns=list(self.x_scores.columns))
+                for i in range(self.n_drafters - 1)
+            ],
+        }
 
     def get_position_priorities_from_category_weights(self, weights):
         return np.einsum('ij, akj -> ik', weights / self.v.T, self.position_means)
@@ -687,7 +689,7 @@ class HAgent:
 
     def get_objective_and_pdf_weights_mc(self, cdf_estimates, pdf_estimates,
                                           calculate_pdf_weights=False):
-        objective = combinatorial_calculation(cdf_estimates, 1 - cdf_estimates).mean(axis=1)
+        objective = compute_win_probability(np.array(cdf_estimates)).mean(axis=1)
         if calculate_pdf_weights:
             tipping_points = calculate_tipping_points(np.array(cdf_estimates))
             return objective, (tipping_points * pdf_estimates).mean(axis=2)

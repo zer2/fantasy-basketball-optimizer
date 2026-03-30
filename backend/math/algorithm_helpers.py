@@ -12,8 +12,6 @@ import pandas as pd
 from scipy.stats import norm
 import numpy as np
 from itertools import combinations
-import numexpr as ne
-
 
 def auction_value_adjuster(raw_values_unselected: pd.Series,
                             n_remaining_players: int,
@@ -61,6 +59,7 @@ def combinatorial_calculation(c: np.ndarray,
         return data
 
 
+@functools.lru_cache(maxsize=None)
 def get_win_grid(n_categories: int) -> np.ndarray:
     which = np.array([list(combinations(range(n_categories), int(n_categories / 2) + 1))])
     grid = np.zeros((which.shape[1], n_categories), dtype='bool')
@@ -68,6 +67,7 @@ def get_win_grid(n_categories: int) -> np.ndarray:
     return np.expand_dims(grid, axis=2)
 
 
+@functools.lru_cache(maxsize=None)
 def get_tie_grid(n_categories: int) -> np.ndarray:
     which = np.array([list(combinations(range(n_categories), int(n_categories / 2)))])
     grid = np.zeros((which.shape[1], n_categories), dtype='bool')
@@ -75,28 +75,115 @@ def get_tie_grid(n_categories: int) -> np.ndarray:
     return np.expand_dims(grid, axis=2)
 
 
+def compute_win_probability(probs: np.ndarray) -> np.ndarray:
+    """Compute P(winning the matchup) for each player vs each opponent via DP.
+
+    Uses the same win-count polynomial DP as combinatorial_calculation, but
+    expressed as a single forward pass rather than recursive enumeration.
+
+    Args:
+        probs: Win probability per category, shape (n_players, n_categories, n_opponents).
+
+    Returns:
+        shape (n_players, n_opponents): probability of winning the matchup.
+    """
+    n_players, n_categories, n_opponents = probs.shape
+    k_to_win = n_categories // 2 + 1
+
+    # dp[:, k, :] = P(win exactly k of the categories processed so far)
+    dp = np.ones((n_players, 1, n_opponents))
+    for i in range(n_categories):
+        p_i     = probs[:, i, :][:, np.newaxis, :]
+        updated = np.zeros((n_players, i + 2, n_opponents))
+        updated[:, :i + 1, :] += dp * (1 - p_i)
+        updated[:, 1:, :]     += dp * p_i
+        dp = updated
+
+    result = dp[:, k_to_win:, :].sum(axis=1)
+    if n_categories % 2 == 0:
+        result += dp[:, n_categories // 2, :] / 2
+    return result
+
+
+def _build_win_count_prefix_suffix(probs: np.ndarray):
+    """Build prefix and suffix DP tables for win-count distributions.
+
+    Each prefix[i] has shape (n_players, i+1, n_opponents) where entry [p, k, o]
+    is the probability of winning exactly k of the first i categories.
+    Suffix tables mirror this from the right.
+    This is the same polynomial-multiplication DP that combinatorial_calculation
+    uses recursively, expressed here as explicit tables so we can do leave-one-out
+    convolutions for every category in one pass.
+    """
+    n_players, n_categories, n_opponents = probs.shape
+
+    prefix = [None] * (n_categories + 1)
+    prefix[0] = np.ones((n_players, 1, n_opponents))
+    for i in range(n_categories):
+        p_i = probs[:, i, :][:, np.newaxis, :]   # (n_players, 1, n_opponents)
+        previous = prefix[i]                       # (n_players, i+1, n_opponents)
+        updated = np.zeros((n_players, i + 2, n_opponents))
+        updated[:, :i + 1, :] += previous * (1 - p_i)
+        updated[:, 1:, :]     += previous * p_i
+        prefix[i + 1] = updated
+
+    suffix = [None] * (n_categories + 1)
+    suffix[n_categories] = np.ones((n_players, 1, n_opponents))
+    for i in range(n_categories - 1, -1, -1):
+        p_i = probs[:, i, :][:, np.newaxis, :]
+        following = suffix[i + 1]                  # (n_players, n_categories-i, n_opponents)
+        n_following = n_categories - i
+        updated = np.zeros((n_players, n_following + 1, n_opponents))
+        updated[:, :n_following, :] += following * (1 - p_i)
+        updated[:, 1:, :]           += following * p_i
+        suffix[i] = updated
+
+    return prefix, suffix
+
+
 def calculate_tipping_points(x: np.ndarray) -> np.ndarray:
-    n_categories = x.shape[1]
-    grid = get_win_grid(n_categories)
-    grid = np.array([grid] * x.shape[0])
-    x = x.reshape(x.shape[0], 1, n_categories, x.shape[2])
+    """Compute per-category tipping-point probabilities using prefix-suffix DP.
 
-    positive_first_part = np.prod(ne.evaluate('grid * x + (1-grid) * (1-x)'), axis=2).reshape(
-        x.shape[0], grid.shape[1], 1, x.shape[3])
-    positive_case_probabilities = np.sum(ne.evaluate('positive_first_part * grid'), axis=1)
+    tipping_point[p, c, o] = P(category c is decisive in player p's matchup vs opponent o)
+                            = x[p,c,o] * P(win exactly k of other n-1 cats | probs=x)
+                            + (1-x[p,c,o]) * P(win exactly k of other n-1 cats | probs=1-x)
+    where k = n_categories // 2.
 
-    negative_first_part = np.prod(ne.evaluate('(1 - grid) * x + grid * (1-x)'), axis=2).reshape(
-        x.shape[0], grid.shape[1], 1, x.shape[3])
-    negative_case_probabilities = np.sum(ne.evaluate('negative_first_part * grid'), axis=1)
+    Uses the same win-count polynomial DP as combinatorial_calculation, but organised as
+    prefix/suffix tables so every leave-one-out result is computed in a single forward and
+    backward pass instead of enumerating C(n, k) winning combinations.
+    """
+    n_players, n_categories, n_opponents = x.shape
+    k = n_categories // 2
 
-    final_probabilities = ne.evaluate('positive_case_probabilities + negative_case_probabilities')
+    prefix,      suffix      = _build_win_count_prefix_suffix(x)
+    prefix_comp, suffix_comp = _build_win_count_prefix_suffix(1 - x)
+
+    result = np.zeros((n_players, n_categories, n_opponents))
+
+    for c in range(n_categories):
+        pre      = prefix[c]          # (n_players, c+1,           n_opponents)
+        suf      = suffix[c + 1]      # (n_players, n_categories-c, n_opponents)
+        pre_comp = prefix_comp[c]
+        suf_comp = suffix_comp[c + 1]
+
+        # P(win exactly k of other n-1 categories) via convolution at sum = k
+        win_exactly_k      = np.zeros((n_players, n_opponents))
+        win_exactly_k_comp = np.zeros((n_players, n_opponents))
+        for a in range(min(k + 1, pre.shape[1])):
+            b = k - a
+            if 0 <= b < suf.shape[1]:
+                win_exactly_k      += pre[:, a, :]      * suf[:, b, :]
+            if 0 <= b < suf_comp.shape[1]:
+                win_exactly_k_comp += pre_comp[:, a, :] * suf_comp[:, b, :]
+
+        x_c = x[:, c, :]
+        result[:, c, :] = x_c * win_exactly_k + (1 - x_c) * win_exactly_k_comp
 
     if n_categories % 2 == 0:
-        tie_grid = get_tie_grid(n_categories)
-        tie_grid = np.array([tie_grid] * x.shape[0])
-        tie_probabilities = np.prod(ne.evaluate('tie_grid * x + (1-tie_grid) * (1-x)'), axis=2)
-        tie_probabilities = tie_probabilities.reshape(
-            x.shape[0], tie_grid.shape[1], 1, x.shape[3]).sum(axis=1)
-        final_probabilities = final_probabilities / 2 + tie_probabilities / 2
+        # For even n, scale win contribution by 1/2 and add tie probability / 2.
+        # Tie probability (same for all categories) = P(win exactly k of all n).
+        tie_prob = prefix[n_categories][:, k, :]   # (n_players, n_opponents)
+        result = result / 2 + tie_prob[:, np.newaxis, :] / 2
 
-    return final_probabilities
+    return result

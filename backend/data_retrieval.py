@@ -70,15 +70,40 @@ _cache: dict[str, tuple[float, pd.DataFrame]] = {}
 _cache_lock = threading.Lock()
 _CACHE_TTL = 24 * 3600  # 24 hours
 
+# If set, Parquet files are read/written here before falling back to Snowflake.
+# In production this is the GCS bucket mount path (e.g. /cache).
+_DISK_CACHE_DIR: Path | None = (
+    Path(os.environ['DISK_CACHE_DIR']) if 'DISK_CACHE_DIR' in os.environ else None
+)
+
+
+def _disk_cache_path(view_name: str) -> Path | None:
+    if _DISK_CACHE_DIR is None:
+        return None
+    return _DISK_CACHE_DIR / f'{view_name}.parquet'
+
 
 def _query(view_name: str) -> pd.DataFrame:
-    """Fetch a view from Snowflake with a 24-hour module-level cache."""
+    """Fetch a view from Snowflake with a 24-hour in-memory and disk cache."""
     with _cache_lock:
         entry = _cache.get(view_name)
         if entry is not None and time.time() - entry[0] < _CACHE_TTL:
             return entry[1].copy()
 
+    disk_path = _disk_cache_path(view_name)
+    if disk_path is not None and disk_path.exists():
+        age = time.time() - disk_path.stat().st_mtime
+        if age < _CACHE_TTL:
+            df = pd.read_parquet(disk_path)
+            with _cache_lock:
+                _cache[view_name] = (time.time() - age, df)
+            return df.copy()
+
     df = _get_connection().cursor().execute(f'SELECT * FROM {view_name}').fetch_pandas_all()
+
+    if disk_path is not None:
+        disk_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(disk_path, index=False)
 
     with _cache_lock:
         _cache[view_name] = (time.time(), df)

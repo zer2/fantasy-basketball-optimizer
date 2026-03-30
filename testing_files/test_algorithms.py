@@ -132,6 +132,29 @@ def test_tipping_point_calculation():
     assert (abs(result - expected_result) < 0.01).all()
 
 
+def test_tipping_point_calculation_even_categories_uniform():
+    # n=8 (e.g. removing turnovers), x=1/2 for all.
+    # P(win exactly 4 of other 7 | x=1/2) = C(7,4)/2^7 = 35/128 ≈ 0.2734
+    # P(tie = exactly 4 of 8 | x=1/2)    = C(8,4)/2^8 = 70/256 ≈ 0.2734
+    # result[c] = (1/2 * 0.2734 + 1/2 * 0.2734)/2 + 0.2734/2 = 0.2734
+    x               = np.array([[[1/2, 0]] * 8] * 2)
+    result          = calculate_tipping_points(x)
+    expected_result = np.array([[[0.2734, 0]] * 8] * 2)
+    assert (abs(result - expected_result) < 0.01).all()
+
+
+def test_tipping_point_calculation_even_categories_analytical():
+    # For n=2 categories, every outcome has exactly one decisive category,
+    # so each tipping point equals 0.5 for all x. Proof:
+    #   result[0] = (x0*x1 + (1-x0)*(1-x1))/2 + (x0*(1-x1) + (1-x0)*x1)/2 = 1/2
+    # This holds for all (x0, x1) and is a clean test of the even-n tie path.
+    rng = np.random.default_rng(seed=42)
+    x      = rng.uniform(0, 1, size=(5, 2, 4))
+    result = calculate_tipping_points(x)
+    assert result.shape == (5, 2, 4)
+    assert (abs(result - 0.5) < 1e-10).all()
+
+
 def test_savor_calculation():
     values = pd.Series([1, 2, 3, 4, 5]).sort_values(ascending=False)
     noise  = 2
