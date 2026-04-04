@@ -8,12 +8,12 @@ useful across more than one backend module.
 from __future__ import annotations
 
 
-def counting_stats(params: dict, categories: list[str]) -> list[str]:
+def get_counting_stats(params: dict, categories: list[str]) -> list[str]:
     """Return counting statistics from params that are in the active categories."""
     return [c for c in params['counting-statistics'] if c in categories]
 
 
-def ratio_stats(params: dict, categories: list[str]) -> list[str]:
+def get_ratio_stats(params: dict, categories: list[str]) -> list[str]:
     """Return ratio statistics from params that are in the active categories."""
     return [c for c in params['ratio-statistics'] if c in categories]
 

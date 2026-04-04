@@ -45,7 +45,7 @@ In "Most Categories", teams also rotate opponents, but instead of keeping all of
 Top Most Category H-scores for the first pick, 2024-25 season
 ///
 
-The table above is based on the same dataset as the Each Category version. The numbers are different because they use the Most Categories objective instead of the Each Category objective. With Most Categories scoring, the algorithm is even more incentivized to punt, and tends to do so to a more extreme degree. Players that benefit strongly from punting like Giannis also end up scoring better (he's fifth either way, but has more distance above Wembanyama in Most Categories).
+The table above is based on the same dataset as the Each Category version. The overall H-scores are different because they are based on the Most Categories objective; the associated strategies are optimized accordingly to match the format and maximize the objective for each player. With most categories scoring, the algorithm is more incentivized to punt, since winning extra categories is not helpful. This leads to players like Giannis, who benefit greatly from punting, ranking better (sixth vs. fourth in this case).
 
 Rotisserie is another degree more complicated than Most Categories. See the [Roto section](roto.md) for details
 

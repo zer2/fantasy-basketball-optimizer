@@ -18,7 +18,7 @@ import uuid
 import numpy as np
 import pandas as pd
 
-from backend.helper_functions import counting_stats, ratio_stats
+from backend.helper_functions import get_counting_stats, get_ratio_stats
 
 
 # ── public helpers ─────────────────────────────────────────────────────────────
@@ -212,8 +212,8 @@ def process_player_data(player_stats_v2: pd.DataFrame,
     """Explicit-parameter version of process_player_data.
     Receives player_stats_v2 directly instead of reading from st.session_state."""
 
-    counting_stats = counting_stats(params, categories)
-    ratio_stats    = ratio_stats(params, categories)
+    counting_stats = get_counting_stats(params, categories)
+    ratio_stats    = get_ratio_stats(params, categories)
     n_players      = n_drafters * n_starters
     player_means   = player_stats_v2
 

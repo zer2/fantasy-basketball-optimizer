@@ -103,11 +103,7 @@ export function renderPlayerStats(container: HTMLElement): void {
     injuredInput.placeholder = 'One player name per line'
     injuredInput.rows = 3
     container.append(injuredInput)
-
-    const injuredCaption = document.createElement('div')
-    injuredCaption.className = 'sidebar-caption'
-    injuredCaption.textContent = 'These players are dropped before coefficient calculation.'
-    container.append(injuredCaption)
+    
 }
 
 /** Renders blend weight sliders and CSV upload inputs for HTB and BBM sources. */
