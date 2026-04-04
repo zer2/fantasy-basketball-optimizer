@@ -182,7 +182,7 @@ NBA:
     FIELD_GOALS_MADE : Field Goals Made
     FIELD_GOAL_ATTEMPTS : Field Goal Attempts
     THREE_ATTEMPTS : Three Attempts 
-    DOUBLE_DOUBLE : Double Doubles
+    DOUBLE_DOUBLES : Double Doubles
     POSITION_LIST : Position
     GAMES_PLAYED_PERCENT : Games Played %
   darko-renamer:

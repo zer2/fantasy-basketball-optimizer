@@ -18,19 +18,7 @@ import uuid
 import numpy as np
 import pandas as pd
 
-
-# ── private helpers (used within this module) ─────────────────────────────────
-
-def _counting_stats(params: dict, categories: list[str]) -> list[str]:
-    return [c for c in params['counting-statistics'] if c in categories]
-
-
-def _ratio_stats(params: dict, categories: list[str]) -> list[str]:
-    return [c for c in params['ratio-statistics'] if c in categories]
-
-
-def _conversion_factors(params: dict) -> pd.Series:
-    return pd.Series(params['coefficients']).T
+from backend.helper_functions import counting_stats, ratio_stats
 
 
 # ── public helpers ─────────────────────────────────────────────────────────────
@@ -51,7 +39,7 @@ def get_category_level_rv(rv: float,
 
 def calculate_coefficients(player_means: pd.DataFrame,
                             representative_player_set: list,
-                            translation_factors: pd.Series,
+                            mean_of_variances: pd.Series,
                             counting_stats: list[str],
                             ratio_stats: list[str],
                             params: dict) -> pd.DataFrame:
@@ -78,15 +66,10 @@ def calculate_coefficients(player_means: pd.DataFrame,
             )
             var_of_means.loc[ratio_stat] = numerator.var()
 
-            if volume_statistic not in translation_factors:
-                translation_factors[volume_statistic] = 0
-
-    mean_of_vars = var_of_means * translation_factors
-
     return pd.DataFrame({
         'Mean of Means':      mean_of_means,
         'Variance of Means':  var_of_means,
-        'Mean of Variances':  mean_of_vars,
+        'Mean of Variances':  mean_of_variances.reindex(var_of_means.index),
     })
 
 
@@ -216,6 +199,7 @@ def games_played_adjustment(scores: pd.DataFrame,
 
 def process_player_data(player_stats_v2: pd.DataFrame,
                         weekly_df,
+                        mean_of_variances: pd.Series,
                         psi: float,
                         chi: float,
                         scoring_format: str,
@@ -228,20 +212,19 @@ def process_player_data(player_stats_v2: pd.DataFrame,
     """Explicit-parameter version of process_player_data.
     Receives player_stats_v2 directly instead of reading from st.session_state."""
 
-    counting_stats     = _counting_stats(params, categories)
-    ratio_stats        = _ratio_stats(params, categories)
-    conversion_factors = _conversion_factors(params)
-    n_players          = n_drafters * n_starters
-    player_means       = player_stats_v2
+    counting_stats = counting_stats(params, categories)
+    ratio_stats    = ratio_stats(params, categories)
+    n_players      = n_drafters * n_starters
+    player_means   = player_stats_v2
 
     if weekly_df is not None:
-        all_players            = list(pd.unique(weekly_df.index.get_level_values('Player')))
-        coeff_first            = calculate_coefficients_historical(weekly_df, all_players, params,
-                                                                    counting_stats, ratio_stats)
+        all_players = list(pd.unique(weekly_df.index.get_level_values('Player')))
+        coeff_first = calculate_coefficients_historical(weekly_df, all_players, params,
+                                                        counting_stats, ratio_stats)
     else:
-        coeff_first            = calculate_coefficients(player_means, player_means.index,
-                                                        conversion_factors, counting_stats,
-                                                        ratio_stats, params)
+        coeff_first = calculate_coefficients(player_means, player_means.index,
+                                             mean_of_variances, counting_stats,
+                                             ratio_stats, params)
 
     beta_weight = chi if scoring_format == 'Rotisserie' else 1
 
@@ -256,7 +239,7 @@ def process_player_data(player_stats_v2: pd.DataFrame,
                                                          params, counting_stats, ratio_stats)
     else:
         coefficients = calculate_coefficients(player_means, representative_player_set,
-                                               conversion_factors, counting_stats, ratio_stats, params)
+                                             mean_of_variances, counting_stats, ratio_stats, params)
 
     mov = coefficients.loc[categories, 'Mean of Variances']
     vom = coefficients.loc[categories, 'Variance of Means']
@@ -398,7 +381,7 @@ def make_upsilon_adjustment(player_stats_v1: pd.DataFrame,
     volume_stats     = [info['volume-statistic'] for info in params['ratio-statistics'].values()]
     games_per_week   = params['n_games_per_week']
 
-    for col in counting_stats + volume_stats:
+    for col in set(counting_stats + volume_stats):
         if col in df.columns:
             df[col] = df[col].astype(float) * df['Games Played %'] * games_per_week
 

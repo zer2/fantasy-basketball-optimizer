@@ -17,14 +17,7 @@ from backend.models import (
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
-
-def _last_name(player_full_name: str) -> str:
-    """Return the player's last name, stripping any trailing position suffix.
-
-    For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
-    "Nikola Jokic" → "Jokic".
-    """
-    return ' '.join(player_full_name.split(' (')[0].split(' ')[1:])
+from backend.helper_functions import extract_last_name
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -441,7 +434,7 @@ def _build_g_score_rows(
     # Fallback when the diff wasn't computed (last pick or dynamic=False):
     # current team diff is unknown so show zeros; Total = player's own G-scores.
     # Use only the last name to keep the table compact.
-    player_last_name = _last_name(player)
+    player_last_name = extract_last_name(player)
 
     if team_diff_row is None:
         return [
@@ -584,7 +577,7 @@ def _roster_from_precomputed(
         slot_idx = int(rosters_row[i])
         if 0 <= slot_idx < len(slot_names):
             assignments[slot_names[slot_idx]] = RosterAssignment(
-                name=_last_name(player_name),
+                name=extract_last_name(player_name),
                 is_candidate=False,
             )
 
@@ -592,7 +585,7 @@ def _roster_from_precomputed(
         candidate_slot_idx = int(rosters_row[n_team_so_far])
         if 0 <= candidate_slot_idx < len(slot_names):
             assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
-                name=_last_name(candidate),
+                name=extract_last_name(candidate),
                 is_candidate=True,
             )
 

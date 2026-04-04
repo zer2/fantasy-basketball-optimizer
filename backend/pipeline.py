@@ -18,8 +18,21 @@ import time
 import threading
 import yaml
 import pandas as pd
+from pathlib import Path
 
 from backend.session import Session
+
+
+_MEAN_OF_VARIANCES_PATH = Path(__file__).parents[1] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
+
+
+def _load_mean_of_variances(sport: str) -> pd.Series:
+    """Load empirical mean-of-variances for the most recent season from the
+    coefficient exploration output CSV.  The CSV has stats as rows and seasons
+    as columns (newest first); the first data column is the most recent season.
+    """
+    df = pd.read_csv(_MEAN_OF_VARIANCES_PATH, index_col=0)
+    return df.iloc[:, 0]
 
 
 # ── v0_clean cache ────────────────────────────────────────────────────────────
@@ -197,16 +210,17 @@ def run_step4(session: Session) -> None:
     categories  = cp['categories']
 
     info, _ = process_player_data(
-        player_stats_v2 = session.v2,
-        weekly_df       = None,
-        psi             = cp['psi'],
-        chi             = cp['chi'],
-        scoring_format  = scoring_format,
-        n_drafters      = n_drafters,
-        n_starters      = n_starters,
-        params          = params,
-        categories      = categories,
-        sport           = sport,
+        player_stats_v2   = session.v2,
+        weekly_df         = None,
+        mean_of_variances = _load_mean_of_variances(sport),
+        psi               = cp['psi'],
+        chi               = cp['chi'],
+        scoring_format    = scoring_format,
+        n_drafters        = n_drafters,
+        n_starters        = n_starters,
+        params            = params,
+        categories        = categories,
+        sport             = sport,
     )
     session.info = info
 

@@ -149,17 +149,30 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
 
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
-const playerStatsDebouncer = makeDebouncer(() => {
+
+const applyPlayerStats = (signal?: AbortSignal) => {
     const { data_source, injured_players } = getPlayerStatsParams()
     resetDraftBoard()
     resetAuctionEntry()
-    createOrPatchSession(1, { data_source, injured_players })
-        .then(() => runModeEval())
-        .then(() => applyLayout())
-        .catch(err => console.error('Player stats apply failed:', err))
-}, 800)
-playerStatsSection.addEventListener('input',  () => playerStatsDebouncer.fire())
-playerStatsSection.addEventListener('change', () => playerStatsDebouncer.fire())
+    createOrPatchSession(1, { data_source, injured_players }, signal)
+        .then(() => { if (!signal || !signal.aborted) return runModeEval() })
+        .then(() => { if (!signal || !signal.aborted) applyLayout() })
+        .catch(err => {
+            if (err.name === 'AbortError') return
+            console.error('Player stats apply failed:', err)
+        })
+}
+
+const playerStatsDebouncer = makeDebouncer(() => applyPlayerStats(), 800)
+let playerStatsController: AbortController | null = null
+
+playerStatsSection.addEventListener('input', () => playerStatsDebouncer.fire())
+playerStatsSection.addEventListener('change', () => {
+    playerStatsDebouncer.cancel()
+    if (playerStatsController) playerStatsController.abort()
+    playerStatsController = new AbortController()
+    applyPlayerStats(playerStatsController.signal)
+})
 
 // ─── 3. Format & Categories ───────────────────────────────────────────────────
 

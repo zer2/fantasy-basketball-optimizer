@@ -130,6 +130,26 @@ def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
     return df
 
 
+# ── Weekly box scores ─────────────────────────────────────────────────────────
+
+def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:
+    """Fetch weekly box score totals for a season from WEEKLY_NUMBERS_VIEW.
+
+    Column names are mapped using params['stat-df-renamer'].
+
+    Returns a DataFrame indexed by ('Player', 'Week') with one summed-stat
+    row per player per week — the format expected by
+    calculate_coefficients_historical.
+    """
+    df = _get_connection().cursor().execute(
+        f"SELECT * FROM WEEKLY_NUMBERS_VIEW WHERE SEASON = '{season}'"
+    ).fetch_pandas_all()
+    df = df.rename(columns=params['stat-df-renamer'])
+    df = df.apply(pd.to_numeric, errors='ignore')
+    df = df.set_index(['Player', 'WEEK']).sort_index()
+    return df.select_dtypes(include='number')
+
+
 # ── Available seasons ─────────────────────────────────────────────────────────
 
 _seasons_cache: tuple[float, list[str]] | None = None

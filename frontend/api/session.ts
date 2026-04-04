@@ -27,7 +27,7 @@ function applyIndicatorDisplay(state: IndicatorState): void {
     const el = document.getElementById('eval-indicator') as HTMLElement
     el.classList.toggle('evaluating', state === 'evaluating')
     el.classList.toggle('fetching', state === 'fetching')
-    el.textContent = state === 'fetching'     ? 'Fetching...'
+    el.textContent = state === 'fetching'     ? 'Starting...'
                    : state === 'evaluating'   ? 'Updating...'
                    : state === 'autopiloting' ? 'Autopiloting...'
                    :                           'Updated'
@@ -106,6 +106,7 @@ export async function createOrPatchSession(
     patchBody: Record<string, unknown> = {},
     signal?: AbortSignal,
 ): Promise<void> {
+    setIndicatorState('fetching')
     if (!sessionId) {
         await startFreshSession(signal)
         return
