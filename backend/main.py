@@ -138,7 +138,7 @@ def _resolve_uploaded_dfs(
     params: dict,
 ) -> dict:
     """Return a {file_type: DataFrame} dict for all valid custom data_ids.
-    Used for 'blended' data_source_type (multiple uploads).
+    Used for 'projections' data_source_type (multiple uploads).
     """
     if not custom_data_ids:
         return {}
@@ -288,7 +288,7 @@ def create_session_route(req: SessionRequest):
         csv_bytes, file_type_str = _resolve_csv(
             req.data_source.custom_data_ids if req.data_source else None
         )
-    elif source_type == 'blended':
+    elif source_type == 'projections':
         uploaded_dfs = _resolve_uploaded_dfs(
             req.data_source.custom_data_ids if req.data_source else None, params
         )
@@ -366,7 +366,7 @@ def patch_session_route(session_id: str, req: PatchRequest):
             params = _load_all_params()[_sport]
             if source_type == 'csv':
                 csv_bytes, file_type_str = _resolve_csv(req.data_source.custom_data_ids)
-            elif source_type == 'blended':
+            elif source_type == 'projections':
                 uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
     session.current_params.update(patch)

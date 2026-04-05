@@ -18,8 +18,21 @@ import time
 import threading
 import yaml
 import pandas as pd
+from pathlib import Path
 
 from backend.session import Session
+
+
+_MEAN_OF_VARIANCES_PATH = Path(__file__).parents[1] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
+
+
+def _load_mean_of_variances(sport: str) -> pd.Series:
+    """Load empirical mean-of-variances for the most recent season from the
+    coefficient exploration output CSV.  The CSV has stats as rows and seasons
+    as columns (newest first); the first data column is the most recent season.
+    """
+    df = pd.read_csv(_MEAN_OF_VARIANCES_PATH, index_col=0)
+    return df.iloc[:, 0]
 
 
 # ── v0_clean cache ────────────────────────────────────────────────────────────
@@ -60,13 +73,13 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     sport = cp.get('sport', '')
     if source_type == 'historical':
         return (sport, 'historical', cp.get('season') or '2024-25')
-    if source_type == 'blended':
+    if source_type == 'projections':
         blend_weights = cp.get('blend_weights', {})
         # Only Snowflake-backed sources are cacheable; uploaded DFs are session-specific
         snowflake_keys = tuple(sorted(
             (k, v) for k, v in blend_weights.items() if k not in ('HTB', 'BBM')
         ))
-        return (sport, 'blended', snowflake_keys)
+        return (sport, 'projections', snowflake_keys)
     return None
 
 
@@ -81,7 +94,7 @@ def run_step1(
     Branches on current_params['data_source_type']:
       'csv'        — single uploaded CSV (csv_bytes + file_type required)
       'historical' — Snowflake historical stats for current_params['season']
-      'blended'    — weighted blend of Snowflake sources + any uploaded_dfs
+      'projections' — weighted blend of Snowflake sources + any uploaded_dfs
 
     Results for Snowflake-backed sources are cached at the module level for
     24 hours so repeated session creations with the same data source skip the
@@ -107,7 +120,7 @@ def run_step1(
 
         v0 = get_specified_historical_stats(cp.get('season') or '2024-25', params)
 
-    elif source_type == 'blended':
+    elif source_type == 'projections':
         from backend.data_retrieval import combine_projections
         v0 = combine_projections(
             blend_weights = cp.get('blend_weights', {}),
@@ -197,16 +210,17 @@ def run_step4(session: Session) -> None:
     categories  = cp['categories']
 
     info, _ = process_player_data(
-        player_stats_v2 = session.v2,
-        weekly_df       = None,
-        psi             = cp['psi'],
-        chi             = cp['chi'],
-        scoring_format  = scoring_format,
-        n_drafters      = n_drafters,
-        n_starters      = n_starters,
-        params          = params,
-        categories      = categories,
-        sport           = sport,
+        player_stats_v2   = session.v2,
+        weekly_df         = None,
+        mean_of_variances = _load_mean_of_variances(sport),
+        psi               = cp['psi'],
+        chi               = cp['chi'],
+        scoring_format    = scoring_format,
+        n_drafters        = n_drafters,
+        n_starters        = n_starters,
+        params            = params,
+        categories        = categories,
+        sport             = sport,
     )
     session.info = info
 

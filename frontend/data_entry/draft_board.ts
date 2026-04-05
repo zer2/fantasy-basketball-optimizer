@@ -6,7 +6,7 @@ import { makeCustomSelect } from '../custom_select.js'
 import { getPlayers, getCandidatePlayers, getPlayerNamesByGScore, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
 import { runEvaluate, setAutopilotIndicator, clearFullTeamResult } from '../api/session.js'
-import { getDrafterMode } from '../parameter_collection/league_settings.js'
+import { getDrafterMethodByIndex } from '../parameter_collection/league_settings.js'
 import {
     DraftConfig,
     getPickRow, getPickDrafter, getDrafted, getTeamNames, getNDrafters, getNPicks, getConfigKey,
@@ -53,7 +53,7 @@ export function renderDraftBoard(container: HTMLElement): void {
     // Guard on G-scores being loaded — on initial page render the session hasn't been created yet,
     // and applyLayout() will re-render once runModeEval() completes, at which point this fires correctly.
     const dataIsReady = getPlayerNamesByGScore().length > 0
-    if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMode(getPickDrafter()) !== 'Manual input') {
+    if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMethodByIndex(getPickDrafter()) !== 'Manual input') {
         fireAutopilotPicks(container).catch(err => console.error('Autopilot failed:', err))
     }
 }
@@ -89,7 +89,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
     try {
         while (getPickRow() < getNPicks()) {
-            const mode = getDrafterMode(getPickDrafter())
+            const mode = getDrafterMethodByIndex(getPickDrafter())
             if (mode === 'Manual input') break
 
             const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
@@ -133,7 +133,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const teamNames      = getTeamNames()
 
     const isDone      = pickRowVal >= nPicks
-    const currentMode = isDone ? ('Manual input' as const) : getDrafterMode(pickDrafterVal)
+    const currentMode = isDone ? ('Manual input' as const) : getDrafterMethodByIndex(pickDrafterVal)
     const isAutopilot = currentMode !== 'Manual input'
 
     // Inline row: label + (player select if manual) + action buttons on the same line
@@ -196,7 +196,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
             goBackDraftPick()
             clearDraftPick(getPickRow(), getPickDrafter())
         } while (
-            getDrafterMode(getPickDrafter()) !== 'Manual input'
+            getDrafterMethodByIndex(getPickDrafter()) !== 'Manual input'
             && !(getPickRow() === 0 && getPickDrafter() === 0)
         )
         renderDraftBoard(container)

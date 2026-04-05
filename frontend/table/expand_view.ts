@@ -70,7 +70,7 @@ export function toggleExpandView(
             // so both tables fit within the available space.
             const INDENT_W         = 100   // matches .panel-indent margin-left
             const POSITION_LABEL_W = 110   // matches .panel-colspacer-position-label
-            const containerWidth   = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
+            const containerWidth   = cell.clientWidth
             const nBasePositions   = playerData.flex_allocations.base_positions.length
             const nRosterPositionTypes = playerData.roster
                 ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
@@ -105,17 +105,17 @@ export function toggleExpandView(
 
             if (playerData.roster) {
                 cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-                const containerWidth  = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
-                const INDENT_W        = 100
+                const INDENT_W         = 100
                 const POSITION_LABEL_W = 110
-                cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5)))
+                const nRosterPositionTypes = new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
+                cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((cell.clientWidth - INDENT_W - POSITION_LABEL_W) / nRosterPositionTypes)))
             }
         } else if (playerData.roster) {
-            const containerWidth  = (document.getElementById('panel-content-width-container')?.clientWidth ?? 0)
-            const INDENT_W        = 100
+            const INDENT_W         = 100
             const POSITION_LABEL_W = 110
+            const nRosterPositionTypes = new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
             cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-            cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / 5)))
+            cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((cell.clientWidth - INDENT_W - POSITION_LABEL_W) / nRosterPositionTypes)))
         }
     }
 }

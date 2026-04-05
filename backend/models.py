@@ -42,8 +42,8 @@ class ModelParameters(BaseModel):
 class DataSource(BaseModel):
     type: str = 'mock'
     season: Optional[str] = None                           # 'historical' type only
-    blend_weights: Optional[dict[str, float]] = None          # 'blended' type only
-    custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'blended'
+    blend_weights: Optional[dict[str, float]] = None          # 'projections' type only
+    custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'projections'
 
 
 class SessionRequest(BaseModel):

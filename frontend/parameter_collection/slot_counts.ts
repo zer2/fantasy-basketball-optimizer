@@ -2,19 +2,11 @@
 // Mirrors position_requirement_popover() in src/parameter_collection/position_requirement.py
 //
 // Position types and default slot counts are loaded from the backend config
-// (parameters.yaml) via getSportConfig(). Hard-coded fallbacks are used
-// only if the config fetch failed.
+// (parameters.yaml) via getSportConfig().
 
 import { makeLabel, makeNumberInput } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
-
-const FALLBACK_BASE: string[] = ['PG', 'SG', 'SF', 'PF', 'C']
-const FALLBACK_FLEX: string[] = ['G', 'F', 'Util']
-const FALLBACK_DEFAULTS: Record<string, number> = {
-    PG: 1, SG: 1, SF: 1, PF: 1, C: 2,
-    G: 2, F: 2, Util: 3,
-}
 
 /** Resolves base positions, flex positions, and default slot counts from config. */
 function resolvePositionConfig(): {
@@ -23,25 +15,16 @@ function resolvePositionConfig(): {
     defaults: Record<string, number>
 } {
     const config = getSportConfig()
-    if (!config) {
-        return { basePositions: FALLBACK_BASE, flexPositions: FALLBACK_FLEX, defaults: FALLBACK_DEFAULTS }
-    }
+    if (!config) throw new Error('resolvePositionConfig called before sport config loaded')
 
     const basePositions = config.position_structure.base_list
     const flexPositions = config.position_structure.flex_list
 
-    // Find the default slot counts from positions[n_picks]
-    const nPicksDefault = config.options?.n_picks?.default
-    const posEntry = nPicksDefault != null ? config.positions[String(nPicksDefault)] : null
+    const nPicksDefault = config.options.n_picks.default
+    const posEntry = config.positions[String(nPicksDefault)]
+    if (!posEntry) throw new Error(`No position entry found for n_picks default ${nPicksDefault}`)
 
-    const defaults: Record<string, number> = {}
-    if (posEntry) {
-        for (const [pos, count] of Object.entries(posEntry.base)) defaults[pos] = count
-        for (const [pos, count] of Object.entries(posEntry.flex)) defaults[pos] = count
-    } else {
-        // Fallback: all zeros
-        for (const pos of [...basePositions, ...flexPositions]) defaults[pos] = 0
-    }
+    const defaults = { ...posEntry.base, ...posEntry.flex }
 
     return { basePositions, flexPositions, defaults }
 }
@@ -55,8 +38,8 @@ export function renderSlotCounts(container: HTMLElement): void {
 
     const warning = document.createElement('div')
     warning.className = 'sidebar-caption'
-    warning.textContent = `The H-scoring algorithm will choose players assuming that 
-                            its team ultimately needs to fit this structure. This 
+    warning.textContent = `The H-scoring algorithm will choose players assuming that
+                            its team ultimately needs to fit this structure. This
                             includes players who will start on the bench, but will
                             be rotated to real slots when they have games.`
     container.append(warning)
@@ -80,11 +63,11 @@ export function renderSlotCounts(container: HTMLElement): void {
     grid.append(rightCol)
 
     for (const pos of basePositions) {
-        leftCol.append(makeSlotRow(pos, pref(`slot_${pos}`, defaults[pos] ?? 0)))
+        leftCol.append(makeSlotRow(pos, pref(`slot_${pos}`, defaults[pos])))
     }
 
     for (const pos of flexPositions) {
-        rightCol.append(makeSlotRow(pos, pref(`slot_${pos}`, defaults[pos] ?? 0)))
+        rightCol.append(makeSlotRow(pos, pref(`slot_${pos}`, defaults[pos])))
     }
 
     // Bench slots
@@ -98,7 +81,7 @@ export function renderSlotCounts(container: HTMLElement): void {
     container.append(benchCaption)
 
     const benchInput = makeNumberInput('sc-bench-slots', pref('bench_slots', 0), 0)
-    benchInput.addEventListener('change', () => savePref('bench_slots', parseInt(benchInput.value) || 0))
+    benchInput.addEventListener('change', () => savePref('bench_slots', parseInt(benchInput.value)))
     container.append(benchInput)
 
     // Validation message
@@ -128,7 +111,7 @@ function makeSlotRow(pos: string, defaultValue: number): HTMLElement {
     input.className = 'sidebar-input slot-input'
     input.min = '0'
     input.value = String(defaultValue)
-    input.addEventListener('change', () => savePref(`slot_${pos}`, parseInt(input.value) || 0))
+    input.addEventListener('change', () => savePref(`slot_${pos}`, parseInt(input.value)))
     row.append(input)
 
     return row
@@ -142,7 +125,7 @@ function validateSlotCounts(msgEl: HTMLElement, basePositions: string[], flexPos
     const counts = getSlotCountsFromPositions(basePositions, flexPositions)
     const total = Object.values(counts).reduce((a, b) => a + b, 0)
     const nPicksEl = document.getElementById('ls-n-picks') as HTMLInputElement | null
-    if (!nPicksEl) return
+    if (!nPicksEl) throw new Error('ls-n-picks element not found')
     const nPicks = parseInt(nPicksEl.value)
     if (isNaN(total) || isNaN(nPicks)) return
     msgEl.textContent = total > nPicks
@@ -155,7 +138,8 @@ function getSlotCountsFromPositions(basePositions: string[], flexPositions: stri
     const result: Record<string, number> = {}
     for (const pos of [...basePositions, ...flexPositions]) {
         const input = document.getElementById(`sc-${pos.toLowerCase()}`) as HTMLInputElement | null
-        result[pos] = input ? (parseInt(input.value) || 0) : 0
+        if (!input) throw new Error(`Slot count input sc-${pos.toLowerCase()} not found`)
+        result[pos] = parseInt(input.value)
     }
     return result
 }
@@ -166,8 +150,9 @@ function getSlotCountsFromPositions(basePositions: string[], flexPositions: stri
  */
 export function getSlotCounts(): Record<string, number> {
     const config = getSportConfig()
-    const basePositions = config?.position_structure.base_list ?? FALLBACK_BASE
-    const flexPositions = config?.position_structure.flex_list ?? FALLBACK_FLEX
+    if (!config) throw new Error('getSlotCounts called before sport config loaded')
+    const basePositions = config.position_structure.base_list
+    const flexPositions = config.position_structure.flex_list
     return getSlotCountsFromPositions(basePositions, flexPositions)
 }
 
@@ -176,5 +161,7 @@ export function getSlotCounts(): Record<string, number> {
  * These are roster spots that the platform counts but the optimizer should ignore.
  */
 export function getBenchSlots(): number {
-    return parseInt((document.getElementById('sc-bench-slots') as HTMLInputElement).value) || 0
+    const el = document.getElementById('sc-bench-slots') as HTMLInputElement | null
+    if (!el) throw new Error('sc-bench-slots element not found')
+    return parseInt(el.value)
 }
