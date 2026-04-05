@@ -1,7 +1,7 @@
 // ─── Sport config (from GET /config/{sport}) ─────────────────────────────────
 
 export interface ParamOption {
-    default?: number
+    default: number
     min: number
     max: number | null
 }

@@ -16,56 +16,44 @@ interface ParamSpec {
     key:     string        // key in config.options (e.g. 'omega', 'S')
     label:   string
     caption: string
-    fallback: number       // used if config is unavailable
     step:    number
-}
-
-// S_σ is shown only in Auction Mode; kept separate so it can be toggled independently.
-const S_SPEC: ParamSpec = {
-    id: 'mp-s', key: 'S', label: 'S<sub>\u03C3</sub> (SAVOR)', step: 1,
-    fallback: 10,
-    caption: 'SAVOR noise parameter. Roughly represents the standard deviation of dollar values expected for players during the season. Higher values down-weight low-dollar players more aggressively.',
 }
 
 const PARAM_SPECS: ParamSpec[] = [
     {
+        id: 'mp-s', key: 'S', label: 'S<sub>\u03C3</sub> (SAVOR)', step: 1,
+        caption: 'SAVOR noise parameter. Only used in Auction Mode. Roughly represents the standard deviation of dollar values expected for players during the season. Higher values down-weight low-dollar players more aggressively.',
+    },
+    {
         id: 'mp-upsilon', key: 'upsilon', label: 'υ (upsilon)', step: 0.05,
-        fallback: 1.0,
         caption: 'Scales injury rates down. At 1.0 full projected injury rates apply; at 0.0 all players are treated as healthy.',
     },
     {
         id: 'mp-psi', key: 'psi', label: 'ψ (psi)', step: 0.05,
-        fallback: 0.8,
         caption: 'Fraction of missed games assumed to be replaced by a replacement-level player.',
     },
     {
         id: 'mp-chi', key: 'chi', label: 'χ (chi)', step: 0.05,
-        fallback: 0.6,
         caption: 'Estimated season-long variance relative to empirical week-to-week variance (for Rotisserie).',
     },
     {
         id: 'mp-aleph', key: 'aleph', label: 'ℵ (aleph)', step: 0.05,
-        fallback: 0.2,
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
         id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
-        fallback: 0.7,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
     {
         id: 'mp-gamma', key: 'gamma', label: 'γ (gamma)', step: 0.05,
-        fallback: 0.25,
         caption: 'Complements omega. Higher values require more general value to be sacrificed to pursue a punting strategy.',
     },
     {
         id: 'mp-beth', key: 'beth', label: 'ב (beth)', step: 0.5,
-        fallback: 3,
         caption: "Bayesian shrinkage applied to your team's projected stats. Higher values pull projections closer to the average.",
     },
     {
         id: 'mp-n-iterations', key: 'n_iterations', label: 'Iterations', step: 1,
-        fallback: 30,
         caption: 'Number of gradient descent iterations. More iterations improve convergence but increase compute time.',
     },
 ]
@@ -73,11 +61,13 @@ const PARAM_SPECS: ParamSpec[] = [
 /** Resolves the effective default, min, and max for a parameter from the config. */
 function resolveSpec(spec: ParamSpec): { default: number; min: number; max: number | null } {
     const config = getSportConfig()
-    const opt = config?.options?.[spec.key]
+    if (!config) throw new Error('resolveSpec called before sport config loaded')
+    const opt = config.options[spec.key]
+    if (!opt) throw new Error(`No config option found for parameter key '${spec.key}'`)
     return {
-        default: opt?.default ?? spec.fallback,
-        min:     opt?.min     ?? 0,
-        max:     opt?.max     ?? null,
+        default: opt.default,
+        min:     opt.min,
+        max:     opt.max,
     }
 }
 
@@ -95,15 +85,6 @@ export function renderModelParameters(container: HTMLElement): void {
         grid.append(makeParamItem(spec))
     }
 
-    // S_σ is only relevant in Auction Mode; hidden otherwise.
-    const sItem = makeParamItem(S_SPEC)
-    const isAuction = () => (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
-    sItem.style.display = isAuction() ? '' : 'none'
-    grid.append(sItem)
-
-    document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
-        sItem.style.display = isAuction() ? '' : 'none'
-    })
 }
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */

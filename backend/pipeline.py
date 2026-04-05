@@ -73,13 +73,13 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     sport = cp.get('sport', '')
     if source_type == 'historical':
         return (sport, 'historical', cp.get('season') or '2024-25')
-    if source_type == 'blended':
+    if source_type == 'projections':
         blend_weights = cp.get('blend_weights', {})
         # Only Snowflake-backed sources are cacheable; uploaded DFs are session-specific
         snowflake_keys = tuple(sorted(
             (k, v) for k, v in blend_weights.items() if k not in ('HTB', 'BBM')
         ))
-        return (sport, 'blended', snowflake_keys)
+        return (sport, 'projections', snowflake_keys)
     return None
 
 
@@ -94,7 +94,7 @@ def run_step1(
     Branches on current_params['data_source_type']:
       'csv'        — single uploaded CSV (csv_bytes + file_type required)
       'historical' — Snowflake historical stats for current_params['season']
-      'blended'    — weighted blend of Snowflake sources + any uploaded_dfs
+      'projections' — weighted blend of Snowflake sources + any uploaded_dfs
 
     Results for Snowflake-backed sources are cached at the module level for
     24 hours so repeated session creations with the same data source skip the
@@ -120,7 +120,7 @@ def run_step1(
 
         v0 = get_specified_historical_stats(cp.get('season') or '2024-25', params)
 
-    elif source_type == 'blended':
+    elif source_type == 'projections':
         from backend.data_retrieval import combine_projections
         v0 = combine_projections(
             blend_weights = cp.get('blend_weights', {}),

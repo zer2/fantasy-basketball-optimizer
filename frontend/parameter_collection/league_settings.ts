@@ -7,18 +7,19 @@ import { makeLabel, makeNumberInput, makeSidebarToggle } from '../helper_functio
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
-export type DraftMode = 'Draft Mode' | 'Auction Mode' | 'Season Mode'
-export type Platform = 'Enter your own data' | 'Retrieve from Yahoo' | 'Retrieve from Fantrax' | 'Retrieve from ESPN'
-export type DrafterMode = 'Manual input' | 'H-scoring' | 'G-scoring'
+const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
+export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
 
-const DRAFTER_MODE_OPTIONS: DrafterMode[] = ['Manual input', 'H-scoring', 'G-scoring']
-
-const PLATFORM_OPTIONS: Platform[] = [
+const PLATFORM_OPTIONS = [
     'Enter your own data',
     'Retrieve from Yahoo',
     'Retrieve from Fantrax',
     'Retrieve from ESPN',
-]
+] as const
+export type Platform = typeof PLATFORM_OPTIONS[number]
+
+const DRAFTER_METHOD_OPTIONS = ['Manual input', 'H-scoring', 'G-scoring'] as const
+export type DrafterMethod = typeof DRAFTER_METHOD_OPTIONS[number]
 
 /**
  * Renders the League Settings section into `container`.
@@ -26,8 +27,9 @@ const PLATFORM_OPTIONS: Platform[] = [
  */
 export function renderLeagueSettings(container: HTMLElement): void {
     const config = getSportConfig()
-    const nDraftersDefault = config?.options?.n_drafters?.default ?? 12
-    const nPicksDefault    = config?.options?.n_picks?.default    ?? 13
+    if (!config) throw new Error('renderLeagueSettings called before sport config loaded')
+    const nDraftersDefault = config.options.n_drafters.default
+    const nPicksDefault    = config.options.n_picks.default
 
     const grid = document.createElement('div')
     grid.className = 'ls-grid'
@@ -51,7 +53,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     modeCell.append(makeLabel('ls-mode', 'Mode'))
     const modeSelect = makeCustomSelect(
         'ls-mode',
-        ['Draft Mode', 'Auction Mode', 'Season Mode'].map(m => ({ value: m, label: m })),
+        DRAFT_MODE_OPTIONS.map(m => ({ value: m, label: m })),
         pref('mode', 'Draft Mode'),
     )
     modeSelect.element.addEventListener('change', () => savePref('mode', modeSelect.getValue()))
@@ -125,10 +127,11 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
     /** Sync visible inputs → hidden textarea, persist, and notify main.ts. */
     function syncTeamNames(): void {
-        const n     = parseInt(nDraftersInput.value) || 12
-        const names = Array.from({ length: n }, (_, i) => {
+        const nDrafters = parseInt(nDraftersInput.value)
+        const names = Array.from({ length: nDrafters }, (_, i) => {
             const el = document.getElementById(`ls-team-name-${i}`) as HTMLInputElement | null
-            return el?.value ?? ''
+            if (!el) throw new Error(`Team name input ls-team-name-${i} not found`)
+            return el.value
         })
         hiddenNamesTextarea.value = names.join('\n')
         savePref('team_names', hiddenNamesTextarea.value)
@@ -137,14 +140,14 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
     /** Rebuild the visible rows. Pass resetToDefaults=true when n_drafters changes. */
     function rebuildTeamNameRows(resetToDefaults: boolean): void {
-        const n = parseInt(nDraftersInput.value) || 12
+        const nDrafters = parseInt(nDraftersInput.value)
 
         const names: string[] = []
         if (resetToDefaults) {
-            for (let i = 0; i < n; i++) names.push(`Drafter ${i + 1}`)
+            for (let i = 0; i < nDrafters; i++) names.push(`Drafter ${i + 1}`)
         } else {
             const saved = hiddenNamesTextarea.value.split('\n').map(s => s.trim())
-            for (let i = 0; i < n; i++) {
+            for (let i = 0; i < nDrafters; i++) {
                 const existing = document.getElementById(`ls-team-name-${i}`) as HTMLInputElement | null
                 names.push(existing?.value.trim() || saved[i] || `Drafter ${i + 1}`)
             }
@@ -152,7 +155,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
         teamNamesList.innerHTML = ''
 
-        for (let i = 0; i < n; i++) {
+        for (let i = 0; i < nDrafters; i++) {
             const row = document.createElement('div')
             row.className = 'team-name-row'
 
@@ -164,10 +167,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
             nameInput.addEventListener('input', syncTeamNames)
             row.append(nameInput)
 
-            const initialMode = resetToDefaults ? 'Manual input' : pref(`drafter_mode_${i}`, 'Manual input') as DrafterMode
+            const initialMode = resetToDefaults ? 'Manual input' : pref(`drafter_mode_${i}`, 'Manual input') as DrafterMethod
             const drafterModeSelect = makeCustomSelect(
                 `ls-drafter-mode-${i}`
-              , DRAFTER_MODE_OPTIONS.map(m => ({ value: m, label: m }))
+              , DRAFTER_METHOD_OPTIONS.map(m => ({ value: m, label: m }))
               , initialMode
             )
             drafterModeSelect.element.classList.add('drafter-mode-cell')
@@ -184,8 +187,8 @@ export function renderLeagueSettings(container: HTMLElement): void {
     rebuildTeamNameRows(false)
 
     nDraftersInput.addEventListener('change', () => {
-        const n = parseInt(nDraftersInput.value)
-        if (!isNaN(n) && n > 0) rebuildTeamNameRows(true)
+        const nDrafters = parseInt(nDraftersInput.value)
+        if (!isNaN(nDrafters) && nDrafters > 0) rebuildTeamNameRows(true)
     })
 
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
@@ -214,16 +217,17 @@ export function getTeamNames(): string[] {
         .value.split('\n').map(s => s.trim()).filter(Boolean)
 }
 
-export function getDrafterMode(index: number): DrafterMode {
+export function getDrafterMethodByIndex(index: number): DrafterMethod {
     const el = document.getElementById(`ls-drafter-mode-${index}`) as HTMLInputElement | null
-    return (el?.value as DrafterMode) ?? 'Manual input'
+    if (!el) throw new Error(`Drafter method select ls-drafter-mode-${index} not found`)
+    return el.value as DrafterMethod
 }
 
-export function getDrafterModes(): DrafterMode[] {
-    const modes: DrafterMode[] = []
+export function getDrafterMethods(): DrafterMethod[] {
+    const modes: DrafterMethod[] = []
     let i = 0
     while (document.getElementById(`ls-drafter-mode-${i}`)) {
-        modes.push(getDrafterMode(i))
+        modes.push(getDrafterMethodByIndex(i))
         i++
     }
     return modes

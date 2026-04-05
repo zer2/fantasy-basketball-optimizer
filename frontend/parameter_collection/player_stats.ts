@@ -29,7 +29,7 @@ export function renderPlayerStats(container: HTMLElement): void {
     const typeSelect = makeCustomSelect(
         'ps-data-type',
         [
-            { value: 'blended',   label: 'Projections'  },
+            { value: 'projections',   label: 'Projections'  },
             { value: 'historical', label: 'Historical'  },
         ],
         pref('data_source_type', 'historical'),
@@ -37,10 +37,10 @@ export function renderPlayerStats(container: HTMLElement): void {
     typeSelect.element.addEventListener('change', () => savePref('data_source_type', typeSelect.getValue()))
     container.append(typeSelect.element)
 
-    // Projection blend weights section (only relevant for 'blended' type)
+    // Projection blend weights section (only relevant for 'projections' type)
     const projSection = document.createElement('div')
     projSection.id = 'ps-proj-section'
-    projSection.style.display = typeSelect.getValue() === 'blended' ? '' : 'none'
+    projSection.style.display = typeSelect.getValue() === 'projections' ? '' : 'none'
     container.append(projSection)
 
     renderBlendWeights(projSection)
@@ -82,7 +82,7 @@ export function renderPlayerStats(container: HTMLElement): void {
 
     typeSelect.element.addEventListener('change', () => {
         const type = typeSelect.getValue()
-        projSection.style.display = type === 'blended'    ? '' : 'none'
+        projSection.style.display = type === 'projections'    ? '' : 'none'
         histSection.style.display = type === 'historical' ? '' : 'none'
         if (type === 'historical') loadSeasons()
     })
