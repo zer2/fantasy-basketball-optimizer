@@ -6,7 +6,7 @@
 import { PlayerResult, SessionRequest } from '../types.js'
 import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, setPlayerResultsFromGScores, getCurrentSeat } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
-import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
+import { getScoringFormat, getSelectedCategories, syncCategoriesFromBackend } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
@@ -93,6 +93,7 @@ async function startFreshSession(signal?: AbortSignal): Promise<void> {
     setIndicatorState('fetching')
     const resp = await client.createSession(req, signal)
     sessionId = resp.session_id
+    syncCategoriesFromBackend(resp.categories)
     setGScores(resp.g_scores)
 }
 

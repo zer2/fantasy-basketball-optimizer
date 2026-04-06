@@ -19,7 +19,7 @@ import { renderLeagueSettings, getLeagueSettings, getTeamNames } from './paramet
 import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
-import { renderSlotCounts, getSlotCounts } from './parameter_collection/slot_counts.js'
+import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
 import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
@@ -118,8 +118,11 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
         const { signal } = leagueSettingsController
 
         buildTable(getCandidatePlayerResults())
+        applyLayout()  // re-renders draft board with new n_drafters/n_picks so getDraftState() is current before evaluate
+        revalidateSlotCounts()
+        if (!isSlotCountsValid()) return
         const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-        createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team } }, signal)
+        createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() }, signal)
             .then(() => { if (!signal.aborted) return runModeEval() })
             .then(() => { if (!signal.aborted) applyLayout() })
             .catch(err => {
@@ -215,6 +218,7 @@ modelSection.addEventListener('change', () => {
 const slotSection = createSection(sidebarSections, 'Position Parameters')
 renderSlotCounts(slotSection)
 addApplyBtn(slotSection, async () => {
+    if (!isSlotCountsValid()) return
     const slot_counts = getSlotCounts()
     await createOrPatchSession(4, { slot_counts })
     await runModeEval()

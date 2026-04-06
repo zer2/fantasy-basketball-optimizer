@@ -18,7 +18,7 @@ from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.session import create_session, get_session, delete_session
-from backend.pipeline import run_pipeline, _parse_projection_csv
+from backend.pipeline import run_pipeline, _parse_projection_csv, clear_v0_cache
 from backend.models import (
     UploadResponse,
     SessionRequest, SessionResponse, PlayerGScore,
@@ -452,6 +452,12 @@ def trade_suggest_route(session_id: str, req: TradeSuggestRequest):
 
 
 # ── DELETE /sessions/{session_id} ─────────────────────────────────────────────
+
+@app.post('/cache/clear', status_code=status.HTTP_204_NO_CONTENT)
+def clear_cache_route():
+    clear_v0_cache()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 @app.delete('/sessions/{session_id}', status_code=status.HTTP_204_NO_CONTENT)
 def delete_session_route(session_id: str):

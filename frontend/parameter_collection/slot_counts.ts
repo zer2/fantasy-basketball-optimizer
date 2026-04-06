@@ -118,8 +118,8 @@ function makeSlotRow(pos: string, defaultValue: number): HTMLElement {
 }
 
 /**
- * Validates that the sum of all slot counts does not exceed picks-per-drafter.
- * Writes an error message to `msgEl` if over budget, or clears it if valid.
+ * Validates that the sum of all slot counts equals picks-per-drafter.
+ * Writes an error message to `msgEl` if mismatched, or clears it if valid.
  */
 function validateSlotCounts(msgEl: HTMLElement, basePositions: string[], flexPositions: string[]): void {
     const counts = getSlotCountsFromPositions(basePositions, flexPositions)
@@ -128,9 +128,42 @@ function validateSlotCounts(msgEl: HTMLElement, basePositions: string[], flexPos
     if (!nPicksEl) throw new Error('ls-n-picks element not found')
     const nPicks = parseInt(nPicksEl.value)
     if (isNaN(total) || isNaN(nPicks)) return
-    msgEl.textContent = total > nPicks
-        ? `Slot total (${total}) exceeds picks per drafter (${nPicks}).`
-        : ''
+    if (total > nPicks) {
+        msgEl.textContent = `Slot total (${total}) exceeds picks per drafter (${nPicks}).`
+    } else if (total < nPicks) {
+        msgEl.textContent = `Slot total (${total}) is less than picks per drafter (${nPicks}). Increase slot counts or reduce picks.`
+    } else {
+        msgEl.textContent = ''
+    }
+}
+
+/**
+ * Returns true if the current slot count total equals the current picks-per-drafter value.
+ * Call this before applying slot count or n_picks changes to the backend.
+ */
+export function isSlotCountsValid(): boolean {
+    const config = getSportConfig()
+    if (!config) return false
+    const basePositions = config.position_structure.base_list
+    const flexPositions = config.position_structure.flex_list
+    const counts = getSlotCountsFromPositions(basePositions, flexPositions)
+    const total = Object.values(counts).reduce((a, b) => a + b, 0)
+    const nPicksEl = document.getElementById('ls-n-picks') as HTMLInputElement | null
+    if (!nPicksEl) return false
+    const nPicks = parseInt(nPicksEl.value)
+    return total === nPicks
+}
+
+/**
+ * Re-runs the slot count validation against the current n_picks value.
+ * Call this when n_picks changes in League Settings so the error stays in sync.
+ */
+export function revalidateSlotCounts(): void {
+    const msgEl = document.getElementById('sc-validation')
+    if (!msgEl) return
+    const config = getSportConfig()
+    if (!config) return
+    validateSlotCounts(msgEl, config.position_structure.base_list, config.position_structure.flex_list)
 }
 
 /** Reads slot counts for a given set of positions from the DOM. */
