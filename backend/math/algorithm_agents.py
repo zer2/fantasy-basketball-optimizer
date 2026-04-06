@@ -133,9 +133,7 @@ class HAgent:
             negative_stats = params['negative-statistics']
             rho.loc[:, negative_stats] = -rho.loc[:, negative_stats]
             rho.loc[negative_stats, :] = -rho.loc[negative_stats, :]
-            rho_values = rho.values
-            np.fill_diagonal(rho_values, 1)
-            rho = pd.DataFrame(rho_values, index=rho.index, columns=rho.index)
+            rho.loc[negative_stats, negative_stats] = 1
 
             self.rho = np.expand_dims(np.array(rho.loc[categories, categories]), 0)
 
@@ -434,11 +432,14 @@ class HAgent:
         else:
             pitching_preference = None
 
-        for _ in range(max(1, n_iterations)):
-            category_weights_current  = category_weights
-            position_shares_current   = position_shares
+        category_weights_current  = category_weights
+        position_shares_current   = position_shares
 
-            if (n_players_selected < self.n_picks - 1) and self.dynamic:
+        if (n_players_selected < self.n_picks - 1) and self.dynamic:
+
+            for _ in range(max(1, n_iterations)):
+                category_weights_current  = category_weights
+                position_shares_current   = position_shares
 
                 gradient_result = self.get_objective_and_gradient(
                     category_weights, position_shares, diff_means, diff_vars,
@@ -491,27 +492,27 @@ class HAgent:
                     for pos_code in self.position_structure['flex'].keys()
                 }
 
-            elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
-                x_diff_array   = diff_means + x_scores_available_array
-                cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
-                score          = self.get_objective_and_pdf_weights(
-                    x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
-                    calculate_pdf_weights=False,
-                )
-                rosters              = None
-                expected_future_diff = None
-                category_weights_current = None
+        elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
+            x_diff_array   = diff_means + x_scores_available_array
+            cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
+            score          = self.get_objective_and_pdf_weights(
+                x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
+                calculate_pdf_weights=False,
+            )
+            rosters              = None
+            expected_future_diff = None
+            category_weights_current = None
 
-            else:
-                x_diff_array   = diff_means + x_scores_available_array
-                cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
-                score          = self.get_objective_and_pdf_weights(
-                    x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
-                    calculate_pdf_weights=False,
-                )
-                rosters              = None
-                expected_future_diff = None
-                category_weights_current = None
+        else:
+            x_diff_array   = diff_means + x_scores_available_array
+            cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
+            score          = self.get_objective_and_pdf_weights(
+                x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
+                calculate_pdf_weights=False,
+            )
+            rosters              = None
+            expected_future_diff = None
+            category_weights_current = None
 
         cdf_means = cdf_estimates.mean(axis=2)
 
@@ -721,9 +722,9 @@ class HAgent:
         objective = self.get_v(mu_d, sigma_d)
 
         if calculate_pdf_weights:
-            del_sigma_2_p = self.get_del_sigma_2_p(diff_means, self.rho, pdf_estimates, cdf_estimates, f)
+            del_sigma_2_d = self.get_del_sigma_2_d(diff_means, self.rho, pdf_estimates, cdf_estimates, f, self.n_drafters)
             del_mu_d      = self.get_del_mu_d(self.n_drafters, pdf_estimates)
-            gradient      = self.get_del_v(sigma_d, del_mu_d, mu_d, del_sigma_2_p)
+            gradient      = self.get_del_v(sigma_d, del_mu_d, mu_d, del_sigma_2_d)
             gradient      = gradient * np.sqrt(diff_vars)
             if test_mode:
                 return gradient
@@ -898,14 +899,18 @@ class HAgent:
         c2 = (rho * h_m).sum(axis=(1, 2)) / 2
         return c1 + c2
 
-    def get_del_sigma_2_p(self, opponent_mu_matrix, rho, pdfs, cdfs, f):
+    #ZR: Equation 33 in the Rotisserie paper is wrong: 
+    # it is missing the n_managers / (n_managers -1 ) factor that it should have inherited 
+    # from equation 33. It also has a typo, the second sigma_t should be sigma_L
+    #The issue with the missing scaling factor is fixed here 
+    def get_del_sigma_2_d(self, opponent_mu_matrix, rho, pdfs, cdfs, f, n_managers):
         rho2 = rho.copy()
         rho2[:, np.arange(rho2.shape[1]), np.arange(rho2.shape[2])] = 0
         inside  = -pdfs - f.reshape(-1, f.shape[1], 1)
         fp      = np.einsum('pab,pbc -> pac', rho2, inside)
         fc1     = (opponent_mu_matrix * pdfs) * (fp + (pdfs - f.reshape(-1, f.shape[1], 1)))
         fc2     = pdfs * (1 - 2 * cdfs)
-        return fc1 + fc2
+        return (fc1 + fc2) * n_managers / (n_managers - 1)
 
     def get_del_mu_d(self, n_managers, pdfs):
         return n_managers / (n_managers - 1) * pdfs

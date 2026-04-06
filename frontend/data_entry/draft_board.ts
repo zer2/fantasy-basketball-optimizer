@@ -3,7 +3,7 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getPlayers, getCandidatePlayers, getPlayerNamesByGScore, getCurrentSeat, setCurrentSeat } from '../app_state.js'
+import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
 import { runEvaluate, setAutopilotIndicator, clearFullTeamResult } from '../api/session.js'
 import { getDrafterMethodByIndex } from '../parameter_collection/league_settings.js'
@@ -52,7 +52,7 @@ export function renderDraftBoard(container: HTMLElement): void {
     // Auto-fire autopilot when the current drafter is an autopilot drafter and the loop is not already running.
     // Guard on G-scores being loaded — on initial page render the session hasn't been created yet,
     // and applyLayout() will re-render once runModeEval() completes, at which point this fires correctly.
-    const dataIsReady = getPlayerNamesByGScore().length > 0
+    const dataIsReady = getSessionPhase() !== 'uninitialized'
     if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMethodByIndex(getPickDrafter()) !== 'Manual input') {
         fireAutopilotPicks(container).catch(err => console.error('Autopilot failed:', err))
     }
@@ -73,7 +73,7 @@ function pickByGScore(draftedSet: Set<string>): string | null {
 /** Returns the top-ranked candidate from the latest evaluate response.
  *  Candidates are always undrafted (the backend only includes available players). */
 function pickByHScore(): string | null {
-    return getCandidatePlayers()[0]?.name ?? null
+    return getCandidatePlayerResults()?.[0]?.name ?? null
 }
 
 /**
@@ -160,7 +160,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     }
 
     const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
-    const available  = getPlayers().map(p => p.name).filter(n => !draftedSet.has(n))
+    const available  = getPlayerResults()?.map(p => p.name).filter(n => !draftedSet.has(n)) ?? []
 
     const btns = document.createElement('div')
     btns.className = 'pick-control-buttons'

@@ -19,28 +19,28 @@ class UploadResponse(BaseModel):
 # ── /sessions POST ────────────────────────────────────────────────────────────
 
 class LeagueSettings(BaseModel):
-    sport: str = 'NBA'
-    n_drafters: int = 10
-    n_picks: int = 13
-    scoring_format: str = 'Head to Head: Most Categories'
+    sport: str
+    n_drafters: int
+    n_picks: int
+    scoring_format: str
     categories: list[str] = []
     cash_per_team: Optional[int] = None   # Auction Mode only
 
 
 class ModelParameters(BaseModel):
-    omega: float = 0.7     # parameters.yaml punting_defaults.Moderate punting
-    gamma: float = 0.25    # parameters.yaml punting_defaults.Moderate punting
-    beth: float = 3.0      # parameters.yaml options.beth.default
-    upsilon: float = 1.0   # parameters.yaml options.upsilon.default (NBA)
-    psi: float = 0.8       # parameters.yaml options.psi.default
-    chi: float = 0.6       # parameters.yaml options.chi.default
-    aleph: float = 0.2     # parameters.yaml options.aleph.default
-    n_iterations: int = 30 # parameters.yaml punting_defaults.Moderate punting
-    streaming_noise: float = 10.0  # parameters.yaml options.S.default
+    omega: float
+    gamma: float
+    beth: float
+    upsilon: float
+    psi: float
+    chi: float
+    aleph: float
+    n_iterations: int
+    streaming_noise: float
 
 
 class DataSource(BaseModel):
-    type: str = 'mock'
+    type: str
     season: Optional[str] = None                           # 'historical' type only
     blend_weights: Optional[dict[str, float]] = None          # 'projections' type only
     custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'projections'
@@ -49,9 +49,9 @@ class DataSource(BaseModel):
 class SessionRequest(BaseModel):
     league: LeagueSettings
     platform: str = 'Enter your own data'
-    slot_counts: dict[str, int] = {}
-    parameters: ModelParameters = ModelParameters()
-    data_source: DataSource = DataSource()
+    slot_counts: dict[str, int]
+    parameters: ModelParameters
+    data_source: DataSource
     injured_players: list[str] = []
     my_team_id: Optional[str] = None
 

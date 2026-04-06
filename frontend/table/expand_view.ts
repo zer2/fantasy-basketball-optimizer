@@ -3,7 +3,7 @@
 // Mirrors the detail panels in the original Streamlit app.
 
 import { stat_styler_primary, stat_styler_tertiary } from '../styles/styler_functions.js'
-import { Player, FlexAllocations, Roster } from '../types.js'
+import { PlayerResult, FlexAllocations, Roster } from '../types.js'
 import { getPositionNames } from '../app_state.js'
 
 
@@ -31,7 +31,7 @@ function expandFlexLabel(label: string): string {
 export function toggleExpandView(
     expandButton: HTMLButtonElement
     , expandedRow: HTMLTableRowElement
-    , playerData: Player
+    , playerData: PlayerResult
     , categories: string[]
 ): void {
 
@@ -149,7 +149,7 @@ function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
  * Builds the G-score expectations table for one candidate player.
  * Rows show how the player changes each category's head-to-head win expectation.
  */
-function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivElement {
+function makeGScoreTable(playerData: PlayerResult, categories: string[]): HTMLDivElement {
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
@@ -213,7 +213,7 @@ function makeGScoreTable(playerData: Player, categories: string[]): HTMLDivEleme
  * Builds the category weights table showing how the algorithm weights each
  * stat category when evaluating future picks after this candidate is drafted.
  */
-function makeWeightsTable(playerData: Player, categories: string[]): HTMLDivElement {
+function makeWeightsTable(playerData: PlayerResult, categories: string[]): HTMLDivElement {
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
@@ -313,7 +313,7 @@ function makeFlexAllocationsTable(
 // Your $ has no G-score equivalent and is shown as a dash.
 
 /** Builds the auction values detail table: H-score and G-score rows × Your $ / Gnrc. $ / Orig. $ columns. */
-function makeAuctionValuesTable(playerData: Player): HTMLTableElement {
+function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
     const auctionValues = playerData.auction_values!
 
     const table = document.createElement('table')

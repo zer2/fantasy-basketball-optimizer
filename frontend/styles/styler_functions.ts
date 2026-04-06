@@ -11,9 +11,9 @@ function darkPrimary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
     const intensity = Math.min(Math.round(Math.abs(raw)), 110)
     return [
-        raw > 0 ? 55 : 55 + intensity,
-        raw > 0 ? 55 + intensity : 55,
-        70 + Math.round(intensity * 0.7),
+        raw > 0 ? 55 : 55 + intensity
+      , raw > 0 ? 55 + intensity : 55
+      , 70 + Math.round(intensity * 0.7)
     ]
 }
 
@@ -35,9 +35,9 @@ function darkTertiary(value: number, multiplier: number, middle: number): RGB {
     const raw = Math.round((value - middle) * multiplier)
     const intensity = Math.min(Math.abs(raw), 130)
     return [
-        raw > 0 ? 28 + Math.round(intensity / 6) : 28 - Math.round(intensity / 60),
-        raw > 0 ? 34 + Math.round(intensity / 2) : 34 - Math.round(intensity / 20),
-        raw > 0 ? 46 + Math.round(intensity * 0.7) : 46 - Math.round(intensity / 10),
+        raw > 0 ? 28 + Math.round(intensity / 6) : 28 - Math.round(intensity / 60)
+      , raw > 0 ? 34 + Math.round(intensity / 2) : 34 - Math.round(intensity / 20)
+      , raw > 0 ? 46 + Math.round(intensity * 0.7) : 46 - Math.round(intensity / 10)
     ]
 }
 
@@ -48,9 +48,9 @@ function lightPrimary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
     const intensity = Math.min(Math.round(Math.abs(raw)), 255)
     return [
-        raw > 0 ? 255 - intensity : 255,
-        raw > 0 ? 255 : 255 - intensity,
-        raw > 0 ? 255 - intensity : 255 - intensity,
+        raw > 0 ? 255 - intensity : 255
+      , raw > 0 ? 255 : 255 - intensity
+      , raw > 0 ? 255 - intensity : 255 - intensity
     ]
 }
 
@@ -64,9 +64,9 @@ function lightTertiary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
     const intensity = Math.min(Math.round(Math.abs(raw)), 100)
     return [
-        255 - intensity,
-        255 - intensity,
-        255,
+        255 - intensity
+      , 255 - intensity
+      , 255
     ]
 }
 

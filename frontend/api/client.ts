@@ -2,7 +2,7 @@
 // HTTP client for the Fantasy Basketball Optimizer backend.
 // All fetch calls go through this module; callers receive typed results.
 
-import { Player, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
+import { PlayerResult, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
 
 
 // Empty string = same-origin deployment (frontend and backend served from the same host).
@@ -10,13 +10,13 @@ import { Player, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
 // and backend are ever deployed on different origins.
 export const BASE_URL = ''
 
-// ── Map backend Candidate → frontend Player ────────────────────────────────────
+// ── Map backend Candidate → frontend PlayerResult ─────────────────────────────
 
 
-// Adapter between backend snake_case Candidate objects and frontend camelCase Player objects.
+// Adapter between backend snake_case Candidate objects and frontend PlayerResult objects.
 // The backend follows Python naming conventions; this is the single place where that translation happens.
-/** Converts raw backend Candidate objects to frontend Player objects, remapping snake_case keys to camelCase. */
-export function candidatesToPlayers(candidates: any[]): Player[] {
+/** Converts raw backend Candidate objects to frontend PlayerResult objects, remapping snake_case keys to camelCase. */
+export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
     return candidates.filter(c => c.h_score != null).map((c, i) => ({
         name:             c.name,
         h_score:          c.h_score,

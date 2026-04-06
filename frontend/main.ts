@@ -4,7 +4,7 @@
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn, makeSidebarToggle, makeDebouncer } from './helper_functions.js'
-import { getCandidatePlayers, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
+import { getCandidatePlayerResults, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { createOrPatchSession, runEvaluate, runSeasonInit, clearFullTeamResult } from './api/session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTable } from './table/player_table.js'
@@ -94,7 +94,7 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 
     if (mode === 'Season Mode') return   // table is hidden in season mode; skip rebuild and backend call
 
-    buildTable(getCandidatePlayers())
+    buildTable(getCandidatePlayerResults())
 
     const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
     createOrPatchSession(4, patch, signal)
@@ -117,7 +117,7 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
         leagueSettingsController = new AbortController()
         const { signal } = leagueSettingsController
 
-        buildTable(getCandidatePlayers())
+        buildTable(getCandidatePlayerResults())
         const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
         createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team } }, signal)
             .then(() => { if (!signal.aborted) return runModeEval() })
@@ -140,7 +140,7 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
             setCurrentSeat(updatedTeamNames[0])
             seatSelect.setValue(updatedTeamNames[0])
         }
-        buildTable(getCandidatePlayers())
+        buildTable(getCandidatePlayerResults())
         applyLayout()
     }, 600)
 })
@@ -249,6 +249,7 @@ themeInput.addEventListener('change', () => {
 sidebar.style.visibility = ''
 
 applyLayout()
+buildTable(null)
 runModeEval()
     .then(() => applyLayout())
     .catch(err => console.error('Initial load failed:', err))

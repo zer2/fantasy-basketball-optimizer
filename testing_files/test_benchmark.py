@@ -36,55 +36,55 @@ _NO_TO_CATEGORIES = [category for category in _DEFAULT_CATEGORIES if category !=
 _FORMAT_CONFIGS = [
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Nikola Jokic',             63.3),
-            ('Shai Gilgeous-Alexander',  62.2),
-            ('Karl-Anthony Towns',       54.8),
-            ('Tyrese Haliburton',        54.5),
+            ('Shai Gilgeous-Alexander',  62.0),
+            ('Nikola Jokic',             60.4),
+            ('Tyrese Haliburton',        53.5),
+            ('Giannis Antetokounmpo',    53.1),
         ], None),
         id='MC',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Nikola Jokic',             54.8),
-            ('Shai Gilgeous-Alexander',  54.5),
-            ('Karl-Anthony Towns',       51.7),
-            ('Tyrese Haliburton',        51.5),
+            ('Shai Gilgeous-Alexander',  54.4),
+            ('Nikola Jokic',             53.8),
+            ('Tyrese Haliburton',        51.2),
+            ('Karl-Anthony Towns',       51.0),
         ], None),
         id='EC',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Shai Gilgeous-Alexander',  13.9),
-            ('Nikola Jokic',             12.5),
-            ('Tyrese Haliburton',        10.0),
-            ('James Harden',              9.9),
+            ('Shai Gilgeous-Alexander',  13.4),
+            ('Nikola Jokic',             12.9),
+            ('James Harden',              9.6),
+            ('Tyrese Haliburton',         9.3),
         ], None),
         id='Roto',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Nikola Jokic',             63.8),
-            ('Shai Gilgeous-Alexander',  61.8),
-            ('James Harden',             55.2),
-            ('Giannis Antetokounmpo',    55.1),
+            ('Shai Gilgeous-Alexander',  60.5),
+            ('Nikola Jokic',             60.5),
+            ('James Harden',             54.6),
+            ('Giannis Antetokounmpo',    54.0),
         ], _NO_TO_CATEGORIES),
         id='MC-noTO',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Nikola Jokic',             55.7),
-            ('Shai Gilgeous-Alexander',  54.9),
-            ('James Harden',             52.0),
-            ('Giannis Antetokounmpo',    51.6),
+            ('Nikola Jokic',             54.5),
+            ('Shai Gilgeous-Alexander',  54.4),
+            ('James Harden',             51.8),
+            ('Giannis Antetokounmpo',    51.3),
         ], _NO_TO_CATEGORIES),
         id='EC-noTO',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Shai Gilgeous-Alexander',  14.4),
-            ('Nikola Jokic',             12.3),
-            ('James Harden',              9.6),
-            ('Tyrese Haliburton',         9.6),
+            ('Shai Gilgeous-Alexander',  13.4),
+            ('Nikola Jokic',             12.1),
+            ('James Harden',              9.8),
+            ('Tyrese Haliburton',         9.0),
         ], _NO_TO_CATEGORIES),
         id='Roto-noTO',
     ),
@@ -101,7 +101,6 @@ def _build_session_request(
 
     nba              = all_params['NBA']
     nba_options      = nba['options']
-    punting_default  = nba['punting_defaults'][nba['punting_default']]
     n_picks          = nba_options['n_picks']['default']
     n_drafters       = nba_options['n_drafters']['default']
     positions_config = nba_options['positions'][n_picks]
@@ -117,9 +116,9 @@ def _build_session_request(
         },
         'slot_counts': slot_counts,
         'parameters': {
-            'omega':           punting_default['omega'],
-            'gamma':           punting_default['gamma'],
-            'n_iterations':    punting_default['n_iterations'],
+            'omega':           nba_options['omega']['default'],
+            'gamma':           nba_options['gamma']['default'],
+            'n_iterations':    nba_options['n_iterations']['default'],
             'beth':            nba_options['beth']['default'],
             'upsilon':         nba_options['upsilon']['default'],
             'psi':             nba_options['psi']['default'],

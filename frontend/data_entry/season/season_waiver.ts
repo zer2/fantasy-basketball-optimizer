@@ -5,7 +5,7 @@
 // then highlights that player's row in the results.
 
 import { makeCustomSelect } from '../../custom_select.js'
-import { getCandidatePlayers, getPlayerByName } from '../../app_state.js'
+import { getCandidatePlayerResults, getPlayerResultsByName } from '../../app_state.js'
 import { runWaiverEvaluate } from '../../api/session.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ function readRosterAssignments(): Record<string, string[]> {
 /** Returns the name of the player with the highest g_rank (worst) among the given names.
  *  Returns null if none of the names are found in the backend player data. */
 function lowestGRankPlayer(playerNames: string[]): string | null {
-    const byName = getPlayerByName()
+    const byName = getPlayerResultsByName()
     let worst: string | null = null
     let worstRank = -Infinity
     for (const name of playerNames) {
@@ -52,7 +52,8 @@ function lowestGRankPlayer(playerNames: string[]): string | null {
 
 /** Adds a highlight class to the dropped player's row in the candidate table. */
 function highlightDropPlayer(dropPlayer: string): void {
-    const players = getCandidatePlayers()
+    const players = getCandidatePlayerResults()
+    if (players === null) return
     const idx = players.findIndex(p => p.name === dropPlayer)
     const table = document.getElementById('hscoretable') as HTMLTableElement
     // table.rows[0] is the thead header; player rows start at 1, interleaved with expand rows

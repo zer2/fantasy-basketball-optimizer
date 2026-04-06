@@ -187,16 +187,6 @@ def get_config_route(sport: str):
     raw_options = p.get('options', {})
     options = {k: v for k, v in raw_options.items() if k != 'positions'}
 
-    # Apply punting preset to get effective defaults for omega/gamma/n_iterations
-    punting_defaults = p.get('punting_defaults', {})
-    punting_default = p.get('punting_default', None)
-    if punting_default and punting_default in punting_defaults:
-        preset = punting_defaults[punting_default]
-        for key, value in preset.items():
-            if key in options:
-                options[key] = dict(options[key])
-                options[key]['default'] = value
-
     pos_struct = p.get('position_structure', {})
     position_names = {}
     for abbr, info in pos_struct.get('base', {}).items():
@@ -214,8 +204,6 @@ def get_config_route(sport: str):
             'flex_list': pos_struct.get('flex_list', []),
         },
         'position_names': position_names,
-        'punting_defaults': punting_defaults,
-        'punting_default': punting_default,
     }
 
 
@@ -279,19 +267,15 @@ def create_session_route(req: SessionRequest):
         )
 
     params = all_params[req.league.sport]
-    source_type = req.data_source.type if req.data_source else 'mock'
+    source_type = req.data_source.type
     csv_bytes: Optional[bytes] = None
     file_type_str: Optional[str] = None
     uploaded_dfs: Optional[dict] = None
 
     if source_type == 'csv':
-        csv_bytes, file_type_str = _resolve_csv(
-            req.data_source.custom_data_ids if req.data_source else None
-        )
+        csv_bytes, file_type_str = _resolve_csv(req.data_source.custom_data_ids)
     elif source_type == 'projections':
-        uploaded_dfs = _resolve_uploaded_dfs(
-            req.data_source.custom_data_ids if req.data_source else None, params
-        )
+        uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
     session = create_session()
     session.current_params = _build_current_params(req, all_params)

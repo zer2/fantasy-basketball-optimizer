@@ -379,12 +379,8 @@ function buildSuggestionTable(
 
 // ─── Main render ─────────────────────────────────────────────────────────────
 
-let tradingBuilt = false
-
 /** Renders the full Trading tab into the given container element. */
 export function renderSeasonTrading(container: HTMLElement): void {
-    if (tradingBuilt) return
-    tradingBuilt = true
     container.innerHTML = ''
 
     const teamNames   = readTeamNames()
