@@ -3,8 +3,8 @@
 // Owns the session ID, abort controller, and the updateTable bridge between
 // backend responses and the player table.
 
-import { Player, SessionRequest } from '../types.js'
-import { setBasePlayers, setCandidates, getCandidatePlayers, setGScores, setPlayersFromGScores, getCurrentSeat } from '../app_state.js'
+import { PlayerResult, SessionRequest } from '../types.js'
+import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, setPlayerResultsFromGScores, getCurrentSeat } from '../app_state.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
@@ -57,7 +57,7 @@ let evaluateGeneration = 0
 // Caches the empty-board evaluate result per session ID so the draft dropdown always
 // shows base H-score ordering regardless of how many picks have been made.
 // Keyed by session ID; invalidated whenever the session is patched (parameters changed).
-const basePlayersBySession: Map<string, Player[]> = new Map()
+const basePlayersBySession: Map<string, PlayerResult[]> = new Map()
 // Stores the H-score result from the most recent full-team evaluate call.
 // Set when my team is complete; null at all other times.
 let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
@@ -146,7 +146,7 @@ async function ensureSession(): Promise<void> {
 export async function runSeasonInit(): Promise<void> {
     await ensureSession()
     setIndicatorState('idle')
-    setPlayersFromGScores()
+    setPlayerResultsFromGScores()
 }
 
 /**
@@ -197,7 +197,7 @@ async function evaluateSeat(seat: string): Promise<void> {
                     ,   { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
                     ,   signal
                     )
-                    basePlayersBySession.set(sessionId!, client.candidatesToPlayers(baseResp.candidates))
+                    basePlayersBySession.set(sessionId!, client.candidatesToPlayerResults(baseResp.candidates))
                 }
 
                 const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
@@ -219,7 +219,7 @@ async function evaluateSeat(seat: string): Promise<void> {
                 latestFullTeamResult = null
 
                 const resp = await client.evaluate(sessionId!, evalReq, signal)
-                const players = client.candidatesToPlayers(resp.candidates)
+                const players = client.candidatesToPlayerResults(resp.candidates)
 
                 // Cache the base result if the board was empty (this result IS the base).
                 if (!basePlayersBySession.has(sessionId!)) {
@@ -227,8 +227,8 @@ async function evaluateSeat(seat: string): Promise<void> {
                 }
 
                 // Base ordering drives the draft dropdown; current candidates drive the table.
-                setBasePlayers(basePlayersBySession.get(sessionId!)!)
-                setCandidates(players)
+                setBasePlayerResults(basePlayersBySession.get(sessionId!)!)
+                setCandidatePlayerResults(players)
                 return
             } catch (err: any) {
                 if (err.name === 'AbortError') return  // superseded by a newer call
@@ -255,7 +255,7 @@ export async function runEvaluate(): Promise<void> {
         if (getFullTeamResult()) {
             showTableMessage('Your team is full.')
         } else {
-            buildTable(getCandidatePlayers())
+            buildTable(getCandidatePlayerResults())
         }
     }
 }
@@ -346,9 +346,9 @@ export async function runWaiverEvaluate(
             try {
                 await ensureSession()
                 const resp = await client.evaluate(sessionId!, { player_assignments: playerAssignments, my_team_id: myTeamId })
-                const players = client.candidatesToPlayers(resp.candidates)
+                const players = client.candidatesToPlayerResults(resp.candidates)
 
-                setCandidates(players)
+                setCandidatePlayerResults(players)
                 buildTable(players)
                 return
             } catch (err: any) {

@@ -225,27 +225,28 @@ NBA:
       default : 13
       min : 1
       max : 
-    omega : 
-      default : 1.2
+    omega :
+      default : 0.7
       min : 0.0
       max: 2.0
     gamma :
-      default : 0.1
+      default : 0.25
       min : 0.0
       max : 1.0
-    chi : 
+    chi :
       default : 0.6
       min : 0.0
       max: 1.0
-    aleph : 
+    aleph :
       default : 0.2
       min : 0.0
       max: 1.0
-    beth: 
+    beth:
       default : 3
-      min : 0 
-      max: 
-    n_iterations : 
+      min : 0
+      max:
+    n_iterations :
+      default : 30
       min : 0
       max: 10000
     S: 
@@ -338,20 +339,6 @@ NBA:
         - SF
         - PF
         full_str: Forward
-  punting_defaults :
-    No dynamic optimization :
-      omega : 0.0 
-      gamma : 0.0
-      n_iterations : 0
-    Moderate punting : 
-      omega : 0.7
-      gamma : 0.25
-      n_iterations : 30
-    Aggressive punting : 
-      omega : 1.0
-      gamma : 0.4
-      n_iterations : 30
-  punting_default : Moderate punting
   n_games : 82
   n_games_per_week : 3
 WNBA:
@@ -507,11 +494,11 @@ WNBA:
       min : 1
       max : 
     omega : 
-      default : 1.2
+      default : 0.7
       min : 0.0
       max: 2.0
     gamma :
-      default : 0.1
+      default : 0.25
       min : 0.0
       max : 1.0
     chi : 
@@ -579,23 +566,6 @@ WNBA:
         - PF
         - SF
         full_str: Forwards
-  punting_defaults :
-    No dynamic optimization :
-      omega : 0.0 
-      gamma : 0.0
-      n_iterations : 0
-    Moderate punting : 
-      omega : 0.7
-      gamma : 0.25
-      n_iterations : 30
-    Aggressive punting : 
-      omega : 1.0
-      gamma : 0.4
-      n_iterations : 30
-  punting_default_index : 
-    "Head to Head: Most Categories" : 1
-    "Head to Head: Each Category" : 1
-    "Rotisserie": 1
   n_games : 40
   n_games_per_week : 3
 MLB:
@@ -874,11 +844,11 @@ MLB:
       min : 1
       max : 
     omega : 
-      default : 1.2
+      default : 0.7
       min : 0.0
       max: 2.0
     gamma :
-      default : 0.1
+      default : 0.25
       min : 0.0
       max : 1.0
     chi : 
@@ -910,23 +880,6 @@ MLB:
         MI: 1
         Util: 2
         P: 2
-  punting_defaults :
-    No dynamic optimization :
-      omega : 0.0 
-      gamma : 0.0
-      n_iterations : 0
-    Moderate punting : 
-      omega : 0.7
-      gamma : 0.25
-      n_iterations : 30
-    Aggressive punting : 
-      omega : 1.0
-      gamma : 0.4
-      n_iterations : 30
-  punting_default_index : 
-    "Head to Head: Most Categories" : 1
-    "Head to Head: Each Category" : 1
-    "Rotisserie": 1
   z-score-player-multiplier : 50
   z-score-team-multiplier : 20
   g-score-player-multiplier : 60

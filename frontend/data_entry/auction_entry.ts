@@ -3,7 +3,7 @@
 // Mirrors the draft board structure: pick control on top, grid below.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { getCandidatePlayers } from '../app_state.js'
+import { getCandidatePlayerResults } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
 import { runEvaluate } from '../api/session.js'
 import {
@@ -60,7 +60,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     // Player dropdown — grows to fill available space
     const currentPicks = getPicks()
     const pickedSet = new Set(currentPicks.flat().filter(Boolean).map(p => p!.player))
-    const available = getCandidatePlayers().map(p => p.name).filter(n => !pickedSet.has(n))
+    const available = getCandidatePlayerResults()?.map(p => p.name).filter(n => !pickedSet.has(n)) ?? []
     const playerSel = makeCustomSelect(
         'auction-pick-player',
         [{ value: '', label: '' }, ...available.map(n => ({ value: n, label: n }))],

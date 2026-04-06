@@ -145,13 +145,16 @@ function showSeasonLayout(): void {
     if (!seasonNavBuilt) {
         buildSeasonNav()
         seasonNavBuilt = true
-        // Pre-populate roster DOM elements so the Waiver tab can read sr-player-* inputs
-        // on first visit, before the user has manually opened the Rosters tab.
-        renderSeasonRosters(
-            document.getElementById('rosters-left')!,
-            document.getElementById('rosters-right')!,
-        )
     }
+
+    // Pre-populate roster DOM elements so the Waiver tab can read sr-player-* inputs
+    // on first visit, before the user has manually opened the Rosters tab.
+    // Must run every time Season Mode is entered, not just on first build, because
+    // player data may not be loaded yet on the first applyLayout call.
+    renderSeasonRosters(
+        document.getElementById('rosters-left')!,
+        document.getElementById('rosters-right')!,
+    )
 
     // Only default to Waiver on first entry; leave the active tab alone on subsequent calls
     if (currentSeasonTab === null) {

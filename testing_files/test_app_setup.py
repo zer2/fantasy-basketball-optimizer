@@ -27,6 +27,38 @@ def _load_params() -> dict:
         return yaml.safe_load(f)
 
 
+def _build_default_session_request() -> dict:
+    all_params  = _load_params()
+    nba         = all_params['NBA']
+    opts        = nba['options']
+    n_drafters  = opts['n_drafters']['default']
+    n_picks     = opts['n_picks']['default']
+    pos_config  = opts['positions'][n_picks]
+    slot_counts = {**pos_config['base'], **pos_config['flex']}
+    return {
+        'league': {
+            'sport':          'NBA'
+            , 'n_drafters':   n_drafters
+            , 'n_picks':      n_picks
+            , 'scoring_format': 'Head to Head: Most Categories'
+            , 'categories':   nba['default-categories']
+        }
+        , 'slot_counts': slot_counts
+        , 'parameters': {
+            'omega':           opts['omega']['default']
+            , 'gamma':         opts['gamma']['default']
+            , 'beth':          opts['beth']['default']
+            , 'upsilon':       opts['upsilon']['default']
+            , 'psi':           opts['psi']['default']
+            , 'chi':           opts['chi']['default']
+            , 'aleph':         opts['aleph']['default']
+            , 'n_iterations':  opts['n_iterations']['default']
+            , 'streaming_noise': opts['S']['default']
+        }
+        , 'data_source': {'type': 'historical', 'season': '2024-25'}
+    }
+
+
 def test_config_defaults():
     """GET /config/NBA returns all expected numeric options with correct defaults, min, and max."""
     response = client.get('/config/NBA')
@@ -64,7 +96,7 @@ def test_config_unknown_sport():
 
 def test_session_creation_defaults():
     """POST /sessions with default NBA mock parameters creates a session and returns G-scores."""
-    response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    response = client.post('/sessions', json=_build_default_session_request())
     assert response.status_code == 201
 
     body = response.json()
@@ -86,7 +118,7 @@ def test_session_creation_stores_correct_params():
     all_params   = _load_params()
     yaml_options = all_params['NBA']['options']
 
-    response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    response = client.post('/sessions', json=_build_default_session_request())
     assert response.status_code == 201
 
     session = get_session(response.json()['session_id'])
@@ -99,18 +131,20 @@ def test_session_creation_stores_correct_params():
 
 def test_evaluate_empty_board():
     """POST /sessions + evaluate with an empty board returns a valid candidate list."""
-    session_response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    session_response = client.post('/sessions', json=_build_default_session_request())
     assert session_response.status_code == 201
     session_id = session_response.json()['session_id']
 
-    evaluate_response = client.post(
+    n_drafters         = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    evaluate_response  = client.post(
         f'/sessions/{session_id}/evaluate'
         , json={
-            'player_assignments': {'Team 1': []}
+            'player_assignments': player_assignments
             , 'my_team_id': 'Team 1'
         }
     )
-    assert evaluate_response.status_code == 200
+    assert evaluate_response.status_code == 200, evaluate_response.text
 
     body       = evaluate_response.json()
     candidates = body['candidates']

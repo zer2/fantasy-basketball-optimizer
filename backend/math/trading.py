@@ -60,25 +60,12 @@ def analyze_trade(
     post_trade_assignments[team_2] = post_trade_team_2
 
     # Pre-trade H-scores
-    res_1_pre = next(H.get_h_scores(player_assignments, team_1))
-    res_2_pre = next(H.get_h_scores(player_assignments, team_2))
+    res_1_pre = H.get_h_scores(player_assignments, team_1, n_iterations)
+    res_2_pre = H.get_h_scores(player_assignments, team_2, n_iterations)
 
-    # Post-trade H-scores (iterate if uneven trade)
-    n_player_diff = len(team_1_trade) - len(team_2_trade)
-
-    if n_player_diff > 0:
-        generator = H.get_h_scores(post_trade_assignments, team_1)
-        for _ in range(n_iterations):
-            res_1_post = next(generator)
-        res_2_post = next(H.get_h_scores(post_trade_assignments, team_2))
-    elif n_player_diff == 0:
-        res_1_post = next(H.get_h_scores(post_trade_assignments, team_1))
-        res_2_post = next(H.get_h_scores(post_trade_assignments, team_2))
-    else:
-        res_1_post = next(H.get_h_scores(post_trade_assignments, team_1))
-        generator = H.get_h_scores(post_trade_assignments, team_2)
-        for _ in range(n_iterations):
-            res_2_post = next(generator)
+    # Post-trade H-scores
+    res_1_post = H.get_h_scores(post_trade_assignments, team_1, n_iterations)
+    res_2_post = H.get_h_scores(post_trade_assignments, team_2, n_iterations)
 
     def _extract(result: dict) -> tuple[float, list[float]]:
         scores = result['Scores']
@@ -119,7 +106,7 @@ def run_trade_analyze(
     if abs(len(my_trade) - len(their_trade)) > 6:
         return TradeAnalyzeResponse(error="Too lopsided of a trade!")
 
-    n_iterations = session.current_params.get('n_iterations', 30)
+    n_iterations = session.current_params['n_iterations']
     result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, ignore_position_check)
 
     if result is None:
@@ -140,6 +127,7 @@ def _analyze_trade_value(
     player: str,
     team: str,
     player_assignments: dict[str, list[str]],
+    n_iterations: int,
 ) -> float:
     """Estimate how valuable a player is to a particular team.
 
@@ -152,8 +140,8 @@ def _analyze_trade_value(
     if player not in with_player[team]:
         with_player[team] = with_player[team] + [player]
 
-    res_without = next(H.get_h_scores(without_player, team, exclusion_list=[player]))
-    res_with = next(H.get_h_scores(with_player, team))
+    res_without = H.get_h_scores(without_player, team, n_iterations, exclusion_list=[player])
+    res_with    = H.get_h_scores(with_player, team, n_iterations)
 
     return float(res_with['Scores'].max() - res_without['Scores'].max())
 
@@ -163,6 +151,7 @@ def _identify_trade_candidates(
     my_team: str,
     their_team: str,
     player_assignments: dict[str, list[str]],
+    n_iterations: int,
 ) -> tuple[list[str], list[str]]:
     """Identify players from each team that are relatively more valuable to the other.
 
@@ -172,25 +161,25 @@ def _identify_trade_candidates(
     their_players = player_assignments[their_team]
 
     my_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team, player_assignments) for p in my_players],
+        [_analyze_trade_value(H, p, my_team, player_assignments, n_iterations) for p in my_players],
         index=my_players,
     )
     my_values_to_me -= my_values_to_me.mean()
 
     their_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team, player_assignments) for p in their_players],
+        [_analyze_trade_value(H, p, my_team, player_assignments, n_iterations) for p in their_players],
         index=their_players,
     )
     their_values_to_me -= their_values_to_me.mean()
 
     my_values_to_them = pd.Series(
-        [_analyze_trade_value(H, p, their_team, player_assignments) for p in my_players],
+        [_analyze_trade_value(H, p, their_team, player_assignments, n_iterations) for p in my_players],
         index=my_players,
     )
     my_values_to_them -= my_values_to_them.mean()
 
     their_values_to_them = pd.Series(
-        [_analyze_trade_value(H, p, their_team, player_assignments) for p in their_players],
+        [_analyze_trade_value(H, p, their_team, player_assignments, n_iterations) for p in their_players],
         index=their_players,
     )
     their_values_to_them -= their_values_to_them.mean()
@@ -302,19 +291,15 @@ def _get_general_values(session: Session) -> pd.Series:
     H = session.H
     cp = session.current_params
     n_drafters = cp['n_drafters']
-    n_iterations = cp.get('n_iterations', 30)
+    n_iterations = cp['n_iterations']
 
     H_clean = H.clear_initial_weights()
-    generator = H_clean.get_h_scores(
+    result = H_clean.get_h_scores(
         player_assignments={f'Team {i+1}': [] for i in range(n_drafters)},
         drafter='Team 1',
+        n_iterations=n_iterations,
     )
-
-    res = None
-    for _ in range(max(1, n_iterations)):
-        res = next(generator)
-
-    return res['Scores'].sort_values(ascending=False)
+    return result['Scores'].sort_values(ascending=False)
 
 
 def run_trade_suggest(
@@ -330,9 +315,11 @@ def run_trade_suggest(
     """Public entry point for the trade/suggest endpoint."""
     H = session.H
 
+    n_iterations = session.current_params['n_iterations']
+
     # Step 1: identify which players are trade candidates
     my_candidates, their_candidates = _identify_trade_candidates(
-        H, my_team, their_team, player_assignments,
+        H, my_team, their_team, player_assignments, n_iterations,
     )
 
     if len(my_candidates) == 0 or len(their_candidates) == 0:

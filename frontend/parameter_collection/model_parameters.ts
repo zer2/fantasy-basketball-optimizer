@@ -3,9 +3,7 @@
 //   in src/parameter_collection/parameters.py
 //
 // Defaults are loaded from the backend config (parameters.yaml) via
-// getSportConfig(). The config already applies the active punting preset
-// (e.g. "Moderate punting") so omega/gamma/n_iterations reflect the
-// preset defaults rather than the raw option defaults.
+// getSportConfig().
 
 import { ModelParameters } from '../types.js'
 import { getSportConfig } from '../app_state.js'

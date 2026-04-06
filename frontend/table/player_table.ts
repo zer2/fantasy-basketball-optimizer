@@ -4,7 +4,7 @@
 
 import { stat_styler_primary, stat_styler_secondary } from '../styles/styler_functions.js'
 import { toggleExpandView } from './expand_view.js'
-import { Player } from '../types.js'
+import { PlayerResult } from '../types.js'
 import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 
@@ -33,8 +33,9 @@ export function showTableMessage(message: string): void {
     cell.textContent = message
 }
 
-/** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
-export function buildTable(players: Player[]): void {
+/** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells.
+ *  If players is null, only the headers are rendered (categories are known before evaluate runs). */
+export function buildTable(players: PlayerResult[] | null): void {
 
     const categories = getSelectedCategories()
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
@@ -78,6 +79,8 @@ export function buildTable(players: Player[]): void {
         th.textContent = category
         headerRow.append(th)
     }
+
+    if (players === null) return
 
     // ── Player rows (built as HTML string for performance) ───────────────────
     // Roto values hoisted outside the loop to avoid repeated lookups.

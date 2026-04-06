@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from fastapi.testclient import TestClient
+from scipy.stats import norm
 
 from backend.main import app
 from backend.session import get_session
@@ -30,11 +31,44 @@ def _load_default_options() -> dict:
         return yaml.safe_load(f)['NBA']['options']
 
 
+def _build_default_session_request() -> dict:
+    with open(_PARAMS_PATH) as f:
+        all_params = yaml.safe_load(f)
+    nba         = all_params['NBA']
+    opts        = nba['options']
+    n_drafters  = opts['n_drafters']['default']
+    n_picks     = opts['n_picks']['default']
+    pos_config  = opts['positions'][n_picks]
+    slot_counts = {**pos_config['base'], **pos_config['flex']}
+    return {
+        'league': {
+            'sport':            'NBA'
+            , 'n_drafters':     n_drafters
+            , 'n_picks':        n_picks
+            , 'scoring_format': 'Head to Head: Most Categories'
+            , 'categories':     nba['default-categories']
+        }
+        , 'slot_counts': slot_counts
+        , 'parameters': {
+            'omega':             opts['omega']['default']
+            , 'gamma':           opts['gamma']['default']
+            , 'beth':            opts['beth']['default']
+            , 'upsilon':         opts['upsilon']['default']
+            , 'psi':             opts['psi']['default']
+            , 'chi':             opts['chi']['default']
+            , 'aleph':           opts['aleph']['default']
+            , 'n_iterations':    opts['n_iterations']['default']
+            , 'streaming_noise': opts['S']['default']
+        }
+        , 'data_source': {'type': 'historical', 'season': '2024-25'}
+    }
+
+
 def _create_session() -> tuple[str, dict]:
-    """POST /sessions with default NBA mock parameters.
+    """POST /sessions with default NBA parameters using 2024-25 historical data.
     Returns (session_id, info) where info is the processed player data dict.
     """
-    response = client.post('/sessions', json={'league': {'sport': 'NBA'}})
+    response = client.post('/sessions', json=_build_default_session_request())
     assert response.status_code == 201, response.text
     session_id = response.json()['session_id']
     session = get_session(session_id)
@@ -46,7 +80,9 @@ def _build_h_agent(info: dict, scoring_format: str) -> HAgent:
     with open(_PARAMS_PATH) as f:
         all_params = yaml.safe_load(f)
     sport_params = all_params['NBA']
-    slot_counts  = opts.get('positions', {}).get('default', {})
+    n_picks      = opts['n_picks']['default']
+    pos_config   = opts['positions'][n_picks]
+    slot_counts  = {**pos_config['base'], **pos_config['flex']}
 
     return HAgent(
         info           = info
@@ -78,17 +114,107 @@ def test_x_mu_gradients():
                     + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]]).reshape(11, 9)
     ]
 
+    v = H.v
     for c in c_list:
-        L = np.array([H.L] * len(c))
-        _check_all_gradients(c, L, H.get_term_two,          H.get_del_term_two)
-        _check_all_gradients(c, L, H.get_term_five_a,       H.get_del_term_five_a)
-        _check_all_gradients(c, L, H.get_term_five_b,       H.get_del_term_five_b)
-        _check_all_gradients(c, L, H.get_term_four,         H.get_del_term_four)
-        _check_all_gradients(c, L, H.get_terms_four_five,   H.get_del_terms_four_five)
-        _check_all_gradients(c, L, H.get_last_three_terms,  H.get_del_last_three_terms)
-        _check_all_gradients(c, L, H.get_last_four_terms,   H.get_del_last_four_terms)
-        _check_all_gradients(c, L, H.get_x_mu_simplified_form, H.get_del_full)
-        _check_all_gradients(c, L, H.get_term_five,         H.get_del_term_five)
+        L = H.L.repeat(len(c), axis=0)
+        _check_all_gradients(c,
+            lambda c: H.get_term_two(c, v),
+            lambda _: H.get_del_term_two(v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_term_five_a(c, L, v),
+            lambda c: H.get_del_term_five_a(c, L, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_term_five_b(c, L, v),
+            lambda c: H.get_del_term_five_b(c, L, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_term_four(c, v),
+            lambda c: H.get_del_term_four(c, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_terms_four_five(c, L, v),
+            lambda c: H.get_del_terms_four_five(c, L, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_last_three_terms(c, L, v),
+            lambda c: H.get_del_last_three_terms(c, L, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_last_four_terms(c, L, v),
+            lambda c: H.get_del_last_four_terms(c, L, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_x_mu_simplified_form(c, L, v),
+            lambda c: H.get_del_full(c, L, v),
+        )
+        _check_all_gradients(c,
+            lambda c: H.get_term_five(c, L, v),
+            lambda c: H.get_del_term_five(c, L, v),
+        )
+
+
+def test_ec_gradients():
+    """Each Category objective gradient checks (proportions across categories)."""
+    _, info = _create_session()
+    H = _build_h_agent(info, 'Head to Head: Each Category')
+
+    x_diff_list = [
+        np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.2]  + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
+                    + [[0.1] + [0.17] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
+    ]
+
+    diff_vars = 1.0
+
+    def ec_objective(x_diff_array):
+        cdf_estimates = norm.cdf(x_diff_array / np.sqrt(diff_vars))
+        pdf_estimates = norm.pdf(x_diff_array / np.sqrt(diff_vars)) / np.sqrt(diff_vars)
+        return H.get_objective_and_pdf_weights_ec(cdf_estimates, pdf_estimates)
+
+    def ec_gradient(x_diff_array):
+        cdf_estimates = norm.cdf(x_diff_array / np.sqrt(diff_vars))
+        pdf_estimates = norm.pdf(x_diff_array / np.sqrt(diff_vars)) / np.sqrt(diff_vars)
+        _, pdf_weights = H.get_objective_and_pdf_weights_ec(
+            cdf_estimates, pdf_estimates, calculate_pdf_weights=True
+        )
+        return pdf_weights
+
+    for x_diff in x_diff_list:
+        _check_gradient_aggregate(x_diff, ec_objective, ec_gradient)
+
+
+def test_mc_gradients():
+    """Most Categories objective gradient checks (proportions across categories)."""
+    _, info = _create_session()
+    H = _build_h_agent(info, 'Head to Head: Most Categories')
+
+    x_diff_list = [
+        np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.2]  + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
+        , np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
+                    + [[0.1] + [0.17] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
+    ]
+
+    diff_vars = 1.0
+
+    def mc_objective(x_diff_array):
+        cdf_estimates = norm.cdf(x_diff_array / np.sqrt(diff_vars))
+        pdf_estimates = norm.pdf(x_diff_array / np.sqrt(diff_vars)) / np.sqrt(diff_vars)
+        return H.get_objective_and_pdf_weights_mc(cdf_estimates, pdf_estimates)
+
+    def mc_gradient(x_diff_array):
+        cdf_estimates = norm.cdf(x_diff_array / np.sqrt(diff_vars))
+        pdf_estimates = norm.pdf(x_diff_array / np.sqrt(diff_vars)) / np.sqrt(diff_vars)
+        _, pdf_weights = H.get_objective_and_pdf_weights_mc(
+            cdf_estimates, pdf_estimates, calculate_pdf_weights=True
+        )
+        return pdf_weights
+
+    for x_diff in x_diff_list:
+        _check_gradient_aggregate(x_diff, mc_objective, mc_gradient)
 
 
 def test_objective_gradients():
@@ -96,24 +222,40 @@ def test_objective_gradients():
     _, info = _create_session()
     H = _build_h_agent(info, 'Rotisserie')
 
-    c_list = [
-        np.array([[[0.1] + [0.2]  + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-        , np.array([[[0.2] + [0.1]  + [0.201] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-        , np.array([[[0.1] + [0.201] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-        , np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-        , np.array([[[0.1] + [0.2]  + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
-        , np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
-                    + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
+    # diff_vars is uniform across categories when both teams have equal rosters, which
+    # is the simplest valid case. Non-uniform diff_vars would require a different gradient
+    # check since the returned gradient is already scaled by sqrt(diff_vars) internally.
+    diff_vars = 1.0
+
+    x_diff_list = [
+        np.array([[[-0.5, -0.3, -0.1,  0.0,  0.1,  0.2,  0.3,  0.4,  0.5,  0.6,  0.7]] * 9])
+        , np.array([[[ 0.5,  0.3,  0.1,  0.0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7]] * 9])
+        , np.array([[[-0.6, -0.4, -0.2,  0.0,  0.2,  0.3,  0.4,  0.5,  0.6,  0.7,  0.8]] * 9])
+        , np.array([[[-0.3, -0.1,  0.0,  0.1,  0.2,  0.3,  0.4,  0.5,  0.6,  0.7,  0.8]] * 9])
+        , np.array([[[-0.5, -0.3, -0.1,  0.0,  0.1,  0.2,  0.3,  0.4,  0.5,  0.6,  0.7]] * 8
+                    + [[-0.5, -0.3, -0.1,  0.0,  0.1,  0.2,  0.3,  0.4,  0.5,  0.6,  0.75]]])
     ]
 
-    def rotisserie_objective(cdf_estimates):
-        return H.get_objective_and_pdf_weights_rotisserie(cdf_estimates, 1, None, False)
+    for x_diff in x_diff_list:
+        sigma_c   = x_diff[0, :, :].std(axis=1, ddof=1) * np.sqrt(2)
+        h_m       = H.get_h_m(sigma_c, H.n_drafters)
+        sigma_2_m = H.get_sigma_2_m(sigma_c, h_m, H.rho, H.n_drafters)
 
-    def rotisserie_gradient(cdf_estimates):
-        return H.get_objective_and_pdf_weights_rotisserie(cdf_estimates, 1, None, True, True)
+        def rotisserie_objective(x_diff_array, sigma_2_m=sigma_2_m):
+            cdf_estimates = norm.cdf(x_diff_array / np.sqrt(diff_vars))
+            return H.get_objective_and_pdf_weights_rotisserie(
+                x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m
+            )
 
-    for c in c_list:
-        _check_all_gradients_2(c, rotisserie_objective, rotisserie_gradient)
+        def rotisserie_gradient(x_diff_array, sigma_2_m=sigma_2_m):
+            cdf_estimates = norm.cdf(x_diff_array / np.sqrt(diff_vars))
+            _, gradient = H.get_objective_and_pdf_weights_rotisserie(
+                x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m
+                , calculate_pdf_weights=True
+            )
+            return gradient
+
+        _check_gradient_aggregate(x_diff, rotisserie_objective, rotisserie_gradient)
 
 
 # ─── Pure math tests ──────────────────────────────────────────────────────────
@@ -178,24 +320,24 @@ def test_savor_calculation():
 
 # ─── Gradient check helpers ───────────────────────────────────────────────────
 
-def _check_all_gradients(c, L, func, del_func):
+def _check_all_gradients(c, func, del_func):
     for j in range(9):
-        _check_gradient(c, L, func, del_func, j)
+        _check_gradient(c, func, del_func, j)
 
 
 def _check_all_gradients_2(c, func, del_func):
     _check_gradient_2(c, func, del_func)
 
 
-def _check_gradient(c, L, func, del_func, term: int):
+def _check_gradient(c, func, del_func, term: int):
     h         = 0.0000001
-    old       = func(c, L)
+    old       = func(c)
     c2        = c.copy()
     c2[0, term] = c2[0, term] + h
-    new       = func(c2, L)
+    new       = func(c2)
 
     del_real        = (new - old) / h
-    del_theoretical = del_func(c, L)
+    del_theoretical = del_func(c)
 
     if del_real.shape[0] > 1:
         del_real = del_real[0, :, :]
@@ -216,7 +358,7 @@ def _check_gradient(c, L, func, del_func, term: int):
 
 
 def _check_gradient_2(c, func, del_func):
-    h   = 0.0001
+    h   = 0.0000001
     old = func(c)
 
     all_del_real = []
@@ -234,4 +376,33 @@ def _check_gradient_2(c, func, del_func):
     all_del_real_normalized = np.array(all_del_real).reshape(9, 1) / sum(all_del_real)
     all_results_normalized  = np.array(all_results).reshape(9, 1)  / sum(all_del_real)
 
-    assert (abs(all_del_real_normalized - all_results_normalized) < 0.001).all()
+    assert (abs(all_del_real_normalized - all_results_normalized) < 1e-7).all()
+
+
+def _check_gradient_aggregate(x_diff, func, del_func):
+    """Check gradient proportions by perturbing all opponents of each category simultaneously.
+    del_func must return shape (players, categories) — a gradient already averaged over opponents.
+    Normalizes each array by its own sum so only relative proportions are checked, not absolute scale.
+    """
+    h            = 0.0001
+    n_categories = x_diff.shape[1]
+
+    all_del_real = []
+    all_results  = []
+
+    for term in range(n_categories):
+        x_plus          = x_diff.copy()
+        x_minus         = x_diff.copy()
+        x_plus[0, term, :]  += h
+        x_minus[0, term, :] -= h
+        del_real        = float(np.asarray(func(x_plus) - func(x_minus)).ravel()[0]) / (2 * h)
+        del_theoretical = del_func(x_diff)
+        all_del_real.append(del_real)
+        all_results.append(del_theoretical[0, term])
+
+    all_del_real_array      = np.array(all_del_real).reshape(n_categories, 1)
+    all_results_array       = np.array(all_results).reshape(n_categories, 1)
+    all_del_real_normalized = all_del_real_array / all_del_real_array.sum()
+    all_results_normalized  = all_results_array  / all_results_array.sum()
+
+    assert (abs(all_del_real_normalized - all_results_normalized) < 1e-7).all()

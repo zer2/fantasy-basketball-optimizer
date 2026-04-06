@@ -16,8 +16,6 @@ export interface SportConfig {
         flex_list: string[]
     }
     position_names: Record<string, string>
-    punting_defaults: Record<string, Record<string, number>>
-    punting_default: string | null
 }
 
 // ─── Player G-scores (from session creation, pipeline step 4) ────────────────
@@ -77,7 +75,7 @@ export interface ModelParameters {
 }
 
 export interface DataSource {
-    type: 'blended' | 'historical' | 'csv' | 'mock'
+    type: 'blended' | 'historical' | 'csv'
     blend_weights: { ESPN: number; DARKO: number; HTB: number; BBM: number }
     custom_data_ids: { HTB: string | null; BBM: string | null }
     season?: string | null   // for 'historical' type
@@ -110,7 +108,7 @@ export interface AuctionValues {
     orig_dollar_g: number;   // SAVOR on G-scores, full original cash/picks
 }
 
-export interface Player {
+export interface PlayerResult {
     name: string;
     h_score: number;            // overall H-score win rate (0–100 scale)
     h_rank: number;             // rank by H-score among available players

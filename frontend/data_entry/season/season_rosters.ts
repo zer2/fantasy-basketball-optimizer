@@ -3,7 +3,7 @@
 // inspector table (right).  Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
-import { getPlayers, getGScoreByName } from '../../app_state.js'
+import { getPlayerResults, getGScoreByName } from '../../app_state.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
@@ -11,11 +11,14 @@ import { evaluateTeamHScore } from '../../api/session.js'
 
 /** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
+    const playerResults = getPlayerResults()
+    if (playerResults === null) return
+
     const nDrafters = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
     const nPicks    = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
     const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
-    const playerNames = getPlayers().map(p => p.name)
+    const playerNames = playerResults.map(p => p.name)
 
     leftEl.innerHTML  = ''
     rightEl.innerHTML = ''
@@ -47,7 +50,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const tbody = table.createTBody()
 
     // Sort players by G-score rank and snake-draft to pre-fill the table
-    const sorted = [...getPlayers()].sort((a, b) => a.g_rank - b.g_rank)
+    const sorted = [...playerResults].sort((a, b) => a.g_rank - b.g_rank)
     const totalSlots = nDrafters * nPicks
     const snakeDraft: string[][] = Array.from({ length: nDrafters }, () => [])
     for (let i = 0; i < Math.min(sorted.length, totalSlots); i++) {
