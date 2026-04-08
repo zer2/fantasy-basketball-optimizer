@@ -45,6 +45,13 @@ _v0_cache: dict[tuple, tuple[float, pd.DataFrame]] = {}
 _v0_cache_lock = threading.Lock()
 _V0_CACHE_TTL = 24 * 3600  # 24 hours
 
+
+def clear_v0_cache() -> None:
+    """Evict all entries from the v0_clean in-memory cache."""
+    with _v0_cache_lock:
+        _v0_cache.clear()
+
+
 # Parameters file path (relative to the project root)
 _PARAMS_PATH = 'parameters.yaml'
 
@@ -207,7 +214,10 @@ def run_step4(session: Session) -> None:
     n_picks     = cp['n_picks']
     slot_counts = cp['slot_counts']
     n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
-    categories  = cp['categories']
+
+    available_columns = set(session.v2.columns)
+    categories = [c for c in cp['categories'] if c in available_columns]
+    cp['categories'] = categories
 
     info, _ = process_player_data(
         player_stats_v2   = session.v2,

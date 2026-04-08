@@ -4,6 +4,7 @@
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayerResults, getGScoreByName } from '../../app_state.js'
+import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
@@ -49,17 +50,6 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const blankOption = [{ value: '', label: '' }]
     const tbody = table.createTBody()
 
-    // Sort players by G-score rank and snake-draft to pre-fill the table
-    const sorted = [...playerResults].sort((a, b) => a.g_rank - b.g_rank)
-    const totalSlots = nDrafters * nPicks
-    const snakeDraft: string[][] = Array.from({ length: nDrafters }, () => [])
-    for (let i = 0; i < Math.min(sorted.length, totalSlots); i++) {
-        const round = Math.floor(i / nDrafters)
-        const pos   = i % nDrafters
-        const team  = round % 2 === 0 ? pos : nDrafters - 1 - pos
-        snakeDraft[team].push(sorted[i].name)
-    }
-
     for (let r = 0; r < nPicks; r++) {
         const row  = tbody.insertRow()
         const rowSelects: CustomSelect[] = []
@@ -76,8 +66,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
               , undefined
               , true
             )
-            // Pre-fill from snake draft if a player is available for this slot
-            const prefill = snakeDraft[d]?.[r]
+            const prefill = DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
             if (prefill) sel.setValue(prefill)
             cell.append(sel.element)
             rowSelects.push(sel)

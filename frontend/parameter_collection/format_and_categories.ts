@@ -14,6 +14,10 @@ import { pref, savePref } from '../preferences.js'
 // reflects the current state without re-querying the DOM.
 let _selectedCategories: string[]
 
+// Set to true while syncCategoriesFromBackend is mutating the DOM so the
+// MutationObserver skips saving prefs / dispatching a change event.
+let _suppressCategoryEvents = false
+
 /**
  * Renders the Format & Categories section: scoring format selector and
  * a chip-style multiselect for stat categories.
@@ -56,9 +60,43 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     const inputArea = container.querySelector('.ms-input-area')
     if (inputArea) {
         new MutationObserver(() => {
+            if (_suppressCategoryEvents) return
             savePref('categories', [..._selectedCategories])
             container.dispatchEvent(new Event('change', { bubbles: true }))
         }).observe(inputArea, { childList: true })
+    }
+}
+
+/**
+ * Removes any categories not in `backendCategories` from both `_selectedCategories`
+ * and the chip DOM, without triggering a session patch or preference save.
+ * Call this after session creation when the backend has filtered unavailable categories.
+ */
+export function syncCategoriesFromBackend(backendCategories: string[]): void {
+    const backendSet = new Set(backendCategories)
+    const invalidIndices: number[] = []
+    for (let i = _selectedCategories.length - 1; i >= 0; i--) {
+        if (!backendSet.has(_selectedCategories[i])) invalidIndices.push(i)
+    }
+    if (invalidIndices.length === 0) return
+
+    _suppressCategoryEvents = true
+    try {
+        // Remove stale chips from DOM first (chip order mirrors _selectedCategories)
+        const inputArea = document.querySelector('.ms-input-area')
+        if (inputArea) {
+            const chips = Array.from(inputArea.querySelectorAll<HTMLElement>('.ms-chip'))
+            for (const idx of invalidIndices) {
+                chips[idx]?.remove()
+            }
+        }
+        // Mutate the live array in-place to match
+        for (const idx of invalidIndices) {
+            _selectedCategories.splice(idx, 1)
+        }
+        savePref('categories', [..._selectedCategories])
+    } finally {
+        _suppressCategoryEvents = false
     }
 }
 
