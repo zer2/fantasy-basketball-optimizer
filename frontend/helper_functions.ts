@@ -220,10 +220,11 @@ export function renderMultiselect(
  * (no Apply button) rather than the pull-style `renderMultiselect` + Apply pattern.
  */
 export interface MultiSelectWidget {
-    element:     HTMLElement
-    getSelected: () => string[]
-    setSelected: (values: string[]) => void
-    onChange:    (cb: () => void) => void
+    element:             HTMLElement
+    getSelected:         () => string[]
+    setSelected:         (values: string[]) => void
+    setSelectedSilently: (values: string[]) => void
+    onChange:            (cb: () => void) => void
 }
 
 /**
@@ -238,10 +239,12 @@ export function makeMultiSelectWidget(
     const wrap = document.createElement('div')
     wrap.className = wrapperClass
 
-    const lbl = document.createElement('div')
-    lbl.className = 'pick-control-label'
-    lbl.textContent = label
-    wrap.append(lbl)
+    if (label) {
+        const lbl = document.createElement('div')
+        lbl.className = 'pick-control-label'
+        lbl.textContent = label
+        wrap.append(lbl)
+    }
 
     let selected = renderMultiselect(wrap, options, [])
 
@@ -256,18 +259,24 @@ export function makeMultiSelectWidget(
     }
     observeInputArea()
 
+    function replaceSelection(values: string[]): void {
+        const oldContainer = wrap.querySelector('.ms-container')
+        if (oldContainer) oldContainer.remove()
+        selected = renderMultiselect(wrap, options, values)
+        observeInputArea()
+    }
+
     return {
-        element:     wrap,
-        getSelected: () => [...selected],
-        setSelected: (values: string[]) => {
-            // Remove the old multiselect container and re-render with new defaults
-            const oldContainer = wrap.querySelector('.ms-container')
-            if (oldContainer) oldContainer.remove()
-            selected = renderMultiselect(wrap, options, values)
-            observeInputArea()
+        element:             wrap,
+        getSelected:         () => [...selected],
+        setSelected:         (values: string[]) => {
+            replaceSelection(values)
             callbacks.forEach(cb => cb())
         },
-        onChange:    (cb) => callbacks.push(cb),
+        setSelectedSilently: (values: string[]) => {
+            replaceSelection(values)
+        },
+        onChange:            (cb) => callbacks.push(cb),
     }
 }
 

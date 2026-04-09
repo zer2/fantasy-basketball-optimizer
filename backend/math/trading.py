@@ -120,6 +120,108 @@ def run_trade_analyze(
     )
 
 
+# ── Fast trade evaluation ────────────────────────────────────────────────────
+
+def _build_trade_context(
+    session: Session,
+    player_assignments: dict[str, list[str]],
+    my_team: str,
+    their_team: str,
+) -> dict:
+    """Pre-compute all quantities that are constant across every trade combo.
+
+    For complete rosters in a k-for-k trade:
+      - x_scores_available is identical pre- and post-trade (same pool, just swapped)
+      - diff_vars depend only on team sizes (unchanged by equal trades)
+      - Pre-trade H-scores are fixed regardless of which combo we evaluate
+      - Baseline diff_means change only in the single column corresponding to the
+        counterparty team — the delta is pure arithmetic per combo
+    """
+    H          = session.H
+    team_names = list(player_assignments.keys())
+    n_drafters = len(player_assignments)
+
+    # Available player pool is the same for every combo (traded players are assigned
+    # to one team or the other regardless of which swap we evaluate).
+    players_chosen     = [p for roster in player_assignments.values() for p in roster if p == p]
+    x_scores_available = H.x_scores[
+        ~H.x_scores.index.isin(players_chosen)
+        & H.x_scores.index.isin(H.positions.index)
+    ]
+
+    # Pre-compute each team's raw stat sum once.
+    team_sums = {
+        team: np.array(H.x_scores.loc[[p for p in roster if p == p]].sum(axis=0))
+        for team, roster in player_assignments.items()
+    }
+
+    def build_baseline_diff_means(drafter: str) -> np.ndarray:
+        """Construct the (1, n_categories, n_drafters-1) diff_means array for drafter."""
+        drafter_roster = [p for p in player_assignments[drafter] if p == p]
+        n_my           = len(drafter_roster)
+        extra_needed   = (n_my + 1) * n_drafters - len(players_chosen)
+        mean_extra     = np.array(x_scores_available.iloc[:extra_needed].mean().fillna(0))
+
+        other_sums = np.vstack([
+            (team_sums[team] + max(n_my + 1 - len(player_assignments[team]), 0) * mean_extra)
+            .reshape(1, H.n_categories, 1)
+            for team in team_names if team != drafter
+        ]).T  # (1, n_categories, n_drafters-1)
+
+        return (
+            team_sums[drafter].reshape(1, H.n_categories, 1)
+            - other_sums.reshape(1, H.n_categories, n_drafters - 1)
+        )
+
+    baseline_diff_means_my    = build_baseline_diff_means(my_team)
+    baseline_diff_means_their = build_baseline_diff_means(their_team)
+
+    # diff_vars depend only on team sizes — constant for equal-size trades.
+    diff_vars_my = np.vstack([
+        H.get_diff_var(len([p for p in player_assignments[team] if p == p]))
+        for team in team_names if team != my_team
+    ]).T.reshape(1, H.n_categories, n_drafters - 1)
+
+    diff_vars_their = np.vstack([
+        H.get_diff_var(len([p for p in player_assignments[team] if p == p]))
+        for team in team_names if team != their_team
+    ]).T.reshape(1, H.n_categories, n_drafters - 1)
+
+    # Pre-trade H-scores — constant across all combos, compute once.
+    my_players    = [p for p in player_assignments[my_team]    if p == p]
+    their_players = [p for p in player_assignments[their_team] if p == p]
+
+    pre_my_h = H.compute_h_score_from_diff_means(
+        diff_means = baseline_diff_means_my,
+        diff_vars  = diff_vars_my,
+    )
+    pre_their_h = H.compute_h_score_from_diff_means(
+        diff_means = baseline_diff_means_their,
+        diff_vars  = diff_vars_their,
+    )
+
+    # Pre-slice x_scores for each trading team so _make_combo_df never touches H.x_scores.
+    my_x_scores    = H.x_scores.loc[my_players]
+    their_x_scores = H.x_scores.loc[their_players]
+
+    # Column indices for the two trading teams in each perspective's diff_means.
+    their_col_in_my_view = [t for t in team_names if t != my_team].index(their_team)
+    my_col_in_their_view = [t for t in team_names if t != their_team].index(my_team)
+
+    return {
+        'my_x_scores':                 my_x_scores,
+        'their_x_scores':              their_x_scores,
+        'baseline_diff_means_my':      baseline_diff_means_my,
+        'baseline_diff_means_their':   baseline_diff_means_their,
+        'diff_vars_my':                diff_vars_my,
+        'diff_vars_their':             diff_vars_their,
+        'pre_my_h':                    pre_my_h,
+        'pre_their_h':                 pre_their_h,
+        'their_col_in_my_view':        their_col_in_my_view,
+        'my_col_in_their_view':        my_col_in_their_view,
+    }
+
+
 # ── Trade value estimation ───────────────────────────────────────────────────
 
 def _analyze_trade_value(
@@ -153,21 +255,22 @@ def _identify_trade_candidates(
     player_assignments: dict[str, list[str]],
     n_iterations: int,
 ) -> tuple[list[str], list[str]]:
-    """Identify players from each team that are relatively more valuable to the other.
+    """Filter each roster to players relatively more valuable to the other team.
 
-    Returns (my_candidates, their_candidates).
+    Returns the bottom half by own-team value differential — roughly the players
+    each side would be most willing to trade — as (my_candidates, their_candidates).
     """
-    my_players = player_assignments[my_team]
+    my_players    = player_assignments[my_team]
     their_players = player_assignments[their_team]
 
     my_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team, player_assignments, n_iterations) for p in my_players],
+        [_analyze_trade_value(H, p, my_team,    player_assignments, n_iterations) for p in my_players],
         index=my_players,
     )
     my_values_to_me -= my_values_to_me.mean()
 
     their_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team, player_assignments, n_iterations) for p in their_players],
+        [_analyze_trade_value(H, p, my_team,    player_assignments, n_iterations) for p in their_players],
         index=their_players,
     )
     their_values_to_me -= their_values_to_me.mean()
@@ -184,10 +287,10 @@ def _identify_trade_candidates(
     )
     their_values_to_them -= their_values_to_them.mean()
 
-    my_differences = my_values_to_me - my_values_to_them
+    my_differences    = my_values_to_me    - my_values_to_them
     their_differences = their_values_to_them - their_values_to_me
 
-    my_candidates = [p for p in my_players if my_differences[p] < 0]
+    my_candidates    = [p for p in my_players    if my_differences[p]    < 0]
     their_candidates = [p for p in their_players if their_differences[p] < 0]
 
     return my_candidates, their_candidates
@@ -250,44 +353,74 @@ def _make_combo_df(
     my_team: str,
     their_team: str,
     player_assignments: dict[str, list[str]],
-    ignore_position_check: bool = False,
+    my_x_numpy: np.ndarray,
+    their_x_numpy: np.ndarray,
+    my_name_to_index: dict[str, int],
+    their_name_to_index: dict[str, int],
 ) -> pd.DataFrame:
-    """Evaluate each trade combo and return a DataFrame sorted by Your Score."""
-    H = session.H
-    rows = []
+    """Evaluate every trade combo in one vectorized pass and return sorted by Your Score.
 
-    for _, row in all_combos.iterrows():
-        my_trade = row['My Trade']
-        their_trade = row['Their Trade']
+    For each combo, trade_delta = received_sum - sent_sum shifts diff_means on ALL
+    opponent columns (my roster improved vs every opponent), with an extra shift on
+    the counterparty column (their roster also weakened). Both perspectives are
+    computed in a single batched call to compute_h_scores_batched.
+    """
+    H   = session.H
+    ctx = _build_trade_context(session, player_assignments, my_team, their_team)
 
-        result = analyze_trade(
-            session, player_assignments,
-            my_team, my_trade, their_team, their_trade,
-            n_iterations=1,
-            ignore_position_check=ignore_position_check,
-        )
-
-        if result is not None:
-            your_diff = result[1]['post'].h_score - result[1]['pre'].h_score
-            their_diff = result[2]['post'].h_score - result[2]['pre'].h_score
-            rows.append({
-                'Send': my_trade,
-                'Receive': their_trade,
-                'Your Score': your_diff,
-                'Their Score': their_diff,
-            })
-
-    if len(rows) == 0:
+    n_combos = len(all_combos)
+    if n_combos == 0:
         return pd.DataFrame(columns=['Send', 'Receive', 'Your Score', 'Their Score'])
 
-    df = pd.DataFrame(rows)
+    # Sum x_scores for each combo's sent / received players: (n_combos, n_categories)
+    # Uses numpy integer indexing to avoid per-combo pandas overhead.
+    # When all combos have the same size, builds a uniform 2D index array for a
+    # fully vectorized sum. When sizes are mixed (asymmetric), falls back to a
+    # per-row loop that still uses numpy rather than pandas.
+    sent_sizes     = set(len(sent)     for sent     in all_combos['My Trade'])
+    received_sizes = set(len(received) for received in all_combos['Their Trade'])
+
+    if len(sent_sizes) == 1 and len(received_sizes) == 1:
+        sent_index_array     = np.array([[my_name_to_index[p]    for p in sent]     for sent     in all_combos['My Trade']])
+        received_index_array = np.array([[their_name_to_index[p] for p in received] for received in all_combos['Their Trade']])
+        sent_sums     = my_x_numpy[sent_index_array].sum(axis=1)
+        received_sums = their_x_numpy[received_index_array].sum(axis=1)
+    else:
+        sent_sums     = np.array([my_x_numpy[   [my_name_to_index[p]    for p in sent]    ].sum(axis=0) for sent     in all_combos['My Trade']])
+        received_sums = np.array([their_x_numpy[[their_name_to_index[p] for p in received]].sum(axis=0) for received in all_combos['Their Trade']])
+    trade_deltas = received_sums - sent_sums  # (n_combos, n_categories)
+
+    # Build all post diff_means at once: (n_combos, n_categories, n_drafters-1)
+    post_diff_means_my    = ctx['baseline_diff_means_my']    + trade_deltas[:, :, np.newaxis]
+    post_diff_means_their = ctx['baseline_diff_means_their'] - trade_deltas[:, :, np.newaxis]
+
+    post_diff_means_my   [:, :, ctx['their_col_in_my_view']]    += trade_deltas
+    post_diff_means_their[:, :, ctx['my_col_in_their_view']]    -= trade_deltas
+
+    post_my_h_scores    = H.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'])
+    post_their_h_scores = H.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'])
+
+    df = pd.DataFrame({
+        'Send':        list(all_combos['My Trade']),
+        'Receive':     list(all_combos['Their Trade']),
+        'Your Score':  post_my_h_scores    - ctx['pre_my_h'],
+        'Their Score': post_their_h_scores - ctx['pre_their_h'],
+    })
     return df.sort_values('Your Score', ascending=False)
 
 
 # ── Suggestion orchestrator ──────────────────────────────────────────────────
 
 def _get_general_values(session: Session) -> pd.Series:
-    """Get default H-score values for all players (no assignments)."""
+    """Get default H-score values for all players (no assignments).
+
+    Cached on session.generic_h_scores after the first call — the same field
+    used by auction mode — so repeated trade searches within a session pay
+    the cost only once.
+    """
+    if session.generic_h_scores is not None:
+        return session.generic_h_scores
+
     H = session.H
     cp = session.current_params
     n_drafters = cp['n_drafters']
@@ -299,7 +432,8 @@ def _get_general_values(session: Session) -> pd.Series:
         drafter='Team 1',
         n_iterations=n_iterations,
     )
-    return result['Scores'].sort_values(ascending=False)
+    session.generic_h_scores = result['Scores'].sort_values(ascending=False)
+    return session.generic_h_scores
 
 
 def run_trade_suggest(
@@ -313,25 +447,25 @@ def run_trade_suggest(
     ignore_position_check: bool = False,
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
-    H = session.H
 
-    n_iterations = session.current_params['n_iterations']
-
-    # Step 1: identify which players are trade candidates
-    my_candidates, their_candidates = _identify_trade_candidates(
-        H, my_team, their_team, player_assignments, n_iterations,
-    )
-
-    if len(my_candidates) == 0 or len(their_candidates) == 0:
-        return TradeSuggestResponse(suggestions=[])
-
-    # Step 2: get general values for filtering
+    # Step 1: get general values for filtering
     general_values = _get_general_values(session)
 
     n_picks = session.current_params['n_picks']
     n_drafters = session.current_params['n_drafters']
     total_players = n_picks * n_drafters
     replacement_value = float(general_values.iloc[min(total_players, len(general_values) - 1)])
+
+    # Step 2: use all players as candidates (candidate filter disabled)
+    my_candidates    = player_assignments[my_team]
+    their_candidates = player_assignments[their_team]
+
+    # Step 2b: pre-extract x_scores for the two teams as numpy arrays.
+    # Avoids per-combo pandas .loc[].sum() overhead in _make_combo_df.
+    my_x_numpy    = session.H.x_scores.loc[my_candidates].to_numpy()
+    their_x_numpy = session.H.x_scores.loc[their_candidates].to_numpy()
+    my_name_to_index    = {name: i for i, name in enumerate(my_candidates)}
+    their_name_to_index = {name: i for i, name in enumerate(their_candidates)}
 
     # Step 3: generate all combos across param sets
     all_combo_frames = []
@@ -350,12 +484,35 @@ def run_trade_suggest(
 
     all_combos = pd.concat(all_combo_frames, ignore_index=True)
 
-    # Step 4: evaluate each combo
-    df = _make_combo_df(session, all_combos, my_team, their_team, player_assignments, ignore_position_check)
+    # Step 3: evaluate all combos vectorized
+    df = _make_combo_df(
+        session
+        , all_combos
+        , my_team
+        , their_team
+        , player_assignments
+        , my_x_numpy
+        , their_x_numpy
+        , my_name_to_index
+        , their_name_to_index
+    )
 
-    # Step 5: filter by thresholds
+    # Step 4: filter by score thresholds
     mask = (df['Your Score'] > your_threshold) & (df['Their Score'] > their_threshold)
     df = df[mask]
+
+    # Step 5: position check only on the small set that passed the thresholds
+    if not ignore_position_check and len(df) > 0:
+        pos_cfg = session.H._pos_cfg
+        valid = []
+        for _, row in df.iterrows():
+            sent, received = row['Send'], row['Receive']
+            post_my_roster    = [p for p in player_assignments[my_team]    if p not in sent]    + received
+            post_their_roster = [p for p in player_assignments[their_team] if p not in received] + sent
+            if (check_team_eligibility(session.info['Positions'].loc[post_my_roster],    pos_cfg)
+            and check_team_eligibility(session.info['Positions'].loc[post_their_roster], pos_cfg)):
+                valid.append(row)
+        df = pd.DataFrame(valid) if valid else df.iloc[:0]
 
     suggestions = [
         TradeSuggestion(

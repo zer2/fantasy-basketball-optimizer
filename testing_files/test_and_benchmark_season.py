@@ -1,11 +1,11 @@
-# testing_files/benchmark_season.py
-# Season Mode correctness tests: trade analysis and waiver wire evaluation.
+# testing_files/test_and_benchmark_season.py
+# Season Mode correctness tests: waiver wire evaluation.
 # Uses 2024-25 historical season data with default parameters from parameters.yaml.
 # Rosters mirror the pre-computed defaults in frontend/data_entry/season/default_season_rosters.ts.
 #
 # Covers:
-#   - Trade analysis: Drafter 1 sends SGA, receives Jokic
 #   - Waiver evaluate: Drafter 1 drops Gary Trent Jr.
+# Trade analysis is covered separately in test_trading.py and test_and_benchmark_trading.py.
 
 from benchmark_helpers import (
     client
@@ -14,7 +14,6 @@ from benchmark_helpers import (
 )
 from backend.session import get_session
 from backend.evaluate import run_evaluate
-from backend.math.trading import run_trade_analyze
 
 # Mirrors frontend/data_entry/season/default_season_rosters.ts.
 # EC scoring, 2024-25 historical data, 12 drafters, 13 picks, snake-drafted by H-score rank.
@@ -202,10 +201,9 @@ _DEFAULT_SEASON_ROSTERS: dict[str, list[str]] = {
 }
 
 
-def test_season_mode_trade_and_waiver():
+def test_season_mode_waiver():
     """Season Mode: default H-score snake-draft rosters, EC scoring.
-    Checks trade analysis (Drafter 1 sends SGA, receives Jokic) and
-    waiver evaluate (Drafter 1 drops Gary Trent Jr.).
+    Waiver evaluate: Drafter 1 drops Gary Trent Jr.
     """
     session_request = _build_session_request(scoring_format='Head to Head: Each Category')
     response        = client.post('/sessions', json=session_request)
@@ -215,39 +213,7 @@ def test_season_mode_trade_and_waiver():
     session      = get_session(session_id)
     n_iterations = session.current_params['n_iterations']
 
-    # ── Trade: Drafter 1 sends SGA, receives Jokic ───────────────────────────
-
     drafter_1_roster = _DEFAULT_SEASON_ROSTERS['Drafter 1']
-    drafter_2_roster = _DEFAULT_SEASON_ROSTERS['Drafter 2']
-
-    sga_name   = next(name for name in drafter_1_roster if name.startswith('Shai Gilgeous-Alexander'))
-    jokic_name = next(name for name in drafter_2_roster if name.startswith('Nikola Jokic'))
-
-    trade_response = run_trade_analyze(
-        session            = session
-        , player_assignments = _DEFAULT_SEASON_ROSTERS
-        , my_team            = 'Drafter 1'
-        , their_team         = 'Drafter 2'
-        , my_trade           = [sga_name]
-        , their_trade        = [jokic_name]
-    )
-
-    assert trade_response.error is None, f'Trade analyze returned error: {trade_response.error}'
-
-    drafter_1_result = trade_response.your_team
-    drafter_2_result = trade_response.their_team
-
-    # Trade H-scores are returned on the raw 0–1 scale; multiply by 100 to compare
-    # against the user-facing display values.
-    d1_pre  = drafter_1_result.pre.h_score  * 100
-    d1_post = drafter_1_result.post.h_score * 100
-    d2_pre  = drafter_2_result.pre.h_score  * 100
-    d2_post = drafter_2_result.post.h_score * 100
-
-    assert abs(d1_pre  - 52.68) <= _SCORE_TOL, f'Drafter 1 pre-trade:  expected 52.68, got {d1_pre:.2f}'
-    assert abs(d1_post - 52.03) <= _SCORE_TOL, f'Drafter 1 post-trade: expected 52.03, got {d1_post:.2f}'
-    assert abs(d2_pre  - 52.07) <= _SCORE_TOL, f'Drafter 2 pre-trade:  expected 52.07, got {d2_pre:.2f}'
-    assert abs(d2_post - 52.43) <= _SCORE_TOL, f'Drafter 2 post-trade: expected 52.43, got {d2_post:.2f}'
 
     # ── Waiver: Drafter 1 drops Gary Trent Jr. ───────────────────────────────
 

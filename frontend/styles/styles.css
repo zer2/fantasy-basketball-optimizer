@@ -1430,6 +1430,46 @@ tr {
     margin-bottom: 8px;
 }
 
+.trade-combo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.trade-threshold-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.trade-threshold-group label {
+    font-size: 0.78rem;
+    color: light-dark(#555, #aab);
+}
+
+.trade-threshold-input {
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#333333, lightgrey);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 0.8rem;
+    width: 62px;
+    box-sizing: border-box;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.trade-threshold-input::-webkit-inner-spin-button,
+.trade-threshold-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.trade-threshold-input:focus {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
 /* ─── Waiver Wire ─────────────────────────────────────────────────────────────── */
 
 .waiver-selector-row {
