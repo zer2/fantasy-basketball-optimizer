@@ -75,7 +75,7 @@ export interface ModelParameters {
 }
 
 export interface DataSource {
-    type: 'blended' | 'historical' | 'csv'
+    type: 'projections' | 'historical' | 'csv'
     blend_weights: { ESPN: number; DARKO: number; HTB: number; BBM: number }
     custom_data_ids: { HTB: string | null; BBM: string | null }
     season?: string | null   // for 'historical' type
