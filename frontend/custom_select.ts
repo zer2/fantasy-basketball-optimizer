@@ -166,6 +166,10 @@ export function makeCustomSelect(
         searchInput.addEventListener('focus', () => {
             if (dropdown.hidden) open()
         })
+
+        searchInput.addEventListener('click', () => {
+            if (dropdown.hidden) open()
+        })
     }
 
     searchInput.addEventListener('input', () => {

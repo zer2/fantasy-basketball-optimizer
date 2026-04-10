@@ -353,12 +353,16 @@ function fetchMissingCombos(
             .then(resp => {
                 pendingFetches.delete(key)
                 suggestionCache.set(key, resp.suggestions)
-                refreshSuggestionDisplay(resultsArea, loadingIndicator, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
+                if (pendingFetches.size === 0) {
+                    refreshSuggestionDisplay(resultsArea, loadingIndicator, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
+                }
             })
             .catch(() => {
                 pendingFetches.delete(key)
                 suggestionCache.set(key, [])
-                refreshSuggestionDisplay(resultsArea, loadingIndicator, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
+                if (pendingFetches.size === 0) {
+                    refreshSuggestionDisplay(resultsArea, loadingIndicator, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
+                }
             })
     }
 
@@ -551,8 +555,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
     theirThreshInfo.type = 'button'
     theirThreshInfo.className = 'info-btn'
     theirThreshInfo.textContent = 'ⓘ'
-    theirThreshInfo.dataset.tooltip = 'Minimum H-score improvement for the counterparty team, as a percentage. Negative values allow trades that hurt them slightly. Default: -0.2.'
-    const theirThreshInput = makeNumberInput('ts-their-threshold', pref('ts-their-threshold', -0.2))
+    theirThreshInfo.dataset.tooltip = 'Minimum H-score improvement for the counterparty team, as a percentage. Negative values allow trades that hurt them slightly. Default: 0.'
+    const theirThreshInput = makeNumberInput('ts-their-threshold', pref('ts-their-threshold', 0))
     theirThreshInput.className = ''
     theirThreshInput.step = '0.1'
     const theirThreshWrap = document.createElement('div')
@@ -668,6 +672,15 @@ export function renderSeasonTrading(container: HTMLElement): void {
                 const msg = document.createElement('p')
                 msg.className = 'coming-soon'
                 msg.textContent = 'A trade must include at least one player from each team.'
+                hPane.append(msg)
+                gPane.append(msg.cloneNode(true))
+                return
+            }
+
+            if (sent.length !== received.length) {
+                const msg = document.createElement('p')
+                msg.className = 'coming-soon'
+                msg.textContent = 'Trades must include an equal number of players from both teams.'
                 hPane.append(msg)
                 gPane.append(msg.cloneNode(true))
                 return
