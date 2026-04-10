@@ -270,6 +270,12 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 
 /* ─── Multiselect (chip-style, mirrors st.multiselect) ──────────────────── */
 
+.ms-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
 .ms-container {
     position: relative;
     font-family: "Source Sans 3";
@@ -285,6 +291,7 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     min-height: 30px;
+    box-sizing: border-box;
     cursor: text;
     align-items: center;
 }
@@ -1354,7 +1361,12 @@ tr {
     margin-bottom: 4px;
 }
 
-.trade-selector-col { flex: 1; }
+.trade-selector-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
 
 .trade-divider {
     border: none;
@@ -1367,7 +1379,12 @@ tr {
     gap: 24px;
 }
 
-.trade-left-col { flex: 0 0 36%; }
+.trade-left-col {
+    flex: 0 0 36%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
 .trade-right-col { flex: 1; min-width: 0; }
 
 /* Trade player multi-selects (reuse .ms-* styles from helper_functions) */
@@ -1427,48 +1444,63 @@ tr {
     font-size: 0.85rem;
     font-weight: 600;
     color: light-dark(#333333, #bbc);
-    margin-bottom: 8px;
+    white-space: nowrap;
 }
 
 .trade-combo-row {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 12px;
 }
 
 .trade-threshold-group {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 7px;
     white-space: nowrap;
 }
 
-.trade-threshold-group label {
+.trade-threshold-group label,
+.trade-threshold-label {
     font-size: 0.78rem;
     color: light-dark(#555, #aab);
 }
 
-.trade-threshold-input {
+.trade-threshold-input-wrap {
+    display: flex;
+    align-items: center;
+    width: 66px;
+    padding: 4px 6px;
     background-color: light-dark(#fafafa, #181923);
-    color: light-dark(#333333, lightgrey);
     border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
-    padding: 4px 6px;
-    font-size: 0.8rem;
-    width: 62px;
+    min-height: 30px;
     box-sizing: border-box;
+}
+
+.trade-threshold-input-wrap:focus-within {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
+.trade-threshold-input-wrap input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    width: 100%;
     -moz-appearance: textfield;
     appearance: textfield;
 }
 
-.trade-threshold-input::-webkit-inner-spin-button,
-.trade-threshold-input::-webkit-outer-spin-button {
+.trade-threshold-input-wrap input::-webkit-inner-spin-button,
+.trade-threshold-input-wrap input::-webkit-outer-spin-button {
     -webkit-appearance: none;
 }
 
-.trade-threshold-input:focus {
-    outline: 1px solid light-dark(#999999, #666688);
-}
+
 
 /* ─── Waiver Wire ─────────────────────────────────────────────────────────────── */
 

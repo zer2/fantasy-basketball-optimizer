@@ -332,8 +332,8 @@ function fetchMissingCombos(
     receiveSel: MultiSelectWidget,
     onTradeSelected: () => void,
 ): void {
-    const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value)
-    const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value)
+    const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value) / 100
+    const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value) / 100
     const ignore_position_check        = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
     const selected = comboSel.getSelected()
 
@@ -491,25 +491,35 @@ export function renderSeasonTrading(container: HTMLElement): void {
     divider2.className = 'trade-divider'
     container.append(divider2)
 
-    const suggestHeader = document.createElement('div')
+    // Combo filter row — "Suggested trades" label on left, controls on right
+    const comboRow = document.createElement('div')
+    comboRow.className = 'trade-combo-row'
+
+    const suggestHeader = document.createElement('span')
     suggestHeader.className = 'trade-suggest-header'
     suggestHeader.textContent = 'Suggested trades'
-    container.append(suggestHeader)
+    comboRow.append(suggestHeader)
 
-    // Combo filter multiselect — created once, persists across team changes
+    // Combo filter group — right-justified, with "Trade sizes" caption
+    const comboGroup = document.createElement('div')
+    comboGroup.className = 'trade-threshold-group'
+    comboGroup.style.marginLeft = 'auto'
+
+    const comboSizeLabel = document.createElement('span')
+    comboSizeLabel.className = 'trade-threshold-label'
+    comboSizeLabel.textContent = 'Trade sizes'
+
     const comboOptions = DEFAULT_COMBOS.map(cp => `${cp.n_traded} for ${cp.n_received}`)
     const comboSel = makeMultiSelectWidget('', comboOptions)
     comboSel.setSelected([comboOptions[0]])
-
-    const comboRow = document.createElement('div')
-    comboRow.className = 'trade-combo-row'
-    comboRow.append(comboSel.element)
 
     const loadingIndicator = document.createElement('span')
     loadingIndicator.className = 'eval-indicator evaluating'
     loadingIndicator.textContent = 'Searching...'
     loadingIndicator.style.display = 'none'
-    comboRow.append(loadingIndicator)
+
+    comboGroup.append(comboSizeLabel, comboSel.element, loadingIndicator)
+    comboRow.append(comboGroup)
 
     // Your threshold control group
     const yourThreshGroup = document.createElement('div')
@@ -521,12 +531,14 @@ export function renderSeasonTrading(container: HTMLElement): void {
     yourThreshInfo.type = 'button'
     yourThreshInfo.className = 'info-btn'
     yourThreshInfo.textContent = 'ⓘ'
-    yourThreshInfo.dataset.tooltip = 'Minimum H-score improvement required for a trade to be suggested for your team. Default: 0.'
+    yourThreshInfo.dataset.tooltip = 'Minimum H-score improvement required for a trade to be suggested for your team, as a percentage. Default: 0.'
     const yourThreshInput = makeNumberInput('ts-your-threshold', pref('ts-your-threshold', 0))
-    yourThreshInput.className = 'trade-threshold-input'
-    yourThreshInput.step = '0.001'
-    yourThreshGroup.append(yourThreshLabel, yourThreshInfo, yourThreshInput)
-    yourThreshGroup.style.marginLeft = 'auto'
+    yourThreshInput.className = ''
+    yourThreshInput.step = '0.1'
+    const yourThreshWrap = document.createElement('div')
+    yourThreshWrap.className = 'trade-threshold-input-wrap'
+    yourThreshWrap.append(yourThreshInput)
+    yourThreshGroup.append(yourThreshLabel, yourThreshInfo, yourThreshWrap)
     comboRow.append(yourThreshGroup)
 
     // Their threshold control group
@@ -539,11 +551,14 @@ export function renderSeasonTrading(container: HTMLElement): void {
     theirThreshInfo.type = 'button'
     theirThreshInfo.className = 'info-btn'
     theirThreshInfo.textContent = 'ⓘ'
-    theirThreshInfo.dataset.tooltip = 'Minimum H-score improvement for the counterparty team. Negative values allow trades that hurt them slightly. Default: -0.002.'
-    const theirThreshInput = makeNumberInput('ts-their-threshold', pref('ts-their-threshold', -0.002))
-    theirThreshInput.className = 'trade-threshold-input'
-    theirThreshInput.step = '0.001'
-    theirThreshGroup.append(theirThreshLabel, theirThreshInfo, theirThreshInput)
+    theirThreshInfo.dataset.tooltip = 'Minimum H-score improvement for the counterparty team, as a percentage. Negative values allow trades that hurt them slightly. Default: -0.2.'
+    const theirThreshInput = makeNumberInput('ts-their-threshold', pref('ts-their-threshold', -0.2))
+    theirThreshInput.className = ''
+    theirThreshInput.step = '0.1'
+    const theirThreshWrap = document.createElement('div')
+    theirThreshWrap.className = 'trade-threshold-input-wrap'
+    theirThreshWrap.append(theirThreshInput)
+    theirThreshGroup.append(theirThreshLabel, theirThreshInfo, theirThreshWrap)
     comboRow.append(theirThreshGroup)
 
     // Ignore position toggle
