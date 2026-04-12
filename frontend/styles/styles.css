@@ -1454,6 +1454,12 @@ tr {
     margin-bottom: 12px;
 }
 
+.trade-combo-select .ms-input-area {
+    width: 250px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
 .trade-threshold-group {
     display: flex;
     align-items: center;
