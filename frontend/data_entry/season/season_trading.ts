@@ -13,6 +13,7 @@ import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
 import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
+import { applyIndicatorState } from '../../api/session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -278,14 +279,6 @@ function buildHScoreComparisonTable(
  * Shows a loading indicator for any combos that are still being fetched,
  * and merges + sorts all cached suggestions into a single table.
  */
-function setSuggestIndicator(
-    indicator: HTMLElement
-    , state: 'idle' | 'fetching' | 'evaluating'
-): void {
-    indicator.dataset.state = state
-    indicator.textContent = state === 'idle' ? '' : state === 'fetching' ? 'Starting...' : 'Updating...'
-}
-
 function refreshSuggestionDisplay(
     resultsArea: HTMLElement,
     selected: string[],
@@ -294,12 +287,11 @@ function refreshSuggestionDisplay(
     sendSel: MultiSelectWidget,
     receiveSel: MultiSelectWidget,
     onTradeSelected: () => void,
-    indicator: HTMLElement,
 ): void {
     resultsArea.innerHTML = ''
 
     if (selected.length === 0) {
-        setSuggestIndicator(indicator, 'idle')
+        applyIndicatorState('suggest-indicator', 'idle')
         const msg = document.createElement('div')
         msg.className = 'trade-suggestion-stub'
         msg.textContent = 'Select at least one trade combination.'
@@ -308,7 +300,7 @@ function refreshSuggestionDisplay(
     }
 
     const isLoading = selected.some(key => pendingFetches.has(key))
-    if (!isLoading) setSuggestIndicator(indicator, 'idle')
+    if (!isLoading) applyIndicatorState('suggest-indicator', 'idle')
 
     const allSuggestions = selected.flatMap(key => suggestionCache.get(key) ?? [])
     allSuggestions.sort((a, b) => b.your_score - a.your_score)
@@ -338,7 +330,6 @@ function fetchMissingCombos(
     sendSel: MultiSelectWidget,
     receiveSel: MultiSelectWidget,
     onTradeSelected: () => void,
-    indicator: HTMLElement,
 ): void {
     const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value) / 100
     const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value) / 100
@@ -352,7 +343,6 @@ function fetchMissingCombos(
         if (!cp) continue
 
         pendingFetches.add(key)
-        setSuggestIndicator(indicator, 'fetching')
 
         runTradeSuggest(
             assignments, yourTeam, theirTeam,
@@ -363,19 +353,19 @@ function fetchMissingCombos(
                 pendingFetches.delete(key)
                 suggestionCache.set(key, resp.suggestions)
                 if (pendingFetches.size === 0) {
-                    refreshSuggestionDisplay(resultsArea, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected, indicator)
+                    refreshSuggestionDisplay(resultsArea, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
                 }
             })
             .catch(() => {
                 pendingFetches.delete(key)
                 suggestionCache.set(key, [])
                 if (pendingFetches.size === 0) {
-                    refreshSuggestionDisplay(resultsArea, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected, indicator)
+                    refreshSuggestionDisplay(resultsArea, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
                 }
             })
     }
 
-    refreshSuggestionDisplay(resultsArea, selected, pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected, indicator)
+    refreshSuggestionDisplay(resultsArea, selected, pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
 }
 
 function buildSuggestionTable(
@@ -514,9 +504,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
 
     const suggestIndicator = document.createElement('span')
     suggestIndicator.className = 'eval-indicator'
+    suggestIndicator.id = 'suggest-indicator'
     suggestIndicator.dataset.state = 'idle'
-    suggestIndicator.textContent = ''
-
     comboRow.append(suggestHeader, suggestIndicator)
 
     // Combo filter group — right-justified, with "Trade sizes" caption
@@ -710,7 +699,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
         bodyArea.append(bodyRow)
 
         // Fetch suggestions for the current teams
-        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, sendSel, receiveSel, updateResults, suggestIndicator)
+        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, sendSel, receiveSel, updateResults)
     }
 
     rebuildBody()
@@ -724,7 +713,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
         if (!currentSendSel || !currentReceiveSel || !currentUpdateResults) return
         const yourTeam  = yourTeamSel.getValue() || fullTeams[0]
         const theirTeam = theirTeamSel.getValue() || fullTeams[1]
-        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, currentSendSel, currentReceiveSel, currentUpdateResults, suggestIndicator)
+        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, currentSendSel, currentReceiveSel, currentUpdateResults)
     }
 
     yourThreshInput.addEventListener('change', () => {
@@ -744,7 +733,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
         if (!currentSendSel || !currentReceiveSel || !currentUpdateResults) return
         const yourTeam  = yourTeamSel.getValue() || fullTeams[0]
         const theirTeam = theirTeamSel.getValue() || fullTeams[1]
-        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, currentSendSel, currentReceiveSel, currentUpdateResults, suggestIndicator)
+        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, currentSendSel, currentReceiveSel, currentUpdateResults)
     })
     yourTeamSel.element.addEventListener('change', () => {
         const yourTeam = yourTeamSel.getValue()
