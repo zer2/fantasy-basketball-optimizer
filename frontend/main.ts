@@ -5,7 +5,8 @@
 
 import { createSection, addApplyBtn, makeSidebarToggle, makeDebouncer } from './helper_functions.js'
 import { getCandidatePlayerResults, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
-import { createOrPatchSession, runEvaluate, runSeasonInit, clearFullTeamResult } from './api/session.js'
+import { createOrPatchSession, runEvaluate, clearFullTeamResult } from './api/draft_and_auction_session.js'
+import { runSeasonInit } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTable } from './table/player_table.js'
 import { applyLayout } from './layout.js'
@@ -20,7 +21,6 @@ import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } fr
 import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
-import { renderTradeParameters } from './parameter_collection/trade_parameters.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
 // depending on the current mode selector value.
@@ -225,14 +225,7 @@ addApplyBtn(slotSection, async () => {
     applyLayout()
 })
 
-// ─── 6. Trade Parameters ──────────────────────────────────────────────────────
-
-const tradeSection = createSection(sidebarSections, 'Trade Parameters')
-renderTradeParameters(tradeSection)
-// Trade parameters target a future endpoint; no backend call yet.
-addApplyBtn(tradeSection, () => {})
-
-// ─── 7. Display ───────────────────────────────────────────────────────────────
+// ─── 6. Display ───────────────────────────────────────────────────────────────
 
 const displaySection = createSection(sidebarSections, 'Display')
 const themeToggle = makeSidebarToggle('theme-toggle', 'Light mode', 'Dark mode')

@@ -1,4 +1,4 @@
-# testing_files/benchmark_auction.py
+# testing_files/test_and_benchmark_auction.py
 # Auction mode correctness tests for the H-score and dollar-value algorithms.
 # Uses 2024-25 historical season data with default parameters from parameters.yaml.
 #

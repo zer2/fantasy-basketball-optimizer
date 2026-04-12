@@ -1,4 +1,4 @@
-# testing_files/benchmark_draft.py
+# testing_files/test_and_benchmark_draft.py
 # Draft mode benchmarks and correctness tests for the H-score algorithm.
 # Uses 2024-25 historical season data with default parameters from parameters.yaml.
 #

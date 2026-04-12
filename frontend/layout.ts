@@ -12,7 +12,7 @@ import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
 import { getLeagueSettings } from './parameter_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
-import { getFullTeamResult } from './api/session.js'
+import { getFullTeamResult } from './api/draft_and_auction_session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 

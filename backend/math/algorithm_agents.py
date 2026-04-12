@@ -384,6 +384,58 @@ class HAgent:
 
         return diff_means, diff_vars, sigma_2_m
 
+    def compute_h_score_from_diff_means(self,
+                                         diff_means: np.ndarray,
+                                         diff_vars: np.ndarray) -> float:
+        """Fast H-score for a complete (n_picks) roster given pre-computed diff_means.
+
+        Mirrors the n_players_selected == n_picks branch of perform_iterations:
+        no available-player array needed, just score diff_means directly.
+
+        diff_means : (1, n_categories, n_drafters-1)
+        diff_vars  : (1, n_categories, n_drafters-1)
+        """
+        if self.scoring_format == 'Rotisserie':
+            sigma_c   = (diff_means / np.sqrt(diff_vars))[0, :, :].std(axis=1, ddof=1) * np.sqrt(2)
+            h_m       = self.get_h_m(sigma_c, self.n_drafters)
+            sigma_2_m = self.get_sigma_2_m(sigma_c, h_m, self.rho, self.n_drafters)
+        else:
+            sigma_2_m = None
+
+        cdf_estimates = self.get_cdf(diff_means, diff_vars)
+        score = self.get_objective_and_pdf_weights(
+            diff_means, diff_vars, cdf_estimates, None, sigma_2_m,
+            calculate_pdf_weights=False,
+        )
+        return float(np.max(score))
+
+    def compute_h_scores_batched(self,
+                                  diff_means_batch: np.ndarray,
+                                  diff_vars: np.ndarray) -> np.ndarray:
+        """Vectorized H-score for a batch of complete-roster diff_means.
+
+        Equivalent to calling compute_h_score_from_diff_means N times but in a
+        single pass through get_cdf / get_objective_and_pdf_weights, which are
+        already vectorized over the first (batch) dimension.
+
+        diff_means_batch : (N, n_categories, n_drafters-1)
+        diff_vars        : (1, n_categories, n_drafters-1)  [broadcasts over N]
+        Returns          : (N,) scores
+        """
+        if self.scoring_format == 'Rotisserie':
+            z         = diff_means_batch / np.sqrt(diff_vars)   # (N, n_cats, n_drafters-1)
+            sigma_c   = z.std(axis=2, ddof=1) * np.sqrt(2)      # (N, n_cats)
+            h_m       = self.get_h_m(sigma_c, self.n_drafters)
+            sigma_2_m = self.get_sigma_2_m(sigma_c, h_m, self.rho, self.n_drafters)
+        else:
+            sigma_2_m = None
+
+        cdf_estimates = self.get_cdf(diff_means_batch, diff_vars)
+        return self.get_objective_and_pdf_weights(
+            diff_means_batch, diff_vars, cdf_estimates, None, sigma_2_m,
+            calculate_pdf_weights=False,
+        )
+
     def get_opposing_team_means(self, players, mean_extra_players, n_my_players):
         n_extra = max(n_my_players + 1 - len(players), 0)
         player_sum  = np.array(self.x_scores.loc[[p for p in players if p == p]].sum(axis=0))
@@ -503,16 +555,41 @@ class HAgent:
             expected_future_diff = None
             category_weights_current = None
 
-        else:
-            x_diff_array   = diff_means + x_scores_available_array
-            cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
+        elif n_players_selected == self.n_picks:
+            cdf_estimates  = self.get_cdf(diff_means, diff_vars)
             score          = self.get_objective_and_pdf_weights(
-                x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
+                diff_means, diff_vars, cdf_estimates, None, sigma_2_m,
                 calculate_pdf_weights=False,
             )
-            rosters              = None
-            expected_future_diff = None
+            result_index             = ['']
+            rosters                  = None
+            expected_future_diff     = None
             category_weights_current = None
+            position_shares_current  = None
+
+        else:
+            # n_players_selected > n_picks: find the best subset to drop.
+            extra_players = n_players_selected - self.n_picks
+            players_to_remove_possibilities = combinations(my_players, extra_players)
+
+            drop_potentials = pd.concat(
+                (self.x_scores.loc[list(players_to_remove)].sum(axis=0)
+                 for players_to_remove in players_to_remove_possibilities),
+                axis=1,
+            ).T
+            drop_potentials_array = np.expand_dims(np.array(drop_potentials), axis=2)
+            diff_means_mod = diff_means - drop_potentials_array
+
+            cdf_estimates  = self.get_cdf(diff_means_mod, diff_vars)
+            score          = self.get_objective_and_pdf_weights(
+                diff_means_mod, diff_vars, cdf_estimates, None, sigma_2_m,
+                calculate_pdf_weights=False,
+            )
+            result_index             = drop_potentials.index
+            rosters                  = None
+            expected_future_diff     = None
+            category_weights_current = None
+            position_shares_current  = None
 
         cdf_means = cdf_estimates.mean(axis=2)
 

@@ -8,7 +8,7 @@ import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
-import { evaluateTeamHScore } from '../../api/session.js'
+import { evaluateTeamHScore } from '../../api/season_session.js'
 
 /** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {

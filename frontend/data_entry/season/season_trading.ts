@@ -6,12 +6,14 @@
 //   3. Suggested trades table
 
 import { makeCustomSelect } from '../../custom_select.js'
-import { makeMultiSelectWidget, MultiSelectWidget } from '../../helper_functions.js'
+import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle } from '../../helper_functions.js'
 import { getGScoreByName } from '../../app_state.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
-import { getTradeParameters } from '../../parameter_collection/trade_parameters.js'
-import { runTradeAnalyze, runTradeSuggest } from '../../api/session.js'
+import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
+import { pref, savePref } from '../../preferences.js'
+import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
+import { setIndicatorState } from '../../api/session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -161,7 +163,7 @@ function buildHScoreResult(
     loading.textContent = 'Analyzing trade...'
     pane.append(loading)
 
-    const { ignore_position_check } = getTradeParameters()
+    const ignore_position_check = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
     runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, ignore_position_check)
         .then(resp => renderHScoreResult(pane, resp))
         .catch(err => {
@@ -272,20 +274,24 @@ function buildHScoreComparisonTable(
 
 // ─── Suggested trades ───────────────────────────────────────────────────────
 
-function runSuggestionSearch(
+/**
+ * Rebuilds the suggestion display from whatever is currently in the cache.
+ * Shows a loading indicator for any combos that are still being fetched,
+ * and merges + sorts all cached suggestions into a single table.
+ */
+function refreshSuggestionDisplay(
     resultsArea: HTMLElement,
-    comboSel: MultiSelectWidget,
-    assignments: Record<string, string[]>,
-    yourTeam: string,
-    theirTeam: string,
+    selected: string[],
+    pendingFetches: Set<string>,
+    suggestionCache: Map<string, TradeSuggestion[]>,
     sendSel: MultiSelectWidget,
     receiveSel: MultiSelectWidget,
+    onTradeSelected: () => void,
 ): void {
     resultsArea.innerHTML = ''
-    const { combo_params, your_differential_threshold, their_differential_threshold, ignore_position_check } = getTradeParameters()
 
-    const selected = comboSel.getSelected()
     if (selected.length === 0) {
+        setIndicatorState('idle')
         const msg = document.createElement('div')
         msg.className = 'trade-suggestion-stub'
         msg.textContent = 'Select at least one trade combination.'
@@ -293,45 +299,80 @@ function runSuggestionSearch(
         return
     }
 
-    // Filter combo_params to only the selected ones
-    const filteredCombos = combo_params.filter(cp =>
-        selected.includes(`${cp.n_traded} for ${cp.n_received}`)
-    )
+    const isLoading = selected.some(key => pendingFetches.has(key))
+    if (!isLoading) setIndicatorState('idle')
 
-    const loading = document.createElement('div')
-    loading.className = 'trade-suggestion-stub'
-    loading.textContent = 'Finding suggested trades...'
-    resultsArea.append(loading)
+    const allSuggestions = selected.flatMap(key => suggestionCache.get(key) ?? [])
+    allSuggestions.sort((a, b) => b.your_score - a.your_score)
 
-    runTradeSuggest(
-        assignments, yourTeam, theirTeam,
-        filteredCombos, your_differential_threshold, their_differential_threshold,
-        ignore_position_check,
-    )
-        .then(resp => {
-            loading.remove()
-            if (resp.suggestions.length === 0) {
-                const msg = document.createElement('div')
-                msg.className = 'trade-suggestion-stub'
-                msg.textContent = 'No promising trades found.'
-                resultsArea.append(msg)
-                return
-            }
-            resultsArea.append(buildSuggestionTable(resp.suggestions, sendSel, receiveSel))
-        })
-        .catch(err => {
-            loading.remove()
-            const msg = document.createElement('div')
-            msg.className = 'trade-suggestion-stub'
-            msg.textContent = `Error: ${err.message}`
-            resultsArea.append(msg)
-        })
+    if (allSuggestions.length > 0) {
+        resultsArea.append(buildSuggestionTable(allSuggestions, sendSel, receiveSel, onTradeSelected))
+    } else if (!isLoading) {
+        const msg = document.createElement('div')
+        msg.className = 'trade-suggestion-stub'
+        msg.textContent = 'No promising trades found.'
+        resultsArea.append(msg)
+    }
+}
+
+/**
+ * Fetches any selected combos not yet in the cache, then refreshes the display.
+ * Already-cached combos are shown immediately without a round trip.
+ */
+function fetchMissingCombos(
+    resultsArea: HTMLElement,
+    comboSel: MultiSelectWidget,
+    assignments: Record<string, string[]>,
+    yourTeam: string,
+    theirTeam: string,
+    pendingFetches: Set<string>,
+    suggestionCache: Map<string, TradeSuggestion[]>,
+    sendSel: MultiSelectWidget,
+    receiveSel: MultiSelectWidget,
+    onTradeSelected: () => void,
+): void {
+    const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value) / 100
+    const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value) / 100
+    const ignore_position_check        = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
+    const selected = comboSel.getSelected()
+
+    for (const key of selected) {
+        if (suggestionCache.has(key) || pendingFetches.has(key)) continue
+
+        const cp = DEFAULT_COMBOS.find(p => `${p.n_traded} for ${p.n_received}` === key)
+        if (!cp) continue
+
+        pendingFetches.add(key)
+
+        runTradeSuggest(
+            assignments, yourTeam, theirTeam,
+            [cp], your_differential_threshold, their_differential_threshold,
+            ignore_position_check,
+        )
+            .then(resp => {
+                pendingFetches.delete(key)
+                suggestionCache.set(key, resp.suggestions)
+                if (pendingFetches.size === 0) {
+                    refreshSuggestionDisplay(resultsArea, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
+                }
+            })
+            .catch(() => {
+                pendingFetches.delete(key)
+                suggestionCache.set(key, [])
+                if (pendingFetches.size === 0) {
+                    refreshSuggestionDisplay(resultsArea, comboSel.getSelected(), pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
+                }
+            })
+    }
+
+    refreshSuggestionDisplay(resultsArea, selected, pendingFetches, suggestionCache, sendSel, receiveSel, onTradeSelected)
 }
 
 function buildSuggestionTable(
     suggestions: TradeSuggestion[],
     sendSel: MultiSelectWidget,
     receiveSel: MultiSelectWidget,
+    onTradeSelected: () => void,
 ): HTMLTableElement {
     const table = document.createElement('table')
     table.className = 'trade-result-table'
@@ -367,10 +408,13 @@ function buildSuggestionTable(
         theirCell.textContent = (sug.their_score * 100).toFixed(2) + '%'
         theirCell.style.cssText = stat_styler_primary(sug.their_score, 15000, 0)
 
-        // Clicking a suggestion populates the send/receive selectors
+        // Clicking a suggestion populates the send/receive selectors.
+        // Both are set silently to avoid two separate updateResults() calls
+        // (which would fire a stale API request on the first onChange).
         tr.addEventListener('click', () => {
-            sendSel.setSelected(sug.send)
-            receiveSel.setSelected(sug.receive)
+            sendSel.setSelectedSilently(sug.send)
+            receiveSel.setSelectedSilently(sug.receive)
+            onTradeSelected()
         })
     }
 
@@ -450,27 +494,98 @@ export function renderSeasonTrading(container: HTMLElement): void {
     divider2.className = 'trade-divider'
     container.append(divider2)
 
-    const suggestHeader = document.createElement('div')
+    // Combo filter row — "Suggested trades" label on left, controls on right
+    const comboRow = document.createElement('div')
+    comboRow.className = 'trade-combo-row'
+
+    const suggestHeader = document.createElement('span')
     suggestHeader.className = 'trade-suggest-header'
     suggestHeader.textContent = 'Suggested trades'
-    container.append(suggestHeader)
 
-    // Combo filter multiselect — created once, persists across team changes
-    const { combo_params } = getTradeParameters()
-    const comboOptions = combo_params.map(cp => `${cp.n_traded} for ${cp.n_received}`)
-    const comboSel = makeMultiSelectWidget('Trade combinations to search', comboOptions)
+    comboRow.append(suggestHeader)
+
+    // Combo filter group — right-justified, with "Trade sizes" caption
+    const comboGroup = document.createElement('div')
+    comboGroup.className = 'trade-threshold-group'
+    comboGroup.style.marginLeft = 'auto'
+
+    const comboSizeLabel = document.createElement('span')
+    comboSizeLabel.className = 'trade-threshold-label'
+    comboSizeLabel.textContent = 'Trade sizes'
+
+    const comboOptions = DEFAULT_COMBOS.map(cp => `${cp.n_traded} for ${cp.n_received}`)
+    const comboSel = makeMultiSelectWidget('', comboOptions)
     comboSel.setSelected([comboOptions[0]])
-    container.append(comboSel.element)
+
+    comboGroup.append(comboSizeLabel, comboSel.element)
+    comboRow.append(comboGroup)
+
+    // Your threshold control group
+    const yourThreshGroup = document.createElement('div')
+    yourThreshGroup.className = 'trade-threshold-group'
+    const yourThreshLabel = document.createElement('label')
+    yourThreshLabel.htmlFor = 'ts-your-threshold'
+    yourThreshLabel.textContent = 'Your threshold'
+    const yourThreshInfo = document.createElement('button')
+    yourThreshInfo.type = 'button'
+    yourThreshInfo.className = 'info-btn'
+    yourThreshInfo.textContent = 'ⓘ'
+    yourThreshInfo.dataset.tooltip = 'Minimum H-score improvement required for a trade to be suggested for your team, as a percentage. Default: 0.'
+    const yourThreshInput = makeNumberInput('ts-your-threshold', pref('ts-your-threshold', 0))
+    yourThreshInput.className = ''
+    yourThreshInput.step = '0.1'
+    const yourThreshWrap = document.createElement('div')
+    yourThreshWrap.className = 'trade-threshold-input-wrap'
+    yourThreshWrap.append(yourThreshInput)
+    yourThreshGroup.append(yourThreshLabel, yourThreshInfo, yourThreshWrap)
+    comboRow.append(yourThreshGroup)
+
+    // Their threshold control group
+    const theirThreshGroup = document.createElement('div')
+    theirThreshGroup.className = 'trade-threshold-group'
+    const theirThreshLabel = document.createElement('label')
+    theirThreshLabel.htmlFor = 'ts-their-threshold'
+    theirThreshLabel.textContent = 'Their threshold'
+    const theirThreshInfo = document.createElement('button')
+    theirThreshInfo.type = 'button'
+    theirThreshInfo.className = 'info-btn'
+    theirThreshInfo.textContent = 'ⓘ'
+    theirThreshInfo.dataset.tooltip = 'Minimum H-score improvement for the counterparty team, as a percentage. Negative values allow trades that hurt them slightly. Default: 0.'
+    const theirThreshInput = makeNumberInput('ts-their-threshold', pref('ts-their-threshold', 0))
+    theirThreshInput.className = ''
+    theirThreshInput.step = '0.1'
+    const theirThreshWrap = document.createElement('div')
+    theirThreshWrap.className = 'trade-threshold-input-wrap'
+    theirThreshWrap.append(theirThreshInput)
+    theirThreshGroup.append(theirThreshLabel, theirThreshInfo, theirThreshWrap)
+    comboRow.append(theirThreshGroup)
+
+    // Ignore position toggle
+    const ignorePosToggle = makeSidebarToggle('ts-ignore-position', 'Ignore position')
+    comboRow.append(ignorePosToggle)
+
+    container.append(comboRow)
+
+    const ignorePosInput = document.getElementById('ts-ignore-position') as HTMLInputElement
+    ignorePosInput.checked = pref('ts-ignore-position', false)
 
     const suggestResults = document.createElement('div')
     container.append(suggestResults)
 
-    // Track current send/receive selectors so combo change can re-trigger search
-    let currentSendSel: MultiSelectWidget | null = null
-    let currentReceiveSel: MultiSelectWidget | null = null
+    // Cache of suggestion results keyed by combo label (e.g. "1 for 1").
+    // Cleared when the team pair changes so stale results are never shown.
+    const suggestionCache = new Map<string, TradeSuggestion[]>()
+    const pendingFetches  = new Set<string>()
+
+    // Track current send/receive selectors and updateResults so combo change can re-trigger search
+    let currentSendSel:      MultiSelectWidget | null = null
+    let currentReceiveSel:   MultiSelectWidget | null = null
+    let currentUpdateResults: (() => void) | null     = null
 
     function rebuildBody(): void {
         bodyArea.innerHTML = ''
+        suggestionCache.clear()
+        pendingFetches.clear()
 
         const yourTeam  = yourTeamSel.getValue() || fullTeams[0]
         const theirTeam = theirTeamSel.getValue() || fullTeams[1]
@@ -557,10 +672,20 @@ export function renderSeasonTrading(container: HTMLElement): void {
                 return
             }
 
+            if (sent.length !== received.length) {
+                const msg = document.createElement('p')
+                msg.className = 'coming-soon'
+                msg.textContent = 'Trades must include an equal number of players from both teams.'
+                hPane.append(msg)
+                gPane.append(msg.cloneNode(true))
+                return
+            }
+
             buildHScoreResult(hPane, assignments, yourTeam, theirTeam, sent, received)
             gPane.append(buildGScoreTable(sent, received))
         }
 
+        currentUpdateResults = updateResults
         updateResults()
         sendSel.onChange(updateResults)
         receiveSel.onChange(updateResults)
@@ -568,17 +693,42 @@ export function renderSeasonTrading(container: HTMLElement): void {
         bodyRow.append(rightCol)
         bodyArea.append(bodyRow)
 
-        // Trigger suggestion search for current teams
-        runSuggestionSearch(suggestResults, comboSel, assignments, yourTeam, theirTeam, sendSel, receiveSel)
+        // Fetch suggestions for the current teams
+        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, sendSel, receiveSel, updateResults)
     }
 
     rebuildBody()
 
-    comboSel.onChange(() => {
-        if (!currentSendSel || !currentReceiveSel) return
+    // When inline threshold controls change, clear the cache and re-fetch.
+    // document.contains guard makes this a no-op if the tab has been torn down.
+    function clearCacheAndRefetch(): void {
+        if (!document.contains(suggestResults)) return
+        suggestionCache.clear()
+        pendingFetches.clear()
+        if (!currentSendSel || !currentReceiveSel || !currentUpdateResults) return
         const yourTeam  = yourTeamSel.getValue() || fullTeams[0]
         const theirTeam = theirTeamSel.getValue() || fullTeams[1]
-        runSuggestionSearch(suggestResults, comboSel, assignments, yourTeam, theirTeam, currentSendSel, currentReceiveSel)
+        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, currentSendSel, currentReceiveSel, currentUpdateResults)
+    }
+
+    yourThreshInput.addEventListener('change', () => {
+        savePref('ts-your-threshold', parseFloat(yourThreshInput.value))
+        clearCacheAndRefetch()
+    })
+    theirThreshInput.addEventListener('change', () => {
+        savePref('ts-their-threshold', parseFloat(theirThreshInput.value))
+        clearCacheAndRefetch()
+    })
+    ignorePosInput.addEventListener('change', () => {
+        savePref('ts-ignore-position', ignorePosInput.checked)
+        clearCacheAndRefetch()
+    })
+
+    comboSel.onChange(() => {
+        if (!currentSendSel || !currentReceiveSel || !currentUpdateResults) return
+        const yourTeam  = yourTeamSel.getValue() || fullTeams[0]
+        const theirTeam = theirTeamSel.getValue() || fullTeams[1]
+        fetchMissingCombos(suggestResults, comboSel, assignments, yourTeam, theirTeam, pendingFetches, suggestionCache, currentSendSel, currentReceiveSel, currentUpdateResults)
     })
     yourTeamSel.element.addEventListener('change', () => {
         const yourTeam = yourTeamSel.getValue()
