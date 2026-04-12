@@ -19,6 +19,7 @@ COPY __init__.py .
 
 # Data files referenced at runtime
 COPY parameters.yaml .
+COPY coefficient_exploration_output/ coefficient_exploration_output/
 
 # Frontend static assets
 COPY frontend/app.html frontend/app.html
