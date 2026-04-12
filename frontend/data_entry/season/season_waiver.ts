@@ -6,7 +6,7 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { getCandidatePlayerResults, getPlayerResultsByName } from '../../app_state.js'
-import { runWaiverEvaluate } from '../../api/session.js'
+import { runWaiverEvaluate } from '../../api/season_session.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

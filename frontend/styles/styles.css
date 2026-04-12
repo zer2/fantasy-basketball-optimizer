@@ -1290,21 +1290,21 @@ tr {
     flex-shrink: 0;
 }
 
-.eval-indicator.evaluating {
+.eval-indicator[data-state="evaluating"] {
     color: light-dark(#666688, #9999bb);
 }
 
-.eval-indicator.evaluating::before {
+.eval-indicator[data-state="evaluating"]::before {
     border: 2px solid light-dark(#999999, #6666aa);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;
 }
 
-.eval-indicator.fetching {
+.eval-indicator[data-state="fetching"] {
     color: light-dark(#886644, #bb9955);
 }
 
-.eval-indicator.fetching::before {
+.eval-indicator[data-state="fetching"]::before {
     border: 2px solid light-dark(#aa8844, #997733);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;

@@ -5,7 +5,8 @@
 
 import { createSection, addApplyBtn, makeSidebarToggle, makeDebouncer } from './helper_functions.js'
 import { getCandidatePlayerResults, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
-import { createOrPatchSession, runEvaluate, runSeasonInit, clearFullTeamResult } from './api/session.js'
+import { createOrPatchSession, runEvaluate, clearFullTeamResult } from './api/draft_and_auction_session.js'
+import { runSeasonInit } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTable } from './table/player_table.js'
 import { applyLayout } from './layout.js'

@@ -5,7 +5,7 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { getCandidatePlayerResults } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
-import { runEvaluate } from '../api/session.js'
+import { runEvaluate } from '../api/draft_and_auction_session.js'
 import {
     AuctionConfig,
     getPicks, getTeamNames, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,

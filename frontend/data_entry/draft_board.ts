@@ -5,7 +5,8 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../helper_functions.js'
-import { runEvaluate, setAutopilotIndicator, clearFullTeamResult } from '../api/session.js'
+import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
+import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethodByIndex } from '../parameter_collection/league_settings.js'
 import {
     DraftConfig,
@@ -84,7 +85,7 @@ function pickByHScore(): string | null {
 async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     if (_autopilotRunning) return
     _autopilotRunning = true
-    setAutopilotIndicator(true)
+    setAutopilotOn()
     const userSeat = getCurrentSeat()
     ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
     try {
@@ -112,7 +113,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     } finally {
         setCurrentSeat(userSeat)
         _autopilotRunning = false
-        setAutopilotIndicator(false)
+        setAutopilotOff()
         ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = ''
     }
     // Re-render now that _autopilotRunning is false so the pick control
