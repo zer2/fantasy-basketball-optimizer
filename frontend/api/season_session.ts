@@ -5,7 +5,7 @@
 
 import { setCandidatePlayerResults, setPlayerResultsFromGScores } from '../app_state.js'
 import { buildTable } from '../table/player_table.js'
-import { ensureSession, getSessionId, resetSession, setIndicatorState } from './session.js'
+import { ensureSession, getSessionId, resetSession, setIndicatorState, applyIndicatorState } from './session.js'
 import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades } from './client.js'
 import type { TradeAnalyzeResponse, TradeSuggestResponse } from './client.js'
 
@@ -93,11 +93,11 @@ export async function runTradeSuggest(
   , theirThreshold: number
   , ignorePositionCheck?: boolean
 ): Promise<TradeSuggestResponse> {
-    setIndicatorState('fetching')
+    applyIndicatorState('suggest-indicator', 'fetching')
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             await ensureSession()
-            setIndicatorState('evaluating')
+            applyIndicatorState('suggest-indicator', 'evaluating')
             return await suggestTrades(getSessionId()!, {
                 player_assignments:          playerAssignments,
                 my_team:                     myTeam,
@@ -110,7 +110,7 @@ export async function runTradeSuggest(
         } catch (err: any) {
             if (attempt === 0 && err.message?.includes('(404)')) {
                 resetSession()
-                setIndicatorState('fetching')
+                applyIndicatorState('suggest-indicator', 'fetching')
                 continue
             }
             throw err

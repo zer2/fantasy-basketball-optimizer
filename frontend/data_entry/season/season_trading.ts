@@ -13,7 +13,7 @@ import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
 import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
-import { setIndicatorState } from '../../api/session.js'
+import { applyIndicatorState } from '../../api/session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ function refreshSuggestionDisplay(
     resultsArea.innerHTML = ''
 
     if (selected.length === 0) {
-        setIndicatorState('idle')
+        applyIndicatorState('suggest-indicator', 'idle')
         const msg = document.createElement('div')
         msg.className = 'trade-suggestion-stub'
         msg.textContent = 'Select at least one trade combination.'
@@ -300,7 +300,7 @@ function refreshSuggestionDisplay(
     }
 
     const isLoading = selected.some(key => pendingFetches.has(key))
-    if (!isLoading) setIndicatorState('idle')
+    if (!isLoading) applyIndicatorState('suggest-indicator', 'idle')
 
     const allSuggestions = selected.flatMap(key => suggestionCache.get(key) ?? [])
     allSuggestions.sort((a, b) => b.your_score - a.your_score)
@@ -502,7 +502,11 @@ export function renderSeasonTrading(container: HTMLElement): void {
     suggestHeader.className = 'trade-suggest-header'
     suggestHeader.textContent = 'Suggested trades'
 
-    comboRow.append(suggestHeader)
+    const suggestIndicator = document.createElement('span')
+    suggestIndicator.className = 'eval-indicator'
+    suggestIndicator.id = 'suggest-indicator'
+    suggestIndicator.dataset.state = 'idle'
+    comboRow.append(suggestHeader, suggestIndicator)
 
     // Combo filter group — right-justified, with "Trade sizes" caption
     const comboGroup = document.createElement('div')
@@ -515,6 +519,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
 
     const comboOptions = DEFAULT_COMBOS.map(cp => `${cp.n_traded} for ${cp.n_received}`)
     const comboSel = makeMultiSelectWidget('', comboOptions)
+    comboSel.element.classList.add('trade-combo-select')
     comboSel.setSelected([comboOptions[0]])
 
     comboGroup.append(comboSizeLabel, comboSel.element)

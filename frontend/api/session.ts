@@ -18,13 +18,13 @@ let sessionId: string | null = null
 // Indicator state: single source of truth for the loading indicator (#eval-indicator)
 // across all modes. The current state is stored as a data-state attribute so styles.css
 // can apply different colours and animations per state (e.g. spinner while fetching/evaluating).
-const INDICATOR_STATES: Record<string, string> = {
+const INDICATOR_LABELS: Record<string, string> = {
     idle:         'Updated',
     fetching:     'Starting...',
     evaluating:   'Updating...',
     autopiloting: 'Autopiloting...',
 }
-type IndicatorState = keyof typeof INDICATOR_STATES
+type IndicatorState = keyof typeof INDICATOR_LABELS
 
 let currentIndicatorState: IndicatorState = 'idle'
 
@@ -33,29 +33,34 @@ let currentIndicatorState: IndicatorState = 'idle'
 export function getSessionId(): string | null { return sessionId }
 export function resetSession(): void          { sessionId = null }
 
-function applyIndicatorDisplay(state: IndicatorState): void {
-    const evalEl = document.getElementById('eval-indicator') as HTMLElement
-    evalEl.dataset.state = state
-    evalEl.textContent = INDICATOR_STATES[state]
+/** Applies a state to any indicator element, looked up by ID. */
+export function applyIndicatorState(
+    elementId: string
+    , state: string
+): void {
+    const element = document.getElementById(elementId)
+    if (!element) return
+    element.dataset.state = state
+    element.textContent = INDICATOR_LABELS[state] ?? ''
 }
 
-/** Sets the indicator to fetching, evaluating, or idle.  Suppressed while autopilot is active. */
+/** Sets the primary #eval-indicator to fetching, evaluating, or idle.  Suppressed while autopilot is active. */
 export function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating'): void {
     if (currentIndicatorState === 'autopiloting') return
     currentIndicatorState = state
-    applyIndicatorDisplay(state)
+    applyIndicatorState('eval-indicator', state)
 }
 
 /** Enters autopilot indicator mode. While active, setIndicatorState calls are suppressed. */
 export function setAutopilotOn(): void {
     currentIndicatorState = 'autopiloting'
-    applyIndicatorDisplay('autopiloting')
+    applyIndicatorState('eval-indicator', 'autopiloting')
 }
 
 /** Exits autopilot indicator mode and resets to idle. */
 export function setAutopilotOff(): void {
     currentIndicatorState = 'idle'
-    applyIndicatorDisplay('idle')
+    applyIndicatorState('eval-indicator', 'idle')
 }
 
 // ─── Session creation ────────────────────────────────────────────────────────
