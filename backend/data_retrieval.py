@@ -166,7 +166,7 @@ def get_available_seasons() -> list[str]:
         if _seasons_cache is not None and time.time() - _seasons_cache[0] < _CACHE_TTL:
             return _seasons_cache[1]
         df = _get_connection().cursor().execute(
-            'SELECT DISTINCT SEASON FROM AVERAGE_NUMBERS_VIEW_2 ORDER BY SEASON DESC'
+            'SELECT DISTINCT SEASON FROM HISTORICAL_SEASONAL_AVERAGES_VIEW ORDER BY SEASON DESC'
         ).fetch_pandas_all()
         seasons = [str(s) for s in df['SEASON'].tolist()]
         _seasons_cache = (time.time(), seasons)
@@ -180,7 +180,7 @@ def get_historical_data(params: dict) -> pd.DataFrame:
 
     Returns a DataFrame indexed by (Season, Player).
     """
-    df = _query('AVERAGE_NUMBERS_VIEW_2')
+    df = _query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
     df = df.rename(columns=params['stat-df-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
 
