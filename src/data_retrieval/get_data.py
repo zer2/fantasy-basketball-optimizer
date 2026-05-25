@@ -125,7 +125,7 @@ def get_darko_data(player_name_column : str) -> dict[pd.DataFrame]:
 #cache this globally so it doesn't have to be rerun constantly. No need for refreshes- it won't change
 @st.cache_data(ttl = '1d') 
 def get_historical_data():  
-  full_df = get_data_from_snowflake('AVERAGE_NUMBERS_VIEW')
+  full_df = get_data_from_snowflake('HISTORICAL_SEASONAL_AVERAGES_VIEW')
 
   renamer = get_params()['stat-df-renamer']
   full_df = full_df.rename(columns = renamer)
