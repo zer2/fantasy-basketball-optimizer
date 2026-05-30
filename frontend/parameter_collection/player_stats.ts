@@ -11,6 +11,20 @@ import { pref, savePref } from '../preferences.js'
 // Stored data_ids from POST /data/upload; updated immediately on file selection.
 let customDataIds: { HTB: string | null; BBM: string | null } = { HTB: null, BBM: null }
 
+// Resolves when the initial historical-seasons fetch (kicked off inside
+// renderPlayerStats when the default data source is 'historical') has finished
+// populating the ps-season dropdown. Resolves immediately when the default data
+// source is not 'historical', since no fetch is needed.
+let _initialSeasonsPromise: Promise<void> = Promise.resolve()
+
+/** Returns a promise that resolves once the initial seasons dropdown is ready
+ *  (or immediately if no historical fetch was needed). The bootstrap must await
+ *  this before creating the first session — otherwise getPlayerStatsParams()
+ *  reads `ps-season` before the dropdown exists and sends season=null. */
+export function waitForInitialSeasons(): Promise<void> {
+    return _initialSeasonsPromise
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
@@ -88,7 +102,9 @@ export function renderPlayerStats(container: HTMLElement): void {
     })
 
     // Load seasons immediately if restored type is 'historical'
-    if (typeSelect.getValue() === 'historical') loadSeasons()
+    if (typeSelect.getValue() === 'historical') {
+        _initialSeasonsPromise = loadSeasons()
+    }
 
     // Injured players
     const injuredLabel = document.createElement('label')

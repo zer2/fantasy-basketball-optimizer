@@ -18,7 +18,7 @@ import { setTheme } from './styles/styler_functions.js'
 
 import { renderLeagueSettings, getLeagueSettings, getTeamNames } from './parameter_collection/league_settings.js'
 import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsParams } from './parameter_collection/player_stats.js'
+import { renderPlayerStats, getPlayerStatsParams, waitForInitialSeasons } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
 
@@ -247,7 +247,8 @@ sidebar.style.visibility = ''
 
 applyLayout()
 buildTable(null)
-runModeEval()
+waitForInitialSeasons()
+    .then(() => runModeEval())
     .then(() => applyLayout())
     .catch(err => console.error('Initial load failed:', err))
 
