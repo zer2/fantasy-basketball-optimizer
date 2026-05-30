@@ -79,7 +79,7 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     source_type = cp['data_source_type']
     sport = cp.get('sport', '')
     if source_type == 'historical':
-        return (sport, 'historical', cp.get('season') or '2024-25')
+        return (sport, 'historical', cp['season'])
     if source_type == 'projections':
         blend_weights = cp.get('blend_weights', {})
         # Only Snowflake-backed sources are cacheable; uploaded DFs are session-specific
@@ -125,7 +125,12 @@ def run_step1(
     elif source_type == 'historical':
         from backend.data_retrieval import get_specified_historical_stats
 
-        v0 = get_specified_historical_stats(cp.get('season') or '2024-25', params)
+        season = cp['season']
+        if not season:
+            raise ValueError(
+                "data_source.season is required when data_source.type == 'historical'"
+            )
+        v0 = get_specified_historical_stats(season, params)
 
     elif source_type == 'projections':
         from backend.data_retrieval import combine_projections

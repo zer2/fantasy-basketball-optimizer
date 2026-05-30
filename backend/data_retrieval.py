@@ -152,25 +152,33 @@ def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:
 
 # ── Available seasons ─────────────────────────────────────────────────────────
 
+# (view_cache_timestamp, seasons). The timestamp is the _cache entry's load time
+# for HISTORICAL_SEASONAL_AVERAGES_VIEW — when that entry is refreshed the
+# timestamp changes and we re-derive. This keeps the two in lockstep without
+# re-iterating the DataFrame on every call.
 _seasons_cache: tuple[float, list[str]] | None = None
-_seasons_lock = threading.Lock()
 
 
 def get_available_seasons() -> list[str]:
     """Return distinct historical seasons from Snowflake, newest first.
 
-    Result is cached for 24 hours (same TTL as the full data cache).
+    Derived from the same cached HISTORICAL_SEASONAL_AVERAGES_VIEW DataFrame
+    that get_historical_data uses, so the season list and the season data
+    cannot drift apart. Re-derived only when the view cache is refreshed.
     """
     global _seasons_cache
-    with _seasons_lock:
-        if _seasons_cache is not None and time.time() - _seasons_cache[0] < _CACHE_TTL:
-            return _seasons_cache[1]
-        df = _get_connection().cursor().execute(
-            'SELECT DISTINCT SEASON FROM HISTORICAL_SEASONAL_AVERAGES_VIEW ORDER BY SEASON DESC'
-        ).fetch_pandas_all()
-        seasons = [str(s) for s in df['SEASON'].tolist()]
-        _seasons_cache = (time.time(), seasons)
-        return seasons
+    with _cache_lock:
+        view_entry = _cache.get('HISTORICAL_SEASONAL_AVERAGES_VIEW')
+        view_fresh = view_entry is not None and time.time() - view_entry[0] < _CACHE_TTL
+
+    if view_fresh and _seasons_cache is not None and _seasons_cache[0] == view_entry[0]:
+        return _seasons_cache[1]
+
+    df = _query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
+    with _cache_lock:
+        view_timestamp = _cache['HISTORICAL_SEASONAL_AVERAGES_VIEW'][0]
+    _seasons_cache = (view_timestamp, sorted({str(s) for s in df['SEASON'].tolist()}, reverse=True))
+    return _seasons_cache[1]
 
 
 # ── Historical data ───────────────────────────────────────────────────────────
