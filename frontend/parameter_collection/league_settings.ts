@@ -111,7 +111,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     // readers (draft_board, season modules, main.ts) continue to work.
     // The visible UI is a scrollable list of rows: [editable name] [mode ▼]
     const teamNamesWrap = document.createElement('div')
-    teamNamesWrap.append(makeLabel('ls-team-names-label', 'Teams'))
+    teamNamesWrap.append(makeLabel('ls-team-names', 'Teams'))
 
     const hiddenNamesTextarea = document.createElement('textarea')
     hiddenNamesTextarea.id    = 'ls-team-names'

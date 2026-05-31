@@ -9,10 +9,15 @@
 //   container.append(sel.element)
 //   sel.element.addEventListener('change', () => console.log(sel.getValue()))
 //
-// Getter compatibility: a hidden <input id={id}> is kept in sync so that
+// Getter compatibility: a hidden <select id={id}> is kept in sync so that
 // existing getter code like:
 //   (document.getElementById('my-id') as HTMLSelectElement).value
 // continues to work without modification.
+//
+// <select> is used (rather than <input type="hidden">) because a sibling
+// <label for={id}> requires a labelable element per the HTML spec, and
+// <input type="hidden"> is explicitly excluded from that list. Using <select>
+// silences Chrome's "label's for attribute doesn't match any element id" warning.
 
 export interface CustomSelectOption {
     value: string
@@ -29,14 +34,15 @@ export interface CustomSelect {
 /**
  * Creates a fully browser-rendered custom select widget.
  *
- * A `<input type="hidden" id={id}>` is kept in sync inside the wrapper so that
- * existing getter code like `(document.getElementById(id) as HTMLInputElement).value`
- * continues to work without modification.
+ * A `<select id={id} hidden>` is kept in sync inside the wrapper so that
+ * existing getter code like `(document.getElementById(id) as HTMLSelectElement).value`
+ * continues to work without modification, and so that a sibling `<label for={id}>`
+ * references a labelable element (which <input type="hidden"> is not).
  *
  * The wrapper element dispatches a native `'change'` event (bubbling) whenever the
  * selected value changes, so `element.addEventListener('change', cb)` works as expected.
  *
- * @param id           - DOM id; also used for the hidden input that exposes `.value`
+ * @param id           - DOM id; also used for the hidden <select> that exposes `.value`
  * @param options      - Initial option list
  * @param defaultValue - Initially selected value; falls back to `options[0]` if omitted
  */
@@ -56,10 +62,22 @@ export function makeCustomSelect(
     const wrapper = document.createElement('div')
     wrapper.className = 'cs-wrapper'
 
-    // Hidden input — keeps (document.getElementById(id) as HTMLSelectElement).value working.
-    const hiddenInput = document.createElement('input')
-    hiddenInput.type = 'hidden'
-    hiddenInput.id   = id
+    // Hidden <select> — exposes the current value via (document.getElementById(id) as HTMLSelectElement).value,
+    // and gives a sibling <label for={id}> a labelable target so Chrome doesn't warn.
+    const hiddenSelect = document.createElement('select')
+    hiddenSelect.id = id
+    hiddenSelect.hidden = true
+    hiddenSelect.tabIndex = -1
+
+    function syncHiddenSelectOptions(opts: CustomSelectOption[]): void {
+        hiddenSelect.replaceChildren(...opts.map(o => {
+            const optionEl = document.createElement('option')
+            optionEl.value = o.value
+            optionEl.textContent = o.label
+            return optionEl
+        }))
+    }
+    syncHiddenSelectOptions(currentOptions)
 
     // Visible trigger
     const trigger = document.createElement('div')
@@ -67,6 +85,7 @@ export function makeCustomSelect(
 
     const searchInput = document.createElement('input')
     searchInput.type      = 'text'
+    searchInput.name      = `${id}-search`
     searchInput.className = 'cs-search-input'
     searchInput.autocomplete = 'off'
     searchInput.spellcheck   = false
@@ -82,7 +101,7 @@ export function makeCustomSelect(
     dropdown.className = 'cs-dropdown'
     dropdown.hidden = true
 
-    wrapper.append(hiddenInput, trigger, dropdown)
+    wrapper.append(hiddenSelect, trigger, dropdown)
 
     // ── Internal helpers ───────────────────────────────────────────────────
 
@@ -91,9 +110,9 @@ export function makeCustomSelect(
     }
 
     function commit(value: string, silent = false): void {
-        currentValue      = value
-        hiddenInput.value = value
-        searchInput.value = getLabelFor(value)
+        currentValue       = value
+        hiddenSelect.value = value
+        searchInput.value  = getLabelFor(value)
         if (!silent) wrapper.dispatchEvent(new Event('change', { bubbles: true }))
     }
 
@@ -207,6 +226,7 @@ export function makeCustomSelect(
 
     function setOptions(opts: CustomSelectOption[], preferredValue?: string): void {
         currentOptions = [...opts]
+        syncHiddenSelectOptions(currentOptions)
         const keep = preferredValue ?? currentValue
         const resolved = currentOptions.find(o => o.value === keep)?.value
                       ?? currentOptions[0]?.value ?? ''
