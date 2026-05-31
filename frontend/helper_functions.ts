@@ -131,6 +131,7 @@ export function renderMultiselect(
 
     const textInput = document.createElement('input')
     textInput.type = 'text'
+    textInput.name = 'multiselect-search'
     textInput.className = 'ms-input'
     textInput.placeholder = 'Add…'
     textInput.autocomplete = 'off'
