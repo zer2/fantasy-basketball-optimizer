@@ -23,30 +23,6 @@ document.addEventListener('mouseover', (e: MouseEvent) => {
     _tooltip.style.display = 'block'
 })
 
-// ─── Debounce helper ─────────────────────────────────────────────────────────
-// Used by draft_board and auction_entry so rapid "Lock in" clicks only trigger
-// one backend call after a 300ms pause.
-
-export interface Debouncer {
-    /** Schedule the callback; resets the timer on each call. */
-    fire(): void
-    /** Cancel any pending invocation (e.g. on board reset). */
-    cancel(): void
-}
-
-/** Creates a debouncer that calls `fn` only after `delayMs` ms of inactivity. Each `fire()` resets the timer. */
-export function makeDebouncer(fn: () => void, delayMs = 300): Debouncer {
-    let timer: ReturnType<typeof setTimeout> | null = null
-    return {
-        fire() {
-            if (timer) clearTimeout(timer)
-            timer = setTimeout(() => { timer = null; fn() }, delayMs)
-        },
-        cancel() {
-            if (timer) { clearTimeout(timer); timer = null }
-        },
-    }
-}
 
 /** Creates a `<label>` with class `sidebar-label`, linked to the given input id. */
 export function makeLabel(forId: string, text: string): HTMLLabelElement {

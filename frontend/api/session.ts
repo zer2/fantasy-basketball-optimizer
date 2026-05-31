@@ -9,7 +9,7 @@ import { getScoringFormat, getSelectedCategories, syncCategoriesFromBackend } fr
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
-import { createSession } from './client.js'
+import { createSession, HTTPError } from './client.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -36,12 +36,12 @@ export function resetSession(): void          { sessionId = null }
 /** Applies a state to any indicator element, looked up by ID. */
 export function applyIndicatorState(
     elementId: string
-    , state: string
+    , state: IndicatorState
 ): void {
     const element = document.getElementById(elementId)
     if (!element) return
     element.dataset.state = state
-    element.textContent = INDICATOR_LABELS[state] ?? ''
+    element.textContent = INDICATOR_LABELS[state]
 }
 
 /** Sets the primary #eval-indicator to fetching, evaluating, or idle.  Suppressed while autopilot is active. */
@@ -97,5 +97,65 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
 export async function ensureSession(): Promise<void> {
     if (sessionId) return
     await startFreshSession()
+}
+
+// ─── Indicator-aware debouncer ────────────────────────────────────────────────
+// Used by draft_board, auction_entry, and the player-stats sidebar so rapid
+// edits only trigger one backend call after `delayMs` of inactivity. Each fire()
+// also flips #eval-indicator to "evaluating" immediately, so the spinner appears
+// as soon as the user acts rather than after the debounce window expires.
+
+export interface Debouncer {
+    /** Schedule the callback; resets the timer on each call. */
+    fire(): void
+    /** Cancel any pending invocation (e.g. on board reset). */
+    cancel(): void
+}
+
+/** Creates a debouncer that calls `fn` only after `delayMs` ms of inactivity.
+ *  Each `fire()` also sets the eval indicator to "evaluating" so the spinner is
+ *  visible during the debounce window; the eventual `fn()` is expected to clear
+ *  it (e.g. via runEvaluate's finally). */
+export function makeDebouncer(fn: () => void, delayMs = 300): Debouncer {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    return {
+        fire() {
+            if (timer) clearTimeout(timer)
+            setIndicatorState('evaluating')
+            timer = setTimeout(() => { timer = null; fn() }, delayMs)
+        },
+        cancel() {
+            if (timer) { clearTimeout(timer); timer = null }
+        },
+    }
+}
+
+// ─── Session retry ────────────────────────────────────────────────────────────
+
+/**
+ * Ensures a session exists, runs `fn`, and retries once with a fresh session if
+ * the backend returns 404 (session expired).  Other errors propagate.
+ *
+ * `onBeforeAttempt` runs before each attempt's ensureSession call — useful for
+ * resetting an indicator back to a "fetching" state for the retry.
+ */
+export async function withSessionRetry<T>(
+    fn: () => Promise<T>
+    , onBeforeAttempt?: () => void
+): Promise<T> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            onBeforeAttempt?.()
+            await ensureSession()
+            return await fn()
+        } catch (err) {
+            if (attempt === 0 && err instanceof HTTPError && err.status === 404) {
+                resetSession()
+                continue
+            }
+            throw err
+        }
+    }
+    throw new Error('withSessionRetry: loop exited without returning')
 }
 

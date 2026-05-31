@@ -10,6 +10,40 @@ import { PlayerResult, PlayerGScore, SessionRequest, SportConfig } from '../type
 // and backend are ever deployed on different origins.
 export const BASE_URL = ''
 
+
+// ── HTTP helpers ──────────────────────────────────────────────────────────────
+
+/** Thrown by jsonRequest when the backend returns a non-2xx status. Callers that
+ *  want to react to specific statuses (e.g. retry on session expiry) should catch
+ *  this and check `.status` rather than parsing the message string. */
+export class HTTPError extends Error {
+    constructor(
+        public readonly status: number
+        , public readonly body: string
+        , label: string
+    ) {
+        super(`${label} failed (${status}): ${body}`)
+        this.name = 'HTTPError'
+    }
+}
+
+/** Issues `fetch(url, init)` and parses the JSON response, throwing HTTPError on
+ *  non-2xx. The `label` prefixes error messages so callers don't each repeat the
+ *  "X failed (status): body" boilerplate. */
+async function jsonRequest<T>(
+    url: string
+    , label: string
+    , init?: RequestInit
+): Promise<T> {
+    const res = await fetch(url, init)
+    if (!res.ok) {
+        const body = await res.text()
+        throw new HTTPError(res.status, body, label)
+    }
+    return res.json() as Promise<T>
+}
+
+
 // ── Map backend Candidate → frontend PlayerResult ─────────────────────────────
 
 
@@ -61,12 +95,7 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
 
 /** Fetches sport-specific configuration (defaults, categories, positions) from parameters.yaml. */
 export async function fetchConfig(sport: string): Promise<SportConfig> {
-    const res = await fetch(`${BASE_URL}/config/${encodeURIComponent(sport)}`)
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Config fetch failed (${res.status}): ${detail}`)
-    }
-    return res.json()
+    return jsonRequest(`${BASE_URL}/config/${encodeURIComponent(sport)}`, 'Config fetch')
 }
 
 // ── POST /data/upload ─────────────────────────────────────────────────────────
@@ -79,25 +108,15 @@ export async function uploadCsv(
     const form = new FormData()
     form.append('file', file)
     form.append('file_type', fileType)
-    const res = await fetch(`${BASE_URL}/data/upload`, { method: 'POST', body: form })
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Upload failed (${res.status}): ${detail}`)
-    }
-    return res.json()
+    return jsonRequest(`${BASE_URL}/data/upload`, 'Upload', { method: 'POST', body: form })
 }
 
 // ── GET /seasons ───────────────────────────────────────────────────────────────
 
 /** Fetches the list of available historical seasons from the backend. */
 export async function getSeasons(): Promise<string[]> {
-    const res = await fetch(`${BASE_URL}/seasons`)
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Get seasons failed (${res.status}): ${detail}`)
-    }
-    const data = await res.json()
-    return data.seasons as string[]
+    const data = await jsonRequest<{ seasons: string[] }>(`${BASE_URL}/seasons`, 'Get seasons')
+    return data.seasons
 }
 
 // ── POST /sessions ─────────────────────────────────────────────────────────────
@@ -107,17 +126,12 @@ export async function createSession(
     req: SessionRequest,
     signal?: AbortSignal,
 ): Promise<{ session_id: string; categories: string[]; g_scores: PlayerGScore[]; n_players_loaded: number; expires_at: string }> {
-    const res = await fetch(`${BASE_URL}/sessions`, {
+    return jsonRequest(`${BASE_URL}/sessions`, 'Create session', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
         signal,
     })
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Create session failed (${res.status}): ${detail}`)
-    }
-    return res.json()
 }
 
 // ── PATCH /sessions/{id} ──────────────────────────────────────────────────────
@@ -128,30 +142,20 @@ export async function patchSession(
     req: Record<string, unknown>,
     signal?: AbortSignal,
 ): Promise<{ ok: boolean; steps_rerun: number[] }> {
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}`, {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}`, 'Patch session', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
         signal,
     })
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Patch session failed (${res.status}): ${detail}`)
-    }
-    return res.json()
 }
 
 // ── GET /sessions/{id}/g-scores ───────────────────────────────────────────────
 
 /** Fetches the current G-scores for a session directly from session state. */
 export async function fetchGScores(sessionId: string): Promise<PlayerGScore[]> {
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/g-scores`)
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Fetch G-scores failed (${res.status}): ${detail}`)
-    }
-    const data = await res.json()
-    return data.g_scores as PlayerGScore[]
+    const data = await jsonRequest<{ g_scores: PlayerGScore[] }>(`${BASE_URL}/sessions/${sessionId}/g-scores`, 'Fetch G-scores')
+    return data.g_scores
 }
 
 // ── POST /sessions/{id}/evaluate ──────────────────────────────────────────────
@@ -168,17 +172,12 @@ export async function evaluate(
     signal?: AbortSignal,
 ): Promise<{ iteration: number; candidates: any[] }> {
     const body = { exclusion_list: [], ...req }
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/evaluate`, {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
         signal,
     })
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Evaluate failed (${res.status}): ${detail}`)
-    }
-    return res.json()
 }
 
 // ── POST /sessions/{id}/trade/analyze ────────────────────────────────────────
@@ -211,16 +210,11 @@ export async function analyzeTrade(
         ignore_position_check?: boolean
     },
 ): Promise<TradeAnalyzeResponse> {
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/trade/analyze`, {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/analyze`, 'Trade analyze', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
     })
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Trade analyze failed (${res.status}): ${detail}`)
-    }
-    return res.json()
 }
 
 // ── POST /sessions/{id}/trade/suggest ────────────────────────────────────────
@@ -249,14 +243,9 @@ export async function suggestTrades(
         ignore_position_check?: boolean
     },
 ): Promise<TradeSuggestResponse> {
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, 'Trade suggest', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
     })
-    if (!res.ok) {
-        const detail = await res.text()
-        throw new Error(`Trade suggest failed (${res.status}): ${detail}`)
-    }
-    return res.json()
 }

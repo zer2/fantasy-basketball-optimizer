@@ -8,8 +8,8 @@ import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { buildTable, showTableMessage } from '../table/player_table.js'
-import { startFreshSession, ensureSession, getSessionId, resetSession, setIndicatorState } from './session.js'
-import { patchSession, fetchGScores, evaluate, candidatesToPlayerResults } from './client.js'
+import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
+import { patchSession, fetchGScores, evaluate, candidatesToPlayerResults, HTTPError } from './client.js'
 
 // ─── Draft/auction state ─────────────────────────────────────────────────────
 
@@ -51,8 +51,8 @@ export async function createOrPatchSession(
             const freshGScores = await fetchGScores(getSessionId()!)
             setGScores(freshGScores)
         }
-    } catch (err: any) {
-        if (!err.message?.includes('(404)')) throw err
+    } catch (err) {
+        if (!(err instanceof HTTPError) || err.status !== 404) throw err
         resetSession()
         await startFreshSession(signal)
     }
@@ -73,71 +73,61 @@ async function evaluateSeat(seat: string): Promise<void> {
     setIndicatorState('evaluating')
 
     try {
-        for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-                await ensureSession()
-                setIndicatorState('evaluating')
+        await withSessionRetry(async () => {
+            const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
 
-                const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
-
-                let evalReq: Parameters<typeof evaluate>[1]
-                if (mode === 'Auction Mode') {
-                    const { player_assignments, remaining_cash } = getAuctionState()
-                    evalReq = { player_assignments, my_team_id: seat, remaining_cash }
-                } else {
-                    const { player_assignments } = getDraftState()
-                    evalReq = { player_assignments, my_team_id: seat }
-                }
-
-                const boardIsEmpty = Object.values(evalReq.player_assignments).flat().length === 0
-                if (!basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
-                    const { n_drafters } = getLeagueSettings()
-                    const genericTeams   = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
-                    const emptyAssignments: Record<string, string[]> = Object.fromEntries(
-                        genericTeams.map(name => [name, []])
-                    )
-                    const baseResp = await evaluate(
-                        getSessionId()!
-                    ,   { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
-                    ,   signal
-                    )
-                    basePlayersBySession.set(getSessionId()!, candidatesToPlayerResults(baseResp.candidates))
-                }
-
-                const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
-                if (myTeamSize >= getLeagueSettings().n_picks) {
-                    latestFullTeamResult = null
-                    const fullTeamResp = await evaluate(getSessionId()!, evalReq, signal)
-                    if (fullTeamResp.candidates.length > 0) {
-                        latestFullTeamResult = {
-                            h_score:   fullTeamResp.candidates[0].h_score,
-                            win_rates: fullTeamResp.candidates[0].win_rates,
-                        }
-                        document.dispatchEvent(new Event('full-team-result-updated'))
-                    }
-                    return
-                }
-                latestFullTeamResult = null
-
-                const resp = await evaluate(getSessionId()!, evalReq, signal)
-                const players = candidatesToPlayerResults(resp.candidates)
-
-                if (!basePlayersBySession.has(getSessionId()!)) {
-                    basePlayersBySession.set(getSessionId()!, players)
-                }
-
-                setBasePlayerResults(basePlayersBySession.get(getSessionId()!)!)
-                setCandidatePlayerResults(players)
-                return
-            } catch (err: any) {
-                if (err.name === 'AbortError') return
-                if (attempt === 0 && err.message?.includes('(404)')) {
-                    resetSession()
-                    continue
-                }
-                throw err
+            let evalReq: Parameters<typeof evaluate>[1]
+            if (mode === 'Auction Mode') {
+                const { player_assignments, remaining_cash } = getAuctionState()
+                evalReq = { player_assignments, my_team_id: seat, remaining_cash }
+            } else {
+                const { player_assignments } = getDraftState()
+                evalReq = { player_assignments, my_team_id: seat }
             }
-        }
+
+            const boardIsEmpty = Object.values(evalReq.player_assignments).flat().length === 0
+            if (!basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
+                const { n_drafters } = getLeagueSettings()
+                const genericTeams   = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
+                const emptyAssignments: Record<string, string[]> = Object.fromEntries(
+                    genericTeams.map(name => [name, []])
+                )
+                const baseResp = await evaluate(
+                    getSessionId()!
+                ,   { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
+                ,   signal
+                )
+                basePlayersBySession.set(getSessionId()!, candidatesToPlayerResults(baseResp.candidates))
+            }
+
+            const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
+            if (myTeamSize >= getLeagueSettings().n_picks) {
+                latestFullTeamResult = null
+                const fullTeamResp = await evaluate(getSessionId()!, evalReq, signal)
+                if (fullTeamResp.candidates.length > 0) {
+                    latestFullTeamResult = {
+                        h_score:   fullTeamResp.candidates[0].h_score,
+                        win_rates: fullTeamResp.candidates[0].win_rates,
+                    }
+                    document.dispatchEvent(new Event('full-team-result-updated'))
+                }
+                return
+            }
+            latestFullTeamResult = null
+
+            const resp = await evaluate(getSessionId()!, evalReq, signal)
+            const players = candidatesToPlayerResults(resp.candidates)
+
+            if (!basePlayersBySession.has(getSessionId()!)) {
+                basePlayersBySession.set(getSessionId()!, players)
+            }
+
+            setBasePlayerResults(basePlayersBySession.get(getSessionId()!)!)
+            setCandidatePlayerResults(players)
+        })
+    } catch (err: any) {
+        if (err.name === 'AbortError') return
+        throw err
     } finally {
         if (evaluateGeneration === generation) setIndicatorState('idle')
     }
@@ -151,7 +141,7 @@ export async function runEvaluate(): Promise<void> {
         if (getFullTeamResult()) {
             showTableMessage('Your team is full.')
         } else {
-            buildTable(getCandidatePlayerResults())
+            buildTable(getCandidatePlayerResults()!)
         }
     }
 }

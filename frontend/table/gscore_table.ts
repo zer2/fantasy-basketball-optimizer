@@ -37,16 +37,11 @@ export function renderTeamGScoreTable(
     tbl.style.tableLayout = 'fixed'
     tbl.style.width = '100%'
 
-    // Spacer row to lock column widths
-    const tHead = tbl.createTHead()
-    const spacerRow = tHead.insertRow(-1)
-    spacerRow.style.border = 'none'
-    spacerRow.appendChild(makeSpacerTh('panel-colspacer-name'))
-    spacerRow.appendChild(makeSpacerTh('panel-colspacer-total'))
-    for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh())
+    // colgroup locks column widths without introducing a visual spacer row.
+    tbl.appendChild(makeNameTotalCategoriesColgroup(categories.length))
 
     // Header row
-    const headerRow = tHead.insertRow(-1)
+    const headerRow = tbl.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh())  // invisible label spacer
     const totalTh = document.createElement('th')
     totalTh.className = 'panel-colheader'
@@ -119,16 +114,7 @@ export function renderTeamGScoreTable(
     hScoreTbl.style.tableLayout = 'fixed'
     hScoreTbl.style.width = '100%'
 
-    // colgroup sets column widths to match the G-score table without a spacer row,
-    // so there is no gap between the outer border and the first data row.
-    const colgroup = document.createElement('colgroup')
-    const nameCol  = document.createElement('col')
-    nameCol.style.width = '200px'   // matches .panel-colspacer-name
-    const totalCol = document.createElement('col')
-    totalCol.style.width = '83px'   // matches .panel-colspacer-total
-    colgroup.append(nameCol, totalCol)
-    for (let i = 0; i < categories.length; i++) colgroup.appendChild(document.createElement('col'))
-    hScoreTbl.appendChild(colgroup)
+    hScoreTbl.appendChild(makeNameTotalCategoriesColgroup(categories.length))
 
     const hScoreTBody = hScoreTbl.createTBody()
     const hScoreRow = hScoreTBody.insertRow(-1)
@@ -164,4 +150,18 @@ function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
     const th = document.createElement('th')
     th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
     return th
+}
+
+/** Creates a `<colgroup>` with a 200px name column, an 83px total column, and
+ *  one auto-sized column per category. Used by both the G-score and H-score
+ *  tables so their column widths match. */
+function makeNameTotalCategoriesColgroup(nCategories: number): HTMLTableColElement {
+    const colgroup = document.createElement('colgroup')
+    const nameCol  = document.createElement('col')
+    nameCol.style.width = '200px'   // matches .panel-colspacer-name
+    const totalCol = document.createElement('col')
+    totalCol.style.width = '83px'   // matches .panel-colspacer-total
+    colgroup.append(nameCol, totalCol)
+    for (let i = 0; i < nCategories; i++) colgroup.appendChild(document.createElement('col'))
+    return colgroup
 }
