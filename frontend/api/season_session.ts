@@ -5,7 +5,7 @@
 
 import { setCandidatePlayerResults, setPlayerResultsFromGScores } from '../app_state.js'
 import { buildTable } from '../table/player_table.js'
-import { ensureSession, getSessionId, resetSession, setIndicatorState, applyIndicatorState } from './session.js'
+import { ensureSession, getSessionId, setIndicatorState, applyIndicatorState, withSessionRetry } from './session.js'
 import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades } from './client.js'
 import type { TradeAnalyzeResponse, TradeSuggestResponse } from './client.js'
 
@@ -54,26 +54,14 @@ export async function runTradeAnalyze(
   , theirTrade: string[]
   , ignorePositionCheck?: boolean
 ): Promise<TradeAnalyzeResponse> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            await ensureSession()
-            return await analyzeTrade(getSessionId()!, {
-                player_assignments:  playerAssignments,
-                my_team:             myTeam,
-                their_team:          theirTeam,
-                my_trade:            myTrade,
-                their_trade:         theirTrade,
-                ignore_position_check: ignorePositionCheck,
-            })
-        } catch (err: any) {
-            if (attempt === 0 && err.message?.includes('(404)')) {
-                resetSession()
-                continue
-            }
-            throw err
-        }
-    }
-    throw new Error('Trade analyze failed after retry')
+    return await withSessionRetry(() => analyzeTrade(getSessionId()!, {
+        player_assignments:    playerAssignments,
+        my_team:               myTeam,
+        their_team:            theirTeam,
+        my_trade:              myTrade,
+        their_trade:           theirTrade,
+        ignore_position_check: ignorePositionCheck,
+    }))
 }
 
 // ─── Trade suggestions ───────────────────────────────────────────────────────
@@ -93,30 +81,21 @@ export async function runTradeSuggest(
   , theirThreshold: number
   , ignorePositionCheck?: boolean
 ): Promise<TradeSuggestResponse> {
-    applyIndicatorState('suggest-indicator', 'fetching')
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            await ensureSession()
+    return await withSessionRetry(
+        async () => {
             applyIndicatorState('suggest-indicator', 'evaluating')
             return await suggestTrades(getSessionId()!, {
-                player_assignments:          playerAssignments,
-                my_team:                     myTeam,
-                their_team:                  theirTeam,
-                combo_params:                comboParams,
-                your_differential_threshold: yourThreshold,
+                player_assignments:           playerAssignments,
+                my_team:                      myTeam,
+                their_team:                   theirTeam,
+                combo_params:                 comboParams,
+                your_differential_threshold:  yourThreshold,
                 their_differential_threshold: theirThreshold,
-                ignore_position_check:       ignorePositionCheck,
+                ignore_position_check:        ignorePositionCheck,
             })
-        } catch (err: any) {
-            if (attempt === 0 && err.message?.includes('(404)')) {
-                resetSession()
-                applyIndicatorState('suggest-indicator', 'fetching')
-                continue
-            }
-            throw err
         }
-    }
-    throw new Error('Trade suggest failed after retry')
+        , () => applyIndicatorState('suggest-indicator', 'fetching')
+    )
 }
 
 // ─── Waiver wire ─────────────────────────────────────────────────────────────
@@ -132,22 +111,12 @@ export async function runWaiverEvaluate(
 ): Promise<void> {
     setIndicatorState('evaluating')
     try {
-        for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-                await ensureSession()
-                const resp = await evaluate(getSessionId()!, { player_assignments: playerAssignments, my_team_id: myTeamId })
-                const players = candidatesToPlayerResults(resp.candidates)
-                setCandidatePlayerResults(players)
-                buildTable(players)
-                return
-            } catch (err: any) {
-                if (attempt === 0 && err.message?.includes('(404)')) {
-                    resetSession()
-                    continue
-                }
-                throw err
-            }
-        }
+        await withSessionRetry(async () => {
+            const resp = await evaluate(getSessionId()!, { player_assignments: playerAssignments, my_team_id: myTeamId })
+            const players = candidatesToPlayerResults(resp.candidates)
+            setCandidatePlayerResults(players)
+            buildTable(players)
+        })
     } finally {
         setIndicatorState('idle')
     }

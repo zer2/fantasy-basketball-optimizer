@@ -61,28 +61,24 @@ export function toggleExpandView(
             cell.appendChild(makeWeightsTable(playerData, categories))
         }
 
+        // Position-column count shared between the flex allocations and roster
+        // tables so each non-label column has the same width in both. The roster
+        // always includes every base position the flex table can allocate to plus
+        // extra flex types (G, F, Util), so its position-type count is the larger
+        // of the two and the flex table pads with invisible filler columns to match.
+        const nRosterPositionTypes = playerData.roster
+            ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
+            : 0
+
         if (playerData.flex_allocations) {
             cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'))
 
-            // Compute a shared per-position column width so base position columns align
-            // between the flex allocations table and the roster grid beneath it.
-            // Size columns using the wider table (roster, which has extra flex-slot columns)
-            // so both tables fit within the available space.
-            const INDENT_W         = 100   // matches .panel-indent margin-left
-            const POSITION_LABEL_W = 110   // matches .panel-colspacer-position-label
-            const containerWidth   = cell.clientWidth
-            const nBasePositions   = playerData.flex_allocations.base_positions.length
-            const nRosterPositionTypes = playerData.roster
-                ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
-                : nBasePositions
-            const nMaxColumns     = Math.max(nBasePositions, nRosterPositionTypes)
-            const positionColumnWidth = Math.floor((containerWidth - INDENT_W - POSITION_LABEL_W) / nMaxColumns)
-
             if (playerData.auction_values) {
-                // In auction mode, show flex allocations and auction values side-by-side.
+                // Side-by-side with auction values. The flex table keeps its natural
+                // per-column width (no roster filler) so the auction block fits beside it.
                 const sideRow = document.createElement('div')
                 sideRow.className = 'panel-flex-row'
-                sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false, positionColumnWidth))
+                sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false, playerData.flex_allocations.base_positions.length))
 
                 const auctionBlock = document.createElement('div')
                 auctionBlock.appendChild(makePanelLabel('All auction values'))
@@ -91,31 +87,16 @@ export function toggleExpandView(
 
                 cell.appendChild(sideRow)
             } else {
-                cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true, positionColumnWidth))
-            }
-
-            if (playerData.roster) {
-                cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-                cell.appendChild(makeRosterGrid(playerData.roster, positionColumnWidth))
+                cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true, nRosterPositionTypes))
             }
         } else if (playerData.auction_values) {
-            // No position data but in auction mode: still show auction values alone.
             cell.appendChild(makePanelLabel('All auction values', '60px'))
             cell.appendChild(makeAuctionValuesTable(playerData))
+        }
 
-            if (playerData.roster) {
-                cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-                const INDENT_W         = 100
-                const POSITION_LABEL_W = 110
-                const nRosterPositionTypes = new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
-                cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((cell.clientWidth - INDENT_W - POSITION_LABEL_W) / nRosterPositionTypes)))
-            }
-        } else if (playerData.roster) {
-            const INDENT_W         = 100
-            const POSITION_LABEL_W = 110
-            const nRosterPositionTypes = new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
+        if (playerData.roster) {
             cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-            cell.appendChild(makeRosterGrid(playerData.roster, Math.floor((cell.clientWidth - INDENT_W - POSITION_LABEL_W) / nRosterPositionTypes)))
+            cell.appendChild(makeRosterGrid(playerData.roster, nRosterPositionTypes))
         }
     }
 }
@@ -154,16 +135,17 @@ function makeGScoreTable(playerData: PlayerResult, categories: string[]): HTMLDi
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
 
-    // Row 1: invisible spacers lock column widths.
-    const tableHead = table.createTHead()
-    const spacerRow = tableHead.insertRow(-1)
-    spacerRow.style.border = 'none'
-    spacerRow.appendChild(makeSpacerTh('panel-colspacer-name-sm'))
-    spacerRow.appendChild(makeSpacerTh('panel-colspacer-total'))
-    for (let index = 0; index < categories.length; index++) spacerRow.appendChild(makeSpacerTh())
+    // colgroup locks column widths without introducing a visual spacer row.
+    const colgroup = document.createElement('colgroup')
+    const nameCol  = document.createElement('col')
+    nameCol.style.width = '136px'   // matches .panel-colspacer-name-sm
+    const totalCol = document.createElement('col')
+    totalCol.style.width = '83px'   // matches .panel-colspacer-total
+    colgroup.append(nameCol, totalCol)
+    for (let index = 0; index < categories.length; index++) colgroup.appendChild(document.createElement('col'))
+    table.appendChild(colgroup)
 
-    // Row 2: visible column headers.
-    const headerRow = tableHead.insertRow(-1)
+    const headerRow = table.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh('panel-colheader-blank'))
     const totalHeader = document.createElement('th')
     totalHeader.className = 'panel-colheader'
@@ -218,10 +200,13 @@ function makeWeightsTable(playerData: PlayerResult, categories: string[]): HTMLD
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
 
-    const spacerRow = table.createTHead().insertRow(-1)
-    spacerRow.style.border = 'none'
-    spacerRow.appendChild(makeSpacerTh('panel-colspacer-weights'))
-    for (let index = 0; index < categories.length; index++) spacerRow.appendChild(makeSpacerTh())
+    // colgroup locks column widths without introducing a visual spacer row.
+    const colgroup = document.createElement('colgroup')
+    const labelCol = document.createElement('col')
+    labelCol.style.width = '219px'   // matches .panel-colspacer-weights
+    colgroup.appendChild(labelCol)
+    for (let index = 0; index < categories.length; index++) colgroup.appendChild(document.createElement('col'))
+    table.appendChild(colgroup)
 
     const row = table.createTBody().insertRow(-1)
     const labelCell = document.createElement('th')
@@ -256,26 +241,28 @@ function makeWeightsTable(playerData: PlayerResult, categories: string[]): HTMLD
  */
 function makeFlexAllocationsTable(
     flexData: FlexAllocations
-    , useMargin = true
-    , positionColumnWidth: number
+    , useMargin: boolean
+    , nTotalColumns: number
 ): HTMLDivElement {
     const positionNames = getPositionNames()
-
-    const POSITION_LABEL_W = 110  // matches .panel-colspacer-position-label
 
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
-    table.style.width = (POSITION_LABEL_W + flexData.base_positions.length * positionColumnWidth) + 'px'
+    table.style.width = '100%'
 
     const headerRow = table.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
     for (const basePosition of flexData.base_positions) {
         const positionHeader = document.createElement('th')
         positionHeader.className = 'panel-colheader'
-        positionHeader.style.width = positionColumnWidth + 'px'
         positionHeader.textContent = positionNames[basePosition] ?? basePosition
         headerRow.appendChild(positionHeader)
+    }
+    // Invisible filler columns so this table's column count matches the roster's,
+    // giving each non-label column an identical width in both tables.
+    for (let i = flexData.base_positions.length; i < nTotalColumns; i++) {
+        headerRow.appendChild(makeSpacerTh('panel-colheader-blank'))
     }
 
     const tableBody = table.createTBody()
@@ -296,6 +283,13 @@ function makeFlexAllocationsTable(
                 cell.textContent = value.toFixed(2)
                 cell.style.cssText = stat_styler_tertiary(value, 50, 0)
             }
+        }
+        // Filler cells with border-style:hidden — in border-collapse mode, hidden
+        // borders override any neighbor's solid borders at the shared edge, so the
+        // row's bottom line does not extend into the filler region.
+        for (let i = rowData.values.length; i < nTotalColumns; i++) {
+            const filler = row.insertCell(-1)
+            filler.style.cssText = 'border-style: hidden; padding: 0;'
         }
     }
 
@@ -370,7 +364,7 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
  * Builds the roster grid showing which players are assigned to each slot,
  * and highlights the candidate player being evaluated.
  */
-function makeRosterGrid(roster: Roster, positionColumnWidth: number): HTMLDivElement {
+function makeRosterGrid(roster: Roster, nTotalColumns: number): HTMLDivElement {
     const positionNames = getPositionNames()
 
     // Group slots by position type (e.g. "PG1", "PG2" → type "PG") preserving insertion order.
@@ -383,21 +377,23 @@ function makeRosterGrid(roster: Roster, positionColumnWidth: number): HTMLDivEle
     }
     const maxDepth = Math.max(...positionTypes.map(positionType => slotsByType[positionType].length))
 
-    const POSITION_LABEL_W = 110  // matches .panel-colspacer-position-label
-
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
-    table.style.width = (POSITION_LABEL_W + positionTypes.length * positionColumnWidth) + 'px'
+    table.style.width = '100%'
 
     const headerRow = table.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
     for (const positionType of positionTypes) {
         const positionHeader = document.createElement('th')
         positionHeader.className = 'panel-colheader'
-        positionHeader.style.width = positionColumnWidth + 'px'
         positionHeader.textContent = positionNames[positionType] ?? positionType
         headerRow.appendChild(positionHeader)
+    }
+    // Invisible filler columns so this table's column count matches the flex
+    // allocations table's, giving each non-label column an identical width.
+    for (let i = positionTypes.length; i < nTotalColumns; i++) {
+        headerRow.appendChild(makeSpacerTh('panel-colheader-blank'))
     }
 
     const tableBody = table.createTBody()
@@ -428,6 +424,11 @@ function makeRosterGrid(roster: Roster, positionColumnWidth: number): HTMLDivEle
                     cell.textContent = assignment.name
                 }
             }
+        }
+        // See makeFlexAllocationsTable for the filler-cell rationale.
+        for (let i = positionTypes.length; i < nTotalColumns; i++) {
+            const filler = row.insertCell(-1)
+            filler.style.cssText = 'border-style: hidden; padding: 0;'
         }
     }
 

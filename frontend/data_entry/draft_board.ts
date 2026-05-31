@@ -4,7 +4,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
-import { makeDebouncer } from '../helper_functions.js'
+import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethodByIndex } from '../parameter_collection/league_settings.js'

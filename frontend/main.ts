@@ -3,12 +3,13 @@
 // initializes the layout, and triggers the first backend evaluation.
 // All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
-import { createSection, addApplyBtn, makeSidebarToggle, makeDebouncer } from './helper_functions.js'
-import { getCandidatePlayerResults, setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
+import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
+import { makeDebouncer } from './api/session.js'
+import { setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { createOrPatchSession, runEvaluate, clearFullTeamResult } from './api/draft_and_auction_session.js'
 import { runSeasonInit } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
-import { buildTable } from './table/player_table.js'
+import { buildTableHeader } from './table/player_table.js'
 import { applyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
@@ -74,13 +75,14 @@ if (initialTeamNames.length > 0) {
 seatSelect.element.addEventListener('change', () => {
     setCurrentSeat(seatSelect.getValue() ?? null)
     clearFullTeamResult()
+    buildTableHeader()
     runModeEval()
         .then(() => applyLayout())
         .catch(err => console.error('Seat change evaluate failed:', err))
 })
 
 // Mode change: rebuild table and sync session.
-// Registered before the applyLayout listener so buildTable fires first, ensuring
+// Registered before the applyLayout listener so buildTableHeader fires first, ensuring
 // hscoretable.style.width is correct when applyLayout reads it.
 // When switching to Auction Mode, patch cash_per_team so the backend can compute dollar values.
 // AbortController cancels stale backend calls on rapid mode switches.
@@ -94,7 +96,7 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 
     if (mode === 'Season Mode') return   // table is hidden in season mode; skip rebuild and backend call
 
-    buildTable(getCandidatePlayerResults())
+    buildTableHeader()
 
     const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
     createOrPatchSession(4, patch, signal)
@@ -117,7 +119,7 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
         leagueSettingsController = new AbortController()
         const { signal } = leagueSettingsController
 
-        buildTable(getCandidatePlayerResults())
+        buildTableHeader()
         applyLayout()  // re-renders draft board with new n_drafters/n_picks so getDraftState() is current before evaluate
         revalidateSlotCounts()
         if (!isSlotCountsValid()) return
@@ -143,7 +145,7 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
             setCurrentSeat(updatedTeamNames[0])
             seatSelect.setValue(updatedTeamNames[0])
         }
-        buildTable(getCandidatePlayerResults())
+        buildTableHeader()
         applyLayout()
     }, 600)
 })
@@ -157,6 +159,7 @@ const applyPlayerStats = (signal?: AbortSignal) => {
     const { data_source, injured_players } = getPlayerStatsParams()
     resetDraftBoard()
     resetAuctionEntry()
+    buildTableHeader()
     createOrPatchSession(1, { data_source, injured_players }, signal)
         .then(() => { if (!signal || !signal.aborted) return runModeEval() })
         .then(() => { if (!signal || !signal.aborted) applyLayout() })
@@ -186,6 +189,7 @@ formatSection.addEventListener('change', () => {
     if (formatController) formatController.abort()
     formatController = new AbortController()
     const { signal } = formatController
+    buildTableHeader()
     createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } }, signal)
         .then(() => { if (!signal.aborted) return runModeEval() })
         .then(() => { if (!signal.aborted) applyLayout() })
@@ -204,6 +208,7 @@ modelSection.addEventListener('change', () => {
     if (modelController) modelController.abort()
     modelController = new AbortController()
     const { signal } = modelController
+    buildTableHeader()
     createOrPatchSession(3, { parameters: getModelParameters() }, signal)
         .then(() => { if (!signal.aborted) return runModeEval() })
         .then(() => { if (!signal.aborted) applyLayout() })
@@ -220,6 +225,7 @@ renderSlotCounts(slotSection)
 addApplyBtn(slotSection, async () => {
     if (!isSlotCountsValid()) return
     const slot_counts = getSlotCounts()
+    buildTableHeader()
     await createOrPatchSession(4, { slot_counts })
     await runModeEval()
     applyLayout()
@@ -246,7 +252,7 @@ themeInput.addEventListener('change', () => {
 sidebar.style.visibility = ''
 
 applyLayout()
-buildTable(null)
+buildTableHeader()
 waitForInitialSeasons()
     .then(() => runModeEval())
     .then(() => applyLayout())

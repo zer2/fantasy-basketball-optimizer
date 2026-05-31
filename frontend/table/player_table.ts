@@ -33,13 +33,12 @@ export function showTableMessage(message: string): void {
     cell.textContent = message
 }
 
-/** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells.
- *  If players is null, only the headers are rendered (categories are known before evaluate runs). */
-export function buildTable(players: PlayerResult[] | null): void {
+/** Clears the candidate table and rebuilds its width container, column structure,
+ *  and header row. Categories, mode, and scoring format are read from the DOM. */
+export function buildTableHeader(): void {
 
     const categories = getSelectedCategories()
     const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
-    const isRoto     = getScoringFormat() === 'Rotisserie'
 
     const widthContainer = document.getElementById('panel-content-width-container')!
     widthContainer.style.minWidth = computeContentMinWidth()
@@ -47,7 +46,6 @@ export function buildTable(players: PlayerResult[] | null): void {
 
     table.innerHTML = ''
 
-    // ── Header ──────────────────────────────────────────────────────────────
     const thead = table.createTHead()
     const headerRow = thead.insertRow()
 
@@ -79,17 +77,25 @@ export function buildTable(players: PlayerResult[] | null): void {
         th.textContent = category
         headerRow.append(th)
     }
+}
 
-    if (players === null) return
+
+/** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
+export function buildTable(players: PlayerResult[]): void {
+
+    buildTableHeader()
+
+    const categories = getSelectedCategories()
+    const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
+    const isRoto     = getScoringFormat() === 'Rotisserie'
 
     // ── Player rows (built as HTML string for performance) ───────────────────
-    // Roto values hoisted outside the loop to avoid repeated lookups.
-    let nDrafters  = 0
-    let rotoMiddle = 0
-    if (isRoto) {
-        nDrafters  = getLeagueSettings().n_drafters
-        rotoMiddle = (nDrafters - 1) / 2 + 1
-    }
+    const rotoData = isRoto
+        ? (() => {
+              const nDrafters = getLeagueSettings().n_drafters
+              return { nDrafters, rotoMiddle: (nDrafters - 1) / 2 + 1 }
+          })()
+        : null
 
     let html = ''
     for (const [i, player] of players.entries()) {
@@ -116,9 +122,9 @@ export function buildTable(players: PlayerResult[] | null): void {
 
         // Category win rate cells
         for (const value of player.win_rates) {
-            if (isRoto) {
-                const rotoValue = 1 + (value / 100) * (nDrafters - 1)
-                html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, 3 * (nDrafters - 1), rotoMiddle)}'>${rotoValue.toFixed(1)}</td>`
+            if (rotoData) {
+                const rotoValue = 1 + (value / 100) * (rotoData.nDrafters - 1)
+                html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, 3 * (rotoData.nDrafters - 1), rotoData.rotoMiddle)}'>${rotoValue.toFixed(1)}</td>`
             } else {
                 html += `<td class='categoricalhscore' style='${stat_styler_primary(value, 3, 50)}'>${value.toFixed(1)}</td>`
             }
