@@ -9,6 +9,7 @@ export interface ParamOption {
 export interface SportConfig {
     default_categories: string[]
     all_categories: string[]
+    short_category_names: Record<string, string>
     options: Record<string, ParamOption>
     positions: Record<string, { base: Record<string, number>; flex: Record<string, number> }>
     position_structure: {

@@ -1,4 +1,21 @@
 NBA:
+  short-category-names:
+    Field Goal %: FG%
+    Free Throw %: FT%
+    Three %: 3%
+    Threes: 3s
+    Points: Pts
+    Rebounds: Rbds
+    Assists: Asts
+    Steals: Stls
+    Blocks: Blks
+    Turnovers: Tos
+    Def Rebounds: dRbds
+    Off Rebounds: oRbds
+    Assist to TO: A/To
+    Double Doubles: DDs
+    Field Goals Made: FGM
+    Free Throws Made: FTM
   default-categories:
     - Field Goal %
     - Free Throw %
@@ -6,7 +23,7 @@ NBA:
     - Points
     - Rebounds
     - Assists
-    - Steals 
+    - Steals
     - Blocks
     - Turnovers
   counting-statistics:
@@ -14,12 +31,12 @@ NBA:
     - Points
     - Rebounds
     - Assists
-    - Steals 
+    - Steals
     - Blocks
     - Turnovers
     - Def Rebounds
     - Off Rebounds
-    - Double Doubles 
+    - Double Doubles
     - Field Goals Made
     - Free Throws Made
   ratio-statistics: 
@@ -342,6 +359,23 @@ NBA:
   n_games : 82
   n_games_per_week : 3
 WNBA:
+  short-category-names:
+    Field Goal %: FG%
+    Free Throw %: FT%
+    Three %: 3%
+    Threes: 3s
+    Points: Pts
+    Rebounds: Rbds
+    Assists: Asts
+    Steals: Stls
+    Blocks: Blks
+    Turnovers: Tos
+    Def Rebounds: dRbds
+    Off Rebounds: oRbds
+    Assist to TO: A/To
+    Double Doubles: DDs
+    Field Goals Made: FGM
+    Free Throws Made: FTM
   default-categories:
     - Field Goal %
     - Free Throw %
@@ -349,7 +383,7 @@ WNBA:
     - Points
     - Rebounds
     - Assists
-    - Steals 
+    - Steals
     - Blocks
     - Turnovers
   counting-statistics:
@@ -569,15 +603,38 @@ WNBA:
   n_games : 40
   n_games_per_week : 3
 MLB:
+  short-category-names:
+    Runs: R
+    Home Runs: HR
+    RBI: RBI
+    Stolen Bases: SBs
+    Batting Average: AVG
+    Slugging %: SLG
+    On Base %: OBP
+    Wins: W
+    Saves: SV
+    Strikeouts: Ks
+    ERA: ERA
+    WHIP: WHIP
+    K/9: K/9
+    K/BB: K/BB
+    Hits: H
+    Doubles: 2B
+    Triples: 3B
+    Total Bases: TB
+    Losses: L
+    Quality Starts: QS
+    Holds: HLD
+    Saves and Holds: SVH
   default-categories:
     - Runs
-    - Home Runs 
-    - RBI 
-    - Stolen Bases 
+    - Home Runs
+    - RBI
+    - Stolen Bases
     - Batting Average
-    - Wins 
+    - Wins
     - Saves
-    - Strikeouts 
+    - Strikeouts
     - ERA
     - WHIP
   counting-statistics:

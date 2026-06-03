@@ -120,3 +120,7 @@ export function setSportConfig(c: SportConfig): void { sportConfig = c }
 
 /** Returns the position abbreviation → full name map (e.g. "PG" → "Point Guard"). */
 export function getPositionNames(): Record<string, string> { return sportConfig?.position_names ?? {} }
+
+/** Returns the full category name → short label map (e.g. "Points" → "pts").
+ *  Used by the candidate table on mobile to keep column headers compact. */
+export function getShortCategoryNames(): Record<string, string> { return sportConfig?.short_category_names ?? {} }
