@@ -17,8 +17,8 @@ import {
 
 const _auctionDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Auction evaluate failed:', err)) })
 
-const ROUND_W = 46
-const TEAM_W  = 85
+const ROUND_W = 32
+const TEAM_W  = 60
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 

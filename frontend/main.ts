@@ -246,6 +246,18 @@ themeInput.addEventListener('change', () => {
     setTheme(isLight ? 'light' : 'dark')
 })
 
+// ─── Sidebar toggle ───────────────────────────────────────────────────────────
+
+const SIDEBAR_COLLAPSE_BREAKPOINT = 768  // px; viewports narrower than this default to a collapsed sidebar
+const sidebarToggle = document.getElementById('sidebar-toggle') as HTMLButtonElement
+const appLayout     = document.getElementById('app-layout') as HTMLElement
+const defaultCollapsed = window.innerWidth < SIDEBAR_COLLAPSE_BREAKPOINT
+if (pref('sidebar_collapsed', defaultCollapsed)) appLayout.classList.add('sidebar-collapsed')
+sidebarToggle.addEventListener('click', () => {
+    const collapsed = appLayout.classList.toggle('sidebar-collapsed')
+    savePref('sidebar_collapsed', collapsed)
+})
+
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 // All sections are fully built; reveal the sidebar in one repaint

@@ -2,6 +2,18 @@
 // Shared UI building blocks used across sidebar and parameter_collection modules.
 // Table-specific helpers (ExpandView and friends) live in table/expand_view.ts.
 
+// ─── Viewport breakpoint ──────────────────────────────────────────────────────
+// Mirrors the 768px breakpoint used by the @media (max-width: 768px) blocks in
+// styles.css. CSS handles layout-level switches; this is for the few cases
+// where rendering code (e.g. inline column widths, short vs full labels) has
+// to make the same mobile/desktop choice in JS.
+
+export const MOBILE_BREAKPOINT_PX = 768
+
+export function isMobileViewport(): boolean {
+    return window.innerWidth <= MOBILE_BREAKPOINT_PX
+}
+
 // ─── Global JS tooltip ────────────────────────────────────────────────────────
 // Uses position:fixed so it escapes the sidebar's overflow-y:auto clipping.
 // Any element with a `data-tooltip` attribute automatically gets a hover tooltip.

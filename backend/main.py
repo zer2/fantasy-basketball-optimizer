@@ -197,6 +197,7 @@ def get_config_route(sport: str):
     return {
         'default_categories': p.get('default-categories', []),
         'all_categories': all_categories,
+        'short_category_names': p.get('short-category-names', {}),
         'options': options,
         'positions': raw_options.get('positions', {}),
         'position_structure': {

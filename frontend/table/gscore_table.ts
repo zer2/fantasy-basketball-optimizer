@@ -2,10 +2,11 @@
 // Renders a G-score breakdown table for a list of players.
 // Used by Auction Mode's "My Team" tab and potentially by Season Mode roster inspection.
 
-import { getGScoreByName } from '../app_state.js'
+import { getGScoreByName, getShortCategoryNames } from '../app_state.js'
 import { getSelectedCategories, getScoringFormat } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../styles/styler_functions.js'
+import { isMobileViewport } from '../helper_functions.js'
 
 /**
  * Builds a G-score table for the given players: one row per player plus a
@@ -37,8 +38,15 @@ export function renderTeamGScoreTable(
     tbl.style.tableLayout = 'fixed'
     tbl.style.width = '100%'
 
+    // On mobile, narrow the name/total columns and use short category labels
+    // (e.g. "Points" → "Pts") so the table's intrinsic min-content fits inside
+    // the candidate panel rather than stretching it. Matches the equivalent
+    // mobile treatment in season_rosters.ts's team inspector.
+    const isMobile   = isMobileViewport()
+    const shortNames = isMobile ? getShortCategoryNames() : {}
+
     // colgroup locks column widths without introducing a visual spacer row.
-    tbl.appendChild(makeNameTotalCategoriesColgroup(categories.length))
+    tbl.appendChild(makeNameTotalCategoriesColgroup(categories.length, isMobile))
 
     // Header row
     const headerRow = tbl.createTHead().insertRow(-1)
@@ -48,9 +56,10 @@ export function renderTeamGScoreTable(
     totalTh.textContent = 'Total'
     headerRow.appendChild(totalTh)
     for (const cat of categories) {
+        const label = shortNames[cat] ?? cat
         const th = document.createElement('th')
-        th.className = cat.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
-        th.textContent = cat
+        th.className = label.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
+        th.textContent = label
         headerRow.appendChild(th)
     }
 
@@ -114,7 +123,7 @@ export function renderTeamGScoreTable(
     hScoreTbl.style.tableLayout = 'fixed'
     hScoreTbl.style.width = '100%'
 
-    hScoreTbl.appendChild(makeNameTotalCategoriesColgroup(categories.length))
+    hScoreTbl.appendChild(makeNameTotalCategoriesColgroup(categories.length, isMobile))
 
     const hScoreTBody = hScoreTbl.createTBody()
     const hScoreRow = hScoreTBody.insertRow(-1)
@@ -152,15 +161,19 @@ function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
     return th
 }
 
-/** Creates a `<colgroup>` with a 200px name column, an 83px total column, and
- *  one auto-sized column per category. Used by both the G-score and H-score
- *  tables so their column widths match. */
-function makeNameTotalCategoriesColgroup(nCategories: number): HTMLTableColElement {
+/** Creates a `<colgroup>` with name and total columns followed by one
+ *  auto-sized column per category. Desktop uses 200px/83px (matches
+ *  .panel-colspacer-name / .panel-colspacer-total); mobile uses 7rem/3rem so
+ *  the table fits inside the panel without forcing it wider. */
+function makeNameTotalCategoriesColgroup(
+    nCategories: number
+  , isMobile: boolean
+): HTMLTableColElement {
     const colgroup = document.createElement('colgroup')
     const nameCol  = document.createElement('col')
-    nameCol.style.width = '200px'   // matches .panel-colspacer-name
+    nameCol.style.width = isMobile ? '7rem' : '200px'
     const totalCol = document.createElement('col')
-    totalCol.style.width = '83px'   // matches .panel-colspacer-total
+    totalCol.style.width = isMobile ? '3rem' : '83px'
     colgroup.append(nameCol, totalCol)
     for (let i = 0; i < nCategories; i++) colgroup.appendChild(document.createElement('col'))
     return colgroup

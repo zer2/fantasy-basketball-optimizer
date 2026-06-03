@@ -42,10 +42,15 @@ export function getCurrentDraftTab():   string { return currentDraftTab   }
 /** Re-dispatches the layout with current DOM state. */
 export function applyLayout(): void {
     const { mode, platform } = getLeagueSettings()
+    const appLayout = document.getElementById('app-layout')!
 
     if (mode === 'Season Mode') {
+        // Mark season mode on the layout root so CSS can branch on it without
+        // having to inspect inline styles of #season-nav.
+        appLayout.classList.add('is-season')
         showSeasonLayout()
     } else {
+        appLayout.classList.remove('is-season')
         // Reset season tab tracking when leaving Season Mode so the next entry defaults to Waiver
         currentSeasonTab = null
         if (platform === 'Enter your own data') {

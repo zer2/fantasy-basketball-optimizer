@@ -5,6 +5,13 @@
 /* Scale all rem-based sizes with viewport width, min 16px (laptop), max 20px (wide desktop) */
 html { font-size: clamp(16px, 0.93vw, 20px); }
 
+/* On phones, shrink the root font so all rem-based widths (player col, score col,
+   categories, etc.) scale down proportionally — lets the candidate table fit in
+   viewport widths around 375-430px without horizontal scroll. */
+@media (max-width: 768px) {
+    html { font-size: 10px; }
+}
+
 /* ─── App layout ─────────────────────────────────────────────────────────── */
 
 #app-layout {
@@ -20,6 +27,107 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+}
+
+/* Hidden by default — only the mobile media block makes the toggle visible
+   and styles it. Desktop never shows it (the sidebar is always in flow). */
+#sidebar-toggle {
+    display: none;
+}
+
+/* Mobile: sidebar is a full-screen overlay. The closed state is a transform
+   off-screen, which is GPU-composited — so toggling the menu doesn't reflow
+   or repaint the candidate panel underneath. This is the entire point of this
+   architecture: the candidate panel never changes width, so the ~400ms paint
+   that previously occurred on every toggle is gone. */
+@media (max-width: 768px) {
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 50;
+        transition: transform 0.2s ease-out;
+        /* Pre-allocate a compositor layer so the slide is GPU-only — without
+           this hint, the browser may paint the sidebar contents on each
+           toggle. */
+        will-change: transform;
+    }
+    #app-layout.sidebar-collapsed #sidebar {
+        transform: translateX(-100%);
+    }
+    /* Hamburger / close toggle. Sits at top-right in BOTH open and closed
+       states — same fixed coordinates → no layout change on collapse, no
+       visual jump. Top: 22px vertically aligns the icon with the first row
+       of input boxes / dropdowns in both auction and draft modes (label is
+       at y≈8-20, input/dropdown follows at y≈22-50; toggle is 28px tall
+       and centers within that input). When the sidebar is open, the same
+       coordinates fall inside the .sidebar-title header strip. */
+    #sidebar-toggle {
+        display: flex;
+        position: fixed;
+        top: 22px;
+        right: 8px;
+        z-index: 100;
+        width: 32px;
+        height: 28px;
+        border: none;
+        background: transparent;
+        color: light-dark(#999999, #666688);
+        cursor: pointer;
+        font-family: "Source Sans 3";
+        font-size: 1.3rem;
+        line-height: 1;
+        align-items: center;
+        justify-content: center;
+    }
+    /* Hamburger when closed; X when open. Same font-size so the close
+       affordance doesn't look visually heavier than the open one. */
+    #sidebar-toggle::before {
+        content: '☰';
+    }
+    #app-layout:not(.sidebar-collapsed) #sidebar-toggle::before {
+        content: '✕';
+    }
+    /* Remove the browser's default focus ring on tap — otherwise it appears
+       as a boxy outline around the toggle after the first click. Keep focus
+       visible for keyboard navigation only. */
+    #sidebar-toggle:focus {
+        outline: none;
+    }
+    #sidebar-toggle:focus-visible {
+        outline: 2px solid light-dark(#999999, #666688);
+        outline-offset: 2px;
+    }
+    /* Right-side padding so the inputs / buttons row content doesn't slide
+       under the hamburger. */
+    #right-header:not(:empty) > :first-child,
+    #season-nav,
+    #live-bar {
+        padding-right: 40px;
+    }
+    /* Border-bottom on the sidebar title to demarcate it as a header bar in
+       the open-sidebar overlay. (The matching padding-bottom extension lives
+       in a separate mobile block after the base .sidebar-title rule — it
+       needs to come after the base `padding` shorthand to win the cascade.) */
+    .sidebar-title {
+        border-bottom: 1px solid light-dark(#e5e5e5, #3d3d55);
+    }
+    /* Push the season-mode tabs down to the bottom of the header so they
+       align with the border line — matching how they sit on desktop (where
+       the active tab's underline merges into season-nav's border-bottom).
+       The hamburger occupies the empty space ABOVE the tabs in the top-
+       right of this extended header area. */
+    #season-nav {
+        padding-top: 28px;
+    }
+    /* Season mode exception: #season-nav above gets the 40px right padding,
+       so #right-header sits below the toggle's vertical range and doesn't
+       need its own clearance. */
+    #app-layout.is-season #right-header:not(:empty) > :first-child {
+        padding-right: 0;
+    }
 }
 
 .section-apply-btn {
@@ -46,7 +154,18 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     font-family: "Source Sans 3";
     font-size: 1rem;
     font-weight: 700;
-    padding: 14px 16px 10px;
+    padding: 14px 48px 10px 16px;  /* extra right padding to clear #sidebar-toggle */
+}
+
+/* Mobile: extend the title bar's bottom padding so the bottom border sits
+   below the toggle (top: 22px + height 28px = 50px) instead of cutting
+   through it. Lives here, AFTER the base padding shorthand, to win the
+   same-specificity cascade — earlier mobile overrides of padding-bottom
+   alone are silently overridden by the base `padding` shorthand. */
+@media (max-width: 768px) {
+    .sidebar-title {
+        padding-bottom: 28px;
+    }
 }
 
 .sidebar-divider {
@@ -58,7 +177,14 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 #main-content {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    /* Single source of truth for the horizontal bounds of every main-column
+       element (pick-control row, entry table, candidate table). Children use
+       max-width: 100% and inherit this padding for their right/left edge —
+       no element computes its own calc(100vw - Npx). Mobile overrides these
+       variables to tighten the gutter; nothing else changes. */
+    --main-content-padding-left:  16px;
+    --main-content-padding-right: 16px;
+    padding: 8px var(--main-content-padding-right) 16px var(--main-content-padding-left);
 }
 
 /* ─── Sidebar sections (collapsible, mirroring Streamlit popovers) ───────── */
@@ -674,6 +800,7 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 body {
+    margin: 0;
     background-color: light-dark(#ffffff, rgb(14, 17, 23));
     color: light-dark(#333333, lightgrey);
 }
@@ -750,7 +877,7 @@ tr {
     font-weight:400;
     font-size: 0.78rem;
     text-align: left;
-    width: 224px;
+    width: 6rem;
     border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
     border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
 }
@@ -945,6 +1072,8 @@ tr {
     text-align: left;
     border: 0.5px solid light-dark(#eeeeee, #555566);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .panel-rowlabel-total {
@@ -1164,6 +1293,140 @@ tr {
     margin-left: auto;
 }
 
+/* Mobile pick-control-row layout. Mode-specific grid templates are defined
+   below via :has() — auction uses a 3-column grid with a fixed 5rem Cost
+   track, draft uses a single-column grid. Lives AFTER the base
+   `.pick-control-buttons` rule (immediately above) so the `margin-left: 0`
+   override inside the block wins the same-specificity cascade. */
+@media (max-width: 768px) {
+    .pick-control-row {
+        flex-wrap: wrap;
+        margin-top: 0;
+        margin-bottom: 8px;      /* matches #tab-row margin-top so spacing above and below the auction board is symmetric */
+    }
+    /* Auction mode (row contains the .auction-cost-input): use CSS Grid instead
+       of flex-wrap so the layout is explicit — Player/Drafter/Cost on row 1,
+       buttons span the whole of row 2. Flex-wrap was inconsistent about which
+       item wrapped first across browsers.
+       Tracks: minmax(0, 1fr) twice + a fixed 5rem for Cost. The 1fr tracks
+       have an explicit 0 lower bound so a grid item's min-content (long
+       player names, or the spanning buttons row) doesn't force the tracks
+       wider than the container. The Cost track is fixed-width instead of
+       `auto` because `auto` resolves to minmax(min-content, max-content),
+       which lets the column grow when a spanning item (the buttons row)
+       distributes its content size into it. */
+    .pick-control-row:has(.auction-cost-input) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5rem;
+        gap: 8px;
+        align-items: end;
+    }
+    .pick-control-row:has(.auction-cost-input) > .pick-control-buttons {
+        grid-column: 1 / -1;
+        /* Without this, the grid item's auto-min equals its content min-width
+           (the sum of three nowrap button labels, ~420px on mobile). That
+           min-width propagates into the tracks via the spanning-item rule and
+           pushes the grid wider than its 327px parent — the row visibly
+           overflows the right edge. min-width: 0 lets the buttons shrink. */
+        min-width: 0;
+    }
+    /* Draft mode (row contains .pick-control-label directly): single-column grid
+       so the "Select Pick X for Drafter Y" label sits above the dropdown,
+       mirroring the label-above-input layout used by auction mode's pick-cols.
+       Buttons take row 3. */
+    .pick-control-row:has(> .pick-control-label) {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    /* Spread the wrapped buttons row across the full viewport width: each button
+       gets an equal share, and the row's left edge anchors at x=0 (overrides
+       margin-left: auto). flex-basis: 100% forces the buttons onto their own
+       row inside the flex .pick-control-row (draft mode); auction mode uses
+       grid for the same row, where flex-basis is ignored — grid-column: 1 / -1
+       handles the wrap there. */
+    .pick-control-buttons {
+        margin-left: 0;
+        flex-grow: 1;
+        flex-basis: 100%;
+    }
+    .pick-control-buttons .pick-btn {
+        flex: 1;
+    }
+    /* Shrink the seat selector on mobile — at flex: 1 it grows to fill the tab
+       row, pushing the eval indicator and action buttons off-screen. */
+    #seat-selector-container {
+        flex: 0 1 auto;
+        max-width: 12rem;
+    }
+    /* Tighten the horizontal padding inside score / category cells — the 5px
+       default eats too much of the narrow column widths. */
+    .auction-dollar,
+    .overallhscore,
+    .categoricalhscore,
+    .categoricalRotoHscore {
+        padding: 5px 2px;
+    }
+    /* Tighten vertical spacing between the candidate-panel sections so there's
+       not a big empty band between the auction board and the candidate table. */
+    #right-header:not(:empty) {
+        margin-bottom: 0;
+    }
+    #tab-row {
+        margin-bottom: 8px;      /* matches margin-top so Select-team has equal space above and below */
+        margin-top: 8px;         /* small breath of space below the auction board */
+    }
+    /* Hide the vertical scrollbar gutter on the auction board — overflow: auto
+       reserves space for one even when not scrolling, eating ~15px of vertical
+       space below the board. */
+    .entry-table-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    /* Remove the seat-selector-wrap's bottom margin in tab-row context — it
+       was added for the season rosters layout but in #tab-row it pushes the
+       Select-team box's visual center upward relative to the eval indicator
+       and "Show candidates" buttons (flex align-items: center counts margins
+       in the item's outer box). */
+    #seat-selector-container .seat-selector-wrap {
+        margin-bottom: 0;
+    }
+    /* Single source of truth for the mobile main-column edges. Left padding
+       stays at 4px so content isn't flush against the viewport edge; right
+       padding is 0 so the auction board / candidate table extend all the way
+       to the viewport edge (combined with the ~15px overflow-y scrollbar
+       gutter, that already leaves enough space to read the rightmost data).
+       Every main-column element descends from #main-content and inherits
+       this right edge automatically. */
+    #main-content {
+        --main-content-padding-left:  4px;
+        --main-content-padding-right: 0;
+    }
+    #panel-content-width-container {
+        width: 100%;
+        /* Hard floor at 0 so no descendant's intrinsic min-content can stretch
+           the container past its `width: 100%`. Without this, a wide table
+           (e.g. the team-stats gscore view at desktop widths) inside the panel
+           could propagate its min-content up through the chain and visibly
+           stretch the page. With min-width: 0, content that doesn't fit gets
+           clipped or overflows inside the container instead. */
+        min-width: 0;
+    }
+    /* Season → Rosters tab: tighten the team-inspector's Player and Total
+       columns (200px/83px is fine on desktop but pushes per-category stats off
+       the right edge on mobile). Scoped to #rosters-right so other panel tables
+       elsewhere keep their desktop widths. */
+    #rosters-right .panel-colspacer-name  { width: 7rem; }
+    #rosters-right .panel-colspacer-total { width: 3rem; }
+    /* Season → Rosters tab: shrink the roster entry table's drafter columns —
+       at content-sized widths they fit only ~3 drafters before scrolling. The
+       cs-trigger inside each cell already has overflow: hidden so long player
+       names truncate cleanly. */
+    #rosters-left .entry-table th:not(:first-child) {
+        width: 4rem;
+    }
+}
+
 .pick-btn {
     padding: 5px 10px;
     white-space: nowrap;
@@ -1192,7 +1455,9 @@ tr {
 }
 
 .auction-cost-input {
-    width: 60px;
+    width: 5rem;
+    min-height: 28px;            /* match cs-trigger min-height so Cost matches dropdown row height */
+    box-sizing: border-box;
     padding: 4px 6px;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
@@ -1276,6 +1541,7 @@ tr {
     justify-content: center;
     gap: 6px;
     font-size: 0.9rem;
+    box-sizing: border-box;
     color: light-dark(#aaaaaa, #666688);
     white-space: nowrap;
     flex-shrink: 0;
@@ -1316,6 +1582,29 @@ tr {
 
 .autopilot-running-indicator {
     width: auto;
+}
+
+/* Mobile: shrink both the width and the font so the indicator stays compact
+   AND the longer states ("Updating...", "Starting...") still fit inside the
+   box. Without the font shrink, the longer text overflows past the box edges
+   on both sides (justify-content: center) and visually overlaps the seat
+   selector to the left. */
+@media (max-width: 768px) {
+    .eval-indicator {
+        width: 7rem;
+        font-size: 0.85rem;
+        overflow: hidden;
+    }
+    /* Allow the "Show candidates" / "Show team statistics" tab-bar buttons to
+       wrap their text onto two lines on mobile so the right-sub-header takes
+       less horizontal space, leaving more room for the seat selector. Other
+       .pick-btn instances (Lock in / Undo / Clear) keep their default nowrap. */
+    .draft-tab-bar .pick-btn,
+    .auction-tab-bar .pick-btn {
+        white-space: normal;
+        line-height: 1.1;
+        text-align: center;
+    }
 }
 
 /* ─── Waiver controls bar ────────────────────────────────────────────────────── */

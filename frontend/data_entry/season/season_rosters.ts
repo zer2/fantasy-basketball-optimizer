@@ -3,7 +3,8 @@
 // inspector table (right).  Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
-import { getPlayerResults, getGScoreByName } from '../../app_state.js'
+import { getPlayerResults, getGScoreByName, getShortCategoryNames } from '../../app_state.js'
+import { isMobileViewport } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
@@ -294,7 +295,10 @@ async function buildTeamGScoreTable(
     spacerRow.appendChild(makeSpacerTh('panel-colspacer-total'))
     for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh())
 
-    // Header row
+    // Header row — on mobile, swap full category names for their short form
+    // (e.g. "Points" → "Pts") to keep columns narrow.
+    const isMobile   = isMobileViewport()
+    const shortNames = isMobile ? getShortCategoryNames() : {}
     const headerRow = tHead.insertRow(-1)
     headerRow.appendChild(makeSpacerTh())  // invisible label spacer
     const totalTh = document.createElement('th')
@@ -302,9 +306,10 @@ async function buildTeamGScoreTable(
     totalTh.textContent = 'Total'
     headerRow.appendChild(totalTh)
     for (const cat of categories) {
+        const label = shortNames[cat] ?? cat
         const th = document.createElement('th')
-        th.className = cat.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
-        th.textContent = cat
+        th.className = label.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
+        th.textContent = label
         headerRow.appendChild(th)
     }
 
@@ -383,11 +388,13 @@ async function buildTeamGScoreTable(
     hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
     hScoreTbl.style.tableLayout = 'fixed'
 
+    // Match the team-inspector's column widths above so the two tables line up.
+    // Mobile values mirror the #rosters-right .panel-colspacer-* overrides.
     const colgroup = document.createElement('colgroup')
     const nameCol  = document.createElement('col')
-    nameCol.style.width = '200px'
+    nameCol.style.width = isMobile ? '7rem' : '200px'
     const totalCol = document.createElement('col')
-    totalCol.style.width = '83px'
+    totalCol.style.width = isMobile ? '3rem' : '83px'
     colgroup.append(nameCol, totalCol)
     for (let i = 0; i < categories.length; i++) colgroup.appendChild(document.createElement('col'))
     hScoreTbl.appendChild(colgroup)
