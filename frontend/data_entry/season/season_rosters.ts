@@ -11,8 +11,23 @@ import { getLeagueSettings } from '../../parameter_collection/league_settings.js
 import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { evaluateTeamHScore } from '../../api/season_session.js'
 
+// Tracks the change-event listeners attached by the most recent render so they
+// can be removed before the next one. Without this, calling renderSeasonRosters
+// a second time (e.g. revisiting Season Mode) leaves listener closures bound to
+// the now-detached previous selects. Each closure captures `selects` (156 custom
+// selects × ~300 options) and `rebuildInspector`, so the entire previous render
+// tree stays alive in memory. Aborting this controller before the new render
+// detaches all listeners at once — no manual iteration, no missed cleanup.
+let rosterListenerController: AbortController | null = null
+
 /** Renders the season roster entry grid (left) and team inspector with G-score table (right). */
 export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): void {
+
+    // Remove change listeners from any previously-rendered selects so their
+    // closures can be garbage-collected. See comment on rosterListenerController.
+    rosterListenerController?.abort()
+    rosterListenerController = new AbortController()
+    const listenerOpts = { signal: rosterListenerController.signal }
     const playerResults = getPlayerResults()
     if (playerResults === null) return
 
@@ -136,7 +151,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
             dragging  = true
         }
         applySelectionHighlight()
-    })
+    }, listenerOpts)
 
     table.addEventListener('mousemove', (e: MouseEvent) => {
         if (!dragging) return
@@ -147,9 +162,9 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
             focusCol = coords.col
             applySelectionHighlight()
         }
-    })
+    }, listenerOpts)
 
-    document.addEventListener('mouseup', () => { dragging = false })
+    document.addEventListener('mouseup', () => { dragging = false }, listenerOpts)
 
     table.addEventListener('keydown', (e: KeyboardEvent) => {
         const ctrl = e.ctrlKey || e.metaKey
@@ -204,7 +219,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
                 if (changed) rebuildInspector()
             })
         }
-    })
+    }, listenerOpts)
 
     scroll.append(table)
     leftEl.append(scroll)
@@ -238,12 +253,12 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     }
 
     // Rebuild when the team selector changes
-    teamSel.element.addEventListener('change', rebuildInspector)
+    teamSel.element.addEventListener('change', rebuildInspector, listenerOpts)
 
     // Rebuild when any roster select changes
     for (const rowSelects of selects) {
         for (const sel of rowSelects) {
-            sel.element.addEventListener('change', rebuildInspector)
+            sel.element.addEventListener('change', rebuildInspector, listenerOpts)
         }
     }
 

@@ -9,15 +9,24 @@
 //   container.append(sel.element)
 //   sel.element.addEventListener('change', () => console.log(sel.getValue()))
 //
-// Getter compatibility: a hidden <select id={id}> is kept in sync so that
+// Getter compatibility: a hidden <input id={id}> is kept in sync so that
 // existing getter code like:
-//   (document.getElementById('my-id') as HTMLSelectElement).value
+//   (document.getElementById('my-id') as HTMLInputElement).value
 // continues to work without modification.
 //
-// <select> is used (rather than <input type="hidden">) because a sibling
-// <label for={id}> requires a labelable element per the HTML spec, and
-// <input type="hidden"> is explicitly excluded from that list. Using <select>
-// silences Chrome's "label's for attribute doesn't match any element id" warning.
+// The hidden value carrier is <input type="text" hidden>, not <select>.
+// Two constraints had to be satisfied at once:
+//   (1) it must be a labelable element so <label for={id}> resolves cleanly
+//       and Chrome doesn't warn — that rules out <input type="hidden">, which
+//       is explicitly excluded from the labelable list.
+//   (2) it must not be a heavy native form element with many children. A
+//       <select> populated with hundreds of <option>s creates internal
+//       shadow DOM (slot + label container + ShadowRoot per option) that
+//       browsers don't release cleanly on detach, producing massive detached-
+//       DOM leaks when the widget is recreated repeatedly (~half a gigabyte
+//       observed with 156 selects × 300 options × N renders).
+// <input type="text" hidden> satisfies both: it's labelable per the spec, and
+// it has no internal rendering or option children.
 
 export interface CustomSelectOption {
     value: string
@@ -34,15 +43,16 @@ export interface CustomSelect {
 /**
  * Creates a fully browser-rendered custom select widget.
  *
- * A `<select id={id} hidden>` is kept in sync inside the wrapper so that
- * existing getter code like `(document.getElementById(id) as HTMLSelectElement).value`
+ * An `<input type="text" id={id} hidden>` is kept in sync inside the wrapper
+ * so that existing getter code like `(document.getElementById(id) as HTMLInputElement).value`
  * continues to work without modification, and so that a sibling `<label for={id}>`
- * references a labelable element (which <input type="hidden"> is not).
+ * references a labelable element. See the file header for why this is a hidden
+ * text input rather than <select> or <input type="hidden">.
  *
  * The wrapper element dispatches a native `'change'` event (bubbling) whenever the
  * selected value changes, so `element.addEventListener('change', cb)` works as expected.
  *
- * @param id           - DOM id; also used for the hidden <select> that exposes `.value`
+ * @param id           - DOM id; also used for the hidden <input> that exposes `.value`
  * @param options      - Initial option list
  * @param defaultValue - Initially selected value; falls back to `options[0]` if omitted
  */
@@ -62,22 +72,29 @@ export function makeCustomSelect(
     const wrapper = document.createElement('div')
     wrapper.className = 'cs-wrapper'
 
-    // Hidden <select> — exposes the current value via (document.getElementById(id) as HTMLSelectElement).value,
-    // and gives a sibling <label for={id}> a labelable target so Chrome doesn't warn.
-    const hiddenSelect = document.createElement('select')
-    hiddenSelect.id = id
-    hiddenSelect.hidden = true
-    hiddenSelect.tabIndex = -1
-
-    function syncHiddenSelectOptions(opts: CustomSelectOption[]): void {
-        hiddenSelect.replaceChildren(...opts.map(o => {
-            const optionEl = document.createElement('option')
-            optionEl.value = o.value
-            optionEl.textContent = o.label
-            return optionEl
-        }))
-    }
-    syncHiddenSelectOptions(currentOptions)
+    // Hidden value carrier — exposes the current value via
+    // (document.getElementById(id) as HTMLInputElement).value, and gives a
+    // sibling <label for={id}> a labelable target.
+    //
+    // Uses <input type="text" hidden> rather than <select>: a native <select>
+    // populated with N options creates N pieces of internal shadow DOM (slot +
+    // label container + ShadowRoot per option) that the browser keeps alive
+    // even after the element is detached. With ~300 options × 156 selects per
+    // renderSeasonRosters call, that produced ~half a gigabyte of detached DOM
+    // that GC could not reclaim.
+    //
+    // <input type="hidden"> would be even simpler but is explicitly excluded
+    // from the HTML spec's labelable-element list — <label for={id}> against
+    // it triggers Chrome's "label's for attribute doesn't match any element"
+    // warning. <input type="text"> IS labelable; combined with the `hidden`
+    // attribute it's invisible and non-interactive, and it has no internal
+    // children to leak.
+    const hiddenValueInput = document.createElement('input')
+    hiddenValueInput.type = 'text'
+    hiddenValueInput.id = id
+    hiddenValueInput.hidden = true
+    hiddenValueInput.tabIndex = -1
+    hiddenValueInput.autocomplete = 'off'
 
     // Visible trigger
     const trigger = document.createElement('div')
@@ -101,7 +118,7 @@ export function makeCustomSelect(
     dropdown.className = 'cs-dropdown'
     dropdown.hidden = true
 
-    wrapper.append(hiddenSelect, trigger, dropdown)
+    wrapper.append(hiddenValueInput, trigger, dropdown)
 
     // ── Internal helpers ───────────────────────────────────────────────────
 
@@ -111,7 +128,7 @@ export function makeCustomSelect(
 
     function commit(value: string, silent = false): void {
         currentValue       = value
-        hiddenSelect.value = value
+        hiddenValueInput.value = value
         searchInput.value  = getLabelFor(value)
         if (!silent) wrapper.dispatchEvent(new Event('change', { bubbles: true }))
     }
@@ -226,7 +243,6 @@ export function makeCustomSelect(
 
     function setOptions(opts: CustomSelectOption[], preferredValue?: string): void {
         currentOptions = [...opts]
-        syncHiddenSelectOptions(currentOptions)
         const keep = preferredValue ?? currentValue
         const resolved = currentOptions.find(o => o.value === keep)?.value
                       ?? currentOptions[0]?.value ?? ''

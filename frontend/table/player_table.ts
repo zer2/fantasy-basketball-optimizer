@@ -70,7 +70,7 @@ export function buildTableHeader(): void {
     const playerTh = document.createElement('th')
     playerTh.className = 'tableheader'
     playerTh.textContent = 'Player'
-    playerTh.style.width = isMobile ? '6rem' : '14rem'
+    playerTh.style.width = isMobile ? '11rem' : '14rem'
     headerRow.append(playerTh)
 
     if (isAuction) {
