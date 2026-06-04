@@ -239,11 +239,20 @@ export function makeMultiSelectWidget(
 
     const callbacks: (() => void)[] = []
 
+    // Reuses a single MutationObserver across re-renders. Without this, every
+    // call to observeInputArea (initial + each replaceSelection) created a new
+    // observer without disconnecting the previous one — the old observer kept
+    // watching its (now-detached) input area, with its callback closure rooted
+    // by V8's observer registry. Same re-render-leak pattern as the prior
+    // <select> bug.
+    let inputAreaObserver: MutationObserver | null = null
+
     function observeInputArea(): void {
+        inputAreaObserver?.disconnect()
         const inputArea = wrap.querySelector('.ms-input-area')
         if (inputArea) {
-            new MutationObserver(() => callbacks.forEach(cb => cb()))
-                .observe(inputArea, { childList: true })
+            inputAreaObserver = new MutationObserver(() => callbacks.forEach(cb => cb()))
+            inputAreaObserver.observe(inputArea, { childList: true })
         }
     }
     observeInputArea()
