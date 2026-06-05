@@ -59,11 +59,9 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     }
     /* Hamburger / close toggle. Sits at top-right in BOTH open and closed
        states — same fixed coordinates → no layout change on collapse, no
-       visual jump. Top: 22px vertically aligns the icon with the first row
-       of input boxes / dropdowns in both auction and draft modes (label is
-       at y≈8-20, input/dropdown follows at y≈22-50; toggle is 28px tall
-       and centers within that input). When the sidebar is open, the same
-       coordinates fall inside the .sidebar-title header strip. */
+       visual jump. Top: 22px vertically aligns with the first input row.
+       When the sidebar is open, the same coordinates fall inside the
+       .sidebar-title header strip. */
     #sidebar-toggle {
         display: flex;
         position: fixed;
@@ -100,8 +98,11 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
         outline: 2px solid light-dark(#999999, #666688);
         outline-offset: 2px;
     }
-    /* Right-side padding so the inputs / buttons row content doesn't slide
-       under the hamburger. */
+    /* Right-side padding so the inputs row content doesn't slide under the
+       hamburger. The buttons row inside the same wrap gets its padding
+       cancelled by a negative margin-right (see .pick-control-buttons rule
+       in the pick-control block lower in the file) so it can extend to
+       the full wrap width. */
     #right-header:not(:empty) > :first-child,
     #season-nav,
     #live-bar {
@@ -117,14 +118,14 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     /* Push the season-mode tabs down to the bottom of the header so they
        align with the border line — matching how they sit on desktop (where
        the active tab's underline merges into season-nav's border-bottom).
-       The hamburger occupies the empty space ABOVE the tabs in the top-
-       right of this extended header area. */
+       The hamburger overlays the empty space ABOVE the tabs in the top-
+       right corner. */
     #season-nav {
         padding-top: 28px;
     }
-    /* Season mode exception: #season-nav above gets the 40px right padding,
-       so #right-header sits below the toggle's vertical range and doesn't
-       need its own clearance. */
+    /* Season mode exception: #season-nav above already gets the 40px right
+       padding, so #right-header sits below the toggle's vertical range and
+       doesn't need its own clearance. */
     #app-layout.is-season #right-header:not(:empty) > :first-child {
         padding-right: 0;
     }
@@ -160,8 +161,7 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 /* Mobile: extend the title bar's bottom padding so the bottom border sits
    below the toggle (top: 22px + height 28px = 50px) instead of cutting
    through it. Lives here, AFTER the base padding shorthand, to win the
-   same-specificity cascade — earlier mobile overrides of padding-bottom
-   alone are silently overridden by the base `padding` shorthand. */
+   same-specificity cascade. */
 @media (max-width: 768px) {
     .sidebar-title {
         padding-bottom: 28px;
@@ -1064,6 +1064,20 @@ tr {
     font-size: clamp(0.65rem, 0.75vw, 0.8rem);
 }
 
+/* Auction $ headers ("Your $", "Gnrc. $", "Orig. $") wrap to two lines on
+   mobile: the word on line 1, the $ on line 2. This lets each column stay
+   at 1.25rem (12.5px) without truncating the header. Desktop is unaffected
+   — at desktop column widths the text already fits on a single line, and
+   white-space: normal would only kick in if it didn't. */
+@media (max-width: 768px) {
+    .colheader-wrap-dollar {
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.05;
+        font-size: 0.7rem;
+    }
+}
+
 .panel-rowlabel {
     background-color: light-dark(#ffffff, rgb(14, 17, 23));
     color: light-dark(#555555, darkgrey);
@@ -1344,9 +1358,19 @@ tr {
        margin-left: auto). flex-basis: 100% forces the buttons onto their own
        row inside the flex .pick-control-row (draft mode); auction mode uses
        grid for the same row, where flex-basis is ignored — grid-column: 1 / -1
-       handles the wrap there. */
+       handles the wrap there.
+
+       margin-right: -40px cancels the 40px right padding that the wrap
+       container has (for clearing the hamburger). The inputs row above is
+       still constrained by the wrap padding, but the buttons row sits below
+       the hamburger's vertical range and can occupy the full width without
+       sliding under it. min-width: 0 on the spanning grid item (set in the
+       auction grid rule above) prevents the resulting (cell + 40) used width
+       from inflating the chain past its parent — the buttons row visually
+       extends but doesn't propagate. */
     .pick-control-buttons {
         margin-left: 0;
+        margin-right: -40px;
         flex-grow: 1;
         flex-basis: 100%;
     }
