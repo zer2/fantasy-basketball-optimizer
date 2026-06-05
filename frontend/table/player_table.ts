@@ -59,9 +59,10 @@ export function buildTableHeader(): void {
     table.innerHTML = ''
 
     const isMobile = isMobileViewport()
-    // Auction $ columns are quite narrow on mobile (since "Your $"/"Gnrc. $" headers
-    // truncate anyway), but on desktop they need room for the full headers.
-    const dollarColWidth = isMobile ? '1.5rem'  : '2.5rem'
+    // Auction $ columns on mobile use a two-line header ("Your" then "$") so
+    // they can stay narrow — see the .colheader-wrap-dollar rule in styles.css
+    // and the className branch in the auction header loop below.
+    const dollarColWidth = isMobile ? '1.25rem' : '2.5rem'
     const diffColWidth   = isMobile ? '1.25rem' : '2.5rem'
 
     const thead = table.createTHead()
@@ -70,13 +71,22 @@ export function buildTableHeader(): void {
     const playerTh = document.createElement('th')
     playerTh.className = 'tableheader'
     playerTh.textContent = 'Player'
-    playerTh.style.width = isMobile ? '11rem' : '14rem'
+    // Auction needs more horizontal room for 4 score columns + 9 categories,
+    // so the player column gets less. Draft has only the H-Score column, so
+    // the player column can be wider without squeezing the categories.
+    playerTh.style.width = isMobile
+        ? (isAuction ? '7rem' : '11rem')
+        : '14rem'
     headerRow.append(playerTh)
 
     if (isAuction) {
         for (const label of ['Diff.', 'Your $', 'Gnrc. $', 'Orig. $']) {
             const th = document.createElement('th')
-            th.className = 'tableheader'
+            // Dollar headers (Your $, Gnrc. $, Orig. $) get the wrap class so
+            // mobile breaks the label across two lines ("Your" then "$"),
+            // letting the column be narrower than a single-line header would
+            // permit. Diff. doesn't have a $ so it stays single-line.
+            th.className = label.includes('$') ? 'tableheader colheader-wrap-dollar' : 'tableheader'
             th.textContent = label
             th.style.width = label === 'Diff.' ? diffColWidth : dollarColWidth
             headerRow.append(th)
