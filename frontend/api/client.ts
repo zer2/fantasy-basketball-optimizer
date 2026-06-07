@@ -171,11 +171,10 @@ export async function evaluate(
     },
     signal?: AbortSignal,
 ): Promise<{ iteration: number; candidates: any[] }> {
-    const body = { exclusion_list: [], ...req }
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
+        body:    JSON.stringify(req),
         signal,
     })
 }

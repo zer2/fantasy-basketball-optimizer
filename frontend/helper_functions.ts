@@ -36,6 +36,23 @@ document.addEventListener('mouseover', (e: MouseEvent) => {
 })
 
 
+/**
+ * Reads a required positive integer from a sidebar input. Throws if the element
+ * is missing or the value does not parse to a positive integer — both indicate
+ * a programming error rather than user choice, so we surface them instead of
+ * substituting a silent default.
+ */
+export function readRequiredIntInput(elementId: string): number {
+    const element = document.getElementById(elementId) as HTMLInputElement | null
+    if (!element) throw new Error(`Input element #${elementId} not found`)
+    const value = parseInt(element.value)
+    if (isNaN(value) || value <= 0) {
+        throw new Error(`Input #${elementId} must be a positive integer, got "${element.value}"`)
+    }
+    return value
+}
+
+
 /** Creates a `<label>` with class `sidebar-label`, linked to the given input id. */
 export function makeLabel(forId: string, text: string): HTMLLabelElement {
     const label = document.createElement('label')

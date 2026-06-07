@@ -3,6 +3,7 @@
 // Mirrors the draft board structure: pick control on top, grid below.
 
 import { makeCustomSelect } from '../custom_select.js'
+import { readRequiredIntInput } from '../helper_functions.js'
 import { getCandidatePlayerResults } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
@@ -277,14 +278,17 @@ function makePickCol(labelText: string, input: HTMLElement): HTMLElement {
 
 /** Reads current sidebar league settings and returns them with a composite key for change detection. */
 function readAuctionConfig(): AuctionConfig {
-    const nD   = parseInt((document.getElementById('ls-n-drafters')   as HTMLInputElement).value) || 12
-    const nP   = parseInt((document.getElementById('ls-n-picks')       as HTMLInputElement).value) || 13
-    const cash = parseInt((document.getElementById('ls-cash-per-team') as HTMLInputElement).value) || 200
-    const src  = (document.getElementById('ps-data-type') as HTMLInputElement).value
-    const names = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
+    const nDrafters   = readRequiredIntInput('ls-n-drafters')
+    const nPicks      = readRequiredIntInput('ls-n-picks')
+    const cashPerTeam = readRequiredIntInput('ls-cash-per-team')
+    const dataSource  = (document.getElementById('ps-data-type') as HTMLInputElement).value
+    const teamNames   = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
     return {
-        nDrafters: nD, nPicks: nP, cashPerTeam: cash, teamNames: names,
-        key: `${nD}:${nP}:${cash}:${src}:${names.join(',')}`,
+        nDrafters
+        , nPicks
+        , cashPerTeam
+        , teamNames
+        , key: `${nDrafters}:${nPicks}:${cashPerTeam}:${dataSource}:${teamNames.join(',')}`
     }
 }

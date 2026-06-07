@@ -75,6 +75,7 @@ export function renderPlayerStats(container: HTMLElement): void {
         histSection.append(loadingEl)
         try {
             const seasons = await getSeasons()
+            if (seasons.length === 0) throw new Error('Backend returned an empty season list')
             loadingEl.remove()
             const label = document.createElement('label')
             label.className = 'sidebar-label'
@@ -84,7 +85,7 @@ export function renderPlayerStats(container: HTMLElement): void {
             const seasonSelect = makeCustomSelect(
                 'ps-season',
                 seasons.map(s => ({ value: s, label: s })),
-                seasons[0] ?? '',
+                seasons[0],
             )
             histSection.append(seasonSelect.element)
             seasonsLoaded = true
@@ -224,12 +225,19 @@ export function getPlayerStatsParams(): { data_source: DataSource; injured_playe
         BBM:   parseFloat((document.getElementById('ps-w-bbm')   as HTMLInputElement).value),
     }
 
-    const seasonEl = document.getElementById('ps-season') as HTMLInputElement | null
+    let season: string | null = null
+    if (type === 'historical') {
+        const seasonEl = document.getElementById('ps-season') as HTMLInputElement | null
+        if (!seasonEl || !seasonEl.value) {
+            throw new Error('Historical data source selected but #ps-season is missing or empty')
+        }
+        season = seasonEl.value
+    }
     const data_source: DataSource = {
         type,
         blend_weights,
         custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM },
-        season: type === 'historical' ? (seasonEl?.value ?? null) : null,
+        season,
     }
 
     const injuredRaw = (document.getElementById('ps-injured') as HTMLTextAreaElement).value

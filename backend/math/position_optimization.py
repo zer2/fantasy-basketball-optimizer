@@ -105,10 +105,15 @@ def _optimize_positions_for_prospective_player(
     full_array = np.concatenate(
         [team_so_far_array, [candidate_player_row], future_player_rows], axis=0
     )
+    # scipy raises ValueError both for infeasible assignments (legitimate — the
+    # team can't fit this player anywhere) and for NaN/Inf in the cost matrix
+    # (a bug we want surfaced). The -1 sentinel signals infeasibility downstream
+    # in get_position_array_from_res. Narrowed to ValueError so unrelated bugs
+    # (TypeError, KeyError, etc.) propagate instead of being swallowed.
     try:
         res = linear_sum_assignment(full_array, maximize=True)
         return res[1]
-    except Exception:
+    except ValueError:
         return np.array([-1] * len(reward_vector))
 
 
@@ -209,14 +214,19 @@ def check_single_player_eligibility(
 
 
 def check_team_eligibility(team: list, pos_cfg: PositionConfig) -> bool:
-    """Checks if a full team satisfies position constraints."""
+    """Checks if a full team satisfies position constraints.
+
+    scipy's linear_sum_assignment raises ValueError when no feasible assignment
+    exists — that is the signal for "team is ineligible." Narrowed to ValueError
+    so genuine bugs (NaN/Inf in the cost matrix, TypeError, etc.) propagate.
+    """
     if len(team) == 0:
         return True
     team_array = get_player_rows(team, pos_cfg)
     try:
         linear_sum_assignment(team_array, maximize=True)
         return True
-    except Exception:
+    except ValueError:
         return False
 
 

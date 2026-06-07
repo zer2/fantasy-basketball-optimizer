@@ -269,91 +269,83 @@ def process_player_data(player_stats_v2: pd.DataFrame,
     position_structure = params['position_structure']
     base_position_list = position_structure['base_list']
 
-    try:
-        players_and_positions = pd.merge(x_scores, positions, left_index=True, right_index=True)
-        players_and_positions_limited = players_and_positions.iloc[:n_players]
-        players_and_positions_limited = players_and_positions_limited.copy()
-        players_and_positions_limited[categories] = (
-            players_and_positions_limited[categories]
-            .sub(players_and_positions_limited[categories].mean(axis=0))
-        )
-        positions_exploded = (
-            players_and_positions_limited
-            .explode('Position')
-            .reset_index()
-            .set_index(['Player', 'Position'])
-        )
-        position_mean_weights = 1 / positions_exploded.groupby('Player').transform('count')
-        position_means_weighted = positions_exploded.mul(position_mean_weights)
+    players_and_positions = pd.merge(x_scores, positions, left_index=True, right_index=True)
+    players_and_positions_limited = players_and_positions.iloc[:n_players]
+    players_and_positions_limited = players_and_positions_limited.copy()
+    players_and_positions_limited[categories] = (
+        players_and_positions_limited[categories]
+        .sub(players_and_positions_limited[categories].mean(axis=0))
+    )
+    positions_exploded = (
+        players_and_positions_limited
+        .explode('Position')
+        .reset_index()
+        .set_index(['Player', 'Position'])
+    )
+    position_mean_weights = 1 / positions_exploded.groupby('Player').transform('count')
+    position_means_weighted = positions_exploded.mul(position_mean_weights)
 
-        position_means = (
-            position_means_weighted.groupby('Position').sum()
-            / position_mean_weights.groupby('Position').sum()
-        )
-        positions_exploded = positions_exploded.sub(positions_exploded.mean(axis=0))
-        position_means = position_means.loc[base_position_list, :]
-        position_means_g = position_means * v
+    position_means = (
+        position_means_weighted.groupby('Position').sum()
+        / position_mean_weights.groupby('Position').sum()
+    )
+    positions_exploded = positions_exploded.sub(positions_exploded.mean(axis=0))
+    position_means = position_means.loc[base_position_list, :]
+    position_means_g = position_means * v
 
-        if sport == 'MLB':
-            pitching_positions = ['SP', 'RP']
-            batting_positions  = [p for p in position_means.index if p not in pitching_positions]
-            batting_stats  = [x for x in params['batter_stats']  if x in position_means.columns]
-            pitching_stats = [x for x in params['pitcher_stats'] if x in position_means.columns]
+    if sport == 'MLB':
+        pitching_positions = ['SP', 'RP']
+        batting_positions  = [p for p in position_means.index if p not in pitching_positions]
+        batting_stats  = [x for x in params['batter_stats']  if x in position_means.columns]
+        pitching_stats = [x for x in params['pitcher_stats'] if x in position_means.columns]
 
-            from functools import reduce as _reduce
-            from backend.session import build_position_config
-            # derive position_numbers from params (no slot_counts here; use balanced defaults)
-            # this path is only reached for MLB historical mode — not our primary use case
-            position_numbers = {p: 1 for p in base_position_list + position_structure['flex_list']}
-            pitching_numbers = {p: v_n for p, v_n in position_numbers.items() if p in pitching_positions}
-            batting_numbers  = {p: v_n for p, v_n in position_numbers.items() if p in batting_positions}
-            pitching_series  = pd.Series(pitching_numbers)
-            batting_series   = pd.Series(batting_numbers)
-            pitching_series  = pitching_series / pitching_series.sum()
-            batting_series   = batting_series / batting_series.sum()
+        # Balanced default since slot_counts is not available in this path; MLB
+        # historical mode is not the primary use case.
+        position_numbers = {p: 1 for p in base_position_list + position_structure['flex_list']}
+        pitching_numbers = {p: v_n for p, v_n in position_numbers.items() if p in pitching_positions}
+        batting_numbers  = {p: v_n for p, v_n in position_numbers.items() if p in batting_positions}
+        pitching_series  = pd.Series(pitching_numbers)
+        batting_series   = pd.Series(batting_numbers)
+        pitching_series  = pitching_series / pitching_series.sum()
+        batting_series   = batting_series / batting_series.sum()
 
-            position_means_g.loc[pitching_positions, batting_stats] = 0
-            fix_factor = position_means_g.loc[pitching_positions, pitching_stats].mean(axis=1).values.reshape(-1, 1)
-            position_means_g.loc[pitching_positions, pitching_stats] -= fix_factor
-            fix_factor_2 = (position_means_g.loc[pitching_positions, pitching_stats]
-                            * pitching_series.values.reshape(-1, 1)).sum(axis=0).values.reshape(1, -1)
-            position_means_g.loc[pitching_positions, pitching_stats] -= fix_factor_2
+        position_means_g.loc[pitching_positions, batting_stats] = 0
+        fix_factor = position_means_g.loc[pitching_positions, pitching_stats].mean(axis=1).values.reshape(-1, 1)
+        position_means_g.loc[pitching_positions, pitching_stats] -= fix_factor
+        fix_factor_2 = (position_means_g.loc[pitching_positions, pitching_stats]
+                        * pitching_series.values.reshape(-1, 1)).sum(axis=0).values.reshape(1, -1)
+        position_means_g.loc[pitching_positions, pitching_stats] -= fix_factor_2
 
-            position_means_g.loc[batting_positions, pitching_stats] = 0
-            fix_factor = position_means_g.loc[batting_positions, batting_stats].mean(axis=1).values.reshape(-1, 1)
-            position_means_g.loc[batting_positions, batting_stats] -= fix_factor
-            fix_factor_2 = (position_means_g.loc[batting_positions, batting_stats]
-                            * batting_series.values.reshape(-1, 1)).sum(axis=0).values.reshape(1, -1)
-            position_means_g.loc[batting_positions, batting_stats] -= fix_factor_2
+        position_means_g.loc[batting_positions, pitching_stats] = 0
+        fix_factor = position_means_g.loc[batting_positions, batting_stats].mean(axis=1).values.reshape(-1, 1)
+        position_means_g.loc[batting_positions, batting_stats] -= fix_factor
+        fix_factor_2 = (position_means_g.loc[batting_positions, batting_stats]
+                        * batting_series.values.reshape(-1, 1)).sum(axis=0).values.reshape(1, -1)
+        position_means_g.loc[batting_positions, batting_stats] -= fix_factor_2
 
-            total_value = g_scores.loc[representative_player_set].sum(axis=1).sort_values(ascending=False)
-            relative_value = total_value - total_value.min()
-            helper_df = pd.DataFrame({
-                'Round': [i // n_drafters for i in range(n_drafters * n_starters)],
-                'Value': relative_value,
-            })
-            average_round_value = helper_df.groupby('Round')['Value'].mean()
-
-        else:  # NBA (default)
-            position_means_g = position_means_g.sub(position_means_g.mean(axis=1), axis=0)
-            position_means_g = position_means_g.sub(position_means_g.mean(axis=0), axis=1)
-            average_round_value = None
-
-        position_means = position_means_g / v
-
-        L_by_position = pd.concat({
-            position: _weighted_cov_matrix(
-                positions_exploded.loc[pd.IndexSlice[:, position], :],
-                position_mean_weights.loc[pd.IndexSlice[:, position],
-                                          position_mean_weights.columns[0]],
-            )
-            for position in base_position_list
+        total_value = g_scores.loc[representative_player_set].sum(axis=1).sort_values(ascending=False)
+        relative_value = total_value - total_value.min()
+        helper_df = pd.DataFrame({
+            'Round': [i // n_drafters for i in range(n_drafters * n_starters)],
+            'Value': relative_value,
         })
+        average_round_value = helper_df.groupby('Round')['Value'].mean()
 
-    except Exception:
-        position_means      = None
-        L_by_position       = np.array([x_scores.cov()])
+    else:  # NBA (default)
+        position_means_g = position_means_g.sub(position_means_g.mean(axis=1), axis=0)
+        position_means_g = position_means_g.sub(position_means_g.mean(axis=0), axis=1)
         average_round_value = None
+
+    position_means = position_means_g / v
+
+    L_by_position = pd.concat({
+        position: _weighted_cov_matrix(
+            positions_exploded.loc[pd.IndexSlice[:, position], :],
+            position_mean_weights.loc[pd.IndexSlice[:, position],
+                                      position_mean_weights.columns[0]],
+        )
+        for position in base_position_list
+    })
 
     info = {
         'G-scores':            g_scores,

@@ -6,7 +6,7 @@
 //   3. Suggested trades table
 
 import { makeCustomSelect } from '../../custom_select.js'
-import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle } from '../../helper_functions.js'
+import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../../helper_functions.js'
 import { getGScoreByName } from '../../app_state.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
@@ -27,8 +27,8 @@ function readTeamNames(): string[] {
 /** Reads roster assignments from the Rosters tab grid (sr-player-{row}-{col}). */
 function readRosterAssignments(): Record<string, string[]> {
     const teamNames = readTeamNames()
-    const nDrafters = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
-    const nPicks    = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
+    const nDrafters = readRequiredIntInput('ls-n-drafters')
+    const nPicks    = readRequiredIntInput('ls-n-picks')
 
     const assignments: Record<string, string[]> = {}
     for (let d = 0; d < nDrafters; d++) {

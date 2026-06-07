@@ -5,6 +5,7 @@
 // then highlights that player's row in the results.
 
 import { makeCustomSelect } from '../../custom_select.js'
+import { readRequiredIntInput } from '../../helper_functions.js'
 import { getCandidatePlayerResults, getPlayerResultsByName } from '../../app_state.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
 
@@ -17,8 +18,8 @@ function readTeamNames(): string[] {
 
 function readRosterAssignments(): Record<string, string[]> {
     const teamNames = readTeamNames()
-    const nDrafters = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
-    const nPicks    = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
+    const nDrafters = readRequiredIntInput('ls-n-drafters')
+    const nPicks    = readRequiredIntInput('ls-n-picks')
 
     const assignments: Record<string, string[]> = {}
     for (let d = 0; d < nDrafters; d++) {
@@ -75,7 +76,7 @@ export function renderWaiverControls(container: HTMLElement): void {
 
     const teamNames   = readTeamNames()
     const assignments = readRosterAssignments()
-    const nPicks      = parseInt((document.getElementById('ls-n-picks') as HTMLInputElement).value) || 13
+    const nPicks      = readRequiredIntInput('ls-n-picks')
     // assignments[t] can be undefined for team names beyond nDrafters, hence the optional chain
     const fullTeams   = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
 

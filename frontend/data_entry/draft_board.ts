@@ -3,6 +3,7 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
+import { readRequiredIntInput } from '../helper_functions.js'
 import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
@@ -297,15 +298,17 @@ function buildDraftBoard(): HTMLElement {
 
 /** Reads current sidebar league settings and returns them with a composite key for change detection. */
 function readDraftConfig(): DraftConfig {
-    const nD  = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
-    const nP  = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
-    const src = (document.getElementById('ps-data-type') as HTMLInputElement).value
-    const trr = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
-    const names = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
+    const nDrafters          = readRequiredIntInput('ls-n-drafters')
+    const nPicks             = readRequiredIntInput('ls-n-picks')
+    const dataSource         = (document.getElementById('ps-data-type') as HTMLInputElement).value
+    const thirdRoundReversal = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
+    const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
-    return { nDrafters: nD
-        , nPicks: nP
-        , teamNames: names
-        , thirdRoundReversal: trr
-        , key: `${nD}:${nP}:${src}:${trr}:${names.join(',')}` }
+    return {
+        nDrafters
+        , nPicks
+        , teamNames
+        , thirdRoundReversal
+        , key: `${nDrafters}:${nPicks}:${dataSource}:${thirdRoundReversal}:${teamNames.join(',')}`
+    }
 }

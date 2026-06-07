@@ -3,7 +3,7 @@
 // Mirrors league_settings_popover() in src/parameter_collection/league_settings.py
 
 import { makeCustomSelect } from '../custom_select.js'
-import { makeLabel, makeNumberInput, makeSidebarToggle } from '../helper_functions.js'
+import { makeLabel, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
@@ -251,9 +251,9 @@ export function getLeagueSettings(): {
         sport:                (document.getElementById('ls-sport') as HTMLInputElement).value,
         platform:             (document.getElementById('ls-platform') as HTMLInputElement).value as Platform,
         mode,
-        n_drafters:           parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value),
-        n_picks:              parseInt((document.getElementById('ls-n-picks') as HTMLInputElement).value),
-        cash_per_team:        parseInt((document.getElementById('ls-cash-per-team') as HTMLInputElement).value),
+        n_drafters:           readRequiredIntInput('ls-n-drafters'),
+        n_picks:              readRequiredIntInput('ls-n-picks'),
+        cash_per_team:        readRequiredIntInput('ls-cash-per-team'),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
         team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
                                   .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),

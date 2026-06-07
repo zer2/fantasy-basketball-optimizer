@@ -4,7 +4,7 @@
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayerResults, getGScoreByName, getShortCategoryNames } from '../../app_state.js'
-import { isMobileViewport } from '../../helper_functions.js'
+import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
@@ -31,8 +31,8 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const playerResults = getPlayerResults()
     if (playerResults === null) return
 
-    const nDrafters = parseInt((document.getElementById('ls-n-drafters') as HTMLInputElement).value) || 12
-    const nPicks    = parseInt((document.getElementById('ls-n-picks')    as HTMLInputElement).value) || 13
+    const nDrafters = readRequiredIntInput('ls-n-drafters')
+    const nPicks    = readRequiredIntInput('ls-n-picks')
     const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
     const playerNames = playerResults.map(p => p.name)
