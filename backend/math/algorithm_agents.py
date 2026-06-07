@@ -29,22 +29,22 @@ from backend.session import PositionConfig, build_position_config
 
 class HAgent:
 
-    def __init__(self,
-                 info: dict,
-                 omega: float,
-                 gamma: float,
-                 n_picks: int,
-                 n_drafters: int,
-                 dynamic: bool,
-                 scoring_format: str,
+    def __init__(self
+                 , info: dict
+                 , omega: float
+                 , gamma: float
+                 , n_picks: int
+                 , n_drafters: int
+                 , dynamic: bool
+                 , scoring_format: str
                  # ── explicit context (replaces get_*() calls) ──
-                 sport: str,
-                 params: dict,
-                 slot_counts: dict,
-                 aleph: float = 0.0,
+                 , sport: str
+                 , params: dict
+                 , slot_counts: dict
+                 , aleph: float = 0.0
                  # ── original optional args ──
-                 beth: float = 0,
-                 collect_info: bool = False,
+                 , beth: float = 0
+                 , collect_info: bool = False
                  ):
 
         self.omega         = omega
@@ -212,12 +212,12 @@ class HAgent:
 
     # ── public API ─────────────────────────────────────────────────────────────
 
-    def get_h_scores(self,
-                     player_assignments: dict,
-                     drafter,
-                     n_iterations: int,
-                     cash_remaining_per_team: dict = None,
-                     exclusion_list: list = []) -> dict:
+    def get_h_scores(self
+                     , player_assignments: dict
+                     , drafter
+                     , n_iterations: int
+                     , cash_remaining_per_team: dict = None
+                     , exclusion_list: list = []) -> dict:
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -308,8 +308,11 @@ class HAgent:
             n_iterations,
         )
 
-    def get_diff_distributions(self, player_assignments, drafter,
-                               x_scores_available, cash_remaining_per_team=None):
+    def get_diff_distributions(self
+                               , player_assignments
+                               , drafter
+                               , x_scores_available
+                               , cash_remaining_per_team=None):
         team_names = list(player_assignments.keys())
         my_players = [p for p in player_assignments[drafter] if p == p]
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis=0))
@@ -384,9 +387,9 @@ class HAgent:
 
         return diff_means, diff_vars, sigma_2_m
 
-    def compute_h_score_from_diff_means(self,
-                                         diff_means: np.ndarray,
-                                         diff_vars: np.ndarray) -> float:
+    def compute_h_score_from_diff_means(self
+                                         , diff_means: np.ndarray
+                                         , diff_vars: np.ndarray) -> float:
         """Fast H-score for a complete (n_picks) roster given pre-computed diff_means.
 
         Mirrors the n_players_selected == n_picks branch of perform_iterations:
@@ -409,9 +412,9 @@ class HAgent:
         )
         return float(np.max(score))
 
-    def compute_h_scores_batched(self,
-                                  diff_means_batch: np.ndarray,
-                                  diff_vars: np.ndarray) -> np.ndarray:
+    def compute_h_scores_batched(self
+                                  , diff_means_batch: np.ndarray
+                                  , diff_vars: np.ndarray) -> np.ndarray:
         """Vectorized H-score for a batch of complete-roster diff_means.
 
         Equivalent to calling compute_h_score_from_diff_means N times but in a
@@ -442,8 +445,12 @@ class HAgent:
         extra_sum   = np.array(mean_extra_players) * n_extra
         return (player_sum + extra_sum).reshape(1, self.n_categories, 1)
 
-    def get_diff_means_auction(self, score_diff, money_diff, player_diff,
-                                category_value_per_dollar, replacement_value_by_category):
+    def get_diff_means_auction(self
+                                , score_diff
+                                , money_diff
+                                , player_diff
+                                , category_value_per_dollar
+                                , replacement_value_by_category):
         player_diff_total = ((player_diff - 1) * replacement_value_by_category).reshape(1, self.n_categories, 1)
         money_diff_total  = (money_diff * category_value_per_dollar).reshape(1, self.n_categories, 1)
         return score_diff - player_diff_total + money_diff_total
@@ -451,9 +458,14 @@ class HAgent:
     def get_diff_var(self, n_their_players):
         return self.n_picks * (2 + self.w * (self.n_picks - n_their_players) / self.n_picks)
 
-    def get_value_of_money_auction(self, diff_means, diff_vars, sigma_2_m,
-                                    category_value_per_dollar, replacement_value_by_category,
-                                    max_money=200, step_size=0.1):
+    def get_value_of_money_auction(self
+                                    , diff_means
+                                    , diff_vars
+                                    , sigma_2_m
+                                    , category_value_per_dollar
+                                    , replacement_value_by_category
+                                    , max_money=200
+                                    , step_size=0.1):
         x_diff_array = np.concatenate([
             diff_means + replacement_value_by_category + category_value_per_dollar * x * step_size
             for x in range(int(max_money / step_size))
@@ -465,10 +477,17 @@ class HAgent:
         return pd.DataFrame({'value': score},
                             index=[x * step_size for x in range(int(max_money / step_size))])
 
-    def perform_iterations(self, category_weights, position_shares, my_players,
-                           n_players_selected, diff_means, diff_vars,
-                           x_scores_available_array, result_index, sigma_2_m,
-                           n_iterations):
+    def perform_iterations(self
+                           , category_weights
+                           , position_shares
+                           , my_players
+                           , n_players_selected
+                           , diff_means
+                           , diff_vars
+                           , x_scores_available_array
+                           , result_index
+                           , sigma_2_m
+                           , n_iterations):
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
@@ -639,9 +658,16 @@ class HAgent:
     def get_position_priorities_from_category_weights(self, weights):
         return np.einsum('ij, akj -> ik', weights / self.v.T, self.position_means)
 
-    def get_objective_and_gradient(self, category_weights, position_shares, diff_means,
-                                    diff_vars, x_scores_available_array, result_index,
-                                    n_players_selected, sigma_2_m, pitching_preference=None):
+    def get_objective_and_gradient(self
+                                    , category_weights
+                                    , position_shares
+                                    , diff_means
+                                    , diff_vars
+                                    , x_scores_available_array
+                                    , result_index
+                                    , n_players_selected
+                                    , sigma_2_m
+                                    , pitching_preference=None):
 
         if self.position_means is not None:
             position_rewards = self.get_position_priorities_from_category_weights(category_weights)
@@ -751,9 +777,13 @@ class HAgent:
 
     # ── objective / pdf helpers (unchanged from original) ─────────────────────
 
-    def get_objective_and_pdf_weights(self, x_diff_array, diff_vars, cdf_estimates,
-                                       pdf_estimates, sigma_2_m=None,
-                                       calculate_pdf_weights=False):
+    def get_objective_and_pdf_weights(self
+                                       , x_diff_array
+                                       , diff_vars
+                                       , cdf_estimates
+                                       , pdf_estimates
+                                       , sigma_2_m=None
+                                       , calculate_pdf_weights=False):
         if self.scoring_format == 'Head to Head: Most Categories':
             return self.get_objective_and_pdf_weights_mc(cdf_estimates, pdf_estimates,
                                                           calculate_pdf_weights)
@@ -765,24 +795,33 @@ class HAgent:
             return self.get_objective_and_pdf_weights_ec(cdf_estimates, pdf_estimates,
                                                           calculate_pdf_weights)
 
-    def get_objective_and_pdf_weights_mc(self, cdf_estimates, pdf_estimates,
-                                          calculate_pdf_weights=False):
+    def get_objective_and_pdf_weights_mc(self
+                                          , cdf_estimates
+                                          , pdf_estimates
+                                          , calculate_pdf_weights=False):
         objective = compute_win_probability(np.array(cdf_estimates)).mean(axis=1)
         if calculate_pdf_weights:
             tipping_points = calculate_tipping_points(np.array(cdf_estimates))
             return objective, (tipping_points * pdf_estimates).mean(axis=2)
         return objective
 
-    def get_objective_and_pdf_weights_ec(self, cdf_estimates, pdf_estimates,
-                                          calculate_pdf_weights=False):
+    def get_objective_and_pdf_weights_ec(self
+                                          , cdf_estimates
+                                          , pdf_estimates
+                                          , calculate_pdf_weights=False):
         objective = cdf_estimates.mean(axis=2).mean(axis=1)
         if calculate_pdf_weights:
             return objective, pdf_estimates.mean(axis=2)
         return objective
 
-    def get_objective_and_pdf_weights_rotisserie(self, x_diff_array, diff_vars, cdf_estimates,
-                                                   pdf_estimates, sigma_2_m,
-                                                   calculate_pdf_weights=False, test_mode=False):
+    def get_objective_and_pdf_weights_rotisserie(self
+                                                   , x_diff_array
+                                                   , diff_vars
+                                                   , cdf_estimates
+                                                   , pdf_estimates
+                                                   , sigma_2_m
+                                                   , calculate_pdf_weights=False
+                                                   , test_mode=False):
         diff_means   = x_diff_array / np.sqrt(diff_vars)
         pdf_estimates = norm.pdf(diff_means)
         f = self.get_f(pdf_estimates)
@@ -1019,8 +1058,18 @@ class AdamOptimizer:
 
 # ── plain factory function (no @st.cache_resource) ────────────────────────────
 
-def build_h_agent(info, omega, gamma, n_starters, n_drafters, beth,
-                  scoring_format, dynamic, sport, params, slot_counts, aleph=0.0):
+def build_h_agent(info
+                  , omega
+                  , gamma
+                  , n_starters
+                  , n_drafters
+                  , beth
+                  , scoring_format
+                  , dynamic
+                  , sport
+                  , params
+                  , slot_counts
+                  , aleph=0.0):
     return HAgent(
         info           = info,
         omega          = omega,

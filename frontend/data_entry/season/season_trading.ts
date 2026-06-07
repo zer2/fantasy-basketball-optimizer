@@ -149,12 +149,12 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
 
 /** Builds the H-score trade result display with pre/post comparison for both teams. */
 function buildHScoreResult(
-    pane: HTMLElement,
-    assignments: Record<string, string[]>,
-    yourTeam: string,
-    theirTeam: string,
-    sent: string[],
-    received: string[],
+    pane: HTMLElement
+    , assignments: Record<string, string[]>
+    , yourTeam: string
+    , theirTeam: string
+    , sent: string[]
+    , received: string[]
 ): void {
     pane.innerHTML = ''
 
@@ -228,9 +228,9 @@ function renderHScoreResult(pane: HTMLElement, resp: TradeAnalyzeResponse): void
 }
 
 function buildHScoreComparisonTable(
-    pre: { h_score: number; rates: number[] },
-    post: { h_score: number; rates: number[] },
-    categories: string[],
+    pre: { h_score: number; rates: number[] }
+    , post: { h_score: number; rates: number[] }
+    , categories: string[]
 ): HTMLTableElement {
     const table = document.createElement('table')
     table.className = 'trade-result-table'
@@ -280,13 +280,13 @@ function buildHScoreComparisonTable(
  * and merges + sorts all cached suggestions into a single table.
  */
 function refreshSuggestionDisplay(
-    resultsArea: HTMLElement,
-    selected: string[],
-    pendingFetches: Set<string>,
-    suggestionCache: Map<string, TradeSuggestion[]>,
-    sendSel: MultiSelectWidget,
-    receiveSel: MultiSelectWidget,
-    onTradeSelected: () => void,
+    resultsArea: HTMLElement
+    , selected: string[]
+    , pendingFetches: Set<string>
+    , suggestionCache: Map<string, TradeSuggestion[]>
+    , sendSel: MultiSelectWidget
+    , receiveSel: MultiSelectWidget
+    , onTradeSelected: () => void
 ): void {
     resultsArea.innerHTML = ''
 
@@ -320,16 +320,16 @@ function refreshSuggestionDisplay(
  * Already-cached combos are shown immediately without a round trip.
  */
 function fetchMissingCombos(
-    resultsArea: HTMLElement,
-    comboSel: MultiSelectWidget,
-    assignments: Record<string, string[]>,
-    yourTeam: string,
-    theirTeam: string,
-    pendingFetches: Set<string>,
-    suggestionCache: Map<string, TradeSuggestion[]>,
-    sendSel: MultiSelectWidget,
-    receiveSel: MultiSelectWidget,
-    onTradeSelected: () => void,
+    resultsArea: HTMLElement
+    , comboSel: MultiSelectWidget
+    , assignments: Record<string, string[]>
+    , yourTeam: string
+    , theirTeam: string
+    , pendingFetches: Set<string>
+    , suggestionCache: Map<string, TradeSuggestion[]>
+    , sendSel: MultiSelectWidget
+    , receiveSel: MultiSelectWidget
+    , onTradeSelected: () => void
 ): void {
     const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value) / 100
     const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value) / 100
@@ -369,10 +369,10 @@ function fetchMissingCombos(
 }
 
 function buildSuggestionTable(
-    suggestions: TradeSuggestion[],
-    sendSel: MultiSelectWidget,
-    receiveSel: MultiSelectWidget,
-    onTradeSelected: () => void,
+    suggestions: TradeSuggestion[]
+    , sendSel: MultiSelectWidget
+    , receiveSel: MultiSelectWidget
+    , onTradeSelected: () => void
 ): HTMLTableElement {
     const table = document.createElement('table')
     table.className = 'trade-result-table'
@@ -439,7 +439,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
     const teamNames   = readTeamNames()
     const assignments = readRosterAssignments()
 
-    const nPicks = parseInt((document.getElementById('ls-n-picks') as HTMLInputElement).value) || 13
+    const nPicks = readRequiredIntInput('ls-n-picks')
     const fullTeams = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
 
     if (fullTeams.length < 2) {

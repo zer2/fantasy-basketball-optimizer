@@ -13,19 +13,19 @@ from scipy.stats import norm
 import numpy as np
 from itertools import combinations
 
-def auction_value_adjuster(raw_values_unselected: pd.Series,
-                            n_remaining_players: int,
-                            remaining_cash: int,
-                            noise: float) -> pd.Series:
+def auction_value_adjuster(raw_values_unselected: pd.Series
+                            , n_remaining_players: int
+                            , remaining_cash: int
+                            , noise: float) -> pd.Series:
     dollar_values = dollar_scale_adjustment(raw_values_unselected,
                                             remaining_cash,
                                             n_remaining_players)
     return savor_calculation(dollar_values, noise)
 
 
-def dollar_scale_adjustment(raw_values_unselected: pd.Series,
-                             remaining_cash: int,
-                             n_remaining_players: int) -> pd.Series:
+def dollar_scale_adjustment(raw_values_unselected: pd.Series
+                             , remaining_cash: int
+                             , n_remaining_players: int) -> pd.Series:
     raw_values_unselected = raw_values_unselected.sort_values(ascending=False)
     replacement_value = raw_values_unselected.iloc[n_remaining_players]
     value_above_replacement = np.clip(raw_values_unselected - replacement_value, 0, None)
@@ -43,11 +43,11 @@ def savor_calculation(dollar_value: pd.Series, noise: float) -> pd.Series:
     return adjusted_value * dollar_value.sum() / adjusted_value.sum()
 
 
-def combinatorial_calculation(c: np.ndarray,
-                               c_comp: np.ndarray,
-                               data=1,
-                               level: int = 0,
-                               n_false: int = 0):
+def combinatorial_calculation(c: np.ndarray
+                               , c_comp: np.ndarray
+                               , data=1
+                               , level: int = 0
+                               , n_false: int = 0):
     if n_false > c.shape[1] / 2:
         return 0
     elif level < c.shape[1]:

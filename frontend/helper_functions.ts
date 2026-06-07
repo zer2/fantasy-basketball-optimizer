@@ -121,9 +121,9 @@ export function makeSidebarToggle(id: string, rightText: string, leftText?: stri
  * ```
  */
 export function renderMultiselect(
-    container:       HTMLElement,
-    allOptions:      string[],
-    defaultSelected: string[],
+    container:       HTMLElement
+    , allOptions:      string[]
+    , defaultSelected: string[]
 ): string[] {
 
     const selected: string[] = [...defaultSelected]
@@ -238,9 +238,9 @@ export interface MultiSelectWidget {
  * Each chip add/remove fires all registered `onChange` callbacks immediately.
  */
 export function makeMultiSelectWidget(
-    label:   string,
-    options: string[],
-    wrapperClass = 'ms-widget',
+    label:   string
+    , options: string[]
+    , wrapperClass = 'ms-widget'
 ): MultiSelectWidget {
     const wrap = document.createElement('div')
     wrap.className = wrapperClass

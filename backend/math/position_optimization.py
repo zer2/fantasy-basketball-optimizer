@@ -17,8 +17,8 @@ from backend.session import PositionConfig
 
 # ── internal helpers ──────────────────────────────────────────────────────────
 
-def get_future_player_rows(position_rewards: np.ndarray,
-                           pos_cfg: PositionConfig) -> np.ndarray:
+def get_future_player_rows(position_rewards: np.ndarray
+                           , pos_cfg: PositionConfig) -> np.ndarray:
     """Takes an array of rewards by simplified position (5 cols) and
     translates them to rewards per slot (13) by player."""
 
@@ -93,10 +93,10 @@ def get_player_rows(players: list, pos_cfg: PositionConfig) -> np.ndarray:
 
 
 def _optimize_positions_for_prospective_player(
-    candidate_player_row: np.ndarray,
-    reward_vector: np.ndarray,
-    team_so_far_array: np.ndarray,
-    n_remaining_players: int,
+    candidate_player_row: np.ndarray
+    , reward_vector: np.ndarray
+    , team_so_far_array: np.ndarray
+    , n_remaining_players: int
 ) -> np.ndarray:
     """Pure function — no session state needed (unchanged from original)."""
     future_player_rows = np.array([reward_vector] * n_remaining_players).reshape(
@@ -117,10 +117,10 @@ def _optimize_positions_for_prospective_player(
         return np.array([-1] * len(reward_vector))
 
 
-def get_position_array_from_res(res: np.ndarray,
-                                 position_shares: dict,
-                                 n_remaining_players: int,
-                                 pos_cfg: PositionConfig):
+def get_position_array_from_res(res: np.ndarray
+                                 , position_shares: dict
+                                 , n_remaining_players: int
+                                 , pos_cfg: PositionConfig):
     position_ranges    = pos_cfg.position_ranges
     position_structure = pos_cfg.position_structure
 
@@ -153,12 +153,12 @@ def get_position_array_from_res(res: np.ndarray,
 # ── public API ────────────────────────────────────────────────────────────────
 
 def optimize_positions_all_players(
-    candidate_players: list,
-    position_rewards: np.ndarray,
-    team_so_far: list,
-    position_shares: dict,
-    pos_cfg: PositionConfig,
-    scale_down: bool = True,
+    candidate_players: list
+    , position_rewards: np.ndarray
+    , team_so_far: list
+    , position_shares: dict
+    , pos_cfg: PositionConfig
+    , scale_down: bool = True
 ):
     position_numbers   = pos_cfg.position_numbers
     n_total_picks      = sum(position_numbers.values())
@@ -191,9 +191,9 @@ def optimize_positions_all_players(
 
 
 def check_single_player_eligibility(
-    player: list,
-    team_so_far: list,
-    pos_cfg: PositionConfig,
+    player: list
+    , team_so_far: list
+    , pos_cfg: PositionConfig
 ) -> bool:
     position_numbers = pos_cfg.position_numbers
     n_total_picks    = sum(position_numbers.values())
@@ -231,9 +231,9 @@ def check_team_eligibility(team: list, pos_cfg: PositionConfig) -> bool:
 
 
 def check_all_player_eligibility(
-    players: list,
-    team_so_far: list,
-    pos_cfg: PositionConfig,
+    players: list
+    , team_so_far: list
+    , pos_cfg: PositionConfig
 ) -> list[bool]:
     position_numbers = pos_cfg.position_numbers
     n_total_picks    = sum(position_numbers.values())

@@ -23,9 +23,9 @@ from backend.helper_functions import get_counting_stats, get_ratio_stats
 
 # ── public helpers ─────────────────────────────────────────────────────────────
 
-def get_category_level_rv(rv: float,
-                          v: pd.Series,
-                          categories: list[str]) -> pd.Series:
+def get_category_level_rv(rv: float
+                          , v: pd.Series
+                          , categories: list[str]) -> pd.Series:
     rv_multiple = (rv / (len(categories) - 2)
                    if 'Turnovers' in categories
                    else rv / len(categories))
@@ -37,12 +37,12 @@ def get_category_level_rv(rv: float,
 
 # ── coefficient calculation ────────────────────────────────────────────────────
 
-def calculate_coefficients(player_means: pd.DataFrame,
-                            representative_player_set: list,
-                            mean_of_variances: pd.Series,
-                            counting_stats: list[str],
-                            ratio_stats: list[str],
-                            params: dict) -> pd.DataFrame:
+def calculate_coefficients(player_means: pd.DataFrame
+                            , representative_player_set: list
+                            , mean_of_variances: pd.Series
+                            , counting_stats: list[str]
+                            , ratio_stats: list[str]
+                            , params: dict) -> pd.DataFrame:
 
     var_of_means  = player_means.loc[representative_player_set, counting_stats].var(axis=0)
     mean_of_means = player_means.loc[representative_player_set, counting_stats].mean(axis=0)
@@ -73,12 +73,12 @@ def calculate_coefficients(player_means: pd.DataFrame,
     })
 
 
-def calculate_coefficients_historical(weekly_df: pd.DataFrame,
-                                       representative_player_set: list,
-                                       params: dict,
-                                       counting_stats: list[str],
-                                       ratio_stats: list[str],
-                                       coefficient_exploration_mode: bool = False,
+def calculate_coefficients_historical(weekly_df: pd.DataFrame
+                                       , representative_player_set: list
+                                       , params: dict
+                                       , counting_stats: list[str]
+                                       , ratio_stats: list[str]
+                                       , coefficient_exploration_mode: bool = False
                                        ) -> pd.DataFrame:
     player_stats = weekly_df.groupby(level='Player').agg(['mean', 'var'])
 
@@ -120,14 +120,14 @@ def calculate_coefficients_historical(weekly_df: pd.DataFrame,
     })
 
 
-def calculate_scores_from_coefficients(player_means: pd.DataFrame,
-                                        coefficients: pd.DataFrame,
-                                        params: dict,
-                                        alpha_weight: float,
-                                        beta_weight: float,
-                                        counting_stats: list[str],
-                                        ratio_stats: list[str],
-                                        categories: list[str]) -> pd.DataFrame:
+def calculate_scores_from_coefficients(player_means: pd.DataFrame
+                                        , coefficients: pd.DataFrame
+                                        , params: dict
+                                        , alpha_weight: float
+                                        , beta_weight: float
+                                        , counting_stats: list[str]
+                                        , ratio_stats: list[str]
+                                        , categories: list[str]) -> pd.DataFrame:
 
     counting_mean    = coefficients.loc[counting_stats, 'Mean of Means']
     counting_var_m   = coefficients.loc[counting_stats, 'Variance of Means']
@@ -171,12 +171,12 @@ def _weighted_cov_matrix(df: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
 
 
-def games_played_adjustment(scores: pd.DataFrame,
-                             replacement_games_rate: pd.Series,
-                             representative_player_set: list[str],
-                             params: dict,
-                             categories: list[str],
-                             v: pd.Series = None) -> pd.DataFrame:
+def games_played_adjustment(scores: pd.DataFrame
+                             , replacement_games_rate: pd.Series
+                             , representative_player_set: list[str]
+                             , params: dict
+                             , categories: list[str]
+                             , v: pd.Series = None) -> pd.DataFrame:
 
     if v is None:
         v = pd.Series({stat: 1 / len(categories) for stat in categories})
@@ -197,17 +197,17 @@ def games_played_adjustment(scores: pd.DataFrame,
 
 # ── public pipeline steps ──────────────────────────────────────────────────────
 
-def process_player_data(player_stats_v2: pd.DataFrame,
-                        weekly_df,
-                        mean_of_variances: pd.Series,
-                        psi: float,
-                        chi: float,
-                        scoring_format: str,
-                        n_drafters: int,
-                        n_starters: int,
-                        params: dict,
-                        categories: list[str],
-                        sport: str = 'NBA',
+def process_player_data(player_stats_v2: pd.DataFrame
+                        , weekly_df
+                        , mean_of_variances: pd.Series
+                        , psi: float
+                        , chi: float
+                        , scoring_format: str
+                        , n_drafters: int
+                        , n_starters: int
+                        , params: dict
+                        , categories: list[str]
+                        , sport: str = 'NBA'
                         ) -> tuple[dict, str]:
     """Explicit-parameter version of process_player_data.
     Receives player_stats_v2 directly instead of reading from st.session_state."""
@@ -362,9 +362,9 @@ def process_player_data(player_stats_v2: pd.DataFrame,
     return info, str(uuid.uuid4())
 
 
-def make_upsilon_adjustment(player_stats_v1: pd.DataFrame,
-                             upsilon: float,
-                             params: dict) -> tuple[pd.DataFrame, str]:
+def make_upsilon_adjustment(player_stats_v1: pd.DataFrame
+                             , upsilon: float
+                             , params: dict) -> tuple[pd.DataFrame, str]:
     """Explicit-parameter version: receives the DataFrame directly."""
     df = player_stats_v1.copy()
     df['Games Played %'] = 1 - (1 - df['Games Played %']) * upsilon
@@ -380,8 +380,8 @@ def make_upsilon_adjustment(player_stats_v1: pd.DataFrame,
     return df, str(uuid.uuid4())
 
 
-def drop_injured_players(player_stats_v0: pd.DataFrame,
-                          injured_players: tuple | list) -> tuple[pd.DataFrame, str]:
+def drop_injured_players(player_stats_v0: pd.DataFrame
+                          , injured_players: tuple | list) -> tuple[pd.DataFrame, str]:
     """Explicit-parameter version: receives the DataFrame directly."""
     res = player_stats_v0.drop(list(injured_players), errors='ignore')
     return res, str(uuid.uuid4())

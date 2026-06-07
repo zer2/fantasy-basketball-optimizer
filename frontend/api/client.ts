@@ -102,8 +102,8 @@ export async function fetchConfig(sport: string): Promise<SportConfig> {
 
 /** Uploads a projection CSV (HTB or BBM format) and returns a data_id for later reference. */
 export async function uploadCsv(
-    file: File,
-    fileType: 'HTB' | 'BBM',
+    file: File
+    , fileType: 'HTB' | 'BBM'
 ): Promise<{ data_id: string; file_type: string; n_players: number; expires_at: string }> {
     const form = new FormData()
     form.append('file', file)
@@ -123,8 +123,8 @@ export async function getSeasons(): Promise<string[]> {
 
 /** Creates a new backend session, running the full 5-step pipeline. Returns session_id and resolved categories. */
 export async function createSession(
-    req: SessionRequest,
-    signal?: AbortSignal,
+    req: SessionRequest
+    , signal?: AbortSignal
 ): Promise<{ session_id: string; categories: string[]; g_scores: PlayerGScore[]; n_players_loaded: number; expires_at: string }> {
     return jsonRequest(`${BASE_URL}/sessions`, 'Create session', {
         method:  'POST',
@@ -138,9 +138,9 @@ export async function createSession(
 
 /** Patches an existing session. Only call via `createOrPatchSession`, which handles 404 (expired session) recovery. */
 export async function patchSession(
-    sessionId: string,
-    req: Record<string, unknown>,
-    signal?: AbortSignal,
+    sessionId: string
+    , req: Record<string, unknown>
+    , signal?: AbortSignal
 ): Promise<{ ok: boolean; steps_rerun: number[] }> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}`, 'Patch session', {
         method:  'PATCH',
@@ -162,14 +162,14 @@ export async function fetchGScores(sessionId: string): Promise<PlayerGScore[]> {
 
 /** Runs the H-score algorithm for the given draft/auction state and returns ranked candidates. Supports AbortSignal for cancellation. */
 export async function evaluate(
-    sessionId: string,
-    req: {
+    sessionId: string
+    , req: {
         player_assignments: Record<string, string[]>
         my_team_id: string
         exclusion_list?: string[]
         remaining_cash?: Record<string, number>
-    },
-    signal?: AbortSignal,
+    }
+    , signal?: AbortSignal
 ): Promise<{ iteration: number; candidates: any[] }> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
@@ -199,15 +199,15 @@ export interface TradeAnalyzeResponse {
 
 /** Analyzes a trade and returns pre/post H-scores for both teams. */
 export async function analyzeTrade(
-    sessionId: string,
-    req: {
+    sessionId: string
+    , req: {
         player_assignments: Record<string, string[]>
         my_team: string
         their_team: string
         my_trade: string[]
         their_trade: string[]
         ignore_position_check?: boolean
-    },
+    }
 ): Promise<TradeAnalyzeResponse> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/analyze`, 'Trade analyze', {
         method:  'POST',
@@ -231,8 +231,8 @@ export interface TradeSuggestResponse {
 
 /** Generates trade suggestions for two teams. May take 10-30s. */
 export async function suggestTrades(
-    sessionId: string,
-    req: {
+    sessionId: string
+    , req: {
         player_assignments: Record<string, string[]>
         my_team: string
         their_team: string
@@ -240,7 +240,7 @@ export async function suggestTrades(
         your_differential_threshold: number
         their_differential_threshold: number
         ignore_position_check?: boolean
-    },
+    }
 ): Promise<TradeSuggestResponse> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, 'Trade suggest', {
         method:  'POST',

@@ -24,14 +24,14 @@ from backend.math.position_optimization import check_team_eligibility
 # ── Core trade analysis ──────────────────────────────────────────────────────
 
 def analyze_trade(
-    session: Session,
-    player_assignments: dict[str, list[str]],
-    team_1: str,
-    team_1_trade: list[str],
-    team_2: str,
-    team_2_trade: list[str],
-    n_iterations: int,
-    ignore_position_check: bool = False,
+    session: Session
+    , player_assignments: dict[str, list[str]]
+    , team_1: str
+    , team_1_trade: list[str]
+    , team_2: str
+    , team_2_trade: list[str]
+    , n_iterations: int
+    , ignore_position_check: bool = False
 ) -> Optional[dict]:
     """Compute pre/post H-scores for both teams after a trade.
 
@@ -91,13 +91,13 @@ def analyze_trade(
 
 
 def run_trade_analyze(
-    session: Session,
-    player_assignments: dict[str, list[str]],
-    my_team: str,
-    their_team: str,
-    my_trade: list[str],
-    their_trade: list[str],
-    ignore_position_check: bool = False,
+    session: Session
+    , player_assignments: dict[str, list[str]]
+    , my_team: str
+    , their_team: str
+    , my_trade: list[str]
+    , their_trade: list[str]
+    , ignore_position_check: bool = False
 ) -> TradeAnalyzeResponse:
     """Public entry point for the trade/analyze endpoint."""
     if len(my_trade) == 0 or len(their_trade) == 0:
@@ -123,10 +123,10 @@ def run_trade_analyze(
 # ── Fast trade evaluation ────────────────────────────────────────────────────
 
 def _build_trade_context(
-    session: Session,
-    player_assignments: dict[str, list[str]],
-    my_team: str,
-    their_team: str,
+    session: Session
+    , player_assignments: dict[str, list[str]]
+    , my_team: str
+    , their_team: str
 ) -> dict:
     """Pre-compute all quantities that are constant across every trade combo.
 
@@ -225,11 +225,11 @@ def _build_trade_context(
 # ── Trade value estimation ───────────────────────────────────────────────────
 
 def _analyze_trade_value(
-    H: object,
-    player: str,
-    team: str,
-    player_assignments: dict[str, list[str]],
-    n_iterations: int,
+    H: object
+    , player: str
+    , team: str
+    , player_assignments: dict[str, list[str]]
+    , n_iterations: int
 ) -> float:
     """Estimate how valuable a player is to a particular team.
 
@@ -249,11 +249,11 @@ def _analyze_trade_value(
 
 
 def _identify_trade_candidates(
-    H: object,
-    my_team: str,
-    their_team: str,
-    player_assignments: dict[str, list[str]],
-    n_iterations: int,
+    H: object
+    , my_team: str
+    , their_team: str
+    , player_assignments: dict[str, list[str]]
+    , n_iterations: int
 ) -> tuple[list[str], list[str]]:
     """Filter each roster to players relatively more valuable to the other team.
 
@@ -299,8 +299,8 @@ def _identify_trade_candidates(
 # ── Combination generation ───────────────────────────────────────────────────
 
 def _get_combos(
-    players_with_weight: list[tuple[str, float]],
-    n: int,
+    players_with_weight: list[tuple[str, float]]
+    , n: int
 ) -> list[tuple[list[str], float]]:
     """Generate all n-player combinations with summed general values."""
     combos = list(itertools.combinations(players_with_weight, n))
@@ -311,13 +311,13 @@ def _get_combos(
 
 
 def _get_cross_combos(
-    n: int,
-    m: int,
-    my_players: list[str],
-    their_players: list[str],
-    general_values: pd.Series,
-    replacement_value: float,
-    value_threshold: float,
+    n: int
+    , m: int
+    , my_players: list[str]
+    , their_players: list[str]
+    , general_values: pd.Series
+    , replacement_value: float
+    , value_threshold: float
 ) -> pd.DataFrame:
     """Generate filtered cross-product of (n-from-mine, m-from-theirs) combos.
 
@@ -348,15 +348,15 @@ def _get_cross_combos(
 
 
 def _make_combo_df(
-    session: Session,
-    all_combos: pd.DataFrame,
-    my_team: str,
-    their_team: str,
-    player_assignments: dict[str, list[str]],
-    my_x_numpy: np.ndarray,
-    their_x_numpy: np.ndarray,
-    my_name_to_index: dict[str, int],
-    their_name_to_index: dict[str, int],
+    session: Session
+    , all_combos: pd.DataFrame
+    , my_team: str
+    , their_team: str
+    , player_assignments: dict[str, list[str]]
+    , my_x_numpy: np.ndarray
+    , their_x_numpy: np.ndarray
+    , my_name_to_index: dict[str, int]
+    , their_name_to_index: dict[str, int]
 ) -> pd.DataFrame:
     """Evaluate every trade combo in one vectorized pass and return sorted by Your Score.
 
@@ -437,14 +437,14 @@ def _get_general_values(session: Session) -> pd.Series:
 
 
 def run_trade_suggest(
-    session: Session,
-    player_assignments: dict[str, list[str]],
-    my_team: str,
-    their_team: str,
-    combo_params: list[ComboParam],
-    your_threshold: float,
-    their_threshold: float,
-    ignore_position_check: bool = False,
+    session: Session
+    , player_assignments: dict[str, list[str]]
+    , my_team: str
+    , their_team: str
+    , combo_params: list[ComboParam]
+    , your_threshold: float
+    , their_threshold: float
+    , ignore_position_check: bool = False
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
 

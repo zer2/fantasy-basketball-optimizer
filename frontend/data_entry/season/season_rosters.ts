@@ -278,11 +278,11 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
  * Styled to match the expanded-view G-score tables.
  */
 async function buildTeamGScoreTable(
-    teamIdx: number,
-    selects: CustomSelect[][],
-    nPicks: number,
-    teamNames: string[],
-    container: HTMLElement,
+    teamIdx: number
+    , selects: CustomSelect[][]
+    , nPicks: number
+    , teamNames: string[]
+    , container: HTMLElement
 ): Promise<void> {
     container.innerHTML = ''
     const categories = getSelectedCategories()
