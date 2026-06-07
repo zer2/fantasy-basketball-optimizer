@@ -17,6 +17,13 @@ import {
 
 const _auctionDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Auction evaluate failed:', err)) })
 
+// Tracks the listeners attached by the most recent renderAuctionEntry call so
+// they can be detached before the next one. renderAuctionEntry is called on
+// every pick — without this, each rebuild would leave the previous pick-control
+// custom selects' internal listeners (~9 each × 2 selects) bound to detached
+// nodes. The closures keep the old wrapper DOM alive until the cycle is broken.
+let auctionListenerController: AbortController | null = null
+
 const ROUND_W = 32
 const TEAM_W  = 60
 
@@ -39,6 +46,11 @@ export function renderAuctionEntry(container: HTMLElement): void {
     if (cfg.key !== getConfigKey()) {
         applyAuctionConfig(cfg)
     }
+
+    // Detach listeners from the previous render's custom selects so their
+    // closures can be garbage-collected. See comment on auctionListenerController.
+    auctionListenerController?.abort()
+    auctionListenerController = new AbortController()
 
     container.innerHTML = ''
     container.append(buildPickControl(container))
@@ -64,6 +76,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const playerSel = makeCustomSelect(
         'auction-pick-player',
         [{ value: '', label: '' }, ...available.map(n => ({ value: n, label: n }))],
+        undefined,
+        undefined,
+        auctionListenerController?.signal,
     )
     playerSel.element.style.width = '100%'
     const playerCol = makePickCol('Player', playerSel.element)
@@ -77,6 +92,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const teamSel = makeCustomSelect(
         'auction-pick-team',
         [{ value: '', label: '' }, ...availableTeams.map(n => ({ value: n, label: n }))],
+        undefined,
+        undefined,
+        auctionListenerController?.signal,
     )
     teamSel.element.style.width = '100%'
     const teamCol = makePickCol('Drafter', teamSel.element)

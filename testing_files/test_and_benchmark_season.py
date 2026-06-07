@@ -15,8 +15,10 @@ from benchmark_helpers import (
 from backend.session import get_session
 from backend.evaluate import run_evaluate
 
-# Mirrors frontend/data_entry/season/default_season_rosters.ts.
-# EC scoring, 2024-25 historical data, 12 drafters, 13 picks, snake-drafted by H-score rank.
+# 2024-25 snapshot of an H-score snake draft used by the assertions below.
+# (The frontend default — default_season_rosters.ts — tracks current-season data
+# and is regenerated via testing_files/generate_default_season_rosters.py.)
+# EC scoring, 12 drafters, 13 picks, snake-drafted by H-score rank.
 _DEFAULT_SEASON_ROSTERS: dict[str, list[str]] = {
     'Drafter 1': [
         'Shai Gilgeous-Alexander (PG,SG)',

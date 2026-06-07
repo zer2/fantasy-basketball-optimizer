@@ -98,16 +98,6 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
         outline: 2px solid light-dark(#999999, #666688);
         outline-offset: 2px;
     }
-    /* Right-side padding so the inputs row content doesn't slide under the
-       hamburger. The buttons row inside the same wrap gets its padding
-       cancelled by a negative margin-right (see .pick-control-buttons rule
-       in the pick-control block lower in the file) so it can extend to
-       the full wrap width. */
-    #right-header:not(:empty) > :first-child,
-    #season-nav,
-    #live-bar {
-        padding-right: 40px;
-    }
     /* Border-bottom on the sidebar title to demarcate it as a header bar in
        the open-sidebar overlay. (The matching padding-bottom extension lives
        in a separate mobile block after the base .sidebar-title rule — it
@@ -122,12 +112,6 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
        right corner. */
     #season-nav {
         padding-top: 28px;
-    }
-    /* Season mode exception: #season-nav above already gets the 40px right
-       padding, so #right-header sits below the toggle's vertical range and
-       doesn't need its own clearance. */
-    #app-layout.is-season #right-header:not(:empty) > :first-child {
-        padding-right: 0;
     }
 }
 
@@ -1322,16 +1306,22 @@ tr {
        of flex-wrap so the layout is explicit — Player/Drafter/Cost on row 1,
        buttons span the whole of row 2. Flex-wrap was inconsistent about which
        item wrapped first across browsers.
-       Tracks: minmax(0, 1fr) twice + a fixed 5rem for Cost. The 1fr tracks
-       have an explicit 0 lower bound so a grid item's min-content (long
-       player names, or the spanning buttons row) doesn't force the tracks
-       wider than the container. The Cost track is fixed-width instead of
-       `auto` because `auto` resolves to minmax(min-content, max-content),
-       which lets the column grow when a spanning item (the buttons row)
-       distributes its content size into it. */
+       Tracks: minmax(0, 1fr) twice + a fixed 5rem for Cost + a 32px gutter
+       for the fixed-position hamburger toggle. The 1fr tracks have an
+       explicit 0 lower bound so a grid item's min-content (long player
+       names, or the spanning buttons row) doesn't force the tracks wider
+       than the container. The Cost track is fixed-width instead of `auto`
+       because `auto` resolves to minmax(min-content, max-content), which
+       lets the column grow when a spanning item (the buttons row) distributes
+       its content size into it.
+       The trailing 32px gutter reserves space for the hamburger; combined
+       with the 8px grid gap before it, the inputs row stops exactly 40px
+       from the right edge (where the hamburger sits). The buttons row's
+       `grid-column: 1 / -1` lets it span the gutter too, so it extends to
+       the full grid width while the inputs stay clear. */
     .pick-control-row:has(.auction-cost-input) {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5rem;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5rem 32px;
         gap: 8px;
         align-items: end;
     }
@@ -1344,33 +1334,37 @@ tr {
            overflows the right edge. min-width: 0 lets the buttons shrink. */
         min-width: 0;
     }
-    /* Draft mode (row contains .pick-control-label directly): single-column grid
+    /* Draft mode (row contains .pick-control-label directly): two-column grid
        so the "Select Pick X for Drafter Y" label sits above the dropdown,
        mirroring the label-above-input layout used by auction mode's pick-cols.
-       Buttons take row 3. */
+       Buttons take row 3. The 34px second column is a gutter reserving space
+       for the fixed-position hamburger toggle; combined with the 6px gap
+       between columns it totals 40px, so the inputs stop exactly at the
+       hamburger's left edge. Children default to grid-column: 1 so they
+       don't get auto-placed into the gutter; the buttons row overrides with
+       grid-column: 1 / -1 to span both. */
     .pick-control-row:has(> .pick-control-label) {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 34px;
         gap: 6px;
+    }
+    .pick-control-row:has(> .pick-control-label) > * {
+        grid-column: 1;
+    }
+    .pick-control-row:has(> .pick-control-label) > .pick-control-buttons {
+        grid-column: 1 / -1;
     }
     /* Spread the wrapped buttons row across the full viewport width: each button
        gets an equal share, and the row's left edge anchors at x=0 (overrides
        margin-left: auto). flex-basis: 100% forces the buttons onto their own
        row inside the flex .pick-control-row (draft mode); auction mode uses
        grid for the same row, where flex-basis is ignored — grid-column: 1 / -1
-       handles the wrap there.
-
-       margin-right: -40px cancels the 40px right padding that the wrap
-       container has (for clearing the hamburger). The inputs row above is
-       still constrained by the wrap padding, but the buttons row sits below
-       the hamburger's vertical range and can occupy the full width without
-       sliding under it. min-width: 0 on the spanning grid item (set in the
-       auction grid rule above) prevents the resulting (cell + 40) used width
-       from inflating the chain past its parent — the buttons row visually
-       extends but doesn't propagate. */
+       handles the wrap there. Extending into the hamburger gutter is handled
+       by `grid-column: 1 / -1` on the spanning rules above (the auction and
+       draft templates both include a trailing 40px gutter column); the
+       buttons row simply spans every column including the gutter. */
     .pick-control-buttons {
         margin-left: 0;
-        margin-right: -40px;
         flex-grow: 1;
         flex-basis: 100%;
     }
@@ -1771,6 +1765,15 @@ tr {
     width: 250px;
     flex-wrap: nowrap;
     overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    /* Tighter trade-sizes selector on mobile — the 250px desktop width was
+       eating most of the row above the suggestion table; ~130px is enough
+       to show a "1 for 1 ×" chip plus a small Add input. */
+    .trade-combo-select .ms-input-area {
+        width: 130px;
+    }
 }
 
 .trade-threshold-group {

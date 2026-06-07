@@ -20,6 +20,12 @@ import {
 
 const _draftDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Draft evaluate failed:', err)) })
 
+// Tracks the listeners attached by the most recent renderDraftBoard call so
+// they can be detached before the next one. renderDraftBoard is called on every
+// pick — without this, each rebuild would leave the previous pick-control
+// custom select's internal listeners (~9) bound to detached nodes.
+let draftListenerController: AbortController | null = null
+
 let _autopilotRunning = false
 
 const ROUND_W = 32   // px — Round label column
@@ -45,6 +51,11 @@ export function renderDraftBoard(container: HTMLElement): void {
     if (cfg.key !== getConfigKey()) {
         applyDraftConfig(cfg)
     }
+
+    // Detach listeners from the previous render's custom select so its closures
+    // can be garbage-collected. See comment on draftListenerController.
+    draftListenerController?.abort()
+    draftListenerController = new AbortController()
 
     container.innerHTML = ''
     container.append(buildPickControl(container))
@@ -167,7 +178,13 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     btns.className = 'pick-control-buttons'
 
     if (!isDone && !isAutopilot) {
-        const sel = makeCustomSelect('draft-pick-select', available.map(n => ({ value: n, label: n })))
+        const sel = makeCustomSelect(
+            'draft-pick-select',
+            available.map(n => ({ value: n, label: n })),
+            undefined,
+            undefined,
+            draftListenerController?.signal,
+        )
         sel.element.style.flex = '1'
         row.append(sel.element)
 

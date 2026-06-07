@@ -60,10 +60,19 @@ function highlightDropPlayer(dropPlayer: string): void {
     table.rows[1 + idx * 2].cells[0].classList.add('waiver-drop-highlight')
 }
 
+// Tracks the listeners attached by the most recent renderWaiverControls call so
+// they can be detached before the next one. Without this, switching tabs in and
+// out of Waiver would leave the previous render's two custom selects' internal
+// listeners bound to detached nodes.
+let waiverListenerController: AbortController | null = null
+
 // ─── Main render ─────────────────────────────────────────────────────────────
 
 /** Renders waiver wire controls (team + drop-player selectors) into the given container. */
 export function renderWaiverControls(container: HTMLElement): void {
+    waiverListenerController?.abort()
+    waiverListenerController = new AbortController()
+
     const teamNames   = readTeamNames()
     const assignments = readRosterAssignments()
     const nPicks      = parseInt((document.getElementById('ls-n-picks') as HTMLInputElement).value) || 13
@@ -91,6 +100,9 @@ export function renderWaiverControls(container: HTMLElement): void {
     const teamSel = makeCustomSelect(
         'waiver-team-select',
         fullTeams.map(n => ({ value: n, label: n })),
+        undefined,
+        undefined,
+        waiverListenerController.signal,
     )
     teamWrap.append(teamSel.element)
     container.append(teamWrap)
@@ -117,6 +129,8 @@ export function renderWaiverControls(container: HTMLElement): void {
         'waiver-drop-select',
         buildDropOptions(initialTeam),
         initialDefault,
+        undefined,
+        waiverListenerController.signal,
     )
     dropWrap.append(dropSel.element)
     container.append(dropWrap)

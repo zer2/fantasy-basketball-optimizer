@@ -52,6 +52,15 @@ export interface CustomSelect {
  * The wrapper element dispatches a native `'change'` event (bubbling) whenever the
  * selected value changes, so `element.addEventListener('change', cb)` works as expected.
  *
+ * Cleanup: every internal listener (trigger / search input / dropdown options)
+ * is registered with the optional `signal`. Callers that build widgets in a
+ * re-render path should provide an AbortSignal from a controller they tear
+ * down before rebuilding — that detaches all internal listeners in one call
+ * and lets the wrapper's closures be garbage-collected. Without a signal the
+ * listeners persist for the page's lifetime, which is fine for one-shot
+ * widgets (sidebar/seat selector) but accumulates if the widget is recreated
+ * repeatedly.
+ *
  * @param id           - DOM id; also used for the hidden <input> that exposes `.value`
  * @param options      - Initial option list
  * @param defaultValue - Initially selected value; falls back to `options[0]` if omitted
@@ -61,7 +70,10 @@ export function makeCustomSelect(
   , options:      CustomSelectOption[]
   , defaultValue?: string
   , doubleClickToOpen?: boolean
+  , signal?:      AbortSignal
 ): CustomSelect {
+
+    const listenerOpts = signal ? { signal } : undefined
 
     let currentOptions = [...options]
     let currentValue   = defaultValue ?? currentOptions[0]?.value ?? ''
@@ -159,7 +171,7 @@ export function makeCustomSelect(
                 e.preventDefault()   // prevent blur from firing before click
                 close()
                 commit(opt.value)
-            })
+            }, listenerOpts)
             dropdown.append(item)
         }
     }
@@ -190,28 +202,28 @@ export function makeCustomSelect(
             searchInput.readOnly = false
             searchInput.focus()
             open()
-        })
+        }, listenerOpts)
     } else {
         // Default: single click toggles the dropdown.
         trigger.addEventListener('mousedown', e => {
             if (e.target === searchInput) return
             e.preventDefault()
             if (dropdown.hidden) { searchInput.focus(); open() } else { close(); searchInput.blur() }
-        })
+        }, listenerOpts)
 
         searchInput.addEventListener('focus', () => {
             if (dropdown.hidden) open()
-        })
+        }, listenerOpts)
 
         searchInput.addEventListener('click', () => {
             if (dropdown.hidden) open()
-        })
+        }, listenerOpts)
     }
 
     searchInput.addEventListener('input', () => {
         if (dropdown.hidden) open()
         renderDropdown()
-    })
+    }, listenerOpts)
 
     searchInput.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
@@ -232,12 +244,12 @@ export function makeCustomSelect(
             const next = e.key === 'ArrowDown' ? visible[idx + 1] : visible[idx - 1]
             if (next) { commit(next.value); renderDropdown() }
         }
-    })
+    }, listenerOpts)
 
     searchInput.addEventListener('blur', () => {
         // Delay so the mousedown handler on a dropdown option fires first.
         setTimeout(close, 150)
-    })
+    }, listenerOpts)
 
     // ── Public API ─────────────────────────────────────────────────────────
 

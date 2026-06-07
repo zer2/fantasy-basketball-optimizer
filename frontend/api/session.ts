@@ -26,7 +26,10 @@ const INDICATOR_LABELS: Record<string, string> = {
 }
 type IndicatorState = keyof typeof INDICATOR_LABELS
 
-let currentIndicatorState: IndicatorState = 'idle'
+// Default to 'fetching' (not 'idle') so the indicator says "Starting..." from page
+// load until the first session-creating action runs setIndicatorState. The HTML
+// default in app.html mirrors this so the very first paint matches.
+let currentIndicatorState: IndicatorState = 'fetching'
 
 // ─── Session ID ───────────────────────────────────────────────────────────────
 

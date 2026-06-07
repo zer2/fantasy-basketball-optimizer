@@ -421,10 +421,19 @@ function buildSuggestionTable(
     return table
 }
 
+// Tracks the listeners attached by the most recent renderSeasonTrading call so
+// they can be detached before the next one. Without this, switching tabs in and
+// out of Trading would leave the previous render's custom selects and
+// multiselect widgets' internal listeners bound to detached nodes.
+let tradingListenerController: AbortController | null = null
+
 // ─── Main render ─────────────────────────────────────────────────────────────
 
 /** Renders the full Trading tab into the given container element. */
 export function renderSeasonTrading(container: HTMLElement): void {
+    tradingListenerController?.abort()
+    tradingListenerController = new AbortController()
+
     container.innerHTML = ''
 
     const teamNames   = readTeamNames()
@@ -456,6 +465,9 @@ export function renderSeasonTrading(container: HTMLElement): void {
     const yourTeamSel = makeCustomSelect(
         'trade-your-team',
         fullTeams.map(n => ({ value: n, label: n })),
+        undefined,
+        undefined,
+        tradingListenerController.signal,
     )
     yourWrap.append(yourTeamSel.element)
     selectorRow.append(yourWrap)
@@ -471,6 +483,9 @@ export function renderSeasonTrading(container: HTMLElement): void {
     const theirTeamSel = makeCustomSelect(
         'trade-their-team',
         counterpartyOptions.map(n => ({ value: n, label: n })),
+        undefined,
+        undefined,
+        tradingListenerController.signal,
     )
     theirWrap.append(theirTeamSel.element)
     selectorRow.append(theirWrap)

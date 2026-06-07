@@ -81,6 +81,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
               , [...blankOption, ...playerNames.map(n => ({ value: n, label: n }))]
               , undefined
               , true
+              , rosterListenerController.signal
             )
             const prefill = DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
             if (prefill) sel.setValue(prefill)
@@ -237,6 +238,9 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const teamSel = makeCustomSelect(
         'sr-team-select',
         teamNames.map(n => ({ value: n, label: n })),
+        undefined,
+        undefined,
+        rosterListenerController.signal,
     )
     wrap.append(teamSel.element)
     rightEl.append(wrap)
