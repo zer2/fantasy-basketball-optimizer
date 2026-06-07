@@ -38,7 +38,10 @@
                         <div id="right-header"></div>
                         <div id="tab-row">
                             <div id="seat-selector-container" style="display:none"></div>
-                            <span id="eval-indicator" class="eval-indicator" data-state="fetching">Starting...</span>
+                            <!-- Hidden until applyLayout() runs show('eval-indicator'). Without this the
+                                 indicator briefly paints in its raw HTML position before the sidebar/layout
+                                 settles, so the user sees "Starting..." (or "Updating...") flash at the wrong spot. -->
+                            <span id="eval-indicator" class="eval-indicator" data-state="fetching" style="display:none">Starting...</span>
                             <div id="right-sub-header"></div>
                         </div>
                         <table id="hscoretable"><tbody></tbody></table>
