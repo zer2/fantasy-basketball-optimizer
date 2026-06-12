@@ -385,22 +385,19 @@ def get_g_scores_route(session_id: str):
 @app.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse)
 def evaluate_route(session_id: str, req: EvaluateRequest):
 
-    #ZR: What is the point of these lines? This function isn't using the session at all
-    #just the session id.
+    # Fetch once here so a missing/expired session returns a clean 404; the live
+    # session object is handed to run_evaluate, which reads n_iterations from it.
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
 
-    n_iterations = session.current_params['n_iterations']
-
     try:
         result = run_evaluate(
-            session_id        = session_id,
+            session            = session,
             player_assignments = req.player_assignments,
-            my_team_id        = req.my_team_id,
-            exclusion_list    = req.exclusion_list,
-            remaining_cash    = req.remaining_cash,
-            n_iterations      = n_iterations,
+            my_team_id         = req.my_team_id,
+            exclusion_list     = req.exclusion_list,
+            remaining_cash     = req.remaining_cash,
         )
         return result
     except Exception as exc:

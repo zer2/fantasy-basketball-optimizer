@@ -5,6 +5,7 @@
 import { stat_styler_primary, stat_styler_tertiary } from '../styles/styler_functions.js'
 import { PlayerResult, FlexAllocations, Roster } from '../types.js'
 import { getPositionNames } from '../app_state.js'
+import { makeSpacerTh } from './table_helpers.js'
 
 
 /** Expands a flex slot row label by expanding the position prefix.
@@ -111,13 +112,6 @@ function makePanelLabel(text: string, paddingLeft?: string): HTMLDivElement {
     label.textContent = text
     if (paddingLeft) label.style.paddingLeft = paddingLeft
     return label
-}
-
-/** Creates an invisible `<th>` spacer used to lock column widths in panel tables. */
-function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
-    const spacer = document.createElement('th')
-    spacer.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
-    return spacer
 }
 
 

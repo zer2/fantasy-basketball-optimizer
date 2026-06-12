@@ -135,7 +135,10 @@ async function evaluateSeat(seat: string): Promise<void> {
 
 /** Evaluates the current draft/auction state for the current seat and rebuilds the candidate table. */
 export async function runEvaluate(): Promise<void> {
-    await evaluateSeat(getCurrentSeat() ?? getLeagueSettings().team_names[0] ?? 'Drafter 1')
+    // No explicit seat selected falls back to the first team; an empty league is a bug, not a default.
+    const seat = getCurrentSeat() ?? getLeagueSettings().team_names[0]
+    if (seat === undefined) throw new Error('runEvaluate: no seat selected and league has no team names')
+    await evaluateSeat(seat)
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
     if (mode !== 'Season Mode') {
         if (getFullTeamResult()) {

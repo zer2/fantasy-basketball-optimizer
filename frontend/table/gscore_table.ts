@@ -7,6 +7,7 @@ import { getSelectedCategories, getScoringFormat } from '../parameter_collection
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../styles/styler_functions.js'
 import { isMobileViewport } from '../helper_functions.js'
+import { makeSpacerTh } from './table_helpers.js'
 
 /**
  * Builds a G-score table for the given players: one row per player plus a
@@ -152,13 +153,6 @@ export function renderTeamGScoreTable(
     }
 
     container.appendChild(hScoreTbl)
-}
-
-/** Creates an invisible `<th>` spacer to lock column widths in panel tables. */
-function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
-    const th = document.createElement('th')
-    th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
-    return th
 }
 
 /** Creates a `<colgroup>` with name and total columns followed by one

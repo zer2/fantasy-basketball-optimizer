@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
-from backend.session import get_session
+from backend.session import Session
 from backend.models import (
     Candidate, GScoreRow, FlexAllocations, FlexRow,
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
@@ -23,44 +23,36 @@ from backend.helper_functions import extract_last_name
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def run_evaluate(
-    session_id: str,
+    session: Session,
     player_assignments: dict[str, list[str]],
     my_team_id: str,
     exclusion_list: list[str],
     remaining_cash: Optional[dict[str, float]],
-    n_iterations: int,
 ) -> EvaluateResponse:
     """Drive the HAgent gradient-descent loop and return ranked candidates.
 
-    Retrieves the session, clears warm-start weights so each evaluate call
-    starts fresh, then advances the get_h_scores generator for the requested
-    number of iterations.  The final yielded result is converted to a
-    serialisable EvaluateResponse.
+    Clears warm-start weights so each evaluate call starts fresh, then advances
+    the get_h_scores generator for the requested number of iterations.  The
+    final yielded result is converted to a serialisable EvaluateResponse.
 
     Args:
-        session_id:         Identifies the active session (created by POST /sessions).
+        session:            The active session (fetched by the caller). n_iterations
+                            is read from its current_params.
         player_assignments: Maps each team name to the list of players already
                             drafted/won by that team.
         my_team_id:         The team name whose perspective the evaluation is from.
         exclusion_list:     Players to exclude from the candidate rankings
                             (e.g. already drafted by the user, injured).
         remaining_cash:     Per-team auction budget remaining; None for draft mode.
-        n_iterations:       Number of gradient-descent iterations to run.
 
     Returns:
         EvaluateResponse containing the iteration count and ranked Candidate list.
-
-    Raises:
-        KeyError: If the session does not exist or has expired.
     """
-    session = get_session(session_id)
-    if session is None:
-        raise KeyError(f"Session '{session_id}' not found or expired")
-
     info           = session.info
     H              = session.H
-    categories     = session.current_params['categories']
     current_params = session.current_params
+    categories     = current_params['categories']
+    n_iterations   = current_params['n_iterations']
 
     # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()

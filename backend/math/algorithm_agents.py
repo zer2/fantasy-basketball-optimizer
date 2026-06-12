@@ -266,9 +266,6 @@ class HAgent:
             else: 
                 pos_avg_array = 0 #not an array, but this will work fine
 
-            #ZR: Below is a hack, to keep things consistent with streamlit. Uncomment it for testing
-            #pos_avg_array = 0 
-
             initial_category_weights = (
                 (diff_means + x_scores_available_array - pos_avg_array)
                 / (default_weights * category_momentum_factor)
@@ -615,8 +612,9 @@ class HAgent:
         if expected_future_diff is not None:
             expected_diff_means = expected_future_diff.mean(axis=2) + diff_means.mean(axis=2)
         else:
-            #ZR: This is a bit of a hack. It just gets diff_means into the right shape
-            expected_diff_means = cdf_means * 0 + diff_means.mean(axis=2)
+            # No future picks to account for: broadcast the single current-team diff
+            # to one row per candidate player, matching cdf_means' leading dimension.
+            expected_diff_means = np.broadcast_to(diff_means.mean(axis=2), cdf_means.shape)
 
         future_diff_df = (
             pd.DataFrame(expected_future_diff.mean(axis=2),

@@ -7,6 +7,7 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../../helper_functions.js'
+import { readTeamNames, readRosterAssignments } from './season_helpers.js'
 import { getGScoreByName } from '../../app_state.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
@@ -15,35 +16,6 @@ import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
 import { applyIndicatorState } from '../../api/session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Reads team names from the sidebar textarea. */
-function readTeamNames(): string[] {
-    return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
-}
-
-/** Reads roster assignments from the Rosters tab grid (sr-player-{row}-{col}). */
-function readRosterAssignments(): Record<string, string[]> {
-    const teamNames = readTeamNames()
-    const nDrafters = readRequiredIntInput('ls-n-drafters')
-    const nPicks    = readRequiredIntInput('ls-n-picks')
-
-    const assignments: Record<string, string[]> = {}
-    for (let d = 0; d < nDrafters; d++) {
-        const team = teamNames[d] ?? `Team ${d + 1}`
-        const players: string[] = []
-        for (let r = 0; r < nPicks; r++) {
-            const input = document.getElementById(`sr-player-${r}-${d}`) as HTMLInputElement | null
-            const val = input?.value ?? ''
-            if (val) players.push(val)
-        }
-        assignments[team] = players
-    }
-    return assignments
-}
-
 
 // ─── G-score comparison table ────────────────────────────────────────────────
 

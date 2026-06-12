@@ -154,10 +154,15 @@ def _parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.
     """Parse an uploaded CSV (HTB or BBM format) into the canonical column set."""
     df = pd.read_csv(io.BytesIO(csv_bytes))
 
-    renamer_key = {
+    renamer_keys_by_file_type = {
         'HTB': 'htb-renamer',
         'BBM': 'bbm-renamer',
-    }.get(file_type.upper(), 'htb-renamer')
+    }
+    if file_type.upper() not in renamer_keys_by_file_type:
+        raise ValueError(
+            f"Unknown file_type {file_type!r}; expected one of {sorted(renamer_keys_by_file_type)}"
+        )
+    renamer_key = renamer_keys_by_file_type[file_type.upper()]
 
     renamer = params.get(renamer_key, {})
     df = df.rename(columns=renamer)
@@ -170,7 +175,9 @@ def _parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.
         if 'Games Played' in df.columns:
             df['Games Played %'] = df['Games Played'] / 82.0
         else:
-            df['Games Played %'] = 0.85  # default
+            raise ValueError(
+                "CSV missing both 'Games Played %' and 'Games Played' columns after rename"
+            )
 
     # Clamp GP to 0–1
     df['Games Played %'] = df['Games Played %'].clip(0, 1)

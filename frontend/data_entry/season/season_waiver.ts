@@ -6,34 +6,11 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
+import { readTeamNames, readRosterAssignments } from './season_helpers.js'
 import { getCandidatePlayerResults, getPlayerResultsByName } from '../../app_state.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function readTeamNames(): string[] {
-    return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
-}
-
-function readRosterAssignments(): Record<string, string[]> {
-    const teamNames = readTeamNames()
-    const nDrafters = readRequiredIntInput('ls-n-drafters')
-    const nPicks    = readRequiredIntInput('ls-n-picks')
-
-    const assignments: Record<string, string[]> = {}
-    for (let d = 0; d < nDrafters; d++) {
-        const team = teamNames[d] ?? `Team ${d + 1}`   // d can exceed teamNames.length
-        const players: string[] = []
-        for (let r = 0; r < nPicks; r++) {
-            const input = document.getElementById(`sr-player-${r}-${d}`) as HTMLInputElement | null
-            const val = input?.value ?? ''              // getElementById can return null
-            if (val) players.push(val)
-        }
-        assignments[team] = players
-    }
-    return assignments
-}
 
 /** Returns the name of the player with the highest g_rank (worst) among the given names.
  *  Returns null if none of the names are found in the backend player data. */

@@ -95,10 +95,26 @@ _lock = threading.Lock()
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
+def _evict_expired_sessions(now: float) -> None:
+    """Remove every session past its TTL. Caller must hold _lock."""
+    expired_ids = [
+        sid for sid, session in _store.items()
+        if now - session.last_accessed > SESSION_TTL
+    ]
+    for sid in expired_ids:
+        del _store[sid]
+
+
 def create_session() -> Session:
     sid = uuid.uuid4().hex[:8]
     session = Session(id=sid)
     with _lock:
+        # Reclaim abandoned sessions on each create. get_session only evicts a
+        # session when it is actively looked up, so sessions that are never
+        # queried again (e.g. the user closed the tab) would otherwise pin their
+        # DataFrames in memory forever. Sweeping here bounds the store to the
+        # active set plus whatever expired since the last create.
+        _evict_expired_sessions(time.time())
         _store[sid] = session
     return session
 
@@ -109,8 +125,8 @@ def get_session(sid: str) -> Optional[Session]:
         if session is None:
             return None
         if time.time() - session.last_accessed > SESSION_TTL:
-            #ZR: What is the point of this? Is it efficient to only remove stuff 
-            #from the store when it is queried actively? 
+            # Expired on read: never serve a stale session. Bulk reclamation of
+            # abandoned sessions happens in create_session via _evict_expired_sessions.
             del _store[sid]
             return None
         session.last_accessed = time.time()
