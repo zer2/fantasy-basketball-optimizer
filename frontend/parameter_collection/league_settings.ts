@@ -6,6 +6,7 @@ import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
+import { fetchDivisions, connectPlatform } from '../api/client.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -191,6 +192,89 @@ export function renderLeagueSettings(container: HTMLElement): void {
         if (!isNaN(nDrafters) && nDrafters > 0) rebuildTeamNameRows(true)
     })
 
+    // ── Live-platform connect (shown only when a live platform is selected) ───
+    const connectCell = makeCell('ls-cell-full')
+    connectCell.id = 'ls-connect-cell'
+
+    connectCell.append(makeLabel('ls-league-id', 'League ID'))
+    const leagueIdInput = document.createElement('input')
+    leagueIdInput.type      = 'text'
+    leagueIdInput.id        = 'ls-league-id'
+    leagueIdInput.className = 'team-name-input'
+    leagueIdInput.value     = pref('platform_league_id', '')
+    connectCell.append(leagueIdInput)
+
+    const divisionWrap = document.createElement('div')
+    divisionWrap.id = 'ls-division-wrap'
+    divisionWrap.style.display = 'none'
+    divisionWrap.append(makeLabel('ls-division', 'Division'))
+    const divisionSelect = makeCustomSelect('ls-division', [{ value: '', label: '(none)' }])
+    divisionWrap.append(divisionSelect.element)
+    connectCell.append(divisionWrap)
+
+    const connectButton = document.createElement('button')
+    connectButton.type        = 'button'
+    connectButton.id          = 'ls-connect-btn'
+    connectButton.className   = 'section-apply-btn'
+    connectButton.textContent = 'Connect'
+    connectCell.append(connectButton)
+
+    const connectStatus = document.createElement('div')
+    connectStatus.id        = 'ls-connect-status'
+    connectStatus.className  = 'pick-control-label'
+    connectCell.append(connectStatus)
+
+    container.append(connectCell)
+
+    /** Loads the league's divisions into the division select (hidden when none). */
+    async function loadDivisions(): Promise<void> {
+        const platform = platformSelect.getValue()
+        const leagueId = leagueIdInput.value.trim()
+        if (platform === 'Enter your own data' || !leagueId) return
+        const divisions = await fetchDivisions(platform, leagueId)
+        if (divisions.length === 0) {
+            divisionWrap.style.display = 'none'
+            divisionSelect.setOptions([{ value: '', label: '(none)' }])
+        } else {
+            divisionWrap.style.display = ''
+            divisionSelect.setOptions(divisions.map(division => ({ value: division.id, label: division.name })))
+        }
+    }
+
+    leagueIdInput.addEventListener('change', () => {
+        savePref('platform_league_id', leagueIdInput.value)
+        loadDivisions().catch(err => { connectStatus.textContent = `Could not load divisions: ${err.message}` })
+    })
+
+    connectButton.addEventListener('click', () => {
+        const platform = platformSelect.getValue()
+        const leagueId = leagueIdInput.value.trim()
+        if (platform === 'Enter your own data' || !leagueId) {
+            connectStatus.textContent = 'Enter a league ID first.'
+            return
+        }
+        const divisionId = divisionSelect.getValue() || null
+        connectStatus.textContent = 'Connecting...'
+        connectPlatform(platform, leagueId, divisionId)
+            .then(resp => {
+                // Restrict the mode selector to what this platform supports.
+                modeSelect.setOptions(resp.available_modes.map(m => ({ value: m, label: m })))
+                if (!resp.available_modes.includes(modeSelect.getValue())) {
+                    modeSelect.setValue(resp.available_modes[0])
+                }
+                // Set n_drafters / n_picks directly — NOT via a change event, which
+                // would reset the team-name rows — and drive the seat selector via
+                // the hidden textarea's input event (main.ts repopulates it).
+                nDraftersInput.value = String(resp.n_drafters)
+                nPicksInput.value    = String(resp.n_picks)
+                hiddenNamesTextarea.value = resp.team_names.join('\n')
+                hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+                connectStatus.textContent =
+                    `Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`
+            })
+            .catch(err => { connectStatus.textContent = `Connect failed: ${err.message}` })
+    })
+
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
     function updateVisibility(): void {
         const isOwnData = platformSelect.getValue() === 'Enter your own data'
@@ -198,6 +282,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         cashCell.style.display       = mode === 'Auction Mode' ? '' : 'none'
         trrToggle.style.display      = isOwnData && mode === 'Draft Mode' ? '' : 'none'
         teamNamesWrap.style.display  = isOwnData ? '' : 'none'
+        connectCell.style.display    = isOwnData ? 'none' : ''
         if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
 
         // Show drafter mode dropdowns only in Draft Mode + own data
@@ -258,6 +343,20 @@ export function getLeagueSettings(): {
         team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
                                   .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
     }
+}
+
+/**
+ * Returns the live-platform connection for the session request, or null for
+ * 'Enter your own data' (or a live platform with no league ID entered yet).
+ */
+export function getPlatformConfig(): { league_id: string; division_id?: string | null } | null {
+    const platform = (document.getElementById('ls-platform') as HTMLInputElement).value
+    if (platform === 'Enter your own data') return null
+    const leagueIdEl = document.getElementById('ls-league-id') as HTMLInputElement | null
+    const leagueId   = leagueIdEl?.value.trim() ?? ''
+    if (!leagueId) return null
+    const divisionEl = document.getElementById('ls-division') as HTMLInputElement | null
+    return { league_id: leagueId, division_id: (divisionEl?.value || null) }
 }
 
 /** Creates a grid cell `<div>` that stacks its label and input vertically. */

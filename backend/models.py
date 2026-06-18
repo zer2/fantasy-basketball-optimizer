@@ -46,6 +46,11 @@ class DataSource(BaseModel):
     custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'projections'
 
 
+class PlatformConfigRequest(BaseModel):
+    league_id: str
+    division_id: Optional[str] = None
+
+
 class SessionRequest(BaseModel):
     league: LeagueSettings
     platform: str = 'Enter your own data'
@@ -54,6 +59,7 @@ class SessionRequest(BaseModel):
     data_source: DataSource
     injured_players: list[str] = []
     my_team_id: Optional[str] = None
+    platform_config: Optional[PlatformConfigRequest] = None   # live platforms only
 
 
 class PlayerGScore(BaseModel):
@@ -217,3 +223,27 @@ class TradeSuggestion(BaseModel):
 
 class TradeSuggestResponse(BaseModel):
     suggestions: list[TradeSuggestion]
+
+
+# ── /platforms/* (live platform integration) ─────────────────────────────────
+
+class DivisionsResponse(BaseModel):
+    divisions: list[dict]            # [{name, id}]; empty when the league has none
+
+
+class ConnectRequest(BaseModel):
+    league_id: str
+    division_id: Optional[str] = None
+
+
+class ConnectResponse(BaseModel):
+    team_names: list[str]
+    n_drafters: int
+    n_picks: int
+    available_modes: list[str]
+
+
+class DraftStateResponse(BaseModel):
+    player_assignments: dict[str, list[str]]
+    injured_players: list[str]
+    status: str

@@ -12,7 +12,7 @@ import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
 import { getLeagueSettings } from './parameter_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
-import { getFullTeamResult } from './api/draft_and_auction_session.js'
+import { getFullTeamResult, refreshLiveAnalysis } from './api/draft_and_auction_session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -120,10 +120,19 @@ function showLiveLayout(): void {
 
     show('seat-selector-container')
 
-    const stub = document.createElement('div')
-    stub.className   = 'team-display-stub'
-    stub.textContent = 'Team statistics will appear here once the backend is connected.'
-    rightFooter.append(stub)
+    // Live platforms have no manual data-entry grid; a Refresh Analysis button
+    // pulls the current draft/roster state from the platform and re-evaluates.
+    const refreshButton = document.createElement('button')
+    refreshButton.type        = 'button'
+    refreshButton.className    = 'section-apply-btn'
+    refreshButton.textContent  = 'Refresh Analysis'
+    refreshButton.addEventListener('click', () => {
+        refreshLiveAnalysis().catch(err => console.error('Refresh analysis failed:', err))
+    })
+    rightHeader.append(refreshButton)
+
+    show('hscoretable')
+    hide('draft-gscore')
 }
 
 // ─── Season layout ────────────────────────────────────────────────────────────

@@ -130,6 +130,13 @@ def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
     return df
 
 
+def get_player_mapping_view() -> pd.DataFrame:
+    """The cross-platform player-name mapping table (PLAYER_MAPPING_VIEW), whose
+    columns include each naming convention (PLAYER_NAME, FANTRAX_PLAYER_NAME,
+    ESPN_NAME, ...). Used by platform integrations to map roster names to canonical."""
+    return _query('PLAYER_MAPPING_VIEW')
+
+
 # ── Weekly box scores ─────────────────────────────────────────────────────────
 
 def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:

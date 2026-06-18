@@ -4,7 +4,7 @@
 
 import { SessionRequest } from '../types.js'
 import { setGScores } from '../app_state.js'
-import { getLeagueSettings } from '../parameter_collection/league_settings.js'
+import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/league_settings.js'
 import { getScoringFormat, getSelectedCategories, syncCategoriesFromBackend } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
@@ -87,6 +87,8 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
         data_source,
         injured_players,
     }
+    const platformConfig = getPlatformConfig()
+    if (platformConfig) req.platform_config = platformConfig
     const resp = await createSession(req, signal)
     sessionId = resp.session_id
     syncCategoriesFromBackend(resp.categories)

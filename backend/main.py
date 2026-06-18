@@ -26,9 +26,14 @@ from backend.models import (
     EvaluateRequest, EvaluateResponse,
     TradeAnalyzeRequest, TradeAnalyzeResponse,
     TradeSuggestRequest, TradeSuggestResponse,
+    DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
 )
 from backend.evaluate import run_evaluate
 from backend.math.trading import run_trade_analyze, run_trade_suggest
+from backend.platform_integration.registry import get_integration, is_live_platform
+from backend.platform_integration.base import PlatformConfig
+from backend.platform_integration.helpers import build_platform_name_lookup
+from backend.data_retrieval import get_player_mapping_view
 
 
 # ── Upload store ──────────────────────────────────────────────────────────────
@@ -111,6 +116,49 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
         'blend_weights':    req.data_source.blend_weights,
         'custom_data_ids':  req.data_source.custom_data_ids,
     }
+
+
+def _resolve_platform_config(req: SessionRequest) -> Optional[PlatformConfig]:
+    """For a live platform, fetch the league shape and build a PlatformConfig to
+    store on the session. Returns None for 'Enter your own data'."""
+    if not is_live_platform(req.platform):
+        return None
+    if req.platform_config is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f'platform_config is required for platform {req.platform!r}.',
+        )
+    integration = get_integration(req.platform)
+    try:
+        shape = integration.fetch_league_shape(
+            req.platform_config.league_id,
+            req.platform_config.division_id,
+        )
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return PlatformConfig(
+        platform           = req.platform,
+        league_id          = req.platform_config.league_id,
+        division_id        = req.platform_config.division_id,
+        teams_dict         = shape.teams_dict,
+        player_name_column = integration.player_name_column,
+    )
+
+
+def _refresh_platform_name_lookup(session) -> None:
+    """Rebuild the session's platform name lookup from its current info.
+
+    Lives here, not in run_pipeline, so the pipeline stays platform-agnostic. Call
+    after the pipeline runs when the player set may have changed (session creation
+    and data/injured patches, i.e. from_step <= 2); model/category/slot patches
+    leave info['Positions'] untouched.
+    """
+    config = session.platform_config
+    if config is None:
+        return
+    session.platform_name_lookup = build_platform_name_lookup(
+        session.info, config.player_name_column, get_player_mapping_view(),
+    )
 
 
 def _resolve_csv(
@@ -278,12 +326,20 @@ def create_session_route(req: SessionRequest):
     elif source_type == 'projections':
         uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
+    # Resolve any live-platform connection up front so a bad league fails before
+    # the expensive pipeline runs.
+    platform_config = _resolve_platform_config(req)
+
     session = create_session()
     session.current_params = _build_current_params(req, all_params)
+    if platform_config is not None:
+        session.platform_config = platform_config
+        session.current_params['team_names'] = list(platform_config.teams_dict.keys())
 
     try:
         run_pipeline(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type_str,
                      uploaded_dfs=uploaded_dfs)
+        _refresh_platform_name_lookup(session)   # no-op unless a live platform is connected
     except Exception as exc:
         delete_session(session.id)
         raise HTTPException(status_code=500, detail=traceback.format_exc())
@@ -357,6 +413,11 @@ def patch_session_route(session_id: str, req: PatchRequest):
     session.current_params.update(patch)
     run_pipeline(session, from_step=req.from_step, csv_bytes=csv_bytes, file_type=file_type_str,
                  uploaded_dfs=uploaded_dfs)
+    # The platform name lookup depends on the player set (info['Positions']), which
+    # only changes on data/injured patches (from_step <= 2). Rebuilt outside
+    # run_pipeline to keep the pipeline platform-agnostic.
+    if req.from_step <= 2:
+        _refresh_platform_name_lookup(session)
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
 
 
@@ -463,6 +524,64 @@ def delete_session_route(session_id: str):
     if not found:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Platform integration (live: ESPN / Yahoo / Fantrax) ──────────────────────
+# The {platform} path segment is the exact platform label the frontend sends
+# (e.g. 'Retrieve from Fantrax'), URL-encoded; it is resolved via the registry.
+
+def _resolve_live_integration(platform: str):
+    if not is_live_platform(platform):
+        raise HTTPException(status_code=400, detail=f'No live integration for platform {platform!r}.')
+    return get_integration(platform)
+
+
+@app.get('/platforms/{platform}/divisions', response_model=DivisionsResponse)
+def get_platform_divisions_route(platform: str, league_id: str):
+    integration = _resolve_live_integration(platform)
+    try:
+        divisions = integration.list_divisions(league_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return DivisionsResponse(divisions=divisions)
+
+
+@app.post('/platforms/{platform}/connect', response_model=ConnectResponse)
+def connect_platform_route(platform: str, req: ConnectRequest):
+    integration = _resolve_live_integration(platform)
+    try:
+        shape = integration.fetch_league_shape(req.league_id, req.division_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return ConnectResponse(
+        team_names      = shape.team_names,
+        n_drafters      = shape.n_drafters,
+        n_picks         = shape.n_picks,
+        available_modes = integration.available_modes,
+    )
+
+
+@app.get('/sessions/{session_id}/draft-state', response_model=DraftStateResponse)
+def get_draft_state_route(session_id: str, mode: str):
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found or expired.')
+    if session.platform_config is None:
+        raise HTTPException(status_code=400, detail='Session is not connected to a live platform.')
+    integration = get_integration(session.platform_config.platform)
+    # The lookup is built at session creation / data patches; rebuild defensively
+    # if somehow absent so the poll never maps every player to 'RP'.
+    if session.platform_name_lookup is None:
+        _refresh_platform_name_lookup(session)
+    try:
+        state = integration.get_draft_results(session.platform_config, mode, session.platform_name_lookup)
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return DraftStateResponse(
+        player_assignments = state.player_assignments,
+        injured_players    = state.injured_players,
+        status             = state.status,
+    )
 
 
 # ── Static frontend ────────────────────────────────────────────────────────────

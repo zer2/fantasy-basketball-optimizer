@@ -9,7 +9,7 @@ import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { buildTable, showTableMessage } from '../table/player_table.js'
 import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
-import { patchSession, fetchGScores, evaluate, candidatesToPlayerResults, HTTPError } from './client.js'
+import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
 
 // ─── Draft/auction state ─────────────────────────────────────────────────────
 
@@ -17,6 +17,19 @@ const basePlayersBySession: Map<string, PlayerResult[]> = new Map()
 let evaluateController: AbortController | null = null
 let evaluateGeneration = 0
 let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
+
+// Player assignments pulled from a live platform (Refresh Analysis). When set,
+// evaluateSeat uses these instead of reading the manual draft/auction board,
+// which does not exist in the live-platform layout.
+let livePlayerAssignments: Record<string, string[]> | null = null
+
+export function setLivePlayerAssignments(assignments: Record<string, string[]>): void {
+    livePlayerAssignments = assignments
+}
+
+export function clearLivePlayerAssignments(): void {
+    livePlayerAssignments = null
+}
 
 export function getFullTeamResult(): { h_score: number; win_rates: number[] } | null {
     return latestFullTeamResult
@@ -75,9 +88,17 @@ async function evaluateSeat(seat: string): Promise<void> {
     try {
         await withSessionRetry(async () => {
             const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+            const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
 
             let evalReq: Parameters<typeof evaluate>[1]
-            if (mode === 'Auction Mode') {
+            if (isLivePlatform) {
+                // Live platforms supply assignments via the Refresh Analysis poll
+                // instead of a manual board; auction is not supported live.
+                if (livePlayerAssignments === null) {
+                    throw new Error('No live draft state loaded; click Refresh Analysis first')
+                }
+                evalReq = { player_assignments: livePlayerAssignments, my_team_id: seat }
+            } else if (mode === 'Auction Mode') {
                 const { player_assignments, remaining_cash } = getAuctionState()
                 evalReq = { player_assignments, my_team_id: seat, remaining_cash }
             } else {
@@ -147,4 +168,19 @@ export async function runEvaluate(): Promise<void> {
             buildTable(getCandidatePlayerResults()!)
         }
     }
+}
+
+/**
+ * Live-platform refresh: polls the connected platform for the current draft /
+ * roster state, stores it as the live player assignments, then re-evaluates.
+ * Backs the "Refresh Analysis" button in the live-platform layout.
+ */
+export async function refreshLiveAnalysis(): Promise<void> {
+    setIndicatorState('fetching')
+    await withSessionRetry(async () => {
+        const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+        const state = await fetchDraftState(getSessionId()!, mode)
+        setLivePlayerAssignments(state.player_assignments)
+    })
+    await runEvaluate()
 }
