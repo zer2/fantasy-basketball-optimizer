@@ -40,6 +40,7 @@ async function jsonRequest<T>(
         const body = await res.text()
         throw new HTTPError(res.status, body, label)
     }
+    if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
     return res.json() as Promise<T>
 }
 
@@ -268,6 +269,13 @@ export interface DraftStateResponse {
     player_assignments: Record<string, string[]>
     injured_players: string[]
     status: string
+    remaining_cash?: Record<string, number>   // Auction Mode only
+}
+
+export interface PlatformLeague {
+    id: string
+    name: string
+    season?: number
 }
 
 /** Lists a platform league's divisions (empty when the league has none). */
@@ -282,11 +290,39 @@ export async function fetchDivisions(
     return data.divisions
 }
 
+/** Lists the user's leagues for an auth-based platform (empty for manual-id platforms). */
+export async function fetchLeagues(
+    platform: string
+    , clientId: string
+): Promise<PlatformLeague[]> {
+    const data = await jsonRequest<{ leagues: PlatformLeague[] }>(
+        `${BASE_URL}/platforms/${encodeURIComponent(platform)}/leagues?client_id=${encodeURIComponent(clientId)}`
+        , 'Platform leagues'
+    )
+    return data.leagues
+}
+
+/** Returns the Yahoo OAuth authorization URL for the user to visit. */
+export async function fetchYahooAuthUrl(): Promise<string> {
+    const data = await jsonRequest<{ auth_url: string }>(`${BASE_URL}/platforms/yahoo/auth-url`, 'Yahoo auth URL')
+    return data.auth_url
+}
+
+/** Exchanges a pasted Yahoo authorization code for tokens, persisted under clientId. */
+export async function submitYahooToken(clientId: string, authCode: string): Promise<void> {
+    await jsonRequest<void>(`${BASE_URL}/platforms/yahoo/token`, 'Yahoo token', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ client_id: clientId, auth_code: authCode }),
+    })
+}
+
 /** Connects to a platform league and returns its team/shape metadata. */
 export async function connectPlatform(
     platform: string
     , leagueId: string
     , divisionId: string | null
+    , clientId: string | null
 ): Promise<PlatformConnectResponse> {
     return jsonRequest(
         `${BASE_URL}/platforms/${encodeURIComponent(platform)}/connect`
@@ -294,7 +330,7 @@ export async function connectPlatform(
         , {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ league_id: leagueId, division_id: divisionId }),
+            body:    JSON.stringify({ league_id: leagueId, division_id: divisionId, client_id: clientId }),
         }
     )
 }

@@ -49,6 +49,7 @@ class DataSource(BaseModel):
 class PlatformConfigRequest(BaseModel):
     league_id: str
     division_id: Optional[str] = None
+    client_id: Optional[str] = None   # auth platforms: identifies the persisted credentials
 
 
 class SessionRequest(BaseModel):
@@ -231,9 +232,14 @@ class DivisionsResponse(BaseModel):
     divisions: list[dict]            # [{name, id}]; empty when the league has none
 
 
+class LeaguesResponse(BaseModel):
+    leagues: list[dict]              # [{id, name, season}]; empty for manual-id platforms (Fantrax)
+
+
 class ConnectRequest(BaseModel):
     league_id: str
     division_id: Optional[str] = None
+    client_id: Optional[str] = None   # auth platforms: identifies the persisted credentials
 
 
 class ConnectResponse(BaseModel):
@@ -247,3 +253,15 @@ class DraftStateResponse(BaseModel):
     player_assignments: dict[str, list[str]]
     injured_players: list[str]
     status: str
+    remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
+
+
+# Yahoo OAuth (manual code-paste flow)
+
+class YahooAuthUrlResponse(BaseModel):
+    auth_url: str
+
+
+class YahooTokenRequest(BaseModel):
+    client_id: str
+    auth_code: str

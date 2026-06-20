@@ -60,7 +60,7 @@ Import direction is one-way: `integrations/* → base, helpers`; `registry → b
 `main`/`session` → `base`, `helpers`, `registry`. `registry` stays separate from `base` because
 folding it in would create a base ← subclass ← base cycle.
 
-**`base.py` — the ABC (+ `LeagueShape` / `PlatformConfig` / `PlatformDraftState` dataclasses):**
+**`base.py` — the ABC (+ `LeagueShape` / `PlatformConfig` / `PlatformSelections` dataclasses):**
 ```python
 class PlatformIntegration(abc.ABC):
     @property
@@ -117,14 +117,18 @@ class PlatformConfig:
     player_name_column: str
 
 @dataclass
-class PlatformDraftState:        # returned by get_draft_results / get_auction_results
+class PlatformSelections:        # returned by get_draft_results / get_auction_results
     player_assignments: dict[str, list[str]]   # {team: [canonical 'Name (POS)', ...]} — the /evaluate shape
     status: str
     injured_players: list[str]   # Season Mode only; returned explicitly, not mutated into global state
+    costs: Optional[dict[str, list[float]]] = None   # auction only; costs[team][i] ↔ player_assignments[team][i]
 ```
 
-The package also contains `registry.py` (`get_integration(platform)` / `is_live_platform(platform)`).
-`get_draft_results` returns a `PlatformDraftState` rather than the Streamlit `(df, status)` tuple, so
+The package also contains `registry.py` (`get_integration(platform, credentials=None)` /
+`is_live_platform(platform)`). The ABC's `__init__(credentials)` puts credentials on the instance
+(Yahoo's `{'auth_dir': ...}`; Fantrax ignores), and a concrete `list_leagues()` (default `[]`) serves
+auth platforms. `get_draft_results` returns a `PlatformSelections` rather than the Streamlit
+`(df, status)` tuple, so
 the injured-player list (a Streamlit `st.session_state` side effect) is returned explicitly. It builds
 the assignments **dict directly** (no intermediate DataFrame — the only consumer wants this shape) and
 takes a prebuilt `name_lookup` (see §2) rather than `info`.
@@ -299,16 +303,58 @@ no-circular-deps rationale as the backend routes. Instead the pieces fold into e
 4. **Private `_request`** — works in 0.2.9 but is unofficial; flagged. If it breaks on upgrade, swap
    to public `api.teams` / `api.roster_info(team_id)` / `api.standings`.
 
-## Persistence (deferred)
-Fantrax needs no credentials, so the persistent token store isn't built here. It lands in Phase 1
-(ESPN s2/SWID) / Phase 2 (Yahoo tokens), keyed by a frontend-minted client id in `localStorage`.
-
-## Credentials (Phase 1+)
+## Credentials & construction
 No method takes a `credentials` argument (Streamlit didn't either — it stashed creds in
-`st.session_state` and the integration read them). When ESPN/Yahoo arrive, credentials live **on the
-integration object**, not threaded per-call: `get_integration(platform, credentials)` constructs a
-configured instance whose methods use `self`-held creds. The route looks up creds from the persistent
-store by client id, builds the configured integration, and calls it. Fantrax ignores credentials.
+`st.session_state` and the integration read them). The **ABC has no `__init__`**: it constrains
+behavior, not construction. Each integration declares its own explicit constructor params (Fantrax
+none; Yahoo `auth_dir`), and the registry **spreads the creds bag** into them —
+`get_integration(platform, credentials)` does `cls(**(credentials or {}))`. So Fantrax is built with
+no args, Yahoo as `YahooIntegration(auth_dir=…)`, and a bag key the constructor doesn't declare raises
+`TypeError` (fail-noisily). Routes resolve creds from the persistent store by `client_id` (a
+frontend-minted id in `localStorage`, validated to `[A-Za-z0-9_-]{1,64}`) via `credential_store.py`.
+The integration only ever *uses* creds; *acquiring* them (OAuth, env, persistence) is route/frontend
+orchestration.
+
+## Frontend platform connectors (`frontend/platforms/`)
+Each platform's connect/auth UX lives in its own connector module — the frontend counterpart to a
+backend integration, paired by the platform label (no shared object; just the label + the HTTP
+contract). `connector.ts` defines `PlatformConnector` (`platform`, `element`, `getSelection()`);
+`fantrax_connector.ts` (league id + division) and `yahoo_connector.ts` (OAuth → paste code → league
+dropdown) implement it; `registry.ts` holds the connector map (`makeConnectors` / `connectorPlatforms`).
+`league_settings.ts` is a thin host: it builds every connector, shows the active one, and a single
+generic Connect path serves all of them; `getPlatformConfig()` delegates to the active connector. The
+platform dropdown is derived from `connectorPlatforms()`, so it can only ever offer platforms with a
+frontend connector (a backend-only platform simply never appears).
+
+> No runtime parity check. An earlier version exposed `GET /platforms` (backend registry) and had
+> `main.ts` assert at startup that the frontend connectors matched it; that was removed (didn't need to
+> run on every load). There is currently **no drift detection** between the backend registry and the
+> frontend connectors — if you want it back without per-load cost, a CI test calling a parity helper is
+> the right home.
+
+## Phase 2 (Yahoo) — IMPLEMENTED, UNTESTED
+`integrations/yahoo.py` is a faithful framework-agnostic port of the Streamlit `YahooIntegration`
+(+ `yahoo_helper`), now **fully wired** but **never run against a real Yahoo league/OAuth app**. What's
+in place:
+- Registered in `registry.py`; `available_modes` includes Auction.
+- OAuth (manual code-paste): `build_auth_url` / `exchange_auth_code`, the `/platforms/yahoo/auth-url`
+  and `/platforms/yahoo/token` routes, and the per-client token store (`credential_store.yahoo_auth_dir`,
+  holding yfpy's `token.json`/`private.json`). Yahoo *app* client id/secret come from
+  `YAHOO_CLIENT_ID`/`YAHOO_CLIENT_SECRET` env vars.
+- League picking: `list_leagues()` (ABC default `[]`, overridden by Yahoo) + `GET /platforms/{platform}/leagues`.
+- Auction: `PlatformSelections.costs` carries per-player cost; the draft-state route dispatches to
+  `get_auction_results` in Auction Mode and turns costs into `remaining_cash` (= `cash_per_team` − spent).
+- Frontend: `client_id.ts`, Yahoo connect UI in `league_settings.ts` (authenticate → paste code →
+  league dropdown), live auction `remaining_cash` plumbed through `draft_and_auction_session.ts`.
+- Unit tests cover the pure draft/cost parsing (`_assignments_from_draft`) and `build_auth_url`.
+
+Risks to check first at E2E (also in the file banner): the OAuth handshake + yfpy token refresh have
+never run; `YAHOO_PLAYER_ID` dtype must match yfpy's `player_id` (else everyone → `'RP'`); `n_picks`
+is hard-coded to 13; exact yfpy method names may differ by version.
+
+## Persistence
+The per-client token store (`credential_store.py`) persists Yahoo OAuth tokens to disk under
+`.platform_credentials/` (gitignored; override with `PLATFORM_CREDENTIAL_DIR`), keyed by `client_id`.
 
 ## Testing
 - **Unit**: mock `FantraxAPI._request` with captured sample payloads; assert `fetch_league_shape` →

@@ -37,22 +37,30 @@ class PlatformConfig:
     division_id:        Optional[str]
     teams_dict:         dict[str, str]   # team_name -> platform team_id
     player_name_column: str
+    client_id:          Optional[str] = None   # auth platforms: looks up persisted credentials
 
 
 @dataclass
-class PlatformDraftState:
-    """Current state pulled from a platform.
+class PlatformSelections:
+    """Current selections pulled from a platform — draft board, season rosters, or
+    auction.
 
     `player_assignments` maps each team to its list of canonical 'Name (POS)'
     players (the shape /evaluate expects). `injured_players` lists players the
-    platform flags as out (Season Mode only); empty otherwise.
+    platform flags as out (Season Mode only); empty otherwise. `costs` is populated
+    only for auctions: costs[team][i] is the price paid for player_assignments[team][i].
     """
     player_assignments: dict[str, list[str]]
     status:             str
     injured_players:    list[str]
+    costs:              Optional[dict[str, list[float]]] = None
 
 
 class PlatformIntegration(abc.ABC):
+    # No __init__ here on purpose: the ABC constrains behavior, not construction.
+    # Each integration declares its own explicit constructor params (Fantrax none;
+    # Yahoo auth_dir), and the registry spreads the credentials bag into them via
+    # get_integration's cls(**(credentials or {})).
 
     @property
     @abc.abstractmethod
@@ -68,6 +76,11 @@ class PlatformIntegration(abc.ABC):
     @abc.abstractmethod
     def player_name_column(self) -> str:
         """The platform's player-name column in PLAYER_MAPPING_VIEW, e.g. 'FANTRAX_PLAYER_NAME'."""
+
+    def list_leagues(self) -> list[dict]:
+        """The user's leagues as [{'id', 'name', ...}] for auth-based platforms (Yahoo,
+        ESPN). Default [] for platforms that take a manually-entered league id (Fantrax)."""
+        return []
 
     @abc.abstractmethod
     def list_divisions(self, league_id: str) -> list[dict]:
@@ -87,7 +100,7 @@ class PlatformIntegration(abc.ABC):
         , config: PlatformConfig
         , mode: str
         , name_lookup: dict[str, str]
-    ) -> PlatformDraftState:
+    ) -> PlatformSelections:
         """Fetch the current draft board / rosters, mapping platform names to canonical
         via name_lookup (built once upstream from session.info)."""
 
@@ -97,5 +110,6 @@ class PlatformIntegration(abc.ABC):
         , config: PlatformConfig
         , mode: str
         , name_lookup: dict[str, str]
-    ) -> Optional[PlatformDraftState]:
-        """Fetch the current auction state, or None when the platform has no auction support."""
+    ) -> Optional[PlatformSelections]:
+        """Fetch the current auction state (with `costs`), or None when the platform has
+        no auction support."""

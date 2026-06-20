@@ -22,13 +22,19 @@ let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
 // evaluateSeat uses these instead of reading the manual draft/auction board,
 // which does not exist in the live-platform layout.
 let livePlayerAssignments: Record<string, string[]> | null = null
+let liveRemainingCash: Record<string, number> | null = null
 
-export function setLivePlayerAssignments(assignments: Record<string, string[]>): void {
+export function setLivePlayerAssignments(
+    assignments: Record<string, string[]>
+    , remainingCash?: Record<string, number>
+): void {
     livePlayerAssignments = assignments
+    liveRemainingCash = remainingCash ?? null
 }
 
 export function clearLivePlayerAssignments(): void {
     livePlayerAssignments = null
+    liveRemainingCash = null
 }
 
 export function getFullTeamResult(): { h_score: number; win_rates: number[] } | null {
@@ -92,12 +98,14 @@ async function evaluateSeat(seat: string): Promise<void> {
 
             let evalReq: Parameters<typeof evaluate>[1]
             if (isLivePlatform) {
-                // Live platforms supply assignments via the Refresh Analysis poll
-                // instead of a manual board; auction is not supported live.
+                // Live platforms supply assignments (and, for auctions, remaining cash)
+                // via the Refresh Analysis poll instead of a manual board.
                 if (livePlayerAssignments === null) {
                     throw new Error('No live draft state loaded; click Refresh Analysis first')
                 }
-                evalReq = { player_assignments: livePlayerAssignments, my_team_id: seat }
+                evalReq = (mode === 'Auction Mode')
+                    ? { player_assignments: livePlayerAssignments, my_team_id: seat, remaining_cash: liveRemainingCash ?? undefined }
+                    : { player_assignments: livePlayerAssignments, my_team_id: seat }
             } else if (mode === 'Auction Mode') {
                 const { player_assignments, remaining_cash } = getAuctionState()
                 evalReq = { player_assignments, my_team_id: seat, remaining_cash }
@@ -180,7 +188,7 @@ export async function refreshLiveAnalysis(): Promise<void> {
     await withSessionRetry(async () => {
         const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
         const state = await fetchDraftState(getSessionId()!, mode)
-        setLivePlayerAssignments(state.player_assignments)
+        setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
     })
     await runEvaluate()
 }

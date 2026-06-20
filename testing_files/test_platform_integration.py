@@ -7,6 +7,7 @@ from backend.platform_integration.helpers import (
     deduplicate_team_names, build_platform_name_lookup,
 )
 from backend.platform_integration.integrations.fantrax import FantraxIntegration
+from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.platform_integration.base import PlatformConfig
 
 
@@ -127,3 +128,36 @@ def test_get_draft_results_keeps_injured_in_draft_mode(monkeypatch):
 
     assert state.injured_players == []
     assert state.player_assignments == {'T': ['Bam Adebayo (C,PF)']}
+
+
+# ── Yahoo draft/auction parsing (pure logic, no yfpy) ─────────────────────────
+
+class _FakeDraftObj:
+    def __init__(self, player_key, team_key, cost=None):
+        self.player_key = player_key
+        self.team_key = team_key
+        self.cost = cost
+
+
+def test_yahoo_assignments_from_draft_groups_by_team_with_costs():
+    config = PlatformConfig(
+        platform='Retrieve from Yahoo', league_id='123', division_id=None,
+        teams_dict={'Team One': '1', 'Team Two': '2'},
+        player_name_column='YAHOO_PLAYER_ID',
+    )
+    name_lookup = {100: 'Nikola Jokic (C)', 200: 'James Harden (PG,SG)'}
+    draft = [
+        _FakeDraftObj('nba.p.100', 'nba.l.123.t.1', cost=50),
+        _FakeDraftObj('nba.p.200', 'nba.l.123.t.2', cost=30),
+        _FakeDraftObj('nba.p.999', 'nba.l.123.t.1', cost=5),   # unknown id -> RP
+    ]
+    assignments, costs = YahooIntegration()._assignments_from_draft(draft, config, name_lookup)
+
+    assert assignments == {'Team One': ['Nikola Jokic (C)', 'RP'], 'Team Two': ['James Harden (PG,SG)']}
+    assert costs == {'Team One': [50.0, 5.0], 'Team Two': [30.0]}
+
+
+def test_yahoo_build_auth_url():
+    url = YahooIntegration.build_auth_url('myclient')
+    assert 'client_id=myclient' in url
+    assert 'response_type=code' in url

@@ -13,7 +13,7 @@ from typing import Optional
 from fantraxapi import FantraxAPI
 
 from backend.platform_integration.base import (
-    PlatformIntegration, LeagueShape, PlatformConfig, PlatformDraftState,
+    PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
 from backend.platform_integration.helpers import deduplicate_team_names
 
@@ -114,7 +114,7 @@ class FantraxIntegration(PlatformIntegration):
         , config: PlatformConfig
         , mode: str
         , name_lookup: dict[str, str]
-    ) -> PlatformDraftState:
+    ) -> PlatformSelections:
         """Read each team's current roster, mapping platform names to canonical via
         name_lookup ('RP' for any player missing from it). In Season Mode, players
         flagged injured-reserve are moved to injured_players instead of the roster."""
@@ -135,7 +135,7 @@ class FantraxIntegration(PlatformIntegration):
                     roster.append(player)
             player_assignments[team_name] = roster
 
-        return PlatformDraftState(
+        return PlatformSelections(
             player_assignments = player_assignments,
             status             = 'Success',
             injured_players    = injured_players,
@@ -146,6 +146,6 @@ class FantraxIntegration(PlatformIntegration):
         , config: PlatformConfig
         , mode: str
         , name_lookup: dict[str, str]
-    ) -> Optional[PlatformDraftState]:
+    ) -> Optional[PlatformSelections]:
         """Fantrax has no auction support, so this always returns None (matches Streamlit)."""
         return None

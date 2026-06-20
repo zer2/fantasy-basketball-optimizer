@@ -6,18 +6,22 @@ import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
-import { fetchDivisions, connectPlatform } from '../api/client.js'
+import { connectPlatform } from '../api/client.js'
+import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
+import { PlatformConnector } from '../platforms/connector.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
 
-const PLATFORM_OPTIONS = [
-    'Enter your own data',
-    'Retrieve from Yahoo',
-    'Retrieve from Fantrax',
-    'Retrieve from ESPN',
-] as const
-export type Platform = typeof PLATFORM_OPTIONS[number]
+// Own-data plus every platform we have a connector for. Deriving the live options from
+// the connector registry means the dropdown can't offer a platform the frontend can't
+// connect (main.ts asserts these match the backend's /platforms).
+const PLATFORM_OPTIONS = ['Enter your own data', ...connectorPlatforms()]
+export type Platform = string
+
+// The active connectors, keyed by platform, so the module-level getPlatformConfig() can
+// delegate to whichever platform is selected.
+let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
 
 const DRAFTER_METHOD_OPTIONS = ['Manual input', 'H-scoring', 'G-scoring'] as const
 export type DrafterMethod = typeof DRAFTER_METHOD_OPTIONS[number]
@@ -196,21 +200,19 @@ export function renderLeagueSettings(container: HTMLElement): void {
     const connectCell = makeCell('ls-cell-full')
     connectCell.id = 'ls-connect-cell'
 
-    connectCell.append(makeLabel('ls-league-id', 'League ID'))
-    const leagueIdInput = document.createElement('input')
-    leagueIdInput.type      = 'text'
-    leagueIdInput.id        = 'ls-league-id'
-    leagueIdInput.className = 'team-name-input'
-    leagueIdInput.value     = pref('platform_league_id', '')
-    connectCell.append(leagueIdInput)
+    const connectStatus = document.createElement('div')
+    connectStatus.id        = 'ls-connect-status'
+    connectStatus.className = 'pick-control-label'
+    const setConnectStatus = (message: string): void => { connectStatus.textContent = message }
 
-    const divisionWrap = document.createElement('div')
-    divisionWrap.id = 'ls-division-wrap'
-    divisionWrap.style.display = 'none'
-    divisionWrap.append(makeLabel('ls-division', 'Division'))
-    const divisionSelect = makeCustomSelect('ls-division', [{ value: '', label: '(none)' }])
-    divisionWrap.append(divisionSelect.element)
-    connectCell.append(divisionWrap)
+    // Each platform's connect/auth controls live in its own connector module. Build them
+    // all once, append them, and show the active one — no per-platform branching here.
+    const connectors = makeConnectors(setConnectStatus)
+    connectorsByPlatform = new Map(connectors.map(connector => [connector.platform, connector]))
+    for (const connector of connectors) {
+        connector.element.style.display = 'none'
+        connectCell.append(connector.element)
+    }
 
     const connectButton = document.createElement('button')
     connectButton.type        = 'button'
@@ -218,44 +220,27 @@ export function renderLeagueSettings(container: HTMLElement): void {
     connectButton.className   = 'section-apply-btn'
     connectButton.textContent = 'Connect'
     connectCell.append(connectButton)
-
-    const connectStatus = document.createElement('div')
-    connectStatus.id        = 'ls-connect-status'
-    connectStatus.className  = 'pick-control-label'
     connectCell.append(connectStatus)
-
     container.append(connectCell)
 
-    /** Loads the league's divisions into the division select (hidden when none). */
-    async function loadDivisions(): Promise<void> {
+    /** Show only the selected platform's connector controls. */
+    function refreshConnectControls(): void {
         const platform = platformSelect.getValue()
-        const leagueId = leagueIdInput.value.trim()
-        if (platform === 'Enter your own data' || !leagueId) return
-        const divisions = await fetchDivisions(platform, leagueId)
-        if (divisions.length === 0) {
-            divisionWrap.style.display = 'none'
-            divisionSelect.setOptions([{ value: '', label: '(none)' }])
-        } else {
-            divisionWrap.style.display = ''
-            divisionSelect.setOptions(divisions.map(division => ({ value: division.id, label: division.name })))
+        for (const connector of connectors) {
+            connector.element.style.display = connector.platform === platform ? '' : 'none'
         }
     }
 
-    leagueIdInput.addEventListener('change', () => {
-        savePref('platform_league_id', leagueIdInput.value)
-        loadDivisions().catch(err => { connectStatus.textContent = `Could not load divisions: ${err.message}` })
-    })
-
     connectButton.addEventListener('click', () => {
-        const platform = platformSelect.getValue()
-        const leagueId = leagueIdInput.value.trim()
-        if (platform === 'Enter your own data' || !leagueId) {
-            connectStatus.textContent = 'Enter a league ID first.'
+        const connector = connectorsByPlatform.get(platformSelect.getValue())
+        if (!connector) return
+        const selection = connector.getSelection()
+        if (selection === null) {
+            setConnectStatus('Select or enter a league first.')
             return
         }
-        const divisionId = divisionSelect.getValue() || null
-        connectStatus.textContent = 'Connecting...'
-        connectPlatform(platform, leagueId, divisionId)
+        setConnectStatus('Connecting...')
+        connectPlatform(connector.platform, selection.league_id, selection.division_id, selection.client_id)
             .then(resp => {
                 // Restrict the mode selector to what this platform supports.
                 modeSelect.setOptions(resp.available_modes.map(m => ({ value: m, label: m })))
@@ -269,10 +254,9 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 nPicksInput.value    = String(resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
-                connectStatus.textContent =
-                    `Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`
+                setConnectStatus(`Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`)
             })
-            .catch(err => { connectStatus.textContent = `Connect failed: ${err.message}` })
+            .catch(err => { setConnectStatus(`Connect failed: ${err.message}`) })
     })
 
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
@@ -283,6 +267,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         trrToggle.style.display      = isOwnData && mode === 'Draft Mode' ? '' : 'none'
         teamNamesWrap.style.display  = isOwnData ? '' : 'none'
         connectCell.style.display    = isOwnData ? 'none' : ''
+        refreshConnectControls()
         if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
 
         // Show drafter mode dropdowns only in Draft Mode + own data
@@ -349,14 +334,9 @@ export function getLeagueSettings(): {
  * Returns the live-platform connection for the session request, or null for
  * 'Enter your own data' (or a live platform with no league ID entered yet).
  */
-export function getPlatformConfig(): { league_id: string; division_id?: string | null } | null {
+export function getPlatformConfig(): { league_id: string; division_id?: string | null; client_id?: string | null } | null {
     const platform = (document.getElementById('ls-platform') as HTMLInputElement).value
-    if (platform === 'Enter your own data') return null
-    const leagueIdEl = document.getElementById('ls-league-id') as HTMLInputElement | null
-    const leagueId   = leagueIdEl?.value.trim() ?? ''
-    if (!leagueId) return null
-    const divisionEl = document.getElementById('ls-division') as HTMLInputElement | null
-    return { league_id: leagueId, division_id: (divisionEl?.value || null) }
+    return connectorsByPlatform.get(platform)?.getSelection() ?? null
 }
 
 /** Creates a grid cell `<div>` that stacks its label and input vertically. */
