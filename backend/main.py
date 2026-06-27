@@ -29,6 +29,7 @@ from backend.models import (
     TradeSuggestRequest, TradeSuggestResponse,
     DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
     LeaguesResponse, YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
+    PlatformConfigRequest,
 )
 from backend.evaluate import run_evaluate
 from backend.math.trading import run_trade_analyze, run_trade_suggest
@@ -125,29 +126,33 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
     }
 
 
-def _resolve_platform_config(req: SessionRequest) -> Optional[PlatformConfig]:
+def _resolve_platform_config(
+    platform: str
+    , platform_config_request: Optional[PlatformConfigRequest]
+) -> Optional[PlatformConfig]:
     """For a live platform, fetch the league shape and build a PlatformConfig to
-    store on the session. Returns None for 'Enter your own data'."""
-    if not is_live_platform(req.platform):
+    store on the session. Returns None for 'Enter your own data'. Shared by the
+    create and patch routes (connecting a platform patches this onto the session)."""
+    if not is_live_platform(platform):
         return None
-    if req.platform_config is None:
+    if platform_config_request is None:
         raise HTTPException(
             status_code=400,
-            detail=f'platform_config is required for platform {req.platform!r}.',
+            detail=f'platform_config is required for platform {platform!r}.',
         )
-    client_id = req.platform_config.client_id
-    integration = get_integration(req.platform, _credentials_for(req.platform, client_id))
+    client_id = platform_config_request.client_id
+    integration = get_integration(platform, _credentials_for(platform, client_id))
     try:
         shape = integration.fetch_league_shape(
-            req.platform_config.league_id,
-            req.platform_config.division_id,
+            platform_config_request.league_id,
+            platform_config_request.division_id,
         )
     except Exception:
         raise HTTPException(status_code=502, detail=traceback.format_exc())
     return PlatformConfig(
-        platform           = req.platform,
-        league_id          = req.platform_config.league_id,
-        division_id        = req.platform_config.division_id,
+        platform           = platform,
+        league_id          = platform_config_request.league_id,
+        division_id        = platform_config_request.division_id,
         teams_dict         = shape.teams_dict,
         player_name_column = integration.player_name_column,
         client_id          = client_id,
@@ -337,7 +342,7 @@ def create_session_route(req: SessionRequest):
 
     # Resolve any live-platform connection up front so a bad league fails before
     # the expensive pipeline runs.
-    platform_config = _resolve_platform_config(req)
+    platform_config = _resolve_platform_config(req.platform, req.platform_config)
 
     session = create_session()
     session.current_params = _build_current_params(req, all_params)
@@ -420,12 +425,25 @@ def patch_session_route(session_id: str, req: PatchRequest):
                 uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
     session.current_params.update(patch)
+
+    # Connecting/switching a live platform patches its config onto the session. Resolve it
+    # up front (before the pipeline) so a bad league fails fast. platform_config feeds only
+    # the draft-state poll + name lookup, never the pipeline, so it needs no rerun of its own.
+    platform_config = (
+        _resolve_platform_config(req.platform, req.platform_config)
+        if req.platform is not None else None
+    )
+    if platform_config is not None:
+        session.platform_config = platform_config
+        session.current_params['team_names'] = list(platform_config.teams_dict.keys())
+
     run_pipeline(session, from_step=req.from_step, csv_bytes=csv_bytes, file_type=file_type_str,
                  uploaded_dfs=uploaded_dfs)
-    # The platform name lookup depends on the player set (info['Positions']), which
-    # only changes on data/injured patches (from_step <= 2). Rebuilt outside
-    # run_pipeline to keep the pipeline platform-agnostic.
-    if req.from_step <= 2:
+    # Rebuild the platform name lookup when either of its inputs changed: the player set
+    # (info['Positions'], on data/injured patches, from_step <= 2) or player_name_column
+    # (when a platform_config was just set). Kept outside run_pipeline so the pipeline stays
+    # platform-agnostic.
+    if session.platform_config is not None and (req.from_step <= 2 or platform_config is not None):
         _refresh_platform_name_lookup(session)
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
 

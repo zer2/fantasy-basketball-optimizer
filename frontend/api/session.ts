@@ -23,6 +23,7 @@ const INDICATOR_LABELS: Record<string, string> = {
     fetching:     'Starting...',
     evaluating:   'Updating...',
     autopiloting: 'Autopiloting...',
+    unconnected:  'Unconnected',
 }
 type IndicatorState = keyof typeof INDICATOR_LABELS
 
@@ -47,8 +48,8 @@ export function applyIndicatorState(
     element.textContent = INDICATOR_LABELS[state]
 }
 
-/** Sets the primary #eval-indicator to fetching, evaluating, or idle.  Suppressed while autopilot is active. */
-export function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating'): void {
+/** Sets the primary #eval-indicator state.  Suppressed while autopilot is active. */
+export function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating' | 'unconnected'): void {
     if (currentIndicatorState === 'autopiloting') return
     currentIndicatorState = state
     applyIndicatorState('eval-indicator', state)

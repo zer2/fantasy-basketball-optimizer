@@ -10,9 +10,10 @@ import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { getAuctionState }     from './data_entry/auction_state.js'
 import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
-import { getLeagueSettings } from './parameter_collection/league_settings.js'
+import { getLeagueSettings, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import { getFullTeamResult, refreshLiveAnalysis } from './api/draft_and_auction_session.js'
+import { setIndicatorState } from './api/session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ function showOwnDataLayout(mode: string): void {
     hide('left-panel')
     hide('season-rosters-row')
     hide('season-trading-row')
+    removeLiveRefreshButton()   // live-only; gone in own-data mode
 
     show('content-row')
     show('eval-indicator')
@@ -120,19 +122,36 @@ function showLiveLayout(): void {
 
     show('seat-selector-container')
 
-    // Live platforms have no manual data-entry grid; a Refresh Analysis button
-    // pulls the current draft/roster state from the platform and re-evaluates.
+    // Live platforms have no manual data-entry grid; a Refresh Analysis button pulls the
+    // current draft/roster state and re-evaluates. It sits in the tab-row beside the seat
+    // selector (left of the status indicator) and is disabled until the platform connection
+    // is established — clicking before then would spin the indicator forever.
+    removeLiveRefreshButton()
     const refreshButton = document.createElement('button')
     refreshButton.type        = 'button'
-    refreshButton.className    = 'section-apply-btn'
+    refreshButton.id          = 'live-refresh-btn'
+    refreshButton.className    = 'section-apply-btn live-refresh-btn'
     refreshButton.textContent  = 'Refresh Analysis'
+    refreshButton.disabled     = !isPlatformConnected()
     refreshButton.addEventListener('click', () => {
+        if (refreshButton.disabled) return
         refreshLiveAnalysis().catch(err => console.error('Refresh analysis failed:', err))
     })
-    rightHeader.append(refreshButton)
+    const tabRow = document.getElementById('tab-row')!
+    tabRow.insertBefore(refreshButton, document.getElementById('eval-indicator'))
+
+    // Until a platform is connected, the status reads "Unconnected" rather than a stale
+    // "Updated"; once connected it returns to the neutral idle state (the default rankings
+    // are still shown the whole time — see showDefaultRankings).
+    setIndicatorState(isPlatformConnected() ? 'idle' : 'unconnected')
 
     show('hscoretable')
     hide('draft-gscore')
+}
+
+/** Removes the live-platform Refresh Analysis button from the tab-row, if present. */
+function removeLiveRefreshButton(): void {
+    document.getElementById('live-refresh-btn')?.remove()
 }
 
 // ─── Season layout ────────────────────────────────────────────────────────────
@@ -143,6 +162,7 @@ function showSeasonLayout(): void {
     hide('left-panel')
     hide('seat-selector-container')
     hide('eval-indicator')
+    removeLiveRefreshButton()   // live draft/auction-only; gone in season mode
 
     // Clear sub-header so the tab bar from draft/auction mode doesn't bleed in
     const rightSubHeader = document.getElementById('right-sub-header')!

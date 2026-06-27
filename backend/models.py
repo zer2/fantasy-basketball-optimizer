@@ -94,6 +94,8 @@ class PatchRequest(BaseModel):
     data_source: Optional[DataSource] = None
     slot_counts: Optional[dict[str, int]] = None
     injured_players: Optional[list[str]] = None
+    platform: Optional[str] = None                            # set when connecting a live platform
+    platform_config: Optional[PlatformConfigRequest] = None   # set when connecting a live platform
 
 
 class PatchResponse(BaseModel):

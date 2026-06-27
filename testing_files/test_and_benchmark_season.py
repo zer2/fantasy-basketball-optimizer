@@ -225,12 +225,11 @@ def test_season_mode_waiver():
     waiver_assignments['Drafter 1']    = [p for p in drafter_1_roster if p != gary_name]
 
     waiver_result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = waiver_assignments
         , my_team_id         = 'Drafter 1'
         , exclusion_list     = []
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
 
     candidates = waiver_result.candidates

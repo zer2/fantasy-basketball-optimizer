@@ -47,12 +47,11 @@ def generate_snake_draft_rosters() -> dict[str, list[str]]:
             drafter_name  = team_names[drafter_index]
 
             result = run_evaluate(
-                session_id         = session_id
+                session            = session
                 , player_assignments = assignments
                 , my_team_id         = drafter_name
                 , exclusion_list     = []
                 , remaining_cash     = None
-                , n_iterations       = n_iterations
             )
             assert result.candidates, f'No candidates returned for {drafter_name} at pick {pick_row + 1}'
             top_player = result.candidates[0].name

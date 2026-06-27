@@ -23,6 +23,15 @@ export type Platform = string
 // delegate to whichever platform is selected.
 let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
 
+// True once a live platform has been connected successfully (Connect succeeded); reset
+// when the platform changes. Gates the live-layout "Refresh Analysis" button.
+let platformConnected = false
+
+/** Whether a live platform connection has been established (Connect succeeded). */
+export function isPlatformConnected(): boolean {
+    return platformConnected
+}
+
 const DRAFTER_METHOD_OPTIONS = ['Manual input', 'H-scoring', 'G-scoring'] as const
 export type DrafterMethod = typeof DRAFTER_METHOD_OPTIONS[number]
 
@@ -74,7 +83,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
         PLATFORM_OPTIONS.map(p => ({ value: p, label: p })),
         pref('platform', 'Enter your own data'),
     )
-    platformSelect.element.addEventListener('change', () => savePref('platform', platformSelect.getValue()))
+    platformSelect.element.addEventListener('change', () => {
+        savePref('platform', platformSelect.getValue())
+        platformConnected = false   // changing platform invalidates the previous connection
+    })
     platformCell.append(platformSelect.element)
     grid.append(platformCell)
 
@@ -254,6 +266,11 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 nPicksInput.value    = String(resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+                platformConnected = true   // enables the live-layout Refresh Analysis button
+                // Patch the session with the platform's config (drives the draft-state poll +
+                // name lookup) and counts. Routed through an event so this module doesn't import
+                // the session layer (which imports this one — would be a cycle).
+                document.dispatchEvent(new Event('platform-connected'))
                 setConnectStatus(`Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`)
             })
             .catch(err => { setConnectStatus(`Connect failed: ${err.message}`) })

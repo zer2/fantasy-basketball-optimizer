@@ -4,7 +4,8 @@
 
 import { PlayerResult } from '../types.js'
 import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat } from '../app_state.js'
-import { getLeagueSettings } from '../parameter_collection/league_settings.js'
+import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/league_settings.js'
+import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { buildTable, showTableMessage } from '../table/player_table.js'
@@ -76,6 +77,20 @@ export async function createOrPatchSession(
         await startFreshSession(signal)
     }
 }
+
+// When a live platform connects, patch the session so it carries the platform's config
+// (which drives the draft-state poll + name lookup) and the platform's drafter/pick counts.
+// No recreate needed — platform_config feeds nothing the pipeline computes. Driven by an
+// event so league_settings doesn't import this module (it imports league_settings — a cycle).
+document.addEventListener('platform-connected', () => {
+    const { platform, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
+    createOrPatchSession(4, {
+        league: { n_drafters, n_picks, cash_per_team },
+        slot_counts: getSlotCounts(),
+        platform,
+        platform_config: getPlatformConfig(),
+    }).catch(err => console.error('Platform connect patch failed:', err))
+})
 
 // ─── Evaluate ────────────────────────────────────────────────────────────────
 
@@ -183,12 +198,46 @@ export async function runEvaluate(): Promise<void> {
  * roster state, stores it as the live player assignments, then re-evaluates.
  * Backs the "Refresh Analysis" button in the live-platform layout.
  */
+/**
+ * Before a live platform is connected, show the base player rankings (everyone vs.
+ * empty teams) so the user still sees default rankings pre-auth. Uses generic teams
+ * for the evaluation, so it doesn't depend on a selected seat.
+ */
+export async function showDefaultRankings(): Promise<void> {
+    // Cancel any in-flight per-seat evaluate and invalidate its generation, so its finally
+    // block can't flip the indicator back to 'idle' after we settle on 'unconnected'.
+    if (evaluateController) evaluateController.abort()
+    evaluateGeneration++
+    setIndicatorState('fetching')
+    try {
+        await withSessionRetry(async () => {
+            const { n_drafters } = getLeagueSettings()
+            const genericTeams = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
+            const emptyAssignments: Record<string, string[]> = Object.fromEntries(
+                genericTeams.map(name => [name, []])
+            )
+            const resp = await evaluate(getSessionId()!, { player_assignments: emptyAssignments, my_team_id: genericTeams[0] })
+            const players = candidatesToPlayerResults(resp.candidates)
+            setBasePlayerResults(players)
+            setCandidatePlayerResults(players)
+        })
+        buildTable(getCandidatePlayerResults()!)
+    } finally {
+        setIndicatorState('unconnected')
+    }
+}
+
 export async function refreshLiveAnalysis(): Promise<void> {
     setIndicatorState('fetching')
-    await withSessionRetry(async () => {
-        const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
-        const state = await fetchDraftState(getSessionId()!, mode)
-        setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
-    })
-    await runEvaluate()
+    try {
+        await withSessionRetry(async () => {
+            const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+            const state = await fetchDraftState(getSessionId()!, mode)
+            setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
+        })
+        await runEvaluate()
+    } catch (err) {
+        setIndicatorState('idle')   // never leave the spinner stuck on a failed poll
+        throw err
+    }
 }
