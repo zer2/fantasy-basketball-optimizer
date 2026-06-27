@@ -214,12 +214,11 @@ def test_evaluate_empty_board(session_for_format):
     start    = time.perf_counter()
     result   = profiler.runcall(
         run_evaluate
-        , session_id         = session_id
+        , session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 1'
         , exclusion_list     = []
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
     evaluate_seconds = time.perf_counter() - start
 
@@ -281,12 +280,11 @@ def test_evaluate_mid_draft(session_for_format):
 
     start  = time.perf_counter()
     result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 1'
         , exclusion_list     = team_one_picks
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
     evaluate_seconds = time.perf_counter() - start
 
@@ -334,12 +332,11 @@ def test_evaluate_first_round(session_for_first_round):
 
     start  = time.perf_counter()
     result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 5'
         , exclusion_list     = []
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
     evaluate_seconds = time.perf_counter() - start
 
@@ -383,12 +380,11 @@ def test_evaluate_two_category_roto():
     player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
 
     result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 12'
         , exclusion_list     = []
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
 
     candidates = result.candidates
@@ -430,12 +426,11 @@ def test_evaluate_twenty_five_drafters():
     n_iterations = session.current_params['n_iterations']
 
     result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
         , my_team_id         = 'Team 1'
         , exclusion_list     = []
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
 
     candidates = result.candidates
@@ -477,12 +472,11 @@ def test_evaluate_three_drafters():
     n_iterations = session.current_params['n_iterations']
 
     result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
         , my_team_id         = 'Team 1'
         , exclusion_list     = []
         , remaining_cash     = None
-        , n_iterations       = n_iterations
     )
 
     candidates = result.candidates

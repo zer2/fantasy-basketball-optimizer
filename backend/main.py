@@ -4,6 +4,7 @@ FastAPI application — Fantasy Basketball Optimizer backend.
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 import threading
@@ -26,9 +27,21 @@ from backend.models import (
     EvaluateRequest, EvaluateResponse,
     TradeAnalyzeRequest, TradeAnalyzeResponse,
     TradeSuggestRequest, TradeSuggestResponse,
+    DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
+    LeaguesResponse, YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
+    PlatformConfigRequest,
 )
 from backend.evaluate import run_evaluate
 from backend.math.trading import run_trade_analyze, run_trade_suggest
+from backend.platform_integration.registry import get_integration, is_live_platform
+from backend.platform_integration.base import PlatformConfig
+from backend.platform_integration.helpers import build_platform_name_lookup
+from backend.platform_integration.credential_store import (
+    yahoo_auth_dir, has_yahoo_credentials,
+    store_espn_credentials, get_espn_credentials, has_espn_credentials,
+)
+from backend.platform_integration.integrations.yahoo import YahooIntegration
+from backend.data_retrieval import get_player_mapping_view
 
 
 # ── Upload store ──────────────────────────────────────────────────────────────
@@ -111,6 +124,55 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
         'blend_weights':    req.data_source.blend_weights,
         'custom_data_ids':  req.data_source.custom_data_ids,
     }
+
+
+def _resolve_platform_config(
+    platform: str
+    , platform_config_request: Optional[PlatformConfigRequest]
+) -> Optional[PlatformConfig]:
+    """For a live platform, fetch the league shape and build a PlatformConfig to
+    store on the session. Returns None for 'Enter your own data'. Shared by the
+    create and patch routes (connecting a platform patches this onto the session)."""
+    if not is_live_platform(platform):
+        return None
+    if platform_config_request is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f'platform_config is required for platform {platform!r}.',
+        )
+    client_id = platform_config_request.client_id
+    integration = get_integration(platform, _credentials_for(platform, client_id))
+    try:
+        shape = integration.fetch_league_shape(
+            platform_config_request.league_id,
+            platform_config_request.division_id,
+        )
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return PlatformConfig(
+        platform           = platform,
+        league_id          = platform_config_request.league_id,
+        division_id        = platform_config_request.division_id,
+        teams_dict         = shape.teams_dict,
+        player_name_column = integration.player_name_column,
+        client_id          = client_id,
+    )
+
+
+def _refresh_platform_name_lookup(session) -> None:
+    """Rebuild the session's platform name lookup from its current info.
+
+    Lives here, not in run_pipeline, so the pipeline stays platform-agnostic. Call
+    after the pipeline runs when the player set may have changed (session creation
+    and data/injured patches, i.e. from_step <= 2); model/category/slot patches
+    leave info['Positions'] untouched.
+    """
+    config = session.platform_config
+    if config is None:
+        return
+    session.platform_name_lookup = build_platform_name_lookup(
+        session.info, config.player_name_column, get_player_mapping_view(),
+    )
 
 
 def _resolve_csv(
@@ -278,12 +340,20 @@ def create_session_route(req: SessionRequest):
     elif source_type == 'projections':
         uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
+    # Resolve any live-platform connection up front so a bad league fails before
+    # the expensive pipeline runs.
+    platform_config = _resolve_platform_config(req.platform, req.platform_config)
+
     session = create_session()
     session.current_params = _build_current_params(req, all_params)
+    if platform_config is not None:
+        session.platform_config = platform_config
+        session.current_params['team_names'] = list(platform_config.teams_dict.keys())
 
     try:
         run_pipeline(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type_str,
                      uploaded_dfs=uploaded_dfs)
+        _refresh_platform_name_lookup(session)   # no-op unless a live platform is connected
     except Exception as exc:
         delete_session(session.id)
         raise HTTPException(status_code=500, detail=traceback.format_exc())
@@ -355,8 +425,26 @@ def patch_session_route(session_id: str, req: PatchRequest):
                 uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
     session.current_params.update(patch)
+
+    # Connecting/switching a live platform patches its config onto the session. Resolve it
+    # up front (before the pipeline) so a bad league fails fast. platform_config feeds only
+    # the draft-state poll + name lookup, never the pipeline, so it needs no rerun of its own.
+    platform_config = (
+        _resolve_platform_config(req.platform, req.platform_config)
+        if req.platform is not None else None
+    )
+    if platform_config is not None:
+        session.platform_config = platform_config
+        session.current_params['team_names'] = list(platform_config.teams_dict.keys())
+
     run_pipeline(session, from_step=req.from_step, csv_bytes=csv_bytes, file_type=file_type_str,
                  uploaded_dfs=uploaded_dfs)
+    # Rebuild the platform name lookup when either of its inputs changed: the player set
+    # (info['Positions'], on data/injured patches, from_step <= 2) or player_name_column
+    # (when a platform_config was just set). Kept outside run_pipeline so the pipeline stays
+    # platform-agnostic.
+    if session.platform_config is not None and (req.from_step <= 2 or platform_config is not None):
+        _refresh_platform_name_lookup(session)
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
 
 
@@ -463,6 +551,144 @@ def delete_session_route(session_id: str):
     if not found:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Platform integration (live: ESPN / Yahoo / Fantrax) ──────────────────────
+# The {platform} path segment is the exact platform label the frontend sends
+# (e.g. 'Retrieve from Fantrax'), URL-encoded; it is resolved via the registry.
+
+def _credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
+    """Build the credentials an integration needs, or None. Yahoo needs a persisted OAuth
+    token directory keyed by client_id; an unauthenticated client_id fails noisily."""
+    if platform == 'Retrieve from Yahoo' and client_id:
+        if not has_yahoo_credentials(client_id):
+            raise HTTPException(status_code=401, detail='Not authenticated with Yahoo; complete the auth flow first.')
+        return {'auth_dir': yahoo_auth_dir(client_id)}
+    if platform == 'Retrieve from ESPN' and client_id:
+        if not has_espn_credentials(client_id):
+            raise HTTPException(status_code=401, detail='Not authenticated with ESPN; save your s2/SWID cookies first.')
+        return get_espn_credentials(client_id)   # {'s2': ..., 'swid': ...} -> spread into ESPNIntegration
+    return None
+
+
+def _yahoo_app_credentials() -> tuple[str, str]:
+    """The Yahoo *app* (developer) client id/secret, from the environment."""
+    client_id = os.environ.get('YAHOO_CLIENT_ID')
+    client_secret = os.environ.get('YAHOO_CLIENT_SECRET')
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail='YAHOO_CLIENT_ID / YAHOO_CLIENT_SECRET are not configured.')
+    return client_id, client_secret
+
+
+def _resolve_live_integration(platform: str, client_id: Optional[str] = None):
+    """Resolve a live integration, configured with credentials when the platform needs them
+    (Yahoo). client_id=None gives an unauthenticated instance — fine for Fantrax and for Yahoo
+    calls that don't hit the API (list_divisions)."""
+    if not is_live_platform(platform):
+        raise HTTPException(status_code=400, detail=f'No live integration for platform {platform!r}.')
+    return get_integration(platform, _credentials_for(platform, client_id))
+
+
+@app.get('/platforms/yahoo/auth-url', response_model=YahooAuthUrlResponse)
+def yahoo_auth_url_route():
+    client_id, _ = _yahoo_app_credentials()
+    return YahooAuthUrlResponse(auth_url=YahooIntegration.build_auth_url(client_id))
+
+
+@app.post('/platforms/yahoo/token', status_code=status.HTTP_204_NO_CONTENT)
+def yahoo_token_route(req: YahooTokenRequest):
+    client_id, client_secret = _yahoo_app_credentials()
+    try:
+        YahooIntegration.exchange_auth_code(
+            client_id, client_secret, req.auth_code, yahoo_auth_dir(req.client_id),
+        )
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post('/platforms/espn/credentials', status_code=status.HTTP_204_NO_CONTENT)
+def espn_credentials_route(req: EspnCredentialsRequest):
+    # SWID is stored with braces stripped (as the Streamlit integration did).
+    swid = req.swid.replace('{', '').replace('}', '')
+    store_espn_credentials(req.client_id, req.s2, swid)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get('/platforms/{platform}/leagues', response_model=LeaguesResponse)
+def get_platform_leagues_route(platform: str, client_id: Optional[str] = None):
+    integration = _resolve_live_integration(platform, client_id)
+    try:
+        leagues = integration.list_leagues()
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return LeaguesResponse(leagues=leagues)
+
+
+@app.get('/platforms/{platform}/divisions', response_model=DivisionsResponse)
+def get_platform_divisions_route(platform: str, league_id: str):
+    integration = _resolve_live_integration(platform)
+    try:
+        divisions = integration.list_divisions(league_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return DivisionsResponse(divisions=divisions)
+
+
+@app.post('/platforms/{platform}/connect', response_model=ConnectResponse)
+def connect_platform_route(platform: str, req: ConnectRequest):
+    integration = _resolve_live_integration(platform, req.client_id)
+    try:
+        shape = integration.fetch_league_shape(req.league_id, req.division_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return ConnectResponse(
+        team_names      = shape.team_names,
+        n_drafters      = shape.n_drafters,
+        n_picks         = shape.n_picks,
+        available_modes = integration.available_modes,
+    )
+
+
+@app.get('/sessions/{session_id}/draft-state', response_model=DraftStateResponse)
+def get_draft_state_route(session_id: str, mode: str):
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found or expired.')
+    config = session.platform_config
+    if config is None:
+        raise HTTPException(status_code=400, detail='Session is not connected to a live platform.')
+    integration = get_integration(config.platform, _credentials_for(config.platform, config.client_id))
+    # The lookup is built at session creation / data patches; rebuild defensively if
+    # somehow absent so the poll never maps every player to 'RP'.
+    if session.platform_name_lookup is None:
+        _refresh_platform_name_lookup(session)
+    try:
+        if mode == 'Auction Mode':
+            selections = integration.get_auction_results(config, mode, session.platform_name_lookup)
+            if selections is None:
+                raise HTTPException(status_code=400, detail=f'{config.platform} does not support auctions.')
+        else:
+            selections = integration.get_draft_results(config, mode, session.platform_name_lookup)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail=traceback.format_exc())
+
+    # Auction selections carry per-player costs; turn them into per-team remaining cash.
+    remaining_cash = None
+    if selections.costs is not None:
+        cash_per_team = session.current_params['cash_per_team']
+        remaining_cash = {
+            team: cash_per_team - sum(team_costs)
+            for team, team_costs in selections.costs.items()
+        }
+    return DraftStateResponse(
+        player_assignments = selections.player_assignments,
+        injured_players    = selections.injured_players,
+        status             = selections.status,
+        remaining_cash     = remaining_cash,
+    )
 
 
 # ── Static frontend ────────────────────────────────────────────────────────────

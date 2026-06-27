@@ -134,6 +134,34 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     color: light-dark(black, white);
 }
 
+/* Disabled (e.g. live Refresh Analysis before a platform is connected): greyed, inert. */
+.section-apply-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.section-apply-btn:disabled:hover {
+    background: light-dark(#efefef, #2a2a3e);
+    color: light-dark(#555555, #aaaacc);
+}
+
+/* Inline variant for the live-platform Refresh Analysis button (sits in the tab-row,
+   beside the seat selector). Matches the seat-select box's height/weight (min-height +
+   0.8rem font, inherited border/radius), but is longer. */
+.live-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 220px;
+    min-height: 28px;
+    margin-top: 0;
+    margin-left: 10px;
+    padding: 4px 16px;
+    white-space: nowrap;
+}
+
 .sidebar-title {
     color: light-dark(#333333, lightgrey);
     font-family: "Source Sans 3";
@@ -1130,6 +1158,14 @@ tr {
     min-width: 0;
 }
 
+/* The seat-selector-wrap carries a bottom margin (for other layouts); inside #tab-row that
+   margin pushes the Select-team box's visual center above the Refresh Analysis button and the
+   eval indicator (flex align-items: center counts margins in the item's outer box). Zero it
+   in this context so the row's controls line up. */
+#seat-selector-container .seat-selector-wrap {
+    margin-bottom: 0;
+}
+
 #right-sub-header {
     margin-left: auto;
 }
@@ -1401,14 +1437,7 @@ tr {
         overflow-x: auto;
         overflow-y: hidden;
     }
-    /* Remove the seat-selector-wrap's bottom margin in tab-row context — it
-       was added for the season rosters layout but in #tab-row it pushes the
-       Select-team box's visual center upward relative to the eval indicator
-       and "Show candidates" buttons (flex align-items: center counts margins
-       in the item's outer box). */
-    #seat-selector-container .seat-selector-wrap {
-        margin-bottom: 0;
-    }
+    /* (seat-selector-wrap bottom-margin is zeroed in the base #tab-row rules, all widths.) */
     /* Single source of truth for the mobile main-column edges. Left padding
        stays at 4px so content isn't flush against the viewport edge; right
        padding is 0 so the auction board / candidate table extend all the way
@@ -1593,6 +1622,9 @@ tr {
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;
 }
+
+/* 'unconnected' needs no rule: it falls back to the base indicator (muted text, no
+   visible dot) — same as the idle 'Updated' state. */
 
 @keyframes eval-spin {
     to { transform: rotate(360deg); }

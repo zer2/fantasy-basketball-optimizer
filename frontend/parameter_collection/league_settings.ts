@@ -6,17 +6,31 @@ import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
+import { connectPlatform } from '../api/client.js'
+import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
+import { PlatformConnector } from '../platforms/connector.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
 
-const PLATFORM_OPTIONS = [
-    'Enter your own data',
-    'Retrieve from Yahoo',
-    'Retrieve from Fantrax',
-    'Retrieve from ESPN',
-] as const
-export type Platform = typeof PLATFORM_OPTIONS[number]
+// Own-data plus every platform we have a connector for. Deriving the live options from
+// the connector registry means the dropdown can't offer a platform the frontend can't
+// connect (main.ts asserts these match the backend's /platforms).
+const PLATFORM_OPTIONS = ['Enter your own data', ...connectorPlatforms()]
+export type Platform = string
+
+// The active connectors, keyed by platform, so the module-level getPlatformConfig() can
+// delegate to whichever platform is selected.
+let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
+
+// True once a live platform has been connected successfully (Connect succeeded); reset
+// when the platform changes. Gates the live-layout "Refresh Analysis" button.
+let platformConnected = false
+
+/** Whether a live platform connection has been established (Connect succeeded). */
+export function isPlatformConnected(): boolean {
+    return platformConnected
+}
 
 const DRAFTER_METHOD_OPTIONS = ['Manual input', 'H-scoring', 'G-scoring'] as const
 export type DrafterMethod = typeof DRAFTER_METHOD_OPTIONS[number]
@@ -69,7 +83,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
         PLATFORM_OPTIONS.map(p => ({ value: p, label: p })),
         pref('platform', 'Enter your own data'),
     )
-    platformSelect.element.addEventListener('change', () => savePref('platform', platformSelect.getValue()))
+    platformSelect.element.addEventListener('change', () => {
+        savePref('platform', platformSelect.getValue())
+        platformConnected = false   // changing platform invalidates the previous connection
+    })
     platformCell.append(platformSelect.element)
     grid.append(platformCell)
 
@@ -191,6 +208,74 @@ export function renderLeagueSettings(container: HTMLElement): void {
         if (!isNaN(nDrafters) && nDrafters > 0) rebuildTeamNameRows(true)
     })
 
+    // ── Live-platform connect (shown only when a live platform is selected) ───
+    const connectCell = makeCell('ls-cell-full')
+    connectCell.id = 'ls-connect-cell'
+
+    const connectStatus = document.createElement('div')
+    connectStatus.id        = 'ls-connect-status'
+    connectStatus.className = 'pick-control-label'
+    const setConnectStatus = (message: string): void => { connectStatus.textContent = message }
+
+    // Each platform's connect/auth controls live in its own connector module. Build them
+    // all once, append them, and show the active one — no per-platform branching here.
+    const connectors = makeConnectors(setConnectStatus)
+    connectorsByPlatform = new Map(connectors.map(connector => [connector.platform, connector]))
+    for (const connector of connectors) {
+        connector.element.style.display = 'none'
+        connectCell.append(connector.element)
+    }
+
+    const connectButton = document.createElement('button')
+    connectButton.type        = 'button'
+    connectButton.id          = 'ls-connect-btn'
+    connectButton.className   = 'section-apply-btn'
+    connectButton.textContent = 'Connect'
+    connectCell.append(connectButton)
+    connectCell.append(connectStatus)
+    container.append(connectCell)
+
+    /** Show only the selected platform's connector controls. */
+    function refreshConnectControls(): void {
+        const platform = platformSelect.getValue()
+        for (const connector of connectors) {
+            connector.element.style.display = connector.platform === platform ? '' : 'none'
+        }
+    }
+
+    connectButton.addEventListener('click', () => {
+        const connector = connectorsByPlatform.get(platformSelect.getValue())
+        if (!connector) return
+        const selection = connector.getSelection()
+        if (selection === null) {
+            setConnectStatus('Select or enter a league first.')
+            return
+        }
+        setConnectStatus('Connecting...')
+        connectPlatform(connector.platform, selection.league_id, selection.division_id, selection.client_id)
+            .then(resp => {
+                // Restrict the mode selector to what this platform supports.
+                modeSelect.setOptions(resp.available_modes.map(m => ({ value: m, label: m })))
+                if (!resp.available_modes.includes(modeSelect.getValue())) {
+                    modeSelect.setValue(resp.available_modes[0])
+                }
+                // Set n_drafters / n_picks directly — NOT via a change event, which
+                // would reset the team-name rows — and drive the seat selector via
+                // the hidden textarea's input event (main.ts repopulates it).
+                nDraftersInput.value = String(resp.n_drafters)
+                nPicksInput.value    = String(resp.n_picks)
+                hiddenNamesTextarea.value = resp.team_names.join('\n')
+                hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+                platformConnected = true   // enables the live-layout Refresh Analysis button
+                // Patch the session with the platform's config (drives the draft-state poll +
+                // name lookup) and counts. Routed through an event so this module doesn't import
+                // the session layer (which imports this one — would be a cycle).
+                document.dispatchEvent(new Event('platform-connected'))
+                setConnectStatus(`Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`)
+            })
+            .catch(err => { setConnectStatus(`Connect failed: ${err.message}`) })
+    })
+
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
     function updateVisibility(): void {
         const isOwnData = platformSelect.getValue() === 'Enter your own data'
@@ -198,6 +283,8 @@ export function renderLeagueSettings(container: HTMLElement): void {
         cashCell.style.display       = mode === 'Auction Mode' ? '' : 'none'
         trrToggle.style.display      = isOwnData && mode === 'Draft Mode' ? '' : 'none'
         teamNamesWrap.style.display  = isOwnData ? '' : 'none'
+        connectCell.style.display    = isOwnData ? 'none' : ''
+        refreshConnectControls()
         if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
 
         // Show drafter mode dropdowns only in Draft Mode + own data
@@ -258,6 +345,15 @@ export function getLeagueSettings(): {
         team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
                                   .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
     }
+}
+
+/**
+ * Returns the live-platform connection for the session request, or null for
+ * 'Enter your own data' (or a live platform with no league ID entered yet).
+ */
+export function getPlatformConfig(): { league_id: string; division_id?: string | null; client_id?: string | null } | null {
+    const platform = (document.getElementById('ls-platform') as HTMLInputElement).value
+    return connectorsByPlatform.get(platform)?.getSelection() ?? null
 }
 
 /** Creates a grid cell `<div>` that stacks its label and input vertically. */

@@ -22,6 +22,8 @@ from typing import Optional
 
 import pandas as pd
 
+from backend.platform_integration.base import PlatformConfig
+
 
 # ── Position config ───────────────────────────────────────────────────────────
 
@@ -87,6 +89,15 @@ class Session:
     # Used for gnrc_dollar / orig_dollar auction values.
     # Invalidated whenever run_step5 rebuilds the HAgent.
     generic_h_scores: Optional[object] = None  # pd.Series when populated
+
+    # Live-platform connection (None for 'Enter your own data'). Set during session
+    # creation when a live platform is selected; used by the draft-state poll.
+    platform_config: Optional[PlatformConfig] = None
+
+    # {platform player name -> canonical 'Name (POS)'} lookup, rebuilt from info
+    # whenever the data changes (see _refresh_platform_name_lookup). None until a
+    # live platform is connected.
+    platform_name_lookup: Optional[dict[str, str]] = None
 
 
 _store: dict[str, Session] = {}

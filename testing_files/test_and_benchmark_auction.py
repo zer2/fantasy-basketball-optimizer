@@ -35,12 +35,11 @@ def test_evaluate_auction():
     # session.generic_h_scores is populated from the neutral (full-cash) state,
     # then evaluate with the actual assignments.
     run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = {name: [] for name in team_names}
         , my_team_id         = 'Drafter 1'
         , exclusion_list     = []
         , remaining_cash     = full_cash
-        , n_iterations       = n_iterations
     )
 
     player_assignments = {name: [] for name in team_names}
@@ -52,12 +51,11 @@ def test_evaluate_auction():
     remaining_cash['Drafter 2'] = 150.0
 
     result = run_evaluate(
-        session_id         = session_id
+        session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Drafter 1'
         , exclusion_list     = ['Giannis Antetokounmpo (C,PF)']
         , remaining_cash     = remaining_cash
-        , n_iterations       = n_iterations
     )
 
     candidates = result.candidates

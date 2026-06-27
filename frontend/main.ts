@@ -6,8 +6,8 @@
 import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
 import { makeDebouncer } from './api/session.js'
 import { setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
-import { createOrPatchSession, runEvaluate, clearFullTeamResult } from './api/draft_and_auction_session.js'
-import { runSeasonInit } from './api/season_session.js'
+import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings } from './api/draft_and_auction_session.js'
+import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTableHeader } from './table/player_table.js'
 import { applyLayout } from './layout.js'
@@ -17,7 +17,7 @@ import { makeCustomSelect } from './custom_select.js'
 import { pref, savePref } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
 
-import { renderLeagueSettings, getLeagueSettings, getTeamNames } from './parameter_collection/league_settings.js'
+import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams, waitForInitialSeasons } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
@@ -26,8 +26,13 @@ import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCount
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
 // depending on the current mode selector value.
 function runModeEval(): Promise<void> {
-    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
-    return mode === 'Season Mode' ? runSeasonInit() : runEvaluate()
+    const { platform, mode } = getLeagueSettings()
+    if (mode === 'Season Mode') return runSeasonInit()
+    // A live platform that isn't connected yet has no draft state to evaluate, and a normal
+    // evaluate would throw (then its finally would flip the indicator to 'Updated'). Show the
+    // base ("default") rankings instead, which leaves the indicator on 'Unconnected'.
+    if (platform !== 'Enter your own data' && !isPlatformConnected()) return showDefaultRankings()
+    return runEvaluate()
 }
 
 // ─── Async init: fetch config, then build sidebar ────────────────────────────
@@ -109,6 +114,48 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 })
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', applyLayout)
 document.getElementById('ls-platform')!.parentElement!.addEventListener('change', applyLayout)
+
+// Season Mode + live platform: pull the platform's rosters into the grid when the user
+// switches into that state (via either the mode or the platform dropdown). The poll is
+// async, so we re-applyLayout once it lands; renderSeasonRosters reads the cache. Leaving
+// that state clears the cache so the grid reverts to defaults.
+function refreshSeasonRostersIfLive(): void {
+    const { platform, mode } = getLeagueSettings()
+    if (mode === 'Season Mode' && platform !== 'Enter your own data') {
+        refreshSeasonRostersFromPlatform()
+            .then(() => applyLayout())
+            .catch(err => console.error('Season roster refresh failed:', err))
+    } else {
+        clearLivePlatformRosters()
+    }
+}
+document.getElementById('ls-mode')!.parentElement!.addEventListener('change', refreshSeasonRostersIfLive)
+document.getElementById('ls-platform')!.parentElement!.addEventListener('change', refreshSeasonRostersIfLive)
+
+// On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
+// for the new data source. Mode switches don't change the data source, so they're handled by
+// the mode-change listener above (via runModeEval) and intentionally don't trigger this.
+//   - Unconnected live   -> empty the seat, show base rankings, leave the indicator 'Unconnected'.
+//   - Own data / connected -> seat from team names, run the normal evaluate (which renders
+//     results and moves the indicator off 'Unconnected').
+function syncForPlatformSwitch(): void {
+    const { platform, mode } = getLeagueSettings()
+    if (mode === 'Season Mode') return   // season handled by refreshSeasonRostersIfLive
+    if (platform !== 'Enter your own data' && !isPlatformConnected()) {
+        setCurrentSeat(null)
+        seatSelect.setOptions([])
+        showDefaultRankings().catch(err => console.error('Default rankings failed:', err))
+    } else {
+        const names = getTeamNames()
+        seatSelect.setOptions(names.map(name => ({ value: name, label: name })), getCurrentSeat() ?? names[0])
+        if (getCurrentSeat() === null && names.length > 0) setCurrentSeat(names[0])
+        buildTableHeader()
+        runModeEval()
+            .then(() => applyLayout())
+            .catch(err => console.error('Platform-switch evaluate failed:', err))
+    }
+}
+document.getElementById('ls-platform')!.parentElement!.addEventListener('change', syncForPlatformSwitch)
 
 // Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
 // AbortController cancels stale calls if the user changes multiple fields quickly.

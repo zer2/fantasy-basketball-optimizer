@@ -9,7 +9,7 @@ import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
-import { evaluateTeamHScore } from '../../api/season_session.js'
+import { evaluateTeamHScore, getLivePlatformRosters } from '../../api/season_session.js'
 
 // Tracks the change-event listeners attached by the most recent render so they
 // can be removed before the next one. Without this, calling renderSeasonRosters
@@ -36,6 +36,11 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
     const playerNames = playerResults.map(p => p.name)
+
+    // Live platform → prefill the grid from the platform's rosters (blank until the
+    // async poll populates the cache); own data → the hardcoded defaults.
+    const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
+    const platformRosters = isLivePlatform ? getLivePlatformRosters() : null
 
     leftEl.innerHTML  = ''
     rightEl.innerHTML = ''
@@ -83,7 +88,9 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
               , true
               , rosterListenerController.signal
             )
-            const prefill = DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
+            const prefill = isLivePlatform
+                ? platformRosters?.[teamNames[d]]?.[r]
+                : DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
             if (prefill) sel.setValue(prefill)
             cell.append(sel.element)
             rowSelects.push(sel)

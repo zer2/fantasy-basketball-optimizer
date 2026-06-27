@@ -52,5 +52,9 @@ docs/_build/
 # Streamlit secrets
 .streamlit/secrets.toml
 
+# Persisted platform OAuth credentials (per-client token dirs)
+.platform_credentials/
+
 # Claude 
 claude.md
+.claude

@@ -46,6 +46,12 @@ class DataSource(BaseModel):
     custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'projections'
 
 
+class PlatformConfigRequest(BaseModel):
+    league_id: str
+    division_id: Optional[str] = None
+    client_id: Optional[str] = None   # auth platforms: identifies the persisted credentials
+
+
 class SessionRequest(BaseModel):
     league: LeagueSettings
     platform: str = 'Enter your own data'
@@ -54,6 +60,7 @@ class SessionRequest(BaseModel):
     data_source: DataSource
     injured_players: list[str] = []
     my_team_id: Optional[str] = None
+    platform_config: Optional[PlatformConfigRequest] = None   # live platforms only
 
 
 class PlayerGScore(BaseModel):
@@ -87,6 +94,8 @@ class PatchRequest(BaseModel):
     data_source: Optional[DataSource] = None
     slot_counts: Optional[dict[str, int]] = None
     injured_players: Optional[list[str]] = None
+    platform: Optional[str] = None                            # set when connecting a live platform
+    platform_config: Optional[PlatformConfigRequest] = None   # set when connecting a live platform
 
 
 class PatchResponse(BaseModel):
@@ -217,3 +226,52 @@ class TradeSuggestion(BaseModel):
 
 class TradeSuggestResponse(BaseModel):
     suggestions: list[TradeSuggestion]
+
+
+# ── /platforms/* (live platform integration) ─────────────────────────────────
+
+class DivisionsResponse(BaseModel):
+    divisions: list[dict]            # [{name, id}]; empty when the league has none
+
+
+class LeaguesResponse(BaseModel):
+    leagues: list[dict]              # [{id, name, season}]; empty for manual-id platforms (Fantrax)
+
+
+class ConnectRequest(BaseModel):
+    league_id: str
+    division_id: Optional[str] = None
+    client_id: Optional[str] = None   # auth platforms: identifies the persisted credentials
+
+
+class ConnectResponse(BaseModel):
+    team_names: list[str]
+    n_drafters: int
+    n_picks: int
+    available_modes: list[str]
+
+
+class DraftStateResponse(BaseModel):
+    player_assignments: dict[str, list[str]]
+    injured_players: list[str]
+    status: str
+    remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
+
+
+# Yahoo OAuth (manual code-paste flow)
+
+class YahooAuthUrlResponse(BaseModel):
+    auth_url: str
+
+
+class YahooTokenRequest(BaseModel):
+    client_id: str
+    auth_code: str
+
+
+# ESPN auth (s2 + SWID cookies)
+
+class EspnCredentialsRequest(BaseModel):
+    client_id: str
+    s2: str
+    swid: str

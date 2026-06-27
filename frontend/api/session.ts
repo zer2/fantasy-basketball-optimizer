@@ -4,7 +4,7 @@
 
 import { SessionRequest } from '../types.js'
 import { setGScores } from '../app_state.js'
-import { getLeagueSettings } from '../parameter_collection/league_settings.js'
+import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/league_settings.js'
 import { getScoringFormat, getSelectedCategories, syncCategoriesFromBackend } from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
@@ -23,6 +23,7 @@ const INDICATOR_LABELS: Record<string, string> = {
     fetching:     'Starting...',
     evaluating:   'Updating...',
     autopiloting: 'Autopiloting...',
+    unconnected:  'Unconnected',
 }
 type IndicatorState = keyof typeof INDICATOR_LABELS
 
@@ -47,8 +48,8 @@ export function applyIndicatorState(
     element.textContent = INDICATOR_LABELS[state]
 }
 
-/** Sets the primary #eval-indicator to fetching, evaluating, or idle.  Suppressed while autopilot is active. */
-export function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating'): void {
+/** Sets the primary #eval-indicator state.  Suppressed while autopilot is active. */
+export function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating' | 'unconnected'): void {
     if (currentIndicatorState === 'autopiloting') return
     currentIndicatorState = state
     applyIndicatorState('eval-indicator', state)
@@ -87,6 +88,8 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
         data_source,
         injured_players,
     }
+    const platformConfig = getPlatformConfig()
+    if (platformConfig) req.platform_config = platformConfig
     const resp = await createSession(req, signal)
     sessionId = resp.session_id
     syncCategoriesFromBackend(resp.categories)

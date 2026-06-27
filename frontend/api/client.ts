@@ -40,6 +40,7 @@ async function jsonRequest<T>(
         const body = await res.text()
         throw new HTTPError(res.status, body, label)
     }
+    if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
     return res.json() as Promise<T>
 }
 
@@ -247,4 +248,109 @@ export async function suggestTrades(
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
     })
+}
+
+// ── Platform integration (live: ESPN / Yahoo / Fantrax) ───────────────────────
+// `platform` is the exact label from PLATFORM_OPTIONS (e.g. 'Retrieve from Fantrax').
+
+export interface PlatformDivision {
+    name: string
+    id: string
+}
+
+export interface PlatformConnectResponse {
+    team_names: string[]
+    n_drafters: number
+    n_picks: number
+    available_modes: string[]
+}
+
+export interface DraftStateResponse {
+    player_assignments: Record<string, string[]>
+    injured_players: string[]
+    status: string
+    remaining_cash?: Record<string, number>   // Auction Mode only
+}
+
+export interface PlatformLeague {
+    id: string
+    name: string
+    season?: number
+}
+
+/** Lists a platform league's divisions (empty when the league has none). */
+export async function fetchDivisions(
+    platform: string
+    , leagueId: string
+): Promise<PlatformDivision[]> {
+    const data = await jsonRequest<{ divisions: PlatformDivision[] }>(
+        `${BASE_URL}/platforms/${encodeURIComponent(platform)}/divisions?league_id=${encodeURIComponent(leagueId)}`
+        , 'Platform divisions'
+    )
+    return data.divisions
+}
+
+/** Lists the user's leagues for an auth-based platform (empty for manual-id platforms). */
+export async function fetchLeagues(
+    platform: string
+    , clientId: string
+): Promise<PlatformLeague[]> {
+    const data = await jsonRequest<{ leagues: PlatformLeague[] }>(
+        `${BASE_URL}/platforms/${encodeURIComponent(platform)}/leagues?client_id=${encodeURIComponent(clientId)}`
+        , 'Platform leagues'
+    )
+    return data.leagues
+}
+
+/** Returns the Yahoo OAuth authorization URL for the user to visit. */
+export async function fetchYahooAuthUrl(): Promise<string> {
+    const data = await jsonRequest<{ auth_url: string }>(`${BASE_URL}/platforms/yahoo/auth-url`, 'Yahoo auth URL')
+    return data.auth_url
+}
+
+/** Exchanges a pasted Yahoo authorization code for tokens, persisted under clientId. */
+export async function submitYahooToken(clientId: string, authCode: string): Promise<void> {
+    await jsonRequest<void>(`${BASE_URL}/platforms/yahoo/token`, 'Yahoo token', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ client_id: clientId, auth_code: authCode }),
+    })
+}
+
+/** Persists the user's ESPN s2 + SWID cookies under clientId. */
+export async function submitEspnCredentials(clientId: string, s2: string, swid: string): Promise<void> {
+    await jsonRequest<void>(`${BASE_URL}/platforms/espn/credentials`, 'ESPN credentials', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ client_id: clientId, s2, swid }),
+    })
+}
+
+/** Connects to a platform league and returns its team/shape metadata. */
+export async function connectPlatform(
+    platform: string
+    , leagueId: string
+    , divisionId: string | null
+    , clientId: string | null
+): Promise<PlatformConnectResponse> {
+    return jsonRequest(
+        `${BASE_URL}/platforms/${encodeURIComponent(platform)}/connect`
+        , 'Platform connect'
+        , {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ league_id: leagueId, division_id: divisionId, client_id: clientId }),
+        }
+    )
+}
+
+/** Polls the current draft/roster state from the connected platform. */
+export async function fetchDraftState(
+    sessionId: string
+    , mode: string
+): Promise<DraftStateResponse> {
+    return jsonRequest(
+        `${BASE_URL}/sessions/${sessionId}/draft-state?mode=${encodeURIComponent(mode)}`
+        , 'Draft state'
+    )
 }
