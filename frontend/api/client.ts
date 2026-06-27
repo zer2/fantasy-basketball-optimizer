@@ -317,6 +317,15 @@ export async function submitYahooToken(clientId: string, authCode: string): Prom
     })
 }
 
+/** Persists the user's ESPN s2 + SWID cookies under clientId. */
+export async function submitEspnCredentials(clientId: string, s2: string, swid: string): Promise<void> {
+    await jsonRequest<void>(`${BASE_URL}/platforms/espn/credentials`, 'ESPN credentials', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ client_id: clientId, s2, swid }),
+    })
+}
+
 /** Connects to a platform league and returns its team/shape metadata. */
 export async function connectPlatform(
     platform: string

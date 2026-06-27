@@ -6,8 +6,36 @@
 import { setCandidatePlayerResults, setPlayerResultsFromGScores } from '../app_state.js'
 import { buildTable } from '../table/player_table.js'
 import { ensureSession, getSessionId, setIndicatorState, applyIndicatorState, withSessionRetry } from './session.js'
-import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades } from './client.js'
+import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState } from './client.js'
 import type { TradeAnalyzeResponse, TradeSuggestResponse } from './client.js'
+
+// ─── Live-platform season rosters ──────────────────────────────────────────────
+// When a live platform is connected in Season Mode, the roster grid is prefilled
+// from the platform instead of DEFAULT_SEASON_ROSTERS. The rosters are fetched async
+// (draft-state needs a session), cached here, and read by renderSeasonRosters as its
+// prefill source; the caller re-renders (applyLayout) once they arrive. Living here
+// (not in season_rosters) keeps the import one-way: season_rosters → season_session.
+
+let livePlatformRosters: Record<string, string[]> | null = null
+
+/** Platform-provided season rosters ({team: [players]}), or null when not loaded
+ *  (own data, or before the first platform refresh). */
+export function getLivePlatformRosters(): Record<string, string[]> | null {
+    return livePlatformRosters
+}
+
+export function clearLivePlatformRosters(): void {
+    livePlatformRosters = null
+}
+
+/** Pull the connected platform's current rosters for Season Mode and cache them.
+ *  The caller re-renders the season layout so renderSeasonRosters picks them up. */
+export async function refreshSeasonRostersFromPlatform(): Promise<void> {
+    await withSessionRetry(async () => {
+        const state = await fetchDraftState(getSessionId()!, 'Season Mode')
+        livePlatformRosters = state.player_assignments
+    })
+}
 
 // ─── Team H-score ────────────────────────────────────────────────────────────
 

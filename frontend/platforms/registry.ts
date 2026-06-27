@@ -5,10 +5,12 @@
 import { PlatformConnector, ConnectorFactory } from './connector.js'
 import { makeFantraxConnector } from './fantrax_connector.js'
 import { makeYahooConnector } from './yahoo_connector.js'
+import { makeEspnConnector } from './espn_connector.js'
 
 const CONNECTOR_FACTORIES: Record<string, ConnectorFactory> = {
     'Retrieve from Fantrax': makeFantraxConnector,
     'Retrieve from Yahoo':   makeYahooConnector,
+    'Retrieve from ESPN':    makeEspnConnector,
 }
 
 /** The live platform labels the frontend has connectors for. */

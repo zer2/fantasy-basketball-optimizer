@@ -7,6 +7,7 @@ from typing import Optional
 from backend.platform_integration.base import PlatformIntegration
 from backend.platform_integration.integrations.fantrax import FantraxIntegration
 from backend.platform_integration.integrations.yahoo import YahooIntegration
+from backend.platform_integration.integrations.espn import ESPNIntegration
 
 # Kept separate from base.py on purpose: this module imports the concrete
 # integrations, and base.py is the dependency-free root they import — folding the
@@ -16,6 +17,7 @@ from backend.platform_integration.integrations.yahoo import YahooIntegration
 _INTEGRATION_CLASSES_BY_PLATFORM: dict[str, type[PlatformIntegration]] = {
     'Retrieve from Fantrax': FantraxIntegration,
     'Retrieve from Yahoo':   YahooIntegration,
+    'Retrieve from ESPN':    ESPNIntegration,
 }
 
 

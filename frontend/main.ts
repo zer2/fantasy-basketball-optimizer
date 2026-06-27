@@ -7,7 +7,7 @@ import { createSection, addApplyBtn, makeSidebarToggle } from './helper_function
 import { makeDebouncer } from './api/session.js'
 import { setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { createOrPatchSession, runEvaluate, clearFullTeamResult } from './api/draft_and_auction_session.js'
-import { runSeasonInit } from './api/season_session.js'
+import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { buildTableHeader } from './table/player_table.js'
 import { applyLayout } from './layout.js'
@@ -109,6 +109,23 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
 })
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', applyLayout)
 document.getElementById('ls-platform')!.parentElement!.addEventListener('change', applyLayout)
+
+// Season Mode + live platform: pull the platform's rosters into the grid when the user
+// switches into that state (via either the mode or the platform dropdown). The poll is
+// async, so we re-applyLayout once it lands; renderSeasonRosters reads the cache. Leaving
+// that state clears the cache so the grid reverts to defaults.
+function refreshSeasonRostersIfLive(): void {
+    const { platform, mode } = getLeagueSettings()
+    if (mode === 'Season Mode' && platform !== 'Enter your own data') {
+        refreshSeasonRostersFromPlatform()
+            .then(() => applyLayout())
+            .catch(err => console.error('Season roster refresh failed:', err))
+    } else {
+        clearLivePlatformRosters()
+    }
+}
+document.getElementById('ls-mode')!.parentElement!.addEventListener('change', refreshSeasonRostersIfLive)
+document.getElementById('ls-platform')!.parentElement!.addEventListener('change', refreshSeasonRostersIfLive)
 
 // Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
 // AbortController cancels stale calls if the user changes multiple fields quickly.

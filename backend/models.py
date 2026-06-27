@@ -265,3 +265,11 @@ class YahooAuthUrlResponse(BaseModel):
 class YahooTokenRequest(BaseModel):
     client_id: str
     auth_code: str
+
+
+# ESPN auth (s2 + SWID cookies)
+
+class EspnCredentialsRequest(BaseModel):
+    client_id: str
+    s2: str
+    swid: str

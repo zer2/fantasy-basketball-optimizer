@@ -8,6 +8,7 @@ from backend.platform_integration.helpers import (
 )
 from backend.platform_integration.integrations.fantrax import FantraxIntegration
 from backend.platform_integration.integrations.yahoo import YahooIntegration
+from backend.platform_integration.integrations.espn import ESPNIntegration
 from backend.platform_integration.base import PlatformConfig
 
 
@@ -161,3 +162,45 @@ def test_yahoo_build_auth_url():
     url = YahooIntegration.build_auth_url('myclient')
     assert 'client_id=myclient' in url
     assert 'response_type=code' in url
+
+
+# ── ESPN (composite league id + roster mapping, no espn_api network) ───────────
+
+class _FakeEspnPlayer:
+    def __init__(self, name): self.name = name
+
+
+class _FakeEspnTeam:
+    def __init__(self, team_id, team_name, roster_names):
+        self.team_id = team_id
+        self.team_name = team_name
+        self.roster = [_FakeEspnPlayer(n) for n in roster_names]
+
+
+class _FakeEspnLeague:
+    def __init__(self, teams): self.teams = teams
+
+
+def test_espn_split_league_id_carries_season():
+    assert ESPNIntegration._split_league_id('abc:12345::2024') == ('12345', 2024)
+
+
+def test_espn_get_draft_results_maps_rosters(monkeypatch):
+    integration = ESPNIntegration(s2='x', swid='y')
+    fake = _FakeEspnLeague([
+        _FakeEspnTeam(1, 'Team One', ['Nikola Jokic']),
+        _FakeEspnTeam(2, 'Team Two', ['James Harden', 'Unknown Guy']),   # unknown -> RP
+    ])
+    monkeypatch.setattr(integration, '_make_league', lambda league_id: fake)
+    config = PlatformConfig(
+        platform='Retrieve from ESPN', league_id='abc:1::2024', division_id=None,
+        teams_dict={'Team One': '1', 'Team Two': '2'},
+        player_name_column='ESPN_NAME',
+    )
+    name_lookup = {'Nikola Jokic': 'Nikola Jokic (C)', 'James Harden': 'James Harden (PG,SG)'}
+    state = integration.get_draft_results(config, 'Season Mode', name_lookup)
+
+    assert state.player_assignments == {
+        'Team One': ['Nikola Jokic (C)'],
+        'Team Two': ['James Harden (PG,SG)', 'RP'],
+    }

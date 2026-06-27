@@ -352,6 +352,41 @@ Risks to check first at E2E (also in the file banner): the OAuth handshake + yfp
 never run; `YAHOO_PLAYER_ID` dtype must match yfpy's `player_id` (else everyone → `'RP'`); `n_picks`
 is hard-coded to 13; exact yfpy method names may differ by version.
 
+## Phase 3 (ESPN) — IMPLEMENTED, UNTESTED
+`integrations/espn.py` is a framework-agnostic port of the Streamlit `ESPNIntegration`, fully wired but
+**never run against a real ESPN league**. ESPN is **Season-only** (the Streamlit ESPN never did draft).
+What's in place:
+- Registered in `registry.py`; `player_name_column = 'ESPN_NAME'`; `available_modes = ['Season Mode']`.
+- Auth = the `espn_s2` + `SWID` cookies (no OAuth): a `POST /platforms/espn/credentials` route stores
+  them per-client via `credential_store` (SWID braces stripped, as Streamlit did); `_credentials_for`
+  spreads `{s2, swid}` into `ESPNIntegration(s2=…, swid=…)`.
+- League picking: `list_leagues()` via the ESPN fan API (keyed by SWID); the league id is composite
+  `"<fan-api id>::<year>"` so `fetch_league_shape` / `get_draft_results` can reconstruct
+  `League(league_id=<id>.split(':')[1], year=<year>, espn_s2, swid)`.
+- `get_draft_results` returns current rosters (Season); `get_auction_results` → None.
+- Frontend: `espn_connector.ts` (paste s2 + SWID → Save → league dropdown) + `client.submitEspnCredentials`.
+- Unit tests: composite league-id parse + roster mapping (mocked league).
+
+Risks (also in the file banner): never run against real ESPN; `ESPN_NAME` must match espn_api's
+`player.name`; the fan-api id `split(':')[1]` shape is unverified; SWID brace handling for espn_api is
+untested.
+
+## Live Season-mode roster fill (Fantrax / Yahoo / ESPN)
+The season roster grid is now populated from the platform (this previously blocked ESPN, which is
+Season-only). Mechanism: `season_session.ts` caches `livePlatformRosters` and exposes
+`refreshSeasonRostersFromPlatform()` (polls `GET /sessions/{id}/draft-state?mode=Season Mode` → cache)
+plus `getLivePlatformRosters()` / `clearLivePlatformRosters()`. `renderSeasonRosters` uses the cache as
+its **prefill source** when a live platform is selected (blank until loaded), instead of
+`DEFAULT_SEASON_ROSTERS`. `main.ts` fires the refresh (then re-`applyLayout`) when the user switches the
+mode or platform dropdown *into* (Season Mode ∧ live platform), and clears the cache on leaving — kept
+in those two handlers (not `showSeasonLayout`) so it doesn't re-poll on every layout pass.
+
+Untested / deferred: the user must **Connect first** (so team names populate the grid columns matching
+the poll's `player_assignments` keys); players that mapped to `'RP'` may not be valid grid options;
+`injured_players` from the poll is **not** applied to the exclusion list (left alone for now); and there
+is **no manual "Refresh from platform" button** yet (deferred — rosters only re-pull on a mode/platform
+switch into season+live).
+
 ## Persistence
 The per-client token store (`credential_store.py`) persists Yahoo OAuth tokens to disk under
 `.platform_credentials/` (gitignored; override with `PLATFORM_CREDENTIAL_DIR`), keyed by `client_id`.

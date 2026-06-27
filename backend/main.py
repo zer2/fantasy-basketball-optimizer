@@ -28,14 +28,17 @@ from backend.models import (
     TradeAnalyzeRequest, TradeAnalyzeResponse,
     TradeSuggestRequest, TradeSuggestResponse,
     DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
-    LeaguesResponse, YahooAuthUrlResponse, YahooTokenRequest,
+    LeaguesResponse, YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
 )
 from backend.evaluate import run_evaluate
 from backend.math.trading import run_trade_analyze, run_trade_suggest
 from backend.platform_integration.registry import get_integration, is_live_platform
 from backend.platform_integration.base import PlatformConfig
 from backend.platform_integration.helpers import build_platform_name_lookup
-from backend.platform_integration.credential_store import yahoo_auth_dir, has_yahoo_credentials
+from backend.platform_integration.credential_store import (
+    yahoo_auth_dir, has_yahoo_credentials,
+    store_espn_credentials, get_espn_credentials, has_espn_credentials,
+)
 from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.data_retrieval import get_player_mapping_view
 
@@ -543,6 +546,10 @@ def _credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
         if not has_yahoo_credentials(client_id):
             raise HTTPException(status_code=401, detail='Not authenticated with Yahoo; complete the auth flow first.')
         return {'auth_dir': yahoo_auth_dir(client_id)}
+    if platform == 'Retrieve from ESPN' and client_id:
+        if not has_espn_credentials(client_id):
+            raise HTTPException(status_code=401, detail='Not authenticated with ESPN; save your s2/SWID cookies first.')
+        return get_espn_credentials(client_id)   # {'s2': ..., 'swid': ...} -> spread into ESPNIntegration
     return None
 
 
@@ -579,6 +586,14 @@ def yahoo_token_route(req: YahooTokenRequest):
         )
     except Exception:
         raise HTTPException(status_code=502, detail=traceback.format_exc())
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post('/platforms/espn/credentials', status_code=status.HTTP_204_NO_CONTENT)
+def espn_credentials_route(req: EspnCredentialsRequest):
+    # SWID is stored with braces stripped (as the Streamlit integration did).
+    swid = req.swid.replace('{', '').replace('}', '')
+    store_espn_credentials(req.client_id, req.s2, swid)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
