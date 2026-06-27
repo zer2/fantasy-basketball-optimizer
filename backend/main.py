@@ -7,13 +7,13 @@ from __future__ import annotations
 import os
 import time
 import uuid
+import logging
 import threading
-import traceback
 from datetime import datetime, timezone
 from typing import Optional
 
 import yaml
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,6 +42,16 @@ from backend.platform_integration.credential_store import (
 )
 from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.data_retrieval import get_player_mapping_view
+
+
+logger = logging.getLogger('fbbo.api')
+
+
+def _fail(status_code: int, message: str) -> HTTPException:
+    """Log the active exception server-side (with traceback) and return a client-safe error.
+    Tracebacks/internal details must never be sent in the response body."""
+    logger.exception(message)
+    return HTTPException(status_code=status_code, detail=message)
 
 
 # ── Upload store ──────────────────────────────────────────────────────────────
@@ -148,7 +158,7 @@ def _resolve_platform_config(
             platform_config_request.division_id,
         )
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Could not reach the fantasy platform for this league.')
     return PlatformConfig(
         platform           = platform,
         league_id          = platform_config_request.league_id,
@@ -222,9 +232,19 @@ def _resolve_uploaded_dfs(
 
 app = FastAPI(title='Fantasy Basketball Optimizer', version='1.0.0')
 
+# The app serves its own frontend (same-origin, BASE_URL=''), so normal use never triggers
+# CORS. Restrict to a localhost allowlist (override with ALLOWED_ORIGINS, comma-separated, in
+# deployment) so other origins can't script the API / credential endpoints.
+_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'ALLOWED_ORIGINS', 'http://localhost:8000,http://127.0.0.1:8000'
+    ).split(',')
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=['*'],
     allow_headers=['*'],
 )
@@ -314,7 +334,7 @@ def get_seasons_route():
         from backend.data_retrieval import get_available_seasons
         return {'seasons': get_available_seasons()}
     except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Could not load available seasons.')
 
 
 # ── POST /sessions ────────────────────────────────────────────────────────────
@@ -354,9 +374,9 @@ def create_session_route(req: SessionRequest):
         run_pipeline(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type_str,
                      uploaded_dfs=uploaded_dfs)
         _refresh_platform_name_lookup(session)   # no-op unless a live platform is connected
-    except Exception as exc:
+    except Exception:
         delete_session(session.id)
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Failed to build projections for this session.')
 
     categories = session.current_params['categories']
 
@@ -488,8 +508,8 @@ def evaluate_route(session_id: str, req: EvaluateRequest):
             remaining_cash     = req.remaining_cash,
         )
         return result
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+    except Exception:
+        raise _fail(500, 'Evaluation failed.')
 
 
 # ── POST /sessions/{session_id}/trade/analyze ────────────────────────────────
@@ -511,7 +531,7 @@ def trade_analyze_route(session_id: str, req: TradeAnalyzeRequest):
             ignore_position_check=req.ignore_position_check,
         )
     except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Trade analysis failed.')
 
 
 # ── POST /sessions/{session_id}/trade/suggest ────────────────────────────────
@@ -534,7 +554,7 @@ def trade_suggest_route(session_id: str, req: TradeSuggestRequest):
             ignore_position_check=req.ignore_position_check,
         )
     except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Trade suggestion failed.')
 
 
 # ── DELETE /sessions/{session_id} ─────────────────────────────────────────────
@@ -603,7 +623,7 @@ def yahoo_token_route(req: YahooTokenRequest):
             client_id, client_secret, req.auth_code, yahoo_auth_dir(req.client_id),
         )
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Yahoo authorization failed.')
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -616,12 +636,16 @@ def espn_credentials_route(req: EspnCredentialsRequest):
 
 
 @app.get('/platforms/{platform}/leagues', response_model=LeaguesResponse)
-def get_platform_leagues_route(platform: str, client_id: Optional[str] = None):
-    integration = _resolve_live_integration(platform, client_id)
+def get_platform_leagues_route(
+    platform: str
+    , x_client_id: Optional[str] = Header(default=None)
+):
+    # client_id arrives in the X-Client-Id header (not the URL) since it keys stored credentials.
+    integration = _resolve_live_integration(platform, x_client_id)
     try:
         leagues = integration.list_leagues()
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to list leagues from the platform.')
     return LeaguesResponse(leagues=leagues)
 
 
@@ -631,7 +655,7 @@ def get_platform_divisions_route(platform: str, league_id: str):
     try:
         divisions = integration.list_divisions(league_id)
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to list divisions from the platform.')
     return DivisionsResponse(divisions=divisions)
 
 
@@ -641,7 +665,7 @@ def connect_platform_route(platform: str, req: ConnectRequest):
     try:
         shape = integration.fetch_league_shape(req.league_id, req.division_id)
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to connect to the platform league.')
     return ConnectResponse(
         team_names      = shape.team_names,
         n_drafters      = shape.n_drafters,
@@ -673,7 +697,7 @@ def get_draft_state_route(session_id: str, mode: str):
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to fetch the live draft state.')
 
     # Auction selections carry per-player costs; turn them into per-team remaining cash.
     remaining_cash = None

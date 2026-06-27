@@ -295,9 +295,12 @@ export async function fetchLeagues(
     platform: string
     , clientId: string
 ): Promise<PlatformLeague[]> {
+    // client_id is sent as a header, never in the URL — it keys stored credentials, so it
+    // must not land in access logs / browser history / Referer.
     const data = await jsonRequest<{ leagues: PlatformLeague[] }>(
-        `${BASE_URL}/platforms/${encodeURIComponent(platform)}/leagues?client_id=${encodeURIComponent(clientId)}`
+        `${BASE_URL}/platforms/${encodeURIComponent(platform)}/leagues`
         , 'Platform leagues'
+        , { headers: { 'X-Client-Id': clientId } }
     )
     return data.leagues
 }
