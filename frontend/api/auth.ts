@@ -7,6 +7,8 @@ import { BASE_URL } from './client.js'
 
 export interface CurrentUser {
     email: string
+    name: string             // Google given name, falling back to email
+    picture: string | null   // Google profile picture URL, when available
 }
 
 /** Returns the signed-in user, or null when not authenticated (401). */
