@@ -9,6 +9,7 @@ import { setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings } from './api/draft_and_auction_session.js'
 import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
+import { fetchCurrentUser, renderLoginScreen, logout } from './api/auth.js'
 import { buildTableHeader } from './table/player_table.js'
 import { applyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
@@ -38,6 +39,14 @@ function runModeEval(): Promise<void> {
 // ─── Async init: fetch config, then build sidebar ────────────────────────────
 
 ;(async () => {
+
+// Gate the whole app behind Google login. The session is a same-origin cookie, so once
+// signed in every subsequent fetch carries it automatically.
+const currentUser = await fetchCurrentUser()
+if (!currentUser) {
+    renderLoginScreen()
+    return
+}
 
 // Fetch sport config before rendering sidebar so defaults come from parameters.yaml
 const config = await fetchConfig('NBA')
@@ -304,6 +313,21 @@ sidebarToggle.addEventListener('click', () => {
     const collapsed = appLayout.classList.toggle('sidebar-collapsed')
     savePref('sidebar_collapsed', collapsed)
 })
+
+// ─── Account (signed-in email + sign out) ─────────────────────────────────────
+
+const accountRow = document.createElement('div')
+accountRow.className = 'sidebar-account'
+const accountEmail = document.createElement('span')
+accountEmail.className   = 'account-email'
+accountEmail.textContent = currentUser.email
+const logoutBtn = document.createElement('button')
+logoutBtn.type        = 'button'
+logoutBtn.className    = 'account-logout'
+logoutBtn.textContent  = 'Sign out'
+logoutBtn.addEventListener('click', () => { logout().catch(err => console.error('Logout failed:', err)) })
+accountRow.append(accountEmail, logoutBtn)
+sidebar.append(accountRow)
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 

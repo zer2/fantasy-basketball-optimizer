@@ -37,7 +37,6 @@ class PlatformConfig:
     division_id:        Optional[str]
     teams_dict:         dict[str, str]   # team_name -> platform team_id
     player_name_column: str
-    client_id:          Optional[str] = None   # auth platforms: looks up persisted credentials
 
 
 @dataclass

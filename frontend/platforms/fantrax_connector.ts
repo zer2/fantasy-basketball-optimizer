@@ -6,7 +6,6 @@ import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
 import { pref, savePref } from '../preferences.js'
 import { fetchDivisions } from '../api/client.js'
-import { getClientId } from '../api/client_id.js'
 import { PlatformConnector } from './connector.js'
 
 const PLATFORM = 'Retrieve from Fantrax'
@@ -56,7 +55,7 @@ export function makeFantraxConnector(setStatus: (message: string) => void): Plat
         getSelection() {
             const leagueId = leagueIdInput.value.trim()
             if (!leagueId) return null
-            return { league_id: leagueId, division_id: divisionSelect.getValue() || null, client_id: getClientId() }
+            return { league_id: leagueId, division_id: divisionSelect.getValue() || null }
         },
     }
 }

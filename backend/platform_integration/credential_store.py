@@ -30,11 +30,22 @@ def _validate_client_id(client_id: str) -> None:
         raise ValueError(f'Invalid client_id {client_id!r}; expected 1-64 chars of [A-Za-z0-9_-].')
 
 
+def _restrict_permissions(path: Path) -> None:
+    """Best-effort tighten a credential file/dir to owner-only (0o700 dir / 0o600 file).
+    These hold long-lived account credentials (OAuth tokens, ESPN cookies). Has limited
+    effect on Windows, where user-profile ACLs already restrict access."""
+    try:
+        os.chmod(path, 0o700 if path.is_dir() else 0o600)
+    except OSError:
+        pass
+
+
 def yahoo_auth_dir(client_id: str) -> str:
     """Return (creating if needed) the directory holding this client's Yahoo token files."""
     _validate_client_id(client_id)
     auth_dir = _CREDENTIAL_BASE / 'yahoo' / client_id
     auth_dir.mkdir(parents=True, exist_ok=True)
+    _restrict_permissions(auth_dir)   # protects the token files yfpy writes inside
     return str(auth_dir)
 
 
@@ -56,6 +67,8 @@ def store_espn_credentials(client_id: str, s2: str, swid: str) -> None:
     path = _espn_credentials_path(client_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({'s2': s2, 'swid': swid}))
+    _restrict_permissions(path.parent)
+    _restrict_permissions(path)
 
 
 def get_espn_credentials(client_id: str) -> Optional[dict]:

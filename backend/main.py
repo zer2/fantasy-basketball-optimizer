@@ -7,16 +7,23 @@ from __future__ import annotations
 import os
 import time
 import uuid
+import logging
 import threading
-import traceback
 from datetime import datetime, timezone
 from typing import Optional
 
 import yaml
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, FileResponse
+from fastapi.responses import Response, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+
+from backend.auth import (
+    oauth, current_user_key, current_user_key_optional, email_is_allowed,
+    session_secret_key, session_https_only,
+)
+from backend.secret_config import get_secret
 
 from backend.session import create_session, get_session, delete_session
 from backend.pipeline import run_pipeline, _parse_projection_csv, clear_v0_cache
@@ -42,6 +49,19 @@ from backend.platform_integration.credential_store import (
 )
 from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.data_retrieval import get_player_mapping_view
+
+
+logger = logging.getLogger('fbbo.api')
+# Ensure app INFO logs (sign-ins) pass the level filter; handlers/formatting are left to the
+# process's logging setup (uvicorn / imported libraries already configure stderr handlers).
+logging.getLogger('fbbo').setLevel(logging.INFO)
+
+
+def _fail(status_code: int, message: str) -> HTTPException:
+    """Log the active exception server-side (with traceback) and return a client-safe error.
+    Tracebacks/internal details must never be sent in the response body."""
+    logger.exception(message)
+    return HTTPException(status_code=status_code, detail=message)
 
 
 # ── Upload store ──────────────────────────────────────────────────────────────
@@ -129,33 +149,35 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 def _resolve_platform_config(
     platform: str
     , platform_config_request: Optional[PlatformConfigRequest]
+    , user_key: Optional[str]
 ) -> Optional[PlatformConfig]:
     """For a live platform, fetch the league shape and build a PlatformConfig to
     store on the session. Returns None for 'Enter your own data'. Shared by the
     create and patch routes (connecting a platform patches this onto the session)."""
     if not is_live_platform(platform):
         return None
+    if user_key is None:
+        raise HTTPException(status_code=401, detail='Sign in to connect a live platform.')
     if platform_config_request is None:
         raise HTTPException(
             status_code=400,
             detail=f'platform_config is required for platform {platform!r}.',
         )
-    client_id = platform_config_request.client_id
-    integration = get_integration(platform, _credentials_for(platform, client_id))
+    # Credentials are keyed by the authenticated user, never by anything in the request.
+    integration = get_integration(platform, _credentials_for(platform, user_key))
     try:
         shape = integration.fetch_league_shape(
             platform_config_request.league_id,
             platform_config_request.division_id,
         )
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Could not reach the fantasy platform for this league.')
     return PlatformConfig(
         platform           = platform,
         league_id          = platform_config_request.league_id,
         division_id        = platform_config_request.division_id,
         teams_dict         = shape.teams_dict,
         player_name_column = integration.player_name_column,
-        client_id          = client_id,
     )
 
 
@@ -222,12 +244,75 @@ def _resolve_uploaded_dfs(
 
 app = FastAPI(title='Fantasy Basketball Optimizer', version='1.0.0')
 
+# The app serves its own frontend (same-origin, BASE_URL=''), so normal use never triggers
+# CORS. Restrict to a localhost allowlist (override with ALLOWED_ORIGINS, comma-separated, in
+# deployment) so other origins can't script the API / credential endpoints.
+_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'ALLOWED_ORIGINS', 'http://localhost:8000,http://127.0.0.1:8000'
+    ).split(',')
+    if origin.strip()
+]
+
+# SessionMiddleware holds the signed login cookie (and Authlib's OAuth state). add_middleware
+# prepends, so adding CORS last makes it outermost. Auth itself is enforced per-route via the
+# current_user_key dependency, not globally — 'Enter your own data' usage needs no login.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=session_secret_key(),
+    https_only=session_https_only(),
+    same_site='lax',
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+
+# ── Auth (Google OIDC login) ──────────────────────────────────────────────────
+
+@app.get('/auth/login')
+async def auth_login_route(request: Request):
+    """Kick off the Google sign-in redirect."""
+    redirect_uri = get_secret('OAUTH_REDIRECT_URI') or str(request.url_for('auth_callback_route'))
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@app.get('/auth/callback', name='auth_callback_route')
+async def auth_callback_route(request: Request):
+    """Google redirects back here with a code; exchange it, verify, and start a session."""
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except Exception:
+        raise _fail(401, 'Google sign-in failed.')
+    userinfo = token.get('userinfo')
+    if not userinfo or not userinfo.get('email_verified'):
+        raise HTTPException(status_code=401, detail='Google account has no verified email.')
+    email = userinfo['email']
+    if not email_is_allowed(email):
+        logger.warning('login denied (not allowlisted): %s', email)
+        raise HTTPException(status_code=403, detail='This account is not permitted to sign in.')
+    request.session['user'] = {'sub': userinfo['sub'], 'email': email}
+    logger.info('login: %s', email)
+    return RedirectResponse(url='/')
+
+
+@app.post('/auth/logout', status_code=status.HTTP_204_NO_CONTENT)
+async def auth_logout_route(request: Request):
+    request.session.clear()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get('/auth/me')
+async def auth_me_route(request: Request):
+    """Lightweight auth check for the frontend; 401 when not signed in."""
+    user = request.session.get('user')
+    if not user:
+        raise HTTPException(status_code=401, detail='Not authenticated.')
+    return {'email': user['email']}
 
 
 # ── GET /config/{sport} ───────────────────────────────────────────────────────
@@ -305,7 +390,6 @@ async def upload_projection(
         expires_at=_iso_expires(_UPLOAD_TTL),
     )
 
-
 # ── GET /seasons ──────────────────────────────────────────────────────────────
 
 @app.get('/seasons')
@@ -314,13 +398,13 @@ def get_seasons_route():
         from backend.data_retrieval import get_available_seasons
         return {'seasons': get_available_seasons()}
     except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Could not load available seasons.')
 
 
 # ── POST /sessions ────────────────────────────────────────────────────────────
 
 @app.post('/sessions', response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
-def create_session_route(req: SessionRequest):
+def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(current_user_key_optional)):
     all_params = _load_all_params()
 
     if req.league.sport not in all_params:
@@ -342,7 +426,7 @@ def create_session_route(req: SessionRequest):
 
     # Resolve any live-platform connection up front so a bad league fails before
     # the expensive pipeline runs.
-    platform_config = _resolve_platform_config(req.platform, req.platform_config)
+    platform_config = _resolve_platform_config(req.platform, req.platform_config, user_key)
 
     session = create_session()
     session.current_params = _build_current_params(req, all_params)
@@ -354,9 +438,9 @@ def create_session_route(req: SessionRequest):
         run_pipeline(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type_str,
                      uploaded_dfs=uploaded_dfs)
         _refresh_platform_name_lookup(session)   # no-op unless a live platform is connected
-    except Exception as exc:
+    except Exception:
         delete_session(session.id)
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Failed to build projections for this session.')
 
     categories = session.current_params['categories']
 
@@ -383,7 +467,7 @@ def create_session_route(req: SessionRequest):
 # ── PATCH /sessions/{session_id} ──────────────────────────────────────────────
 
 @app.patch('/sessions/{session_id}', response_model=PatchResponse)
-def patch_session_route(session_id: str, req: PatchRequest):
+def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[str] = Depends(current_user_key_optional)):
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
@@ -430,7 +514,7 @@ def patch_session_route(session_id: str, req: PatchRequest):
     # up front (before the pipeline) so a bad league fails fast. platform_config feeds only
     # the draft-state poll + name lookup, never the pipeline, so it needs no rerun of its own.
     platform_config = (
-        _resolve_platform_config(req.platform, req.platform_config)
+        _resolve_platform_config(req.platform, req.platform_config, user_key)
         if req.platform is not None else None
     )
     if platform_config is not None:
@@ -488,8 +572,8 @@ def evaluate_route(session_id: str, req: EvaluateRequest):
             remaining_cash     = req.remaining_cash,
         )
         return result
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+    except Exception:
+        raise _fail(500, 'Evaluation failed.')
 
 
 # ── POST /sessions/{session_id}/trade/analyze ────────────────────────────────
@@ -511,7 +595,7 @@ def trade_analyze_route(session_id: str, req: TradeAnalyzeRequest):
             ignore_position_check=req.ignore_position_check,
         )
     except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Trade analysis failed.')
 
 
 # ── POST /sessions/{session_id}/trade/suggest ────────────────────────────────
@@ -534,7 +618,7 @@ def trade_suggest_route(session_id: str, req: TradeSuggestRequest):
             ignore_position_check=req.ignore_position_check,
         )
     except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+        raise _fail(500, 'Trade suggestion failed.')
 
 
 # ── DELETE /sessions/{session_id} ─────────────────────────────────────────────
@@ -573,8 +657,8 @@ def _credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
 
 def _yahoo_app_credentials() -> tuple[str, str]:
     """The Yahoo *app* (developer) client id/secret, from the environment."""
-    client_id = os.environ.get('YAHOO_CLIENT_ID')
-    client_secret = os.environ.get('YAHOO_CLIENT_SECRET')
+    client_id = get_secret('YAHOO_CLIENT_ID')
+    client_secret = get_secret('YAHOO_CLIENT_SECRET')
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail='YAHOO_CLIENT_ID / YAHOO_CLIENT_SECRET are not configured.')
     return client_id, client_secret
@@ -596,32 +680,32 @@ def yahoo_auth_url_route():
 
 
 @app.post('/platforms/yahoo/token', status_code=status.HTTP_204_NO_CONTENT)
-def yahoo_token_route(req: YahooTokenRequest):
+def yahoo_token_route(req: YahooTokenRequest, user_key: str = Depends(current_user_key)):
     client_id, client_secret = _yahoo_app_credentials()
     try:
         YahooIntegration.exchange_auth_code(
-            client_id, client_secret, req.auth_code, yahoo_auth_dir(req.client_id),
+            client_id, client_secret, req.auth_code, yahoo_auth_dir(user_key),
         )
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Yahoo authorization failed.')
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post('/platforms/espn/credentials', status_code=status.HTTP_204_NO_CONTENT)
-def espn_credentials_route(req: EspnCredentialsRequest):
+def espn_credentials_route(req: EspnCredentialsRequest, user_key: str = Depends(current_user_key)):
     # SWID is stored with braces stripped (as the Streamlit integration did).
     swid = req.swid.replace('{', '').replace('}', '')
-    store_espn_credentials(req.client_id, req.s2, swid)
+    store_espn_credentials(user_key, req.s2, swid)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get('/platforms/{platform}/leagues', response_model=LeaguesResponse)
-def get_platform_leagues_route(platform: str, client_id: Optional[str] = None):
-    integration = _resolve_live_integration(platform, client_id)
+def get_platform_leagues_route(platform: str, user_key: str = Depends(current_user_key)):
+    integration = _resolve_live_integration(platform, user_key)
     try:
         leagues = integration.list_leagues()
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to list leagues from the platform.')
     return LeaguesResponse(leagues=leagues)
 
 
@@ -631,17 +715,17 @@ def get_platform_divisions_route(platform: str, league_id: str):
     try:
         divisions = integration.list_divisions(league_id)
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to list divisions from the platform.')
     return DivisionsResponse(divisions=divisions)
 
 
 @app.post('/platforms/{platform}/connect', response_model=ConnectResponse)
-def connect_platform_route(platform: str, req: ConnectRequest):
-    integration = _resolve_live_integration(platform, req.client_id)
+def connect_platform_route(platform: str, req: ConnectRequest, user_key: str = Depends(current_user_key)):
+    integration = _resolve_live_integration(platform, user_key)
     try:
         shape = integration.fetch_league_shape(req.league_id, req.division_id)
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to connect to the platform league.')
     return ConnectResponse(
         team_names      = shape.team_names,
         n_drafters      = shape.n_drafters,
@@ -651,14 +735,15 @@ def connect_platform_route(platform: str, req: ConnectRequest):
 
 
 @app.get('/sessions/{session_id}/draft-state', response_model=DraftStateResponse)
-def get_draft_state_route(session_id: str, mode: str):
+def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(current_user_key)):
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
     config = session.platform_config
     if config is None:
         raise HTTPException(status_code=400, detail='Session is not connected to a live platform.')
-    integration = get_integration(config.platform, _credentials_for(config.platform, config.client_id))
+    # Poll with the requesting user's own credentials, never the key stored on the session.
+    integration = get_integration(config.platform, _credentials_for(config.platform, user_key))
     # The lookup is built at session creation / data patches; rebuild defensively if
     # somehow absent so the poll never maps every player to 'RP'.
     if session.platform_name_lookup is None:
@@ -673,7 +758,7 @@ def get_draft_state_route(session_id: str, mode: str):
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=502, detail=traceback.format_exc())
+        raise _fail(502, 'Failed to fetch the live draft state.')
 
     # Auction selections carry per-player costs; turn them into per-team remaining cash.
     remaining_cash = None

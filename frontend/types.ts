@@ -92,7 +92,7 @@ export interface SessionRequest {
         cash_per_team?: number   // only set in Auction Mode
     }
     platform: string
-    platform_config?: { league_id: string; division_id?: string | null; client_id?: string | null }   // live platforms only
+    platform_config?: { league_id: string; division_id?: string | null }   // live platforms only
     slot_counts: Record<string, number>
     parameters: ModelParameters
     data_source: DataSource
