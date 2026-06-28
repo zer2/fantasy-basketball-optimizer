@@ -6,3 +6,5 @@
 - Parameter should be framed in the positive. E.g. 'usemargin' instead of 'nomargin'
 - Variable names should be descriptive. Except in one-liners like lamdba functions, let's never use any abbreviations 
 - No circular dependenies or clumsy fixes for circular dependencies, like loading functions as parameters from other functions 
+
+Do not push to github unless I explicitly tell you to

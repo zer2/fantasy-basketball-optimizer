@@ -272,6 +272,18 @@ app.add_middleware(
 )
 
 
+@app.middleware('http')
+async def _revalidate_app_assets(request: Request, call_next):
+    """Force the browser to revalidate the app shell + static assets. StaticFiles sends no
+    Cache-Control, so browsers heuristically cache styles.css / dist and serve stale copies —
+    'no-cache' means 'revalidate before use' (cheap 304s when unchanged), so edits show up."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == '/' or path.startswith(('/dist', '/styles')):
+        response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
 # ── Auth (Google OIDC login) ──────────────────────────────────────────────────
 
 @app.get('/auth/login')
@@ -295,7 +307,11 @@ async def auth_callback_route(request: Request):
     if not email_is_allowed(email):
         logger.warning('login denied (not allowlisted): %s', email)
         raise HTTPException(status_code=403, detail='This account is not permitted to sign in.')
-    request.session['user'] = {'sub': userinfo['sub'], 'email': email}
+    name = userinfo.get('given_name') or userinfo.get('name') or email
+    request.session['user'] = {
+        'sub': userinfo['sub'], 'email': email, 'name': name,
+        'picture': userinfo.get('picture'),   # optional; Google provides it when available
+    }
     logger.info('login: %s', email)
     return RedirectResponse(url='/')
 
@@ -309,10 +325,12 @@ async def auth_logout_route(request: Request):
 @app.get('/auth/me')
 async def auth_me_route(request: Request):
     """Lightweight auth check for the frontend; 401 when not signed in."""
+    # A valid session always carries name (set at login); a session missing it is stale /
+    # malformed, so treat it as unauthenticated rather than silently degrading to the email.
     user = request.session.get('user')
-    if not user:
+    if not user or 'name' not in user:
         raise HTTPException(status_code=401, detail='Not authenticated.')
-    return {'email': user['email']}
+    return {'email': user['email'], 'name': user['name'], 'picture': user.get('picture')}
 
 
 # ── GET /config/{sport} ───────────────────────────────────────────────────────

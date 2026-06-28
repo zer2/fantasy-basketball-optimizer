@@ -314,20 +314,46 @@ sidebarToggle.addEventListener('click', () => {
     savePref('sidebar_collapsed', collapsed)
 })
 
-// ─── Account (signed-in email + sign out) ─────────────────────────────────────
+// ─── Account (signed-in name + sign out) ──────────────────────────────────────
 
 const accountRow = document.createElement('div')
 accountRow.className = 'sidebar-account'
-const accountEmail = document.createElement('span')
-accountEmail.className   = 'account-email'
-accountEmail.textContent = currentUser.email
+
+const identity = document.createElement('div')
+identity.className = 'account-identity'
+
+const avatar = document.createElement('span')
+avatar.className = 'account-avatar'
+if (currentUser.picture) {
+    const avatarImg = document.createElement('img')
+    avatarImg.src = currentUser.picture
+    avatarImg.alt = ''
+    avatarImg.referrerPolicy = 'no-referrer'   // Google pic URLs 403 without this
+    avatar.append(avatarImg)
+} else {
+    // Default person icon when no Google picture is available.
+    avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        + '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>'
+}
+
+const accountName = document.createElement('span')
+accountName.className   = 'account-name'
+accountName.textContent = currentUser.name
+identity.append(avatar, accountName)
+
 const logoutBtn = document.createElement('button')
 logoutBtn.type        = 'button'
 logoutBtn.className    = 'account-logout'
 logoutBtn.textContent  = 'Sign out'
 logoutBtn.addEventListener('click', () => { logout().catch(err => console.error('Logout failed:', err)) })
-accountRow.append(accountEmail, logoutBtn)
-sidebar.append(accountRow)
+
+accountRow.append(identity, logoutBtn)
+// Place it below the title's divider line, above the sidebar options, with its own
+// divider separating it from the first option.
+sidebar.insertBefore(accountRow, sidebarSections)
+const accountDivider = document.createElement('hr')
+accountDivider.className = 'sidebar-divider'
+sidebar.insertBefore(accountDivider, sidebarSections)
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
