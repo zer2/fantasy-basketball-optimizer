@@ -289,7 +289,7 @@ async def _revalidate_app_assets(request: Request, call_next):
 @app.get('/auth/login')
 async def auth_login_route(request: Request):
     """Kick off the Google sign-in redirect."""
-    redirect_uri = get_secret('OAUTH_REDIRECT_URI') or str(request.url_for('auth_callback_route'))
+    redirect_uri = os.environ.get('OAUTH_REDIRECT_URI') or str(request.url_for('auth_callback_route'))
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 

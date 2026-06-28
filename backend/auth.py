@@ -19,16 +19,13 @@ Optional:
 from __future__ import annotations
 
 import hashlib
-import logging
-import secrets
+import os
 from typing import Optional
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, Request
 
 from backend.secret_config import get_secret
-
-logger = logging.getLogger('fbbo.auth')
 
 _GOOGLE_METADATA_URL = 'https://accounts.google.com/.well-known/openid-configuration'
 
@@ -43,25 +40,28 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
-# Used only when SESSION_SECRET_KEY is unset (local dev) — logins reset when the process
-# restarts. Production must set SESSION_SECRET_KEY.
-_DEV_FALLBACK_SECRET = secrets.token_hex(32)
-
-
 def session_secret_key() -> str:
+    """The key that signs the login session cookie. Required, with no fallback: a per-process
+    random key would silently break logins across restarts / multiple instances (a process
+    that didn't sign the OAuth-state cookie can't verify it). Fail loudly if it's missing."""
     secret = get_secret('SESSION_SECRET_KEY')
-    if secret:
-        return secret
-    logger.warning('SESSION_SECRET_KEY not set; using an ephemeral key (logins reset on restart).')
-    return _DEV_FALLBACK_SECRET
+    if not secret:
+        raise RuntimeError(
+            'SESSION_SECRET_KEY is not set (environment or .streamlit/secrets.toml). It signs '
+            'the login session cookie and must be a stable secret value. Generate one with: '
+            'python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+    return secret
 
 
 def session_https_only() -> bool:
-    return (get_secret('SESSION_HTTPS_ONLY') or '').lower() in ('1', 'true', 'yes')
+    # Plain deployment flag, not a secret — read straight from the environment.
+    return os.environ.get('SESSION_HTTPS_ONLY', '').lower() in ('1', 'true', 'yes')
 
 
 def _allowed_emails() -> Optional[set[str]]:
-    raw = (get_secret('AUTH_ALLOWED_EMAILS') or '').strip()
+    # A (non-secret) allowlist of emails; environment config, not a secret.
+    raw = os.environ.get('AUTH_ALLOWED_EMAILS', '').strip()
     if not raw:
         return None   # no allowlist -> any verified Google account may sign in
     return {email.strip().lower() for email in raw.split(',') if email.strip()}
