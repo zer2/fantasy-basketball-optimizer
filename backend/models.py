@@ -49,7 +49,6 @@ class DataSource(BaseModel):
 class PlatformConfigRequest(BaseModel):
     league_id: str
     division_id: Optional[str] = None
-    client_id: Optional[str] = None   # auth platforms: identifies the persisted credentials
 
 
 class SessionRequest(BaseModel):
@@ -241,7 +240,6 @@ class LeaguesResponse(BaseModel):
 class ConnectRequest(BaseModel):
     league_id: str
     division_id: Optional[str] = None
-    client_id: Optional[str] = None   # auth platforms: identifies the persisted credentials
 
 
 class ConnectResponse(BaseModel):
@@ -265,13 +263,11 @@ class YahooAuthUrlResponse(BaseModel):
 
 
 class YahooTokenRequest(BaseModel):
-    client_id: str
     auth_code: str
 
 
 # ESPN auth (s2 + SWID cookies)
 
 class EspnCredentialsRequest(BaseModel):
-    client_id: str
     s2: str
     swid: str

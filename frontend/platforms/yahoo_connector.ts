@@ -1,11 +1,10 @@
 // platforms/yahoo_connector.ts
 // Yahoo connect UX: OAuth (authenticate → paste authorization code) then pick a league
-// from the user's leagues. Tokens are persisted server-side, keyed by the client id.
+// from the user's leagues. Tokens are persisted server-side, keyed by the signed-in user.
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
 import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken } from '../api/client.js'
-import { getClientId } from '../api/client_id.js'
 import { PlatformConnector } from './connector.js'
 
 const PLATFORM = 'Retrieve from Yahoo'
@@ -58,7 +57,7 @@ export function makeYahooConnector(setStatus: (message: string) => void): Platfo
 
     /** Loads the authenticated user's Yahoo leagues into the league select. */
     async function loadLeagues(): Promise<void> {
-        const leagues = await fetchLeagues(PLATFORM, getClientId())
+        const leagues = await fetchLeagues(PLATFORM)
         if (leagues.length === 0) {
             leagueSelect.setOptions([{ value: '', label: '(no leagues found)' }])
             setStatus('Authenticated, but no NBA leagues were found.')
@@ -72,7 +71,7 @@ export function makeYahooConnector(setStatus: (message: string) => void): Platfo
         const code = codeInput.value.trim()
         if (!code) { setStatus('Paste the authorization code first.'); return }
         setStatus('Exchanging code...')
-        submitYahooToken(getClientId(), code)
+        submitYahooToken(code)
             .then(() => loadLeagues())
             .catch(err => setStatus(`Token exchange failed: ${err.message}`))
     })
@@ -83,7 +82,7 @@ export function makeYahooConnector(setStatus: (message: string) => void): Platfo
         getSelection() {
             const leagueId = leagueSelect.getValue() ?? ''
             if (!leagueId) return null
-            return { league_id: leagueId, division_id: null, client_id: getClientId() }
+            return { league_id: leagueId, division_id: null }
         },
     }
 }

@@ -252,7 +252,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
             return
         }
         setConnectStatus('Connecting...')
-        connectPlatform(connector.platform, selection.league_id, selection.division_id, selection.client_id)
+        connectPlatform(connector.platform, selection.league_id, selection.division_id)
             .then(resp => {
                 // Restrict the mode selector to what this platform supports.
                 modeSelect.setOptions(resp.available_modes.map(m => ({ value: m, label: m })))
@@ -351,7 +351,7 @@ export function getLeagueSettings(): {
  * Returns the live-platform connection for the session request, or null for
  * 'Enter your own data' (or a live platform with no league ID entered yet).
  */
-export function getPlatformConfig(): { league_id: string; division_id?: string | null; client_id?: string | null } | null {
+export function getPlatformConfig(): { league_id: string; division_id?: string | null } | null {
     const platform = (document.getElementById('ls-platform') as HTMLInputElement).value
     return connectorsByPlatform.get(platform)?.getSelection() ?? null
 }

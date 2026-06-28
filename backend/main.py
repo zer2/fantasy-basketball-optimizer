@@ -164,8 +164,7 @@ def _resolve_platform_config(
             detail=f'platform_config is required for platform {platform!r}.',
         )
     # Credentials are keyed by the authenticated user, never by anything in the request.
-    client_id = user_key
-    integration = get_integration(platform, _credentials_for(platform, client_id))
+    integration = get_integration(platform, _credentials_for(platform, user_key))
     try:
         shape = integration.fetch_league_shape(
             platform_config_request.league_id,
@@ -179,7 +178,6 @@ def _resolve_platform_config(
         division_id        = platform_config_request.division_id,
         teams_dict         = shape.teams_dict,
         player_name_column = integration.player_name_column,
-        client_id          = client_id,
     )
 
 

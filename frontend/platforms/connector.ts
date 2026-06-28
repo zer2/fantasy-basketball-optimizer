@@ -1,14 +1,14 @@
 // platforms/connector.ts
 // A frontend "connector" owns one platform's connect/auth UX — the counterpart to the
 // backend PlatformIntegration. It builds the platform-specific controls and produces the
-// {league_id, division_id, client_id} the shared connect/session flow needs. The host
-// (league_settings) renders the active connector and reuses one generic Connect path for
-// every platform, so per-platform auth differences stay encapsulated here.
+// {league_id, division_id} the shared connect/session flow needs. The host (league_settings)
+// renders the active connector and reuses one generic Connect path for every platform, so
+// per-platform auth differences stay encapsulated here. The signed-in Google user identifies
+// the credentials server-side, so no client identifier is sent from here.
 
 export interface PlatformSelection {
     league_id: string
     division_id: string | null
-    client_id: string | null
 }
 
 export interface PlatformConnector {

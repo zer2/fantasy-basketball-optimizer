@@ -5,7 +5,6 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
 import { fetchLeagues, submitEspnCredentials } from '../api/client.js'
-import { getClientId } from '../api/client_id.js'
 import { PlatformConnector } from './connector.js'
 
 const PLATFORM = 'Retrieve from ESPN'
@@ -42,7 +41,7 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
 
     /** Loads the user's ESPN leagues into the league select. */
     async function loadLeagues(): Promise<void> {
-        const leagues = await fetchLeagues(PLATFORM, getClientId())
+        const leagues = await fetchLeagues(PLATFORM)
         if (leagues.length === 0) {
             leagueSelect.setOptions([{ value: '', label: '(no leagues found)' }])
             setStatus('Saved, but no leagues were found.')
@@ -57,7 +56,7 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
         const swid = swidInput.value.trim()
         if (!s2 || !swid) { setStatus('Enter both the s2 and SWID cookies first.'); return }
         setStatus('Saving credentials...')
-        submitEspnCredentials(getClientId(), s2, swid)
+        submitEspnCredentials(s2, swid)
             .then(() => loadLeagues())
             .catch(err => setStatus(`Could not save credentials: ${err.message}`))
     })
@@ -68,7 +67,7 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
         getSelection() {
             const leagueId = leagueSelect.getValue() ?? ''
             if (!leagueId) return null
-            return { league_id: leagueId, division_id: null, client_id: getClientId() }
+            return { league_id: leagueId, division_id: null }
         },
     }
 }

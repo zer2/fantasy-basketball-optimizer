@@ -290,17 +290,12 @@ export async function fetchDivisions(
     return data.divisions
 }
 
-/** Lists the user's leagues for an auth-based platform (empty for manual-id platforms). */
-export async function fetchLeagues(
-    platform: string
-    , clientId: string
-): Promise<PlatformLeague[]> {
-    // client_id is sent as a header, never in the URL — it keys stored credentials, so it
-    // must not land in access logs / browser history / Referer.
+/** Lists the user's leagues for an auth-based platform (empty for manual-id platforms).
+ *  Credentials are resolved server-side from the signed-in user's session cookie. */
+export async function fetchLeagues(platform: string): Promise<PlatformLeague[]> {
     const data = await jsonRequest<{ leagues: PlatformLeague[] }>(
         `${BASE_URL}/platforms/${encodeURIComponent(platform)}/leagues`
         , 'Platform leagues'
-        , { headers: { 'X-Client-Id': clientId } }
     )
     return data.leagues
 }
@@ -311,21 +306,21 @@ export async function fetchYahooAuthUrl(): Promise<string> {
     return data.auth_url
 }
 
-/** Exchanges a pasted Yahoo authorization code for tokens, persisted under clientId. */
-export async function submitYahooToken(clientId: string, authCode: string): Promise<void> {
+/** Exchanges a pasted Yahoo authorization code for tokens, persisted for the signed-in user. */
+export async function submitYahooToken(authCode: string): Promise<void> {
     await jsonRequest<void>(`${BASE_URL}/platforms/yahoo/token`, 'Yahoo token', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ client_id: clientId, auth_code: authCode }),
+        body:    JSON.stringify({ auth_code: authCode }),
     })
 }
 
-/** Persists the user's ESPN s2 + SWID cookies under clientId. */
-export async function submitEspnCredentials(clientId: string, s2: string, swid: string): Promise<void> {
+/** Persists the signed-in user's ESPN s2 + SWID cookies. */
+export async function submitEspnCredentials(s2: string, swid: string): Promise<void> {
     await jsonRequest<void>(`${BASE_URL}/platforms/espn/credentials`, 'ESPN credentials', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ client_id: clientId, s2, swid }),
+        body:    JSON.stringify({ s2, swid }),
     })
 }
 
@@ -334,7 +329,6 @@ export async function connectPlatform(
     platform: string
     , leagueId: string
     , divisionId: string | null
-    , clientId: string | null
 ): Promise<PlatformConnectResponse> {
     return jsonRequest(
         `${BASE_URL}/platforms/${encodeURIComponent(platform)}/connect`
@@ -342,7 +336,7 @@ export async function connectPlatform(
         , {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ league_id: leagueId, division_id: divisionId, client_id: clientId }),
+            body:    JSON.stringify({ league_id: leagueId, division_id: divisionId }),
         }
     )
 }
