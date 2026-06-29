@@ -1,6 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
 
-:root { color-scheme: dark; }
+:root {
+    color-scheme: dark;
+
+    /* Line colors — two tiers. Name by role, not appearance, so a value can be retuned
+       without the name lying. --line-structural is the existing edge color (panels, sidebar,
+       dividers); --line-grid is a quieter line for interior data-grid cells. */
+    --line-structural: light-dark(#e5e5e5, #3d3d55);   /* staged for the next pass */
+    --line-grid:       light-dark(#f0f0f0, #2a2c3a);
+}
 
 /* Scale all rem-based sizes with viewport width, min 16px (laptop), max 20px (wide desktop) */
 html { font-size: clamp(16px, 0.93vw, 20px); }
@@ -255,53 +263,112 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     grid-column: 1 / -1;
 }
 
-/* ─── Team names list (replaces textarea; rows = name input + mode dropdown) */
+/* ─── Draft board header: editable team label + compact method dropdown ─────── */
 
-.team-names-list {
-    background-color: light-dark(#fafafa, #181923);
-    border: 1px solid light-dark(#e5e5e5, #3d3d55);
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    padding: 2px 0;
+.team-header-cell {
+    padding: 2px 4px;
 }
 
-.team-name-row {
+.team-header {
     display: flex;
     align-items: center;
-    padding: 1px 4px;
+    justify-content: center;
     gap: 4px;
 }
 
-.team-name-row:not(:last-child) {
-    border-bottom: 1px solid light-dark(#f0f0f0, #2a2c3a);
-}
-
-.team-name-input {
-    flex: 1;
+.team-label-input {
     min-width: 0;
+    flex: 1 1 auto;
     background: transparent;
-    border: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
     outline: none;
-    color: light-dark(#333333, lightgrey);
+    text-align: center;
+    text-overflow: ellipsis;
+    color: light-dark(#555555, #aaaaaa);
     font-family: "Source Sans 3";
     font-size: 0.8rem;
-    padding: 0 2px;
+    font-weight: 500;
+    padding: 1px 2px;
 }
 
-.drafter-mode-cell {
+.team-label-input:hover {
+    border-color: light-dark(#e5e5e5, #3d3d55);
+}
+
+.team-label-input:focus {
+    border-color: light-dark(#bbbbbb, #55557a);
+    background: light-dark(#ffffff, #1a1c28);
+}
+
+.method-dd {
+    position: relative;
     flex-shrink: 0;
 }
 
-/* .cs-wrapper has width:100% — double-class selector wins on specificity */
-.drafter-mode-cell.cs-wrapper {
-    width: 108px;
+.method-dd-trigger {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: light-dark(#ffffff, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 3px;
+    color: light-dark(#555555, #aaaaaa);
+    font-family: "Source Sans 3";
     font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
 }
 
-.drafter-mode-cell .cs-trigger {
-    min-height: 0;
-    padding: 2px 5px;
+.method-dd-trigger:hover {
+    border-color: light-dark(#bbbbbb, #55557a);
+    color: light-dark(#333333, lightgrey);
+}
+
+.method-dd-menu {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 2px;
+    z-index: 20;
+    min-width: 104px;
+    background: light-dark(#ffffff, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    padding: 2px 0;
+}
+
+.method-dd-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    font-weight: 400;
+    padding: 3px 10px;
+    white-space: nowrap;
+}
+
+.method-dd-item b {
+    font-weight: 700;
+}
+
+.method-dd-item:hover {
+    background: light-dark(#f0f0f0, #2a2c3a);
+}
+
+.method-dd-item.selected {
+    background: light-dark(#eaeaf5, #2f3147);
 }
 
 /* ─── Sidebar input widgets ──────────────────────────────────────────────── */
@@ -840,6 +907,7 @@ tr {
     font-family: "Source Sans 3";
     font-weight: 400;
     font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;   /* equal-width digits so stat columns align */
     line-height: 1.6;
     text-size-adjust: 100%;
     width: 100%;
@@ -925,7 +993,7 @@ tr {
 }
 
 .overallhscore {
-    background-color: light-dark(#d4d4d4, #3a3a4a);
+    background-color: light-dark(#f0f0f6, #3a3a4a);   /* faint cool grey — matches the cool chrome / dark-mode counterpart */
     color: light-dark(black, white);
     font-weight:400;
     text-align:right;
@@ -986,8 +1054,10 @@ tr {
 }
 
 .ineligible {
-    background-color: light-dark(lightgrey, #555566);
-    color: light-dark(lightgrey, #555566);
+    /* Match the panel grid-border color in each theme so adjacent "nothing here" cells
+       blend into one seamless region (borders disappear into the fill). */
+    background-color: light-dark(#eeeeee, #555566);
+    color: light-dark(#eeeeee, #555566);
 }
 
 .auction-dollar {
@@ -1025,6 +1095,7 @@ tr {
     font-family: "Source Sans 3";
     font-weight: 400;
     font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;   /* equal-width digits so stat columns align */
     line-height: 1.5;
     width: 100%;
 }
@@ -1238,13 +1309,13 @@ tr {
     padding: 5px 8px;
     text-align: center;
     font-weight: 500;
-    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border: 1px solid var(--line-grid);
     white-space: nowrap;
 }
 
 .entry-table td {
     background: light-dark(#ffffff, #1a1c28);
-    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border: 1px solid var(--line-grid);
     padding: 0;
     text-align: center;
     color: light-dark(#555555, #aaaaaa);
@@ -1587,9 +1658,9 @@ tr {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;   /* match .pick-control-label beside it */
     box-sizing: border-box;
-    color: light-dark(#aaaaaa, #666688);
+    color: light-dark(#555555, #aaaaaa);   /* neutral secondary grey, matching nearby labels */
     white-space: nowrap;
     flex-shrink: 0;
     width: 130px;
@@ -1603,18 +1674,10 @@ tr {
     flex-shrink: 0;
 }
 
-.eval-indicator[data-state="evaluating"] {
-    color: light-dark(#666688, #9999bb);
-}
-
 .eval-indicator[data-state="evaluating"]::before {
     border: 2px solid light-dark(#999999, #6666aa);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;
-}
-
-.eval-indicator[data-state="fetching"] {
-    color: light-dark(#886644, #bb9955);
 }
 
 .eval-indicator[data-state="fetching"]::before {
@@ -1950,7 +2013,7 @@ tr {
 }
 
 .account-name {
-    color: light-dark(#666666, #9999bb);
+    color: light-dark(#555555, darkgrey);   /* match .sidebar-section labels (neutral grey) */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1963,7 +2026,7 @@ tr {
     border: 1px solid light-dark(#e5e5e5, #3d3d55);
     border-radius: 4px;
     background: light-dark(#efefef, #2a2a3e);
-    color: light-dark(#555555, #aaaacc);
+    color: light-dark(#555555, darkgrey);   /* match .sidebar-section labels (neutral grey) */
     font-size: 0.8rem;
     cursor: pointer;
 }
