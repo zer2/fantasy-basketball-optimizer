@@ -6,6 +6,7 @@ import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayerResults, getGScoreByName, getShortCategoryNames } from '../../app_state.js'
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
+import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
 import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
@@ -60,11 +61,21 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     pickTh.textContent = 'Pick'
     pickTh.style.width = '48px'
     hrow.append(pickTh)
-    for (const name of teamNames) {
+    teamNames.forEach((name, d) => {
         const th = document.createElement('th')
-        th.textContent = name
+        // Own data → editable display label ("Team N" by default); live platform → the real
+        // team name (identity), shown read-only since it comes from the platform.
+        if (isLivePlatform) {
+            th.textContent = name
+        } else {
+            th.className = 'team-header-cell'
+            const headerWrap = document.createElement('div')
+            headerWrap.className = 'team-header'
+            headerWrap.append(makeTeamLabelInput(d, rosterListenerController!.signal))
+            th.append(headerWrap)
+        }
         hrow.append(th)
-    }
+    })
 
     // Data rows — one row per pick, one column per team
     const selects: CustomSelect[][] = []   // [row][col]
@@ -244,7 +255,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
     const teamSel = makeCustomSelect(
         'sr-team-select',
-        teamNames.map(n => ({ value: n, label: n })),
+        teamNames.map((name, index) => ({ value: name, label: isLivePlatform ? name : getTeamLabel(index) })),
         undefined,
         undefined,
         rosterListenerController.signal,
