@@ -134,7 +134,7 @@ export function goBackDraftPick(): void {
 export function getDraftState(): { player_assignments: Record<string, string[]> } {
     const player_assignments: Record<string, string[]> = {}
     for (let d = 0; d < nDrafters; d++) {
-        const name = teamNames[d] ?? `Drafter ${d + 1}`
+        const name = teamNames[d] ?? `Team ${d + 1}`
         player_assignments[name] = drafted.map(row => row[d]).filter(Boolean) as string[]
     }
     return { player_assignments }

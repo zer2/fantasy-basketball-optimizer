@@ -7,6 +7,7 @@ import { readRequiredIntInput } from '../helper_functions.js'
 import { getCandidatePlayerResults } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
+import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
 import {
     AuctionConfig,
     getPicks, getTeamNames, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
@@ -86,13 +87,16 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     playerCol.style.flex = '1'
     row.append(playerCol)
 
-    // Drafter dropdown — before cost so the cap makes sense visually; full teams excluded
-    const availableTeams = getTeamNames().filter((_, index) =>
-        currentPicks.some(pickRow => pickRow[index] === null)
-    )
+    // Drafter dropdown — before cost so the cap makes sense visually; full teams excluded.
+    // Option value is the team identity ("Team N", mapped back via indexOf on lock-in); the
+    // shown label is the editable display label.
+    const availableTeamOptions = getTeamNames()
+        .map((name, index) => ({ value: name, label: getTeamLabel(index), index }))
+        .filter(({ index }) => currentPicks.some(pickRow => pickRow[index] === null))
+        .map(({ value, label }) => ({ value, label }))
     const teamSel = makeCustomSelect(
         'auction-pick-team',
-        [{ value: '', label: '' }, ...availableTeams.map(n => ({ value: n, label: n }))],
+        [{ value: '', label: '' }, ...availableTeamOptions],
         undefined,
         undefined,
         auctionListenerController?.signal,
@@ -208,11 +212,15 @@ function buildAuctionBoard(): HTMLElement {
     roundTh.textContent = 'Round'
     roundTh.style.width = ROUND_W + 'px'
     hrow.append(roundTh)
-    for (const name of teamNames) {
+    teamNames.forEach((_, d) => {
         const th = document.createElement('th')
-        th.textContent = name
+        th.className = 'team-header-cell'
+        const headerWrap = document.createElement('div')
+        headerWrap.className = 'team-header'
+        headerWrap.append(makeTeamLabelInput(d, auctionListenerController?.signal))
+        th.append(headerWrap)
         hrow.append(th)
-    }
+    })
 
     // Body rows
     const tbody = table.createTBody()

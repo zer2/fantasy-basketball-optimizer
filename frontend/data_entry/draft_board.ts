@@ -8,7 +8,9 @@ import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, ge
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
-import { getDrafterMethodByIndex } from '../parameter_collection/league_settings.js'
+import { getDrafterMethod } from './drafter_methods.js'
+import { makeMethodDropdown } from './method_dropdown.js'
+import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
 import {
     DraftConfig,
     getPickRow, getPickDrafter, getDrafted, getTeamNames, getNDrafters, getNPicks, getConfigKey,
@@ -21,11 +23,17 @@ import {
 
 const _draftDebouncer = makeDebouncer(() => { runEvaluate().catch(err => console.error('Draft evaluate failed:', err)) })
 
-// Tracks the listeners attached by the most recent renderDraftBoard call so
-// they can be detached before the next one. renderDraftBoard is called on every
-// pick — without this, each rebuild would leave the previous pick-control
-// custom select's internal listeners (~9) bound to detached nodes.
-let draftListenerController: AbortController | null = null
+// The header (team-label inputs + method dropdowns) is built ONCE — on first render, on a
+// config change, or if the container was cleared (e.g. applyLayout). Only the pick control and
+// the table body rebuild per pick, so editing a label isn't interrupted mid-keystroke.
+let boardTable:       HTMLTableElement | null = null
+let pickControlSlot:  HTMLElement      | null = null
+
+// Pick-control listeners (the candidate select) are detached every render; header listeners
+// (label inputs + method dropdowns) only when the header itself is rebuilt. Without this, each
+// rebuild would leave the previous custom select's internal listeners (~9) bound to detached nodes.
+let pickListenerController:   AbortController | null = null
+let headerListenerController: AbortController | null = null
 
 let _autopilotRunning = false
 
@@ -47,28 +55,52 @@ export function resetDraftBoard(): void {
 /** Renders the draft board UI into the container. Resets state if sidebar config changed. */
 export function renderDraftBoard(container: HTMLElement): void {
     const cfg = readDraftConfig()
+    const configChanged = cfg.key !== getConfigKey()
 
-    // Reset state if league settings changed (different drafter/pick counts or teams)
-    if (cfg.key !== getConfigKey()) {
-        applyDraftConfig(cfg)
+    // Reset state if league settings changed (different drafter/pick counts, reversal, data source)
+    if (configChanged) applyDraftConfig(cfg)
+
+    // (Re)build the persistent scaffold (pick-control slot + table with its header) on first
+    // render, on a config change, or if the table was detached (container cleared elsewhere).
+    if (configChanged || !boardTable || !container.contains(boardTable)) {
+        buildScaffold(container)
     }
 
-    // Detach listeners from the previous render's custom select so its closures
-    // can be garbage-collected. See comment on draftListenerController.
-    draftListenerController?.abort()
-    draftListenerController = new AbortController()
+    // Pick control: rebuilt every render — its candidate dropdown changes each pick.
+    pickListenerController?.abort()
+    pickListenerController = new AbortController()
+    pickControlSlot!.innerHTML = ''
+    pickControlSlot!.append(buildPickControl(container))
 
-    container.innerHTML = ''
-    container.append(buildPickControl(container))
-    container.append(buildDraftBoard())
+    // Body: rebuilt every render (text + classes only; no components → no header churn).
+    rebuildBoardBody(boardTable!)
 
     // Auto-fire autopilot when the current drafter is an autopilot drafter and the loop is not already running.
     // Guard on G-scores being loaded — on initial page render the session hasn't been created yet,
     // and applyLayout() will re-render once runModeEval() completes, at which point this fires correctly.
     const dataIsReady = getSessionPhase() !== 'uninitialized'
-    if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMethodByIndex(getPickDrafter()) !== 'Manual input') {
+    if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMethod(getPickDrafter()) !== 'Manual input') {
         fireAutopilotPicks(container).catch(err => console.error('Autopilot failed:', err))
     }
+}
+
+/** Builds the stable scaffold: a pick-control slot followed by the board table (header built once,
+ *  empty body). Detaches stale header listeners; the body is filled by rebuildBoardBody. */
+function buildScaffold(container: HTMLElement): void {
+    container.innerHTML = ''
+
+    pickControlSlot = document.createElement('div')
+    pickControlSlot.className = 'draft-pick-control-slot'
+    container.append(pickControlSlot)
+
+    headerListenerController?.abort()
+    headerListenerController = new AbortController()
+
+    const scroll = document.createElement('div')
+    scroll.className = 'entry-table-scroll'
+    boardTable = buildBoardTable(container)
+    scroll.append(boardTable)
+    container.append(scroll)
 }
 
 // ─── Autopilot helpers ────────────────────────────────────────────────────────
@@ -102,7 +134,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
     try {
         while (getPickRow() < getNPicks()) {
-            const mode = getDrafterMethodByIndex(getPickDrafter())
+            const mode = getDrafterMethod(getPickDrafter())
             if (mode === 'Manual input') break
 
             const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
@@ -110,7 +142,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
             let player: string | null
             if (mode === 'H-scoring') {
                 clearFullTeamResult()
-                setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Drafter ${getPickDrafter() + 1}`)
+                setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Team ${getPickDrafter() + 1}`)
                 await runEvaluate()
                 player = pickByHScore()
             } else {
@@ -143,10 +175,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const pickRowVal     = getPickRow()
     const pickDrafterVal = getPickDrafter()
     const nPicks         = getNPicks()
-    const teamNames      = getTeamNames()
 
     const isDone      = pickRowVal >= nPicks
-    const currentMode = isDone ? ('Manual input' as const) : getDrafterMethodByIndex(pickDrafterVal)
+    const currentMode = isDone ? ('Manual input' as const) : getDrafterMethod(pickDrafterVal)
     const isAutopilot = currentMode !== 'Manual input'
 
     // Inline row: label + (player select if manual) + action buttons on the same line
@@ -158,8 +189,8 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     label.textContent = isDone
         ? 'Draft complete'
         : isAutopilot
-            ? `${teamNames[pickDrafterVal] ?? `Drafter ${pickDrafterVal + 1}`} (${currentMode})`
-            : `Select Pick ${pickRowVal + 1} for ${teamNames[pickDrafterVal] ?? `Drafter ${pickDrafterVal + 1}`}`
+            ? `${getTeamLabel(pickDrafterVal)} (${currentMode})`
+            : `Select Pick ${pickRowVal + 1} for ${getTeamLabel(pickDrafterVal)}`
     row.append(label)
 
     if (_autopilotRunning) {
@@ -184,7 +215,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
             available.map(n => ({ value: n, label: n })),
             undefined,
             undefined,
-            draftListenerController?.signal,
+            pickListenerController?.signal,
         )
         sel.element.style.flex = '1'
         row.append(sel.element)
@@ -215,7 +246,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
             goBackDraftPick()
             clearDraftPick(getPickRow(), getPickDrafter())
         } while (
-            getDrafterMethodByIndex(getPickDrafter()) !== 'Manual input'
+            getDrafterMethod(getPickDrafter()) !== 'Manual input'
             && !(getPickRow() === 0 && getPickDrafter() === 0)
         )
         renderDraftBoard(container)
@@ -239,38 +270,59 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 
 // ─── Draft board table ────────────────────────────────────────────────────────
 
-/** Builds the draft board grid table: rounds × drafters with serpentine pick highlighting. */
-function buildDraftBoard(): HTMLElement {
-    const scroll = document.createElement('div')
-    scroll.className = 'entry-table-scroll'
-
-    const nPicks    = getNPicks()
+/** Builds the draft board table with its header (Round | per-drafter [label input][method ▾])
+ *  and an empty body. The header is built once per scaffold; rebuildBoardBody fills the rows. */
+function buildBoardTable(container: HTMLElement): HTMLTableElement {
     const nDrafters = getNDrafters()
-    const teamNames = getTeamNames()
-    const drafted   = getDrafted()
-    const pickRow   = getPickRow()
-    const pickDrafter = getPickDrafter()
 
     const table = document.createElement('table')
-    table.className    = 'entry-table'
+    table.className      = 'entry-table'
     table.style.width    = '100%'
     table.style.minWidth = (ROUND_W + nDrafters * TEAM_W) + 'px'
 
-    // Header: Round | Team1 | Team2 | …
     const thead = table.createTHead()
     const hrow  = thead.insertRow()
     const roundTh = document.createElement('th')
     roundTh.textContent = 'Round'
     roundTh.style.width = ROUND_W + 'px'
     hrow.append(roundTh)
-    for (const name of teamNames) {
+    for (let d = 0; d < nDrafters; d++) {
         const th = document.createElement('th')
-        th.textContent = name
+        th.className = 'team-header-cell'
+        th.append(buildTeamHeader(d, container))
         hrow.append(th)
     }
 
-    // Data rows
-    const tbody = table.createTBody()
+    table.createTBody()   // filled by rebuildBoardBody
+    return table
+}
+
+/** Builds one column header: an editable display-label input plus the compact method dropdown.
+ *  Editing the label only changes presentation (identity stays "Team N") — it persists and
+ *  relabels the seat selector via the team-labels-changed event, without rebuilding the header. */
+function buildTeamHeader(drafterIndex: number, container: HTMLElement): HTMLElement {
+    const cell = document.createElement('div')
+    cell.className = 'team-header'
+
+    cell.append(makeTeamLabelInput(drafterIndex, headerListenerController?.signal))
+
+    cell.append(makeMethodDropdown(
+        drafterIndex
+      , () => renderDraftBoard(container)
+      , headerListenerController?.signal
+    ))
+    return cell
+}
+
+/** Replaces the table body with the current picks: rounds × drafters, serpentine highlighting. */
+function rebuildBoardBody(table: HTMLTableElement): void {
+    const nPicks      = getNPicks()
+    const nDrafters   = getNDrafters()
+    const drafted     = getDrafted()
+    const pickRow     = getPickRow()
+    const pickDrafter = getPickDrafter()
+
+    const tbody = document.createElement('tbody')
     for (let r = 0; r < nPicks; r++) {
         const row = tbody.insertRow()
 
@@ -290,8 +342,9 @@ function buildDraftBoard(): HTMLElement {
         }
     }
 
-    scroll.append(table)
-    return scroll
+    const oldBody = table.tBodies[0]
+    if (oldBody) table.replaceChild(tbody, oldBody)
+    else         table.append(tbody)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -304,11 +357,14 @@ function readDraftConfig(): DraftConfig {
     const thirdRoundReversal = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
     const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
+    // teamNames are excluded from the key: identities are constant "Team N" (so they never
+    // trigger a reset), and editable display labels are presentation-only — a rename must not
+    // reset the draft or rebuild the header. n_drafters covers any change in team count.
     return {
         nDrafters
         , nPicks
         , teamNames
         , thirdRoundReversal
-        , key: `${nDrafters}:${nPicks}:${dataSource}:${thirdRoundReversal}:${teamNames.join(',')}`
+        , key: `${nDrafters}:${nPicks}:${dataSource}:${thirdRoundReversal}`
     }
 }

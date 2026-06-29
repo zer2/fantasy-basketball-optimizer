@@ -42,32 +42,41 @@ function darkTertiary(value: number, multiplier: number, middle: number): RGB {
 }
 
 // ─── Light styler ────────────────────────────────────────────────────────────
-// Matches the Streamlit LightStyler: white base, full-range subtraction
+// Muted pastels on a white base. The original ported Streamlit's "full-range
+// subtraction", which drove strong cells to fully-saturated primary red/green —
+// garish against white. Instead we blend white toward a soft target colour by a
+// capped factor, so even the strongest cell stays pastel. This mirrors the dark
+// styler's restraint (which likewise caps intensity and never reaches a pure primary).
+
+// How far a max-intensity cell travels from white toward its target colour
+// (0 = white, 1 = the full target). Kept well below 1 so cells stay soft.
+// This is the main knob: raise for punchier colour, lower for subtler.
+const LIGHT_BLEND_MAX = 0.7
+
+function blendFromWhite(target: RGB, intensity: number, cap: number): RGB {
+    const t = Math.min(intensity, cap) / cap * LIGHT_BLEND_MAX
+    return [
+        Math.round(255 + t * (target[0] - 255))
+      , Math.round(255 + t * (target[1] - 255))
+      , Math.round(255 + t * (target[2] - 255))
+    ]
+}
 
 function lightPrimary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
-    const intensity = Math.min(Math.round(Math.abs(raw)), 255)
-    return [
-        raw > 0 ? 255 - intensity : 255
-      , raw > 0 ? 255 : 255 - intensity
-      , raw > 0 ? 255 - intensity : 255 - intensity
-    ]
+    const target: RGB = raw > 0 ? [70, 160, 100] : [205, 80, 80]   // soft green (good) / soft red (bad)
+    return blendFromWhite(target, Math.abs(raw), 110)
 }
 
 function lightSecondary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
-    const intensity = Math.min(Math.round(Math.abs(raw)), 255)
-    return [255, raw > 0 ? 255 : 255 - intensity, raw > 0 ? 255 - intensity : 255]
+    const target: RGB = raw > 0 ? [215, 195, 90] : [200, 100, 175]   // soft gold / soft magenta
+    return blendFromWhite(target, Math.abs(raw), 150)
 }
 
 function lightTertiary(value: number, multiplier: number, middle: number): RGB {
     const raw = (value - middle) * multiplier
-    const intensity = Math.min(Math.round(Math.abs(raw)), 100)
-    return [
-        255 - intensity
-      , 255 - intensity
-      , 255
-    ]
+    return blendFromWhite([120, 150, 215], Math.abs(raw), 100)   // soft blue (unsigned magnitude)
 }
 
 // ─── Public exports (light-dark dual output) ─────────────────────────────────

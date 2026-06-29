@@ -4,7 +4,7 @@
 // Used to pre-fill the Season Mode roster table consistently across the app and tests.
 
 export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
-    'Drafter 1': [
+    'Team 1': [
         'Nikola Jokic (C)',
         'Bam Adebayo (C,PF)',
         'James Harden (PG,SG)',
@@ -19,7 +19,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Kevin Porter Jr. (PG,SG)',
         'Dylan Harper (PG,SG)',
     ],
-    'Drafter 2': [
+    'Team 2': [
         'Shai Gilgeous-Alexander (PG)',
         'Cooper Flagg (PG,SG,SF)',
         'Donovan Clingan (C)',
@@ -34,7 +34,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Jimmy Butler (PF,SG,SF)',
         'Ivica Zubac (C)',
     ],
-    'Drafter 3': [
+    'Team 3': [
         'Victor Wembanyama (C,PF)',
         'Kon Knueppel (SG,SF)',
         'Anthony Edwards (PG,SG)',
@@ -49,7 +49,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'AJ Green (PG,SG,SF)',
         'Isaiah Stewart (C,PF)',
     ],
-    'Drafter 4': [
+    'Team 4': [
         'Tyrese Maxey (PG)',
         'Derrick White (PG,SG)',
         'Onyeka Okongwu (C,PF)',
@@ -64,7 +64,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Andrew Nembhard (PG,SG)',
         'Grayson Allen (PG,SG,SF)',
     ],
-    'Drafter 5': [
+    'Team 5': [
         'Scottie Barnes (C,PF,SG,SF)',
         'Dyson Daniels (PG,SG,SF)',
         'Alperen Sengun (C,PF)',
@@ -79,7 +79,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Jock Landale (C)',
         'P.J. Washington (C,PF,SF)',
     ],
-    'Drafter 6': [
+    'Team 6': [
         'Jamal Murray (PG,SG)',
         'Trey Murphy III (PF,SG,SF)',
         'Jalen Duren (C)',
@@ -94,7 +94,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Ajay Mitchell (PG,SG)',
         'Bruce Brown (PG,SG)',
     ],
-    'Drafter 7': [
+    'Team 7': [
         'Kawhi Leonard (PF,SF)',
         'Chet Holmgren (C,PF)',
         "Kel'el Ware (C,PF)",
@@ -109,7 +109,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Brice Sensabaugh (PF,SG,SF)',
         'Moses Moody (PF,SG,SF)',
     ],
-    'Drafter 8': [
+    'Team 8': [
         'Luka Doncic (PG,SG)',
         'Mikal Bridges (PF,SG,SF)',
         'Rudy Gobert (C)',
@@ -124,7 +124,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'RJ Barrett (PF,SG,SF)',
         'Giannis Antetokounmpo (C,PF)',
     ],
-    'Drafter 9': [
+    'Team 9': [
         'Kevin Durant (PF,SG,SF)',
         'Nickeil Alexander-Walker (PG,SG,SF)',
         'Neemias Queta (C,PF)',
@@ -139,7 +139,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Joel Embiid (C)',
         'Kevin Huerter (SG,SF)',
     ],
-    'Drafter 10': [
+    'Team 10': [
         'Karl-Anthony Towns (C,PF)',
         'Desmond Bane (SG,SF)',
         'Jalen Brunson (PG)',
@@ -154,7 +154,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Russell Westbrook (PG,SG)',
         'Jarace Walker (PF,SF)',
     ],
-    'Drafter 11': [
+    'Team 11': [
         'Amen Thompson (PG,SG,SF)',
         'Cade Cunningham (PG,SG)',
         'DeMar DeRozan (PF,SF)',
@@ -169,7 +169,7 @@ export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
         'Daniel Gafford (C)',
         'Goga Bitadze (C)',
     ],
-    'Drafter 12': [
+    'Team 12': [
         'Donovan Mitchell (PG,SG)',
         'Jalen Johnson (PF,SF)',
         'Payton Pritchard (PG)',

@@ -96,7 +96,7 @@ export function getAuctionState(): {
     const player_assignments: Record<string, string[]> = {}
     const remaining_cash:     Record<string, number>   = {}
     for (let d = 0; d < nDrafters; d++) {
-        const name      = teamNames[d] ?? `Drafter ${d + 1}`
+        const name      = teamNames[d] ?? `Team ${d + 1}`
         const teamPicks = picks.map(row => row[d]).filter(Boolean) as AuctionPick[]
         player_assignments[name] = teamPicks.map(p => p.player)
         const spent              = teamPicks.reduce((sum, p) => sum + p.cost, 0)

@@ -19,6 +19,7 @@ import { pref, savePref } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
 
 import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
+import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams, waitForInitialSeasons } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
@@ -59,12 +60,23 @@ const sidebarSections = document.getElementById('sidebar-sections')!
 
 renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
 
+// Seat selector option from a team identity: the value is always the identity ("Team N" for own
+// data; the real name for a live platform). For own-data identities we show the editable display
+// label; a live-platform name (which differs from the "Team N" default) is shown as-is.
+function seatOption(identityName: string, index: number): { value: string; label: string } {
+    const label = identityName === defaultTeamLabel(index) ? getTeamLabel(index) : identityName
+    return { value: identityName, label }
+}
+function seatOptions(names: string[]): { value: string; label: string }[] {
+    return names.map(seatOption)
+}
+
 // Seat selector: rendered once into the fixed DOM element; layout.ts shows/hides the container.
 const seatSelectorContainer = document.getElementById('seat-selector-container') as HTMLElement
 const initialTeamNames = getTeamNames()
 const seatSelect = makeCustomSelect(
     'seat-select',
-    initialTeamNames.map(name => ({ value: name, label: name })),
+    seatOptions(initialTeamNames),
 )
 seatSelect.element.style.flex = '1'
 
@@ -156,7 +168,7 @@ function syncForPlatformSwitch(): void {
         showDefaultRankings().catch(err => console.error('Default rankings failed:', err))
     } else {
         const names = getTeamNames()
-        seatSelect.setOptions(names.map(name => ({ value: name, label: name })), getCurrentSeat() ?? names[0])
+        seatSelect.setOptions(seatOptions(names), getCurrentSeat() ?? names[0])
         if (getCurrentSeat() === null && names.length > 0) setCurrentSeat(names[0])
         buildTableHeader()
         runModeEval()
@@ -190,20 +202,23 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     })
 }
 
-// : debounce 600 ms after last keystroke to avoid flicker while typing.
-let teamNamesTimer: ReturnType<typeof setTimeout> | null = null
+// Team identities (#ls-team-names) only change when the drafter count changes (own data) or a
+// live platform connects — both already drive a layout re-render elsewhere — so this handler just
+// keeps the seat-selector options in sync with the identity set.
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
-    if (teamNamesTimer) clearTimeout(teamNamesTimer)
-    teamNamesTimer = setTimeout(() => {
-        const updatedTeamNames = getTeamNames()
-        seatSelect.setOptions(updatedTeamNames.map(name => ({ value: name, label: name })))
-        if (getCurrentSeat() === null && updatedTeamNames.length > 0) {
-            setCurrentSeat(updatedTeamNames[0])
-            seatSelect.setValue(updatedTeamNames[0])
-        }
-        buildTableHeader()
-        applyLayout()
-    }, 600)
+    const updatedTeamNames = getTeamNames()
+    seatSelect.setOptions(seatOptions(updatedTeamNames), getCurrentSeat() ?? updatedTeamNames[0])
+    if (getCurrentSeat() === null && updatedTeamNames.length > 0) {
+        setCurrentSeat(updatedTeamNames[0])
+        seatSelect.setValue(updatedTeamNames[0])
+    }
+})
+
+// A team's display label changed (header input). Identity/value is unchanged, so only relabel the
+// seat selector's options — preserving the current selection by value.
+document.addEventListener(TEAM_LABELS_CHANGED, () => {
+    const names = getTeamNames()
+    seatSelect.setOptions(seatOptions(names), getCurrentSeat() ?? names[0])
 })
 
 // ─── 2. Player Stats ──────────────────────────────────────────────────────────
