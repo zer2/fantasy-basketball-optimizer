@@ -1365,6 +1365,57 @@ tr {
     overflow: auto;
 }
 
+/* Transposed draft board (mobile): teams as rows, rounds as columns. Freeze the team-name first
+   column and the round-number header row so they stay visible while scrolling right through rounds.
+   The .transposed class is only added on mobile, so these rules don't need a media query. */
+.entry-table.transposed thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.entry-table.transposed tbody th.team-header-cell {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+.entry-table.transposed thead th:first-child {
+    left: 0;
+    z-index: 3;   /* corner: above both the sticky row and the sticky column */
+}
+/* Honor the column widths so pick cells truncate instead of wrapping long names to many lines. */
+.entry-table.transposed {
+    table-layout: fixed;
+}
+/* In the transposed board the team header sits in the frozen first column, so keep the name and
+   method dropdown on ONE compact row to keep team rows short. (The general mobile rule stacks them,
+   which is right for the column-header layout that auction/season still use, but wrong here.) */
+.entry-table.transposed .team-header {
+    flex-direction: row;
+    gap: 3px;
+}
+.entry-table.transposed .team-label-input {
+    width: auto;
+    font-size: 0.72rem;
+    padding: 0 2px;
+}
+/* Compact every transposed cell: tight padding + line-height, a smaller method trigger, and pick
+   names truncate with an ellipsis rather than wrapping — so team rows stay short. */
+.entry-table.transposed th,
+.entry-table.transposed td {
+    padding: 1px 4px;
+    line-height: 1.2;
+}
+.entry-table.transposed td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.entry-table.transposed .method-dd-trigger {
+    width: 15px;
+    height: 15px;
+    font-size: 0.62rem;
+}
+
 /* ─── Pick control ───────────────────────────────────────────────────────────── */
 
 .pick-control-label {
@@ -1491,6 +1542,22 @@ tr {
     .categoricalhscore,
     .categoricalRotoHscore {
         padding: 5px 2px;
+    }
+    /* Tabular figures equalise digit widths for column alignment on desktop, but the
+       extra numeral width crowds the narrow mobile stat columns — use proportional
+       figures here so the values stay compact. */
+    #hscoretable,
+    .panel-table {
+        font-variant-numeric: normal;
+    }
+    /* Stack each board header so the team name sits on its own line above the method
+       dropdown — keeps the column narrow to save horizontal space. */
+    .team-header {
+        flex-direction: column;
+        gap: 2px;
+    }
+    .team-header .team-label-input {
+        width: 100%;
     }
     /* Tighten vertical spacing between the candidate-panel sections so there's
        not a big empty band between the auction board and the candidate table. */

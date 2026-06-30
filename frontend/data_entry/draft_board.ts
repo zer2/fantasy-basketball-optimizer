@@ -3,7 +3,7 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { readRequiredIntInput } from '../helper_functions.js'
+import { isMobileViewport, readRequiredIntInput } from '../helper_functions.js'
 import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
@@ -37,8 +37,16 @@ let headerListenerController: AbortController | null = null
 
 let _autopilotRunning = false
 
-const ROUND_W = 32   // px — Round label column
-const TEAM_W  = 50   // px — per-drafter column (min-width floor only; table fills available width)
+// Mobile transposes the board (teams as rows, rounds as columns) with a frozen team-name column.
+// `transposed` is the orientation the current scaffold was built for; the scaffold rebuilds when
+// the viewport crosses the mobile breakpoint and this flips.
+let transposed        = false
+let lastScrolledRound = -1   // mobile auto-scroll: only nudge when the current round changes
+
+const ROUND_W    = 32   // px — Round label column (desktop)
+const TEAM_W     = 50   // px — per-drafter column, desktop (min-width floor; table fills width)
+const TEAMCOL_W  = 90   // px — frozen team-name column (transposed mobile; fits name + method dropdown on one row)
+const ROUNDCOL_W = 64   // px — per-round column (transposed mobile)
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -61,8 +69,9 @@ export function renderDraftBoard(container: HTMLElement): void {
     if (configChanged) applyDraftConfig(cfg)
 
     // (Re)build the persistent scaffold (pick-control slot + table with its header) on first
-    // render, on a config change, or if the table was detached (container cleared elsewhere).
-    if (configChanged || !boardTable || !container.contains(boardTable)) {
+    // render, on a config change, if the table was detached (container cleared elsewhere), or on
+    // an orientation flip (desktop ⇄ mobile transpose).
+    if (configChanged || !boardTable || !container.contains(boardTable) || isMobileViewport() !== transposed) {
         buildScaffold(container)
     }
 
@@ -88,6 +97,8 @@ export function renderDraftBoard(container: HTMLElement): void {
  *  empty body). Detaches stale header listeners; the body is filled by rebuildBoardBody. */
 function buildScaffold(container: HTMLElement): void {
     container.innerHTML = ''
+    transposed = isMobileViewport()
+    lastScrolledRound = -1
 
     pickControlSlot = document.createElement('div')
     pickControlSlot.className = 'draft-pick-control-slot'
@@ -270,9 +281,15 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 
 // ─── Draft board table ────────────────────────────────────────────────────────
 
-/** Builds the draft board table with its header (Round | per-drafter [label input][method ▾])
- *  and an empty body. The header is built once per scaffold; rebuildBoardBody fills the rows. */
+/** Builds the board table for the current orientation. Header widgets (team label + method
+ *  dropdown) are built once per scaffold; rebuildBoardBody fills the data cells. */
 function buildBoardTable(container: HTMLElement): HTMLTableElement {
+    return transposed ? buildTransposedTable(container) : buildStandardTable(container)
+}
+
+/** Desktop: rounds as rows, teams as columns. Header row = Round | per-team [label input][method ▾];
+ *  empty body filled by rebuildStandardBody. */
+function buildStandardTable(container: HTMLElement): HTMLTableElement {
     const nDrafters = getNDrafters()
 
     const table = document.createElement('table')
@@ -293,7 +310,46 @@ function buildBoardTable(container: HTMLElement): HTMLTableElement {
         hrow.append(th)
     }
 
-    table.createTBody()   // filled by rebuildBoardBody
+    table.createTBody()   // filled by rebuildStandardBody
+    return table
+}
+
+/** Mobile: teams as rows, rounds as columns, with a frozen team-name first column. The header row is
+ *  round numbers; each team row's first cell is the persistent team header (sticky). The trailing
+ *  pick cells are filled/rebuilt by rebuildTransposedBody. */
+function buildTransposedTable(container: HTMLElement): HTMLTableElement {
+    const nDrafters = getNDrafters()
+    const nPicks    = getNPicks()
+
+    const table = document.createElement('table')
+    table.className      = 'entry-table transposed'
+    table.style.width    = '100%'
+    table.style.minWidth = (TEAMCOL_W + nPicks * ROUNDCOL_W) + 'px'
+
+    // Header: [corner] | 1 | 2 | … | nPicks
+    const thead = table.createTHead()
+    const hrow  = thead.insertRow()
+    const corner = document.createElement('th')
+    corner.style.width = TEAMCOL_W + 'px'
+    hrow.append(corner)
+    for (let r = 0; r < nPicks; r++) {
+        const th = document.createElement('th')
+        th.textContent = String(r + 1)
+        th.style.width = ROUNDCOL_W + 'px'
+        hrow.append(th)
+    }
+
+    // One body row per team; first cell = persistent team header (kept across picks by
+    // rebuildTransposedBody, which only rebuilds the trailing pick cells).
+    const tbody = table.createTBody()
+    for (let d = 0; d < nDrafters; d++) {
+        const row = tbody.insertRow()
+        const teamCell = document.createElement('th')
+        teamCell.className = 'team-header-cell'
+        teamCell.style.width = TEAMCOL_W + 'px'
+        teamCell.append(buildTeamHeader(d, container))
+        row.append(teamCell)
+    }
     return table
 }
 
@@ -314,8 +370,14 @@ function buildTeamHeader(drafterIndex: number, container: HTMLElement): HTMLElem
     return cell
 }
 
-/** Replaces the table body with the current picks: rounds × drafters, serpentine highlighting. */
+/** Repaints the picks for the current orientation. */
 function rebuildBoardBody(table: HTMLTableElement): void {
+    if (transposed) rebuildTransposedBody(table)
+    else            rebuildStandardBody(table)
+}
+
+/** Desktop: replace the whole body with rounds × drafters (team headers live in <thead>). */
+function rebuildStandardBody(table: HTMLTableElement): void {
     const nPicks      = getNPicks()
     const nDrafters   = getNDrafters()
     const drafted     = getDrafted()
@@ -345,6 +407,41 @@ function rebuildBoardBody(table: HTMLTableElement): void {
     const oldBody = table.tBodies[0]
     if (oldBody) table.replaceChild(tbody, oldBody)
     else         table.append(tbody)
+}
+
+/** Mobile: per team row, keep the sticky team-header cell (cell 0) and rebuild only the trailing
+ *  pick cells (one per round). Auto-scrolls the current round into view when the round changes. */
+function rebuildTransposedBody(table: HTMLTableElement): void {
+    const nPicks      = getNPicks()
+    const nDrafters   = getNDrafters()
+    const drafted     = getDrafted()
+    const pickRow     = getPickRow()
+    const pickDrafter = getPickDrafter()
+    const tbody       = table.tBodies[0]
+
+    let currentCell: HTMLTableCellElement | null = null
+    for (let d = 0; d < nDrafters; d++) {
+        const row = tbody.rows[d]
+        while (row.cells.length > 1) row.deleteCell(-1)   // keep the sticky team header (cell 0)
+        for (let r = 0; r < nPicks; r++) {
+            const cell   = row.insertCell()
+            const player = drafted[r][d]
+            if (player) {
+                cell.textContent = player
+                cell.classList.add('drafted')
+            } else if (r === pickRow && d === pickDrafter) {
+                cell.classList.add('current-pick')
+                currentCell = cell
+            }
+        }
+    }
+
+    // Follow the draft: bring the current round column into view, but only when the round actually
+    // changes, so it doesn't fight the user's manual horizontal scrolling.
+    if (currentCell && pickRow !== lastScrolledRound) {
+        currentCell.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+        lastScrolledRound = pickRow
+    }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
