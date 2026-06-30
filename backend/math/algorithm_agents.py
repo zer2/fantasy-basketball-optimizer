@@ -14,13 +14,33 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.special import ndtr, ndtri
+
+# Direct standard-normal pdf / cdf / ppf. Equivalent to scipy.stats.norm.{pdf,cdf,ppf} (loc is
+# always 0 here; scale defaults to 1) but far cheaper — scipy.stats.norm.* routes every call
+# through the generic continuous-distribution machinery (argsreduce, _support_mask, place, ...),
+# which dominated get_pdf/get_cdf in the gradient loop.
+_INV_SQRT_2PI = 1.0 / np.sqrt(2.0 * np.pi)
+
+
+def _normal_pdf(x, scale=1.0):
+    z = x / scale
+    return _INV_SQRT_2PI / scale * np.exp(-0.5 * z * z)
+
+
+def _normal_cdf(x, scale=1.0):
+    return ndtr(x / scale)
+
+
+def _normal_ppf(q, scale=1.0):
+    return scale * ndtri(q)
 from itertools import combinations
 
 from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
 from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
+    get_player_rows,
     check_single_player_eligibility,
     check_all_player_eligibility,
 )
@@ -223,6 +243,14 @@ class HAgent:
         my_players = [p for p in player_assignments[drafter] if p == p]
         self.players = my_players
 
+        # Position-optimiser throttle schedule for this run. Draft uses the 'tiered' schedule; auction
+        # defaults to 'exact' (dollar values anchor on the whole-distribution replacement level, so
+        # they're sensitive to the approximated tail). _position_mode_override lets benchmarks/tests
+        # force a specific schedule: 'exact' | 'tiered' | 'light'.
+        self._position_mode = getattr(self, '_position_mode_override', None) or (
+            'light' if cash_remaining_per_team is not None else 'tiered'
+        )
+
         n_players_selected = len(my_players)
         players_chosen     = [x for v in player_assignments.values() for x in v if x == x]
 
@@ -238,7 +266,7 @@ class HAgent:
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis=2)
 
         if len(my_players) > 0:
-            cdf_original = norm.cdf(
+            cdf_original = _normal_cdf(
                 (diff_means + x_scores_available_array).mean(axis=2),
                 scale=np.sqrt(diff_vars.mean(axis=2)),
             )
@@ -247,7 +275,7 @@ class HAgent:
                 self.transformation_matrix_inverted,
                 cdf_original + self.transformation_addition_constant,
             )
-            corrected_strength = norm.ppf(cdf_mod, scale=np.sqrt(diff_vars.mean(axis=2)))
+            corrected_strength = _normal_ppf(cdf_mod, scale=np.sqrt(diff_vars.mean(axis=2)))
             x_scores_available_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_available_array  = np.expand_dims(x_scores_available_mod, axis=2)
 
@@ -505,14 +533,30 @@ class HAgent:
 
         if (n_players_selected < self.n_picks - 1) and self.dynamic:
 
-            for _ in range(max(1, n_iterations)):
+            # Eligibility rows depend only on which players are eligible for which slots — not on the
+            # category weights — so build them once here instead of on every gradient iteration.
+            if self.position_means is not None:
+                n_total_picks          = sum(self._pos_cfg.position_numbers.values())
+                candidate_player_array = get_player_rows(self.positions.loc[result_index], self._pos_cfg)
+                team_so_far_array      = (get_player_rows(self.positions.loc[self.players], self._pos_cfg)
+                                          if len(self.players) > 0
+                                          else np.empty((0, n_total_picks)))
+            else:
+                candidate_player_array = None
+                team_so_far_array      = None
+
+            # Throttled position optimisation reuses the previous iteration's roster assignment for
+            # lower-ranked candidates; this cache starts empty each perform_iterations call.
+            self._position_rosters_cache = None
+
+            for iteration in range(max(1, n_iterations)):
                 category_weights_current  = category_weights
                 position_shares_current   = position_shares
 
                 gradient_result = self.get_objective_and_gradient(
                     category_weights, position_shares, diff_means, diff_vars,
-                    x_scores_available_array, result_index, n_players_selected,
-                    sigma_2_m, pitching_preference,
+                    x_scores_available_array, candidate_player_array, team_so_far_array,
+                    n_players_selected, sigma_2_m, iteration, pitching_preference,
                 )
 
                 score               = gradient_result['Score']
@@ -656,26 +700,50 @@ class HAgent:
     def get_position_priorities_from_category_weights(self, weights):
         return np.einsum('ij, akj -> ik', weights / self.v.T, self.position_means)
 
+    def _active_candidate_count(self, iteration, n_candidates):
+        """How many top candidates to re-solve roster positions for this iteration (the rest reuse
+        the previous iteration's assignment). iteration+1 so the final iteration is a full pass."""
+        mode = self._position_mode
+        if mode == 'exact':
+            return n_candidates
+        if mode == 'light':                       # top 300 every iteration, everyone every 5th
+            return n_candidates if (iteration + 1) % 5 == 0 else min(300, n_candidates)
+        # 'tiered': top 30 every iteration, top 70 every 5th, everyone every 10th
+        if (iteration + 1) % 10 == 0:
+            return n_candidates
+        if (iteration + 1) % 5 == 0:
+            return min(70, n_candidates)
+        return min(30, n_candidates)
+
     def get_objective_and_gradient(self
                                     , category_weights
                                     , position_shares
                                     , diff_means
                                     , diff_vars
                                     , x_scores_available_array
-                                    , result_index
+                                    , candidate_player_array
+                                    , team_so_far_array
                                     , n_players_selected
                                     , sigma_2_m
+                                    , iteration
                                     , pitching_preference=None):
 
         if self.position_means is not None:
             position_rewards = self.get_position_priorities_from_category_weights(category_weights)
+            # Re-solve positions for the top candidates every iteration, the next tier every 5th, and
+            # everyone every 10th; reuse cached assignments otherwise. iteration+1 so the last
+            # iteration (i = n_iterations-1) lands on a full pass, keeping the final scores consistent.
+            active_count = self._active_candidate_count(iteration, candidate_player_array.shape[0])
             rosters, future_position_array, flex_shares = optimize_positions_all_players(
-                self.positions.loc[result_index],
+                candidate_player_array,
                 position_rewards,
-                self.positions.loc[self.players],
+                team_so_far_array,
                 position_shares,
                 self._pos_cfg,
+                active_count=active_count,
+                cached_rosters=self._position_rosters_cache,
             )
+            self._position_rosters_cache = rosters
             position_mu = np.einsum('aij,bi -> bj', self.position_means, future_position_array)
             position_mu = np.expand_dims(position_mu, axis=2)
         else:
@@ -821,7 +889,7 @@ class HAgent:
                                                    , calculate_pdf_weights=False
                                                    , test_mode=False):
         diff_means   = x_diff_array / np.sqrt(diff_vars)
-        pdf_estimates = norm.pdf(diff_means)
+        pdf_estimates = _normal_pdf(diff_means)
         f = self.get_f(pdf_estimates)
         g = self.get_g(pdf_estimates)
 
@@ -848,12 +916,12 @@ class HAgent:
     def get_pdf(self, x_diff_array, diff_vars):
         r = x_diff_array.reshape(x_diff_array.shape[0], x_diff_array.shape[1] * x_diff_array.shape[2])
         v = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
-        return norm.pdf(r, scale=np.sqrt(v)).reshape(x_diff_array.shape)
+        return _normal_pdf(r, scale=np.sqrt(v)).reshape(x_diff_array.shape)
 
     def get_cdf(self, x_diff_array, diff_vars):
         r = x_diff_array.reshape(x_diff_array.shape[0], x_diff_array.shape[1] * x_diff_array.shape[2])
         v = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
-        return norm.cdf(r, scale=np.sqrt(v)).reshape(x_diff_array.shape)
+        return _normal_cdf(r, scale=np.sqrt(v)).reshape(x_diff_array.shape)
 
     def clear_initial_weights(self):
         self.initial_category_weights = None
@@ -863,7 +931,8 @@ class HAgent:
     # ── simplified-form x_mu helpers (unchanged) ──────────────────────────────
 
     def get_x_mu_simplified_form(self, c, L, v):
-        return np.einsum('aij,ajk -> aik', L, self.get_last_four_terms(c, L, v))
+        # 'aij,ajk -> aik' is a batched matmul; @ dispatches to BLAS (~5-6x faster than einsum here).
+        return L @ self.get_last_four_terms(c, L, v)
 
     def get_term_two(self, c, v):
         return (
@@ -888,9 +957,9 @@ class HAgent:
         return self.get_term_five_a(c, L, v) / self.get_term_five_b(c, L, v)
 
     def get_term_five_a(self, c, L, v):
-        vvL       = np.einsum('ac,pcd -> pad', v.dot(v.T), L)
+        vvL       = v.dot(v.T) @ L
         factor_top = np.einsum('pad,dp -> ap', vvL, c.T)
-        vL        = np.einsum('ac,pcd -> pad', v.T, L)
+        vL        = v.T @ L
         vLv       = np.einsum('pad,dc -> ap', vL, v)
         factor    = (factor_top / vLv).T
         c_mod     = c - factor
@@ -900,7 +969,7 @@ class HAgent:
     def get_term_five_b(self, c, L, v):
         cL  = np.einsum('pc,pcd -> pd', c, L)
         cLc = np.einsum('pd,pd -> p', cL, c)
-        vTL = np.einsum('ac,pcd -> pad', v.T, L)
+        vTL = v.T @ L
         vTLv = np.einsum('pad,dc -> ap', vTL, v)
         Lct = np.einsum('pcd,dp -> cp', L, c.T)
         vTLc = np.einsum('ac,cp -> ap', v.T, Lct)
@@ -913,9 +982,9 @@ class HAgent:
         return (np.identity(v.shape[0]) * self.gamma).reshape(1, v.shape[0], v.shape[0])
 
     def get_del_term_five_a(self, c, L, v):
-        vvL       = np.einsum('ac,pcd -> pad', v.dot(v.T), L)
+        vvL       = v.dot(v.T) @ L
         factor_top = np.einsum('pad,dp -> ap', vvL, c.T)
-        vL        = np.einsum('ac,pcd -> pad', v.T, L)
+        vL        = v.T @ L
         vLv       = np.einsum('pad,dj -> jp', vL, v)
         factor    = (factor_top / vLv).T
         c_mod     = c - factor
@@ -923,12 +992,12 @@ class HAgent:
         top       = top_og.reshape(-1, 1, v.shape[0])
         bottom    = np.sqrt(np.einsum('pd,pd -> p', top_og, c_mod).reshape(-1, 1, 1))
         side      = (np.identity(v.shape[0])
-                     - np.einsum('ac,pcd -> pad', v.dot(v.T), L) / vLv.reshape(-1, 1, 1))
+                     - (v.dot(v.T) @ L) / vLv.reshape(-1, 1, 1))
         return np.einsum('pia,pad -> pid', top / bottom, side).reshape(-1, 1, v.shape[0])
 
     def get_del_term_five_b(self, c, L, v):
         cL   = np.einsum('pc,pcd -> pd', c, L)
-        vTL  = np.einsum('ac,pcd -> pad', v.T, L)
+        vTL  = v.T @ L
         vTLv = np.einsum('pad,dj -> paj', vTL, v)
         Lct  = np.einsum('pcd,dp -> cp', L, c.T)
         vTLc = np.einsum('ac,cp -> ap', v.T, Lct)
@@ -947,23 +1016,23 @@ class HAgent:
                 + self.get_del_term_four(c, v) * self.get_term_five(c, L, v))
 
     def get_last_three_terms(self, c, L, v):
-        return np.einsum('aij,ajk -> aik', L, self.get_terms_four_five(c, L, v))
+        return L @ self.get_terms_four_five(c, L, v)
 
     def get_del_last_three_terms(self, c, L, v):
-        return np.einsum('aij,ajk -> aik', L, self.get_del_terms_four_five(c, L, v))
+        return L @ self.get_del_terms_four_five(c, L, v)
 
     def get_last_four_terms(self, c, L, v):
-        return np.einsum('aij,ajk -> aik', self.get_term_two(c, v), self.get_last_three_terms(c, L, v))
+        return self.get_term_two(c, v) @ self.get_last_three_terms(c, L, v)
 
     def get_del_last_four_terms(self, c, L, v):
         ci   = self.get_del_term_two(v)
         cii  = self.get_last_three_terms(c, L, v)
         ta   = np.einsum('aijk,aj -> aik', ci, cii.reshape(-1, v.shape[0]))
-        tb   = np.einsum('aij,ajk -> aik', self.get_term_two(c, v), self.get_del_last_three_terms(c, L, v))
+        tb   = self.get_term_two(c, v) @ self.get_del_last_three_terms(c, L, v)
         return ta + tb
 
     def get_del_full(self, c, L, v):
-        return np.einsum('aij,ajk -> aik', L, self.get_del_last_four_terms(c, L, v))
+        return L @ self.get_del_last_four_terms(c, L, v)
 
     # ── Rotisserie helpers (unchanged) ─────────────────────────────────────────
 
@@ -971,7 +1040,8 @@ class HAgent:
         return pdfs.sum(axis=2)
 
     def get_g(self, pdfs):
-        return np.einsum('pao,pbo -> pab', pdfs, pdfs)
+        # 'pao,pbo -> pab' is a batched matmul (pdfs @ pdfs^T per row); @ dispatches to BLAS.
+        return pdfs @ pdfs.transpose(0, 2, 1)
 
     def get_h_p(self, f, g):
         g1 = g.copy()
@@ -987,7 +1057,7 @@ class HAgent:
         return (n_managers - 1) / (2 * np.pi) * first
 
     def get_v(self, mu_d, sigma_d):
-        return norm.cdf(mu_d / sigma_d).reshape(-1)
+        return _normal_cdf(mu_d / sigma_d).reshape(-1)
 
     def get_mu_d(self, mu_p, mu_l, n_managers, n_categories):
         return mu_p * n_managers / (n_managers - 1) - n_categories * n_managers / 2 - mu_l
@@ -1021,7 +1091,7 @@ class HAgent:
         rho2 = rho.copy()
         rho2[:, np.arange(rho2.shape[1]), np.arange(rho2.shape[2])] = 0
         inside  = -pdfs - f.reshape(-1, f.shape[1], 1)
-        fp      = np.einsum('pab,pbc -> pac', rho2, inside)
+        fp      = rho2 @ inside   # 'pab,pbc -> pac' batched matmul
         fc1     = (opponent_mu_matrix * pdfs) * (fp + (pdfs - f.reshape(-1, f.shape[1], 1)))
         fc2     = pdfs * (1 - 2 * cdfs)
         return (fc1 + fc2) * n_managers / (n_managers - 1)
@@ -1030,7 +1100,7 @@ class HAgent:
         return n_managers / (n_managers - 1) * pdfs
 
     def get_del_v(self, sigma_d, del_mu_d, mu_d, del_sigma_2_p):
-        return (norm.pdf(mu_d / sigma_d) / (sigma_d ** 3)
+        return (_normal_pdf(mu_d / sigma_d) / (sigma_d ** 3)
                 * (sigma_d ** 2 * del_mu_d - mu_d * del_sigma_2_p / 2))
 
 
