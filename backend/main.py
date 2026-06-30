@@ -26,6 +26,7 @@ from backend.auth import (
 from backend.secret_config import get_secret
 
 from backend.session import create_session, get_session, delete_session
+from backend.server_timing import begin_timing, server_timing_header
 from backend.pipeline import run_pipeline, _parse_projection_csv, clear_v0_cache
 from backend.models import (
     UploadResponse,
@@ -281,6 +282,20 @@ async def _revalidate_app_assets(request: Request, call_next):
     path = request.url.path
     if path == '/' or path.startswith(('/dist', '/styles')):
         response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+@app.middleware('http')
+async def _server_timing(request: Request, call_next):
+    """Append a `total` entry to Server-Timing for every request so each fetch's total server
+    time shows in DevTools -> Network -> Timing. Instrumented handlers (e.g. /evaluate) set their
+    own phase breakdown on the response first; this preserves it and adds the total."""
+    start = time.perf_counter()
+    response = await call_next(request)
+    total_ms = (time.perf_counter() - start) * 1000
+    existing = response.headers.get('Server-Timing')
+    total_entry = f'total;dur={total_ms:.1f}'
+    response.headers['Server-Timing'] = f'{existing}, {total_entry}' if existing else total_entry
     return response
 
 
@@ -573,7 +588,8 @@ def get_g_scores_route(session_id: str):
 # ── POST /sessions/{session_id}/evaluate ──────────────────────────────────────
 
 @app.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse)
-def evaluate_route(session_id: str, req: EvaluateRequest):
+def evaluate_route(session_id: str, req: EvaluateRequest, response: Response):
+    begin_timing()
 
     # Fetch once here so a missing/expired session returns a clean 404; the live
     # session object is handed to run_evaluate, which reads n_iterations from it.
@@ -589,9 +605,11 @@ def evaluate_route(session_id: str, req: EvaluateRequest):
             exclusion_list     = req.exclusion_list,
             remaining_cash     = req.remaining_cash,
         )
-        return result
     except Exception:
         raise _fail(500, 'Evaluation failed.')
+
+    response.headers['Server-Timing'] = server_timing_header()
+    return result
 
 
 # ── POST /sessions/{session_id}/trade/analyze ────────────────────────────────

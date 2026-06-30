@@ -53,43 +53,41 @@ def get_future_player_rows(position_rewards: np.ndarray
 
 
 def get_player_rows(players: list, pos_cfg: PositionConfig) -> np.ndarray:
-    """Turns a list of player eligibilities into a row array for the
-    assignment problem."""
+    """Turns a list of player eligibilities into a row array for the assignment
+    problem: one row per player, one column per roster slot, 0 where the player is
+    eligible for that slot and -inf where not.
 
+    Slots are ordered base positions first (each repeated position_numbers[code]
+    times) then flex positions, matching get_future_player_rows / the optimiser.
+    """
     n_players          = len(players)
     position_structure = pos_cfg.position_structure
     position_numbers   = pos_cfg.position_numbers
     base_list          = position_structure['base_list']
     flex_list          = position_structure['flex_list']
+    base_index         = {position_code: i for i, position_code in enumerate(base_list)}
 
-    base_index     = {position_code: i for i, position_code in enumerate(base_list)}
-    is_base        = np.array([[position_code in player for position_code in base_list] for player in players])
+    # (n_players, n_base) eligibility for each base position. (reshape covers n_players == 0,
+    # where the list comprehension would otherwise collapse to shape (0,).)
+    is_base = np.array(
+        [[position_code in player for position_code in base_list] for player in players],
+        dtype=bool,
+    ).reshape(n_players, len(base_list))
 
-    base_slots = {
-        position_code: np.where(
-            is_base[:, base_index[position_code]].reshape(-1, 1),
-            [[0]       * position_numbers[position_code]] * n_players,
-            [[-np.inf] * position_numbers[position_code]] * n_players,
-        )
-        for position_code in base_list
-    }
-
-    flex_slots = {
-        position_code: np.where(
-            is_base[:, [base_index[b] for b in position_structure['flex'][position_code]['bases']]]
-            .any(axis=1).reshape(-1, 1),
-            [[0]       * position_numbers[position_code]] * n_players,
-            [[-np.inf] * position_numbers[position_code]] * n_players,
-        )
+    # Per-slot-group eligibility in final slot order: a base group is eligible iff the player
+    # has that base position; a flex group iff the player has ANY of its eligible bases.
+    group_eligible = [is_base[:, base_index[position_code]] for position_code in base_list]
+    group_eligible += [
+        is_base[:, [base_index[b] for b in position_structure['flex'][position_code]['bases']]].any(axis=1)
         for position_code in flex_list
-    }
+    ]
+    group_slot_counts = [position_numbers[position_code] for position_code in base_list + flex_list]
 
-    res = np.concatenate(
-        [base_slots[p] for p in base_list]
-        + [flex_slots[p] for p in flex_list],
-        axis=1,
-    )
-    return res
+    # Map eligibility to 0 / -inf on the compact (n_players, n_groups) matrix, then expand each
+    # group to its slot count with one vectorised np.repeat — replacing the per-group Python
+    # list-of-lists builds + dict + concatenate of the original.
+    group_values = np.where(np.stack(group_eligible, axis=1), 0.0, -np.inf)
+    return np.repeat(group_values, group_slot_counts, axis=1)
 
 
 def _optimize_positions_for_prospective_player(
@@ -153,32 +151,38 @@ def get_position_array_from_res(res: np.ndarray
 # ── public API ────────────────────────────────────────────────────────────────
 
 def optimize_positions_all_players(
-    candidate_players: list
+    candidate_player_array: np.ndarray
     , position_rewards: np.ndarray
-    , team_so_far: list
+    , team_so_far_array: np.ndarray
     , position_shares: dict
     , pos_cfg: PositionConfig
     , scale_down: bool = True
+    , active_count: int | None = None
+    , cached_rosters: np.ndarray | None = None
 ):
-    position_numbers   = pos_cfg.position_numbers
-    n_total_picks      = sum(position_numbers.values())
-    n_remaining_players = n_total_picks - 1 - len(team_so_far)
+    # The eligibility rows (candidate_player_array, team_so_far_array) are weight-independent, so the
+    # caller builds them once per evaluate via get_player_rows rather than once per gradient iteration.
+    n_total_picks       = sum(pos_cfg.position_numbers.values())
+    n_remaining_players = n_total_picks - 1 - team_so_far_array.shape[0]
+    n_candidates        = candidate_player_array.shape[0]
 
-    reward_array          = get_future_player_rows(position_rewards, pos_cfg)
-    team_so_far_array     = (get_player_rows(team_so_far, pos_cfg)
-                             if len(team_so_far) > 0
-                             else np.empty((0, n_total_picks)))
-    candidate_player_array = get_player_rows(candidate_players, pos_cfg)
+    reward_array = get_future_player_rows(position_rewards, pos_cfg)
 
-    rosters = np.concatenate(
-        [[
-            _optimize_positions_for_prospective_player(
-                player, reward_vector, team_so_far_array, n_remaining_players
-            )
-            for player, reward_vector in zip(candidate_player_array, reward_array)
-        ]],
-        axis=0,
-    )
+    # Throttle: solve the roster assignment only for the top `active_count` candidates and reuse the
+    # previous iteration's assignment for the rest. The per-candidate Hungarian solve dominates the
+    # cost, and a lower-ranked candidate's optimal slots barely move between iterations. A full solve
+    # runs when there is no cache yet or active_count already covers everyone.
+    if cached_rosters is None or active_count is None or active_count >= n_candidates:
+        active_count = n_candidates
+
+    active_rosters = np.array([
+        _optimize_positions_for_prospective_player(
+            player, reward_vector, team_so_far_array, n_remaining_players
+        )
+        for player, reward_vector in zip(candidate_player_array[:active_count], reward_array[:active_count])
+    ])
+    rosters = (active_rosters if active_count >= n_candidates
+               else np.concatenate([active_rosters, cached_rosters[active_count:]], axis=0))
 
     final_positions, flex_shares = get_position_array_from_res(
         rosters, position_shares, n_remaining_players, pos_cfg

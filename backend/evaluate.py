@@ -18,6 +18,7 @@ from backend.models import (
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.helper_functions import extract_last_name
+from backend.server_timing import record_phase
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -56,13 +57,14 @@ def run_evaluate(
 
     # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()
-    h_score_result = H.get_h_scores(
-        player_assignments      = player_assignments,
-        drafter                 = my_team_id,
-        n_iterations            = n_iterations,
-        cash_remaining_per_team = remaining_cash,
-        exclusion_list          = exclusion_list,
-    )
+    with record_phase('hscores'):
+        h_score_result = H.get_h_scores(
+            player_assignments      = player_assignments,
+            drafter                 = my_team_id,
+            n_iterations            = n_iterations,
+            cash_remaining_per_team = remaining_cash,
+            exclusion_list          = exclusion_list,
+        )
     actual_iterations = max(1, n_iterations)
 
     if h_score_result is None:
@@ -89,21 +91,23 @@ def run_evaluate(
             team_names        = current_params.get('team_names', [my_team_id])
             empty_assignments = {name: [] for name in team_names}
             generic_H         = H.clear_initial_weights()
-            generic_result = generic_H.get_h_scores(
-                player_assignments      = empty_assignments,
-                drafter                 = my_team_id,
-                n_iterations            = n_iterations,
-                cash_remaining_per_team = remaining_cash,
-                exclusion_list          = [],
-            )
+            with record_phase('hscores_generic'):
+                generic_result = generic_H.get_h_scores(
+                    player_assignments      = empty_assignments,
+                    drafter                 = my_team_id,
+                    n_iterations            = n_iterations,
+                    cash_remaining_per_team = remaining_cash,
+                    exclusion_list          = [],
+                )
             if generic_result is not None:
                 session.generic_h_scores = generic_result['Scores'].sort_values(ascending=False)
 
-    candidates = _build_candidates(
-        h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
-        remaining_cash,
-        generic_h_scores=session.generic_h_scores,
-    )
+    with record_phase('build_candidates'):
+        candidates = _build_candidates(
+            h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
+            remaining_cash,
+            generic_h_scores=session.generic_h_scores,
+        )
 
     return EvaluateResponse(
         iteration  = actual_iterations,
