@@ -15,7 +15,7 @@ from typing import Optional
 import yaml
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, FileResponse, RedirectResponse, HTMLResponse
+from fastapi.responses import Response, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -297,27 +297,6 @@ async def _server_timing(request: Request, call_next):
     total_entry = f'total;dur={total_ms:.1f}'
     response.headers['Server-Timing'] = f'{existing}, {total_entry}' if existing else total_entry
     return response
-
-
-# ── Performance profiling (pyinstrument; opt-in per request) ──────────────────
-
-def _start_profiler_if_requested(request: Request):
-    """Return a started pyinstrument Profiler when the request carries `?profile`, else None.
-    Profiles the handler's own (sync, threadpool) thread, so it captures the real compute; the
-    handler returns the rendered flame report instead of the JSON payload. pyinstrument is imported
-    lazily so it's only needed when actually profiling."""
-    if not request.query_params.get('profile'):
-        return None
-    from pyinstrument import Profiler
-    profiler = Profiler()
-    profiler.start()
-    return profiler
-
-
-def _profiler_report(profiler) -> HTMLResponse:
-    """Stop the profiler and return its interactive HTML report as the response."""
-    profiler.stop()
-    return HTMLResponse(profiler.output_html())
 
 
 # ── Auth (Google OIDC login) ──────────────────────────────────────────────────
@@ -609,7 +588,7 @@ def get_g_scores_route(session_id: str):
 # ── POST /sessions/{session_id}/evaluate ──────────────────────────────────────
 
 @app.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse)
-def evaluate_route(session_id: str, req: EvaluateRequest, request: Request, response: Response):
+def evaluate_route(session_id: str, req: EvaluateRequest, response: Response):
     begin_timing()
 
     # Fetch once here so a missing/expired session returns a clean 404; the live
@@ -618,7 +597,6 @@ def evaluate_route(session_id: str, req: EvaluateRequest, request: Request, resp
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
 
-    profiler = _start_profiler_if_requested(request)
     try:
         result = run_evaluate(
             session            = session,
@@ -628,12 +606,7 @@ def evaluate_route(session_id: str, req: EvaluateRequest, request: Request, resp
             remaining_cash     = req.remaining_cash,
         )
     except Exception:
-        if profiler is not None:
-            profiler.stop()
         raise _fail(500, 'Evaluation failed.')
-
-    if profiler is not None:
-        return _profiler_report(profiler)   # ?profile=1 -> flame report instead of the JSON payload
 
     response.headers['Server-Timing'] = server_timing_header()
     return result
