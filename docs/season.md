@@ -1,11 +1,10 @@
 # Season Mode
 
-
 ## Waiver wire & free agents tab 
 
 The waiver wire tab evaluates whether an available player might fit better on an existing team than one of the players already on the team.
 
-![](img/hwaiver.png)
+![Waiver substitution H-scores](img/hwaiver.png)
 /// caption
 Substitution H-scores for a synthetic team with Max Christie on it, based on the 2024-25 season
 ///
@@ -16,7 +15,7 @@ These H-scores are relatively simple to calculate, because all other players are
 
 G-score expectation breakdowns are available through the dropdown arrow. 
 
-![](img/hwaiverexp.png)
+![Waiver G-score breakdown](img/hwaiverexp.png)
 /// caption
 A breakdown of how Max Christie contributes to the team in terms of G-score
 ///
@@ -31,7 +30,7 @@ The trading tab analyzes the H-score and G-score implications of potential trade
 
 The trade analysis module analyzes trades proposed by the user. 
 
-![](img/tradeanalysis.png)
+![Trade analysis H-score view](img/tradeanalysis.png)
 
 The thumbs on the H-score tab for 'Your Team' and 'Their Team' indicate whether a trade improves a team's H-score or not. Thumbs up means the trade is beneficial, thumbs down means the trade is not beneficial. This can also be seen by whether the H-score is higher before or after the trade. 
 
@@ -39,11 +38,11 @@ Trades in which the same number of players is sent and received are relatively s
 
 Asymmetrical trades can also be analyzed, though the methodology is more complicated and less reliable. The post-trade team that goes down in number of players is scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. The post-trade team that goes up in players is scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score. The players chosen for addition/removal through these calculations are not shown. 
 
-Because a player gets added during an asymmetrical trade, it is important for asymmetrical trade analysis that the list of available players is accurate. A valuable player that appears to be on the waiver wire will artificially make any trade that goes down in players look beneficial, because it allows for that player to be added. Another consideration is that highly assymetrical trades can take time to process because every possible combination of players to be dropped is being analyzed. 
+Because a player gets added during an asymmetrical trade, it is important for asymmetrical trade analysis that the list of available players is accurate. A valuable player that appears to be on the waiver wire will artificially make any trade that goes down in players look beneficial, because it allows for that player to be added. Another consideration is that highly asymmetrical trades can take time to process because every possible combination of players to be dropped is being analyzed. 
 
 A G-score table is also provided, which shows the net changes in G-scores for both teams by category.
 
-![alt text](img/tradeanalysisg.png)
+![Trade analysis G-score table](img/tradeanalysisg.png)
 
 This view is available even if the trade is impermissible by position structure. 
 
@@ -51,13 +50,15 @@ This view is available even if the trade is impermissible by position structure.
 
 Below the trade analysis module, trade suggestions are shown. 
 
-![alt text](img/tradesuggestions.png)
+![Trade suggestions list](img/tradesuggestions.png)
 
-Which trades end up being shown as suggestions depends on the user-configurable [trade parameters](parameters.md/#trade-parameters). 
+Which trades end up being shown as suggestions depends on the user-configurable trade parameters. 
+
+![Trade parameters](img/tp3.png)
 
 Candidate trades are found by first heuristically estimating which players might be more favored by the other team, then iterating through all combinations of possible trades with those players. Those trades are further filtered by a general value difference threshold, which is based on user inputs.
 
-![](img/tp2.png)
+![General value threshold parameters](img/tp2.png)
 
 The general value thresholds limit candidate trades to those between collections of players whose total general values are similar to each other. If the absolute value of the difference in total general value between the two groups of players that are to be traded is above the threshold, the trade will not be considered for analysis. This is to prevent unnecessary computation checking trades that are unlikely to be viable. 
 
@@ -69,7 +70,7 @@ Trade suggestions can be generated for any kind of trade for which a general str
 
 After trades are analyzed for H-score implications, one more filter is applied. Only those which meet the H-score differential thresholds as supplied by the user are shown. 
 
-![](img/tp1.png)
+![H-score differential thresholds](img/tp1.png)
 
 The thresholds are in terms of H-score as a percentage, so if the threshold for a party is -0.2, then trades that decrease the party's H-score by more than 0.2% are not shown. 
 
@@ -79,13 +80,13 @@ Even with all this filtering, there can be many possible trades to look through,
 
 ### Roster table
 
-Rosters can be manually input or edited on this tab. It is unneccesary if rosters are loaded through a platform integration.
+Rosters can be manually input or edited on this tab. It is unnecessary if rosters are loaded through a platform integration.
 
-![](img/rosters.png)
+![Roster editing table](img/rosters.png)
 
 Only players from the loaded dataset can be added to the roster table, which are shown on a searchable drop-down for each cell. The same player can be added multiple times.
 
-![](img/rosterjokic.png)
+![Player search dropdown](img/rosterjokic.png)
 /// caption
 Nikola Jokic is still shown as an option after already being taken by another team
 ///
@@ -94,8 +95,8 @@ Generally draft results can be copy-pasted from the drafting view into an Excel 
 
 ### Roster inspection
 
-![](img/rosterinspection.png)
+![Roster inspection G-score table](img/rosterinspection.png)
 
 Individual teams can be analyzed in terms of G-score. H-scores are also provided below the table, based on how the team matches up against its opponents. 
 
-![](img/rosterh.png)
+![Roster inspection H-scores](img/rosterh.png)

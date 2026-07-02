@@ -12,7 +12,7 @@ When the selected mode is 'auction', the website will provide analysis for eithe
 
 ### Manual entry 
 
-![](img/mauction.png)
+![Manual auction entry table](img/mauction.png)
 
 Player selection information can be entered into the table through the selectors above it. 
 
@@ -20,7 +20,7 @@ Player selection information can be entered into the table through the selectors
 
 For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. 
 
-![](img/notbegun.png)
+![Auction not yet begun message](img/notbegun.png)
 
 Once the 'Auction has not yet begun' message is gone, information is being received from Yahoo. 
 
@@ -34,11 +34,11 @@ A well-known heuristic for quantifying auction value is described in many places
 4. Divide the total number of dollars available by the total amount of real value available. This yields a conversion rate from score above replacement to dollars
 5. Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value
 
-This process ensures both that players' dollar values proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
+This process ensures both that players' dollar values are proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
 
 Auction mode uses this process to quantify player value in a few ways. They are all shown in the detailed drop-down for auction candidates.
 
-![](img/auctiondetail.png)
+![Auction candidate detail dropdown](img/auctiondetail.png)
 
 ### Converting G-score value to dollar value 
 
@@ -50,7 +50,7 @@ Two kinds of dollar values are presented for G-scores. 'Orig. $' value, or origi
 
 The dollar estimates based on H-scores are shown in the main candidate table, along with category-level H-scores. 
 
-![alt text](img/hdollars.png)
+![H-score-based dollar values](img/hdollars.png)
 /// caption
 H-score-based $ values in a synthetic draft context
 ///
@@ -66,7 +66,7 @@ Like for G-scores, the original values are processed once with the auction value
 
 For generic values, the underlying step 1 estimates are not changed, but the step 2 process is adjusted for the number of players remaining etc. That is, if a player was estimated to be worth $30 originally, that number will continue to be plugged in as a value to the auction value heuristic process. The auction value heuristic process will be slightly different because players have been taken and cash has been spent. 
 
-H-scoring is also run with with the updated context for the drafter in question. Those monetary estimates become 'Your $' after refinement through the auction value heuristic. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. 
+H-scoring is also run with the updated context for the drafter in question. Those monetary estimates become 'Your $' after refinement through the auction value heuristic. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. 
 
 ### The SAVOR adjustment 
 
@@ -74,9 +74,26 @@ After the previously described processing for H-score and G-score dollar values,
 
 SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the fact that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valuable than their alternatives. This is a known concept in the fantasy basketball community- for example it is referenced in this [reddit thread](https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/).
 
-Details of the mathematical model behind the SAVOR adjustment are included in the appendix of [an old version of the first paper](https://arxiv.org/abs/2307.02188v4). It was removed from the most recent version because it was not topical. 
+![The SAVOR input](img/savorinput.png)
 
-![alt text](img/savorinput.png)
+SAVOR takes an input parameter, $S_{\sigma}$. It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value is sourced by vibes- different values may be just as or more reasonable. 
 
-SAVOR takes an input parameter, $S_{\sigma}$. It controls the degree to which players are expected to move up and down across the season according to the SAVOR model. Its default value is sourced by vibes- different values may be just as or more reasonable. 
+??? note "The theoretical framework behind the SAVOR calculation"
+
+    Details of the SAVOR adjustment are included in the appendix of [an old version of the first paper](https://arxiv.org/abs/2307.02188v4). It was removed from the most recent version because it was not topical to the main point of the paper. 
+
+    The first foundational idea is to model observations of player values as noisy estimates, which are resolved once the season begins. If a player is projected to be valuable before the draft but ends up being below replacement-level during the season, they will be replaced by a replacement-level player. 
+
+    The second foundational idea is that value during an auction is relative to a player that could be picked up at the end for essentially no cost. These players are not useless- it is possible that they could end up being more valuable than projected, and turn into a meaningful asset. 
+
+    Assuming that error between projected and realized value is a Normal distribution with a constant scale allows this situation to be modeled mathematically with relative ease. The result is the following formula 
+
+    $$
+    \mu \Phi\left(\frac{\mu}{\sigma}\right) - \frac{\sigma}{\sqrt{2\pi}}\left(1 - e^{-\frac{\mu^2}{2\sigma^2}}\right)
+    $$
+
+    This does not lend itself to intuition, but the simple explanation is that as the scale parameter is turned up, players projected to be valuable become even more valuable than their projection. The reason is that the small bump in mean expectation from a low value player versus a tail-end-of-the-auction player doesn't mean as much as a bump in mean expectation for a high-value player, because a significant fraction of the time, the real value of a low-value player will dip below the replacement threshold. That is highly unlikely to happen for high-value players.
+
+    ![Pre- and post-SAVOR value table](img/savor.png)
+
 

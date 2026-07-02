@@ -8,7 +8,7 @@ The papers which motivate this website were written with drafting in mind, allow
 
 With manual entry, draft picks are entered through the website. 
 
-![](img/mdraft.png)
+![Manual draft entry](img/mdraft.png)
 
 The 'Lock in selection' button puts the player shown in the dropdown into the next draft slot. Picks go in a snake order (except when there is a third round reversal) and cannot be skipped. 
 
@@ -20,6 +20,6 @@ The table below the player selection dropdown shows which players have been take
 
 With a live connection, draft selections are provided by the platform. The entire screen becomes a view for candidate evaluation. 
 
-![](img/livedraft.png)
+![Live draft candidate view](img/livedraft.png)
 
 The 'Refresh Analysis' button fetches new information on draft picks from the platform and re-runs H-scoring. 
