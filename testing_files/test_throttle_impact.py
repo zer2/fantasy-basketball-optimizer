@@ -36,8 +36,17 @@ def test_throttle_draft_close_to_exact():
     kwargs = dict(player_assignments=player_assignments, my_team_id='Team 1',
                   exclusion_list=top_eight[:4], remaining_cash=None)
 
-    exact_by, exact_order = _evaluate(session, 'exact', **kwargs)
-    thr_by,   thr_order   = _evaluate(session, 'tiered', **kwargs)
+    def run(mode):
+        session.H._position_mode_override = mode
+        session.generic_h_scores = None
+        # Neutral pass first so generic_h_scores — the ranking the throttle prioritises by — is built.
+        run_evaluate(session=session,
+                     player_assignments={f'Team {i + 1}': [] for i in range(n_drafters)},
+                     my_team_id='Team 1', exclusion_list=[], remaining_cash=None)
+        return _evaluate(session, mode, **kwargs)
+
+    exact_by, exact_order = run('exact')
+    thr_by,   thr_order   = run('tiered')
 
     assert thr_order[:_TOP_N] == exact_order[:_TOP_N], 'throttle changed the top-30 draft ordering'
     for name in exact_order[:_TOP_N]:

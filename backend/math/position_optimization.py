@@ -159,6 +159,7 @@ def optimize_positions_all_players(
     , scale_down: bool = True
     , active_count: int | None = None
     , cached_rosters: np.ndarray | None = None
+    , priority_order: np.ndarray | None = None
 ):
     # The eligibility rows (candidate_player_array, team_so_far_array) are weight-independent, so the
     # caller builds them once per evaluate via get_player_rows rather than once per gradient iteration.
@@ -168,21 +169,31 @@ def optimize_positions_all_players(
 
     reward_array = get_future_player_rows(position_rewards, pos_cfg)
 
-    # Throttle: solve the roster assignment only for the top `active_count` candidates and reuse the
+    # Throttle: re-solve the roster assignment only for the top `active_count` candidates — ranked by
+    # `priority_order` (the cached default-H-score ranking supplied by the caller) — and reuse the
     # previous iteration's assignment for the rest. The per-candidate Hungarian solve dominates the
     # cost, and a lower-ranked candidate's optimal slots barely move between iterations. A full solve
-    # runs when there is no cache yet or active_count already covers everyone.
-    if cached_rosters is None or active_count is None or active_count >= n_candidates:
-        active_count = n_candidates
+    # runs when there is no cache/ranking yet or active_count already covers everyone.
+    full_solve = (cached_rosters is None or active_count is None
+                  or priority_order is None or active_count >= n_candidates)
 
-    active_rosters = np.array([
-        _optimize_positions_for_prospective_player(
-            player, reward_vector, team_so_far_array, n_remaining_players
-        )
-        for player, reward_vector in zip(candidate_player_array[:active_count], reward_array[:active_count])
-    ])
-    rosters = (active_rosters if active_count >= n_candidates
-               else np.concatenate([active_rosters, cached_rosters[active_count:]], axis=0))
+    if full_solve:
+        rosters = np.array([
+            _optimize_positions_for_prospective_player(
+                player, reward_vector, team_so_far_array, n_remaining_players
+            )
+            for player, reward_vector in zip(candidate_player_array, reward_array)
+        ])
+    else:
+        active_indices = priority_order[:active_count]
+        active_rosters = np.array([
+            _optimize_positions_for_prospective_player(
+                candidate_player_array[i], reward_array[i], team_so_far_array, n_remaining_players
+            )
+            for i in active_indices
+        ])
+        rosters = cached_rosters.copy()
+        rosters[active_indices] = active_rosters
 
     final_positions, flex_shares = get_position_array_from_res(
         rosters, position_shares, n_remaining_players, pos_cfg

@@ -64,21 +64,21 @@ def run_evaluate(
             n_iterations            = n_iterations,
             cash_remaining_per_team = remaining_cash,
             exclusion_list          = exclusion_list,
+            baseline_h_scores       = session.generic_h_scores,
         )
     actual_iterations = max(1, n_iterations)
 
     if h_score_result is None:
         return EvaluateResponse(iteration=0, candidates=[])
 
-    # ── Generic H-scores cache (auction mode only) ────────────────────────────
-    # gnrc_dollar / orig_dollar are anchored to a neutral state: no players taken.
-    # On the first call (no players assigned), the current result already represents
-    # that neutral state, so we cache it directly — avoiding a redundant second run
-    # and guaranteeing Your $ == Gnrc. $ at the start of the auction.
-    # On later calls the cached value is reused unchanged.
-    # If the session connects mid-auction (players already assigned on first call),
-    # run a separate clean evaluation to obtain the neutral baseline.
-    if remaining_cash is not None and session.generic_h_scores is None:
+    # ── Generic (default, first-pick) H-scores cache ──────────────────────────
+    # These neutral-state scores (no players taken) serve two purposes: in auction mode they anchor
+    # gnrc_dollar / orig_dollar, and in every mode they give the position-optimiser throttle a ranking
+    # to prioritise by (so the exact-solve tier tracks the players most likely to be picked).
+    # On the first call (no players assigned), the current result already represents that neutral
+    # state, so we cache it directly — avoiding a redundant run. If the session connects mid-draft/
+    # auction (players already assigned on first call), run a separate clean evaluation for it.
+    if session.generic_h_scores is None:
         all_assigned = [
             p for team_players in player_assignments.values()
             for p in team_players if isinstance(p, str)
@@ -87,9 +87,9 @@ def run_evaluate(
             # No players taken yet — current scores are the neutral baseline.
             session.generic_h_scores = h_score_result['Scores'].sort_values(ascending=False)
         else:
-            # Mid-auction start: run a clean evaluation with all slots empty.
-            team_names        = current_params.get('team_names', [my_team_id])
-            empty_assignments = {name: [] for name in team_names}
+            # Mid-draft/auction start: run a clean evaluation with all slots empty. Mirror the teams
+            # actually in play (same identities as player_assignments) so the drafter is always present.
+            empty_assignments = {name: [] for name in player_assignments}
             generic_H         = H.clear_initial_weights()
             with record_phase('hscores_generic'):
                 generic_result = generic_H.get_h_scores(

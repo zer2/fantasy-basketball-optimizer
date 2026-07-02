@@ -237,7 +237,8 @@ class HAgent:
                      , drafter
                      , n_iterations: int
                      , cash_remaining_per_team: dict = None
-                     , exclusion_list: list = []) -> dict:
+                     , exclusion_list: list = []
+                     , baseline_h_scores=None) -> dict:
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -320,6 +321,16 @@ class HAgent:
                 for pos_code, pos_info in self.position_structure['flex'].items()
             }
 
+        # Position-optimiser throttle priority: rank candidates by the cached default (first-pick)
+        # H-scores so the exact-solve tier covers the players most likely to actually be picked.
+        # Missing/uncached players sort last; with no cached ranking at all we pass None, which
+        # disables throttling entirely (a full, exact solve every iteration).
+        if baseline_h_scores is not None:
+            ranked = baseline_h_scores.reindex(x_scores_available.index).to_numpy()
+            candidate_priority = np.argsort(-np.nan_to_num(ranked, nan=-np.inf))
+        else:
+            candidate_priority = None
+
         return self.perform_iterations(
             initial_category_weights,
             initial_position_shares,
@@ -331,6 +342,7 @@ class HAgent:
             x_scores_available.index,
             sigma_2_m,
             n_iterations,
+            candidate_priority,
         )
 
     def get_diff_distributions(self
@@ -512,7 +524,8 @@ class HAgent:
                            , x_scores_available_array
                            , result_index
                            , sigma_2_m
-                           , n_iterations):
+                           , n_iterations
+                           , candidate_priority=None):
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
@@ -547,7 +560,9 @@ class HAgent:
 
             # Throttled position optimisation reuses the previous iteration's roster assignment for
             # lower-ranked candidates; this cache starts empty each perform_iterations call.
+            # candidate_priority ranks candidates for the throttle (None disables it → full solves).
             self._position_rosters_cache = None
+            self._candidate_priority     = candidate_priority
 
             for iteration in range(max(1, n_iterations)):
                 category_weights_current  = category_weights
@@ -733,7 +748,11 @@ class HAgent:
             # Re-solve positions for the top candidates every iteration, the next tier every 5th, and
             # everyone every 10th; reuse cached assignments otherwise. iteration+1 so the last
             # iteration (i = n_iterations-1) lands on a full pass, keeping the final scores consistent.
-            active_count = self._active_candidate_count(iteration, candidate_player_array.shape[0])
+            # Only throttle when we have a cached ranking to prioritise by; otherwise solve everyone.
+            if self._candidate_priority is None:
+                active_count = candidate_player_array.shape[0]
+            else:
+                active_count = self._active_candidate_count(iteration, candidate_player_array.shape[0])
             rosters, future_position_array, flex_shares = optimize_positions_all_players(
                 candidate_player_array,
                 position_rewards,
@@ -742,6 +761,7 @@ class HAgent:
                 self._pos_cfg,
                 active_count=active_count,
                 cached_rosters=self._position_rosters_cache,
+                priority_order=self._candidate_priority,
             )
             self._position_rosters_cache = rosters
             position_mu = np.einsum('aij,bi -> bj', self.position_means, future_position_array)
