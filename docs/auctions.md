@@ -8,7 +8,7 @@ The auction mode of this website implements some basic methods for converting G-
 
 ## Using auction mode 
 
-When the selected mode is 'auction', the website will provide analysis for either synthetic or live auctions. 
+When the selected mode is 'Auction', the website will provide analysis for either synthetic or live auctions. 
 
 ### Manual entry 
 
@@ -18,55 +18,63 @@ Player selection information can be entered into the table through the selectors
 
 ### Live connection 
 
-For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. 
+Yahoo auctions can be integrated with the website, like drafts. 
 
-![Auction not yet begun message](img/notbegun.png)
-
-Once the 'Auction has not yet begun' message is gone, information is being received from Yahoo. 
+For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides, that, the integration works much the same way as for drafting mode. 
 
 ## Quantifying auction value
 
-A well-known heuristic for quantifying auction value is described in many places including [this article from rotowire](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). For reference, it is
+The concept of estimating player values for auctions is not new. A well known heuristic is described in many places including [this article from rotowire](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). It converts player strength quantified by something like Z-score into an equivalent dollar value, and it is the basis for evaluating players in the auction context. 
 
-1. Calculate the replacement-level score. That is, if 156 players will be chosen, the 157th-highest score is the replacement value
-2. Adjust all scores by subtracting out the replacement-level value. If this would make a score go below zero, set it to zero instead
-3. Calculate the sum of scores above replacement. This is the total amount of real value available in the auction
-4. Divide the total number of dollars available by the total amount of real value available. This yields a conversion rate from score above replacement to dollars
-5. Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value
+??? note "What is the standard auction heuristic?"
+    The standard method for estimating auction value is
 
-This process ensures both that players' dollar values are proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
+    1. Calculate the replacement-level score. That is, if 156 players will be chosen, the 157th-highest score is the replacement value
+    2. Adjust all scores by subtracting out the replacement-level value. If this would make a score go below zero, set it to zero instead
+    3. Calculate the sum of scores above replacement. This is the total amount of real value available in the auction
+    4. Divide the total number of dollars available by the total amount of real value available. This yields a conversion rate from score above replacement to dollars
+    5. Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value
 
-Auction mode uses this process to quantify player value in a few ways. They are all shown in the detailed drop-down for auction candidates.
+    This process ensures both that players' dollar values are proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
 
-![Auction candidate detail dropdown](img/auctiondetail.png)
+The website uses a few different variations of this idea. Five different dollar value estimates can be found within players' detailed drop-downs. 
+
+![Auction candidate detail drop-down](img/auctiondetail.png)
+/// caption
+All of the computed dollar estimates, from a detailed drop-down 
+///
 
 ### Converting G-score value to dollar value 
 
-Two kinds of dollar values are presented for G-scores. 'Orig. $' value, or original value, is exactly the auction value heuristic described above applied to total G-score. Original values do not change during auctions, and can be helpful as objective benchmarks that quantify how good deals are in the abstract. 
+The two $ value estimates for G-scores are the easiest to explain. G-scores are used instead of Z-scores for the reasons discussed in the [G-score](gscores.md) section. 
 
-'Gnrc. $' value, or generic value, is a variant which is recomputed as players are taken and the amount of available money decreases. For example if two players out of 156 have been taken for $200 total, those two players are removed from the list, the replacement-level value becomes the 155th-highest score, and 200 dollars are removed from the amount of total dollars available. The same process as for original value is then applied using the modified inputs. Generic value may be useful strategically because it reflects whether other managers have been under- or over-spending. E.g. if managers have been underspending, it implicitly takes into account the fact that some managers have excess money and will be able to pay more for remaining players. 
+'Orig. $' value, or original value, is the auction value heuristic described above applied to total G-score on all players in the league. Original values do not change during auctions, and can be helpful as objective benchmarks that quantify how good deals are in the abstract. 
+
+'Gnrc. $' value, or generic value, is a variant which is recomputed as players are taken and the amount of available money decreases. For example if two players out of 156 have been taken for $200 total, those two players are removed from the list, the replacement-level value becomes the 155th-highest score, and 200 dollars are removed from the amount of total dollars available. The same process as for original value is then applied using the modified inputs. Generic value may be useful strategically because it reflects whether other drafters have been under- or over-spending. E.g. if drafters have been underspending, it implicitly takes into account the fact that some drafters have excess money and will be able to pay more for remaining players. 
 
 ### Converting H-score value to dollar value 
 
-The dollar estimates based on H-scores are shown in the main candidate table, along with category-level H-scores. 
+The dollar estimates based on H-scores are featured more centrally on the website than the estimates based on G-scores. In addition to being available within player drop-downs, the H-score estimates are also shown in the main candidate table. 
+
+The H-score-based estimates are also somewhat more complicated than the G-score equivalents. 
 
 ![H-score-based dollar values](img/hdollars.png)
 /// caption
 H-score-based $ values in a synthetic draft context
 ///
 
-H-scores are probabilities, not general values. They are converted into dollar values with two steps
+There are two complicating factors. The first is that H-scores are probabilities, not general values. They are converted into dollar values with two steps
 
 1. It is estimated how much money it would take to improve winning chances by the same amount as taking the player
 2. Those monetary estimates are refined into dollar values with the auction value heuristic as described previously
-
-The original and generic values are based on players' H-scores converted to monetary estimates for the first pick of the auction, with no players taken and no cash spent. Those are not context-dependent so they stay the same for the whole auction. The lack of context also means that they are imprecise approximations of real player value.
 
 Like for G-scores, the original values are processed once with the auction value heuristic and stay the same throughout the auction. 
 
 For generic values, the underlying step 1 estimates are not changed, but the step 2 process is adjusted for the number of players remaining etc. That is, if a player was estimated to be worth $30 originally, that number will continue to be plugged in as a value to the auction value heuristic process. The auction value heuristic process will be slightly different because players have been taken and cash has been spent. 
 
-H-scoring is also run with the updated context for the drafter in question. Those monetary estimates become 'Your $' after refinement through the auction value heuristic. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. 
+The other difference is that H-scores are dynamic and change throughout a draft for each drafter. Beyond just adjusting values for total amount ramining throughout an auction, estimates based on H-scores can also be adjusted for drafting context by running the H-scoring algorithm again.  Re-running the algorithm for the drafter in question and putting the results into the auction value heuristic is how 'Your $' estimates are calculated. The difference between 'Your $' and 'Gnrc. $' highlights players which are more or less valuable to the drafter in question than they are to a generic drafter. For both, the total value across players equals the total dollar value left to be spent, but 'Your $' reacts to the drafter's draft situation while 'Gnrc. $' does not. 
+
+**The long and short of it is: 'Your $' is a reasonable benchmark for what you would be willing to pay for a player. The difference between 'Your $' and 'Gnrc. $' highlights players that are particularly good for your team. The difference between what you might pay and 'Orig. $' tells you whether you got an overall good deal on the player or not, independent of context**
 
 ### The SAVOR adjustment 
 
@@ -74,9 +82,7 @@ After the previously described processing for H-score and G-score dollar values,
 
 SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the fact that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valuable than their alternatives. This is a known concept in the fantasy basketball community- for example it is referenced in this [reddit thread](https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/).
 
-![The SAVOR input](img/savorinput.png)
-
-SAVOR takes an input parameter, $S_{\sigma}$. It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value is sourced by vibes- different values may be just as or more reasonable. 
+SAVOR takes an input parameter, $S_{\sigma}$ (S-sigma). It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value of 10 is sourced by vibes- different values may be just as or more reasonable. 
 
 ??? note "The theoretical framework behind the SAVOR calculation"
 

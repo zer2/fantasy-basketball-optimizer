@@ -540,10 +540,7 @@
 
 
 <h1 id="league-setup">League Setup</h1>
-<p>Players chosen by other teams are relevant to the H-scoring algorithm, meaning that the league situation is required context for the algorithm. </p>
-<p><img alt="League settings panel" src="../img/lsettings.png" /></p>
-<p>The default option for getting data on drafting situation/teams is entering it manually. </p>
-<p>There is also an option for integrating with a fantasy provider, which allows the website to be used with real fantasy occurring on those platforms. The website will show analysis based on the integrated league. It will never make a pick or take any action itself. </p>
+<p>The H-scoring algorithm factors in which players are selected by other teams. Users can either manually input that information, or integrate with a fantasy provider to load it automatically. </p>
 <h2 id="fantasy-provider-connections">Fantasy provider connections</h2>
 <p>The three platforms currently supported are: </p>
 <p><strong>Yahoo</strong>: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when Yahoo is selected.</p>
@@ -559,8 +556,8 @@
 <p><img alt="Manual entry inputs" src="../img/moreinfo.png" /></p>
 <p>If draft picks are being input manually, a number of additional inputs are required. They are </p>
 <ul>
-<li>The number of drafters and the number of picks per drafter</li>
-<li>The team names of the drafters and their autodraft settings. Possible autodraft modes are manual entry (the default), H-scoring, or G-scoring. With H-scoring, the algorithm is run for every drafter, which takes some time. G-scoring autodrafting simply chooses players in total G-score order. </li>
+<li>The number of drafters</li>
+<li>The number of picks per drafter</li>
 <li>For snake drafting, a third round reversal toggle. Third round reversal is a common draft setting, wherein the draft order stays the same between the second and third round, instead of snaking. This is designed to limit the advantage of early picks. </li>
 </ul>
 

@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/zer2/fantasy-basketball-optimizer#readme",
   "devDependencies": {
+    "playwright": "^1.61.1",
     "typescript": "^5.9.3"
   }
 }

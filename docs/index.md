@@ -1,3 +1,7 @@
+# Fantasy Basketball Optimization
+
+## Introduction
+
 This is documentation for a [website](https://fantasy-basketball-optimizer-281850565831.us-east1.run.app/) which applies an algorithm called [H-scoring](hscores.md) to category-based fantasy basketball. The algorithm provides recommendations for which players to choose based on their statistical profiles and how they synergize with existing teams. 
 
 H-scoring takes two essential inputs. One is [league context](league-setup.md)- which players are getting selected by which teams. The website allows you to either integrate with a real [fantasy league](league-setup.md#fantasy-provider-connections) or [update picks manually](league-setup.md#manual-entry). The other essential input is [player stats](projections.md). When you connect to a platform, those come from external projections; in manual mode you can use external projections too, or data from past NBA seasons. 
@@ -26,13 +30,13 @@ Settings, available in the left sidebar, control the context in which the algori
 
 | Setting | Options | Explained in |
 |---|---|---|
-| Mode | toggle between Draft/Auction/Season modes | [Draft](drafts.md), [Auction](auctions.md), [Season](season.md) |
-| Data source | connect to a platform (Yahoo, Fantrax, ESPN) or enter picks manually | [League Setup](league-setup.md) |
-| Drafters and picks | number of drafters and picks per drafter (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
-| Third-round reversal | snake-draft order toggle (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
-| Player stats | configure forward-looking projections, or data from past NBA seasons | [Player Stats](projections.md) |
-| Format | toggle between H2H Each Category, H2H Most Categories, or Rotisserie | [H-scoring → Formats & categories](hscores.md#formats-categories) |
-| Categories | select statistical categories for scoring | [H-scoring → Formats & categories](hscores.md#formats-categories) |
+| Mode | Toggle between Draft/Auction/Season modes | [Draft](drafts.md), [Auction](auctions.md), [Season](season.md) |
+| Data source | Connect to a platform (Yahoo, Fantrax, ESPN) or enter picks manually | [League Setup](league-setup.md) |
+| Drafters and picks | Number of drafters and picks per drafter (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
+| Third-round reversal | Snake-draft order toggle (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
+| Player stats | Configure forward-looking projections, or data from past NBA seasons | [Player Stats](projections.md) |
+| Format | Toggle between H2H Each Category, H2H Most Categories, or Rotisserie | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
+| Categories | Select statistical categories for scoring | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
 
 ## Parameter glossary
 
@@ -40,11 +44,11 @@ The website's calculations take a number of user-configurable parameters, availa
 
 | Parameter | Controls | Explained in |
 |---|---|---|
-| ω, γ | how aggressively H-scoring punts categories | [H-scoring → Parameters](hscores.md#parameters) |
-| Number of iterations | how long the H-scoring algorithm runs | [H-scoring → Parameters](hscores.md#parameters) |
-| Position requirements | the roster/position structure a team must satisfy | [H-scoring → Detailed drop-down](hscores.md#detailed-drop-down) |
-| υ, ψ | how projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |
-| ℶ | how strongly a team's projected strength is regressed toward average | [Player Stats → Bayesian strength adjustment](projections.md#bayesian-strength-adjustment) |
-| χ, ℵ | Rotisserie projection uncertainty and cross-category correlation | [Player Stats → Rotisserie uncertainty](projections.md#rotisserie-uncertainty) |
-| $S_\sigma$ | the spread of auction dollar values across a season (SAVOR) | [Auction Mode → The SAVOR adjustment](auctions.md#the-savor-adjustment) |
-| Trade thresholds | which candidate trades are considered and shown | [Season Mode → Trade suggestions](season.md#trade-suggestions) |
+| ω, γ (omega, gamma) | How aggressively H-scoring punts categories | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
+| Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
+| Position requirements | The roster/position structure a team must satisfy | [H-scoring → Position structure](hscores.md#position-structure) |
+| υ, ψ (upsilon, psi) | How projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |
+| ℶ (beth) | How strongly a team's projected strength is regressed toward average | [Player Stats → Bayesian strength adjustment](projections.md#bayesian-strength-adjustment) |
+| χ, ℵ (chi, aleph) | Rotisserie projection uncertainty and cross-category correlation | [Player Stats → Projection uncertainty](projections.md#projection-uncertainty) |
+| $S_\sigma$ (S-sigma) | The spread of auction dollar values across a season (SAVOR) | [Auction Mode → The SAVOR adjustment](auctions.md#the-savor-adjustment) |
+| Trade thresholds | Which candidate trades are considered and shown | [Season Mode → Trade suggestions](season.md#trade-suggestions) |

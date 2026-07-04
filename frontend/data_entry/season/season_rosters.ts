@@ -323,6 +323,7 @@ async function buildTeamGScoreTable(
     const tbl = document.createElement('table')
     tbl.className = 'panel-table'
     tbl.style.tableLayout = 'fixed'
+    tbl.dataset.testid = 'roster-inspection-gscore'
 
     // Spacer row to lock column widths
     const tHead = tbl.createTHead()
@@ -424,6 +425,7 @@ async function buildTeamGScoreTable(
     const hScoreTbl = document.createElement('table')
     hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
     hScoreTbl.style.tableLayout = 'fixed'
+    hScoreTbl.dataset.testid = 'roster-inspection-hscore'
 
     // Match the team-inspector's column widths above so the two tables line up.
     // Mobile values mirror the #rosters-right .panel-colspacer-* overrides.

@@ -128,6 +128,7 @@ function makeGScoreTable(playerData: PlayerResult, categories: string[]): HTMLDi
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
+    table.dataset.testid = 'gscore-expectations-table'
 
     // colgroup locks column widths without introducing a visual spacer row.
     const colgroup = document.createElement('colgroup')
@@ -193,6 +194,7 @@ function makeWeightsTable(playerData: PlayerResult, categories: string[]): HTMLD
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
+    table.dataset.testid = 'future-pick-strategy-table'
 
     // colgroup locks column widths without introducing a visual spacer row.
     const colgroup = document.createElement('colgroup')
@@ -242,6 +244,7 @@ function makeFlexAllocationsTable(
 
     const table = document.createElement('table')
     table.className = 'panel-table'
+    table.dataset.testid = 'flex-allocations-table'
     table.style.tableLayout = 'fixed'
     table.style.width = '100%'
 
@@ -307,6 +310,7 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.style.tableLayout = 'fixed'
+    table.dataset.testid = 'auction-values-table'
 
     const headerRow = table.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh('panel-colspacer-dollar'))
@@ -373,6 +377,7 @@ function makeRosterGrid(roster: Roster, nTotalColumns: number): HTMLDivElement {
 
     const table = document.createElement('table')
     table.className = 'panel-table'
+    table.dataset.testid = 'roster-assignments-table'
     table.style.tableLayout = 'fixed'
     table.style.width = '100%'
 

@@ -1,12 +1,6 @@
 # League Setup
 
-Players chosen by other teams are relevant to the H-scoring algorithm, meaning that the league situation is required context for the algorithm. 
-
-![League settings panel](img/lsettings.png)
-
-The default option for getting data on drafting situation/teams is entering it manually. 
-
-There is also an option for integrating with a fantasy provider, which allows the website to be used with real fantasy occurring on those platforms. The website will show analysis based on the integrated league. It will never make a pick or take any action itself. 
+The H-scoring algorithm factors in which players are selected by other teams. Users can either manually input that information, or integrate with a fantasy provider to load it automatically. 
 
 ## Fantasy provider connections
 
@@ -36,6 +30,6 @@ FYI there is a bug in the wrapper used for connecting to the Yahoo API, which cr
 
 If draft picks are being input manually, a number of additional inputs are required. They are 
 
-- The number of drafters and the number of picks per drafter
-- The team names of the drafters and their autodraft settings. Possible autodraft modes are manual entry (the default), H-scoring, or G-scoring. With H-scoring, the algorithm is run for every drafter, which takes some time. G-scoring autodrafting simply chooses players in total G-score order. 
+- The number of drafters
+- The number of picks per drafter
 - For snake drafting, a third round reversal toggle. Third round reversal is a common draft setting, wherein the draft order stays the same between the second and third round, instead of snaking. This is designed to limit the advantage of early picks. 

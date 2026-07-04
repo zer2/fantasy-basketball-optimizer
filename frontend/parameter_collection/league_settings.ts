@@ -171,10 +171,19 @@ export function renderLeagueSettings(container: HTMLElement): void {
     container.append(connectCell)
 
     /** Show only the selected platform's connector controls. */
+    let lastConnectorPlatform: string | null = null
     function refreshConnectControls(): void {
         const platform = platformSelect.getValue()
         for (const connector of connectors) {
             connector.element.style.display = connector.platform === platform ? '' : 'none'
+        }
+        // Fire onSelected/onDeselected only on the transition to a new platform (not on mode-only
+        // re-renders), so e.g. the ESPN instructions pop-up appears when ESPN is picked and closes
+        // when the user switches away.
+        if (platform !== lastConnectorPlatform) {
+            connectorsByPlatform.get(lastConnectorPlatform ?? '')?.onDeselected?.()
+            lastConnectorPlatform = platform
+            connectorsByPlatform.get(platform)?.onSelected?.()
         }
     }
 

@@ -18,6 +18,12 @@ export interface PlatformConnector {
     readonly element: HTMLElement
     /** The selection to connect with, or null if the user hasn't supplied enough yet. */
     getSelection(): PlatformSelection | null
+    /** Optional: called when this platform becomes the selected one (e.g. to pop up
+     *  auth instructions). Fires only on the transition to this platform, not on every refresh. */
+    onSelected?(): void
+    /** Optional: called when the selection moves away from this platform (e.g. to close a pop-up
+     *  this connector opened). Fires once, on the transition away. */
+    onDeselected?(): void
 }
 
 /** Builds a connector; `setStatus` writes to the shared connect status line. */

@@ -46,6 +46,7 @@ export function renderSlotCounts(container: HTMLElement): void {
 
     const grid = document.createElement('div')
     grid.className = 'slot-grid'
+    grid.dataset.testid = 'position-structure'
     container.append(grid)
 
     const leftCol = document.createElement('div')

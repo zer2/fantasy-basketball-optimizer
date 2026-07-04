@@ -39,6 +39,11 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
     const leagueSelect = makeCustomSelect('ls-espn-league', [{ value: '', label: '(save credentials first)' }])
     element.append(leagueSelect.element)
 
+    // Instructions pop-up (mirrors the Streamlit @st.dialog "Authenticate with ESPN"). ESPN has no
+    // OAuth, so the user has to fetch two cookies by hand — this pop-up explains how. It is shown
+    // when ESPN becomes the selected platform (see onSelected) and dismissed once read.
+    const modal = buildInstructionsModal()
+
     /** Loads the user's ESPN leagues into the league select. */
     async function loadLeagues(): Promise<void> {
         const leagues = await fetchLeagues(PLATFORM)
@@ -69,5 +74,49 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
             if (!leagueId) return null
             return { league_id: leagueId, division_id: null }
         },
+        onSelected()   { modal.style.display = 'flex' },
+        onDeselected() { modal.style.display = 'none' },
     }
+}
+
+/** Builds the ESPN auth-instructions pop-up (appended to <body>, hidden until onSelected).
+ *  Text copied from the original Streamlit dialog. */
+function buildInstructionsModal(): HTMLElement {
+    // Rebuilt on every renderLeagueSettings — drop any previous instance so it can't accumulate.
+    document.getElementById('ls-espn-modal')?.remove()
+
+    const overlay = document.createElement('div')
+    overlay.id        = 'ls-espn-modal'
+    overlay.className = 'espn-modal-overlay'
+    overlay.style.display = 'none'
+
+    const box = document.createElement('div')
+    box.className = 'espn-modal-box'
+
+    const title = document.createElement('div')
+    title.className   = 'espn-modal-title'
+    title.textContent = 'Connecting to ESPN'
+
+    const body = document.createElement('p')
+    body.className = 'espn-modal-body'
+    body.innerHTML =
+        'Find your ESPN <code>s2</code> and <code>SWID</code> by opening a tab with '
+        + '<a href="https://www.espn.com/fantasy/" target="_blank" rel="noopener">ESPN</a>, logging into '
+        + 'your account, and using '
+        + '<a href="https://chromewebstore.google.com/detail/espn-cookie-finder/oapfffhnckhffnpiophbcmjnpomjkfcj" '
+        + 'target="_blank" rel="noopener">this web plug-in</a>. Paste them into the fields under the '
+        + 'League Settings sidebar to connect. SWID can be copy-pasted with or without brackets.'
+
+    const closeButton = document.createElement('button')
+    closeButton.type        = 'button'
+    closeButton.className   = 'section-apply-btn'
+    closeButton.textContent = 'Got it'
+    closeButton.addEventListener('click', () => { overlay.style.display = 'none' })
+
+    box.append(title, body, closeButton)
+    overlay.append(box)
+    // Dismiss when clicking the backdrop (but not the box itself).
+    overlay.addEventListener('click', event => { if (event.target === overlay) overlay.style.display = 'none' })
+    document.body.append(overlay)
+    return overlay
 }

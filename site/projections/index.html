@@ -310,17 +310,29 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#projection-sources" class="md-nav__link">
+  <a href="#data-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Projection sources
+        Data Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#projections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projections
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#historical-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -330,8 +342,25 @@
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#adjustments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adjustments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adjustments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#injury-handling" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -341,19 +370,19 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#rotisserie-uncertainty" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#projection-uncertainty" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rotisserie uncertainty
+        Projection uncertainty
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#bayesian-strength-adjustment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -361,6 +390,11 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -534,17 +568,29 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#projection-sources" class="md-nav__link">
+  <a href="#data-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Projection sources
+        Data Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#projections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projections
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#historical-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -554,8 +600,25 @@
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#adjustments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adjustments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adjustments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#injury-handling" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -565,19 +628,19 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#rotisserie-uncertainty" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#projection-uncertainty" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rotisserie uncertainty
+        Projection uncertainty
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#bayesian-strength-adjustment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -585,6 +648,11 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -606,8 +674,10 @@
 
 
 <h1 id="player-stats">Player Stats</h1>
-<p>All of the website's algorithms take player statistics as an input, either from forward-looking projections or historical data. It also makes a few adjustments to them based on user input.</p>
-<h2 id="projection-sources">Projection sources</h2>
+<p>All of the website's algorithms take player statistics as an input, either from forward-looking projections or historical data. The user can decide which statistics to use. </p>
+<p>The website also processes raw statistics in various ways, accounting for injuries and other factors. Details of these adjustments can be controlled via sidebar parameters. </p>
+<h2 id="data-sources">Data Sources</h2>
+<h3 id="projections">Projections</h3>
 <p>The default for player statistics is to use forward-looking projections.</p>
 <p><img alt="Projection source weights" src="../img/projections.png" /></p>
 <p>The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. </p>
@@ -615,9 +685,8 @@
 <p>Two additional kinds of forecasts are also available: those created by Hashtag Basketball, and Basketball Monster (BBM). Both of these projections are paid products, so they cannot be provided through the website. Instead, they must be purchased and uploaded. For HTB, there is no native download option for projections. The projections must be copy pasted into an Excel file and saved as a CSV. For BBM, there is a download option, but only the XLSX download option works. Download it, copy out the projections into Excel, and save them as a CSV UTF-8. Either kind of projection can be manually edited to change projections if desired. </p>
 <p>Also: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. </p>
 <p>Projections are combined between different sources by taking weighted means according to the provided weights. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. </p>
-<h2 id="historical-data">Historical data</h2>
-<p>Historical data from past seasons is available for manual entry drafts. </p>
-<p><img alt="Historical data selection" src="../img/historical.png" /></p>
+<h3 id="historical-data">Historical data</h3>
+<p>Historical data from past seasons is available for manual entry drafts. The season selector defaults to the most recent available season.</p>
 <p>Historical data is available going all the way back to the 1984-85 season, though for any season before 2000-01 player positions will not be available. </p>
 <figure>
 <p><img alt="1984-85 season H-scores" src="../img/1984-85.png" /></p>
@@ -626,41 +695,44 @@
 </figcaption>
 </figure>
 <p>Historical data cannot be used when integrated with a fantasy platform, because platforms do not run leagues based on past seasons.  </p>
-<h2 id="injury-handling">Injury handling</h2>
+<h2 id="adjustments">Adjustments</h2>
+<h3 id="injury-handling">Injury handling</h3>
 <p>Projections generally include forecasts of how many games each player will play during the season, but incorporating them into player valuations is not entirely straightforward. </p>
 <p>Typically, player valuations are presented in two ways: per-game values and season total values. Per-game values exclude the missing games, while season total values include them as all zeros. The website allows granular control of the spectrum between those two perspectives, plus an additional correction for players being substituted out for replacement players. </p>
-<p><img alt="Injury adjustment inputs" src="../img/injury.png" /></p>
-<p>The υ parameter scales expected injury rates. At 100%, injury rates are kept intact, equivalent to season total projections. At 0% they are ignored entirely.</p>
+<p>The υ (upsilon) parameter scales expected injury rates. At 100%, injury rates are kept intact, equivalent to season total projections. At 0% they are ignored entirely.</p>
 <details class="note">
-<summary>υ — injury rate scaling</summary>
-<p>υ, scales injury rates on a spectrum between per-game value and season total values. For example if υ is <span class="arithmatex">\(0.4\)</span> and a player is expected to be injured 10% of the time, that injury rate is adjusted to 4%, and the player's volume projections are multiplied by 96%. A υ of <span class="arithmatex">\(0\)</span> is equivalent to per-game totals, and a υ of 1 is equivalent to season total projections. The argument for setting υ to <span class="arithmatex">\(1\)</span> is that the correct expected value of real player production fully accounts for the probability of injury. The counter-argument is that teams need to be somewhat lucky to have any shot at competing for a championship, so it makes sense for them to strategize with the assumption that their injury luck is reasonably good. The default value for υ is <span class="arithmatex">\(1\)</span>, equivalent to season total values.</p>
+<summary>How does υ scale injury rates?</summary>
+<p>υ scales injury rates on a spectrum between per-game value and season total values. For example if υ is <span class="arithmatex">\(0.4\)</span> and a player is expected to be injured 10% of the time, that injury rate is adjusted to 4%, and the player's volume projections are multiplied by 96%. A υ of <span class="arithmatex">\(0\)</span> is equivalent to per-game totals, and a υ of 1 is equivalent to season total projections. The argument for setting υ to <span class="arithmatex">\(1\)</span> is that the correct expected value of real player production fully accounts for the probability of injury. The counter-argument is that managers need to be somewhat lucky to have any shot at competing for a championship, so it makes sense for them to strategize with the assumption that their injury luck is reasonably good. The default value for υ is <span class="arithmatex">\(1\)</span>, equivalent to season total values.</p>
 </details>
-<p>Using season totals has the issue that it assumes missed games are across-the-board 0s, when in reality replacement players can fill in sometimes. For when υ is above zero, ψ credits some of the value back for replacement-level players potentially filling in.</p>
+<p>Using season totals has the issue that it assumes missed games are across-the-board 0s, when in reality replacement players can fill in sometimes. When υ is above zero, ψ (psi) credits some of the value back for replacement-level players potentially filling in.</p>
 <details class="note">
-<summary>ψ — replacement players</summary>
+<summary>How does ψ treat the effect of replacement players?</summary>
 <p>The second factor, ψ, controls an adjustment for replacement players. It is assumed that when a player misses a game, they will be replaced by a replacement-level player for that game ψ of the time, and that is incorporated into projections after they have been adjusted for injury rates. A replacement-level player has the total G-score value of the <span class="arithmatex">\(N\)</span>th-highest player, spread across categories, where <span class="arithmatex">\(N\)</span> is the number of players in the league.  So continuing the example discused above in the υ section, if ψ is <span class="arithmatex">\(0.75\)</span>, then 3% times a replacement player's value is added to the player's projection. The right value for ψ depends on a league's IR rules and how active managers will be in replacing their injured player. It defaults to <span class="arithmatex">\(0.8\)</span>.</p>
 </details>
-<h2 id="rotisserie-uncertainty">Rotisserie uncertainty</h2>
-<p>Rotisserie is scored over a full season rather than week to week, so what matters for its projections is season-long uncertainty rather than week-to-week variance. Two extra parameters, χ and ℵ, tune how the website models that.</p>
-<p>Variance in player performances is a key input to the G-score calculation. That means week-to-week variance in the case of Head-to-Head, and uncertainty in season-long performance in the case of Rotisserie. The same quantity is also relevant to H-scoring. While week-to-week variance is relatively simple to estimate based on historical data, pre-season uncertainty is harder to quantify and not studied thoroughly. That creates an issue for using G-scores for Rotisserie in practice.</p>
-<p>The website's way of handling this is to use scaled week-to-week variance as a proxy for seasonal uncertainty. The χ factor, which defaults to 60%, controls the degree of scaling.</p>
-<p><img alt="The chi input" src="../img/chi.png" /></p>
+<h3 id="projection-uncertainty">Projection uncertainty</h3>
+<p>Uncertainty in projections is one of the fundamental factors taken into account by both H-scores and G-scores. The relevant variance is week-to-week in the case of Head-to-Head, and season-long in the case of Rotisserie. </p>
+<p>For Head-to-Head formats, the website uses the last year of historical NBA data to estimate week-to-week uncertainty. This is not necessarily exact, but likely a good proxy.</p>
+<p>The Rotisserie algorithm depends on full-season uncertainty instead of week-to-week uncertainty, since that format aggregates scores over full seasons instead of week-by-week. Full-season uncertainty is harder to estimate straight from projection data. It depends largely on how accurate pre-season projections are, which is not well-studied.  </p>
+<p>The website's way of handling this is to use scaled week-to-week variance as a proxy for seasonal uncertainty. The χ (chi) factor, which defaults to 60%, controls the degree of scaling.</p>
 <details class="note">
-<summary>How χ is defined</summary>
+<summary>How is χ defined?</summary>
 <p>The assumption is that the variance over the ~20 weeks in a season will be χ times the week-to-week variance times 20. If week-to-week variance was the only source of variance, χ would be effectively 22%. It is likely higher than that before the season, because there is uncertainty about rotations, playing time, offseason improvements, etc. 60% is an estimate with essentially no justification, it can be changed as desired. </p>
 </details>
-<p>The other parameter is ℵ. ℵ makes a team's category-level performances in counting statistics more correlated than they theoretically would be. The motivation for this is that in reality, some managers will be paying more attention than others, leading to some teams having higher volume across the board. This effect would not be encapsulated within the Rotisserie model's logic without a positive value of ℵ.</p>
-<p><img alt="The aleph input" src="../img/aleph.png" /></p>
+<p>The other parameter is ℵ (aleph), which influences correlation estimates. Correlations between categories are important for Rotisserie because they influence how well the best-performing team is expected to perform. To estimate correlations, the website starts by taking the last season's correlation matrix. </p>
 <details class="note">
-<summary>How ℵ is applied</summary>
+<summary>Why are correlations between categories more important for Rotisserie?</summary>
+<p>The assumption is that the variance over the ~20 weeks in a season will be χ times the week-to-week variance times 20. If week-to-week variance was the only source of variance, χ would be effectively 22%. It is likely higher than that before the season, because there is uncertainty about rotations, playing time, offseason improvements, etc. 60% is an estimate with essentially no justification, it can be changed as desired. </p>
+</details>
+<p>ℵ makes a team's category-level performances in counting statistics more correlated than they theoretically would be. The motivation for this is that in reality, some managers will be paying more attention than others, leading to some teams having higher volume across the board. This effect would not be encapsulated within the Rotisserie model's logic without a positive value of ℵ. It defaults to 0.2.</p>
+<details class="note">
+<summary>How is ℵ applied?</summary>
 <p>Concretely, ℵ is added directly to the entries of the category correlation matrix that Rotisserie scoring uses, for pairs of counting (volume-based) categories — points, rebounds, assists, threes, and so on. Percentage categories like Field Goal % and Free Throw % are left alone. Each entry is capped at 1, so the already-1 diagonal is unaffected while the off-diagonal correlations rise by ℵ.</p>
 </details>
-<h2 id="bayesian-strength-adjustment">Bayesian strength adjustment</h2>
+<h3 id="bayesian-strength-adjustment">Bayesian strength adjustment</h3>
 <p>H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. </p>
 <p>This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. </p>
 <p>The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. </p>
-<p><img alt="The beth input" src="../img/beth.png" /></p>
-<p>The <span class="arithmatex">\(\beth\)</span> parameter controls the influence of the adjustment. Higher values of <span class="arithmatex">\(\beth\)</span> more aggressively regress the strength of the team towards the average. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.</p>
+<p>The <span class="arithmatex">\(\beth\)</span> (beth) parameter controls the influence of the adjustment. Higher values of <span class="arithmatex">\(\beth\)</span> more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.</p>
 <details class="note">
 <summary>The math: how the adjustment is computed</summary>
 <p>Say that <span class="arithmatex">\(w\)</span> is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as</p>
@@ -674,7 +746,7 @@ x^* = \text{CDF}^{-1} \left( w^* \right)
 \]</div>
 <p>Since this adjustment is made before any gradient descent is performed, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. </p>
 </details>
-<p>The justification for this adjustment is a Bayesian model of updating expectations of team strengths given drafting context. </p>
+<p>The justification for this adjustment is a Bayesian model for updating expectations of team strengths, given drafting decisions made by all drafters. </p>
 <details class="note">
 <summary>The math: the Bayesian justification</summary>
 <p>Say that there are prior expectations that </p>

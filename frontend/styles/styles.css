@@ -329,46 +329,17 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     color: light-dark(#333333, lightgrey);
 }
 
-.method-dd-menu {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 2px;
-    z-index: 20;
-    min-width: 104px;
-    background: light-dark(#ffffff, #1a1c28);
-    border: 1px solid light-dark(#e5e5e5, #3d3d55);
-    border-radius: 4px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-    padding: 2px 0;
+/* Highlighted (active) state: this drafter is an H-scoring autodrafter.
+   Reuses the sidebar toggle's checked accent for consistency. */
+.method-dd-trigger.is-autodrafting {
+    background: light-dark(#888888, #4a4a8a);
+    border-color: light-dark(#888888, #4a4a8a);
+    color: #ffffff;
 }
 
-.method-dd-item {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: light-dark(#333333, lightgrey);
-    font-family: "Source Sans 3";
-    font-size: 0.78rem;
-    font-weight: 400;
-    padding: 3px 10px;
-    white-space: nowrap;
-}
-
-.method-dd-item b {
-    font-weight: 700;
-}
-
-.method-dd-item:hover {
-    background: light-dark(#f0f0f0, #2a2c3a);
-}
-
-.method-dd-item.selected {
-    background: light-dark(#eaeaf5, #2f3147);
+.method-dd-trigger.is-autodrafting:hover {
+    border-color: light-dark(#6f6f6f, #5a5aa5);
+    color: #ffffff;
 }
 
 /* ─── Sidebar input widgets ──────────────────────────────────────────────── */
@@ -1547,7 +1518,8 @@ tr {
        extra numeral width crowds the narrow mobile stat columns — use proportional
        figures here so the values stay compact. */
     #hscoretable,
-    .panel-table {
+    .panel-table,
+    .trade-result-table {
         font-variant-numeric: normal;
     }
     /* Stack each board header so the team name sits on its own line above the method
@@ -1887,7 +1859,9 @@ tr {
 .trade-result-table {
     width: 100%;
     border-collapse: collapse;
+    font-family: "Source Sans 3";
     font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;   /* equal-width digits, matching the other H-score tables */
 }
 .trade-result-table th,
 .trade-result-table td {
@@ -1994,7 +1968,7 @@ tr {
 
 /* Highlights the dropped player's candidate row in blue */
 .waiver-drop-highlight {
-    background-color: rgba(53, 128, 187, 0.7) !important;
+    background-color: rgba(53, 128, 187, 0.25) !important;
 }
 
 /* ─── Login screen (shown until the user signs in with Google) ────────────────── */
@@ -2036,6 +2010,55 @@ tr {
 }
 
 .login-btn:hover { background: light-dark(#f0f0f0, #3d3d55); }
+
+/* ─── ESPN auth-instructions pop-up (espn_connector.ts) ───────────────────────── */
+
+.espn-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: light-dark(rgba(20, 20, 30, 0.35), rgba(0, 0, 0, 0.55));
+    font-family: "Source Sans 3";
+}
+
+.espn-modal-box {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 420px;
+    margin: 16px;
+    padding: 24px 28px;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 10px;
+    background: light-dark(white, #1d1e2a);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.espn-modal-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: light-dark(#222222, #e6e6ff);
+}
+
+.espn-modal-body {
+    margin: 0;
+    line-height: 1.5;
+    color: light-dark(#444444, #b8b8d4);
+}
+
+.espn-modal-body code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: light-dark(#f0f0f2, #2a2a3e);
+    font-size: 0.9em;
+}
+
+.espn-modal-body a { color: light-dark(#3a6ea5, #8ab4f8); }
+
+.espn-modal-box .section-apply-btn { align-self: flex-end; }
 
 /* ─── Sidebar account row (signed-in name + sign out) ─────────────────────────── */
 

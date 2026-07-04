@@ -62,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#technical-reference" class="md-skip">
+        <a href="#fantasy-basketball-optimization" class="md-skip">
           Skip to content
         </a>
       
@@ -200,6 +200,8 @@
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
+        
+      
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
           
@@ -242,12 +244,25 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#technical-reference" class="md-nav__link">
@@ -496,12 +511,25 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#technical-reference" class="md-nav__link">
@@ -553,8 +581,8 @@
 
 
 
-  <h1>Home</h1>
-
+<h1 id="fantasy-basketball-optimization">Fantasy Basketball Optimization</h1>
+<h2 id="introduction">Introduction</h2>
 <p>This is documentation for a <a href="https://fantasy-basketball-optimizer-281850565831.us-east1.run.app/">website</a> which applies an algorithm called <a href="hscores/">H-scoring</a> to category-based fantasy basketball. The algorithm provides recommendations for which players to choose based on their statistical profiles and how they synergize with existing teams. </p>
 <p>H-scoring takes two essential inputs. One is <a href="league-setup/">league context</a>- which players are getting selected by which teams. The website allows you to either integrate with a real <a href="league-setup/#fantasy-provider-connections">fantasy league</a> or <a href="league-setup/#manual-entry">update picks manually</a>. The other essential input is <a href="projections/">player stats</a>. When you connect to a platform, those come from external projections; in manual mode you can use external projections too, or data from past NBA seasons. </p>
 <p>The algorithm is primarily designed for <a href="drafts/">drafting</a>, but can be applied in the context of <a href="auctions/">auctions</a> and <a href="season/">ongoing seasons</a> as well. </p>
@@ -585,38 +613,38 @@
 <tbody>
 <tr>
 <td>Mode</td>
-<td>toggle between Draft/Auction/Season modes</td>
+<td>Toggle between Draft/Auction/Season modes</td>
 <td><a href="drafts/">Draft</a>, <a href="auctions/">Auction</a>, <a href="season/">Season</a></td>
 </tr>
 <tr>
 <td>Data source</td>
-<td>connect to a platform (Yahoo, Fantrax, ESPN) or enter picks manually</td>
+<td>Connect to a platform (Yahoo, Fantrax, ESPN) or enter picks manually</td>
 <td><a href="league-setup/">League Setup</a></td>
 </tr>
 <tr>
 <td>Drafters and picks</td>
-<td>number of drafters and picks per drafter (manual entry)</td>
+<td>Number of drafters and picks per drafter (manual entry)</td>
 <td><a href="league-setup/#manual-entry">League Setup → Manual entry</a></td>
 </tr>
 <tr>
 <td>Third-round reversal</td>
-<td>snake-draft order toggle (manual entry)</td>
+<td>Snake-draft order toggle (manual entry)</td>
 <td><a href="league-setup/#manual-entry">League Setup → Manual entry</a></td>
 </tr>
 <tr>
 <td>Player stats</td>
-<td>configure forward-looking projections, or data from past NBA seasons</td>
+<td>Configure forward-looking projections, or data from past NBA seasons</td>
 <td><a href="projections/">Player Stats</a></td>
 </tr>
 <tr>
 <td>Format</td>
-<td>toggle between H2H Each Category, H2H Most Categories, or Rotisserie</td>
-<td><a href="hscores/#formats-categories">H-scoring → Formats &amp; categories</a></td>
+<td>Toggle between H2H Each Category, H2H Most Categories, or Rotisserie</td>
+<td><a href="hscores/#formats-and-categories">H-scoring → Formats and categories</a></td>
 </tr>
 <tr>
 <td>Categories</td>
-<td>select statistical categories for scoring</td>
-<td><a href="hscores/#formats-categories">H-scoring → Formats &amp; categories</a></td>
+<td>Select statistical categories for scoring</td>
+<td><a href="hscores/#formats-and-categories">H-scoring → Formats and categories</a></td>
 </tr>
 </tbody>
 </table>
@@ -632,43 +660,43 @@
 </thead>
 <tbody>
 <tr>
-<td>ω, γ</td>
-<td>how aggressively H-scoring punts categories</td>
-<td><a href="hscores/#parameters">H-scoring → Parameters</a></td>
+<td>ω, γ (omega, gamma)</td>
+<td>How aggressively H-scoring punts categories</td>
+<td><a href="hscores/#h-scoring-parameters">H-scoring → H-scoring parameters</a></td>
 </tr>
 <tr>
 <td>Number of iterations</td>
-<td>how long the H-scoring algorithm runs</td>
-<td><a href="hscores/#parameters">H-scoring → Parameters</a></td>
+<td>How long the H-scoring algorithm runs</td>
+<td><a href="hscores/#h-scoring-parameters">H-scoring → H-scoring parameters</a></td>
 </tr>
 <tr>
 <td>Position requirements</td>
-<td>the roster/position structure a team must satisfy</td>
-<td><a href="hscores/#detailed-drop-down">H-scoring → Detailed drop-down</a></td>
+<td>The roster/position structure a team must satisfy</td>
+<td><a href="hscores/#position-structure">H-scoring → Position structure</a></td>
 </tr>
 <tr>
-<td>υ, ψ</td>
-<td>how projections account for injuries and replacement players</td>
+<td>υ, ψ (upsilon, psi)</td>
+<td>How projections account for injuries and replacement players</td>
 <td><a href="projections/#injury-handling">Player Stats → Injury handling</a></td>
 </tr>
 <tr>
-<td>ℶ</td>
-<td>how strongly a team's projected strength is regressed toward average</td>
+<td>ℶ (beth)</td>
+<td>How strongly a team's projected strength is regressed toward average</td>
 <td><a href="projections/#bayesian-strength-adjustment">Player Stats → Bayesian strength adjustment</a></td>
 </tr>
 <tr>
-<td>χ, ℵ</td>
+<td>χ, ℵ (chi, aleph)</td>
 <td>Rotisserie projection uncertainty and cross-category correlation</td>
-<td><a href="projections/#rotisserie-uncertainty">Player Stats → Rotisserie uncertainty</a></td>
+<td><a href="projections/#projection-uncertainty">Player Stats → Projection uncertainty</a></td>
 </tr>
 <tr>
-<td><span class="arithmatex">\(S_\sigma\)</span></td>
-<td>the spread of auction dollar values across a season (SAVOR)</td>
+<td><span class="arithmatex">\(S_\sigma\)</span> (S-sigma)</td>
+<td>The spread of auction dollar values across a season (SAVOR)</td>
 <td><a href="auctions/#the-savor-adjustment">Auction Mode → The SAVOR adjustment</a></td>
 </tr>
 <tr>
 <td>Trade thresholds</td>
-<td>which candidate trades are considered and shown</td>
+<td>Which candidate trades are considered and shown</td>
 <td><a href="season/#trade-suggestions">Season Mode → Trade suggestions</a></td>
 </tr>
 </tbody>

@@ -677,19 +677,18 @@
 <figure>
 <p><img alt="Waiver substitution H-scores" src="../img/hwaiver.png" /></p>
 <figcaption>
-<p>Substitution H-scores for a synthetic team with Max Christie on it, based on the 2024-25 season</p>
+<p>Substitution H-scores for Team 1, considering dropping its lowest-ranked player, based on the 2025-26 season</p>
 </figcaption>
 </figure>
 <p>The player who is a candidate to be dropped is removed from the team, and H-scores are calculated for all available players plus the drop candidate. The drop candidate is highlighted in blue. Players who do not fit the position structure of the team are filtered out and their H-scores are not shown. </p>
 <p>These H-scores are relatively simple to calculate, because all other players are known and there is no need to strategize around future draft picks. For that reason, the algorithm does not iterate at all and results are shown immediately. </p>
-<p>G-score expectation breakdowns are available through the dropdown arrow. </p>
+<p>G-score expectation breakdowns are available through the drop-down arrow. Waiver players generally have negative overall G-score value, because they are below average for fantasy. </p>
 <figure>
 <p><img alt="Waiver G-score breakdown" src="../img/hwaiverexp.png" /></p>
 <figcaption>
-<p>A breakdown of how Max Christie contributes to the team in terms of G-score</p>
+<p>A breakdown of how Sam Hauser contributes to a team in terms of G-score</p>
 </figcaption>
 </figure>
-<p>Waiver players generally have negative overall G-score value, because they are below average for fantasy. </p>
 <h2 id="trading-tab">Trading tab</h2>
 <p>The trading tab analyzes the H-score and G-score implications of potential trades. It also provides recommendations for trades. </p>
 <h3 id="trade-analysis">Trade analysis</h3>
@@ -707,23 +706,16 @@
 <p><img alt="Trade suggestions list" src="../img/tradesuggestions.png" /></p>
 <p>Which trades end up being shown as suggestions depends on the user-configurable trade parameters. </p>
 <p><img alt="Trade parameters" src="../img/tp3.png" /></p>
-<p>Candidate trades are found by first heuristically estimating which players might be more favored by the other team, then iterating through all combinations of possible trades with those players. Those trades are further filtered by a general value difference threshold, which is based on user inputs.</p>
-<p><img alt="General value threshold parameters" src="../img/tp2.png" /></p>
-<p>The general value thresholds limit candidate trades to those between collections of players whose total general values are similar to each other. If the absolute value of the difference in total general value between the two groups of players that are to be traded is above the threshold, the trade will not be considered for analysis. This is to prevent unnecessary computation checking trades that are unlikely to be viable. </p>
-<p>General value is defined by base H-score (the H-scores the players would have for the first pick of the draft), as a percent. So if the general value threshold is 10, a total base H-score difference of 10% between players is allowed. For asymmetrical trades, the general value of an empty slot is the replacement-level base H-score. </p>
-<p>Thresholds should generally be lower for trade configurations with larger numbers of players involved, because those require checking many more combinations of players. Decreasing the limit and excluding more potential trades limits computation time. </p>
-<p>Trade suggestions can be generated for any kind of trade for which a general strength difference threshold is provided. By default 1x1, 2x2, and 3x3 trades are included, and users can add more through the trade parameters popover. </p>
+<p>Candidate trades are found by iterating through all combinations of possible trades. Those trades are first filtered by a general value difference threshold, which limits candidate trades to those between collections of players whose total general values are similar to each other. Specifically, If the difference in total H-score (calculated for the first pick of a draft, with no players selected) between the two groups of players that are to be traded is above 2%, the trade will not be considered for analysis. E.g. a trade between two 48% players and two 50% players has an H-score difference of 4%, which is above the threshold, so the trade will not be analyzed further. This is to prevent unnecessary computation checking trades that are unlikely to be viable. </p>
 <p>After trades are analyzed for H-score implications, one more filter is applied. Only those which meet the H-score differential thresholds as supplied by the user are shown. </p>
-<p><img alt="H-score differential thresholds" src="../img/tp1.png" /></p>
-<p>The thresholds are in terms of H-score as a percentage, so if the threshold for a party is -0.2, then trades that decrease the party's H-score by more than 0.2% are not shown. </p>
-<p>Even with all this filtering, there can be many possible trades to look through, especially when looking for trades with large numbers of players and when the parameters for acceptable trades are loose. For the purpose of limiting computation time, only 1x1 trades are searched for by default. </p>
+<p>Even with all this filtering, there can be many possible trades to look through, especially when looking for trades with large numbers of players and when the parameters for acceptable trades are loose. For the purpose of limiting computation time, only 1x1 trades are searched for by default, with a general value threshold of XYZ. 2x2 and 3x3 are also available by default. To get more kinds of trades, users must add more combinations to the sidebar with general value thresholds. </p>
 <h2 id="rosters-tab">Rosters tab</h2>
 <h3 id="roster-table">Roster table</h3>
 <p>Rosters can be manually input or edited on this tab. It is unnecessary if rosters are loaded through a platform integration.</p>
 <p><img alt="Roster editing table" src="../img/rosters.png" /></p>
 <p>Only players from the loaded dataset can be added to the roster table, which are shown on a searchable drop-down for each cell. The same player can be added multiple times.</p>
 <figure>
-<p><img alt="Player search dropdown" src="../img/rosterjokic.png" /></p>
+<p><img alt="Player search drop-down" src="../img/rosterjokic.png" /></p>
 <figcaption>
 <p>Nikola Jokic is still shown as an option after already being taken by another team</p>
 </figcaption>
@@ -731,7 +723,7 @@
 <p>Generally draft results can be copy-pasted from the drafting view into an Excel and then into this table, so long as the dataset of valid players remains the same.</p>
 <h3 id="roster-inspection">Roster inspection</h3>
 <p><img alt="Roster inspection G-score table" src="../img/rosterinspection.png" /></p>
-<p>Individual teams can be analyzed in terms of G-score. H-scores are also provided below the table, based on how the team matches up against its opponents. </p>
+<p>On the rosters tab, individual teams can be analyzed in terms of G-score. H-scores are also provided below the table, based on how the team matches up against its opponents. </p>
 <p><img alt="Roster inspection H-scores" src="../img/rosterh.png" /></p>
 
 

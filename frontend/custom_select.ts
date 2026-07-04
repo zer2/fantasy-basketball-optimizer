@@ -83,6 +83,7 @@ export function makeCustomSelect(
     // Root element — callers append this, and attach 'change' listeners to it.
     const wrapper = document.createElement('div')
     wrapper.className = 'cs-wrapper'
+    wrapper.dataset.testid = `${id}-wrapper`
 
     // Hidden value carrier — exposes the current value via
     // (document.getElementById(id) as HTMLInputElement).value, and gives a

@@ -55,6 +55,10 @@ docs/_build/
 # Persisted platform OAuth credentials (per-client token dirs)
 .platform_credentials/
 
-# Claude 
+# Claude
 claude.md
 .claude
+screenshot_review/
+
+# Node deps (screenshot tooling etc.) — installed, not committed
+node_modules/

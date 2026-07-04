@@ -38,6 +38,7 @@ export function renderTeamGScoreTable(
     tbl.className = 'panel-table panel-table--rounded'
     tbl.style.tableLayout = 'fixed'
     tbl.style.width = '100%'
+    tbl.dataset.testid = 'team-gscore'
 
     // On mobile, narrow the name/total columns and use short category labels
     // (e.g. "Points" → "Pts") so the table's intrinsic min-content fits inside

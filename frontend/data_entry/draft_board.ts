@@ -4,12 +4,12 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { isMobileViewport, readRequiredIntInput } from '../helper_functions.js'
-import { getPlayerResults, getCandidatePlayerResults, getPlayerNamesByGScore, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
+import { getPlayerResults, getCandidatePlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethod } from './drafter_methods.js'
-import { makeMethodDropdown } from './method_dropdown.js'
+import { makeAutodraftToggle } from './autodraft_toggle.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
 import {
     DraftConfig,
@@ -116,16 +116,6 @@ function buildScaffold(container: HTMLElement): void {
 
 // ─── Autopilot helpers ────────────────────────────────────────────────────────
 
-/** Returns the undrafted player with the highest G-score total.
- *  Uses the pre-sorted G-score list (computed once at session creation) so this
- *  is O(drafted) rather than O(all players). */
-function pickByGScore(draftedSet: Set<string>): string | null {
-    for (const name of getPlayerNamesByGScore()) {
-        if (!draftedSet.has(name)) return name
-    }
-    return null
-}
-
 /** Returns the top-ranked candidate from the latest evaluate response.
  *  Candidates are always undrafted (the backend only includes available players). */
 function pickByHScore(): string | null {
@@ -145,20 +135,12 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
     try {
         while (getPickRow() < getNPicks()) {
-            const mode = getDrafterMethod(getPickDrafter())
-            if (mode === 'Manual input') break
+            if (getDrafterMethod(getPickDrafter()) === 'Manual input') break
 
-            const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
-
-            let player: string | null
-            if (mode === 'H-scoring') {
-                clearFullTeamResult()
-                setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Team ${getPickDrafter() + 1}`)
-                await runEvaluate()
-                player = pickByHScore()
-            } else {
-                player = pickByGScore(draftedSet)
-            }
+            clearFullTeamResult()
+            setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Team ${getPickDrafter() + 1}`)
+            await runEvaluate()
+            const player = pickByHScore()
 
             if (!player) break
             recordDraftPick(getPickRow(), getPickDrafter(), player)
@@ -353,7 +335,7 @@ function buildTransposedTable(container: HTMLElement): HTMLTableElement {
     return table
 }
 
-/** Builds one column header: an editable display-label input plus the compact method dropdown.
+/** Builds one column header: an editable display-label input plus the compact autodraft toggle.
  *  Editing the label only changes presentation (identity stays "Team N") — it persists and
  *  relabels the seat selector via the team-labels-changed event, without rebuilding the header. */
 function buildTeamHeader(drafterIndex: number, container: HTMLElement): HTMLElement {
@@ -362,7 +344,7 @@ function buildTeamHeader(drafterIndex: number, container: HTMLElement): HTMLElem
 
     cell.append(makeTeamLabelInput(drafterIndex, headerListenerController?.signal))
 
-    cell.append(makeMethodDropdown(
+    cell.append(makeAutodraftToggle(
         drafterIndex
       , () => renderDraftBoard(container)
       , headerListenerController?.signal

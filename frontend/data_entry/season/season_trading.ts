@@ -562,6 +562,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
     ignorePosInput.checked = pref('ts-ignore-position', false)
 
     const suggestResults = document.createElement('div')
+    suggestResults.dataset.testid = 'trade-suggestions'
     container.append(suggestResults)
 
     // Cache of suggestion results keyed by combo label (e.g. "1 for 1").
@@ -634,8 +635,10 @@ export function renderSeasonTrading(container: HTMLElement): void {
         // Tab panes
         const hPane = document.createElement('div')
         hPane.className = 'trade-tab-pane'
+        hPane.dataset.testid = 'trade-hscore-pane'
         const gPane = document.createElement('div')
         gPane.className = 'trade-tab-pane'
+        gPane.dataset.testid = 'trade-gscore-pane'
         gPane.style.display = 'none'
         rightCol.append(hPane, gPane)
 
