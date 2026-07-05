@@ -169,9 +169,11 @@ export async function evaluate(
         my_team_id: string
         exclusion_list?: string[]
         remaining_cash?: Record<string, number>
+        candidate_offset?: number   // draft/waiver batching: slice start
+        candidate_limit?: number    // draft/waiver batching: slice size (omit = whole pool)
     }
     , signal?: AbortSignal
-): Promise<{ iteration: number; candidates: any[] }> {
+): Promise<{ iteration: number; candidates: any[]; has_more?: boolean }> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },

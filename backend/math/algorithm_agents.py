@@ -260,13 +260,21 @@ class HAgent:
             ~self.x_scores.index.isin(players_chosen + exclusion_list)
             & self.x_scores.index.isin(self.positions.index)
         )
-        # candidate_subset (draft/waiver batching) restricts scoring to one slice of the pool.
-        if candidate_subset is not None:
-            available_mask = available_mask & self.x_scores.index.isin(candidate_subset)
-        x_scores_available = self.x_scores[available_mask]
+        # x_scores_pool is the FULL available pool. It models opponents' future picks (the diff
+        # distributions read its top players), so it must stay complete even when batching.
+        x_scores_pool = self.x_scores[available_mask]
 
+        # candidate_subset (draft/waiver batching) restricts only which players are *scored* — the
+        # future-pick model above still sees the whole pool, so each batch's H-scores are unchanged.
+        if candidate_subset is not None:
+            x_scores_available = x_scores_pool[x_scores_pool.index.isin(candidate_subset)]
+        else:
+            x_scores_available = x_scores_pool
+
+        # diff_means/diff_vars/sigma_2_m are candidate-independent (shape (1, n_cat, n_drafters-1)),
+        # so they broadcast against whatever slice of candidates is being scored.
         diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(
-            player_assignments, drafter, x_scores_available, cash_remaining_per_team
+            player_assignments, drafter, x_scores_pool, cash_remaining_per_team
         )
 
         x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis=2)

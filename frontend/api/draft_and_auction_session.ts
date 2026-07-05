@@ -8,7 +8,11 @@ import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/le
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
-import { buildTable, showTableMessage } from '../table/player_table.js'
+import { buildTable, resetTable, addBatch, showTableMessage } from '../table/player_table.js'
+
+// Draft/waiver candidate batch size: score + paint the top players first, then fill in the
+// bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
+const CANDIDATE_BATCH_SIZE = 100
 import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
 
@@ -159,8 +163,30 @@ async function evaluateSeat(seat: string): Promise<void> {
             }
             latestFullTeamResult = null
 
-            const resp = await evaluate(getSessionId()!, evalReq, signal)
-            const players = candidatesToPlayerResults(resp.candidates)
+            let players: PlayerResult[]
+            if (mode === 'Auction Mode') {
+                // Auction scores the whole pool in one call (dollar values anchor on the full
+                // distribution). Rendered by runEvaluate, as before.
+                const resp = await evaluate(getSessionId()!, evalReq, signal)
+                players = candidatesToPlayerResults(resp.candidates)
+            } else {
+                // Draft: score + paint in batches (top-ranked first) so the top of the board appears
+                // before the deep bench is scored. Each batch is merged into the table incrementally.
+                players = []
+                for (let offset = 0, first = true; ; offset += CANDIDATE_BATCH_SIZE, first = false) {
+                    const resp = await evaluate(
+                        getSessionId()!,
+                        { ...evalReq, candidate_offset: offset, candidate_limit: CANDIDATE_BATCH_SIZE },
+                        signal,
+                    )
+                    if (signal.aborted) return
+                    const batch = candidatesToPlayerResults(resp.candidates)
+                    if (first) resetTable()
+                    addBatch(batch)
+                    players.push(...batch)
+                    if (!resp.has_more) break
+                }
+            }
 
             if (!basePlayersBySession.has(getSessionId()!)) {
                 basePlayersBySession.set(getSessionId()!, players)
@@ -187,7 +213,8 @@ export async function runEvaluate(): Promise<void> {
     if (mode !== 'Season Mode') {
         if (getFullTeamResult()) {
             showTableMessage('Your team is full.')
-        } else {
+        } else if (mode === 'Auction Mode') {
+            // Draft renders incrementally inside evaluateSeat; only auction renders in one shot here.
             buildTable(getCandidatePlayerResults()!)
         }
     }
