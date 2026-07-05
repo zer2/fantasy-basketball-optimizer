@@ -62,6 +62,7 @@ let renderCtx: RenderContext | null = null
 
 /** Clears the candidate table and shows a single centred message row. */
 export function showTableMessage(message: string): void {
+    clearTailSpace()
     table.innerHTML = ''
     candidateRows = []
     tbodyEl = null
@@ -258,9 +259,40 @@ function mergeBatch(batch: CandidateRow[]): void {
     candidateRows = merged
 }
 
+// ── Tail-space reservation ────────────────────────────────────────────────────
+// When batches stream in, the page's scroll height grows as each batch appends rows,
+// which shifts the scrollbar under the user. To avoid that, once the first batch is
+// painted we reserve whitespace below the table for the candidates still to come, so
+// the scroll height reaches its final value immediately; each later batch shrinks the
+// reserved space by exactly what it fills, keeping the scrollbar still.
+let tailSpacer: HTMLDivElement | null = null
+let measuredRowHeight = 0
+
+/** Reserves whitespace below the table for `totalCandidates - (already rendered)` rows, so the
+ *  scroll height doesn't grow as later batches merge in. Safe to call after every batch — it
+ *  shrinks the reserved height as rows arrive. Row height is measured once from a rendered row. */
+export function reserveTailSpace(totalCandidates: number): void {
+    if (candidateRows.length === 0) return
+    if (measuredRowHeight === 0) measuredRowHeight = candidateRows[0].displayRow.offsetHeight
+    const remaining = Math.max(0, totalCandidates - candidateRows.length)
+    if (tailSpacer === null) {
+        tailSpacer = document.createElement('div')
+        tailSpacer.id = 'candidate-tail-spacer'
+        table.insertAdjacentElement('afterend', tailSpacer)
+    }
+    tailSpacer.style.height = (remaining * measuredRowHeight) + 'px'
+}
+
+/** Drops the reserved whitespace once every batch has arrived (or the table is rebuilt). */
+export function clearTailSpace(): void {
+    if (tailSpacer) { tailSpacer.remove(); tailSpacer = null }
+    measuredRowHeight = 0
+}
+
 /** Clears the candidate table (header + empty body) and captures the render context,
  *  ready for one or more addBatch() calls. */
 export function resetTable(): void {
+    clearTailSpace()
     buildTableHeader()
     candidateRows = []
     tbodyEl = table.createTBody()

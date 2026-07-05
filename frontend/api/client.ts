@@ -173,7 +173,7 @@ export async function evaluate(
         candidate_limit?: number    // draft/waiver batching: slice size (omit = whole pool)
     }
     , signal?: AbortSignal
-): Promise<{ iteration: number; candidates: any[]; has_more?: boolean }> {
+): Promise<{ iteration: number; candidates: any[]; has_more?: boolean; total_candidates?: number }> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },

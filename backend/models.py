@@ -176,6 +176,7 @@ class EvaluateResponse(BaseModel):
     iteration: int
     candidates: list[Candidate]
     has_more: bool = False   # True when more candidate batches remain beyond this slice
+    total_candidates: int = 0   # total candidates across all batches; lets the client reserve tail space
 
 
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────

@@ -185,15 +185,17 @@ def optimize_positions_all_players(
             for player, reward_vector in zip(candidate_player_array, reward_array)
         ])
     else:
+        # active_count can be 0 (a batch entirely past the global exact-solve tiers): every candidate
+        # reuses its cached roster, so there is nothing to re-solve.
         active_indices = priority_order[:active_count]
-        active_rosters = np.array([
-            _optimize_positions_for_prospective_player(
-                candidate_player_array[i], reward_array[i], team_so_far_array, n_remaining_players
-            )
-            for i in active_indices
-        ])
         rosters = cached_rosters.copy()
-        rosters[active_indices] = active_rosters
+        if len(active_indices) > 0:
+            rosters[active_indices] = np.array([
+                _optimize_positions_for_prospective_player(
+                    candidate_player_array[i], reward_array[i], team_so_far_array, n_remaining_players
+                )
+                for i in active_indices
+            ])
 
     final_positions, flex_shares = get_position_array_from_res(
         rosters, position_shares, n_remaining_players, pos_cfg

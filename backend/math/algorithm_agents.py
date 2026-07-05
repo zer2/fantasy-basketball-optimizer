@@ -239,7 +239,8 @@ class HAgent:
                      , cash_remaining_per_team: dict = None
                      , exclusion_list: list = []
                      , baseline_h_scores=None
-                     , candidate_subset: list = None) -> dict:
+                     , candidate_subset: list = None
+                     , candidate_offset: int = 0) -> dict:
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -260,28 +261,29 @@ class HAgent:
             ~self.x_scores.index.isin(players_chosen + exclusion_list)
             & self.x_scores.index.isin(self.positions.index)
         )
-        # x_scores_pool is the FULL available pool. It models opponents' future picks (the diff
-        # distributions read its top players), so it must stay complete even when batching.
-        x_scores_pool = self.x_scores[available_mask]
+        # x_scores_available is the FULL available pool, exactly as it has always meant. The opponent /
+        # future-pick model (get_diff_distributions) reads its top players, so it must stay complete.
+        x_scores_available = self.x_scores[available_mask]
 
-        # candidate_subset (draft/waiver batching) restricts only which players are *scored* — the
-        # future-pick model above still sees the whole pool, so each batch's H-scores are unchanged.
+        # x_scores_batch is the slice we actually score. candidate_subset (draft/waiver batching) narrows
+        # it to one batch; without it we score the whole pool. The future-pick model below still sees the
+        # full pool either way, so each batch's H-scores match a single full evaluation.
         if candidate_subset is not None:
-            x_scores_available = x_scores_pool[x_scores_pool.index.isin(candidate_subset)]
+            x_scores_batch = x_scores_available[x_scores_available.index.isin(candidate_subset)]
         else:
-            x_scores_available = x_scores_pool
+            x_scores_batch = x_scores_available
 
         # diff_means/diff_vars/sigma_2_m are candidate-independent (shape (1, n_cat, n_drafters-1)),
         # so they broadcast against whatever slice of candidates is being scored.
         diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(
-            player_assignments, drafter, x_scores_pool, cash_remaining_per_team
+            player_assignments, drafter, x_scores_available, cash_remaining_per_team
         )
 
-        x_scores_available_array = np.expand_dims(np.array(x_scores_available), axis=2)
+        x_scores_batch_array = np.expand_dims(np.array(x_scores_batch), axis=2)
 
         if len(my_players) > 0:
             cdf_original = _normal_cdf(
-                (diff_means + x_scores_available_array).mean(axis=2),
+                (diff_means + x_scores_batch_array).mean(axis=2),
                 scale=np.sqrt(diff_vars.mean(axis=2)),
             )
             cdf_mod = np.einsum(
@@ -290,8 +292,8 @@ class HAgent:
                 cdf_original + self.transformation_addition_constant,
             )
             corrected_strength = _normal_ppf(cdf_mod, scale=np.sqrt(diff_vars.mean(axis=2)))
-            x_scores_available_mod    = corrected_strength - diff_means.mean(axis=2)
-            x_scores_available_array  = np.expand_dims(x_scores_available_mod, axis=2)
+            x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
+            x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
         default_weights = self.v.T.reshape(1, self.n_categories, 1)
         category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
@@ -303,13 +305,13 @@ class HAgent:
             #we want to subtract out roughly the player's position means 
             #to account for the fact that they are taking up that slot
             if self.pos_avg is not None:
-                pos_avg = self.pos_avg.loc[x_scores_available.index]
+                pos_avg = self.pos_avg.loc[x_scores_batch.index]
                 pos_avg_array = np.expand_dims(np.array(pos_avg), axis=2)
             else: 
                 pos_avg_array = 0 #not an array, but this will work fine
 
             initial_category_weights = (
-                (diff_means + x_scores_available_array - pos_avg_array)
+                (diff_means + x_scores_batch_array - pos_avg_array)
                 / (default_weights * category_momentum_factor)
                 + default_weights
             ).mean(axis=2)
@@ -317,18 +319,18 @@ class HAgent:
 
             initial_position_shares = {
                 pos_code: pd.DataFrame({
-                    base: [1 / len(pos_info['bases'])] * len(x_scores_available_array)
+                    base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
                     for base in pos_info['bases']
                 })
                 for pos_code, pos_info in self.position_structure['flex'].items()
             }
         else:
             initial_category_weights = np.array(
-                [self.initial_category_weights] * len(x_scores_available)
+                [self.initial_category_weights] * len(x_scores_batch)
             )
             initial_position_shares = {
                 pos_code: pd.DataFrame({
-                    base: [self.initial_shares[pos_code][base]] * len(x_scores_available_array)
+                    base: [self.initial_shares[pos_code][base]] * len(x_scores_batch_array)
                     for base in pos_info['bases']
                 })
                 for pos_code, pos_info in self.position_structure['flex'].items()
@@ -339,7 +341,7 @@ class HAgent:
         # Missing/uncached players sort last; with no cached ranking at all we pass None, which
         # disables throttling entirely (a full, exact solve every iteration).
         if baseline_h_scores is not None:
-            ranked = baseline_h_scores.reindex(x_scores_available.index).to_numpy()
+            ranked = baseline_h_scores.reindex(x_scores_batch.index).to_numpy()
             candidate_priority = np.argsort(-np.nan_to_num(ranked, nan=-np.inf))
         else:
             candidate_priority = None
@@ -351,11 +353,12 @@ class HAgent:
             n_players_selected,
             diff_means,
             diff_vars,
-            x_scores_available_array,
-            x_scores_available.index,
+            x_scores_batch_array,
+            x_scores_batch.index,
             sigma_2_m,
             n_iterations,
             candidate_priority,
+            candidate_offset,
         )
 
     def get_diff_distributions(self
@@ -534,11 +537,12 @@ class HAgent:
                            , n_players_selected
                            , diff_means
                            , diff_vars
-                           , x_scores_available_array
+                           , x_scores_batch_array
                            , result_index
                            , sigma_2_m
                            , n_iterations
-                           , candidate_priority=None):
+                           , candidate_priority=None
+                           , candidate_offset=0):
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
@@ -576,6 +580,10 @@ class HAgent:
             # candidate_priority ranks candidates for the throttle (None disables it → full solves).
             self._position_rosters_cache = None
             self._candidate_priority     = candidate_priority
+            # Global rank of this batch's first candidate. The exact-solve tiers below are global ranks,
+            # so a batch that starts past them (offset >= 70) exact-solves nobody: the "top 30 of the
+            # 5th batch" are deep-bench players, not worth a Hungarian solve every iteration.
+            self._candidate_offset       = candidate_offset
 
             for iteration in range(max(1, n_iterations)):
                 category_weights_current  = category_weights
@@ -583,7 +591,7 @@ class HAgent:
 
                 gradient_result = self.get_objective_and_gradient(
                     category_weights, position_shares, diff_means, diff_vars,
-                    x_scores_available_array, candidate_player_array, team_so_far_array,
+                    x_scores_batch_array, candidate_player_array, team_so_far_array,
                     n_players_selected, sigma_2_m, iteration, pitching_preference,
                 )
 
@@ -633,7 +641,7 @@ class HAgent:
                 }
 
         elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
-            x_diff_array   = diff_means + x_scores_available_array
+            x_diff_array   = diff_means + x_scores_batch_array
             cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
             score          = self.get_objective_and_pdf_weights(
                 x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
@@ -736,19 +744,24 @@ class HAgent:
             return n_candidates
         if mode == 'light':                       # top 300 every iteration, everyone every 5th
             return n_candidates if (iteration + 1) % 5 == 0 else min(300, n_candidates)
-        # 'tiered': top 30 every iteration, top 70 every 5th, everyone every 10th
+        # 'tiered': global top 30 every iteration, global top 70 every 5th, everyone every 10th. The
+        # tiers are global ranks, so this batch only exact-solves the members that fall inside them —
+        # clamp(threshold - offset). Past the first batch (offset >= 70) that is zero every iteration
+        # except the every-10th full passes (which also seed the cache on iteration 0 and keep the
+        # final iteration a full solve, so output scores stay consistent).
+        offset = self._candidate_offset
         if (iteration + 1) % 10 == 0:
             return n_candidates
         if (iteration + 1) % 5 == 0:
-            return min(70, n_candidates)
-        return min(30, n_candidates)
+            return max(0, min(70 - offset, n_candidates))
+        return max(0, min(30 - offset, n_candidates))
 
     def get_objective_and_gradient(self
                                     , category_weights
                                     , position_shares
                                     , diff_means
                                     , diff_vars
-                                    , x_scores_available_array
+                                    , x_scores_batch_array
                                     , candidate_player_array
                                     , team_so_far_array
                                     , n_players_selected
@@ -838,7 +851,7 @@ class HAgent:
             (self.n_picks - 1 - n_players_selected) * expected_future_diff_single
         ).reshape(-1, self.n_categories, 1)
 
-        x_diff_array  = diff_means + x_scores_available_array + expected_future_diff
+        x_diff_array  = diff_means + x_scores_batch_array + expected_future_diff
         pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
         cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
 

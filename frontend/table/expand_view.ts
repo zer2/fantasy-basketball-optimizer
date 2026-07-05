@@ -212,7 +212,12 @@ function makeWeightsTable(playerData: PlayerResult, categories: string[]): HTMLD
     for (const value of playerData.category_weights) {
         const cell = row.insertCell(-1)
         cell.textContent = value.toFixed(0)  // '%' appended by CSS panel-weight::after
-        cell.style.cssText = stat_styler_tertiary(value, 5, 90)
+        // A single blue ramp: white at the low end, deepening with the weight, so the pursued
+        // categories are the strong blues and the punts fade toward white. Weights sit ~70–115, so
+        // the white anchor is 70 (the bottom of that range) — anchoring at 0 would cram every weight
+        // into a narrow, uniform-looking slice of the ramp. Clamp to >=70 so a deep punt stays white
+        // rather than being re-coloured by tertiary's |raw|. ~90% lands on light blue; 110% is deep.
+        cell.style.cssText = stat_styler_tertiary(Math.max(value, 70), 2.5, 70)
         cell.className = 'panel-datacell panel-weight'
     }
 

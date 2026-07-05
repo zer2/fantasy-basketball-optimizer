@@ -65,14 +65,17 @@ def run_evaluate(
     is_auction       = remaining_cash is not None
     candidate_subset = None
     has_more         = False
+    total_candidates = None   # set when batching; falls back to the scored count below
     if candidate_limit is not None and not is_auction and session.generic_h_scores is not None:
         unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
         unavailable |= set(exclusion_list)
         available_ranked = [p for p in session.generic_h_scores.index if p not in unavailable]
         candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
         has_more         = len(available_ranked) > candidate_offset + candidate_limit
+        total_candidates = len(available_ranked)
         if len(candidate_subset) == 0:
-            return EvaluateResponse(iteration=0, candidates=[], has_more=False)
+            return EvaluateResponse(iteration=0, candidates=[], has_more=False,
+                                    total_candidates=total_candidates)
 
     # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()
@@ -85,6 +88,10 @@ def run_evaluate(
             exclusion_list          = exclusion_list,
             baseline_h_scores       = session.generic_h_scores,
             candidate_subset        = candidate_subset,
+            # Global rank of this batch's first candidate, so the throttle's exact-solve tiers stay
+            # global: batches past the first fall outside them and exact-solve nobody. Zero when we
+            # score the whole pool (no subset), where the tiers apply normally from the top.
+            candidate_offset        = candidate_offset if candidate_subset is not None else 0,
         )
     actual_iterations = max(1, n_iterations)
 
@@ -130,9 +137,10 @@ def run_evaluate(
         )
 
     return EvaluateResponse(
-        iteration  = actual_iterations,
-        candidates = candidates,
-        has_more   = has_more,
+        iteration        = actual_iterations,
+        candidates       = candidates,
+        has_more         = has_more,
+        total_candidates = total_candidates if total_candidates is not None else len(candidates),
     )
 
 
@@ -176,12 +184,18 @@ def _build_candidates(
     # Full-population lookup tables (player_position_map, player_g_scores) are
     # NOT reindexed — they are used to look up already-drafted players and for
     # auction value calculations across the entire player pool.
-    h_scores_sorted          = h_score_result['Scores'].sort_values(ascending=False)
+    scores_series            = h_score_result['Scores']
+    h_scores_sorted          = scores_series.sort_values(ascending=False)
     sorted_index             = h_scores_sorted.index
-    category_weights_raw     = h_score_result['Weights'].reindex(sorted_index) if h_score_result['Weights'] is not None else None
-    win_rate_cdfs            = h_score_result['Rates'].reindex(sorted_index)
-    team_diff_df             = h_score_result['Diff'].reindex(sorted_index) if h_score_result['Diff'] is not None else None
-    future_diff_df           = h_score_result['Future-Diff'].reindex(sorted_index) if h_score_result['Future-Diff'] is not None else None
+    # Every frame in h_score_result carries the same candidate index in the same order, so resolve the
+    # sort to integer positions once and reorder each frame positionally with .iloc[order] — a single
+    # hash pass instead of a separate hash-aligned .reindex() per frame. (player_g_scores below is the
+    # exception: it carries the full-population index and needs a genuine cross-index reindex.)
+    order                    = scores_series.index.get_indexer(sorted_index)
+    category_weights_raw     = h_score_result['Weights'].iloc[order] if h_score_result['Weights'] is not None else None
+    win_rate_cdfs            = h_score_result['Rates'].iloc[order]
+    team_diff_df             = h_score_result['Diff'].iloc[order] if h_score_result['Diff'] is not None else None
+    future_diff_df           = h_score_result['Future-Diff'].iloc[order] if h_score_result['Future-Diff'] is not None else None
     player_position_map      = info['Positions']           # full-population: used by _build_roster for my_players
     player_g_scores          = info['G-scores']            # full-population: used for auction dollar values
 
@@ -191,12 +205,13 @@ def _build_candidates(
     # filtering and return None for all position-derived fields.
     # When position data IS present, any value < 0 indicates an individual
     # candidate cannot be fitted into the current roster and is excluded.
-    rosters_col0 = h_score_result['Rosters'].iloc[:, 0]
+    rosters_sorted = h_score_result['Rosters'].iloc[order]
+    rosters_col0 = rosters_sorted.iloc[:, 0]
     no_position_data = bool((rosters_col0 == -1).all())
     player_fits_roster = (
         pd.Series(True, index=sorted_index)
         if no_position_data
-        else (rosters_col0 >= 0).reindex(sorted_index)
+        else (rosters_col0 >= 0)                            # already in sorted order
     )
 
     n_categories = len(categories)
@@ -212,6 +227,14 @@ def _build_candidates(
     # weights_raw ≈ v, so dividing by v and scaling to 100 gives a neutral baseline of 100.
     category_weights_normalized = None if category_weights_raw is None else \
                                   (category_weights_raw.values / v_reshaped) * 100  # (n_players, n_cat)
+
+    # Vectorise the per-candidate scaling + rounding the loop used to do element-by-element: h-scores
+    # and win-rates become percentages (× 100) rounded to 2 dp; weights are already × 100, round to 1.
+    h_scores_scaled  = np.round(h_scores_sorted.values * 100, 2)          # (n_players,)
+    win_rates_scaled = np.round(win_rate_cdfs.values   * 100, 2)          # (n_players, n_cat)
+    category_weights_scaled = (
+        None if category_weights_normalized is None else np.round(category_weights_normalized, 1)
+    )
 
     my_players         = [p for p in player_assignments.get(my_team_id, []) if isinstance(p, str)]
     position_structure = H.position_structure
@@ -302,7 +325,7 @@ def _build_candidates(
         if future_diff_df is not None
         else itertools.repeat(None)
     )
-    rosters_rows = h_score_result['Rosters'].reindex(sorted_index).values
+    rosters_rows = rosters_sorted.values
 
     # Pre-extract position share arrays for each flex type, aligned to sorted_index.
     # Each entry is (numpy_array, base_to_col) where base_to_col maps base position
@@ -310,19 +333,29 @@ def _build_candidates(
     position_shares_arrays = (
         None if no_position_data else {
             flex_type: (
-                share_df.reindex(sorted_index).values,
+                share_df.iloc[order].values,
                 {base: i for i, base in enumerate(share_df.columns)},
             ) if share_df is not None else None
             for flex_type, share_df in h_score_result['Position-Shares'].items()
         }
     )
 
+    # Everything that doesn't need the per-candidate expand-view builders is precomputed here in
+    # sorted order and indexed by rank in the loop. Whole-array .tolist() crosses the numpy→Python
+    # boundary once instead of once per row; the position display (a dict lookup + string join, which
+    # is not numpy-vectorisable) is built out of the loop too.
+    h_scores_list          = h_scores_scaled.tolist()
+    win_rates_lists        = win_rates_scaled.tolist()
+    category_weights_lists = None if category_weights_scaled is None else category_weights_scaled.tolist()
+    position_displays      = [
+        ','.join(raw) if isinstance(raw, list) else str(raw)
+        for raw in (player_position_map.get(p, ['?']) for p in sorted_index)
+    ]
+
     candidates: list[Candidate] = []
-    for rank_idx, (player, fits, h_score_val, win_rates_row, g_scores_row, team_diff_row, future_diff_row, roster_row) in enumerate(zip(
+    for rank_idx, (player, fits, g_scores_row, team_diff_row, future_diff_row, roster_row) in enumerate(zip(
         sorted_index,
         player_fits_roster.values,
-        h_scores_sorted.values,
-        win_rate_cdfs.values,
         g_scores_for_candidates,
         team_diff_rows,
         future_diff_rows,
@@ -330,10 +363,6 @@ def _build_candidates(
     )):
         if not fits:
             continue  # skip players for whom no valid roster slot exists
-
-        h_score                 = float(h_score_val) * 100
-        player_win_rates        = win_rates_row * 100
-        player_category_weights = None if category_weights_normalized is None else category_weights_normalized[rank_idx]
 
         g_score_rows = _build_g_score_rows(
             player, categories, g_scores_row,
@@ -357,16 +386,13 @@ def _build_candidates(
             )
         )
 
-        raw_positions    = player_position_map.get(player, ['?'])
-        position_display = ','.join(raw_positions) if isinstance(raw_positions, list) else str(raw_positions)
-
         candidates.append(Candidate(
             name             = player,
-            position         = position_display,
-            h_score          = round(h_score, 2),
+            position         = position_displays[rank_idx],
+            h_score          = h_scores_list[rank_idx],   # already × 100 and rounded to 2 dp
             h_rank           = rank_idx + 1,
-            win_rates        = [round(float(val), 2) for val in player_win_rates],
-            category_weights = None if player_category_weights is None else [round(float(val), 1) for val in player_category_weights],
+            win_rates        = win_rates_lists[rank_idx],   # already × 100 and rounded to 2 dp
+            category_weights = None if category_weights_lists is None else category_weights_lists[rank_idx],
             g_score_rows     = g_score_rows,
             flex_allocations = flex_allocations,
             roster           = roster,
