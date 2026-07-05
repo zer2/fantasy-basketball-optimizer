@@ -238,7 +238,8 @@ class HAgent:
                      , n_iterations: int
                      , cash_remaining_per_team: dict = None
                      , exclusion_list: list = []
-                     , baseline_h_scores=None) -> dict:
+                     , baseline_h_scores=None
+                     , candidate_subset: list = None) -> dict:
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -255,10 +256,14 @@ class HAgent:
         n_players_selected = len(my_players)
         players_chosen     = [x for v in player_assignments.values() for x in v if x == x]
 
-        x_scores_available = self.x_scores[
+        available_mask = (
             ~self.x_scores.index.isin(players_chosen + exclusion_list)
             & self.x_scores.index.isin(self.positions.index)
-        ]
+        )
+        # candidate_subset (draft/waiver batching) restricts scoring to one slice of the pool.
+        if candidate_subset is not None:
+            available_mask = available_mask & self.x_scores.index.isin(candidate_subset)
+        x_scores_available = self.x_scores[available_mask]
 
         diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(
             player_assignments, drafter, x_scores_available, cash_remaining_per_team

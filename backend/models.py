@@ -115,6 +115,12 @@ class EvaluateRequest(BaseModel):
     my_team_id: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
     exclusion_list: list[str] = []
+    # Draft/waiver batching: evaluate only a slice of the candidate pool (ordered by the cached
+    # default/generic H-score ranking) so the top players can paint before the deep bench is scored.
+    # candidate_limit=None evaluates everyone (auction always does; the first eval does too, since it
+    # is what establishes the generic ranking).
+    candidate_offset: int = 0
+    candidate_limit: Optional[int] = None
 
 
 class GScoreRow(BaseModel):
@@ -169,6 +175,7 @@ class Candidate(BaseModel):
 class EvaluateResponse(BaseModel):
     iteration: int
     candidates: list[Candidate]
+    has_more: bool = False   # True when more candidate batches remain beyond this slice
 
 
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────

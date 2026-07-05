@@ -29,6 +29,8 @@ def run_evaluate(
     my_team_id: str,
     exclusion_list: list[str],
     remaining_cash: Optional[dict[str, float]],
+    candidate_offset: int = 0,
+    candidate_limit: Optional[int] = None,
 ) -> EvaluateResponse:
     """Drive the HAgent gradient-descent loop and return ranked candidates.
 
@@ -55,6 +57,23 @@ def run_evaluate(
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
 
+    # ── Candidate batching (draft/waiver only) ────────────────────────────────
+    # Slice the available pool by the cached default/generic ranking so the top-ranked players are
+    # scored (and can paint) first. Auction always evaluates the whole pool — its dollar values anchor
+    # on the full-distribution replacement level. The first eval also evaluates everyone: it is what
+    # builds session.generic_h_scores, so there is no ranking to slice by yet.
+    is_auction       = remaining_cash is not None
+    candidate_subset = None
+    has_more         = False
+    if candidate_limit is not None and not is_auction and session.generic_h_scores is not None:
+        unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
+        unavailable |= set(exclusion_list)
+        available_ranked = [p for p in session.generic_h_scores.index if p not in unavailable]
+        candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
+        has_more         = len(available_ranked) > candidate_offset + candidate_limit
+        if len(candidate_subset) == 0:
+            return EvaluateResponse(iteration=0, candidates=[], has_more=False)
+
     # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()
     with record_phase('hscores'):
@@ -65,6 +84,7 @@ def run_evaluate(
             cash_remaining_per_team = remaining_cash,
             exclusion_list          = exclusion_list,
             baseline_h_scores       = session.generic_h_scores,
+            candidate_subset        = candidate_subset,
         )
     actual_iterations = max(1, n_iterations)
 
@@ -112,6 +132,7 @@ def run_evaluate(
     return EvaluateResponse(
         iteration  = actual_iterations,
         candidates = candidates,
+        has_more   = has_more,
     )
 
 

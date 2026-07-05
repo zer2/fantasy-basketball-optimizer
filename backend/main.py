@@ -604,6 +604,8 @@ def evaluate_route(session_id: str, req: EvaluateRequest, response: Response):
             my_team_id         = req.my_team_id,
             exclusion_list     = req.exclusion_list,
             remaining_cash     = req.remaining_cash,
+            candidate_offset   = req.candidate_offset,
+            candidate_limit    = req.candidate_limit,
         )
     except Exception:
         raise _fail(500, 'Evaluation failed.')
