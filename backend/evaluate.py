@@ -5,7 +5,6 @@ to the /evaluate response payload.
 
 from __future__ import annotations
 
-import itertools
 import re
 import numpy as np
 import pandas as pd
@@ -310,22 +309,34 @@ def _build_candidates(
             except Exception:
                 player_auction_values = None  # degrade gracefully on edge cases
 
-    # Pre-extract per-candidate rows as numpy arrays so the loop below can zip
-    # through them without any per-iteration label lookups.
+    # ── Vectorised expand-view precompute ─────────────────────────────────────
+    # Every arithmetic input to the three expand-view tables (G-score rows, flex
+    # allocations, roster assignments) is computed across ALL candidates at once with
+    # numpy below, then the batch builders only assemble Pydantic models — no per-player
+    # arithmetic, rounding, or label lookup remains inside any loop.
+
+    # Per-candidate own G-scores, sorted order, shape (n_players, n_cat).
     g_scores_for_candidates = (
         player_g_scores.reindex(sorted_index)[categories].fillna(0.0).values.astype(float)
     )
-    team_diff_rows   = (
+    # Team / future differential matrices in x-score space, or None when the dynamic
+    # optimiser did not produce them (last pick, dynamic=False). None selects the
+    # zero-diff G-score layout, exactly as the old per-row None sentinel did.
+    team_diff_matrix = (
         team_diff_df[categories].values
         if team_diff_df is not None and not team_diff_df.empty
-        else itertools.repeat(None)
+        else None
     )
-    future_diff_rows = (
+    future_diff_matrix = (
         future_diff_df[categories].values
         if future_diff_df is not None
-        else itertools.repeat(None)
+        else None
     )
     rosters_rows = rosters_sorted.values
+
+    # Candidate last names, computed once for the whole pool (previously recomputed per
+    # candidate inside both _build_g_score_rows and the roster builder).
+    candidate_last_names = [extract_last_name(player) for player in sorted_index]
 
     # Pre-extract position share arrays for each flex type, aligned to sorted_index.
     # Each entry is (numpy_array, base_to_col) where base_to_col maps base position
@@ -340,10 +351,40 @@ def _build_candidates(
         }
     )
 
-    # Everything that doesn't need the per-candidate expand-view builders is precomputed here in
-    # sorted order and indexed by rank in the loop. Whole-array .tolist() crosses the numpy→Python
-    # boundary once instead of once per row; the position display (a dict lookup + string join, which
-    # is not numpy-vectorisable) is built out of the loop too.
+    n_players = len(sorted_index)
+
+    # Batch-build the three expand-view tables for every candidate rank at once.
+    g_score_rows_by_rank = _build_g_score_rows(
+        candidate_last_names
+        , g_scores_for_candidates
+        , team_diff_matrix
+        , future_diff_matrix
+        , original_v
+    )
+    flex_allocations_by_rank = (
+        None if no_position_data
+        else _build_flex_allocations(
+            n_players
+            , base_list
+            , position_structure
+            , position_shares_arrays
+            , slot_counts
+        )
+    )
+    roster_by_rank = (
+        None if no_position_data
+        else _build_roster_assignments(
+            candidate_last_names
+            , my_players
+            , rosters_rows
+            , slot_names
+        )
+    )
+
+    # Everything that doesn't need the expand-view builders is precomputed here in
+    # sorted order and indexed by rank in the loop. Whole-array .tolist() crosses the
+    # numpy→Python boundary once instead of once per row; the position display (a dict
+    # lookup + string join, which is not numpy-vectorisable) is built out of the loop too.
     h_scores_list          = h_scores_scaled.tolist()
     win_rates_lists        = win_rates_scaled.tolist()
     category_weights_lists = None if category_weights_scaled is None else category_weights_scaled.tolist()
@@ -352,39 +393,13 @@ def _build_candidates(
         for raw in (player_position_map.get(p, ['?']) for p in sorted_index)
     ]
 
+    # The remaining loop constructs one Candidate per fitting player, indexing into the
+    # pre-built tables — no arithmetic left. rank_idx counts every sorted player (including
+    # skipped non-fitters) so h_rank stays the player's true H-score rank.
     candidates: list[Candidate] = []
-    for rank_idx, (player, fits, g_scores_row, team_diff_row, future_diff_row, roster_row) in enumerate(zip(
-        sorted_index,
-        player_fits_roster.values,
-        g_scores_for_candidates,
-        team_diff_rows,
-        future_diff_rows,
-        rosters_rows,
-    )):
+    for rank_idx, (player, fits) in enumerate(zip(sorted_index, player_fits_roster.values)):
         if not fits:
             continue  # skip players for whom no valid roster slot exists
-
-        g_score_rows = _build_g_score_rows(
-            player, categories, g_scores_row,
-            team_diff_row, future_diff_row, original_v,
-        )
-
-        flex_allocations = (
-            None if no_position_data
-            else _build_flex_allocations(
-                rank_idx, base_list, position_structure,
-                position_shares_arrays, slot_counts,
-            )
-        )
-
-        roster = (
-            None if no_position_data
-            else _roster_from_precomputed(
-                player, my_players,
-                roster_row,
-                slot_names,
-            )
-        )
 
         candidates.append(Candidate(
             name             = player,
@@ -393,9 +408,9 @@ def _build_candidates(
             h_rank           = rank_idx + 1,
             win_rates        = win_rates_lists[rank_idx],   # already × 100 and rounded to 2 dp
             category_weights = None if category_weights_lists is None else category_weights_lists[rank_idx],
-            g_score_rows     = g_score_rows,
-            flex_allocations = flex_allocations,
-            roster           = roster,
+            g_score_rows     = g_score_rows_by_rank[rank_idx],
+            flex_allocations = None if flex_allocations_by_rank is None else flex_allocations_by_rank[rank_idx],
+            roster           = None if roster_by_rank is None else roster_by_rank[rank_idx],
             auction_values   = player_auction_values.get(player) if player_auction_values else None,
         ))
 
@@ -405,20 +420,22 @@ def _build_candidates(
 # ── G-score rows ──────────────────────────────────────────────────────────────
 
 def _build_g_score_rows(
-    player: str,
-    categories: list[str],
-    player_own_g_scores: np.ndarray,
-    team_diff_row: np.ndarray | None,
-    future_diff_row: np.ndarray | None,
-    original_v: np.ndarray,
-) -> list[GScoreRow]:
-    """Build the G-score breakdown table rows for one candidate player.
+    candidate_last_names: list[str]
+    , own_g_scores: np.ndarray
+    , team_diff_matrix: np.ndarray | None
+    , future_diff_matrix: np.ndarray | None
+    , original_v: np.ndarray
+) -> list[list[GScoreRow]]:
+    """Build the G-score breakdown table rows for every candidate at once.
 
     Mirrors make_main_df_styled() in src/tabs/candidate_subtabs.py.
 
     The table always ends with a 'Total diff' row = current team diff + this
     player's own G-scores.  Depending on whether a future component was
     computed, the layout is either 3 rows (no future) or 4 rows (with future).
+    The layout is uniform across candidates — team_diff_matrix / future_diff_matrix
+    are present-or-absent for the whole result, never per player — so it is chosen
+    once and applied to every rank via vectorised numpy arithmetic.
 
     Why the diff decomposition works
     ---------------------------------
@@ -445,93 +462,97 @@ def _build_g_score_rows(
     here instead because G-score display is in the original units.
 
     Note: res['Diff'] does NOT include the candidate player's own G-scores;
-    player_g_scores must be added explicitly to form the Total row.
+    own_g_scores must be added explicitly to form the Total row.
 
     Args:
-        player:              Candidate player name.
-        categories:          Ordered list of scoring category names.
-        player_own_g_scores: Pre-extracted G-score array for this player, shape (n_cat,).
-                             Zeros where the player was absent from the G-scores table.
-        team_diff_row:       Pre-extracted row from res['Diff'], shape (n_cat,), or None
-                             when the dynamic optimiser did not run (e.g., last pick).
-        future_diff_row:     Pre-extracted row from res['Future-Diff'], shape (n_cat,),
-                             or None when no future picks remain or dynamic=False.
-        original_v:          Unnormalised category weight vector; used to convert
-                             x-score diff values to G-score units.
+        candidate_last_names: Per-rank last name used for the player's own row label.
+        categories:           Ordered list of scoring category names.
+        own_g_scores:         G-score matrix for all candidates, shape (n_players, n_cat).
+                              Zeros where a player was absent from the G-scores table.
+        team_diff_matrix:     res['Diff'] matrix, shape (n_players, n_cat), or None when
+                              the dynamic optimiser did not run (e.g., last pick).
+        future_diff_matrix:   res['Future-Diff'] matrix, shape (n_players, n_cat), or None
+                              when no future picks remain or dynamic=False.
+        original_v:           Unnormalised category weight vector; used to convert
+                              x-score diff values to G-score units.
 
     Returns:
-        List of GScoreRow objects: either 3 rows (no future) or 4 rows (with future).
+        One list of GScoreRow objects per candidate rank: either 3 rows (no future)
+        or 4 rows (with future).
     """
-    n_categories = len(categories)
+    n_players, n_categories = own_g_scores.shape
 
-    def _make_row(label: str, values: np.ndarray, is_total: bool = False) -> GScoreRow:
-        """Package a label + numeric array into a GScoreRow, rounding to 2dp."""
-        rounded_values = [round(float(x), 2) for x in values]
-        return GScoreRow(
-            label    = label,
-            values   = rounded_values,
-            total    = round(float(sum(values)), 2),
-            is_total = is_total,
-        )
+    # Player's own G-score row, rounded once for the whole pool.
+    own_values = np.round(own_g_scores, 2).tolist()
+    own_totals = np.round(own_g_scores.sum(axis=1), 2).tolist()
 
-    # Fallback when the diff wasn't computed (last pick or dynamic=False):
-    # current team diff is unknown so show zeros; Total = player's own G-scores.
-    # Use only the last name to keep the table compact.
-    player_last_name = extract_last_name(player)
-
-    if team_diff_row is None:
+    if team_diff_matrix is None:
+        # Fallback when the diff wasn't computed (last pick or dynamic=False):
+        # current team diff is unknown so show zeros; Total = player's own G-scores.
+        zero_values = [0.0] * n_categories
         return [
-            _make_row('Current diff',   np.zeros(n_categories)),
-            _make_row(player_last_name, player_own_g_scores),
-            _make_row('Total diff',     player_own_g_scores, is_total=True),
+            [
+                GScoreRow(label='Current diff', values=zero_values, total=0.0, is_total=False),
+                GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False),
+                GScoreRow(label='Total diff', values=own_values[i], total=own_totals[i], is_total=True),
+            ]
+            for i in range(n_players)
         ]
 
-    else: 
-        # Convert x-score diff to G-score units by multiplying by original_v.
-        # team_diff_row stores (future_diff + current_diff) for this player.
-        total_diff = team_diff_row.astype(float) * original_v
+    # Convert x-score diff to G-score units by multiplying by original_v (broadcast
+    # over all rows). team_diff_matrix stores (future_diff + current_diff) per player.
+    total_diff = team_diff_matrix.astype(float) * original_v
+    # Total diff always equals team differential + candidate's own contribution — the
+    # single source of truth for the Total row regardless of the future component.
+    total_diff_with_player = total_diff + own_g_scores
+    total_values = np.round(total_diff_with_player, 2).tolist()
+    total_totals = np.round(total_diff_with_player.sum(axis=1), 2).tolist()
 
-        # Total diff always equals team differential + candidate's own contribution.
-        # This is the single source of truth for the Total row regardless of whether
-        # the future component is present.
-        total_diff_with_player = total_diff + player_own_g_scores
-
-        if future_diff_row is None:
-            # 3-row layout: dynamic optimiser did not separate current from future.
-            # 'Current diff' here is actually total_diff (= diff_means * original_v),
-            # which is the same across all candidates.
-            return [
-                _make_row('Current diff',   total_diff),
-                _make_row(player_last_name, player_own_g_scores),
-                _make_row('Total diff',     total_diff_with_player, is_total=True),
+    if future_diff_matrix is None:
+        # 3-row layout: dynamic optimiser did not separate current from future.
+        # 'Current diff' here is actually total_diff (= diff_means * original_v),
+        # which is the same across all candidates.
+        current_values = np.round(total_diff, 2).tolist()
+        current_totals = np.round(total_diff.sum(axis=1), 2).tolist()
+        return [
+            [
+                GScoreRow(label='Current diff', values=current_values[i], total=current_totals[i], is_total=False),
+                GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False),
+                GScoreRow(label='Total diff', values=total_values[i], total=total_totals[i], is_total=True),
             ]
-        
-        else: 
+            for i in range(n_players)
+        ]
 
-            # 4-row layout: separate out the future component so the user can see how
-            # much of the expected advantage is 'already there' vs. 'expected from
-            # future picks given this player is on the team'.
-            future_diff  = future_diff_row.astype(float) * original_v
-            current_diff = total_diff - future_diff  # = diff_means * original_v; same for all candidates
-
-            return [
-                _make_row('Current diff',   current_diff),
-                _make_row(player_last_name, player_own_g_scores),
-                _make_row('Future diff',    future_diff),
-                _make_row('Total diff',     total_diff_with_player, is_total=True),
-            ]
+    # 4-row layout: separate out the future component so the user can see how much of
+    # the expected advantage is 'already there' vs. 'expected from future picks given
+    # this player is on the team'.
+    future_diff  = future_diff_matrix.astype(float) * original_v
+    current_diff = total_diff - future_diff  # = diff_means * original_v; same for all candidates
+    current_values = np.round(current_diff, 2).tolist()
+    current_totals = np.round(current_diff.sum(axis=1), 2).tolist()
+    future_values  = np.round(future_diff, 2).tolist()
+    future_totals  = np.round(future_diff.sum(axis=1), 2).tolist()
+    return [
+        [
+            GScoreRow(label='Current diff', values=current_values[i], total=current_totals[i], is_total=False),
+            GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False),
+            GScoreRow(label='Future diff', values=future_values[i], total=future_totals[i], is_total=False),
+            GScoreRow(label='Total diff', values=total_values[i], total=total_totals[i], is_total=True),
+        ]
+        for i in range(n_players)
+    ]
 
 
 # ── Flex allocations ──────────────────────────────────────────────────────────
 
 def _build_flex_allocations(
-    player_rank: int,
-    base_list: list[str],
-    position_structure: dict,
-    position_shares_arrays: dict,
-    slot_counts: dict,
-) -> FlexAllocations:
-    """Build the flex-slot usage table for one candidate player.
+    n_players: int
+    , base_list: list[str]
+    , position_structure: dict
+    , position_shares_arrays: dict
+    , slot_counts: dict
+) -> list[FlexAllocations]:
+    """Build the flex-slot usage table for every candidate at once.
 
     For each flex position type (e.g. 'UTIL') that has at least one slot, one
     row is created showing how many of those slots the candidate is expected to
@@ -540,10 +561,13 @@ def _build_flex_allocations(
 
     Position shares are fractions (0–1) representing the probability the player
     occupies a given base-position role within a flex slot.  Multiplying by the
-    slot count gives an expected number of slots used.
+    slot count gives an expected number of slots used.  All of this arithmetic is
+    vectorised across candidates: each active flex type contributes a
+    (n_players, n_bases) expected-usage matrix, the Total column sums those
+    matrices, and only the final FlexRow/FlexAllocations assembly is per-candidate.
 
     Args:
-        player_rank:            Row index into the pre-extracted position share arrays.
+        n_players:              Number of candidates (rows in the share arrays).
         base_list:              Ordered list of base position codes (e.g. ['PG','SG','SF','PF','C']).
         position_structure:     Dict with 'flex_list' and 'flex' keys describing which
                                 base positions each flex type can accommodate.
@@ -553,86 +577,129 @@ def _build_flex_allocations(
         slot_counts:            Dict mapping position code → number of roster slots.
 
     Returns:
-        FlexAllocations with one row per active flex type plus a Total row.
+        One FlexAllocations per candidate rank, each with one row per active flex
+        type plus a Total row.
     """
     flex_position_types   = position_structure['flex_list']
     flex_position_details = position_structure['flex']
+    n_bases               = len(base_list)
+    base_column_index     = {base_pos: i for i, base_pos in enumerate(base_list)}
 
-    flex_rows: list[FlexRow]        = []
-    totals_by_base: dict[str, float] = {base_pos: 0.0 for base_pos in base_list}
+    # totals_matrix accumulates expected slot usage across all flex types, shape
+    # (n_players, n_bases). Bases never eligible in any flex type stay 0.0.
+    totals_matrix = np.zeros((n_players, n_bases))
+    # Per active flex type: (label, value_lists) where value_lists is a per-rank list of
+    # rounded base values (None for ineligible/absent), or None to mark an all-None row.
+    flex_row_specs: list[tuple[str, list[list[float | None]] | None]] = []
 
     for flex_type in flex_position_types:
         n_flex_slots = slot_counts.get(flex_type, 0)
         if n_flex_slots == 0:
             continue  # this flex type has no slots in the current league settings
 
+        label                = f"{flex_type}-{n_flex_slots}"
         eligible_bases       = flex_position_details[flex_type]['bases']
         share_array_and_cols = position_shares_arrays.get(flex_type)
 
         if share_array_and_cols is None:
-            # No share data for this flex type; mark every column as ineligible.
-            base_position_values: list[float | None] = [None] * len(base_list)
-        else:
-            share_array, base_to_col = share_array_and_cols
-            player_share_row         = share_array[player_rank]
-            base_position_values     = []
-            for base_pos in base_list:
-                if base_pos in eligible_bases:
-                    # Convert share fraction to expected slot usage across all flex slots.
-                    expected_slot_usage = float(player_share_row[base_to_col[base_pos]]) * n_flex_slots
-                    base_position_values.append(round(expected_slot_usage, 2))
-                    totals_by_base[base_pos] += expected_slot_usage
-                else:
-                    # This base position is ineligible for this flex type.
-                    base_position_values.append(None)
+            # No share data for this flex type; every column is ineligible for all ranks.
+            flex_row_specs.append((label, None))
+            continue
 
-        flex_rows.append(FlexRow(
-            label    = f"{flex_type}-{n_flex_slots}",
-            values   = base_position_values,
-            is_total = False,
-        ))
+        share_array, base_to_col = share_array_and_cols
+        # Expected slot usage per (rank, base); NaN marks bases ineligible for this flex.
+        usage = np.full((n_players, n_bases), np.nan)
+        for base_pos in base_list:
+            if base_pos in eligible_bases:
+                # Convert share fraction to expected slot usage across all flex slots.
+                usage[:, base_column_index[base_pos]] = share_array[:, base_to_col[base_pos]] * n_flex_slots
 
-    # Append a Total row summing expected slot usage across all flex types.
-    total_row_values = [round(totals_by_base[base_pos], 2) for base_pos in base_list]
-    flex_rows.append(FlexRow(label='Total', values=total_row_values, is_total=True))
+        totals_matrix += np.nan_to_num(usage)   # NaN (ineligible) contributes nothing
+        # Round once, then swap NaN → None so ineligible columns serialise as null.
+        value_lists = [
+            [None if value != value else value for value in row]
+            for row in np.round(usage, 2).tolist()
+        ]
+        flex_row_specs.append((label, value_lists))
 
-    return FlexAllocations(base_positions=base_list, rows=flex_rows)
+    total_row_lists = np.round(totals_matrix, 2).tolist()
+
+    result: list[FlexAllocations] = []
+    for rank_idx in range(n_players):
+        flex_rows: list[FlexRow] = [
+            FlexRow(
+                label    = label,
+                values   = [None] * n_bases if value_lists is None else value_lists[rank_idx],
+                is_total = False,
+            )
+            for label, value_lists in flex_row_specs
+        ]
+        flex_rows.append(FlexRow(label='Total', values=total_row_lists[rank_idx], is_total=True))
+        result.append(FlexAllocations(base_positions=base_list, rows=flex_rows))
+
+    return result
 
 
 # ── Roster assignment ─────────────────────────────────────────────────────────
 
-def _roster_from_precomputed(
-    candidate: str,
-    my_players: list[str],
-    rosters_row: np.ndarray,
-    slot_names: list[str],
-) -> Roster:
-    """Build Roster display from the pre-computed slot assignments in h_score_result['Rosters'].
+def _build_roster_assignments(
+    candidate_last_names: list[str]
+    , my_players: list[str]
+    , rosters_rows: np.ndarray
+    , slot_names: list[str]
+) -> list[Roster]:
+    """Build the Roster display for every candidate from the pre-computed slot assignments.
 
-    rosters_row[j] is the slot index assigned to player j in the ordering
+    rosters_rows[rank, j] is the slot index assigned to player j in the ordering
     [team_so_far[0], ..., team_so_far[-1], candidate, future_player[0], ...].
     Columns beyond len(my_players) + 1 are future hypothetical players and are ignored.
+
+    The already-drafted players' RosterAssignment objects depend only on their name and
+    are identical across candidates, so they are built once and shared; the slot each one
+    lands in still varies per candidate (the optimiser may repack the roster around the
+    candidate) and is read straight from rosters_rows. Only the candidate's own assignment
+    is unique per rank. Slot indices are converted to Python ints in one array pass.
+
+    Args:
+        candidate_last_names: Per-rank candidate last name for the candidate's own slot.
+        my_players:           Players already on the user's team, in roster-column order.
+        rosters_rows:         Slot-index matrix, shape (n_players, n_columns).
+        slot_names:           Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
+
+    Returns:
+        One Roster per candidate rank.
     """
+    n_slots       = len(slot_names)
     n_team_so_far = len(my_players)
-    assignments: dict[str, RosterAssignment | None] = {slot: None for slot in slot_names}
+    n_columns     = rosters_rows.shape[1]
 
-    for i, player_name in enumerate(my_players):
-        slot_idx = int(rosters_row[i])
-        if 0 <= slot_idx < len(slot_names):
-            assignments[slot_names[slot_idx]] = RosterAssignment(
-                name=extract_last_name(player_name),
-                is_candidate=False,
-            )
+    # Shared, name-only assignments for the already-drafted players (built once).
+    drafted_assignments = [
+        RosterAssignment(name=extract_last_name(player_name), is_candidate=False)
+        for player_name in my_players
+    ]
+    # Cross the numpy→Python boundary once for all slot indices.
+    rosters_int = rosters_rows.astype(int).tolist()
 
-    if n_team_so_far < len(rosters_row):
-        candidate_slot_idx = int(rosters_row[n_team_so_far])
-        if 0 <= candidate_slot_idx < len(slot_names):
-            assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
-                name=extract_last_name(candidate),
-                is_candidate=True,
-            )
+    result: list[Roster] = []
+    for rank_idx, roster_row in enumerate(rosters_int):
+        assignments: dict[str, RosterAssignment | None] = {slot: None for slot in slot_names}
 
-    return Roster(slots=slot_names, assignments=assignments)
+        for team_position, slot_idx in enumerate(roster_row[:n_team_so_far]):
+            if 0 <= slot_idx < n_slots:
+                assignments[slot_names[slot_idx]] = drafted_assignments[team_position]
+
+        if n_team_so_far < n_columns:
+            candidate_slot_idx = roster_row[n_team_so_far]
+            if 0 <= candidate_slot_idx < n_slots:
+                assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
+                    name=candidate_last_names[rank_idx],
+                    is_candidate=True,
+                )
+
+        result.append(Roster(slots=slot_names, assignments=assignments))
+
+    return result
 
 
 def _make_slot_names(slot_counts: dict, position_structure: dict) -> list[str]:

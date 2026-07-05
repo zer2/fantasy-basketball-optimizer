@@ -3,6 +3,7 @@ Pydantic request / response models matching api_spec.md.
 """
 
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import Optional
 from pydantic import BaseModel
 
@@ -123,30 +124,42 @@ class EvaluateRequest(BaseModel):
     candidate_limit: Optional[int] = None
 
 
-class GScoreRow(BaseModel):
+# The candidate expand-view rows below are plain dataclasses rather than Pydantic
+# BaseModels. They are built in bulk (hundreds of candidates × several rows each) by
+# backend.evaluate from already-typed numpy .tolist() output, so per-row Pydantic
+# validation is pure overhead here — dataclass construction is ~4× faster and Pydantic v2
+# still serialises them (nested inside the Candidate/EvaluateResponse models) to identical
+# JSON. The outer Candidate/EvaluateResponse stay Pydantic so the API contract is enforced.
+
+@dataclass
+class GScoreRow:
     label: str
     values: list[float]
     total: float
     is_total: bool
 
 
-class FlexRow(BaseModel):
+@dataclass
+class FlexRow:
     label: str
     values: list[Optional[float]]   # null = ineligible position for this flex slot
     is_total: bool
 
 
-class FlexAllocations(BaseModel):
+@dataclass
+class FlexAllocations:
     base_positions: list[str]
     rows: list[FlexRow]
 
 
-class RosterAssignment(BaseModel):
+@dataclass
+class RosterAssignment:
     name: str
     is_candidate: bool
 
 
-class Roster(BaseModel):
+@dataclass
+class Roster:
     slots: list[str]
     assignments: dict[str, Optional[RosterAssignment]]
 
