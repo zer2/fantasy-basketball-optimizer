@@ -1,6 +1,15 @@
 // table/player_table.ts
 // Renders the H-score candidate table: headers, player rows, expand buttons.
 // Reads current player and category state from app_state.ts.
+//
+// The table is built incrementally so that draft/waiver evaluations can stream in
+// batches (top-ranked players first): resetTable() clears it, then each addBatch()
+// call merges a batch of already-H-score-sorted players into place. Because the
+// virtual list (candidateRows) and the DOM mirror each other in descending H-score
+// order, a batch is merged, not repainted — its tail (which ranks below everything
+// already shown) is appended at the bottom, and only the few "crossing" players that
+// outrank the current bottom are inserted higher up. Existing rows never move.
+// buildTable() is the single-shot entry point (one batch = everything, e.g. auction).
 
 import { stat_styler_primary, stat_styler_secondary } from '../styles/styler_functions.js'
 import { toggleExpandView } from './expand_view.js'
@@ -29,9 +38,34 @@ function computeContentMinWidth(): string {
     return (PLAYER_COL_W_REM + nScoreCols * SCORE_COL_W_REM + categories.length * CAT_COL_W_REM) + 'rem'
 }
 
+// ── Incremental render state ──────────────────────────────────────────────────
+// A rendered candidate: its player data plus the two DOM rows (visible + hidden expand).
+interface CandidateRow {
+    player:     PlayerResult
+    displayRow: HTMLTableRowElement
+    expandRow:  HTMLTableRowElement
+}
+
+// The virtual "dataframe": candidate rows in descending H-score order, mirroring the DOM order.
+let candidateRows: CandidateRow[] = []
+let tbodyEl: HTMLTableSectionElement | null = null
+
+// Per-render context, captured once in resetTable so every addBatch renders rows consistently.
+interface RenderContext {
+    categories: string[]
+    isAuction:  boolean
+    isRoto:     boolean
+    rotoData:   { nDrafters: number; rotoMiddle: number } | null
+    decimals:   number
+}
+let renderCtx: RenderContext | null = null
+
 /** Clears the candidate table and shows a single centred message row. */
 export function showTableMessage(message: string): void {
     table.innerHTML = ''
+    candidateRows = []
+    tbodyEl = null
+    renderCtx = null
     const row = table.createTBody().insertRow()
     const cell = row.insertCell()
     cell.colSpan = 100
@@ -111,79 +145,151 @@ export function buildTableHeader(): void {
     }
 }
 
+/** Builds one candidate's display + hidden-expand `<tr>` pair as an HTML string. */
+function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
+    let html = `<tr>`
 
-/** Rebuilds the H-score candidate table from scratch: clears old rows, creates headers, and populates player rows with styled cells. */
-export function buildTable(players: PlayerResult[]): void {
+    // Player name cell with expand button
+    html += `<th class='playerheader'><div class='playerheaderdiv'><span class='playername'>${player.name}</span><button class='playerpopup'>▶</button></div></th>`
 
-    buildTableHeader()
-
-    const categories = getSelectedCategories()
-    const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
-    const isRoto     = getScoringFormat() === 'Rotisserie'
-
-    // Mobile shows integer-rounded values so columns can stay narrow ("47" vs "47.5").
-    // Desktop keeps 1-decimal precision since there's room. H-Score keeps 1-decimal
-    // on both viewports (see below) — it differentiates closely-ranked players.
-    // Uses the same 768px breakpoint as the smaller root font in styles.css.
-    const decimals = isMobileViewport() ? 0 : 1
-
-    // ── Player rows (built as HTML string for performance) ───────────────────
-    const rotoData = isRoto
-        ? (() => {
-              const nDrafters = getLeagueSettings().n_drafters
-              return { nDrafters, rotoMiddle: (nDrafters - 1) / 2 + 1 }
-          })()
-        : null
-
-    let html = ''
-    for (const [i, player] of players.entries()) {
-        html += `<tr>`
-
-        // Player name cell with expand button
-        html += `<th class='playerheader'><div class='playerheaderdiv'><span class='playername'>${player.name}</span><button class='playerpopup'>▶</button></div></th>`
-
-        // Score column(s)
-        if (isAuction) {
-            const av = player.auction_values
-            if (av) {
-                const diff = av.your_dollar - av.gnrc_dollar
-                html += `<td class='auction-dollar' style='${stat_styler_secondary(diff, 10, 0)}'>${diff.toFixed(decimals)}</td>`
-                for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
-                    html += `<td class='auction-dollar celltypeb'>${val.toFixed(decimals)}</td>`
-                }
-            } else {
-                for (let j = 0; j < 4; j++) html += `<td class='auction-dollar'>—</td>`
+    // Score column(s)
+    if (ctx.isAuction) {
+        const av = player.auction_values
+        if (av) {
+            const diff = av.your_dollar - av.gnrc_dollar
+            html += `<td class='auction-dollar' style='${stat_styler_secondary(diff, 10, 0)}'>${diff.toFixed(ctx.decimals)}</td>`
+            for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
+                html += `<td class='auction-dollar celltypeb'>${val.toFixed(ctx.decimals)}</td>`
             }
         } else {
-            // H-Score keeps 1-decimal precision even on mobile — it differentiates
-            // closely-ranked players (e.g. 52.5% vs 52.3%) which integer rounding flattens.
-            html += `<td class='overallhscore'>${player.h_score.toFixed(1)}</td>`
+            for (let j = 0; j < 4; j++) html += `<td class='auction-dollar'>—</td>`
         }
-
-        // Category win rate cells
-        for (const value of player.win_rates) {
-            if (rotoData) {
-                const rotoValue = 1 + (value / 100) * (rotoData.nDrafters - 1)
-                html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, 3 * (rotoData.nDrafters - 1), rotoData.rotoMiddle)}'>${rotoValue.toFixed(decimals)}</td>`
-            } else {
-                html += `<td class='categoricalhscore' style='${stat_styler_primary(value, 3, 50)}'>${value.toFixed(decimals)}</td>`
-            }
-        }
-
-        html += `</tr>`
-
-        // Expansion row (hidden until button clicked)
-        html += `<tr class='expandedview EV${i}' style='display:none'></tr>`
+    } else {
+        // H-Score keeps 1-decimal precision even on mobile — it differentiates
+        // closely-ranked players (e.g. 52.5% vs 52.3%) which integer rounding flattens.
+        html += `<td class='overallhscore'>${player.h_score.toFixed(1)}</td>`
     }
 
-    const tbody = table.createTBody()
-    tbody.innerHTML = html
-
-    // Attach expand listeners to the header div (larger click target) — cheap second pass
-    const expandButtons  = Array.from(tbody.querySelectorAll<HTMLButtonElement>('.playerpopup'))
-    const expandDivs     = Array.from(tbody.querySelectorAll<HTMLDivElement>('.playerheaderdiv'))
-    const expandedRows   = Array.from(tbody.querySelectorAll<HTMLTableRowElement>('tr.expandedview'))
-    for (const [i, player] of players.entries()) {
-        expandDivs[i].addEventListener('click', () => toggleExpandView(expandButtons[i], expandedRows[i], player, categories))
+    // Category win rate cells
+    for (const value of player.win_rates) {
+        if (ctx.rotoData) {
+            const rotoValue = 1 + (value / 100) * (ctx.rotoData.nDrafters - 1)
+            html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, 3 * (ctx.rotoData.nDrafters - 1), ctx.rotoData.rotoMiddle)}'>${rotoValue.toFixed(ctx.decimals)}</td>`
+        } else {
+            html += `<td class='categoricalhscore' style='${stat_styler_primary(value, 3, 50)}'>${value.toFixed(ctx.decimals)}</td>`
+        }
     }
+
+    html += `</tr>`
+    // Expansion row (hidden until the header is clicked; content built lazily on expand)
+    html += `<tr class='expandedview' style='display:none'></tr>`
+    return html
+}
+
+/** Parses a batch of players into detached CandidateRow pairs with expand listeners bound
+ *  to the rows directly (not by index — indices shift as batches merge in). */
+function buildBatchRows(players: PlayerResult[], ctx: RenderContext): CandidateRow[] {
+    let html = ''
+    for (const player of players) html += buildRowPairHtml(player, ctx)
+
+    // Parse in a scratch table (tables have strict child-parsing rules, so innerHTML
+    // needs a real <tbody>). The parsed rows alternate display, expand, display, ...
+    const scratch = document.createElement('table')
+    scratch.innerHTML = `<tbody>${html}</tbody>`
+    const parsed = Array.from(scratch.tBodies[0].rows) as HTMLTableRowElement[]
+
+    const batch: CandidateRow[] = []
+    for (let k = 0; k < players.length; k++) {
+        const displayRow = parsed[2 * k]
+        const expandRow  = parsed[2 * k + 1]
+        const player     = players[k]
+        const div = displayRow.querySelector('.playerheaderdiv') as HTMLElement
+        const btn = displayRow.querySelector('.playerpopup')     as HTMLButtonElement
+        // Larger click target = the whole header div. Closes over the row refs, not an index.
+        div.addEventListener('click', () => toggleExpandView(btn, expandRow, player, ctx.categories))
+        batch.push({ player, displayRow, expandRow })
+    }
+    return batch
+}
+
+/** Merges an already-descending-sorted batch into candidateRows + the DOM.
+ *  Fast path (common): the batch ranks entirely at/below the current bottom → append it.
+ *  Otherwise: a two-pointer merge that only ever inserts the batch's rows before an
+ *  existing anchor row; existing rows are never moved. */
+function mergeBatch(batch: CandidateRow[]): void {
+    const tbody = tbodyEl!
+
+    const curMin = candidateRows.length ? candidateRows[candidateRows.length - 1].player.h_score : Infinity
+    if (candidateRows.length === 0 || batch[0].player.h_score <= curMin) {
+        const frag = document.createDocumentFragment()
+        for (const r of batch) {
+            frag.appendChild(r.displayRow)
+            frag.appendChild(r.expandRow)
+            candidateRows.push(r)
+        }
+        tbody.appendChild(frag)
+        return
+    }
+
+    // General merge: walk both descending lists; insert batch rows before the first
+    // existing row they outrank. The batch's non-crossing tail falls through to append.
+    const merged: CandidateRow[] = []
+    let i = 0, j = 0
+    while (i < candidateRows.length && j < batch.length) {
+        if (candidateRows[i].player.h_score >= batch[j].player.h_score) {
+            merged.push(candidateRows[i++])
+        } else {
+            const anchor = candidateRows[i].displayRow
+            tbody.insertBefore(batch[j].displayRow, anchor)
+            tbody.insertBefore(batch[j].expandRow,  anchor)
+            merged.push(batch[j++])
+        }
+    }
+    while (i < candidateRows.length) merged.push(candidateRows[i++])
+    if (j < batch.length) {
+        const frag = document.createDocumentFragment()
+        for (; j < batch.length; j++) {
+            frag.appendChild(batch[j].displayRow)
+            frag.appendChild(batch[j].expandRow)
+            merged.push(batch[j])
+        }
+        tbody.appendChild(frag)
+    }
+    candidateRows = merged
+}
+
+/** Clears the candidate table (header + empty body) and captures the render context,
+ *  ready for one or more addBatch() calls. */
+export function resetTable(): void {
+    buildTableHeader()
+    candidateRows = []
+    tbodyEl = table.createTBody()
+
+    const isRoto = getScoringFormat() === 'Rotisserie'
+    renderCtx = {
+        categories: getSelectedCategories(),
+        isAuction:  (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode',
+        isRoto,
+        // Mobile shows integer-rounded values so columns stay narrow ("47" vs "47.5");
+        // desktop keeps 1-decimal precision. H-Score always keeps 1 decimal (see buildRowPairHtml).
+        decimals:   isMobileViewport() ? 0 : 1,
+        rotoData:   isRoto
+            ? (() => { const nDrafters = getLeagueSettings().n_drafters
+                       return { nDrafters, rotoMiddle: (nDrafters - 1) / 2 + 1 } })()
+            : null,
+    }
+}
+
+/** Merges one batch of already-H-score-sorted players into the current table.
+ *  Call resetTable() first. */
+export function addBatch(players: PlayerResult[]): void {
+    if (players.length === 0 || renderCtx === null || tbodyEl === null) return
+    mergeBatch(buildBatchRows(players, renderCtx))
+}
+
+/** Rebuilds the whole candidate table from a single, complete player list.
+ *  (Auction and any non-batched caller use this.) */
+export function buildTable(players: PlayerResult[]): void {
+    resetTable()
+    addBatch(players)
 }
