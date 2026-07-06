@@ -541,7 +541,8 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 .ms-option:hover {
-    background-color: light-dark(#fafafa, #3d3d55);
+    /* Same fix as .cs-option:hover — #fafafa was invisible on the #f8f8f8 light dropdown. */
+    background-color: light-dark(#e5e5e5, #3d3d55);
 }
 
 .ms-empty {
@@ -644,7 +645,9 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 .cs-option:hover {
-    background-color: light-dark(#fafafa, #3d3d55);
+    /* Light hover matches the already-chosen highlight (#e5e5e5); #fafafa was invisible on the
+       #f8f8f8 dropdown. Dark mode keeps the app's standard #3d3d55 hover. */
+    background-color: light-dark(#e5e5e5, #3d3d55);
 }
 
 .cs-option-selected {

@@ -139,7 +139,8 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
 
             clearFullTeamResult()
             setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Team ${getPickDrafter() + 1}`)
-            await runEvaluate()
+            // Autopilot only needs the top pick: score just the first batch and render nothing.
+            await runEvaluate({ forAutopilot: true })
             const player = pickByHScore()
 
             if (!player) break

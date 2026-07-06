@@ -6,44 +6,18 @@ In short, for each candidate player, it optimizes for future draft pick strategy
 
 <!-- Methodology video embeds here, directly under the intro. Left as a comment for now so the guide below stands on its own without it. -->
 
-## Parameters
+## Main H-score table
 
-The context in which H-scoring operates is controlled by a handful of settings and parameters in the sidebar.
+The H-score table for candidate evaluation lists players in order of their H-score rank, along with additional detail.
 
-### Formats and categories
-
-The website's implementation of H-scoring supports the three common category formats for fantasy basketball: H2H Each Category, H2H Most Categories, and Rotisserie. It does not have native support for any additional variants, like using a specific category as a tiebreaker. The format selector defaults to H2H Each Category.
-
-It also supports any combination of categories, across the default nine categories and several alternative options. By default the nine standard categories are selected: Field Goal %, Free Throw %, Threes, Points, Rebounds, Assists, Steals, Blocks, and Turnovers.
-
-For the alternative categories, when using projections, make sure to include them when sourcing the projections. ESPN and DARKO do not forecast them so all of the weight will be from Hashtag or BBM projections. 
-
-### Algorithmic parameters
-
-The H-scoring algorithm has three input parameters- $\omega$ (omega), $\gamma$ (gamma), and the number of iterations- which are configurable by the user through the sidebar. Different parameter choices will lead to different H-scoring results.
-
-$\omega$ and $\gamma$ control how the algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values (ω = 0.7 and γ = 0.25) were configured based on what worked well in testing.
-
-The number of iterations essentially determines how many times the algorithm can try improving its results. Theoretically the algorithm will be more precise with more iterations; in practice the default of thirty is probably easily enough.
-
-### Position structure 
-
-The position structure used by the algorithm — also shown in the [detailed drop-down](#detailed-drop-down) — is configurable by the user.
-
-![Position structure configuration](img/positions.png)
-
-It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accomodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
-
-## Computation time
-
-The algorithm is not instantaneous. In general, the algorithm will take a second or two to complete. It will take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake.
-
-![The updating spinner](img/updating.png)
+![Each Category H-score table](img/hec.png)
 /// caption
-The updating spinner, which indicates that the algorithm is running
+Top Each Category H-scores for the first pick, 2024-25 season
 ///
 
-??? note "What is the algorithm doing to optimize its strategy while it is running?"
+The overall H-score on the left side of the display is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. When the format is Each Category, the H-score is defined as the average expected win rate across categories. It is defined differently for the other two formats. 
+
+??? note "How does the algorithm optimize the overall H-score?"
     While the spinner is up, the algorithm is iterating, attempting to repeatedly improve its solution. Mathematically, the underlying iteration process is a procedure called Adam. 
     
     Adam is a variant of a statistical procedure called gradient descent. The gradient of a function is derivative over multiple dimensions. As an extremely simple example, the gradient of $x - 3y$ is $1$ in the x direction and $-3$ in the y direction. The gradient gives a hint at which direction the function can be minimized or maximized. The idea of gradient descent is to step in the direction of the gradient (or the opposite direction) to try to find a point which minimizes or maximizes the function.
@@ -63,17 +37,6 @@ The updating spinner, which indicates that the algorithm is running
     Both gradient descent and Adam require an underlying function which has well-defined gradients. The main machinery of H-scoring is the definition of that function. 
 
     Roughly, the function for H-scoring has three components: category strength expectations, category-level victory probabilities, and the outer-level objective function. The decisions made by the algorithm impact the category strength expectations, which in turn impact category-level victory probabilities, which in turn impact the outer-level objective function. The total gradient relative to an input decision is the gradient of all three steps relative to the previous, multiplied together.
-
-## Main H-score table
-
-The H-score table for candidate evaluation lists players in order of their H-score rank, along with additional detail.
-
-![Each Category H-score table](img/hec.png)
-/// caption
-Top Each Category H-scores for the first pick, 2024-25 season
-///
-
-The overall H-score on the left side of the display is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. When the format is Each Category, the H-score is defined as the average expected win rate across categories. It is defined differently for the other two formats. 
 
 One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.
 
@@ -173,9 +136,9 @@ The first element of the drop-down is the expectation table. The expectation tab
 Expectations for a team considering Dyson Daniels in round two, having taken Giannis in round one. Each Category, 2024-25
 ///
 
-'Current diff' represents the G-score differential for the draft so far, including players already drafted in the current round and excluding the candidate player. Teams that have not made their pick for the round are filled in with an estimate of the statistics of their next player. So in this case above, 'Current diff' represents other teams' picks so far vs. a team that has already taken Giannis, with estimates filled in for teams that have not yet drafted. 'Future player diff' is the expected difference between future picks made by the drafter and those made by other teams, based on the strategy adopted by H-scoring. In this case the G-score for Free Throws is heavily negative because the algorithm wants to punt it with future picks. 'Current diff' plus the candidate player plus 'Future player diff' equals the total differential versus other teams, which H-scoring uses to calculate win probabilities.
+'Current diff' represents the G-score differential for the draft so far, including players already drafted in the current round and excluding the candidate player. Teams that have not made their pick for the round are filled in with an estimate of the statistics of their next player. So in this case above, 'Current diff' represents other teams' picks so far vs. a team that has already taken Giannis, with estimates filled in for teams that have not yet drafted. 'Future diff' is the expected difference between future picks made by the drafter and those made by other teams, based on the strategy adopted by H-scoring. In this case the G-score for Free Throws is heavily negative because the algorithm wants to punt it with future picks. 'Current diff' plus the candidate player plus 'Future diff' equals the total differential versus other teams, which H-scoring uses to calculate win probabilities.
 
-'Future player diff' depends on the strategy taken by the algorithm for future picks. The elements of that strategy are category weights, flex position weights, and roster allocations, the algorithm's choices for which are shown under the expectation table. 
+'Future diff' depends on the strategy taken by the algorithm for future picks. The elements of that strategy are category weights, flex position weights, and roster allocations, the algorithm's choices for which are shown under the expectation table. 
 
 ### Category weights
 
@@ -254,6 +217,43 @@ The algorithm also has some leeway in how it arranges players already taken in t
     </iframe>
 
     After the sub-problem is solved, the algorithm will have a strategy for what positions it wants to prioritize with future picks- e.g. two guards, one shooting guard, and one center. It then knows how many flex spots it has, and can optimize how it allocates them through the general gradient descent process. 
+
+## Customizability
+
+The context in which H-scoring operates is controlled by a handful of settings and parameters in the sidebar.
+
+### Formats and categories
+
+The website's implementation of H-scoring supports the three common category formats for fantasy basketball: 'H2H Each Category', 'H2H Most Categories', and 'Rotisserie'. It does not have native support for any additional variants, like using a specific category as a tiebreaker. The format selector defaults to H2H Each Category.
+
+It also supports any combination of categories, across the default nine categories and several alternative options. By default the nine standard categories are selected: Field Goal %, Free Throw %, Threes, Points, Rebounds, Assists, Steals, Blocks, and Turnovers.
+
+For the alternative categories, when using projections, make sure to include them when sourcing the projections. ESPN and DARKO do not forecast them so all of the weight will be from Hashtag or BBM projections. 
+
+### Algorithmic parameters
+
+The H-scoring algorithm has three input parameters- $\omega$ (omega), $\gamma$ (gamma), and the number of iterations- which are configurable by the user through the sidebar. Different parameter choices will lead to different H-scoring results.
+
+$\omega$ and $\gamma$ control how the algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values (ω = 0.7 and γ = 0.25) were configured based on what worked well in testing.
+
+The number of iterations essentially determines how many times the algorithm can try improving its results. Theoretically the algorithm will be more precise with more iterations; in practice the default of thirty is probably easily enough.
+
+### Position structure 
+
+The position structure used by the algorithm — also shown in the [detailed drop-down](#detailed-drop-down) — is configurable by the user.
+
+![Position structure configuration](img/positions.png)
+
+It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accomodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
+
+## Timing 
+
+H-scoring is not an instantaneous process. In general, the algorithm will take less than a second to complete. But it could take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake.
+
+![The updating spinner](img/updating.png)
+/// caption
+The updating spinner, which indicates that the algorithm is running
+///
 
 ## Limitations
 

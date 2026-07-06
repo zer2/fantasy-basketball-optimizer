@@ -57,7 +57,7 @@ Using season totals has the issue that it assumes missed games are across-the-bo
 
 Uncertainty in projections is one of the fundamental factors taken into account by both H-scores and G-scores. The relevant variance is week-to-week in the case of Head-to-Head, and season-long in the case of Rotisserie. 
 
-For Head-to-Head formats, the website uses the last year of historical NBA data to estimate week-to-week uncertainty. This is not necessarily exact, but likely a good proxy.
+For Head-to-Head formats, the website uses historical NBA data to estimate week-to-week uncertainty. When the data source is a previous season, it uses data from that season; when the data source is a projection, it uses the most recent year. This is not necessarily exact when using projections, but likely a good proxy.
 
 The Rotisserie algorithm depends on full-season uncertainty instead of week-to-week uncertainty, since that format aggregates scores over full seasons instead of week-by-week. Full-season uncertainty is harder to estimate straight from projection data. It depends largely on how accurate pre-season projections are, which is not well-studied.  
 
@@ -66,12 +66,22 @@ The website's way of handling this is to use scaled week-to-week variance as a p
 ??? note "How is χ defined?"
     The assumption is that the variance over the ~20 weeks in a season will be χ times the week-to-week variance times 20. If week-to-week variance was the only source of variance, χ would be effectively 22%. It is likely higher than that before the season, because there is uncertainty about rotations, playing time, offseason improvements, etc. 60% is an estimate with essentially no justification, it can be changed as desired. 
 
-The other parameter is ℵ (aleph), which influences correlation estimates. Correlations between categories are important for Rotisserie because they influence how well the best-performing team is expected to perform. To estimate correlations, the website starts by taking the last season's correlation matrix. 
+### Correlations between categories 
 
-??? note "Why are correlations between categories more important for Rotisserie?"
-    The assumption is that the variance over the ~20 weeks in a season will be χ times the week-to-week variance times 20. If week-to-week variance was the only source of variance, χ would be effectively 22%. It is likely higher than that before the season, because there is uncertainty about rotations, playing time, offseason improvements, etc. 60% is an estimate with essentially no justification, it can be changed as desired. 
+Correlations between categories are an input to the algorithm for Rotisserie. Base correlations are set in the same way as projection uncertainty; calculated from real historical data. 
 
-ℵ makes a team's category-level performances in counting statistics more correlated than they theoretically would be. The motivation for this is that in reality, some managers will be paying more attention than others, leading to some teams having higher volume across the board. This effect would not be encapsulated within the Rotisserie model's logic without a positive value of ℵ. It defaults to 0.2.
+??? note "Why are correlations considered in the Rotisserie context, but not for other formats?"
+    See the [H-scoring section](hscores.md#main-h-score-table) for details on the objective functions used for each objective function.
+
+    For Each Category, correlations are irrelevant to the objective function. The correlations between categories have no influence on the expected value of their total. 
+
+    For Most Categories, correlations do theoretically matter, since they can influence the probabilities of winning scenarios occuring. Ideally, the algorithm would take them into account. However, calculating the probability of winning scenarios is much harder when factoring in correlations between categories. The Multivariate correlated Normal distribution has no explicit solution, and must be solved with numerical methods. Solving 256 9-dimensional Multivariate Normal CDFs with numerical methods for each player and each iteration is impractical. On the other hand, assuming that categories are independent facilitates the use of dynamic programming to greatly speed up the calculation. And while correlations are not included in the objective function directly, they are included in the model of player statistics, leading the algorithm towards category combinations that tend to be correlated favorably across players. And cross-player correlations are generally similar to correlations for a single player on a weekly level. So the algorithm assumes that the categories are independent for the sake of keeping computations tractable, hopefully without causing a significant distortion. 
+
+    For Rotisserie, ignoring correlations would be problematic. The goal in Rotisserie is to win the entire league, and that requires a certain number of fantasy points. The number of fantasy points needed to win is highly related to the correlations between categories, because the more correlated they are, the more points the luckiest manager would expect to get. Fortunately, H-scoring's approach to Rotisserie is more amenable to incorporating correlations than the approach for Most Categories. Win totals are modeled as Normal distributions, and all that is necessary to calculate the mean and variance of a Normal distribution is the sum of the individual parts and their covariance matrix. This is a much simpler calculation than computing individual winning scenarios separately. 
+
+However, taking historical correlations without adjustment might not be the best choice for simulating real fantasy basketball. In real fantasy basketball, some managers pay more attention than others, leading to some teams having higher volume across the board than would be expected with true randomness. 
+
+The ℵ (aleph) parameter accounts for this by synthetically increasing the correlations between categories that are counting stats. It defaults to 0.2.
 
 ??? note "How is ℵ applied?"
     Concretely, ℵ is added directly to the entries of the category correlation matrix that Rotisserie scoring uses, for pairs of counting (volume-based) categories — points, rebounds, assists, threes, and so on. Percentage categories like Field Goal % and Free Throw % are left alone. Each entry is capped at 1, so the already-1 diagonal is unaffected while the off-diagonal correlations rise by ℵ.
@@ -84,7 +94,7 @@ This inability to doubt itself makes the algorithm overconfident, believing that
 
 The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. 
 
-The $\beth$ (beth) parameter controls the influence of the adjustment. Higher values of $\beth$ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.
+The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.
 
 ??? note "The math: how the adjustment is computed"
     Say that $w$ is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
@@ -93,7 +103,7 @@ The $\beth$ (beth) parameter controls the influence of the adjustment. Higher va
     w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
     $$
 
-    Where $n$ is the number of categories and $\beth$ is a parameter. The intuition on what this expression is doing is not immediately clear, but some intuition can be gleaned from the justification below. 
+    Where $n$ is the number of categories and ℶ is a parameter. The intuition on what this expression is doing is not immediately clear, but some intuition can be gleaned from the justification below. 
 
     These corrected win rates are then used to reverse engineer an adjusted expectation of the team's current strength, like so: 
 

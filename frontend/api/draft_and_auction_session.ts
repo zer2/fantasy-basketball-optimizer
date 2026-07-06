@@ -8,7 +8,11 @@ import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/le
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
-import { buildTable, showTableMessage } from '../table/player_table.js'
+import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, clearTailSpace } from '../table/player_table.js'
+
+// Draft/waiver candidate batch size: score + paint the top players first, then fill in the
+// bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
+const CANDIDATE_BATCH_SIZE = 100
 import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
 
@@ -99,7 +103,7 @@ document.addEventListener('platform-connected', () => {
  * base players cache, and full-team result.
  * Retries once if the session has expired (404).
  */
-async function evaluateSeat(seat: string): Promise<void> {
+async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
     if (evaluateController) evaluateController.abort()
     evaluateController = new AbortController()
     const { signal } = evaluateController
@@ -129,8 +133,10 @@ async function evaluateSeat(seat: string): Promise<void> {
                 evalReq = { player_assignments, my_team_id: seat }
             }
 
+            // Autopilot never renders the board, so it needs neither the base-player comparison nor
+            // a full base evaluation to establish it — skip that work entirely.
             const boardIsEmpty = Object.values(evalReq.player_assignments).flat().length === 0
-            if (!basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
+            if (!forAutopilot && !basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
                 const { n_drafters } = getLeagueSettings()
                 const genericTeams   = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
                 const emptyAssignments: Record<string, string[]> = Object.fromEntries(
@@ -159,8 +165,48 @@ async function evaluateSeat(seat: string): Promise<void> {
             }
             latestFullTeamResult = null
 
-            const resp = await evaluate(getSessionId()!, evalReq, signal)
-            const players = candidatesToPlayerResults(resp.candidates)
+            let players: PlayerResult[]
+            if (mode === 'Auction Mode') {
+                // Auction scores the whole pool in one call (dollar values anchor on the full
+                // distribution). Rendered by runEvaluate, as before.
+                const resp = await evaluate(getSessionId()!, evalReq, signal)
+                players = candidatesToPlayerResults(resp.candidates)
+            } else {
+                // Draft: score + paint in batches (top-ranked first) so the top of the board appears
+                // before the deep bench is scored. Each batch is merged into the table incrementally.
+                // Autopilot only needs the single top pick and never shows the board, so it scores just
+                // the first batch and skips all rendering.
+                players = []
+                for (let offset = 0, first = true; ; offset += CANDIDATE_BATCH_SIZE, first = false) {
+                    const resp = await evaluate(
+                        getSessionId()!,
+                        { ...evalReq, candidate_offset: offset, candidate_limit: CANDIDATE_BATCH_SIZE },
+                        signal,
+                    )
+                    if (signal.aborted) return
+                    const batch = candidatesToPlayerResults(resp.candidates)
+                    players.push(...batch)
+                    if (forAutopilot) break   // the top pick is in the first batch; the rest is wasted work
+                    if (first) resetTable()
+                    addBatch(batch)
+                    // The top of the board is what users look at; once the first batch is painted, drop
+                    // the spinner even though the deep bench is still scoring. The remaining batches merge
+                    // in silently — by the time anyone scrolls past the first ~100, they've arrived.
+                    if (first) setIndicatorState('idle')
+                    // Reserve whitespace for the not-yet-scored candidates so the scrollbar stays put as
+                    // later batches fill in; drop it once the last batch has arrived.
+                    if (resp.has_more) reserveTailSpace(resp.total_candidates ?? 0)
+                    else clearTailSpace()
+                    if (!resp.has_more) break
+                }
+            }
+
+            if (forAutopilot) {
+                // Expose the top candidate for the pick decision, but don't cache this partial
+                // first-batch-only list as the base players or touch the rendered table.
+                setCandidatePlayerResults(players)
+                return
+            }
 
             if (!basePlayersBySession.has(getSessionId()!)) {
                 basePlayersBySession.set(getSessionId()!, players)
@@ -177,17 +223,22 @@ async function evaluateSeat(seat: string): Promise<void> {
     }
 }
 
-/** Evaluates the current draft/auction state for the current seat and rebuilds the candidate table. */
-export async function runEvaluate(): Promise<void> {
+/** Evaluates the current draft/auction state for the current seat and rebuilds the candidate table.
+ *  With `forAutopilot`, it scores only the first batch and renders nothing — the caller only needs the
+ *  top candidate for an autopilot pick. */
+export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Promise<void> {
+    const forAutopilot = options.forAutopilot ?? false
     // No explicit seat selected falls back to the first team; an empty league is a bug, not a default.
     const seat = getCurrentSeat() ?? getLeagueSettings().team_names[0]
     if (seat === undefined) throw new Error('runEvaluate: no seat selected and league has no team names')
-    await evaluateSeat(seat)
+    await evaluateSeat(seat, forAutopilot)
+    if (forAutopilot) return   // autopilot needs only the top candidate; nothing is shown
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
     if (mode !== 'Season Mode') {
         if (getFullTeamResult()) {
             showTableMessage('Your team is full.')
-        } else {
+        } else if (mode === 'Auction Mode') {
+            // Draft renders incrementally inside evaluateSeat; only auction renders in one shot here.
             buildTable(getCandidatePlayerResults()!)
         }
     }
