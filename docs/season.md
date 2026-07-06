@@ -34,17 +34,20 @@ The trade analysis module analyzes trades proposed by the user.
 
 The thumbs on the H-score tab for 'Your Team' and 'Their Team' indicate whether a trade improves a team's H-score or not. Thumbs up means the trade is beneficial, thumbs down means the trade is not beneficial. This can also be seen by whether the H-score is higher before or after the trade. 
 
-Trades in which the same number of players is sent and received are relatively simple to analyze. First, players are switched, then both teams are checked for position structure (unless the user specified that position structure should be ignored for trading). If either team is ineligible, then no results will be shown. Otherwise, H-scores are recomputed and compared against the previous H-scores. 
-
-Asymmetrical trades can also be analyzed, though the methodology is more complicated and less reliable. The post-trade team that goes down in number of players is scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. The post-trade team that goes up in players is scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score. The players chosen for addition/removal through these calculations are not shown. 
-
-Because a player gets added during an asymmetrical trade, it is important for asymmetrical trade analysis that the list of available players is accurate. A valuable player that appears to be on the waiver wire will artificially make any trade that goes down in players look beneficial, because it allows for that player to be added. Another consideration is that highly asymmetrical trades can take time to process because every possible combination of players to be dropped is being analyzed. 
+The methodology for checking a trade is simple. First, players are switched, then both teams are checked for position structure (unless the user specified that position structure should be ignored for trading). If either team is ineligible, then no results will be shown. Otherwise, H-scores are recomputed and compared against the previous H-scores. 
 
 A G-score table is also provided, which shows the net changes in G-scores for both teams by category.
 
 ![Trade analysis G-score table](img/tradeanalysisg.png)
 
 This view is available even if the trade is impermissible by position structure. 
+
+Only trades with the same number of players sent and received can be analyzed. 
+
+??? note "Why can only symmetrical trades be analyzed?"
+    In theory asymmetric trades could be analyzed. The post-trade team that goes down in number of players could be scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. The post-trade team that goes up in players could be scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score.
+
+    However, this process is very sensitive to the conditions of the available player pool. For example, if a player has been dropped by another team because he is unlikely to play in the near future, he could still be considered as an addition for the team that drops players. The trade would then look artificially good because H-scoring would jump on that player's optimistic projection. Practically, this makes it difficult to analyze asymmetric trades robustly. For the sake of simplicity the option has been removed. 
 
 ### Trade suggestions 
 
@@ -60,7 +63,7 @@ Candidate trades are found by iterating through all combinations of possible tra
 
 After trades are analyzed for H-score implications, one more filter is applied. Only those which meet the H-score differential thresholds as supplied by the user are shown. 
 
-Even with all this filtering, there can be many possible trades to look through, especially when looking for trades with large numbers of players and when the parameters for acceptable trades are loose. For the purpose of limiting computation time, only 1x1 trades are searched for by default, with a general value threshold of XYZ. 2x2 and 3x3 are also available by default. To get more kinds of trades, users must add more combinations to the sidebar with general value thresholds. 
+Even with all this filtering, there can be many possible trades to look through, especially when looking for trades with large numbers of players and when the parameters for acceptable trades are loose. For the purpose of limiting computation time, only 1x1 trades are searched for by default. 2x2 and 3x3 are also available. 
 
 ## Rosters tab
 
