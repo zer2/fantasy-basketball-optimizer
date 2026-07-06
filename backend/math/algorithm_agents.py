@@ -49,6 +49,16 @@ from backend.session import PositionConfig, build_position_config
 
 class HAgent:
 
+    # Position-optimiser throttle. _exact_solve_window is how many top candidates (by global rank)
+    # get an exact roster solve every iteration; _exact_solve_refresh_interval is how often (in
+    # gradient iterations) that set is re-ranked from the latest H-scores. Re-ranking keeps the exact
+    # solves pointed at the players currently projecting into the global top window — which shift with
+    # the team's context (e.g. a committed punt) — rather than the static pre-draft ranking. Because
+    # the set tracks the contextually-strongest players, the window can be smaller than a static one.
+    # Refresh interval 0 disables re-ranking (the set stays on its initial, pre-draft order).
+    _exact_solve_window           = 30
+    _exact_solve_refresh_interval = 10
+
     def __init__(self
                  , info: dict
                  , omega: float
@@ -601,6 +611,17 @@ class HAgent:
                 expected_future_diff = gradient_result['Future-Diffs']
                 rosters             = gradient_result['Rosters']
 
+                # Re-rank the exact-solve window from the latest H-scores every N iterations, so it
+                # tracks the players currently projecting into the global top window (e.g. those that
+                # rise under a committed punt) rather than the static pre-draft ranking. Updating here
+                # (after the score is known) applies to the next iteration's position solve. Gated on
+                # having a ranking to throttle by; a no-op when refreshing is disabled.
+                refresh_interval = self._exact_solve_refresh_interval
+                if (self._candidate_priority is not None
+                        and refresh_interval
+                        and (iteration + 1) % refresh_interval == 0):
+                    self._candidate_priority = np.argsort(-np.nan_to_num(score, nan=-np.inf))
+
                 cat_grad_centered = gradients['Categories'] - gradients['Categories'].mean(axis=1).reshape(-1, 1)
                 cat_updates       = optimizers['Categories'].minimize(cat_grad_centered)
                 category_weights  = category_weights + cat_updates
@@ -744,17 +765,17 @@ class HAgent:
             return n_candidates
         if mode == 'light':                       # top 300 every iteration, everyone every 5th
             return n_candidates if (iteration + 1) % 5 == 0 else min(300, n_candidates)
-        # 'tiered': global top 30 every iteration, global top 70 every 5th, everyone every 10th. The
-        # tiers are global ranks, so this batch only exact-solves the members that fall inside them —
-        # clamp(threshold - offset). Past the first batch (offset >= 70) that is zero every iteration
-        # except the every-10th full passes (which also seed the cache on iteration 0 and keep the
-        # final iteration a full solve, so output scores stay consistent).
+        # 'tiered': the global top _exact_solve_window candidates get an exact solve every iteration;
+        # everyone else is re-solved only on the every-10th full pass (which also seeds the cache on
+        # iteration 0 and keeps the final iteration a full solve, so output scores stay consistent).
+        # The window is by GLOBAL rank via candidate_offset, so a batch starting past it exact-solves
+        # nobody — only players projecting into the ultimate top window ever get an exact solve. Which
+        # candidates fill that set is refreshed from the latest H-scores in perform_iterations (see
+        # _exact_solve_refresh_interval), so it follows the contextually strongest players.
         offset = self._candidate_offset
         if (iteration + 1) % 10 == 0:
             return n_candidates
-        if (iteration + 1) % 5 == 0:
-            return max(0, min(70 - offset, n_candidates))
-        return max(0, min(30 - offset, n_candidates))
+        return max(0, min(self._exact_solve_window - offset, n_candidates))
 
     def get_objective_and_gradient(self
                                     , category_weights
