@@ -30,6 +30,13 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 #sidebar {
     width: 280px;
     min-width: 280px;
+    /* Pin to the viewport height and stick in place as the main content scrolls. Without a fixed
+       height the sidebar stretches to #main-content's height (align-items: stretch), which made the
+       bottom-pinned #docs-link jump up/down whenever a tab changed the content height. This also
+       activates the (previously dormant) overflow-y below so the sidebar scrolls its own content. */
+    height: 100vh;
+    position: sticky;
+    top: 0;
     background-color: light-dark(#ffffff, #0e1117);
     border-right: 1px solid light-dark(#e5e5e5, #3d3d55);
     overflow-y: auto;
@@ -192,6 +199,26 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     border: none;
     border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
     margin: 0;
+}
+
+/* Documentation link, pinned to the bottom-left of the flex-column sidebar
+   (margin-top: auto pushes it below the sections). Matches the sidebar-title
+   type and the sidebar/divider edge color. */
+#docs-link {
+    margin-top: auto;
+    display: block;
+    padding: 12px 16px;
+    border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+#docs-link:hover {
+    background-color: light-dark(#f0f0f0, #191c24);
+    text-decoration: underline;
 }
 
 #main-content {
