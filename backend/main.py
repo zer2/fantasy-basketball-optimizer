@@ -53,9 +53,17 @@ from backend.data_retrieval import get_player_mapping_view
 
 
 logger = logging.getLogger('fbbo.api')
-# Ensure app INFO logs (sign-ins) pass the level filter; handlers/formatting are left to the
-# process's logging setup (uvicorn / imported libraries already configure stderr handlers).
-logging.getLogger('fbbo').setLevel(logging.INFO)
+# App logs (notably every sign-in below) go to stderr at INFO so Cloud Run / Cloud Logging captures
+# them. A level alone is not enough: without an explicit handler these records fall through to
+# Python's lastResort handler, whose WARNING threshold silently drops INFO. The handler is scoped to
+# the 'fbbo' logger (not root) so we don't switch on INFO for chatty libraries (Snowflake, urllib3).
+_fbbo_logger = logging.getLogger('fbbo')
+_fbbo_logger.setLevel(logging.INFO)
+if not _fbbo_logger.handlers:            # guard against duplicate handlers on re-import
+    _fbbo_handler = logging.StreamHandler()   # -> stderr
+    _fbbo_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+    _fbbo_logger.addHandler(_fbbo_handler)
+_fbbo_logger.propagate = False           # don't double-emit if the root logger ever gains a handler
 
 
 def _fail(status_code: int, message: str) -> HTTPException:
@@ -327,7 +335,7 @@ async def auth_callback_route(request: Request):
         'sub': userinfo['sub'], 'email': email, 'name': name,
         'picture': userinfo.get('picture'),   # optional; Google provides it when available
     }
-    logger.info('login: %s', email)
+    logger.info('login: %s (%s)', email, name)
     return RedirectResponse(url='/')
 
 
