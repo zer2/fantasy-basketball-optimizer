@@ -87,12 +87,21 @@ def _pick_gscore_player(
     """Highest-Total-G-score available player that keeps the roster position-eligible. Walking the
     ranking top-down and taking the first eligible name is cheap: early picks the top name almost
     always fits, so it is usually a single eligibility check."""
+    first_undrafted = None
     for name in gscore_order:
         if name in drafted:
             continue
+        if first_undrafted is None:
+            first_undrafted = name
         if not has_positions or check_single_player_eligibility(name, team_so_far, position_config):
             return name
-    raise RuntimeError('No eligible G-score player remains — pool exhausted unexpectedly.')
+    # No position-eligible player remains: greedy G-score drafters can corner their own roster, and
+    # transition seasons (~1999-00) carry patchy positions. Fall back to the best undrafted player —
+    # the G-score seats only need to be filled to form the field; only the H-score team is scored, and
+    # opponents enter the H-score math as collections of stats, not as position assignments.
+    if first_undrafted is not None:
+        return first_undrafted
+    raise RuntimeError('Player pool exhausted — no undrafted players remain.')
 
 
 def _light_candidate(candidate) -> dict:
