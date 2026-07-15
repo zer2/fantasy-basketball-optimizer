@@ -52,18 +52,21 @@ from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.data_retrieval import get_player_mapping_view
 
 
-logger = logging.getLogger('fbbo.api')
-# App logs (notably every sign-in below) go to stderr at INFO so Cloud Run / Cloud Logging captures
-# them. A level alone is not enough: without an explicit handler these records fall through to
-# Python's lastResort handler, whose WARNING threshold silently drops INFO. The handler is scoped to
-# the 'fbbo' logger (not root) so we don't switch on INFO for chatty libraries (Snowflake, urllib3).
+# yahoo_oauth (imported above for the Yahoo integration) calls logging.setLoggerClass() to install a
+# logger class that auto-attaches a handler to every logger created afterwards — duplicating and
+# reformatting log lines process-wide. Undo that hijack so loggers behave normally, then configure
+# ours the standard way: one stderr handler on 'fbbo' at INFO (scoped there so noisy libraries stay
+# at WARNING). Child 'fbbo.api' has no handler of its own and propagates up to this one.
+logging.setLoggerClass(logging.Logger)
+
 _fbbo_logger = logging.getLogger('fbbo')
 _fbbo_logger.setLevel(logging.INFO)
-if not _fbbo_logger.handlers:            # guard against duplicate handlers on re-import
-    _fbbo_handler = logging.StreamHandler()   # -> stderr
-    _fbbo_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
-    _fbbo_logger.addHandler(_fbbo_handler)
-_fbbo_logger.propagate = False           # don't double-emit if the root logger ever gains a handler
+_fbbo_handler = logging.StreamHandler()   # -> stderr, captured by Cloud Run / Cloud Logging
+_fbbo_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+_fbbo_logger.addHandler(_fbbo_handler)
+_fbbo_logger.propagate = False   # this logger owns its handler; don't also emit via the root logger
+
+logger = logging.getLogger('fbbo.api')
 
 
 def _fail(status_code: int, message: str) -> HTTPException:
