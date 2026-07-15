@@ -59,16 +59,13 @@ def _create_session(season: str, scoring_format: str):
 
 
 def _has_position_data(session) -> bool:
-    """Historical seasons before 2000-01 carry no positions; the optimiser then skips position work
-    and every player fits every roster. Detect it so the G-score drafter can skip eligibility checks
-    (and so the report can flag the row)."""
-    positions = session.info.get('Positions')
-    if positions is None or len(positions) == 0:
-        return False
-    # Positions map name -> list of position codes (or a '?'/'NP' sentinel when unknown).
-    sample = next(iter(positions.values())) if isinstance(positions, dict) else positions.iloc[0]
-    text = ','.join(sample) if isinstance(sample, list) else str(sample)
-    return 'NP' not in text and '?' not in text
+    """Whether the season carries usable player positions. We use the exact signal the H-score
+    algorithm itself uses: the HAgent builds `position_means` only when positions are present, so it
+    is None both for genuinely position-less seasons (pre-2000, '(NP)' sentinel) and for transition
+    seasons whose positions are blank ('()'). This is authoritative — sniffing the Positions strings
+    missed the empty-string sentinel and mis-flagged ~1999-00 as having positions, which then made the
+    G-score drafter run eligibility against position-less players."""
+    return session.H.position_means is not None
 
 
 def _gscore_ranking(session) -> list[str]:
