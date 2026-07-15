@@ -68,21 +68,12 @@ def stat_style(value: float, multiplier: float, middle: float) -> str:
 
 # ── Per-format cell math (value shown + styler params), mirroring the frontend tables ──────────────
 
-def _cell_value_and_style(format_key: str, rate: float, n_drafters: int) -> tuple[str, str]:
-    """(display text, css) for a per-category cell. `rate` is the stored 0-100 value."""
+def _overall_style(format_key: str, h_score: float, n_drafters: int) -> tuple[str, str]:
+    """(display text, css) for a team's overall H-score (0-100). The neutral midpoint is the average
+    outcome: 50% for EC/MC, and 1/N (≈ 8.3% for 12 drafters) for Rotisserie."""
     if format_key == 'Roto':
-        roto_middle = (n_drafters - 1) / 2 + 1
-        roto_value  = 1 + (rate / 100) * (n_drafters - 1)
-        return f'{roto_value:.2f}', stat_style(roto_value, 3 * (n_drafters - 1), roto_middle)
-    return f'{rate:.1f}', stat_style(rate, 3, 50)   # EC / MC win rate
-
-
-def _overall_value_and_style(format_key: str, h_score: float, n_drafters: int) -> tuple[str, str]:
-    """(display text, css) for the Overall H-score row. `h_score` is 0-100."""
-    if format_key == 'Roto':
-        # Roto overall H-scores are small (~8%); colour on their own modest scale around a neutral 8.
-        return f'{h_score:.1f}', stat_style(h_score, 6, 8)
-    return f'{h_score:.1f}', stat_style(h_score, 2, 50)   # EC / MC probability
+        return f'{h_score:.1f}', stat_style(h_score, 3, 100 / n_drafters)
+    return f'{h_score:.1f}', stat_style(h_score, 2, 50)
 
 
 # ── HTML assembly ──────────────────────────────────────────────────────────────────────────────────
@@ -98,99 +89,61 @@ def _load_records() -> dict[str, list[dict]]:
     return by_format
 
 
-def _styled_cell(format_key: str, row_i: int, value: float, n_drafters: int, extra: str) -> str:
-    """One coloured value cell. row_i 0 = Overall H-score; otherwise a category. `extra` carries the
-    click data-attributes for team cells, or a plain class for average cells."""
-    if row_i == 0:
-        text, css = _overall_value_and_style(format_key, value, n_drafters)
-    else:
-        text, css = _cell_value_and_style(format_key, value, n_drafters)
-    return f'<td style="{css}"{extra}>{text}</td>'
-
-
-def _render_block(
-    format_key: str
-    , season_label: str
-    , flag: str
-    , block: dict[int, dict[int, float]]   # row_i -> seat -> value
-    , seats_present: list[int]
-    , row_labels: list[str]
-    , n_drafters: int
-    , clickable: bool
-) -> str:
-    """Render one season's rows (or the 'Average' summary rows), each ending in a right Avg cell."""
-    rows: list[str] = []
-    for row_i, label in enumerate(row_labels):
-        cells: list[str] = []
-        present: list[float] = []
-        for seat in seats_present:
-            if seat not in block[row_i]:
-                cells.append('<td class="missing"></td>')
-                continue
-            value = block[row_i][seat]
-            present.append(value)
-            if clickable:
-                extra = (f' class="stat" data-season="{season_label}" data-format="{format_key}"'
-                         f' data-seat="{seat}" title="Drafter {seat + 1}, {season_label} — click for detail"')
-            else:
-                extra = ' class="avg"'
-            cells.append(_styled_cell(format_key, row_i, value, n_drafters, extra))
-        avg_cell = (_styled_cell(format_key, row_i, mean(present), n_drafters, ' class="avg avgcol"')
-                    if present else '<td class="avg avgcol missing"></td>')
-        season_th = (f'<th class="season" rowspan="{len(row_labels)}">{season_label}{flag}</th>'
-                     if row_i == 0 else '')
-        row_class = ' class="summaryrow"' if not clickable else ''
-        rows.append(f'<tr{row_class}>{season_th}<th class="rowlabel">{label}</th>{"".join(cells)}{avg_cell}</tr>')
-    return ''.join(rows)
-
-
 def _render_format_table(format_key: str, records: list[dict]) -> str:
+    """One row per season of overall team H-scores (columns = seats), a right Avg column, and an
+    'Average' summary row across seasons at the top. Per-category detail lives only in the drill-down."""
     if not records:
         return f'<h2 id="{format_key}">{_FORMAT_TITLES[format_key]}</h2><p class="empty">No data.</p>'
 
     n_drafters    = records[0]['n_drafters']
-    categories    = records[0]['categories']
-    row_labels    = ['H-score'] + list(categories)
     seats_present = sorted({seat['hscore_seat'] for r in records for seat in r['seats']})
 
-    def raw_value(seat_data: dict, row_i: int) -> float:
-        return seat_data['team_h_score'] if row_i == 0 else seat_data['team_rates'][row_i - 1]
+    def overall_cell(h_score: float, extra: str) -> str:
+        text, css = _overall_style(format_key, h_score, n_drafters)
+        return f'<td style="{css}"{extra}>{text}</td>'
 
-    # Per-season blocks + accumulate across-season values for the summary block.
-    across: dict[int, dict[int, list[float]]] = {i: {s: [] for s in seats_present} for i in range(len(row_labels))}
-    season_blocks: list[tuple[str, str, dict]] = []
+    def avg_cell(values: list[float], css_class: str) -> str:
+        return (overall_cell(mean(values), f' class="{css_class}"') if values
+                else f'<td class="{css_class} missing"></td>')
+
+    across: dict[int, list[float]] = {seat: [] for seat in seats_present}
+    body_rows: list[str] = []
     for record in sorted(records, key=lambda r: r['season'], reverse=True):
         by_seat = {seat['hscore_seat']: seat for seat in record['seats']}
-        block: dict[int, dict[int, float]] = {i: {} for i in range(len(row_labels))}
-        for row_i in range(len(row_labels)):
-            for seat in seats_present:
-                seat_data = by_seat.get(seat)
-                if seat_data is None:
-                    continue
-                value = raw_value(seat_data, row_i)
-                block[row_i][seat] = value
-                across[row_i][seat].append(value)
+        cells, present = [], []
+        for seat in seats_present:
+            seat_data = by_seat.get(seat)
+            if seat_data is None:
+                cells.append('<td class="missing"></td>')
+                continue
+            h_score = seat_data['team_h_score']
+            present.append(h_score)
+            across[seat].append(h_score)
+            cells.append(overall_cell(h_score,
+                f' class="stat" data-season="{record["season"]}" data-format="{format_key}"'
+                f' data-seat="{seat}" title="Drafter {seat + 1}, {record["season"]} — click for detail"'))
         flag = (' <span class="noposition" title="No position data for this season">✦</span>'
                 if not record['has_position_data'] else '')
-        season_blocks.append((record['season'], flag, block))
+        body_rows.append(f'<tr><th class="season">{record["season"]}{flag}</th>'
+                         f'{"".join(cells)}{avg_cell(present, "avg avgcol")}</tr>')
 
-    summary_block = {
-        i: {s: mean(across[i][s]) for s in seats_present if across[i][s]}
-        for i in range(len(row_labels))
-    }
+    summary_cells, summary_present = [], []
+    for seat in seats_present:
+        if across[seat]:
+            seat_mean = mean(across[seat])
+            summary_present.append(seat_mean)
+            summary_cells.append(overall_cell(seat_mean, ' class="avg"'))
+        else:
+            summary_cells.append('<td class="avg missing"></td>')
+    summary_row = (f'<tr><th class="season">Average</th>'
+                   f'{"".join(summary_cells)}{avg_cell(summary_present, "avg avgcol")}</tr>')
 
     head = ''.join(f'<th>Drafter {seat + 1}</th>' for seat in seats_present)
-    summary_html = _render_block(format_key, 'Average', '', summary_block, seats_present, row_labels, n_drafters, clickable=False)
-    seasons_html = ''.join(
-        _render_block(format_key, season, flag, block, seats_present, row_labels, n_drafters, clickable=True)
-        for season, flag, block in season_blocks
-    )
-
     return (
         f'<h2 id="{format_key}">{_FORMAT_TITLES[format_key]}</h2>'
         f'<table class="report"><thead><tr>'
-        f'<th class="season">Season</th><th class="rowlabel"></th>{head}<th class="avgh">Avg</th></tr></thead>'
-        f'<tbody class="summary">{summary_html}</tbody><tbody>{seasons_html}</tbody></table>'
+        f'<th class="season">Season</th>{head}<th class="avgh">Avg</th></tr></thead>'
+        f'<tbody class="summary">{summary_row}</tbody><tbody>{"".join(body_rows)}</tbody></table>'
     )
 
 
@@ -236,8 +189,7 @@ header p { color: light-dark(#555,#aaa); max-width: 900px; }
 h2 { margin-top: 40px; border-bottom: 1px solid light-dark(#ddd,#3d3d55); padding-bottom: 4px; }
 table.report { border-collapse: collapse; font-size: 13px; }
 table.report th, table.report td { border: 1px solid light-dark(#e5e5e5,#2a2c3a); padding: 3px 7px; text-align: right; }
-th.season { position: sticky; left: 0; background: light-dark(#fff,#0e1117); text-align: left; font-weight: 700; vertical-align: top; }
-th.rowlabel { text-align: left; color: light-dark(#555,#aaa); font-weight: 400; white-space: nowrap; }
+th.season { position: sticky; left: 0; background: light-dark(#fff,#0e1117); text-align: left; font-weight: 700; white-space: nowrap; }
 thead th { background: light-dark(#f5f5f5,#161922); position: sticky; top: 0; }
 td.stat, td.avg { font-variant-numeric: tabular-nums; }
 td.stat { cursor: pointer; }
@@ -245,7 +197,7 @@ td.stat:hover { outline: 2px solid light-dark(#333,#ccc); outline-offset: -2px; 
 td.missing, td.empty { background: light-dark(#fafafa,#111); }
 /* Top "Average across seasons" summary block. */
 tbody.summary { border-bottom: 2px solid light-dark(#bbb,#555); }
-tbody.summary td, tbody.summary th.rowlabel, tbody.summary th.season { font-weight: 600; }
+tbody.summary td, tbody.summary th.season { font-weight: 600; }
 /* Right "Avg across seats" column. */
 td.avgcol, th.avgh { border-left: 2px solid light-dark(#bbb,#555); font-weight: 600; }
 /* Per-pick drill-down tables in the detail panel. */
@@ -291,13 +243,13 @@ function catCell(formatKey, rate, nd){
   if(formatKey==='Roto'){ const mid=(nd-1)/2+1, rv=1+(rate/100)*(nd-1); return [rv.toFixed(2), statStyle(rv,3*(nd-1),mid)]; }
   return [rate.toFixed(1), statStyle(rate,3,50)];
 }
-function overallCell(formatKey, h){ return formatKey==='Roto' ? [h.toFixed(1), statStyle(h,6,8)] : [h.toFixed(1), statStyle(h,2,50)]; }
+function overallCell(formatKey, h, nd){ return formatKey==='Roto' ? [h.toFixed(1), statStyle(h,3,100/nd)] : [h.toFixed(1), statStyle(h,2,50)]; }
 
 function candidateTableHTML(pick, cats, formatKey, nd){
   let h = `<table class="ptable"><caption>Candidate ranking (top ${Math.min(pick.candidates.length,15)})</caption>`+
           `<thead><tr><th class="name">Candidate</th><th>H</th>`+cats.map(c=>`<th>${c.split(' ')[0]}</th>`).join('')+`</tr></thead><tbody>`;
   for(const c of pick.candidates.slice(0,15)){
-    const [ov,ost] = overallCell(formatKey, c.h_score);
+    const [ov,ost] = overallCell(formatKey, c.h_score, nd);
     const cls = c.name===pick.picked ? ' class="cand"' : '';
     h += `<tr${cls}><td class="name">${c.name}</td><td style="${ost}">${ov}</td>`+
       c.win_rates.map(r=>{ const [t,s]=catCell(formatKey,r,nd); return `<td style="${s}">${t}</td>`; }).join('')+`</tr>`;
