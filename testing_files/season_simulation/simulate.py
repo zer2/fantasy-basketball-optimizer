@@ -66,6 +66,11 @@ def _create_session(season: str, scoring_format: str):
     """Build one backend session for a (season, format) and return (session, session_id)."""
     request = _build_session_request(scoring_format=scoring_format)
     request['data_source']['season'] = season
+    # Turn OFF the Bayesian strength adjustment (ℶ/beth). It exists to keep the algorithm from being
+    # overconfident when it can't trust its own projections — but this analysis uses real historical
+    # data with objectively-correct stats, so there is nothing to doubt. With beth>0 the draft-time
+    # H-scores are regressed toward average (self-doubt), which is not what we want to measure here.
+    request['parameters']['beth'] = 0
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'Session creation failed ({season}, {scoring_format}): {response.text}'
     session_id = response.json()['session_id']
@@ -139,12 +144,27 @@ def _picked_detail(candidate) -> dict:
 
 
 def _score_team(session, assignments: dict[str, list[str]], team_name: str, n_iterations: int) -> tuple[float, list[float]]:
-    """Final H-score + per-category rates for a completed team, via the same extraction the trade
-    analyzer uses (backend/math/trading.py). A full roster yields a single-row result."""
-    result = session.H.get_h_scores(assignments, team_name, n_iterations)
+    """Final H-score + per-category rates for a COMPLETED team, scored as a balanced N-vs-N matchup.
+
+    We deliberately do NOT score the full roster directly (as the trade analyzer does with
+    get_h_scores + idxmax): on an already-full team that runs the empty-candidate path, but the
+    opponent model still injects a phantom +1 player — get_opposing_team_means uses `n_my_players + 1`
+    to account for the candidate that is normally being added. With no real candidate the drafter stays
+    at N while every opponent is padded to N+1 with the leftover pool, which at draft's end is below
+    replacement, so the team's H-score is inflated. Instead we remove one player and score the roster
+    by evaluating adding them back: team_so_far = N-1, so opponents are modeled at N — a correct N-vs-N
+    comparison. Every removal choice yields the same team score, so we just use the last player."""
+    team = [p for p in assignments[team_name] if isinstance(p, str)]
+    removed = team[-1]
+    board = dict(assignments)
+    board[team_name] = team[:-1]
+    # candidate_subset scores only the removed player (its H-score against the full-size opponents is
+    # the team's H-score); the opponent/future model still reads the whole pool, so the value matches a
+    # full evaluation. Falls back to idxmax if the removed player was filtered (e.g. position edge case).
+    result = session.H.get_h_scores(board, team_name, n_iterations, candidate_subset=[removed])
     scores = result['Scores']
     rates  = result['Rates']
-    index  = scores.idxmax()
+    index  = removed if removed in scores.index else scores.idxmax()
     return float(scores[index]), [float(x) for x in rates.loc[index].tolist()]
 
 
