@@ -68,12 +68,17 @@ def stat_style(value: float, multiplier: float, middle: float) -> str:
 
 # ── Per-format cell math (value shown + styler params), mirroring the frontend tables ──────────────
 
+# Single colour multiplier for the overall H-score cells across all three formats, so the mapping is
+# consistent (a given delta from neutral is the same colour everywhere). Set high enough that EC's
+# tight spread (~50-57%) shows a clear gradient; wider-spread MC/Roto simply saturate sooner. One knob.
+_OVERALL_MULTIPLIER = 8
+
+
 def _overall_style(format_key: str, h_score: float, n_drafters: int) -> tuple[str, str]:
     """(display text, css) for a team's overall H-score (0-100). The neutral midpoint is the average
     outcome: 50% for EC/MC, and 1/N (≈ 8.3% for 12 drafters) for Rotisserie."""
-    if format_key == 'Roto':
-        return f'{h_score:.1f}', stat_style(h_score, 3, 100 / n_drafters)
-    return f'{h_score:.1f}', stat_style(h_score, 2, 50)
+    middle = 100 / n_drafters if format_key == 'Roto' else 50
+    return f'{h_score:.1f}', stat_style(h_score, _OVERALL_MULTIPLIER, middle)
 
 
 # ── HTML assembly ──────────────────────────────────────────────────────────────────────────────────
@@ -243,7 +248,8 @@ function catCell(formatKey, rate, nd){
   if(formatKey==='Roto'){ const mid=(nd-1)/2+1, rv=1+(rate/100)*(nd-1); return [rv.toFixed(2), statStyle(rv,3*(nd-1),mid)]; }
   return [rate.toFixed(1), statStyle(rate,3,50)];
 }
-function overallCell(formatKey, h, nd){ return formatKey==='Roto' ? [h.toFixed(1), statStyle(h,3,100/nd)] : [h.toFixed(1), statStyle(h,2,50)]; }
+const OVERALL_MULT = 8;   // keep in sync with _OVERALL_MULTIPLIER in render.py
+function overallCell(formatKey, h, nd){ const mid = formatKey==='Roto' ? 100/nd : 50; return [h.toFixed(1), statStyle(h, OVERALL_MULT, mid)]; }
 
 function candidateTableHTML(pick, cats, formatKey, nd){
   let h = `<table class="ptable"><caption>Candidate ranking (top ${Math.min(pick.candidates.length,15)})</caption>`+
