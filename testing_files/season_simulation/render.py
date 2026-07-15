@@ -77,6 +77,8 @@ _OVERALL_MULTIPLIER = 8
 def _overall_style(format_key: str, h_score: float, n_drafters: int) -> tuple[str, str]:
     """(display text, css) for a team's overall H-score (0-100). The neutral midpoint is the average
     outcome: 50% for EC/MC, and 1/N (≈ 8.3% for 12 drafters) for Rotisserie."""
+    if h_score is None:   # sanitized non-finite score
+        return '—', ''
     middle = 100 / n_drafters if format_key == 'Roto' else 50
     return f'{h_score:.1f}', stat_style(h_score, _OVERALL_MULTIPLIER, middle)
 
@@ -118,7 +120,7 @@ def _render_format_table(format_key: str, records: list[dict]) -> str:
         cells, present = [], []
         for seat in seats_present:
             seat_data = by_seat.get(seat)
-            if seat_data is None:
+            if seat_data is None or seat_data['team_h_score'] is None:
                 cells.append('<td class="missing"></td>')
                 continue
             h_score = seat_data['team_h_score']
@@ -245,11 +247,12 @@ function darkTertiary(v,m,mid){ const raw=Math.round((v-mid)*m), i=Math.min(Math
 function statTertiary(v,m,mid){ return dual(lightTertiary(v,m,mid), darkTertiary(v,m,mid)); }
 
 function catCell(formatKey, rate, nd){
+  if(rate==null) return ['—',''];   // sanitized NaN
   if(formatKey==='Roto'){ const mid=(nd-1)/2+1, rv=1+(rate/100)*(nd-1); return [rv.toFixed(2), statStyle(rv,3*(nd-1),mid)]; }
   return [rate.toFixed(1), statStyle(rate,3,50)];
 }
 const OVERALL_MULT = 8;   // keep in sync with _OVERALL_MULTIPLIER in render.py
-function overallCell(formatKey, h, nd){ const mid = formatKey==='Roto' ? 100/nd : 50; return [h.toFixed(1), statStyle(h, OVERALL_MULT, mid)]; }
+function overallCell(formatKey, h, nd){ if(h==null) return ['—','']; const mid = formatKey==='Roto' ? 100/nd : 50; return [h.toFixed(1), statStyle(h, OVERALL_MULT, mid)]; }
 
 function candidateTableHTML(pick, cats, formatKey, nd){
   let h = `<table class="ptable"><caption>Candidate ranking (top ${Math.min(pick.candidates.length,15)})</caption>`+
@@ -267,8 +270,9 @@ function gscoreTableHTML(detail, cats){
   let h = `<table class="ptable"><caption>G-score expectations (difference vs. other teams)</caption>`+
           `<thead><tr><th class="name"></th><th>Total</th>`+cats.map(c=>`<th>${c.split(' ')[0]}</th>`).join('')+`</tr></thead><tbody>`;
   for(const r of detail.g_score_rows){
-    h += `<tr><th class="name">${r.label}</th><td>${r.total.toFixed(2)}</td>`+
-      r.values.map(v=>`<td style="${statStyle(v,60,0)}">${v.toFixed(2)}</td>`).join('')+`</tr>`;
+    const tot = r.total==null ? '—' : r.total.toFixed(2);
+    h += `<tr><th class="name">${r.label}</th><td>${tot}</td>`+
+      r.values.map(v=> v==null ? `<td>—</td>` : `<td style="${statStyle(v,60,0)}">${v.toFixed(2)}</td>`).join('')+`</tr>`;
   }
   return h+`</tbody></table>`;
 }

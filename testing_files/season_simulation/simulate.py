@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import time
 from pathlib import Path
@@ -46,6 +47,19 @@ SCORING_FORMATS = {
 
 _OUTPUT_DIR = _HERE / 'output' / 'data'
 _TOP_N_DEFAULT = 40   # how many ranked candidates to keep per pick for the report's candidate table
+
+
+def _sanitize(obj):
+    """Replace non-finite floats (NaN/inf) with None throughout a record. The algorithm can emit a NaN
+    H-score for some candidates on a near-full roster (last pick); Python's json.dumps writes those as
+    a bare `NaN` token, which is invalid JSON that browsers' JSON.parse rejects."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {key: _sanitize(value) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(value) for value in obj]
+    return obj
 
 
 def _create_session(season: str, scoring_format: str):
@@ -249,8 +263,9 @@ def main() -> None:
                 top_n = args.top_n,
             )
             # Write atomically (tmp then replace) so a concurrent render.py never reads a half file.
+            # Sanitize first: NaN/inf -> null keeps the JSON valid for the browser.
             tmp = path.with_suffix('.json.tmp')
-            tmp.write_text(json.dumps(record), encoding='utf-8')
+            tmp.write_text(json.dumps(_sanitize(record)), encoding='utf-8')
             tmp.replace(path)
             print(f'  wrote {path}  ({path.stat().st_size // 1024} KB)', flush=True)
 
