@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from statistics import mean
 
 _HERE = Path(__file__).resolve().parent
 _DATA_DIR = _HERE / 'output' / 'data'
@@ -97,48 +98,99 @@ def _load_records() -> dict[str, list[dict]]:
     return by_format
 
 
+def _styled_cell(format_key: str, row_i: int, value: float, n_drafters: int, extra: str) -> str:
+    """One coloured value cell. row_i 0 = Overall H-score; otherwise a category. `extra` carries the
+    click data-attributes for team cells, or a plain class for average cells."""
+    if row_i == 0:
+        text, css = _overall_value_and_style(format_key, value, n_drafters)
+    else:
+        text, css = _cell_value_and_style(format_key, value, n_drafters)
+    return f'<td style="{css}"{extra}>{text}</td>'
+
+
+def _render_block(
+    format_key: str
+    , season_label: str
+    , flag: str
+    , block: dict[int, dict[int, float]]   # row_i -> seat -> value
+    , seats_present: list[int]
+    , row_labels: list[str]
+    , n_drafters: int
+    , clickable: bool
+) -> str:
+    """Render one season's rows (or the 'Average' summary rows), each ending in a right Avg cell."""
+    rows: list[str] = []
+    for row_i, label in enumerate(row_labels):
+        cells: list[str] = []
+        present: list[float] = []
+        for seat in seats_present:
+            if seat not in block[row_i]:
+                cells.append('<td class="missing"></td>')
+                continue
+            value = block[row_i][seat]
+            present.append(value)
+            if clickable:
+                extra = (f' class="stat" data-season="{season_label}" data-format="{format_key}"'
+                         f' data-seat="{seat}" title="Drafter {seat + 1}, {season_label} — click for detail"')
+            else:
+                extra = ' class="avg"'
+            cells.append(_styled_cell(format_key, row_i, value, n_drafters, extra))
+        avg_cell = (_styled_cell(format_key, row_i, mean(present), n_drafters, ' class="avg avgcol"')
+                    if present else '<td class="avg avgcol missing"></td>')
+        season_th = (f'<th class="season" rowspan="{len(row_labels)}">{season_label}{flag}</th>'
+                     if row_i == 0 else '')
+        row_class = ' class="summaryrow"' if not clickable else ''
+        rows.append(f'<tr{row_class}>{season_th}<th class="rowlabel">{label}</th>{"".join(cells)}{avg_cell}</tr>')
+    return ''.join(rows)
+
+
 def _render_format_table(format_key: str, records: list[dict]) -> str:
     if not records:
-        return f'<h2>{_FORMAT_TITLES[format_key]}</h2><p class="empty">No data.</p>'
+        return f'<h2 id="{format_key}">{_FORMAT_TITLES[format_key]}</h2><p class="empty">No data.</p>'
 
-    n_drafters = records[0]['n_drafters']
-    categories = records[0]['categories']
+    n_drafters    = records[0]['n_drafters']
+    categories    = records[0]['categories']
+    row_labels    = ['H-score'] + list(categories)
     seats_present = sorted({seat['hscore_seat'] for r in records for seat in r['seats']})
 
-    head = ''.join(f'<th>Drafter {seat + 1}</th>' for seat in seats_present)
-    rows_html: list[str] = []
+    def raw_value(seat_data: dict, row_i: int) -> float:
+        return seat_data['team_h_score'] if row_i == 0 else seat_data['team_rates'][row_i - 1]
 
-    for record in records:
-        season = record['season']
+    # Per-season blocks + accumulate across-season values for the summary block.
+    across: dict[int, dict[int, list[float]]] = {i: {s: [] for s in seats_present} for i in range(len(row_labels))}
+    season_blocks: list[tuple[str, str, dict]] = []
+    for record in sorted(records, key=lambda r: r['season'], reverse=True):
         by_seat = {seat['hscore_seat']: seat for seat in record['seats']}
-        row_labels = ['H-score'] + list(categories)
-        flag = ' <span class="noposition" title="No position data for this season">✦</span>' if not record['has_position_data'] else ''
-
-        for row_i, label in enumerate(row_labels):
-            cells: list[str] = []
+        block: dict[int, dict[int, float]] = {i: {} for i in range(len(row_labels))}
+        for row_i in range(len(row_labels)):
             for seat in seats_present:
                 seat_data = by_seat.get(seat)
                 if seat_data is None:
-                    cells.append('<td class="missing"></td>')
                     continue
-                if row_i == 0:
-                    text, css = _overall_value_and_style(format_key, seat_data['team_h_score'], n_drafters)
-                else:
-                    text, css = _cell_value_and_style(format_key, seat_data['team_rates'][row_i - 1], n_drafters)
-                cells.append(
-                    f'<td class="stat" style="{css}" '
-                    f'data-season="{season}" data-format="{format_key}" data-seat="{seat}" '
-                    f'title="Drafter {seat + 1}, {season} — click for team detail">{text}</td>'
-                )
-            season_cell = (f'<th class="season" rowspan="{len(row_labels)}">{season}{flag}</th>'
-                           if row_i == 0 else '')
-            rows_html.append(f'<tr>{season_cell}<th class="rowlabel">{label}</th>{"".join(cells)}</tr>')
+                value = raw_value(seat_data, row_i)
+                block[row_i][seat] = value
+                across[row_i][seat].append(value)
+        flag = (' <span class="noposition" title="No position data for this season">✦</span>'
+                if not record['has_position_data'] else '')
+        season_blocks.append((record['season'], flag, block))
+
+    summary_block = {
+        i: {s: mean(across[i][s]) for s in seats_present if across[i][s]}
+        for i in range(len(row_labels))
+    }
+
+    head = ''.join(f'<th>Drafter {seat + 1}</th>' for seat in seats_present)
+    summary_html = _render_block(format_key, 'Average', '', summary_block, seats_present, row_labels, n_drafters, clickable=False)
+    seasons_html = ''.join(
+        _render_block(format_key, season, flag, block, seats_present, row_labels, n_drafters, clickable=True)
+        for season, flag, block in season_blocks
+    )
 
     return (
         f'<h2 id="{format_key}">{_FORMAT_TITLES[format_key]}</h2>'
         f'<table class="report"><thead><tr>'
-        f'<th class="season">Season</th><th class="rowlabel"></th>{head}</tr></thead>'
-        f'<tbody>{"".join(rows_html)}</tbody></table>'
+        f'<th class="season">Season</th><th class="rowlabel"></th>{head}<th class="avgh">Avg</th></tr></thead>'
+        f'<tbody class="summary">{summary_html}</tbody><tbody>{seasons_html}</tbody></table>'
     )
 
 
@@ -187,9 +239,23 @@ table.report th, table.report td { border: 1px solid light-dark(#e5e5e5,#2a2c3a)
 th.season { position: sticky; left: 0; background: light-dark(#fff,#0e1117); text-align: left; font-weight: 700; vertical-align: top; }
 th.rowlabel { text-align: left; color: light-dark(#555,#aaa); font-weight: 400; white-space: nowrap; }
 thead th { background: light-dark(#f5f5f5,#161922); position: sticky; top: 0; }
-td.stat { cursor: pointer; font-variant-numeric: tabular-nums; }
+td.stat, td.avg { font-variant-numeric: tabular-nums; }
+td.stat { cursor: pointer; }
 td.stat:hover { outline: 2px solid light-dark(#333,#ccc); outline-offset: -2px; }
 td.missing, td.empty { background: light-dark(#fafafa,#111); }
+/* Top "Average across seasons" summary block. */
+tbody.summary { border-bottom: 2px solid light-dark(#bbb,#555); }
+tbody.summary td, tbody.summary th.rowlabel, tbody.summary th.season { font-weight: 600; }
+/* Right "Avg across seats" column. */
+td.avgcol, th.avgh { border-left: 2px solid light-dark(#bbb,#555); font-weight: 600; }
+/* Per-pick drill-down tables in the detail panel. */
+.pick > details > summary { cursor: pointer; user-select: none; }
+.ptable { border-collapse: collapse; font-size: 11px; margin: 4px 0 8px; }
+.ptable th, .ptable td { border: 1px solid light-dark(#eee,#2a2c3a); padding: 1px 5px; text-align: right; font-variant-numeric: tabular-nums; }
+.ptable th.name, .ptable td.name { text-align: left; white-space: nowrap; }
+.ptable td.ineligible { background: light-dark(#f3f3f3,#181a22); }
+.ptable td.cand { font-weight: 700; }
+.ptable caption { text-align: left; color: light-dark(#666,#999); font-size: 11px; padding: 2px 0; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-start; justify-content: center; padding: 40px; overflow: auto; }
 .overlay.hidden { display: none; }
 .panel { background: light-dark(#fff,#0e1117); border: 1px solid light-dark(#ddd,#3d3d55); border-radius: 8px; padding: 20px 24px; max-width: 1100px; width: 100%; position: relative; }
@@ -206,18 +272,75 @@ td.missing, td.empty { background: light-dark(#fafafa,#111); }
 # port above and to styler_functions.ts) so the lazily-rendered per-pick tables colour like the app.
 _JS = r"""
 const CACHE = {};
+// Stat styler ported from frontend/styles/styler_functions.ts (primary + tertiary), so the lazily
+// rendered per-pick tables colour exactly like the website's candidate table and expand view.
 function blendFromWhite(t, intensity, cap){ const k=Math.min(intensity,cap)/cap*0.7;
   return [Math.round(255+k*(t[0]-255)),Math.round(255+k*(t[1]-255)),Math.round(255+k*(t[2]-255))]; }
-function lightPrimary(v,m,mid){ const raw=(v-mid)*m; const t=raw>0?[70,160,100]:[205,80,80]; return blendFromWhite(t,Math.abs(raw),110); }
-function darkPrimary(v,m,mid){ const raw=(v-mid)*m; const i=Math.min(Math.round(Math.abs(raw)),110);
-  return [raw>0?55:55+i, raw>0?55+i:55, 70+Math.round(i*0.7)]; }
 function txt(c){ return (c[0]*0.299+c[1]*0.587+c[2]*0.114)>150?'black':'white'; }
-function statStyle(v,m,mid){ const l=lightPrimary(v,m,mid), d=darkPrimary(v,m,mid);
-  return `color:light-dark(${txt(l)},${txt(d)});background-color:light-dark(rgb(${l}),rgb(${d}));`; }
+function dual(l,d){ return `color:light-dark(${txt(l)},${txt(d)});background-color:light-dark(rgb(${l}),rgb(${d}));`; }
+function lightPrimary(v,m,mid){ const raw=(v-mid)*m; return blendFromWhite(raw>0?[70,160,100]:[205,80,80],Math.abs(raw),110); }
+function darkPrimary(v,m,mid){ const raw=(v-mid)*m, i=Math.min(Math.round(Math.abs(raw)),110);
+  return [raw>0?55:55+i, raw>0?55+i:55, 70+Math.round(i*0.7)]; }
+function statStyle(v,m,mid){ return dual(lightPrimary(v,m,mid), darkPrimary(v,m,mid)); }
+function lightTertiary(v,m,mid){ return blendFromWhite([120,150,215],Math.abs((v-mid)*m),100); }
+function darkTertiary(v,m,mid){ const raw=Math.round((v-mid)*m), i=Math.min(Math.abs(raw),130);
+  return [raw>0?28+Math.round(i/6):28-Math.round(i/60), raw>0?34+Math.round(i/2):34-Math.round(i/20), raw>0?46+Math.round(i*0.7):46-Math.round(i/10)]; }
+function statTertiary(v,m,mid){ return dual(lightTertiary(v,m,mid), darkTertiary(v,m,mid)); }
 
 function catCell(formatKey, rate, nd){
   if(formatKey==='Roto'){ const mid=(nd-1)/2+1, rv=1+(rate/100)*(nd-1); return [rv.toFixed(2), statStyle(rv,3*(nd-1),mid)]; }
   return [rate.toFixed(1), statStyle(rate,3,50)];
+}
+function overallCell(formatKey, h){ return formatKey==='Roto' ? [h.toFixed(1), statStyle(h,6,8)] : [h.toFixed(1), statStyle(h,2,50)]; }
+
+function candidateTableHTML(pick, cats, formatKey, nd){
+  let h = `<table class="ptable"><caption>Candidate ranking (top ${Math.min(pick.candidates.length,15)})</caption>`+
+          `<thead><tr><th class="name">Candidate</th><th>H</th>`+cats.map(c=>`<th>${c.split(' ')[0]}</th>`).join('')+`</tr></thead><tbody>`;
+  for(const c of pick.candidates.slice(0,15)){
+    const [ov,ost] = overallCell(formatKey, c.h_score);
+    const cls = c.name===pick.picked ? ' class="cand"' : '';
+    h += `<tr${cls}><td class="name">${c.name}</td><td style="${ost}">${ov}</td>`+
+      c.win_rates.map(r=>{ const [t,s]=catCell(formatKey,r,nd); return `<td style="${s}">${t}</td>`; }).join('')+`</tr>`;
+  }
+  return h+`</tbody></table>`;
+}
+function gscoreTableHTML(detail, cats){
+  if(!detail.g_score_rows) return '';
+  let h = `<table class="ptable"><caption>G-score expectations (difference vs. other teams)</caption>`+
+          `<thead><tr><th class="name"></th><th>Total</th>`+cats.map(c=>`<th>${c.split(' ')[0]}</th>`).join('')+`</tr></thead><tbody>`;
+  for(const r of detail.g_score_rows){
+    h += `<tr><th class="name">${r.label}</th><td>${r.total.toFixed(2)}</td>`+
+      r.values.map(v=>`<td style="${statStyle(v,60,0)}">${v.toFixed(2)}</td>`).join('')+`</tr>`;
+  }
+  return h+`</tbody></table>`;
+}
+function flexTableHTML(detail){
+  const f = detail.flex_allocations; if(!f) return '';
+  let h = `<table class="ptable"><caption>Position allocations for future flex picks</caption>`+
+          `<thead><tr><th class="name"></th>`+f.base_positions.map(p=>`<th>${p}</th>`).join('')+`</tr></thead><tbody>`;
+  for(const r of f.rows){
+    h += `<tr><th class="name">${r.label}</th>`+
+      r.values.map(v=> v===null ? `<td class="ineligible"></td>` : `<td style="${statTertiary(v,50,0)}">${v.toFixed(2)}</td>`).join('')+`</tr>`;
+  }
+  return h+`</tbody></table>`;
+}
+function rosterTableHTML(roster){
+  if(!roster) return '';
+  const types=[], byType={};
+  for(const slot of roster.slots){ const t=slot.replace(/\d+$/,''); if(!byType[t]){byType[t]=[];types.push(t);} byType[t].push(slot); }
+  const maxDepth = Math.max(...types.map(t=>byType[t].length));
+  let h = `<table class="ptable"><caption>Roster assignments</caption><thead><tr><th class="name"></th>`+
+          types.map(t=>`<th>${t}</th>`).join('')+`</tr></thead><tbody>`;
+  for(let d=0; d<maxDepth; d++){
+    h += `<tr><th class="name">Slot ${d+1}</th>`;
+    for(const t of types){ const slot=byType[t][d];
+      if(slot===undefined){ h+=`<td class="ineligible"></td>`; continue; }
+      const a = roster.assignments[slot];
+      h += a ? `<td class="name${a.is_candidate?' cand':''}">${a.name}</td>` : `<td></td>`;
+    }
+    h += `</tr>`;
+  }
+  return h+`</tbody></table>`;
 }
 
 async function loadData(season, formatKey){
@@ -225,26 +348,21 @@ async function loadData(season, formatKey){
   if(!CACHE[key]) CACHE[key] = await (await fetch('data/'+key+'.json')).json();
   return CACHE[key];
 }
-
 async function openDetail(season, formatKey, seat){
   const rec = await loadData(season, formatKey);
   const seatData = rec.seats.find(s => s.hscore_seat === seat);
   const cats = rec.categories, nd = rec.n_drafters;
-  let html = `<h3>Drafter ${seat+1} — ${season} · ${formatKey}</h3>`;
+  let html = `<h3>Drafter ${seat+1} — ${season} · ${formatKey}`+(rec.has_position_data?'':' · no position data')+`</h3>`;
   html += `<p><b>Final team H-score:</b> ${seatData.team_h_score}%</p>`;
   html += `<h4>Roster</h4><ol>` + seatData.roster.map(p=>`<li>${p}</li>`).join('') + `</ol>`;
-  html += `<h4>How each pick was made (H-score candidate tables)</h4>`;
+  html += `<h4>How each pick was made — the tables the website would have shown</h4>`;
   for(const pick of seatData.picks){
-    html += `<div class="pick"><b>Round ${pick.round}</b> → <span class="picked">${pick.picked}</span>`;
-    html += `<table class="detail-table"><thead><tr><th class="name">Candidate</th><th>H</th>` +
-            cats.map(c=>`<th>${c.split(' ')[0]}</th>`).join('') + `</tr></thead><tbody>`;
-    for(const c of pick.candidates.slice(0, 12)){
-      const cls = c.name===pick.picked ? ' class="picked"' : '';
-      const [ov, ost] = formatKey==='Roto' ? [c.h_score.toFixed(1), statStyle(c.h_score,6,8)] : [c.h_score.toFixed(1), statStyle(c.h_score,2,50)];
-      html += `<tr${cls}><td class="name">${c.name}</td><td style="${ost}">${ov}</td>` +
-        c.win_rates.map(r=>{ const [t,s]=catCell(formatKey,r,nd); return `<td style="${s}">${t}</td>`; }).join('') + `</tr>`;
-    }
-    html += `</tbody></table></div>`;
+    html += `<div class="pick"><details><summary><b>Round ${pick.round}</b> &rarr; <span class="picked">${pick.picked}</span></summary>`+
+      candidateTableHTML(pick, cats, formatKey, nd)+
+      gscoreTableHTML(pick.picked_detail, cats)+
+      flexTableHTML(pick.picked_detail)+
+      rosterTableHTML(pick.picked_detail.roster)+
+      `</details></div>`;
   }
   document.getElementById('panel-body').innerHTML = html;
   document.getElementById('overlay').classList.remove('hidden');

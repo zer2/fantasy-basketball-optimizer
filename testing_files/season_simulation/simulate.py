@@ -221,6 +221,8 @@ def main() -> None:
     parser.add_argument('--seats', nargs='*', type=int, default=None, help='Seat indices 0..11 (default: all).')
     parser.add_argument('--top-n', type=int, default=_TOP_N_DEFAULT, help='Ranked candidates kept per pick.')
     parser.add_argument('--out', default=str(_OUTPUT_DIR), help='Output directory for JSON files.')
+    parser.add_argument('--resume', action='store_true',
+                        help='Skip any (season, format) whose JSON already exists (for restarts).')
     args = parser.parse_args()
 
     seasons = args.seasons if args.seasons else get_available_seasons()
@@ -229,16 +231,21 @@ def main() -> None:
 
     for season in seasons:
         for format_key in args.formats:
+            path = out_dir / f'{season}__{format_key}.json'
+            if args.resume and path.exists():
+                print(f'[{season} / {format_key}] skip (exists)', flush=True)
+                continue
             # Seats default to all drafters; resolve per session since n_drafters could vary.
-            probe_seats = args.seats
             print(f'[{season} / {format_key}] simulating...', flush=True)
             record = simulate_season_format(
                 season, format_key,
-                seats = probe_seats if probe_seats is not None else list(range(12)),
+                seats = args.seats if args.seats is not None else list(range(12)),
                 top_n = args.top_n,
             )
-            path = out_dir / f'{season}__{format_key}.json'
-            path.write_text(json.dumps(record), encoding='utf-8')
+            # Write atomically (tmp then replace) so a concurrent render.py never reads a half file.
+            tmp = path.with_suffix('.json.tmp')
+            tmp.write_text(json.dumps(record), encoding='utf-8')
+            tmp.replace(path)
             print(f'  wrote {path}  ({path.stat().st_size // 1024} KB)', flush=True)
 
 
