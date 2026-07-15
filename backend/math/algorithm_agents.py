@@ -415,10 +415,17 @@ class HAgent:
             ]).T
 
         else:
-            extra_needed     = (len(my_players) + 1) * self.n_drafters - len(players_chosen)
+            # While the roster still has room a candidate is being added, so the drafter's team grows to
+            # len+1 and opponents are modelled at that size (shortfalls padded with the expected next-pick
+            # quality). Once the roster is full there is no candidate and no future pick, so opponents are
+            # compared at their actual size — without this, scoring a complete team pads every opponent
+            # with a phantom below-replacement player, inflating the team's H-score.
+            adding_candidate = len(my_players) < self.n_picks
+            target_team_size = len(my_players) + (1 if adding_candidate else 0)
+            extra_needed     = target_team_size * self.n_drafters - len(players_chosen)
             mean_extra       = x_scores_available.iloc[:extra_needed].mean().fillna(0)
             other_team_sums  = np.vstack([
-                self.get_opposing_team_means(player_assignments[team], mean_extra, len(my_players))
+                self.get_opposing_team_means(player_assignments[team], mean_extra, target_team_size)
                 for team in team_names if team != drafter
             ]).T
             diff_means = (
@@ -502,8 +509,8 @@ class HAgent:
             calculate_pdf_weights=False,
         )
 
-    def get_opposing_team_means(self, players, mean_extra_players, n_my_players):
-        n_extra = max(n_my_players + 1 - len(players), 0)
+    def get_opposing_team_means(self, players, mean_extra_players, target_team_size):
+        n_extra = max(target_team_size - len(players), 0)
         player_sum  = np.array(self.x_scores.loc[[p for p in players if p == p]].sum(axis=0))
         extra_sum   = np.array(mean_extra_players) * n_extra
         return (player_sum + extra_sum).reshape(1, self.n_categories, 1)

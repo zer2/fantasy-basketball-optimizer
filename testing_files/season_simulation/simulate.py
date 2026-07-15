@@ -144,27 +144,13 @@ def _picked_detail(candidate) -> dict:
 
 
 def _score_team(session, assignments: dict[str, list[str]], team_name: str, n_iterations: int) -> tuple[float, list[float]]:
-    """Final H-score + per-category rates for a COMPLETED team, scored as a balanced N-vs-N matchup.
-
-    We deliberately do NOT score the full roster directly (as the trade analyzer does with
-    get_h_scores + idxmax): on an already-full team that runs the empty-candidate path, but the
-    opponent model still injects a phantom +1 player — get_opposing_team_means uses `n_my_players + 1`
-    to account for the candidate that is normally being added. With no real candidate the drafter stays
-    at N while every opponent is padded to N+1 with the leftover pool, which at draft's end is below
-    replacement, so the team's H-score is inflated. Instead we remove one player and score the roster
-    by evaluating adding them back: team_so_far = N-1, so opponents are modeled at N — a correct N-vs-N
-    comparison. Every removal choice yields the same team score, so we just use the last player."""
-    team = [p for p in assignments[team_name] if isinstance(p, str)]
-    removed = team[-1]
-    board = dict(assignments)
-    board[team_name] = team[:-1]
-    # candidate_subset scores only the removed player (its H-score against the full-size opponents is
-    # the team's H-score); the opponent/future model still reads the whole pool, so the value matches a
-    # full evaluation. Falls back to idxmax if the removed player was filtered (e.g. position edge case).
-    result = session.H.get_h_scores(board, team_name, n_iterations, candidate_subset=[removed])
+    """Final H-score + per-category rates for a completed team. Scored directly on the full roster — now
+    correct because get_diff_distributions no longer pads a full team's opponents with a phantom +1
+    player (see algorithm_agents.py). A full roster yields a single-row result."""
+    result = session.H.get_h_scores(assignments, team_name, n_iterations)
     scores = result['Scores']
     rates  = result['Rates']
-    index  = removed if removed in scores.index else scores.idxmax()
+    index  = scores.idxmax()
     return float(scores[index]), [float(x) for x in rates.loc[index].tolist()]
 
 
