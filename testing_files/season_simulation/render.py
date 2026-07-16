@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 from statistics import mean
@@ -85,10 +86,10 @@ def _overall_style(format_key: str, h_score: float, n_drafters: int) -> tuple[st
 
 # ── HTML assembly ──────────────────────────────────────────────────────────────────────────────────
 
-def _load_records() -> dict[str, list[dict]]:
+def _load_records(data_dir: Path) -> dict[str, list[dict]]:
     """Group the per-(season, format) JSON files by format key, sorted by season descending."""
     by_format: dict[str, list[dict]] = {key: [] for key in _FORMAT_ORDER}
-    for path in sorted(_DATA_DIR.glob('*.json')):
+    for path in sorted(data_dir.glob('*.json')):
         record = json.loads(path.read_text(encoding='utf-8'))
         by_format.setdefault(record['format_key'], []).append(record)
     for records in by_format.values():
@@ -154,7 +155,7 @@ def _render_format_table(format_key: str, records: list[dict]) -> str:
     )
 
 
-def _page(body: str) -> str:
+def _page(body: str, data_subdir: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -172,18 +173,32 @@ def _page(body: str) -> str:
   <div id="panel" class="panel"><button class="close" onclick="closeDetail()">✕</button>
   <div id="panel-body"></div></div>
 </div>
-<script>{_JS}</script>
+<script>const DATA_DIR = {json.dumps(data_subdir)};
+{_JS}</script>
 </body></html>"""
 
 
 def main() -> None:
-    by_format = _load_records()
+    parser = argparse.ArgumentParser(description='Render the season-simulation HTML report from a data dir.')
+    parser.add_argument('--data-dir', default=str(_DATA_DIR),
+                        help='Directory of per-(season, format) JSON files (default: output/data).')
+    parser.add_argument('--out', default=str(_OUT_HTML),
+                        help='Output HTML path (default: output/index.html).')
+    args = parser.parse_args()
+
+    data_dir = Path(args.data_dir)
+    out_html = Path(args.out)
+    # The report lazily fetches each cell's JSON from a path relative to the HTML. We assume the HTML
+    # sits alongside the data dir (both under output/), so the browser fetch path is the data dir's name.
+    data_subdir = data_dir.name
+
+    by_format = _load_records(data_dir)
     sections = ''.join(_render_format_table(key, by_format.get(key, [])) for key in _FORMAT_ORDER)
-    _OUT_HTML.write_text(_page(sections), encoding='utf-8')
+    out_html.write_text(_page(sections, data_subdir), encoding='utf-8')
     total_cells = sum(len(r['seats']) for records in by_format.values() for r in records)
-    print(f'Wrote {_OUT_HTML}  ({total_cells} team cells across '
+    print(f'Wrote {out_html}  ({total_cells} team cells across '
           f'{sum(len(v) for v in by_format.values())} season-formats)')
-    print(f'View: cd {_OUT_HTML.parent} && python -m http.server   # then open index.html')
+    print(f'View: cd {out_html.parent} && python -m http.server   # then open {out_html.name}')
 
 
 # ── Static assets (CSS + the lazy-detail JS, which re-implements the styler client-side) ────────────
@@ -307,7 +322,7 @@ function rosterTableHTML(roster){
 
 async function loadData(season, formatKey){
   const key = season+'__'+formatKey;
-  if(!CACHE[key]) CACHE[key] = await (await fetch('data/'+key+'.json')).json();
+  if(!CACHE[key]) CACHE[key] = await (await fetch(DATA_DIR+'/'+key+'.json')).json();
   return CACHE[key];
 }
 async function openDetail(season, formatKey, seat){
