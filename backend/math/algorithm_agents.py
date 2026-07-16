@@ -34,6 +34,26 @@ def _normal_cdf(x, scale=1.0):
 
 def _normal_ppf(q, scale=1.0):
     return scale * ndtri(q)
+
+
+def _softmax_rows(logits):
+    """Row-wise softmax (each row is a probability distribution over that row's columns). Used to
+    parameterise the flex position shares: optimising in this unconstrained logit space keeps the
+    shares on the simplex automatically, so the share update needs no clip-to-[0,1] or renormalise
+    (those distort the step at the boundary and homogenise the survivors).
+
+    Subtracting the row max is purely numerical and has no effect on the result: softmax is
+    shift-invariant, so e^{z − c}/Σe^{z − c} = e^z/Σe^z — the common e^{−c} factor cancels between
+    numerator and denominator. Its only job is to keep exp() from overflowing on large logits."""
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    exponentiated = np.exp(shifted)
+    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
+
+
+# Learning rate for the softmax-logit flex-share optimiser. Larger than the old share-space 0.01
+# because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
+# gradient-iteration budget rather than still drifting at the final iteration.
+_SHARES_LEARNING_RATE = 0.3
 from itertools import combinations
 
 from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
@@ -563,8 +583,11 @@ class HAgent:
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
+            # Shares are optimised in softmax-logit space (see the update below). A logit must travel
+            # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
+            # logit learning rate is an order of magnitude larger than the old share-space 0.01.
             'Shares': {
-                pos_code: AdamOptimizer(learning_rate=0.01)
+                pos_code: AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE)
                 for pos_code in self.position_structure['flex'].keys()
             },
         }
@@ -577,6 +600,16 @@ class HAgent:
 
         category_weights_current  = category_weights
         position_shares_current   = position_shares
+
+        # Flex shares live on the probability simplex. We optimise them in unconstrained softmax-logit
+        # space: position_shares stays the working set of shares (what the objective reads), and
+        # position_logits is its pre-image, so softmax(logits) reproduces the initial shares exactly
+        # (softmax is shift-invariant, so log(shares) is a valid pre-image). Clip to a tiny floor first
+        # so a warm-started zero share yields a finite (very negative) logit rather than -inf.
+        position_logits = {
+            pos_code: np.log(np.clip(position_shares[pos_code].values, 1e-12, None))
+            for pos_code in self.position_structure['flex'].keys()
+        }
 
         if (n_players_selected < self.n_picks - 1) and self.dynamic:
 
@@ -645,17 +678,23 @@ class HAgent:
                     pitching_preference = np.clip(pitching_preference + pp_update, -0.5, 0.5)
 
                 if self.position_means is not None:
-                    share_gradients_centered = {
-                        k: grad - grad.mean(axis=1).reshape(-1, 1)
-                        for k, grad in gradient_result['Gradients']['Shares'].items()
-                    }
                     for pos_code, optimizer in optimizers['Shares'].items():
-                        share_update = optimizer.minimize(share_gradients_centered[pos_code])
-                        position_shares[pos_code] = position_shares[pos_code] + share_update
-                        position_shares[pos_code].values[:] = np.clip(position_shares[pos_code].values, 0, 1)
-                        position_shares[pos_code] = position_shares[pos_code].div(
-                            position_shares[pos_code].sum(axis=1), axis=0
-                        )
+                        shares      = position_shares[pos_code].values
+                        share_grad  = gradient_result['Gradients']['Shares'][pos_code]
+                        # Step in logit space: the chain rule through the softmax Jacobian turns the
+                        # share gradient g into the logit gradient s ⊙ (g − ⟨g, s⟩). That Jacobian,
+                        # ∂sⱼ/∂zᵢ = sⱼ(δᵢⱼ − sᵢ), is just the quotient rule applied to sⱼ = e^{zⱼ}/Σe^{zₖ}:
+                        # both the numerator term (u'v) and the denominator term (−uv') bring down an
+                        # e^{zᵢ} — since d/dz e^z = e^z — and each e^{zᵢ}/Σe^{zₖ} is exactly the share sᵢ,
+                        # so every raw exponential is replaced by the share it represents. The numerator
+                        # term gives the leading s (the update vanishes at the boundary, so a share can
+                        # never be driven negative); the denominator term gives the ⟨g, s⟩ share-weighted
+                        # centering (positions already near 0 drop out instead of dragging a plain mean).
+                        # No clip or renormalise is needed — softmax(logits) is always a valid distribution.
+                        logit_grad   = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
+                        logit_update = optimizer.minimize(logit_grad)
+                        position_logits[pos_code] = position_logits[pos_code] + logit_update
+                        position_shares[pos_code].values[:] = _softmax_rows(position_logits[pos_code])
 
                 # Store best weights for warm-starting
                 best_player_idx = np.argmax(score)
