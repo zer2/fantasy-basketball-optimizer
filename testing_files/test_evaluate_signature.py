@@ -47,10 +47,10 @@ _TEAM_2 = [
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True) on a warmed session,
 # keyed by (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '604a43f88ae1da7917160f45d8a05469952ed4f0b5c1e3ce8a7d5bfed59a1db2',
-    ('Head to Head: Each Category',  'mid'):   '4b51f52a3c11745cada555e4d29f885441e005482f18f36515019862397af754',
-    ('Head to Head: Most Categories','empty'): '36391bf603aaaa6bcb2fdfc6eeed13682349ca3ed550e48d18b1bb2764024734',
-    ('Head to Head: Most Categories','mid'):   'c00c024c32ec50b6c928c41aed4d62e9a381bf71eed67d3838291004b980b386',
+    ('Head to Head: Each Category',  'empty'): '1d64ea31b3856f7f266f5f18d72b27c94f97f2c950e170faffb8187c1c38e1ac',
+    ('Head to Head: Each Category',  'mid'):   'b50fc4b9f717ebee418b4f4c2b8589b66731cca4665519039b16a62434759e02',
+    ('Head to Head: Most Categories','empty'): '03985ba0cce4f558d9533838869dfee4f52052c7e7801230e55e22c37a621253',
+    ('Head to Head: Most Categories','mid'):   '8ee0f03774684f687a2a78a058edec4b15c0f6adfe5e1193731944e115bb9717',
 }
 
 

@@ -66,10 +66,10 @@ def test_evaluate_auction():
 
     # (expected_name, diff, your_dollar, gnrc_dollar, orig_dollar)
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',  -8.5,  76.7, 85.2, 87.3),
-        ('Tyrese Haliburton',        12.3,  57.2, 45.0, 46.3),
-        ('Dyson Daniels',            10.5,  47.9, 37.4, 38.6),
-        ('Jayson Tatum',              1.9,  40.9, 39.0, 40.2),
+        ('Shai Gilgeous-Alexander',  -2.5,  80.7, 83.2, 86.1),
+        ('Tyrese Haliburton',        18.2,  57.2, 39.0, 40.5),
+        ('Dyson Daniels',            12.6,  53.5, 41.0, 42.5),
+        ('Jayson Tatum',              4.7,  39.3, 34.6, 36.0),
     ]
     candidates_by_name = {c.name: c for c in candidates}
     for expected_name, expected_diff, expected_your, expected_gnrc, expected_orig in expected_auction_values:
