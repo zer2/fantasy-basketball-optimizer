@@ -74,7 +74,7 @@ class PlatformIntegration(abc.ABC):
     @property
     @abc.abstractmethod
     def player_name_column(self) -> str:
-        """The platform's player-name column in PLAYER_MAPPING_VIEW, e.g. 'FANTRAX_PLAYER_NAME'."""
+        """The platform's player id/name column in UNIFIED_PLAYER_TABLE, e.g. 'FANTRAX_ID'."""
 
     def list_leagues(self) -> list[dict]:
         """The user's leagues as [{'id', 'name', ...}] for auth-based platforms (Yahoo,

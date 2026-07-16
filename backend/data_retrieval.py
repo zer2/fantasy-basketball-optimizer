@@ -116,25 +116,26 @@ def _query(view_name: str) -> pd.DataFrame:
 def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
     """Map source-specific player names to the canonical 'Player' column.
 
-    source_col is the column name in PLAYER_MAPPING_VIEW whose values match
-    what's currently in df['Player']. The canonical name column in the view
-    is 'PLAYER_NAME' (not 'Player').
+    source_col is the column name in UNIFIED_PLAYER_TABLE whose values match
+    what's currently in df['Player']. The canonical name column in that table
+    is 'MASTER_PLAYER_NAME' (not 'Player').
     """
-    mapping_view = _query('PLAYER_MAPPING_VIEW')
+    unified_player_table = _query('UNIFIED_PLAYER_TABLE')
     mapper = (
-        mapping_view.dropna(subset=[source_col])
-        .set_index(source_col)['PLAYER_NAME']
+        unified_player_table.dropna(subset=[source_col])
+        .set_index(source_col)['MASTER_PLAYER_NAME']
     )
     df = df.copy()
     df['Player'] = df['Player'].map(mapper).fillna(df['Player'])
     return df
 
 
-def get_player_mapping_view() -> pd.DataFrame:
-    """The cross-platform player-name mapping table (PLAYER_MAPPING_VIEW), whose
-    columns include each naming convention (PLAYER_NAME, FANTRAX_PLAYER_NAME,
-    ESPN_NAME, ...). Used by platform integrations to map roster names to canonical."""
-    return _query('PLAYER_MAPPING_VIEW')
+def get_unified_player_table() -> pd.DataFrame:
+    """The single cross-platform player table (UNIFIED_PLAYER_TABLE), whose columns
+    include the canonical MASTER_PLAYER_NAME plus each bridge id/name (NBA_PLAYER_ID,
+    YAHOO_PLAYER_ID, FANTRAX_ID, ESPN_NAME, DARKO_NAME, ...). Used by platform
+    integrations to map roster ids/names to canonical."""
+    return _query('UNIFIED_PLAYER_TABLE')
 
 
 # ── Weekly box scores ─────────────────────────────────────────────────────────
@@ -204,9 +205,6 @@ def get_historical_data(params: dict) -> pd.DataFrame:
     df['Three %']       = df['Threes'] / df['Three Attempts']
     df['Assist to TO']  = df['Assists'] / df['Turnovers']
     df['Position']      = df['Position'].fillna('NP')
-
-    # Known duplicate in the reference table
-    df = df[df['Player'] != 'OG Anunoby']
 
     return df.set_index(['Season', 'Player']).sort_index().fillna(0)
 

@@ -44,7 +44,10 @@ class FantraxIntegration(PlatformIntegration):
 
     @property
     def player_name_column(self) -> str:
-        return 'FANTRAX_PLAYER_NAME'
+        # Fantrax players are matched to canonical by their stable Fantrax id
+        # (UNIFIED_PLAYER_TABLE.FANTRAX_ID == the roster row's scorer 'scorerId'),
+        # not by name — so no Fantrax name needs storing in the unified table.
+        return 'FANTRAX_ID'
 
     # ── External dependency (wrapped so tests can substitute it) ───────────────
 
@@ -115,9 +118,9 @@ class FantraxIntegration(PlatformIntegration):
         , mode: str
         , name_lookup: dict[str, str]
     ) -> PlatformSelections:
-        """Read each team's current roster, mapping platform names to canonical via
-        name_lookup ('RP' for any player missing from it). In Season Mode, players
-        flagged injured-reserve are moved to injured_players instead of the roster."""
+        """Read each team's current roster, mapping each player's Fantrax scorer id to
+        canonical via name_lookup ('RP' for any player missing from it). In Season Mode,
+        players flagged injured-reserve are moved to injured_players instead of the roster."""
         api = self._make_api(config.league_id)
         exclude_injured = mode == 'Season Mode'
         injured_players: list[str] = []
@@ -128,7 +131,7 @@ class FantraxIntegration(PlatformIntegration):
             for row in self._fetch_team_roster_rows(api, team_id):
                 if 'scorer' not in row:
                     continue
-                player = name_lookup.get(row['scorer']['name'], 'RP')
+                player = name_lookup.get(row['scorer']['scorerId'], 'RP')
                 if exclude_injured and row['statusId'] == _INJURED_RESERVE_STATUS_ID:
                     injured_players.append(player)
                 else:
