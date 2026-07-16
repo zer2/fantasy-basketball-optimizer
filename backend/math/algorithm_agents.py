@@ -696,16 +696,18 @@ class HAgent:
                         position_logits[pos_code] = position_logits[pos_code] + logit_update
                         position_shares[pos_code].values[:] = _softmax_rows(position_logits[pos_code])
 
-                # Store best weights for warm-starting
-                best_player_idx = np.argmax(score)
-                self.initial_category_weights = category_weights[best_player_idx] / 2 + self.v.reshape(self.n_categories) / 2
-                self.initial_shares = {
-                    pos_code: {
-                        base: float(position_shares[pos_code][base].iloc[best_player_idx])
-                        for base in self.position_structure['flex'][pos_code]['bases']
-                    }
-                    for pos_code in self.position_structure['flex'].keys()
+            # Warm-start the next pick from the converged best candidate. Computed once after the loop
+            # (only the final iteration's values are ever kept) and read straight from the numpy arrays,
+            # avoiding a per-iteration pandas column-select + .iloc scan of the share DataFrames.
+            best_player_idx = int(np.argmax(score))
+            self.initial_category_weights = category_weights[best_player_idx] / 2 + self.v.reshape(self.n_categories) / 2
+            self.initial_shares = {
+                pos_code: {
+                    base: float(position_shares[pos_code].values[best_player_idx, col_idx])
+                    for col_idx, base in enumerate(self.position_structure['flex'][pos_code]['bases'])
                 }
+                for pos_code in self.position_structure['flex'].keys()
+            }
 
         elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
             x_diff_array   = diff_means + x_scores_batch_array
