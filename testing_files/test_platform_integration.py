@@ -23,30 +23,30 @@ def _info_with_positions() -> dict:
     return {'Positions': positions}
 
 
-def _fantrax_mapping_view() -> pd.DataFrame:
-    # PLAYER_MAPPING_VIEW: platform spellings differ from the canonical PLAYER_NAME.
+def _fantrax_unified_table() -> pd.DataFrame:
+    # UNIFIED_PLAYER_TABLE: Fantrax players bridge by FANTRAX_ID -> canonical MASTER_PLAYER_NAME.
     return pd.DataFrame({
-        'FANTRAX_PLAYER_NAME': ['Nik Jokic', 'Bam A.', 'Jim Harden'],
-        'PLAYER_NAME':         ['Nikola Jokic', 'Bam Adebayo', 'James Harden'],
+        'FANTRAX_ID':         ['j01', 'b02', 'h03'],
+        'MASTER_PLAYER_NAME': ['Nikola Jokic', 'Bam Adebayo', 'James Harden'],
     })
 
 
-# ── Name lookup (PLAYER_MAPPING_VIEW-backed) ──────────────────────────────────
+# ── Name lookup (UNIFIED_PLAYER_TABLE-backed) ─────────────────────────────────
 
-def test_build_platform_name_lookup_maps_platform_spelling_to_canonical():
+def test_build_platform_name_lookup_maps_platform_id_to_canonical():
     lookup = build_platform_name_lookup(
-        _info_with_positions(), 'FANTRAX_PLAYER_NAME', _fantrax_mapping_view(),
+        _info_with_positions(), 'FANTRAX_ID', _fantrax_unified_table(),
     )
-    assert lookup['Nik Jokic']  == 'Nikola Jokic (C)'
-    assert lookup['Bam A.']     == 'Bam Adebayo (C,PF)'
-    assert lookup['Jim Harden'] == 'James Harden (PG,SG)'
+    assert lookup['j01'] == 'Nikola Jokic (C)'
+    assert lookup['b02'] == 'Bam Adebayo (C,PF)'
+    assert lookup['h03'] == 'James Harden (PG,SG)'
 
 
 def test_build_platform_name_lookup_omits_unknown_so_get_yields_rp():
     lookup = build_platform_name_lookup(
-        _info_with_positions(), 'FANTRAX_PLAYER_NAME', _fantrax_mapping_view(),
+        _info_with_positions(), 'FANTRAX_ID', _fantrax_unified_table(),
     )
-    assert lookup.get('Nobody Atall', 'RP') == 'RP'
+    assert lookup.get('nobody', 'RP') == 'RP'
 
 
 # ── Team-name dedup (the Fantrax bug fix) ─────────────────────────────────────
@@ -64,7 +64,7 @@ def test_deduplicate_team_names_preserves_every_team():
     assert set(result.keys()) == {'Dup', 'Dup 2', 'Dup 3'}
 
 
-# ── Fantrax draft/roster fetch (mocked API + mapping view) ────────────────────
+# ── Fantrax draft/roster fetch (mocked API + unified table) ───────────────────
 
 class _FakeFantraxAPI:
     def __init__(self, roster_rows_by_team: dict):
@@ -79,9 +79,9 @@ class _FakeFantraxAPI:
 # Prebuilt platform-name -> canonical lookup (the integration consumes this; the
 # builder that produces it is exercised separately above).
 _NAME_LOOKUP = {
-    'Nik Jokic':  'Nikola Jokic (C)',
-    'Bam A.':     'Bam Adebayo (C,PF)',
-    'Jim Harden': 'James Harden (PG,SG)',
+    'j01': 'Nikola Jokic (C)',
+    'b02': 'Bam Adebayo (C,PF)',
+    'h03': 'James Harden (PG,SG)',
 }
 
 
@@ -95,19 +95,19 @@ def _fantrax_with_fake_api(monkeypatch, roster_rows_by_team) -> FantraxIntegrati
 def test_get_draft_results_maps_names_and_excludes_injured_in_season(monkeypatch):
     roster_rows = {
         't1': [
-            {'scorer': {'name': 'Nik Jokic'}, 'statusId': '1'},
-            {'scorer': {'name': 'Bam A.'}, 'statusId': '3'},   # injured reserve
-            {'no_scorer': True},                                # skipped (no 'scorer')
+            {'scorer': {'scorerId': 'j01'}, 'statusId': '1'},
+            {'scorer': {'scorerId': 'b02'}, 'statusId': '3'},   # injured reserve
+            {'no_scorer': True},                                 # skipped (no 'scorer')
         ],
         't2': [
-            {'scorer': {'name': 'Jim Harden'}, 'statusId': '1'},
+            {'scorer': {'scorerId': 'h03'}, 'statusId': '1'},
         ],
     }
     integration = _fantrax_with_fake_api(monkeypatch, roster_rows)
     config = PlatformConfig(
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
         teams_dict={'Team One': 't1', 'Team Two': 't2'},
-        player_name_column='FANTRAX_PLAYER_NAME',
+        player_name_column='FANTRAX_ID',
     )
     state = integration.get_draft_results(config, 'Season Mode', _NAME_LOOKUP)
 
@@ -119,11 +119,11 @@ def test_get_draft_results_maps_names_and_excludes_injured_in_season(monkeypatch
 
 
 def test_get_draft_results_keeps_injured_in_draft_mode(monkeypatch):
-    roster_rows = {'t1': [{'scorer': {'name': 'Bam A.'}, 'statusId': '3'}]}
+    roster_rows = {'t1': [{'scorer': {'scorerId': 'b02'}, 'statusId': '3'}]}
     integration = _fantrax_with_fake_api(monkeypatch, roster_rows)
     config = PlatformConfig(
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
-        teams_dict={'T': 't1'}, player_name_column='FANTRAX_PLAYER_NAME',
+        teams_dict={'T': 't1'}, player_name_column='FANTRAX_ID',
     )
     state = integration.get_draft_results(config, 'Draft Mode', _NAME_LOOKUP)
 

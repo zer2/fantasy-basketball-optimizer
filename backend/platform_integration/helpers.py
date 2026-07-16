@@ -38,19 +38,20 @@ def deduplicate_team_names(team_pairs: list[tuple[str, str]]) -> dict[str, str]:
 def build_platform_name_lookup(
     info: dict
     , player_name_column: str
-    , mapping_view: pd.DataFrame
+    , unified_player_table: pd.DataFrame
 ) -> dict[str, str]:
-    """Map a platform's player names to canonical 'Name (POS1,POS2)' identifiers.
+    """Map a platform's player ids/names to canonical 'Name (POS1,POS2)' identifiers.
 
-    Composes PLAYER_MAPPING_VIEW (the platform's `player_name_column` -> canonical
-    'PLAYER_NAME') with info['Positions'] (canonical base name -> position codes),
-    so a platform-specific spelling such as 'Nik Jokic' resolves to 'Nikola Jokic
-    (C)'. Names absent from either table are simply omitted from the lookup, so a
-    later `lookup.get(name, 'RP')` yields the 'RP' replacement-player fallback.
+    Composes UNIFIED_PLAYER_TABLE (the platform's `player_name_column` -> canonical
+    'MASTER_PLAYER_NAME') with info['Positions'] (canonical base name -> position
+    codes), so a platform-specific key such as 'Nik Jokic' (or a Fantrax/Yahoo id)
+    resolves to 'Nikola Jokic (C)'. Keys absent from either table are simply omitted
+    from the lookup, so a later `lookup.get(key, 'RP')` yields the 'RP'
+    replacement-player fallback.
 
     Replaces the Streamlit get_fixed_player_name suffix-strip shortcut, which
     assumed the platform name already equalled the canonical name; this consults
-    the mapping view instead (which is why each integration declares
+    the unified table instead (which is why each integration declares
     player_name_column).
     """
     # Canonical base name (suffix stripped) -> position codes. keep='first' guards
@@ -59,10 +60,10 @@ def build_platform_name_lookup(
     positions = positions[~positions.index.duplicated(keep='first')]
     positions_by_base = {name.split(' (')[0]: codes for name, codes in positions.items()}
 
-    # Platform name -> canonical base 'PLAYER_NAME'.
+    # Platform id/name -> canonical base 'MASTER_PLAYER_NAME'.
     base_by_platform_name = (
-        mapping_view.dropna(subset=[player_name_column])
-        .set_index(player_name_column)['PLAYER_NAME']
+        unified_player_table.dropna(subset=[player_name_column])
+        .set_index(player_name_column)['MASTER_PLAYER_NAME']
     )
 
     lookup: dict[str, str] = {}

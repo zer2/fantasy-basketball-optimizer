@@ -16,7 +16,7 @@ unproven. Known risks to check first at E2E:
     Credentials live on the instance as `auth_dir` (the dir yfpy reads token.json/private.json
     from), supplied by get_integration(platform, {'auth_dir': ...}).
 
-  - Name mapping. player_name_column is 'YAHOO_PLAYER_ID' (the PLAYER_MAPPING_VIEW column for
+  - Name mapping. player_name_column is 'YAHOO_PLAYER_ID' (the UNIFIED_PLAYER_TABLE column for
     Yahoo is an id, not a name), so the prebuilt name_lookup maps Yahoo player ids -> canonical
     'Name (POS)'. VERIFY the YAHOO_PLAYER_ID dtype (int vs str) matches yfpy's player_id — a
     mismatch would silently map everyone to 'RP'.
@@ -76,7 +76,7 @@ class YahooIntegration(PlatformIntegration):
 
     @property
     def player_name_column(self) -> str:
-        # The PLAYER_MAPPING_VIEW column for Yahoo is an id, not a name (see banner).
+        # The UNIFIED_PLAYER_TABLE column for Yahoo is an id, not a name (see banner).
         return 'YAHOO_PLAYER_ID'
 
     # ── OAuth2 (manual code-paste flow; needs route + token-store wiring) ───────

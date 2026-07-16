@@ -49,7 +49,7 @@ from backend.platform_integration.credential_store import (
     store_espn_credentials, get_espn_credentials, has_espn_credentials,
 )
 from backend.platform_integration.integrations.yahoo import YahooIntegration
-from backend.data_retrieval import get_player_mapping_view
+from backend.data_retrieval import get_unified_player_table
 
 
 # yahoo_oauth (imported above for the Yahoo integration) calls logging.setLoggerClass() to install a
@@ -205,7 +205,7 @@ def _refresh_platform_name_lookup(session) -> None:
     if config is None:
         return
     session.platform_name_lookup = build_platform_name_lookup(
-        session.info, config.player_name_column, get_player_mapping_view(),
+        session.info, config.player_name_column, get_unified_player_table(),
     )
 
 

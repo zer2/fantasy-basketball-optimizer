@@ -12,7 +12,7 @@ Risks / gaps to check first at E2E:
   - The league id from the fan API is composite; we carry the season as
     "<fan-api id>::<year>" through league_id, then `League(league_id=<id>.split(':')[1],
     year=<year>, ...)` (mirrors Streamlit's split(':')[1]). Verify that id shape.
-  - player_name_column is 'ESPN_NAME' (the PLAYER_MAPPING_VIEW column), so the prebuilt
+  - player_name_column is 'ESPN_NAME' (the UNIFIED_PLAYER_TABLE column), so the prebuilt
     name_lookup maps espn_api's player.name -> canonical 'Name (POS)'. Verify those names
     match ESPN_NAME at E2E.
   - SWID is stored with braces stripped (as Streamlit did); espn_api may want them — untested.

@@ -104,7 +104,14 @@ export function getScoringFormat(): string {
     return (document.getElementById('fc-scoring-format') as HTMLInputElement).value
 }
 
-/** Returns a snapshot of the currently selected stat categories. */
+/** Returns a snapshot of the currently selected stat categories, ordered canonically — the order
+ *  they are listed in the parameters (percentage/ratio stats then counting stats, via the config's
+ *  all_categories) — rather than the chip/insertion order of the multiselect. This keeps category
+ *  order independent of how the user happened to arrange them in the picker. */
 export function getSelectedCategories(): string[] {
-    return [..._selectedCategories]
+    const canonicalOrder = getSportConfig()?.all_categories ?? []
+    const orderIndex = new Map(canonicalOrder.map((category, index) => [category, index]))
+    return [..._selectedCategories].sort(
+        (a, b) => (orderIndex.get(a) ?? Infinity) - (orderIndex.get(b) ?? Infinity),
+    )
 }

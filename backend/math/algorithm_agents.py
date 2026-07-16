@@ -34,6 +34,26 @@ def _normal_cdf(x, scale=1.0):
 
 def _normal_ppf(q, scale=1.0):
     return scale * ndtri(q)
+
+
+def _softmax_rows(logits):
+    """Row-wise softmax (each row is a probability distribution over that row's columns). Used to
+    parameterise the flex position shares: optimising in this unconstrained logit space keeps the
+    shares on the simplex automatically, so the share update needs no clip-to-[0,1] or renormalise
+    (those distort the step at the boundary and homogenise the survivors).
+
+    Subtracting the row max is purely numerical and has no effect on the result: softmax is
+    shift-invariant, so e^{z − c}/Σe^{z − c} = e^z/Σe^z — the common e^{−c} factor cancels between
+    numerator and denominator. Its only job is to keep exp() from overflowing on large logits."""
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    exponentiated = np.exp(shifted)
+    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
+
+
+# Learning rate for the softmax-logit flex-share optimiser. Larger than the old share-space 0.01
+# because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
+# gradient-iteration budget rather than still drifting at the final iteration.
+_SHARES_LEARNING_RATE = 0.3
 from itertools import combinations
 
 from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
@@ -415,10 +435,17 @@ class HAgent:
             ]).T
 
         else:
-            extra_needed     = (len(my_players) + 1) * self.n_drafters - len(players_chosen)
+            # While the roster still has room a candidate is being added, so the drafter's team grows to
+            # len+1 and opponents are modelled at that size (shortfalls padded with the expected next-pick
+            # quality). Once the roster is full there is no candidate and no future pick, so opponents are
+            # compared at their actual size — without this, scoring a complete team pads every opponent
+            # with a phantom below-replacement player, inflating the team's H-score.
+            adding_candidate = len(my_players) < self.n_picks
+            target_team_size = len(my_players) + (1 if adding_candidate else 0)
+            extra_needed     = target_team_size * self.n_drafters - len(players_chosen)
             mean_extra       = x_scores_available.iloc[:extra_needed].mean().fillna(0)
             other_team_sums  = np.vstack([
-                self.get_opposing_team_means(player_assignments[team], mean_extra, len(my_players))
+                self.get_opposing_team_means(player_assignments[team], mean_extra, target_team_size)
                 for team in team_names if team != drafter
             ]).T
             diff_means = (
@@ -502,8 +529,8 @@ class HAgent:
             calculate_pdf_weights=False,
         )
 
-    def get_opposing_team_means(self, players, mean_extra_players, n_my_players):
-        n_extra = max(n_my_players + 1 - len(players), 0)
+    def get_opposing_team_means(self, players, mean_extra_players, target_team_size):
+        n_extra = max(target_team_size - len(players), 0)
         player_sum  = np.array(self.x_scores.loc[[p for p in players if p == p]].sum(axis=0))
         extra_sum   = np.array(mean_extra_players) * n_extra
         return (player_sum + extra_sum).reshape(1, self.n_categories, 1)
@@ -556,8 +583,11 @@ class HAgent:
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
+            # Shares are optimised in softmax-logit space (see the update below). A logit must travel
+            # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
+            # logit learning rate is an order of magnitude larger than the old share-space 0.01.
             'Shares': {
-                pos_code: AdamOptimizer(learning_rate=0.01)
+                pos_code: AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE)
                 for pos_code in self.position_structure['flex'].keys()
             },
         }
@@ -570,6 +600,16 @@ class HAgent:
 
         category_weights_current  = category_weights
         position_shares_current   = position_shares
+
+        # Flex shares live on the probability simplex. We optimise them in unconstrained softmax-logit
+        # space: position_shares stays the working set of shares (what the objective reads), and
+        # position_logits is its pre-image, so softmax(logits) reproduces the initial shares exactly
+        # (softmax is shift-invariant, so log(shares) is a valid pre-image). Clip to a tiny floor first
+        # so a warm-started zero share yields a finite (very negative) logit rather than -inf.
+        position_logits = {
+            pos_code: np.log(np.clip(position_shares[pos_code].values, 1e-12, None))
+            for pos_code in self.position_structure['flex'].keys()
+        }
 
         if (n_players_selected < self.n_picks - 1) and self.dynamic:
 
@@ -638,28 +678,36 @@ class HAgent:
                     pitching_preference = np.clip(pitching_preference + pp_update, -0.5, 0.5)
 
                 if self.position_means is not None:
-                    share_gradients_centered = {
-                        k: grad - grad.mean(axis=1).reshape(-1, 1)
-                        for k, grad in gradient_result['Gradients']['Shares'].items()
-                    }
                     for pos_code, optimizer in optimizers['Shares'].items():
-                        share_update = optimizer.minimize(share_gradients_centered[pos_code])
-                        position_shares[pos_code] = position_shares[pos_code] + share_update
-                        position_shares[pos_code].values[:] = np.clip(position_shares[pos_code].values, 0, 1)
-                        position_shares[pos_code] = position_shares[pos_code].div(
-                            position_shares[pos_code].sum(axis=1), axis=0
-                        )
+                        shares      = position_shares[pos_code].values
+                        share_grad  = gradient_result['Gradients']['Shares'][pos_code]
+                        # Step in logit space: the chain rule through the softmax Jacobian turns the
+                        # share gradient g into the logit gradient s ⊙ (g − ⟨g, s⟩). That Jacobian,
+                        # ∂sⱼ/∂zᵢ = sⱼ(δᵢⱼ − sᵢ), is just the quotient rule applied to sⱼ = e^{zⱼ}/Σe^{zₖ}:
+                        # both the numerator term (u'v) and the denominator term (−uv') bring down an
+                        # e^{zᵢ} — since d/dz e^z = e^z — and each e^{zᵢ}/Σe^{zₖ} is exactly the share sᵢ,
+                        # so every raw exponential is replaced by the share it represents. The numerator
+                        # term gives the leading s (the update vanishes at the boundary, so a share can
+                        # never be driven negative); the denominator term gives the ⟨g, s⟩ share-weighted
+                        # centering (positions already near 0 drop out instead of dragging a plain mean).
+                        # No clip or renormalise is needed — softmax(logits) is always a valid distribution.
+                        logit_grad   = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
+                        logit_update = optimizer.minimize(logit_grad)
+                        position_logits[pos_code] = position_logits[pos_code] + logit_update
+                        position_shares[pos_code].values[:] = _softmax_rows(position_logits[pos_code])
 
-                # Store best weights for warm-starting
-                best_player_idx = np.argmax(score)
-                self.initial_category_weights = category_weights[best_player_idx] / 2 + self.v.reshape(self.n_categories) / 2
-                self.initial_shares = {
-                    pos_code: {
-                        base: float(position_shares[pos_code][base].iloc[best_player_idx])
-                        for base in self.position_structure['flex'][pos_code]['bases']
-                    }
-                    for pos_code in self.position_structure['flex'].keys()
+            # Warm-start the next pick from the converged best candidate. Computed once after the loop
+            # (only the final iteration's values are ever kept) and read straight from the numpy arrays,
+            # avoiding a per-iteration pandas column-select + .iloc scan of the share DataFrames.
+            best_player_idx = int(np.argmax(score))
+            self.initial_category_weights = category_weights[best_player_idx] / 2 + self.v.reshape(self.n_categories) / 2
+            self.initial_shares = {
+                pos_code: {
+                    base: float(position_shares[pos_code].values[best_player_idx, col_idx])
+                    for col_idx, base in enumerate(self.position_structure['flex'][pos_code]['bases'])
                 }
+                for pos_code in self.position_structure['flex'].keys()
+            }
 
         elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
             x_diff_array   = diff_means + x_scores_batch_array

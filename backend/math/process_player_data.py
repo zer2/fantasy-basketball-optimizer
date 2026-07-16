@@ -13,6 +13,7 @@ The original src/ file is untouched.
 
 from __future__ import annotations
 
+import os
 import uuid
 
 import numpy as np
@@ -195,6 +196,15 @@ def games_played_adjustment(scores: pd.DataFrame
     return adjusted_scores
 
 
+# Fraction of the top of the draftable (top-n_players) G-score pool to EXCLUDE when building the
+# position means. The remaining (weaker) players better represent the replacement-tier talent that
+# actually fills flex/late slots; the star-dominated full pool over-states how much value a stacked
+# position delivers, which pushed the optimiser to over-commit to a single position. Default 0.25
+# trims the top quartile (a mild shrink that stays net-positive without over-flattening the tilts).
+# 0.0 recovers the prior full-pool behaviour; overridable via the POSITION_MEAN_POOL_TOP_TRIM env var.
+_POSITION_MEAN_POOL_TOP_TRIM = float(os.environ.get('POSITION_MEAN_POOL_TOP_TRIM', '0.25'))
+
+
 # ── public pipeline steps ──────────────────────────────────────────────────────
 
 def process_player_data(player_stats_v2: pd.DataFrame
@@ -270,25 +280,32 @@ def process_player_data(player_stats_v2: pd.DataFrame
     base_position_list = position_structure['base_list']
 
     players_and_positions = pd.merge(x_scores, positions, left_index=True, right_index=True)
-    players_and_positions_limited = players_and_positions.iloc[:n_players]
-    players_and_positions_limited = players_and_positions_limited.copy()
-    players_and_positions_limited[categories] = (
-        players_and_positions_limited[categories]
-        .sub(players_and_positions_limited[categories].mean(axis=0))
+
+    # Position means (the positional *tilt*) are built from the weaker slice of the draftable pool —
+    # the top _POSITION_MEAN_POOL_TOP_TRIM fraction is skipped, since the replacement-tier players that
+    # actually fill flex/late slots have milder tilts than the star-heavy full pool. This trim applies
+    # ONLY to the means: the covariance L below is estimated from the full pool, because it is a
+    # distributional property that a biased weak subsample would badly mis-estimate.
+    pool_start     = int(n_players * _POSITION_MEAN_POOL_TOP_TRIM)
+    means_pool     = players_and_positions.iloc[pool_start:n_players].copy()
+    means_pool[categories] = means_pool[categories].sub(means_pool[categories].mean(axis=0))
+    means_exploded = (
+        means_pool.explode('Position').reset_index().set_index(['Player', 'Position'])
     )
+    means_weights  = 1 / means_exploded.groupby('Player').transform('count')
+    position_means = (
+        means_exploded.mul(means_weights).groupby('Position').sum()
+        / means_weights.groupby('Position').sum()
+    )
+
+    # Covariance inputs use the full draftable pool (unbiased) — matching the untrimmed behaviour, so
+    # the trim never perturbs L.
+    full_pool = players_and_positions.iloc[:n_players].copy()
+    full_pool[categories] = full_pool[categories].sub(full_pool[categories].mean(axis=0))
     positions_exploded = (
-        players_and_positions_limited
-        .explode('Position')
-        .reset_index()
-        .set_index(['Player', 'Position'])
+        full_pool.explode('Position').reset_index().set_index(['Player', 'Position'])
     )
     position_mean_weights = 1 / positions_exploded.groupby('Player').transform('count')
-    position_means_weighted = positions_exploded.mul(position_mean_weights)
-
-    position_means = (
-        position_means_weighted.groupby('Position').sum()
-        / position_mean_weights.groupby('Position').sum()
-    )
     positions_exploded = positions_exploded.sub(positions_exploded.mean(axis=0))
     # Some historical seasons carry no position data — every player is 'NP'. There are then no
     # base-position rows to build means/covariances from (position_means.loc[base_position_list]

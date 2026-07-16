@@ -49,26 +49,26 @@ _FIRST_ROUND_PICKS = [
 _FIRST_ROUND_CONFIGS = [
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Karl-Anthony Towns',  50.5),
-            ('Brook Lopez',         50.1),
-            ('Jaren Jackson Jr.',   50.0),
-            ('Derrick White',       49.9),
+            ('Karl-Anthony Towns',  50.6),
+            ('Brook Lopez',         50.2),
+            ('Jaren Jackson Jr.',   50.1),
+            ('Derrick White',       50.0),
         ], None),
         id='EC-first-round',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  51.9),
-            ('Brook Lopez',         50.6),
-            ('Jaren Jackson Jr.',   50.4),
-            ('Myles Turner',        49.8),
+            ('Karl-Anthony Towns',  52.3),
+            ('Brook Lopez',         51.0),
+            ('Jaren Jackson Jr.',   51.0),
+            ('Myles Turner',        50.1),
         ], None),
         id='MC-first-round',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Karl-Anthony Towns',  10.8),
-            ('Ivica Zubac',         10.1),
+            ('Karl-Anthony Towns',  10.7),
+            ('Ivica Zubac',         10.2),
             ('Dyson Daniels',       10.0),
             ('Josh Hart',            9.7),
         ], None),
@@ -76,27 +76,27 @@ _FIRST_ROUND_CONFIGS = [
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Karl-Anthony Towns',  51.8),
-            ('Cade Cunningham',     51.4),
-            ('Devin Booker',        51.3),
-            ('Jaren Jackson Jr.',   51.1),
+            ('Karl-Anthony Towns',  51.9),
+            ('Cade Cunningham',     51.5),
+            ('Devin Booker',        51.4),
+            ('Jaren Jackson Jr.',   51.4),
         ], _NO_TO_CATEGORIES),
         id='EC-first-round-noTO',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  54.6),
-            ('Cade Cunningham',     53.9),
-            ('Devin Booker',        53.5),
-            ('Jaren Jackson Jr.',   53.4),
+            ('Karl-Anthony Towns',  54.9),
+            ('Cade Cunningham',     54.1),
+            ('Devin Booker',        54.1),
+            ('Jaren Jackson Jr.',   54.2),
         ], _NO_TO_CATEGORIES),
         id='MC-first-round-noTO',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Karl-Anthony Towns',  10.6),
-            ('Ivica Zubac',         10.1),
-            ('Cade Cunningham',     10.0),
+            ('Karl-Anthony Towns',  10.5),
+            ('Ivica Zubac',         10.2),
+            ('Cade Cunningham',     10.1),
             ('Dyson Daniels',        9.9),
         ], _NO_TO_CATEGORIES),
         id='Roto-first-round-noTO',
@@ -108,64 +108,64 @@ _FIRST_ROUND_CONFIGS = [
 _FORMAT_CONFIGS = [
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Shai Gilgeous-Alexander',  62.0),
-            ('Nikola Jokic',             60.4),
-            ('Tyrese Haliburton',        53.5),
-            ('Giannis Antetokounmpo',    53.1),
+            ('Shai Gilgeous-Alexander',  63.3),
+            ('Nikola Jokic',             60.8),
+            ('Tyrese Haliburton',        54.0),
+            ('Giannis Antetokounmpo',    54.8),
         ], None),
         id='MC',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Shai Gilgeous-Alexander',  54.4),
-            ('Nikola Jokic',             53.8),
-            ('Tyrese Haliburton',        51.2),
-            ('Karl-Anthony Towns',       51.0),
+            ('Shai Gilgeous-Alexander',  54.8),
+            ('Nikola Jokic',             54.0),
+            ('Tyrese Haliburton',        51.4),
+            ('Karl-Anthony Towns',       50.9),
         ], None),
         id='EC',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Shai Gilgeous-Alexander',  15.1),
+            ('Shai Gilgeous-Alexander',  15.0),
             ('Nikola Jokic',             14.5),
-            ('James Harden',              10.8),
-            ('Tyrese Haliburton',         10.0),
+            ('James Harden',              11.0),
+            ('Tyrese Haliburton',         10.9),
         ], None),
         id='Roto',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Shai Gilgeous-Alexander',  60.5),
-            ('Nikola Jokic',             60.5),
-            ('James Harden',             54.6),
-            ('Giannis Antetokounmpo',    54.0),
+            ('Shai Gilgeous-Alexander',  60.6),
+            ('Nikola Jokic',             60.0),
+            ('James Harden',             55.1),
+            ('Giannis Antetokounmpo',    54.9),
         ], _NO_TO_CATEGORIES),
         id='MC-noTO',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
             ('Nikola Jokic',             54.5),
-            ('Shai Gilgeous-Alexander',  54.4),
-            ('James Harden',             51.8),
-            ('Giannis Antetokounmpo',    51.3),
+            ('Shai Gilgeous-Alexander',  54.5),
+            ('James Harden',             52.0),
+            ('Giannis Antetokounmpo',    51.5),
         ], _NO_TO_CATEGORIES),
         id='EC-noTO',
     ),
     pytest.param(
         ('Rotisserie', [
             ('Shai Gilgeous-Alexander',  14.0),
-            ('Nikola Jokic',             12.7),
-            ('James Harden',              9.9),
+            ('Nikola Jokic',             13.1),
+            ('James Harden',              10.1),
             ('Tyrese Haliburton',         9.6),
         ], _NO_TO_CATEGORIES),
         id='Roto-noTO',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Nikola Jokic',                  63.4),
-            ('Shai Gilgeous-Alexander',        58.1),
-            ('Karl-Anthony Towns',             55.2),
-            ('Giannis Antetokounmpo',          54.4),
+            ('Nikola Jokic',                  64.0),
+            ('Shai Gilgeous-Alexander',        58.4),
+            ('Karl-Anthony Towns',             55.9),
+            ('Giannis Antetokounmpo',          54.9),
         ], _ALL_CATEGORIES),
         id='MC-all-cats',
     ),
@@ -396,10 +396,10 @@ def test_evaluate_two_category_roto():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Tyler Herro',    5.2),
-        ('Jordan Poole',   5.2),
-        ('Dillon Brooks',  4.8),
-        ('Klay Thompson',  4.8),
+        ('Tyler Herro',    5.6),
+        ('Jordan Poole',   5.8),
+        ('Dillon Brooks',  4.5),
+        ('Klay Thompson',  3.8),
     ]
     candidates_by_name = {c.name: c for c in candidates}
     for expected_name, expected_score in expected_top_scores:
@@ -442,9 +442,9 @@ def test_evaluate_twenty_five_drafters():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Shai Gilgeous-Alexander',  55.0),
+        ('Shai Gilgeous-Alexander',  55.1),
         ('Nikola Jokic',             54.8),
-        ('James Harden',             51.9),
+        ('James Harden',             51.8),
         ('Giannis Antetokounmpo',    51.6),
     ]
     candidates_by_name = {c.name: c for c in candidates}
@@ -488,10 +488,10 @@ def test_evaluate_three_drafters():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Shai Gilgeous-Alexander',  52.8),
-        ('Nikola Jokic',             51.9),
-        ('Karl-Anthony Towns',       50.1),
-        ('Stephen Curry',            50.0),
+        ('Shai Gilgeous-Alexander',  53.1),
+        ('Nikola Jokic',             52.0),
+        ('Karl-Anthony Towns',       50.6),
+        ('Stephen Curry',            50.5),
     ]
     candidates_by_name = {c.name: c for c in candidates}
     for expected_name, expected_score in expected_top_scores:
