@@ -13,6 +13,7 @@ The original src/ file is untouched.
 
 from __future__ import annotations
 
+import os
 import uuid
 
 import numpy as np
@@ -195,6 +196,15 @@ def games_played_adjustment(scores: pd.DataFrame
     return adjusted_scores
 
 
+# Fraction of the top of the draftable (top-n_players) G-score pool to EXCLUDE when building the
+# position means. The remaining (weaker) players better represent the replacement-tier talent that
+# actually fills flex/late slots; the star-dominated full pool over-states how much value a stacked
+# position delivers, which pushed the optimiser to over-commit to a single position. Default 0.25
+# trims the top quartile (a mild shrink that stays net-positive without over-flattening the tilts).
+# 0.0 recovers the prior full-pool behaviour; overridable via the POSITION_MEAN_POOL_TOP_TRIM env var.
+_POSITION_MEAN_POOL_TOP_TRIM = float(os.environ.get('POSITION_MEAN_POOL_TOP_TRIM', '0.25'))
+
+
 # ── public pipeline steps ──────────────────────────────────────────────────────
 
 def process_player_data(player_stats_v2: pd.DataFrame
@@ -270,7 +280,9 @@ def process_player_data(player_stats_v2: pd.DataFrame
     base_position_list = position_structure['base_list']
 
     players_and_positions = pd.merge(x_scores, positions, left_index=True, right_index=True)
-    players_and_positions_limited = players_and_positions.iloc[:n_players]
+    # Skip the top _POSITION_MEAN_POOL_TOP_TRIM fraction of the draftable pool (see the constant's note).
+    pool_start = int(n_players * _POSITION_MEAN_POOL_TOP_TRIM)
+    players_and_positions_limited = players_and_positions.iloc[pool_start:n_players]
     players_and_positions_limited = players_and_positions_limited.copy()
     players_and_positions_limited[categories] = (
         players_and_positions_limited[categories]
