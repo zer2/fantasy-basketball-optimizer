@@ -361,6 +361,14 @@ def _build_candidates(
         , future_diff_matrix
         , original_v
     )
+    # How many of each flex type's slots are still open for future picks, per candidate. The shares
+    # describe how those *remaining* slots would be filled, so the display multiplies by this — not by
+    # the full slot count — otherwise the table sums to the league total even when the drafter has
+    # already filled flex spots with real players. Read straight from the roster slot assignments.
+    remaining_flex_by_rank = (
+        {} if no_position_data
+        else _remaining_flex_slots(rosters_rows, len(my_players), slot_counts, position_structure)
+    )
     flex_allocations_by_rank = (
         None if no_position_data
         else _build_flex_allocations(
@@ -369,6 +377,7 @@ def _build_candidates(
             , position_structure
             , position_shares_arrays
             , slot_counts
+            , remaining_flex_by_rank
         )
     )
     roster_by_rank = (
@@ -545,12 +554,53 @@ def _build_g_score_rows(
 
 # ── Flex allocations ──────────────────────────────────────────────────────────
 
+def _remaining_flex_slots(
+    rosters_rows: np.ndarray
+    , n_team_so_far: int
+    , slot_counts: dict
+    , position_structure: dict
+) -> dict[str, np.ndarray]:
+    """Per-candidate count of each flex type's slots still open for future picks.
+
+    A flex slot is "taken" when the roster solve seats a current player or the candidate in it — those
+    occupy the first n_team_so_far + 1 columns of each candidate's slot-assignment row. The remaining
+    slots of that flex type are what the position shares describe filling, so the flex-allocation
+    display scales the shares by this count rather than the full league slot count.
+
+    Args:
+        rosters_rows:       Slot-index matrix, shape (n_candidates, n_columns); rosters_rows[rank, j]
+                            is the slot index assigned to player j in order [team_so_far..., candidate, future...].
+        n_team_so_far:      Number of players already on the drafter's team.
+        slot_counts:        Dict mapping position code → number of roster slots.
+        position_structure: Dict with 'base_list' and 'flex_list'.
+
+    Returns:
+        Dict flex type → per-candidate array (length n_candidates) of remaining open slots.
+    """
+    flex_types     = position_structure['flex_list']
+    position_order = position_structure['base_list'] + flex_types
+    # Slot index → position code, in the same canonical order _make_slot_names uses.
+    slot_type_by_index = [
+        position_code
+        for position_code in position_order
+        for _ in range(slot_counts.get(position_code, 0))
+    ]
+    filled = rosters_rows[:, :n_team_so_far + 1].astype(int)   # slots taken by current players + candidate
+    remaining: dict[str, np.ndarray] = {}
+    for flex_type in flex_types:
+        type_slot_indices = {i for i, code in enumerate(slot_type_by_index) if code == flex_type}
+        taken = np.array([sum(1 for slot in row if slot in type_slot_indices) for row in filled])
+        remaining[flex_type] = np.maximum(slot_counts.get(flex_type, 0) - taken, 0)
+    return remaining
+
+
 def _build_flex_allocations(
     n_players: int
     , base_list: list[str]
     , position_structure: dict
     , position_shares_arrays: dict
     , slot_counts: dict
+    , remaining_flex_by_rank: dict[str, np.ndarray]
 ) -> list[FlexAllocations]:
     """Build the flex-slot usage table for every candidate at once.
 
@@ -600,6 +650,10 @@ def _build_flex_allocations(
         label                = f"{flex_type}-{n_flex_slots}"
         eligible_bases       = flex_position_details[flex_type]['bases']
         share_array_and_cols = position_shares_arrays.get(flex_type)
+        # Per-candidate count of this flex type's still-open slots (falls back to the full count).
+        remaining_counts     = remaining_flex_by_rank.get(flex_type)
+        if remaining_counts is None:
+            remaining_counts = np.full(n_players, n_flex_slots)
 
         if share_array_and_cols is None:
             # No share data for this flex type; every column is ineligible for all ranks.
@@ -611,8 +665,8 @@ def _build_flex_allocations(
         usage = np.full((n_players, n_bases), np.nan)
         for base_pos in base_list:
             if base_pos in eligible_bases:
-                # Convert share fraction to expected slot usage across all flex slots.
-                usage[:, base_column_index[base_pos]] = share_array[:, base_to_col[base_pos]] * n_flex_slots
+                # Convert share fraction to expected usage across this candidate's *remaining* flex slots.
+                usage[:, base_column_index[base_pos]] = share_array[:, base_to_col[base_pos]] * remaining_counts
 
         totals_matrix += np.nan_to_num(usage)   # NaN (ineligible) contributes nothing
         # Round once, then swap NaN → None so ineligible columns serialise as null.
