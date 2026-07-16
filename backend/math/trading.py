@@ -159,11 +159,15 @@ def _build_trade_context(
         """Construct the (1, n_categories, n_drafters-1) diff_means array for drafter."""
         drafter_roster = [p for p in player_assignments[drafter] if p == p]
         n_my           = len(drafter_roster)
-        extra_needed   = (n_my + 1) * n_drafters - len(players_chosen)
+        # Compare complete teams at their actual size (n_my), not n_my + 1. A k-for-k trade adds no
+        # player, so padding opponents up to n_my + 1 would seat a phantom below-replacement player on
+        # each of them and inflate the H-score — the same phantom-+1 bug fixed in get_diff_distributions.
+        # mean_extra stays as the shortfall model (pads a short-handed opponent), a no-op when full.
+        extra_needed   = n_my * n_drafters - len(players_chosen)
         mean_extra     = np.array(x_scores_available.iloc[:extra_needed].mean().fillna(0))
 
         other_sums = np.vstack([
-            (team_sums[team] + max(n_my + 1 - len(player_assignments[team]), 0) * mean_extra)
+            (team_sums[team] + max(n_my - len(player_assignments[team]), 0) * mean_extra)
             .reshape(1, H.n_categories, 1)
             for team in team_names if team != drafter
         ]).T  # (1, n_categories, n_drafters-1)
