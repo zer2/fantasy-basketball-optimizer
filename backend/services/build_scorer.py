@@ -16,10 +16,10 @@ from __future__ import annotations
 import io
 import time
 import threading
-import yaml
 import pandas as pd
 from pathlib import Path
 
+from backend.parameters import load_all_params
 from backend.state.session import Session
 from backend.state.scorer import Scorer
 
@@ -54,19 +54,11 @@ def clear_v0_cache() -> None:
         _v0_cache.clear()
 
 
-# Parameters file path (relative to the project root)
-_PARAMS_PATH = 'parameters.yaml'
-
 # ── helpers ───────────────────────────────────────────────────────────────────
-
-def _load_params() -> dict:
-    with open(_PARAMS_PATH, 'r') as f:
-        return yaml.safe_load(f)
-
 
 def _sport_params(session: Session) -> tuple[dict, dict, str]:
     """Return (all_params, sport_params, sport) for the current session."""
-    all_params = _load_params()
+    all_params = load_all_params()
     sport = session.current_params['sport']
     return all_params, all_params[sport], sport
 
