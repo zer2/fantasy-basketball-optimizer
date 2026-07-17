@@ -20,10 +20,11 @@ import yaml
 import pandas as pd
 from pathlib import Path
 
-from backend.session import Session
+from backend.state.session import Session
 
 
-_MEAN_OF_VARIANCES_PATH = Path(__file__).parents[1] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
+# pipeline.py is backend/services/pipeline.py, so the project root is parents[2].
+_MEAN_OF_VARIANCES_PATH = Path(__file__).parents[2] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
 
 
 def _load_mean_of_variances(sport: str) -> pd.Series:

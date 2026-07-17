@@ -1,114 +1,24 @@
 """
 Backend data retrieval from Snowflake.
 
+Domain data-access layer: player mapping, historical stats, projections, and
+seasons — all the fantasy-basketball-specific reads. The generic Snowflake
+connection + query caching lives in backend.snowflake_connection.
+
 Equivalent to src/data_retrieval/get_data.py but:
 - No Streamlit dependencies
 - Explicit `params: dict` instead of get_params()
 - Player names always mapped to the canonical 'Player' column
-- TTL cache via module-level dict (replacing @st.cache_data(ttl='1d'))
-- Snowflake connection managed with a simple TTL (replacing @st.cache_resource)
 """
 
 from __future__ import annotations
 
-import os
-import time
-import threading
-import tomllib
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-import snowflake.connector
 
-
-# ── Snowflake connection ───────────────────────────────────────────────────────
-
-_con: Optional[snowflake.connector.SnowflakeConnection] = None
-_con_expires_at: float = 0.0
-_con_lock = threading.Lock()
-_CON_TTL = 3600  # 1 hour
-
-
-_SECRETS_TOML = Path(__file__).parent.parent / '.streamlit' / 'secrets.toml'
-_SNOWFLAKE_KEYS = ('SNOWFLAKE_ACCOUNT', 'SNOWFLAKE_USER', 'SNOWFLAKE_PASSWORD',
-                   'SNOWFLAKE_DATABASE', 'SNOWFLAKE_SCHEMA')
-
-
-def _snowflake_creds() -> dict[str, str | None]:
-    """Read Snowflake credentials from env vars, falling back to .streamlit/secrets.toml."""
-    creds: dict[str, str | None] = {k: os.getenv(k) for k in _SNOWFLAKE_KEYS}
-    if not all(creds.values()) and _SECRETS_TOML.exists():
-        with open(_SECRETS_TOML, 'rb') as f:
-            secrets = tomllib.load(f)
-        for k in _SNOWFLAKE_KEYS:
-            if not creds[k]:
-                creds[k] = secrets.get(k)
-    return creds
-
-
-def _get_connection() -> snowflake.connector.SnowflakeConnection:
-    global _con, _con_expires_at
-    with _con_lock:
-        if _con is None or time.time() > _con_expires_at:
-            creds = _snowflake_creds()
-            _con = snowflake.connector.connect(
-                account  = creds['SNOWFLAKE_ACCOUNT'],
-                user     = creds['SNOWFLAKE_USER'],
-                password = creds['SNOWFLAKE_PASSWORD'],
-                database = creds['SNOWFLAKE_DATABASE'],
-                schema   = creds['SNOWFLAKE_SCHEMA'],
-            )
-            _con_expires_at = time.time() + _CON_TTL
-        return _con
-
-
-# ── Query cache ───────────────────────────────────────────────────────────────
-
-_cache: dict[str, tuple[float, pd.DataFrame]] = {}
-_cache_lock = threading.Lock()
-_CACHE_TTL = 24 * 3600  # 24 hours
-
-# If set, Parquet files are read/written here before falling back to Snowflake.
-# In production this is the GCS bucket mount path (e.g. /cache).
-_DISK_CACHE_DIR: Path | None = (
-    Path(os.environ['DISK_CACHE_DIR']) if 'DISK_CACHE_DIR' in os.environ else None
-)
-
-
-def _disk_cache_path(view_name: str) -> Path | None:
-    if _DISK_CACHE_DIR is None:
-        return None
-    return _DISK_CACHE_DIR / f'{view_name}.parquet'
-
-
-def _query(view_name: str) -> pd.DataFrame:
-    """Fetch a view from Snowflake with a 24-hour in-memory and disk cache."""
-    with _cache_lock:
-        entry = _cache.get(view_name)
-        if entry is not None and time.time() - entry[0] < _CACHE_TTL:
-            return entry[1].copy()
-
-    disk_path = _disk_cache_path(view_name)
-    if disk_path is not None and disk_path.exists():
-        age = time.time() - disk_path.stat().st_mtime
-        if age < _CACHE_TTL:
-            df = pd.read_parquet(disk_path)
-            with _cache_lock:
-                _cache[view_name] = (time.time() - age, df)
-            return df.copy()
-
-    df = _get_connection().cursor().execute(f'SELECT * FROM {view_name}').fetch_pandas_all()
-
-    if disk_path is not None:
-        disk_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(disk_path, index=False)
-
-    with _cache_lock:
-        _cache[view_name] = (time.time(), df)
-
-    return df.copy()
+from backend.infra.snowflake_connection import query, run_query, view_cache_timestamp
 
 
 # ── Player name mapping ───────────────────────────────────────────────────────
@@ -120,7 +30,7 @@ def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
     what's currently in df['Player']. The canonical name column in that table
     is 'MASTER_PLAYER_NAME' (not 'Player').
     """
-    unified_player_table = _query('UNIFIED_PLAYER_TABLE')
+    unified_player_table = query('UNIFIED_PLAYER_TABLE')
     mapper = (
         unified_player_table.dropna(subset=[source_col])
         .set_index(source_col)['MASTER_PLAYER_NAME']
@@ -135,7 +45,7 @@ def get_unified_player_table() -> pd.DataFrame:
     include the canonical MASTER_PLAYER_NAME plus each bridge id/name (NBA_PLAYER_ID,
     YAHOO_PLAYER_ID, FANTRAX_ID, ESPN_NAME, DARKO_NAME, ...). Used by platform
     integrations to map roster ids/names to canonical."""
-    return _query('UNIFIED_PLAYER_TABLE')
+    return query('UNIFIED_PLAYER_TABLE')
 
 
 # ── Weekly box scores ─────────────────────────────────────────────────────────
@@ -149,9 +59,7 @@ def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:
     row per player per week — the format expected by
     calculate_coefficients_historical.
     """
-    df = _get_connection().cursor().execute(
-        f"SELECT * FROM WEEKLY_NUMBERS_VIEW WHERE SEASON = '{season}'"
-    ).fetch_pandas_all()
+    df = run_query(f"SELECT * FROM WEEKLY_NUMBERS_VIEW WHERE SEASON = '{season}'")
     df = df.rename(columns=params['stat-df-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
     df = df.set_index(['Player', 'WEEK']).sort_index()
@@ -160,11 +68,13 @@ def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:
 
 # ── Available seasons ─────────────────────────────────────────────────────────
 
-# (view_cache_timestamp, seasons). The timestamp is the _cache entry's load time
-# for HISTORICAL_SEASONAL_AVERAGES_VIEW — when that entry is refreshed the
+# (view_load_time, seasons). The timestamp is the load time of the cached
+# HISTORICAL_SEASONAL_AVERAGES_VIEW entry — when that entry is refreshed the
 # timestamp changes and we re-derive. This keeps the two in lockstep without
 # re-iterating the DataFrame on every call.
 _seasons_cache: tuple[float, list[str]] | None = None
+
+_HISTORICAL_VIEW = 'HISTORICAL_SEASONAL_AVERAGES_VIEW'
 
 
 def get_available_seasons() -> list[str]:
@@ -175,17 +85,13 @@ def get_available_seasons() -> list[str]:
     cannot drift apart. Re-derived only when the view cache is refreshed.
     """
     global _seasons_cache
-    with _cache_lock:
-        view_entry = _cache.get('HISTORICAL_SEASONAL_AVERAGES_VIEW')
-        view_fresh = view_entry is not None and time.time() - view_entry[0] < _CACHE_TTL
-
-    if view_fresh and _seasons_cache is not None and _seasons_cache[0] == view_entry[0]:
+    load_time = view_cache_timestamp(_HISTORICAL_VIEW)
+    if load_time is not None and _seasons_cache is not None and _seasons_cache[0] == load_time:
         return _seasons_cache[1]
 
-    df = _query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
-    with _cache_lock:
-        view_timestamp = _cache['HISTORICAL_SEASONAL_AVERAGES_VIEW'][0]
-    _seasons_cache = (view_timestamp, sorted({str(s) for s in df['SEASON'].tolist()}, reverse=True))
+    df = query(_HISTORICAL_VIEW)
+    load_time = view_cache_timestamp(_HISTORICAL_VIEW)
+    _seasons_cache = (load_time, sorted({str(s) for s in df['SEASON'].tolist()}, reverse=True))
     return _seasons_cache[1]
 
 
@@ -196,7 +102,7 @@ def get_historical_data(params: dict) -> pd.DataFrame:
 
     Returns a DataFrame indexed by (Season, Player).
     """
-    df = _query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
+    df = query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
     df = df.rename(columns=params['stat-df-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
 
@@ -226,7 +132,7 @@ def get_specified_historical_stats(season: str, params: dict) -> pd.DataFrame:
 def get_espn_projections(params: dict) -> pd.DataFrame:
     """Fetch ESPN projections from Snowflake."""
     n_games = params['n_games']
-    df = _query('ESPN_PROJECTION_VIEW')
+    df = query('ESPN_PROJECTION_VIEW')
     df = df.rename(columns=params['espn-renamer'])
     df = _map_player_names(df, 'ESPN_NAME')
     df['Games Played %'] = df['Games Played'] / n_games
@@ -237,14 +143,14 @@ def get_darko_data(params: dict) -> pd.DataFrame:
     """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game."""
     n_games = params['n_games']
 
-    df = _query('DARKO_VIEW')
+    df = query('DARKO_VIEW')
     df = df.rename(columns=params['darko-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
     df = _map_player_names(df, 'DARKO_NAME')
     df = df.set_index('Player').sort_index().fillna(0)
 
     # Fetch position / minutes / games from ESPN table
-    extra = _query('ESPN_PROJECTION_TABLE')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
+    extra = query('ESPN_PROJECTION_TABLE')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
     extra.columns = ['Player', 'Minutes', 'Games Played %', 'Position']
     extra['Games Played %'] = extra['Games Played %'].astype(float) / n_games
     extra = _map_player_names(extra, 'ESPN_NAME').set_index('Player')

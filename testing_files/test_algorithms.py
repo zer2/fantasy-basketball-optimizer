@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from scipy.stats import norm
 
 from backend.main import app
-from backend.session import get_session
+from backend.state.session import get_session
 from backend.math.algorithm_agents import HAgent
 from backend.math.algorithm_helpers import (
     combinatorial_calculation

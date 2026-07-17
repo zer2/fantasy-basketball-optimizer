@@ -12,8 +12,8 @@ from benchmark_helpers import (
     , _SCORE_TOL
     , _build_session_request
 )
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.evaluate import run_evaluate
 
 # 2024-25 snapshot of an H-score snake draft used by the assertions below.
 # (The frontend default — default_season_rosters.ts — tracks current-season data

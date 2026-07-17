@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from backend.session import Session
+from backend.state.session import Session
 from backend.models import (
     TeamHScore, TeamTradeResult, TradeAnalyzeResponse,
     TradeSuggestion, TradeSuggestResponse, ComboParam,
@@ -123,7 +123,7 @@ def run_trade_analyze(
 # ── Fast trade evaluation ────────────────────────────────────────────────────
 
 def _build_trade_context(
-    session: Session
+    H: object
     , player_assignments: dict[str, list[str]]
     , my_team: str
     , their_team: str
@@ -137,7 +137,6 @@ def _build_trade_context(
       - Baseline diff_means change only in the single column corresponding to the
         counterparty team — the delta is pure arithmetic per combo
     """
-    H          = session.H
     team_names = list(player_assignments.keys())
     n_drafters = len(player_assignments)
 
@@ -226,80 +225,6 @@ def _build_trade_context(
     }
 
 
-# ── Trade value estimation ───────────────────────────────────────────────────
-
-def _analyze_trade_value(
-    H: object
-    , player: str
-    , team: str
-    , player_assignments: dict[str, list[str]]
-    , n_iterations: int
-) -> float:
-    """Estimate how valuable a player is to a particular team.
-
-    Compares H-score with vs. without the player.
-    """
-    without_player = player_assignments.copy()
-    without_player[team] = [p for p in without_player[team] if p != player]
-
-    with_player = player_assignments.copy()
-    if player not in with_player[team]:
-        with_player[team] = with_player[team] + [player]
-
-    res_without = H.get_h_scores(without_player, team, n_iterations, exclusion_list=[player])
-    res_with    = H.get_h_scores(with_player, team, n_iterations)
-
-    return float(res_with['Scores'].max() - res_without['Scores'].max())
-
-
-def _identify_trade_candidates(
-    H: object
-    , my_team: str
-    , their_team: str
-    , player_assignments: dict[str, list[str]]
-    , n_iterations: int
-) -> tuple[list[str], list[str]]:
-    """Filter each roster to players relatively more valuable to the other team.
-
-    Returns the bottom half by own-team value differential — roughly the players
-    each side would be most willing to trade — as (my_candidates, their_candidates).
-    """
-    my_players    = player_assignments[my_team]
-    their_players = player_assignments[their_team]
-
-    my_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team,    player_assignments, n_iterations) for p in my_players],
-        index=my_players,
-    )
-    my_values_to_me -= my_values_to_me.mean()
-
-    their_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team,    player_assignments, n_iterations) for p in their_players],
-        index=their_players,
-    )
-    their_values_to_me -= their_values_to_me.mean()
-
-    my_values_to_them = pd.Series(
-        [_analyze_trade_value(H, p, their_team, player_assignments, n_iterations) for p in my_players],
-        index=my_players,
-    )
-    my_values_to_them -= my_values_to_them.mean()
-
-    their_values_to_them = pd.Series(
-        [_analyze_trade_value(H, p, their_team, player_assignments, n_iterations) for p in their_players],
-        index=their_players,
-    )
-    their_values_to_them -= their_values_to_them.mean()
-
-    my_differences    = my_values_to_me    - my_values_to_them
-    their_differences = their_values_to_them - their_values_to_me
-
-    my_candidates    = [p for p in my_players    if my_differences[p]    < 0]
-    their_candidates = [p for p in their_players if their_differences[p] < 0]
-
-    return my_candidates, their_candidates
-
-
 # ── Combination generation ───────────────────────────────────────────────────
 
 def _get_combos(
@@ -352,7 +277,7 @@ def _get_cross_combos(
 
 
 def _make_combo_df(
-    session: Session
+    H: object
     , all_combos: pd.DataFrame
     , my_team: str
     , their_team: str
@@ -369,8 +294,7 @@ def _make_combo_df(
     the counterparty column (their roster also weakened). Both perspectives are
     computed in a single batched call to compute_h_scores_batched.
     """
-    H   = session.H
-    ctx = _build_trade_context(session, player_assignments, my_team, their_team)
+    ctx = _build_trade_context(H, player_assignments, my_team, their_team)
 
     n_combos = len(all_combos)
     if n_combos == 0:
@@ -490,7 +414,7 @@ def run_trade_suggest(
 
     # Step 3: evaluate all combos vectorized
     df = _make_combo_df(
-        session
+        session.H
         , all_combos
         , my_team
         , their_team

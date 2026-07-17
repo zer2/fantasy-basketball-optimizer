@@ -18,8 +18,8 @@ sys.path.insert(0, str(_HERE.parent))   # repo root, so `backend` and `testing_f
 sys.path.insert(0, str(_HERE))          # so `benchmark_helpers` resolves as a top-level module
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.evaluate import run_evaluate
 
 SEASON      = '2025-26'
 N_DRAFTERS  = 12

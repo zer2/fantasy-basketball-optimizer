@@ -32,8 +32,8 @@ sys.path.insert(0, str(_HERE.parent.parent))   # repo root -> `backend`
 sys.path.insert(0, str(_HERE.parent))           # testing_files -> `benchmark_helpers`
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.evaluate import run_evaluate
 from backend.data_retrieval import get_available_seasons
 from backend.math.position_optimization import check_single_player_eligibility
 

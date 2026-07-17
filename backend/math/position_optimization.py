@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
-from backend.session import PositionConfig
+from backend.math.position_config import PositionConfig
 
 
 # ── internal helpers ──────────────────────────────────────────────────────────

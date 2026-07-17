@@ -10,14 +10,22 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
-from backend.session import Session
+from backend.state.session import Session
 from backend.models import (
     Candidate, GScoreRow, FlexAllocations, FlexRow,
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
-from backend.helper_functions import extract_last_name
-from backend.server_timing import record_phase
+from backend.infra.server_timing import record_phase
+
+
+def extract_last_name(player_full_name: str) -> str:
+    """Return the player's last name, stripping any trailing position suffix.
+
+    For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
+    "Nikola Jokic" → "Jokic".
+    """
+    return ' '.join(player_full_name.split(' (')[0].split(' ')[1:])
 
 
 # ── Public entry point ────────────────────────────────────────────────────────

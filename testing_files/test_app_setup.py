@@ -11,7 +11,7 @@ import yaml
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.session import get_session
+from backend.state.session import get_session
 
 client = TestClient(app)
 

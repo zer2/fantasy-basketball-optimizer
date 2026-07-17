@@ -19,10 +19,17 @@ import uuid
 import numpy as np
 import pandas as pd
 
-from backend.helper_functions import get_counting_stats, get_ratio_stats
-
-
 # ── public helpers ─────────────────────────────────────────────────────────────
+
+def get_counting_stats(params: dict, categories: list[str]) -> list[str]:
+    """Return counting statistics from params that are in the active categories."""
+    return [c for c in params['counting-statistics'] if c in categories]
+
+
+def get_ratio_stats(params: dict, categories: list[str]) -> list[str]:
+    """Return ratio statistics from params that are in the active categories."""
+    return [c for c in params['ratio-statistics'] if c in categories]
+
 
 def get_category_level_rv(rv: float
                           , v: pd.Series

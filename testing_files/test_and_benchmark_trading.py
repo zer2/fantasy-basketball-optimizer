@@ -26,8 +26,8 @@ from benchmark_helpers import (
     , _SEASON
     , _build_session_request
 )
-from backend.session import get_session
-from backend.math.trading import run_trade_suggest
+from backend.state.session import get_session
+from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
 
 # 2024-25 snapshot of an H-score snake draft used by the trading benchmarks below.

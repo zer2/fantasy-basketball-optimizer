@@ -6,8 +6,8 @@
 # Higher, deliberately looser tolerances; the point is "close enough", not "identical".
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.evaluate import run_evaluate
 
 _HSCORE_TOL = 0.05   # h-score percentage points (same bar as the regular tests)
 _DOLLAR_TOL = 0.25   # auction dollar values are estimates — a looser, cents-level bar

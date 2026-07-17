@@ -64,7 +64,7 @@ from backend.math.position_optimization import (
     check_single_player_eligibility,
     check_all_player_eligibility,
 )
-from backend.session import PositionConfig, build_position_config
+from backend.math.position_config import PositionConfig, build_position_config
 
 
 class HAgent:

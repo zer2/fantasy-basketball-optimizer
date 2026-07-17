@@ -25,7 +25,7 @@ from typing import Optional
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, Request
 
-from backend.secret_config import get_secret
+from backend.infra.secret_config import get_secret
 
 _GOOGLE_METADATA_URL = 'https://accounts.google.com/.well-known/openid-configuration'
 

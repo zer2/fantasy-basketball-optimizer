@@ -8,10 +8,6 @@ Each Session holds:
   - v0_clean: immutable copy of raw player stats (before any transformations)
   - v1_clean: immutable copy after injured players dropped (before upsilon)
   - v2: DataFrame after upsilon adjustment (input to process_player_data)
-
-Also exports PositionConfig / build_position_config — pre-computed position
-structure derived from sport params + slot_counts, passed explicitly to backend
-math functions instead of reading from st.session_state.
 """
 
 import time
@@ -23,48 +19,6 @@ from typing import Optional
 import pandas as pd
 
 from backend.platform_integration.base import PlatformConfig
-
-
-# ── Position config ───────────────────────────────────────────────────────────
-
-@dataclass
-class PositionConfig:
-    position_structure: dict
-    position_numbers:   dict[str, int]
-    position_ranges:    dict[str, dict]
-    position_indices:   dict[str, list[int]]
-
-
-def build_position_config(params: dict, slot_counts: dict) -> PositionConfig:
-    """Build a PositionConfig from sport-level params and the session's slot_counts."""
-    position_structure = params['position_structure']
-    base_list  = position_structure['base_list']
-    flex_list  = position_structure['flex_list']
-    all_positions = base_list + flex_list
-
-    position_numbers = {pos: slot_counts.get(pos, 0) for pos in all_positions}
-
-    start = 0
-    position_ranges: dict[str, dict] = {}
-    for pos in all_positions:
-        end = start + position_numbers[pos]
-        position_ranges[pos] = {'start': start, 'end': end}
-        start = end
-
-    flex_info = position_structure['flex']
-    position_indices = {
-        pos: [i for i, val in enumerate(base_list) if val in flex_info[pos]['bases']]
-        for pos in flex_list
-    }
-
-    return PositionConfig(
-        position_structure = position_structure,
-        position_numbers   = position_numbers,
-        position_ranges    = position_ranges,
-        position_indices   = position_indices,
-    )
-
-SESSION_TTL = 4 * 3600  # seconds
 
 
 @dataclass
@@ -99,12 +53,20 @@ class Session:
     # live platform is connected.
     platform_name_lookup: Optional[dict[str, str]] = None
 
+# ── Store ────────────────────────────────────────────────────────────────────
+# Grouped here rather than above Session because the _store annotation below is
+# evaluated at import time, so Session must already be defined.
+
+SESSION_TTL = 4 * 3600  # seconds
 
 _store: dict[str, Session] = {}
 _lock = threading.Lock()
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
+# Public API is in CRUD order (create / get / delete); _evict_expired_sessions
+# leads because it belongs beside create_session, its only caller (same
+# workflow-over-visibility grouping the platform integrations use).
 
 def _evict_expired_sessions(now: float) -> None:
     """Remove every session past its TTL. Caller must hold _lock."""

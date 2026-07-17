@@ -19,8 +19,8 @@ import time
 import pytest
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.math.trading import run_trade_suggest
+from backend.state.session import get_session
+from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
 
 from test_and_benchmark_trading import _DEFAULT_SEASON_ROSTERS

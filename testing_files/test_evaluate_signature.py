@@ -26,8 +26,8 @@ import os
 import pytest
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.evaluate import run_evaluate
 
 # A fixed mid-draft board using players guaranteed present in the 2024-25 dataset (shared with the
 # draft benchmark fixtures). Team 1 is the evaluating team; its own picks are excluded as candidates.
@@ -46,11 +46,15 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True) on a warmed session,
 # keyed by (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
+# Regenerated 2026-07-17 after the NBA_PLAYER_TABLE dedup: pre-dedup, players with two name spellings
+# on one nba id produced duplicate seasonal-average rows, so the historical candidate roster carried
+# spurious duplicate-spelling entries; the dedup removed them. Serialization-only change — H-scores are
+# unchanged (guarded by the tolerance-based auction/draft/trading correctness goldens).
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '1d64ea31b3856f7f266f5f18d72b27c94f97f2c950e170faffb8187c1c38e1ac',
-    ('Head to Head: Each Category',  'mid'):   'b50fc4b9f717ebee418b4f4c2b8589b66731cca4665519039b16a62434759e02',
-    ('Head to Head: Most Categories','empty'): '03985ba0cce4f558d9533838869dfee4f52052c7e7801230e55e22c37a621253',
-    ('Head to Head: Most Categories','mid'):   '8ee0f03774684f687a2a78a058edec4b15c0f6adfe5e1193731944e115bb9717',
+    ('Head to Head: Each Category',  'empty'): '3d233126b4e79300fefe946fb86718075f4675ffbd9fae004228ee298efd1787',
+    ('Head to Head: Each Category',  'mid'):   'ff2e9a2359d6eeda1eadccd6f0c0bdadce52dba71c41340fa0bbf8e0d5db8d26',
+    ('Head to Head: Most Categories','empty'): '6e0d81afc5c4942609d1e55a4a5f116fd9b3ec1b5d9c504a99eebda0daf01427',
+    ('Head to Head: Most Categories','mid'):   '10f46b3cc7e9487bda109f052324a6192460e4cadcd48a503669c1a51683ca00',
 }
 
 
