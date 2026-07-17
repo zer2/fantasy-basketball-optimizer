@@ -61,8 +61,6 @@ from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
     get_player_rows,
-    check_single_player_eligibility,
-    check_all_player_eligibility,
 )
 from backend.math.position_config import PositionConfig, build_position_config
 

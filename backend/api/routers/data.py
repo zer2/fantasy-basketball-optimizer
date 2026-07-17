@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from backend.parameters import load_all_params
-from backend.services.build_scorer import _parse_projection_csv
+from backend.services.build_scorer import parse_projection_csv
 from backend.state.upload_store import store_upload, UPLOAD_TTL, MAX_FILE_BYTES
 from backend.api.schemas import UploadResponse
 from backend.api.util import iso_expires
@@ -34,7 +34,7 @@ async def upload_projection(
     all_params = load_all_params()
     params = all_params.get('NBA', {})
     try:
-        df = _parse_projection_csv(csv_bytes, ft, params)
+        df = parse_projection_csv(csv_bytes, ft, params)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f'Could not parse file: {exc}')
 

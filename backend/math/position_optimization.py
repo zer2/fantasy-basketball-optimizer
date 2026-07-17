@@ -9,7 +9,6 @@ The original src/ file is untouched.
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
 from backend.math.position_config import PositionConfig

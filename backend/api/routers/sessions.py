@@ -14,7 +14,7 @@ from backend.infra.auth import current_user_key_optional
 from backend.parameters import load_all_params
 from backend.state.session import get_session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_scorer import clear_v0_cache, _parse_projection_csv
+from backend.services.build_scorer import clear_v0_cache, parse_projection_csv
 from backend.state.upload_store import get_upload
 from backend.api.platform_helpers import resolve_platform_config
 from backend.api.schemas import (
@@ -113,7 +113,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[dict], params: dict) -> dict
         entry = get_upload(did)
         if entry is None:
             raise HTTPException(status_code=404, detail=f'data_id {did!r} not found or expired.')
-        result[file_type_key.upper()] = _parse_projection_csv(entry['bytes'], entry['file_type'], params)
+        result[file_type_key.upper()] = parse_projection_csv(entry['bytes'], entry['file_type'], params)
     return result
 
 

@@ -24,7 +24,7 @@ from backend.state.session import Session
 from backend.state.scorer import Scorer
 
 
-# pipeline.py is backend/services/pipeline.py, so the project root is parents[2].
+# build_scorer.py is backend/services/build_scorer.py, so the project root is parents[2].
 _MEAN_OF_VARIANCES_PATH = Path(__file__).parents[2] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
 
 
@@ -114,7 +114,7 @@ def run_step1(
                 return
 
     if source_type == 'csv':
-        v0 = _parse_projection_csv(csv_bytes, file_type, params)
+        v0 = parse_projection_csv(csv_bytes, file_type, params)
 
     elif source_type == 'historical':
         from backend.data_retrieval import get_specified_historical_stats
@@ -144,7 +144,7 @@ def run_step1(
     session.v0_clean = v0.copy()
 
 
-def _parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.DataFrame:
+def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.DataFrame:
     """Parse an uploaded CSV (HTB or BBM format) into the canonical column set."""
     df = pd.read_csv(io.BytesIO(csv_bytes))
 
