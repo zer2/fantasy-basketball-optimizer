@@ -25,7 +25,7 @@ from benchmark_helpers import (
     , _build_session_request
 )
 from backend.state.session import get_session
-from backend.services.evaluate import run_evaluate
+from backend.services.ranking import rank_candidates
 
 # Snake-draft first round: pick i goes to Team (i+1), in this order.
 _FIRST_ROUND_PICKS = [
@@ -213,7 +213,7 @@ def test_evaluate_empty_board(session_for_format):
     profiler = cProfile.Profile()
     start    = time.perf_counter()
     result   = profiler.runcall(
-        run_evaluate
+        rank_candidates
         , session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 1'
@@ -267,7 +267,7 @@ def test_evaluate_mid_draft(session_for_format):
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
     n_iterations = session.current_params['n_iterations']
-    g_scores     = session.info['G-scores']
+    g_scores     = session.scorer.info['G-scores']
 
     # Take the top 8 G-score players and split them across two teams.
     top_eight      = list(g_scores.sort_values('Total', ascending=False).head(8).index)
@@ -279,7 +279,7 @@ def test_evaluate_mid_draft(session_for_format):
     player_assignments['Team 2'] = team_two_picks
 
     start  = time.perf_counter()
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 1'
@@ -331,7 +331,7 @@ def test_evaluate_first_round(session_for_first_round):
     player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
 
     start  = time.perf_counter()
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 5'
@@ -379,7 +379,7 @@ def test_evaluate_two_category_roto():
 
     player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 12'
@@ -425,7 +425,7 @@ def test_evaluate_twenty_five_drafters():
     n_drafters   = session.current_params['n_drafters']
     n_iterations = session.current_params['n_iterations']
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
         , my_team_id         = 'Team 1'
@@ -471,7 +471,7 @@ def test_evaluate_three_drafters():
     n_drafters   = session.current_params['n_drafters']
     n_iterations = session.current_params['n_iterations']
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
         , my_team_id         = 'Team 1'

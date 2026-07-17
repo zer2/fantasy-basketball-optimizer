@@ -2,8 +2,7 @@
 In-memory session store for the FastAPI backend.
 
 Each Session holds:
-  - H: the HAgent (set after step 5)
-  - info: the info dict (set after step 4)
+  - scorer: the built Scorer (HAgent + info + baseline cache) — the pipeline's output
   - current_params: snapshot of all mutable parameters, used to diff PATCH bodies
   - v0_clean: immutable copy of raw player stats (before any transformations)
   - v1_clean: immutable copy after injured players dropped (before upsilon)
@@ -19,6 +18,7 @@ from typing import Optional
 import pandas as pd
 
 from backend.platform_integration.base import PlatformConfig
+from backend.state.scorer import Scorer
 
 
 @dataclass
@@ -30,26 +30,20 @@ class Session:
     # Snapshot of current parameters — used to diff PATCH requests
     current_params: dict = field(default_factory=dict)
 
-    # Pipeline intermediate DataFrames
+    # Pipeline intermediate DataFrames (kept for resumable PATCH re-runs from a step)
     v0_clean: Optional[pd.DataFrame] = None   # raw player stats
     v1_clean: Optional[pd.DataFrame] = None   # after drop_injured
     v2:       Optional[pd.DataFrame] = None   # after upsilon adjustment
 
-    # Pipeline outputs
-    info: Optional[dict]   = None   # process_player_data result
-    H:    Optional[object] = None   # HAgent instance
-
-    # Cached baseline H-scores from a run with no players taken.
-    # Used for gnrc_dollar / orig_dollar auction values.
-    # Invalidated whenever run_step5 rebuilds the HAgent.
-    generic_h_scores: Optional[object] = None  # pd.Series when populated
+    # The built scoring model (HAgent + info + baseline cache); None until the pipeline runs.
+    scorer: Optional[Scorer] = None
 
     # Live-platform connection (None for 'Enter your own data'). Set during session
     # creation when a live platform is selected; used by the draft-state poll.
     platform_config: Optional[PlatformConfig] = None
 
-    # {platform player name -> canonical 'Name (POS)'} lookup, rebuilt from info
-    # whenever the data changes (see _refresh_platform_name_lookup). None until a
+    # {platform player name -> canonical 'Name (POS)'} lookup, rebuilt from scorer.info
+    # whenever the data changes (see refresh_platform_name_lookup). None until a
     # live platform is connected.
     platform_name_lookup: Optional[dict[str, str]] = None
 

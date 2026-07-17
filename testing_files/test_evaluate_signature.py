@@ -27,7 +27,7 @@ import pytest
 
 from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
-from backend.services.evaluate import run_evaluate
+from backend.services.ranking import rank_candidates
 
 # A fixed mid-draft board using players guaranteed present in the 2024-25 dataset (shared with the
 # draft benchmark fixtures). Team 1 is the evaluating team; its own picks are excluded as candidates.
@@ -78,7 +78,7 @@ def warmed_session(request):
     n_drafters = session.current_params['n_drafters']
 
     empty_board = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    run_evaluate(session, empty_board, 'Team 1', [], None, 0, None)   # warm-up
+    rank_candidates(session, empty_board, 'Team 1', [], None, 0, None)   # warm-up
     return session, scoring_format, n_drafters
 
 
@@ -94,7 +94,7 @@ def test_evaluate_signature(warmed_session, board):
         assignments['Team 2'] = _TEAM_2
         exclusion_list        = _TEAM_1
 
-    result = run_evaluate(session, assignments, 'Team 1', exclusion_list, None, 0, None)
+    result = rank_candidates(session, assignments, 'Team 1', exclusion_list, None, 0, None)
     assert len(result.candidates) > 0, 'No candidates returned'
 
     digest = _signature(result)

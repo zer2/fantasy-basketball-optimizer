@@ -5,8 +5,8 @@ Steps:
   1. Load player_stats_v0 from CSV / Snowflake → session.v0_clean
   2. drop_injured_players → session.v1_clean
   3. make_upsilon_adjustment → session.v2
-  4. process_player_data → session.info
-  5. build HAgent → session.H
+  4. process_player_data → session.scorer.info
+  5. build HAgent → session.scorer.h_agent  (finalizes the Scorer)
 
 No session_context or _SessionState: each step reads/writes session fields directly.
 """
@@ -21,6 +21,7 @@ import pandas as pd
 from pathlib import Path
 
 from backend.state.session import Session
+from backend.state.scorer import Scorer
 
 
 # pipeline.py is backend/services/pipeline.py, so the project root is parents[2].
@@ -216,7 +217,7 @@ def run_step3(session: Session) -> None:
 # ── Step 4: process_player_data ───────────────────────────────────────────────
 
 def run_step4(session: Session) -> None:
-    """Build the info dict (G-scores, X-scores, covariance, etc.)."""
+    """Build the info dict (G-scores, X-scores, covariance, etc.) onto the session's Scorer."""
     from backend.math.process_player_data import process_player_data
 
     _, params, sport = _sport_params(session)
@@ -245,13 +246,18 @@ def run_step4(session: Session) -> None:
         categories        = categories,
         sport             = sport,
     )
-    session.info = info
+    # step 5 (re)builds the agent from this info; on a from_step==5 patch info is unchanged
+    # and this step is skipped, so the existing Scorer's info is reused.
+    if session.scorer is None:
+        session.scorer = Scorer(info=info)
+    else:
+        session.scorer.info = info
 
 
 # ── Step 5: build HAgent ──────────────────────────────────────────────────────
 
 def run_step5(session: Session) -> None:
-    """Construct HAgent and store in session.H."""
+    """Build the HAgent from the scored data and finalize the session's Scorer."""
     from backend.math.algorithm_agents import HAgent
 
     _, params, sport = _sport_params(session)
@@ -263,10 +269,9 @@ def run_step5(session: Session) -> None:
     n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
     n_drafters  = cp['n_drafters']
 
-    session.generic_h_scores = None  # invalidate cached baseline whenever HAgent rebuilds
-
-    session.H = HAgent(
-        info           = session.info,
+    scorer = session.scorer   # info was set by step 4 (or carried over on a from_step==5 patch)
+    scorer.h_agent = HAgent(
+        info           = scorer.info,
         omega          = cp['omega'],
         gamma          = cp['gamma'],
         n_picks        = n_starters,
@@ -279,11 +284,13 @@ def run_step5(session: Session) -> None:
         aleph          = cp['aleph'],
         beth           = cp['beth'],
     )
+    # Fresh agent -> reset the baseline cache; it can't outlive the agent it was built for.
+    scorer.generic_h_scores = None
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
 
-def run_pipeline(
+def build_scorer(
     session: Session,
     from_step: int = 1,
     csv_bytes: bytes | None = None,

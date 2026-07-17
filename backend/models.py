@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 # The candidate expand-view rows below are plain dataclasses rather than Pydantic
 # BaseModels. They are built in bulk (hundreds of candidates × several rows each) by
-# backend.services.evaluate from already-typed numpy .tolist() output, so per-row Pydantic
+# backend.services.ranking from already-typed numpy .tolist() output, so per-row Pydantic
 # validation is pure overhead here — dataclass construction is ~4× faster and Pydantic v2
 # still serialises them (nested inside the Candidate/EvaluateResponse models) to identical
 # JSON. The outer Candidate/EvaluateResponse stay Pydantic so the API contract is enforced.

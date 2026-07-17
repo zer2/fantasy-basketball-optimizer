@@ -14,7 +14,7 @@ from backend.infra.auth import current_user_key_optional
 from backend.parameters import load_all_params
 from backend.state.session import get_session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.pipeline import clear_v0_cache, _parse_projection_csv
+from backend.services.build_scorer import clear_v0_cache, _parse_projection_csv
 from backend.state.upload_store import get_upload
 from backend.api.platform_helpers import resolve_platform_config
 from backend.api.schemas import (
@@ -120,7 +120,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[dict], params: dict) -> dict
 def _serialize_g_scores(session) -> list[PlayerGScore]:
     """Serialize the session's G-scores DataFrame into a list of PlayerGScore objects."""
     categories = session.current_params['categories']
-    g_scores_df = session.info['G-scores']
+    g_scores_df = session.scorer.info['G-scores']
     return [
         PlayerGScore(
             name=str(name),

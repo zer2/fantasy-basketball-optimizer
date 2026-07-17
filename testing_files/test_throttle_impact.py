@@ -7,7 +7,7 @@
 
 from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
-from backend.services.evaluate import run_evaluate
+from backend.services.ranking import rank_candidates
 
 _HSCORE_TOL = 0.05   # h-score percentage points (same bar as the regular tests)
 _DOLLAR_TOL = 0.25   # auction dollar values are estimates — a looser, cents-level bar
@@ -20,8 +20,8 @@ _TOP_N      = 30
 
 def _evaluate(session, mode, **kwargs):
     """Run an evaluate forcing a specific throttle schedule; return {name: candidate}, [name order]."""
-    session.H._position_mode_override = mode
-    res = run_evaluate(session=session, **kwargs)
+    session.scorer.h_agent._position_mode_override = mode
+    res = rank_candidates(session=session, **kwargs)
     return {c.name: c for c in res.candidates}, [c.name for c in res.candidates]
 
 
@@ -29,7 +29,7 @@ def test_throttle_draft_close_to_exact():
     """The tiered draft throttle must not move the top-N h-score ranking or scores meaningfully."""
     session = get_session(client.post('/sessions', json=_build_session_request()).json()['session_id'])
     n_drafters = session.current_params['n_drafters']
-    top_eight  = list(session.info['G-scores'].sort_values('Total', ascending=False).head(8).index)
+    top_eight  = list(session.scorer.info['G-scores'].sort_values('Total', ascending=False).head(8).index)
     player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     player_assignments['Team 1'] = top_eight[:4]
     player_assignments['Team 2'] = top_eight[4:]
@@ -37,10 +37,10 @@ def test_throttle_draft_close_to_exact():
                   exclusion_list=top_eight[:4], remaining_cash=None)
 
     def run(mode):
-        session.H._position_mode_override = mode
-        session.generic_h_scores = None
+        session.scorer.h_agent._position_mode_override = mode
+        session.scorer.generic_h_scores = None
         # Neutral pass first so generic_h_scores — the ranking the throttle prioritises by — is built.
-        run_evaluate(session=session,
+        rank_candidates(session=session,
                      player_assignments={f'Team {i + 1}': [] for i in range(n_drafters)},
                      my_team_id='Team 1', exclusion_list=[], remaining_cash=None)
         return _evaluate(session, mode, **kwargs)
@@ -69,10 +69,10 @@ def test_throttle_auction_close_to_exact():
     remaining_cash['Drafter 2'] = 150.0
 
     def run(mode):
-        session.H._position_mode_override = mode
-        session.generic_h_scores = None
+        session.scorer.h_agent._position_mode_override = mode
+        session.scorer.generic_h_scores = None
         # Neutral pass first so generic_h_scores is built under the same schedule.
-        run_evaluate(session=session, player_assignments={t: [] for t in teams},
+        rank_candidates(session=session, player_assignments={t: [] for t in teams},
                      my_team_id='Drafter 1', exclusion_list=[], remaining_cash=full_cash)
         return _evaluate(session, mode, player_assignments=player_assignments, my_team_id='Drafter 1',
                          exclusion_list=['Giannis Antetokounmpo (C,PF)'], remaining_cash=remaining_cash)

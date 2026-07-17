@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.state.session import get_session
-from backend.services.evaluate import run_evaluate
+from backend.services.ranking import rank_candidates
 
 client = TestClient(app)
 

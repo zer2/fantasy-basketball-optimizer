@@ -21,7 +21,7 @@ from typing import Optional
 @dataclass
 class LeagueShape:
     """League metadata needed to configure a session, fetched before any roster
-    data and therefore without requiring session.info."""
+    data and therefore without requiring session.scorer.info."""
     team_names: list[str]
     n_drafters: int
     n_picks:    int
@@ -101,7 +101,7 @@ class PlatformIntegration(abc.ABC):
         , name_lookup: dict[str, str]
     ) -> PlatformSelections:
         """Fetch the current draft board / rosters, mapping platform names to canonical
-        via name_lookup (built once upstream from session.info)."""
+        via name_lookup (built once upstream from session.scorer.info)."""
 
     @abc.abstractmethod
     def get_auction_results(

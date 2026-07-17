@@ -13,7 +13,7 @@ from benchmark_helpers import (
     , _build_session_request
 )
 from backend.state.session import get_session
-from backend.services.evaluate import run_evaluate
+from backend.services.ranking import rank_candidates
 
 # 2024-25 snapshot of an H-score snake draft used by the assertions below.
 # (The frontend default — default_season_rosters.ts — tracks current-season data
@@ -224,7 +224,7 @@ def test_season_mode_waiver():
     waiver_assignments                 = {team: list(roster) for team, roster in _DEFAULT_SEASON_ROSTERS.items()}
     waiver_assignments['Drafter 1']    = [p for p in drafter_1_roster if p != gary_name]
 
-    waiver_result = run_evaluate(
+    waiver_result = rank_candidates(
         session            = session
         , player_assignments = waiver_assignments
         , my_team_id         = 'Drafter 1'

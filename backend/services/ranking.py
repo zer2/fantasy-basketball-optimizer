@@ -30,7 +30,7 @@ def extract_last_name(player_full_name: str) -> str:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def run_evaluate(
+def rank_candidates(
     session: Session,
     player_assignments: dict[str, list[str]],
     my_team_id: str,
@@ -58,8 +58,8 @@ def run_evaluate(
     Returns:
         EvaluateResponse containing the iteration count and ranked Candidate list.
     """
-    info           = session.info
-    H              = session.H
+    info           = session.scorer.info
+    H              = session.scorer.h_agent
     current_params = session.current_params
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
@@ -68,15 +68,15 @@ def run_evaluate(
     # Slice the available pool by the cached default/generic ranking so the top-ranked players are
     # scored (and can paint) first. Auction always evaluates the whole pool — its dollar values anchor
     # on the full-distribution replacement level. The first eval also evaluates everyone: it is what
-    # builds session.generic_h_scores, so there is no ranking to slice by yet.
+    # builds session.scorer.generic_h_scores, so there is no ranking to slice by yet.
     is_auction       = remaining_cash is not None
     candidate_subset = None
     has_more         = False
     total_candidates = None   # set when batching; falls back to the scored count below
-    if candidate_limit is not None and not is_auction and session.generic_h_scores is not None:
+    if candidate_limit is not None and not is_auction and session.scorer.generic_h_scores is not None:
         unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
         unavailable |= set(exclusion_list)
-        available_ranked = [p for p in session.generic_h_scores.index if p not in unavailable]
+        available_ranked = [p for p in session.scorer.generic_h_scores.index if p not in unavailable]
         candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
         has_more         = len(available_ranked) > candidate_offset + candidate_limit
         total_candidates = len(available_ranked)
@@ -93,7 +93,7 @@ def run_evaluate(
             n_iterations            = n_iterations,
             cash_remaining_per_team = remaining_cash,
             exclusion_list          = exclusion_list,
-            baseline_h_scores       = session.generic_h_scores,
+            baseline_h_scores       = session.scorer.generic_h_scores,
             candidate_subset        = candidate_subset,
             # Global rank of this batch's first candidate, so the throttle's exact-solve tiers stay
             # global: batches past the first fall outside them and exact-solve nobody. Zero when we
@@ -112,14 +112,14 @@ def run_evaluate(
     # On the first call (no players assigned), the current result already represents that neutral
     # state, so we cache it directly — avoiding a redundant run. If the session connects mid-draft/
     # auction (players already assigned on first call), run a separate clean evaluation for it.
-    if session.generic_h_scores is None:
+    if session.scorer.generic_h_scores is None:
         all_assigned = [
             p for team_players in player_assignments.values()
             for p in team_players if isinstance(p, str)
         ]
         if len(all_assigned) == 0:
             # No players taken yet — current scores are the neutral baseline.
-            session.generic_h_scores = h_score_result['Scores'].sort_values(ascending=False)
+            session.scorer.generic_h_scores = h_score_result['Scores'].sort_values(ascending=False)
         else:
             # Mid-draft/auction start: run a clean evaluation with all slots empty. Mirror the teams
             # actually in play (same identities as player_assignments) so the drafter is always present.
@@ -134,13 +134,13 @@ def run_evaluate(
                     exclusion_list          = [],
                 )
             if generic_result is not None:
-                session.generic_h_scores = generic_result['Scores'].sort_values(ascending=False)
+                session.scorer.generic_h_scores = generic_result['Scores'].sort_values(ascending=False)
 
     with record_phase('build_candidates'):
         candidates = _build_candidates(
             h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
             remaining_cash,
-            generic_h_scores=session.generic_h_scores,
+            generic_h_scores=session.scorer.generic_h_scores,
         )
 
     return EvaluateResponse(

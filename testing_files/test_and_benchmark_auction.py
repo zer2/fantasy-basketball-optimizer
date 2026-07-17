@@ -11,7 +11,7 @@ from benchmark_helpers import (
     , _build_session_request
 )
 from backend.state.session import get_session
-from backend.services.evaluate import run_evaluate
+from backend.services.ranking import rank_candidates
 
 
 def test_evaluate_auction():
@@ -32,9 +32,9 @@ def test_evaluate_auction():
     full_cash  = {name: 200.0 for name in team_names}
 
     # Mirrors the frontend workflow: first evaluate with an empty board so
-    # session.generic_h_scores is populated from the neutral (full-cash) state,
+    # session.scorer.generic_h_scores is populated from the neutral (full-cash) state,
     # then evaluate with the actual assignments.
-    run_evaluate(
+    rank_candidates(
         session            = session
         , player_assignments = {name: [] for name in team_names}
         , my_team_id         = 'Drafter 1'
@@ -50,7 +50,7 @@ def test_evaluate_auction():
     remaining_cash['Drafter 1'] = 150.0
     remaining_cash['Drafter 2'] = 150.0
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Drafter 1'
