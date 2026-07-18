@@ -6,6 +6,7 @@ The routes here own the HTTP concerns — parse the request into plain dicts, re
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status, Response
@@ -22,7 +23,6 @@ from backend.api.schemas import (
     PatchRequest, PatchResponse, GScoresResponse,
 )
 from backend.api.errors import fail
-from backend.api.util import iso_expires
 
 router = APIRouter()
 
@@ -170,7 +170,7 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
         n_players_loaded=len(session.v0_clean),
         categories=list(session.current_params['categories']),
         g_scores=_serialize_g_scores(session),
-        expires_at=iso_expires(4 * 3600),
+        expires_at=(datetime.now(timezone.utc) + timedelta(seconds=4 * 3600)).strftime('%Y-%m-%dT%H:%M:%SZ'),
     )
 
 

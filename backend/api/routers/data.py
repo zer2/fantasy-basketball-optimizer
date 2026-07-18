@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
@@ -10,7 +11,6 @@ from backend.parameters import load_all_params
 from backend.services.build_scorer import parse_projection_csv
 from backend.state.upload_store import store_upload, UPLOAD_TTL, MAX_FILE_BYTES
 from backend.api.schemas import UploadResponse
-from backend.api.util import iso_expires
 
 router = APIRouter()
 
@@ -45,5 +45,5 @@ async def upload_projection(
         data_id=data_id,
         file_type=ft,
         n_players=len(df),
-        expires_at=iso_expires(UPLOAD_TTL),
+        expires_at=(datetime.now(timezone.utc) + timedelta(seconds=UPLOAD_TTL)).strftime('%Y-%m-%dT%H:%M:%SZ'),
     )
