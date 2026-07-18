@@ -2,7 +2,7 @@
 Trade analysis and suggestion engine.
 
 Ported from src/tabs/trading.py, adapted to use the backend Session pattern
-(session.scorer.h_agent, session.scorer.info) instead of Streamlit session state.
+(session.agent, session.agent.info) instead of Streamlit session state.
 """
 
 from __future__ import annotations
@@ -38,15 +38,15 @@ def analyze_trade(
     Returns None if the trade violates position structure for either team.
     Otherwise returns {1: {pre: ..., post: ...}, 2: {pre: ..., post: ...}}.
     """
-    info = session.scorer.info
-    H = session.scorer.h_agent
+    info = session.agent.info
+    H = session.agent
 
     post_trade_team_1 = [p for p in player_assignments[team_1] if p not in team_1_trade] + team_2_trade
     post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
 
     # Check position eligibility for both teams
     if not ignore_position_check:
-        pos_cfg = session.scorer.h_agent._pos_cfg
+        pos_cfg = session.agent._pos_cfg
         team_1_positions = info['Positions'].loc[post_trade_team_1]
         if not check_team_eligibility(team_1_positions, pos_cfg):
             return None
@@ -340,28 +340,12 @@ def _make_combo_df(
 # ── Suggestion orchestrator ──────────────────────────────────────────────────
 
 def _get_general_values(session: Session) -> pd.Series:
-    """Get default H-score values for all players (no assignments).
+    """The default (neutral-board) H-score ranking for all players.
 
-    Cached on session.scorer.generic_h_scores after the first call — the same field
-    used by auction mode — so repeated trade searches within a session pay
-    the cost only once.
+    Computed once at build time (agent.populate_default_h_scores) and shared with
+    auction dollar anchoring and the ranking throttle — so a trade search reuses it.
     """
-    if session.scorer.generic_h_scores is not None:
-        return session.scorer.generic_h_scores
-
-    H = session.scorer.h_agent
-    cp = session.current_params
-    n_drafters = cp['n_drafters']
-    n_iterations = cp['n_iterations']
-
-    H_clean = H.clear_initial_weights()
-    result = H_clean.get_h_scores(
-        player_assignments={f'Team {i+1}': [] for i in range(n_drafters)},
-        drafter='Team 1',
-        n_iterations=n_iterations,
-    )
-    session.scorer.generic_h_scores = result['Scores'].sort_values(ascending=False)
-    return session.scorer.generic_h_scores
+    return session.agent.default_h_scores
 
 
 def run_trade_suggest(
@@ -390,8 +374,8 @@ def run_trade_suggest(
 
     # Step 2b: pre-extract x_scores for the two teams as numpy arrays.
     # Avoids per-combo pandas .loc[].sum() overhead in _make_combo_df.
-    my_x_numpy    = session.scorer.h_agent.x_scores.loc[my_candidates].to_numpy()
-    their_x_numpy = session.scorer.h_agent.x_scores.loc[their_candidates].to_numpy()
+    my_x_numpy    = session.agent.x_scores.loc[my_candidates].to_numpy()
+    their_x_numpy = session.agent.x_scores.loc[their_candidates].to_numpy()
     my_name_to_index    = {name: i for i, name in enumerate(my_candidates)}
     their_name_to_index = {name: i for i, name in enumerate(their_candidates)}
 
@@ -414,7 +398,7 @@ def run_trade_suggest(
 
     # Step 3: evaluate all combos vectorized
     df = _make_combo_df(
-        session.scorer.h_agent
+        session.agent
         , all_combos
         , my_team
         , their_team
@@ -431,14 +415,14 @@ def run_trade_suggest(
 
     # Step 5: position check only on the small set that passed the thresholds
     if not ignore_position_check and len(df) > 0:
-        pos_cfg = session.scorer.h_agent._pos_cfg
+        pos_cfg = session.agent._pos_cfg
         valid = []
         for _, row in df.iterrows():
             sent, received = row['Send'], row['Receive']
             post_my_roster    = [p for p in player_assignments[my_team]    if p not in sent]    + received
             post_their_roster = [p for p in player_assignments[their_team] if p not in received] + sent
-            if (check_team_eligibility(session.scorer.info['Positions'].loc[post_my_roster],    pos_cfg)
-            and check_team_eligibility(session.scorer.info['Positions'].loc[post_their_roster], pos_cfg)):
+            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    pos_cfg)
+            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], pos_cfg)):
                 valid.append(row)
         df = pd.DataFrame(valid) if valid else df.iloc[:0]
 

@@ -267,7 +267,7 @@ def test_evaluate_mid_draft(session_for_format):
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
     n_iterations = session.current_params['n_iterations']
-    g_scores     = session.scorer.info['G-scores']
+    g_scores     = session.agent.info['G-scores']
 
     # Take the top 8 G-score players and split them across two teams.
     top_eight      = list(g_scores.sort_values('Total', ascending=False).head(8).index)

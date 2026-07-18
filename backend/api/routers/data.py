@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from backend.parameters import load_all_params
-from backend.services.build_scorer import parse_projection_csv
+from backend.services.build_agent import parse_projection_csv
 from backend.state.upload_store import store_upload, UPLOAD_TTL, MAX_FILE_BYTES
 from backend.api.schemas import UploadResponse
 

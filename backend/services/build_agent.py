@@ -5,8 +5,8 @@ Steps:
   1. Load player_stats_v0 from CSV / Snowflake → session.v0_clean
   2. drop_injured_players → session.v1_clean
   3. make_upsilon_adjustment → session.v2
-  4. process_player_data → session.scorer.info
-  5. build HAgent → session.scorer.h_agent  (finalizes the Scorer)
+  4. process_player_data → session.info
+  5. build HAgent (retains info; populates the default baseline) → session.agent
 
 No session_context or _SessionState: each step reads/writes session fields directly.
 """
@@ -21,10 +21,9 @@ from pathlib import Path
 
 from backend.parameters import load_all_params
 from backend.state.session import Session
-from backend.state.scorer import Scorer
 
 
-# build_scorer.py is backend/services/build_scorer.py, so the project root is parents[2].
+# build_agent.py is backend/services/build_agent.py, so the project root is parents[2].
 _MEAN_OF_VARIANCES_PATH = Path(__file__).parents[2] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
 
 
@@ -209,7 +208,7 @@ def run_step3(session: Session) -> None:
 # ── Step 4: process_player_data ───────────────────────────────────────────────
 
 def run_step4(session: Session) -> None:
-    """Build the info dict (G-scores, X-scores, covariance, etc.) onto the session's Scorer."""
+    """Build the info dict (G-scores, X-scores, covariance, etc.) onto session.info."""
     from backend.math.process_player_data import process_player_data
 
     _, params, sport = _sport_params(session)
@@ -238,18 +237,16 @@ def run_step4(session: Session) -> None:
         categories        = categories,
         sport             = sport,
     )
-    # step 5 (re)builds the agent from this info; on a from_step==5 patch info is unchanged
-    # and this step is skipped, so the existing Scorer's info is reused.
-    if session.scorer is None:
-        session.scorer = Scorer(info=info)
-    else:
-        session.scorer.info = info
+    # session.info is the pipeline's step-4 intermediate; step 5 builds the agent from it (and the
+    # agent retains it, so consumers read G-scores via session.agent.info). On a from_step==5 patch
+    # this step is skipped and the existing session.info is reused.
+    session.info = info
 
 
 # ── Step 5: build HAgent ──────────────────────────────────────────────────────
 
 def run_step5(session: Session) -> None:
-    """Build the HAgent from the scored data and finalize the session's Scorer."""
+    """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
     from backend.math.algorithm_agents import HAgent
 
     _, params, sport = _sport_params(session)
@@ -261,9 +258,8 @@ def run_step5(session: Session) -> None:
     n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
     n_drafters  = cp['n_drafters']
 
-    scorer = session.scorer   # info was set by step 4 (or carried over on a from_step==5 patch)
-    scorer.h_agent = HAgent(
-        info           = scorer.info,
+    session.agent = HAgent(
+        info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
         omega          = cp['omega'],
         gamma          = cp['gamma'],
         n_picks        = n_starters,
@@ -276,20 +272,28 @@ def run_step5(session: Session) -> None:
         aleph          = cp['aleph'],
         beth           = cp['beth'],
     )
-    # Fresh agent -> reset the baseline cache; it can't outlive the agent it was built for.
-    scorer.generic_h_scores = None
+
+    # Prime the neutral (empty-board) baseline as part of the build — this workflow always evaluates,
+    # so the throttle ranking + auction anchor are always needed. Auction passes full cash (every
+    # team at cash_per_team); draft passes None.
+    cash_per_team = cp.get('cash_per_team')
+    default_cash = (
+        {f'Team {i + 1}': cash_per_team for i in range(n_drafters)}
+        if cash_per_team is not None else None
+    )
+    session.agent.populate_default_h_scores(cp['n_iterations'], default_cash)
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
 
-def build_scorer(
+def build_agent(
     session: Session,
     from_step: int = 1,
     csv_bytes: bytes | None = None,
     file_type: str | None = None,
     uploaded_dfs: dict | None = None,
 ) -> None:
-    """Re-run the pipeline starting from the given step number (1–5)."""
+    """Re-run the pipeline starting from the given step number (1–5), leaving session.agent built."""
     if from_step <= 1:
         run_step1(session, csv_bytes=csv_bytes, file_type=file_type, uploaded_dfs=uploaded_dfs)
     if from_step <= 2:

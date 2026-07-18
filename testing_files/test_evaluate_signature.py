@@ -9,9 +9,9 @@
 # This is NOT a correctness test — the benchmark suites already assert H-scores with tolerances.
 # This guards SERIALIZATION and hot-path STABILITY: the exact bytes the frontend receives.
 #
-# The signature is captured from a WARMED session (generic_h_scores cached, so the position-optimiser
-# throttle is active and the result is reproducible). The very first evaluate on a fresh session runs
-# the throttle un-primed and would produce a different, non-reproducible payload.
+# The agent's neutral baseline (agent.default_h_scores) is computed once at session build, so every
+# evaluate is reproducible from the first call. An empty board short-circuits to that baseline — the
+# full-exact, un-throttled solve; a non-empty board runs the position-optimiser throttle primed by it.
 #
 # Values in the payload are already rounded to 2 dp by the backend, which absorbs sub-0.005 numeric
 # jitter, so the hash is stable run-to-run. If you intentionally change the algorithm, data, or
@@ -44,16 +44,16 @@ _TEAM_2 = [
     'LeBron James (SF,PF)',
 ]
 
-# sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True) on a warmed session,
-# keyed by (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# Regenerated 2026-07-17 after the NBA_PLAYER_TABLE dedup: pre-dedup, players with two name spellings
-# on one nba id produced duplicate seasonal-average rows, so the historical candidate roster carried
-# spurious duplicate-spelling entries; the dedup removed them. Serialization-only change — H-scores are
-# unchanged (guarded by the tolerance-based auction/draft/trading correctness goldens).
+# sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
+# (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
+# The 'empty' goldens were regenerated 2026-07-18 when the neutral baseline moved into the agent
+# (agent.default_h_scores, built once at session creation): an empty board now short-circuits to that
+# full-exact baseline instead of re-running the throttle, so the draft-start payload is the exact solve.
+# The 'mid' goldens are unchanged — the throttled result the baseline primes is identical to before.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '3d233126b4e79300fefe946fb86718075f4675ffbd9fae004228ee298efd1787',
+    ('Head to Head: Each Category',  'empty'): '8f3fe8c406e135bb5e8ea54722fdff99acc3130e377d57fe2fc94a7f7ccf3421',
     ('Head to Head: Each Category',  'mid'):   'ff2e9a2359d6eeda1eadccd6f0c0bdadce52dba71c41340fa0bbf8e0d5db8d26',
-    ('Head to Head: Most Categories','empty'): '6e0d81afc5c4942609d1e55a4a5f116fd9b3ec1b5d9c504a99eebda0daf01427',
+    ('Head to Head: Most Categories','empty'): '48fc23d88c4658ee8238200ee694310e1b376fc144975153c4b07e321a896cff',
     ('Head to Head: Most Categories','mid'):   '10f46b3cc7e9487bda109f052324a6192460e4cadcd48a503669c1a51683ca00',
 }
 
@@ -69,16 +69,13 @@ def _signature(result) -> str:
     params=['Head to Head: Each Category', 'Head to Head: Most Categories'],
 )
 def warmed_session(request):
-    """Create one session per scoring format and warm it (caches generic_h_scores so the throttle is
-    primed and subsequent evaluates are reproducible)."""
+    """Create one session per scoring format. The neutral baseline the throttle primes from is built
+    at session creation, so no warm-up evaluate is needed for reproducibility."""
     scoring_format = request.param
     response = client.post('/sessions', json=_build_session_request(scoring_format=scoring_format))
     assert response.status_code == 201, f'Session creation failed ({scoring_format}): {response.text}'
     session    = get_session(response.json()['session_id'])
     n_drafters = session.current_params['n_drafters']
-
-    empty_board = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    rank_candidates(session, empty_board, 'Team 1', [], None, 0, None)   # warm-up
     return session, scoring_format, n_drafters
 
 

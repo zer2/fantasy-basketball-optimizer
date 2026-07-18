@@ -2,7 +2,8 @@
 In-memory session store for the FastAPI backend.
 
 Each Session holds:
-  - scorer: the built Scorer (HAgent + info + baseline cache) — the pipeline's output
+  - agent: the built HAgent — the whole scoring model (retains info; owns the default baseline)
+  - info: the step-4 processed player data (pipeline intermediate; also readable via agent.info)
   - current_params: snapshot of all mutable parameters, used to diff PATCH bodies
   - v0_clean: immutable copy of raw player stats (before any transformations)
   - v1_clean: immutable copy after injured players dropped (before upsilon)
@@ -18,7 +19,6 @@ from typing import Optional
 import pandas as pd
 
 from backend.platform_integration.base import PlatformConfig
-from backend.state.scorer import Scorer
 
 
 @dataclass
@@ -35,14 +35,19 @@ class Session:
     v1_clean: Optional[pd.DataFrame] = None   # after drop_injured
     v2:       Optional[pd.DataFrame] = None   # after upsilon adjustment
 
-    # The built scoring model (HAgent + info + baseline cache); None until the pipeline runs.
-    scorer: Optional[Scorer] = None
+    # Step-4 processed player data (G-scores, positions, covariance, ...). A pipeline intermediate
+    # kept for from_step==5 patches; consumers read it via session.agent.info.
+    info: Optional[dict] = None
+
+    # The built HAgent — the whole scoring model (retains info; owns the neutral baseline).
+    # None until the pipeline runs.
+    agent: Optional[object] = None
 
     # Live-platform connection (None for 'Enter your own data'). Set during session
     # creation when a live platform is selected; used by the draft-state poll.
     platform_config: Optional[PlatformConfig] = None
 
-    # {platform player name -> canonical 'Name (POS)'} lookup, rebuilt from scorer.info
+    # {platform player name -> canonical 'Name (POS)'} lookup, rebuilt from agent.info
     # whenever the data changes (see refresh_platform_name_lookup). None until a
     # live platform is connected.
     platform_name_lookup: Optional[dict[str, str]] = None

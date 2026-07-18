@@ -26,22 +26,11 @@ def test_evaluate_auction():
 
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
 
     team_names = [f'Drafter {i + 1}' for i in range(n_drafters)]
-    full_cash  = {name: 200.0 for name in team_names}
 
-    # Mirrors the frontend workflow: first evaluate with an empty board so
-    # session.scorer.generic_h_scores is populated from the neutral (full-cash) state,
-    # then evaluate with the actual assignments.
-    rank_candidates(
-        session            = session
-        , player_assignments = {name: [] for name in team_names}
-        , my_team_id         = 'Drafter 1'
-        , exclusion_list     = []
-        , remaining_cash     = full_cash
-    )
-
+    # The neutral (full-cash) baseline that anchors the dollar values is built once at session
+    # creation (agent.populate_default_h_scores), so we go straight to the real assignments.
     player_assignments = {name: [] for name in team_names}
     player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
     player_assignments['Drafter 2'] = ['Nikola Jokic (C)']

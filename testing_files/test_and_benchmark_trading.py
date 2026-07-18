@@ -7,7 +7,7 @@
 #
 # The suggest pipeline has three main cost centres:
 #   1. _identify_trade_candidates — one get_h_scores call per player on each team
-#   2. _get_general_values        — one empty-board evaluate
+#   2. _get_general_values        — reads the agent's prebuilt default baseline (no evaluate)
 #   3. _make_combo_df             — four get_h_scores calls per surviving combo
 #
 # Covers:

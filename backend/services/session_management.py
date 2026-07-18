@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Optional
 
 from backend.state.session import Session, create_session, delete_session
-from backend.services.build_scorer import build_scorer
+from backend.services.build_agent import build_agent
 from backend.data_retrieval import get_unified_player_table
 from backend.platform_integration.base import PlatformConfig
 from backend.platform_integration.helpers import build_platform_name_lookup
@@ -21,7 +21,7 @@ from backend.platform_integration.helpers import build_platform_name_lookup
 def refresh_platform_name_lookup(session: Session) -> None:
     """Rebuild the session's platform name lookup from its current info (no-op without a live platform).
 
-    Lives here, not in build_scorer, so the pipeline stays platform-agnostic. Call after the
+    Lives here, not in build_agent, so the pipeline stays platform-agnostic. Call after the
     pipeline runs when the player set may have changed (session creation and data/injured
     patches, from_step <= 2); model/category/slot patches leave info['Positions'] untouched.
     """
@@ -29,7 +29,7 @@ def refresh_platform_name_lookup(session: Session) -> None:
     if config is None:
         return
     session.platform_name_lookup = build_platform_name_lookup(
-        session.scorer.info, config.player_name_column, get_unified_player_table(),
+        session.agent.info, config.player_name_column, get_unified_player_table(),
     )
 
 
@@ -51,7 +51,7 @@ def build_session(
         session.platform_config = platform_config
         session.current_params['team_names'] = list(platform_config.teams_dict.keys())
     try:
-        build_scorer(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type,
+        build_agent(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type,
                      uploaded_dfs=uploaded_dfs)
         refresh_platform_name_lookup(session)
     except Exception:
@@ -80,7 +80,7 @@ def apply_patch(
         session.platform_config = platform_config
         session.current_params['team_names'] = list(platform_config.teams_dict.keys())
 
-    build_scorer(session, from_step=from_step, csv_bytes=csv_bytes, file_type=file_type,
+    build_agent(session, from_step=from_step, csv_bytes=csv_bytes, file_type=file_type,
                  uploaded_dfs=uploaded_dfs)
 
     # Rebuild the lookup when either of its inputs changed: the player set (from_step <= 2)

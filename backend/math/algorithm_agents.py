@@ -107,6 +107,17 @@ class HAgent:
         self.sport  = sport
         self.params = params
 
+        # Retain the processed player data so callers read G-scores / positions off the agent
+        # (it is explanation-oriented — see _build_candidates). Consumers use agent.info directly.
+        self.info = info
+
+        # Neutral empty-board baseline: ranks players so the position-optimiser throttle prioritises
+        # the ones most likely to be picked, and anchors auction dollar values. Populated by
+        # populate_default_h_scores at the end of the build. None => "not built yet", which makes
+        # get_h_scores run a full exact solve (no throttle).
+        self.default_h_scores = None   # sorted pd.Series
+        self._default_result  = None   # full empty-board result dict (for the empty-board short-circuit)
+
         # Build position config (replaces all get_position_*() calls)
         self._pos_cfg: PositionConfig = build_position_config(params, slot_counts)
 
@@ -266,9 +277,18 @@ class HAgent:
                      , n_iterations: int
                      , cash_remaining_per_team: dict = None
                      , exclusion_list: list = []
-                     , baseline_h_scores=None
                      , candidate_subset: list = None
                      , candidate_offset: int = 0) -> dict:
+
+        # Empty-board short-circuit: the neutral baseline is exactly an all-empty, no-exclusions,
+        # full-pool run, which populate_default_h_scores already computed at build. Reuse it rather
+        # than re-solving (this is the draft-start evaluate). Guarded so a filtered empty-board call
+        # (exclusions or a candidate subset) still computes.
+        if (self._default_result is not None
+                and not exclusion_list
+                and candidate_subset is None
+                and all(len(roster) == 0 for roster in player_assignments.values())):
+            return self._default_result
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -368,8 +388,8 @@ class HAgent:
         # H-scores so the exact-solve tier covers the players most likely to actually be picked.
         # Missing/uncached players sort last; with no cached ranking at all we pass None, which
         # disables throttling entirely (a full, exact solve every iteration).
-        if baseline_h_scores is not None:
-            ranked = baseline_h_scores.reindex(x_scores_batch.index).to_numpy()
+        if self.default_h_scores is not None:
+            ranked = self.default_h_scores.reindex(x_scores_batch.index).to_numpy()
             candidate_priority = np.argsort(-np.nan_to_num(ranked, nan=-np.inf))
         else:
             candidate_priority = None
@@ -1040,6 +1060,22 @@ class HAgent:
         self.initial_category_weights = None
         self.initial_position_shares  = None
         return self
+
+    def populate_default_h_scores(self, n_iterations: int, cash_remaining_per_team: dict = None) -> None:
+        """Compute and cache the neutral (empty-board) H-scores. Run once at the end of the build so
+        the agent is always primed — the throttle has a ranking to prioritise by, auction values have
+        their anchor, and the draft-start evaluate can short-circuit to this result. Pass full cash
+        only in auction mode. Runs full-exact (default_h_scores is still None here, so no throttling)."""
+        empty = {f'Team {i + 1}': [] for i in range(self.n_drafters)}
+        self.clear_initial_weights()
+        result = self.get_h_scores(
+            player_assignments      = empty,
+            drafter                 = 'Team 1',
+            n_iterations            = n_iterations,
+            cash_remaining_per_team = cash_remaining_per_team,
+        )
+        self.default_h_scores = result['Scores'].sort_values(ascending=False)
+        self._default_result  = result
 
     # ── simplified-form x_mu helpers (unchanged) ──────────────────────────────
 

@@ -20,7 +20,7 @@ _TOP_N      = 30
 
 def _evaluate(session, mode, **kwargs):
     """Run an evaluate forcing a specific throttle schedule; return {name: candidate}, [name order]."""
-    session.scorer.h_agent._position_mode_override = mode
+    session.agent._position_mode_override = mode
     res = rank_candidates(session=session, **kwargs)
     return {c.name: c for c in res.candidates}, [c.name for c in res.candidates]
 
@@ -29,24 +29,17 @@ def test_throttle_draft_close_to_exact():
     """The tiered draft throttle must not move the top-N h-score ranking or scores meaningfully."""
     session = get_session(client.post('/sessions', json=_build_session_request()).json()['session_id'])
     n_drafters = session.current_params['n_drafters']
-    top_eight  = list(session.scorer.info['G-scores'].sort_values('Total', ascending=False).head(8).index)
+    top_eight  = list(session.agent.info['G-scores'].sort_values('Total', ascending=False).head(8).index)
     player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     player_assignments['Team 1'] = top_eight[:4]
     player_assignments['Team 2'] = top_eight[4:]
     kwargs = dict(player_assignments=player_assignments, my_team_id='Team 1',
                   exclusion_list=top_eight[:4], remaining_cash=None)
 
-    def run(mode):
-        session.scorer.h_agent._position_mode_override = mode
-        session.scorer.generic_h_scores = None
-        # Neutral pass first so generic_h_scores — the ranking the throttle prioritises by — is built.
-        rank_candidates(session=session,
-                     player_assignments={f'Team {i + 1}': [] for i in range(n_drafters)},
-                     my_team_id='Team 1', exclusion_list=[], remaining_cash=None)
-        return _evaluate(session, mode, **kwargs)
-
-    exact_by, exact_order = run('exact')
-    thr_by,   thr_order   = run('tiered')
+    # The throttle prioritises by agent.default_h_scores, which is built once at session build — both
+    # the exact and throttled passes share it, so we just force each schedule and evaluate.
+    exact_by, exact_order = _evaluate(session, 'exact', **kwargs)
+    thr_by,   thr_order   = _evaluate(session, 'tiered', **kwargs)
 
     assert thr_order[:_TOP_N] == exact_order[:_TOP_N], 'throttle changed the top-30 draft ordering'
     for name in exact_order[:_TOP_N]:
@@ -59,7 +52,6 @@ def test_throttle_auction_close_to_exact():
     req = _build_session_request(scoring_format='Head to Head: Each Category', cash_per_team=200)
     session = get_session(client.post('/sessions', json=req).json()['session_id'])
     teams = [f'Drafter {i + 1}' for i in range(session.current_params['n_drafters'])]
-    full_cash = {t: 200.0 for t in teams}
 
     player_assignments = {t: [] for t in teams}
     player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
@@ -69,11 +61,6 @@ def test_throttle_auction_close_to_exact():
     remaining_cash['Drafter 2'] = 150.0
 
     def run(mode):
-        session.scorer.h_agent._position_mode_override = mode
-        session.scorer.generic_h_scores = None
-        # Neutral pass first so generic_h_scores is built under the same schedule.
-        rank_candidates(session=session, player_assignments={t: [] for t in teams},
-                     my_team_id='Drafter 1', exclusion_list=[], remaining_cash=full_cash)
         return _evaluate(session, mode, player_assignments=player_assignments, my_team_id='Drafter 1',
                          exclusion_list=['Giannis Antetokounmpo (C,PF)'], remaining_cash=remaining_cash)
 
