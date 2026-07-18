@@ -33,7 +33,7 @@ _fbbo_logger.propagate = False   # this logger owns its handler; don't also emit
 logging.getLogger('fbbo.api')    # instantiate now (clean), before the hijack fires below
 
 from backend.infra.auth import session_secret_key, session_https_only
-from backend.api.routers import auth, meta, data, sessions, evaluate, trade, platforms
+from backend.api.routers import auth, meta, data, sessions, ranking, trade, platforms
 
 # Undo yahoo_oauth's logging.setLoggerClass hijack (fired during the router imports above) so the
 # rest of the process's loggers behave normally. Our 'fbbo'* loggers were created before it.
@@ -101,7 +101,7 @@ app.include_router(auth.router)
 app.include_router(meta.router)
 app.include_router(data.router)
 app.include_router(sessions.router)
-app.include_router(evaluate.router)
+app.include_router(ranking.router)
 app.include_router(trade.router)
 app.include_router(platforms.router)
 

@@ -1,4 +1,4 @@
-"""Candidate evaluation endpoint."""
+"""Candidate ranking endpoint (fronts the ranking service)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 @router.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse)
-def evaluate_route(session_id: str, req: EvaluateRequest, response: Response):
+def rank_candidates_route(session_id: str, req: EvaluateRequest, response: Response):
     begin_timing()
 
     # Fetch once here so a missing/expired session returns a clean 404; the live
