@@ -84,12 +84,13 @@ def test_evaluate_signature(warmed_session, board):
     """Pin the serialized /evaluate payload for a fixed board so refactors can't silently change it."""
     session, scoring_format, n_drafters = warmed_session
 
-    assignments   = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    exclusion_list = []
+    assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     if board == 'mid':
         assignments['Team 1'] = _TEAM_1
         assignments['Team 2'] = _TEAM_2
         exclusion_list        = _TEAM_1
+    else:
+        exclusion_list = []
 
     result = rank_candidates(session, assignments, 'Team 1', exclusion_list, None, 0, None)
     assert len(result.candidates) > 0, 'No candidates returned'

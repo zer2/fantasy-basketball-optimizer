@@ -15,7 +15,7 @@ from backend.infra.auth import current_user_key_optional
 from backend.parameters import load_all_params
 from backend.state.session import get_session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_agent import clear_v0_cache, parse_projection_csv
+from backend.services.build_agent import clear_v0_cache, parse_projection_csv, InsufficientPlayerPoolError
 from backend.state.upload_store import get_upload
 from backend.api.platform_helpers import resolve_platform_config
 from backend.api.schemas import (
@@ -141,14 +141,14 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
 
     params = all_params[req.league.sport]
     source_type = req.data_source.type
-    csv_bytes: Optional[bytes] = None
-    file_type_str: Optional[str] = None
-    uploaded_dfs: Optional[dict] = None
-
     if source_type == 'csv':
         csv_bytes, file_type_str = _resolve_csv(req.data_source.custom_data_ids)
+        uploaded_dfs = None
     elif source_type == 'projections':
+        csv_bytes, file_type_str = None, None
         uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
+    else:
+        csv_bytes, file_type_str, uploaded_dfs = None, None, None
 
     # Resolve any live-platform connection up front so a bad league fails before the pipeline.
     platform_config = resolve_platform_config(req.platform, req.platform_config, user_key)
@@ -162,6 +162,8 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
             file_type       = file_type_str,
             uploaded_dfs    = uploaded_dfs,
         )
+    except InsufficientPlayerPoolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Failed to build projections for this session.')
 
@@ -196,15 +198,18 @@ def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[s
         if req.platform is not None else None
     )
 
-    apply_patch(
-        session,
-        patch           = _build_patch(req),
-        from_step       = req.from_step,
-        platform_config = platform_config,
-        csv_bytes       = csv_bytes,
-        file_type       = file_type_str,
-        uploaded_dfs    = uploaded_dfs,
-    )
+    try:
+        apply_patch(
+            session,
+            patch           = _build_patch(req),
+            from_step       = req.from_step,
+            platform_config = platform_config,
+            csv_bytes       = csv_bytes,
+            file_type       = file_type_str,
+            uploaded_dfs    = uploaded_dfs,
+        )
+    except InsufficientPlayerPoolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
 
 

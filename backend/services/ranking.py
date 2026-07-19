@@ -67,20 +67,21 @@ def rank_candidates(
     # Slice the available pool by the agent's default (neutral-board) ranking so the top-ranked players
     # are scored (and can paint) first. Auction always evaluates the whole pool — its dollar values anchor
     # on the full-distribution replacement level.
-    is_auction       = remaining_cash is not None
-    candidate_subset = None
-    has_more         = False
-    total_candidates = None   # set when batching; falls back to the scored count below
+    is_auction = remaining_cash is not None
     if candidate_limit is not None and not is_auction:
         unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
         unavailable |= set(exclusion_list)
         available_ranked = [p for p in session.agent.default_h_scores.index if p not in unavailable]
         candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
         has_more         = len(available_ranked) > candidate_offset + candidate_limit
-        total_candidates = len(available_ranked)
+        total_candidates = len(available_ranked)   # falls back to the scored count below when not batching
         if len(candidate_subset) == 0:
             return EvaluateResponse(iteration=0, candidates=[], has_more=False,
                                     total_candidates=total_candidates)
+    else:
+        candidate_subset = None
+        has_more         = False
+        total_candidates = None
 
     # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()
@@ -228,7 +229,9 @@ def _build_candidates(
     # n_remaining-th best available player), which anchors the dollar scale.
     player_auction_values: dict[str, AuctionValues] | None = None
     if remaining_cash is not None:
-        cash_per_team   = current_params.get('cash_per_team')
+        # The evaluate route enforces that remaining_cash and cash_per_team are set together, so an
+        # auction evaluate always has cash_per_team here (no defensive fallback needed).
+        cash_per_team   = current_params['cash_per_team']
         streaming_noise = float(current_params.get('streaming_noise', 10.0))
         total_picks     = H.n_drafters * H.n_picks
 
@@ -239,7 +242,7 @@ def _build_candidates(
         n_remaining          = total_picks - len(all_players_chosen)
         total_cash_remaining = float(sum(remaining_cash.values()))
 
-        if cash_per_team is not None and n_remaining > 0:
+        if n_remaining > 0:
             total_original_cash = float(H.n_drafters * cash_per_team)
 
             # G-scores for available (undrafted) players, used for G-score dollar values.
@@ -250,38 +253,37 @@ def _build_candidates(
             # otherwise fall back to the current team-specific scores.
             baseline_scores = generic_h_scores if generic_h_scores is not None else h_scores_sorted
 
-            try:
-                # your_dollar: team-specific H-scores, current state (remaining cash + picks)
-                your_dollar_series = auction_value_adjuster(
-                    h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+            # No defensive guard here: build_agent rejects any league whose pool can't fill every
+            # roster, so the replacement-level index inside auction_value_adjuster always resolves.
+            # your_dollar: team-specific H-scores, current state (remaining cash + picks)
+            your_dollar_series = auction_value_adjuster(
+                h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+            )
+            # gnrc_dollar: neutral baseline H-scores, current cash/picks remaining
+            gnrc_dollar_series = auction_value_adjuster(
+                baseline_scores, n_remaining, total_cash_remaining, streaming_noise,
+            )
+            # orig_dollar: neutral baseline H-scores, full original cash/picks
+            orig_dollar_series = auction_value_adjuster(
+                baseline_scores, total_picks, total_original_cash, streaming_noise,
+            )
+            # G-score variants: generic value using G-scores instead of H-scores.
+            gnrc_dollar_g_series = auction_value_adjuster(
+                g_scores_available, n_remaining, total_cash_remaining, streaming_noise,
+            )
+            orig_dollar_g_series = auction_value_adjuster(
+                player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
+            )
+            player_auction_values = {
+                p: AuctionValues(
+                    your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
+                    gnrc_dollar   = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
+                    orig_dollar   = round(float(orig_dollar_series.get(p, 0.0)), 2),
+                    gnrc_dollar_g = round(float(gnrc_dollar_g_series.get(p, 0.0)), 2),
+                    orig_dollar_g = round(float(orig_dollar_g_series.get(p, 0.0)), 2),
                 )
-                # gnrc_dollar: neutral baseline H-scores, current cash/picks remaining
-                gnrc_dollar_series = auction_value_adjuster(
-                    baseline_scores, n_remaining, total_cash_remaining, streaming_noise,
-                )
-                # orig_dollar: neutral baseline H-scores, full original cash/picks
-                orig_dollar_series = auction_value_adjuster(
-                    baseline_scores, total_picks, total_original_cash, streaming_noise,
-                )
-                # G-score variants: generic value using G-scores instead of H-scores.
-                gnrc_dollar_g_series = auction_value_adjuster(
-                    g_scores_available, n_remaining, total_cash_remaining, streaming_noise,
-                )
-                orig_dollar_g_series = auction_value_adjuster(
-                    player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
-                )
-                player_auction_values = {
-                    p: AuctionValues(
-                        your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
-                        gnrc_dollar   = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
-                        orig_dollar   = round(float(orig_dollar_series.get(p, 0.0)), 2),
-                        gnrc_dollar_g = round(float(gnrc_dollar_g_series.get(p, 0.0)), 2),
-                        orig_dollar_g = round(float(orig_dollar_g_series.get(p, 0.0)), 2),
-                    )
-                    for p in h_scores_sorted.index
-                }
-            except Exception:
-                player_auction_values = None  # degrade gracefully on edge cases
+                for p in h_scores_sorted.index
+            }
 
     # ── Vectorised expand-view precompute ─────────────────────────────────────
     # Every arithmetic input to the three expand-view tables (G-score rows, flex

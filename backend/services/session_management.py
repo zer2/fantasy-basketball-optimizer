@@ -19,17 +19,18 @@ from backend.platform_integration.helpers import build_platform_name_lookup
 
 
 def refresh_platform_name_lookup(session: Session) -> None:
-    """Rebuild the session's platform name lookup from its current info (no-op without a live platform).
+    """Rebuild the session's platform name lookup from its current info.
 
-    Lives here, not in build_agent, so the pipeline stays platform-agnostic. Call after the
-    pipeline runs when the player set may have changed (session creation and data/injured
-    patches, from_step <= 2); model/category/slot patches leave info['Positions'] untouched.
+    Precondition: a live platform is connected (session.platform_config is set) — there is nothing
+    to refresh otherwise, so callers guard on it. Lives here, not in build_agent, so the pipeline
+    stays platform-agnostic. Call after the pipeline runs when the player set may have changed
+    (session creation and data/injured patches, from_step <= 2); model/category/slot patches leave
+    info['Positions'] untouched.
     """
-    config = session.platform_config
-    if config is None:
-        return
     session.platform_name_lookup = build_platform_name_lookup(
-        session.agent.info, config.player_name_column, get_unified_player_table(),
+        session.agent.info,
+        session.platform_config.player_name_column,
+        get_unified_player_table(),
     )
 
 
@@ -53,7 +54,8 @@ def build_session(
     try:
         build_agent(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type,
                      uploaded_dfs=uploaded_dfs)
-        refresh_platform_name_lookup(session)
+        if session.platform_config is not None:
+            refresh_platform_name_lookup(session)
     except Exception:
         delete_session(session.id)
         raise

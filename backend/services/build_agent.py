@@ -23,6 +23,12 @@ from backend.parameters import load_all_params
 from backend.state.session import Session
 
 
+class InsufficientPlayerPoolError(Exception):
+    """The available player pool is too small to fill every roster in the league. This is a bad
+    league configuration (too few players for the number of teams x roster spots), not a server
+    fault, so the routes surface it as a 400."""
+
+
 # build_agent.py is backend/services/build_agent.py, so the project root is parents[2].
 _MEAN_OF_VARIANCES_PATH = Path(__file__).parents[2] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
 
@@ -219,6 +225,17 @@ def run_step4(session: Session) -> None:
     n_picks     = cp['n_picks']
     slot_counts = cp['slot_counts']
     n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
+
+    # The pool must be able to fill every roster; otherwise the whole model is ill-posed (there is
+    # no replacement-level player to anchor auction values, and managers could not complete teams).
+    # Reject it here rather than letting process_player_data or the auction math fail obscurely later.
+    n_available = len(session.v2)
+    n_required  = n_drafters * n_picks
+    if n_available < n_required:
+        raise InsufficientPlayerPoolError(
+            f'Only {n_available} players are available, but this league needs at least {n_required} '
+            f'({n_drafters} teams x {n_picks} roster spots) to fill every roster.'
+        )
 
     available_columns = set(session.v2.columns)
     categories = [c for c in cp['categories'] if c in available_columns]

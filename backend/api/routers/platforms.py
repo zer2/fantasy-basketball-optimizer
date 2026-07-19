@@ -10,7 +10,6 @@ from fastapi import APIRouter, HTTPException, Depends, status, Response
 
 from backend.infra.auth import current_user_key
 from backend.state.session import get_session
-from backend.services.session_management import refresh_platform_name_lookup
 from backend.platform_integration.registry import get_integration
 from backend.platform_integration.credential_store import yahoo_auth_dir, store_espn_credentials
 from backend.platform_integration.integrations.yahoo import YahooIntegration
@@ -97,10 +96,8 @@ def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(cu
         raise HTTPException(status_code=400, detail='Session is not connected to a live platform.')
     # Poll with the requesting user's own credentials, never the key stored on the session.
     integration = get_integration(config.platform, credentials_for(config.platform, user_key))
-    # The lookup is built at session creation / data patches; rebuild defensively if
-    # somehow absent so the poll never maps every player to 'RP'.
-    if session.platform_name_lookup is None:
-        refresh_platform_name_lookup(session)
+    # The lookup is built at session creation and rebuilt on data/injured/connect patches, so a
+    # connected session always has it here; no defensive rebuild (its absence would be an upstream bug).
     try:
         if mode == 'Auction Mode':
             selections = integration.get_auction_results(config, mode, session.platform_name_lookup)
@@ -114,8 +111,9 @@ def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(cu
         raise fail(502, 'Failed to fetch the live draft state.')
 
     # Auction selections carry per-player costs; turn them into per-team remaining cash.
-    remaining_cash = None
-    if selections.costs is not None:
+    if selections.costs is None:
+        remaining_cash = None
+    else:
         cash_per_team = session.current_params['cash_per_team']
         remaining_cash = {
             team: cash_per_team - sum(team_costs)
