@@ -258,6 +258,10 @@ NBA:
       default : 0.2
       min : 0.0
       max: 1.0
+    reg_strength :
+      default : 0.00005
+      min : 0.0
+      max: 0.005
     beth:
       default : 3
       min : 0
@@ -535,11 +539,15 @@ WNBA:
       default : 0.25
       min : 0.0
       max : 1.0
-    chi : 
+    chi :
       default : 0.6
       min : 0.0
       max: 1
-    n_iterations : 
+    reg_strength :
+      default : 0.00005
+      min : 0.0
+      max: 0.005
+    n_iterations :
       default : 30
       min : 10
       max: 10000
@@ -908,11 +916,15 @@ MLB:
       default : 0.25
       min : 0.0
       max : 1.0
-    chi : 
+    chi :
       default : 0.6
       min : 0.0
       max: 1
-    n_iterations : 
+    reg_strength :
+      default : 0.00005
+      min : 0.0
+      max: 0.005
+    n_iterations :
       default : 30
       min : 10
       max: 10000

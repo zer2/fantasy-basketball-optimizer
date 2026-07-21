@@ -66,20 +66,30 @@ _PUNT_SEED_FACTOR = 0.9
 _WEAKNESS_SEED_MIN_ROSTER = 3
 
 # Per-format best-practice configuration, resolved per agent in __init__:
-#   Rotisserie:  lowvar seed (tilts weight off the noisy categories), NO regulariser, unified stability v
-#   H2H (EC/MC): multi-start punt seeding + robustness regulariser (5x schedule)
+#   Rotisserie:  lowvar seed (tilts weight off the noisy categories), regulariser on, unified stability v
+#   H2H (EC/MC): multi-start punt seeding, regulariser on (5x schedule)
 # The env vars below override individual fields for A/B testing only; when unset (the production path)
 # each format uses its per-format default. Leave them unset in production.
 _SEED_MODE_OVERRIDE      = os.environ.get('SEED_MODE')        # multistart | heuristic | neutral | lowvar
 _PUNT_REG_OVERRIDE       = os.environ.get('PUNT_REG')         # '0' | '1'
 _ROTO_V_UNIFIED_OVERRIDE = os.environ.get('ROTO_V_UNIFIED')   # '0' | '1'
-_PUNT_REG_MULT = float(os.environ.get('PUNT_REG_MULT', '5'))  # scales the regulariser schedule (5 = "5x")
 # lowvar seed (Roto): exponent on the seed tilt that down-weights high-v (less stable) categories.
 _LOWVAR_TILT = float(os.environ.get('LOWVAR_TILT', '0.5'))
-# Per-iteration pull of the category weights toward neutral v (a proximal step for a -lambda*||w-v||^2
-# robustness penalty), indexed by the drafter's roster size (pick 1 = 0 players). Strong when the roster
-# is empty and the build is undetermined; decays to none once it has committed.
-_PUNT_REG_SCHEDULE = [x * _PUNT_REG_MULT for x in (0.01, 0.005, 0.003, 0.002, 0.001)]
+# Robustness regulariser: each iteration soft-thresholds the category weights toward neutral v -- the
+# proximal step for an L1 penalty -lambda*||w-v||_1. L1 rewards balance without over-penalising a
+# committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
+# deviate. The per-pick strength lambda follows a cosine schedule (built per agent from n_picks in
+# __init__): it starts at REG_PEAK on an empty roster and decays to 0 by the midpoint of the draft.
+# REG_PEAK tunes the peak; PUNT_REG_SCHEDULE (comma-separated floats) overrides the whole schedule.
+_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides the reg_strength parameter
+# Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
+# component from the singular w==v ray. Only needed if REG_PEAK is raised past ~5e-4, where the small
+# empty-board deviations let the shrink reach v and term_five goes singular (EC in particular).
+_REG_FLOOR = float(os.environ.get('REG_FLOOR', '0.0'))
+# Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
+# (few bases), so they need a firmer pull toward uniform to have a comparable effect.
+_POSITION_REG_MULT = float(os.environ.get('POSITION_REG_MULT', '1000'))
+_schedule_override = os.environ.get('PUNT_REG_SCHEDULE')
 from itertools import combinations
 
 from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
@@ -116,6 +126,7 @@ class HAgent:
                  , params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
+                 , reg_strength: float = 0.00005
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -129,14 +140,22 @@ class HAgent:
         self.collect_info  = collect_info
         self.scoring_format = scoring_format
 
-        # Per-format best-practice config (the env vars above override any field for A/B testing). Roto
-        # punts are structural (best players share the same scarce categories, so no build can contest
-        # every one), so it seeds with the lowvar tilt and runs no regulariser; the H2H formats use
-        # multi-start punt seeding plus the robustness regulariser so early picks avoid over-committing.
+        # Per-format config (the env vars above override any field for A/B testing). All formats run the
+        # robustness regulariser; they differ only in the cold-start seed -- Rotisserie uses the lowvar
+        # tilt (its punts are structural, not a strategic fork), the H2H formats use multi-start punt
+        # seeding so early picks avoid over-committing to a punt they may drop.
         is_rotisserie       = scoring_format == 'Rotisserie'
         self.seed_mode      = _SEED_MODE_OVERRIDE or ('lowvar' if is_rotisserie else 'multistart')
-        self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else (not is_rotisserie)
+        self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else True
         roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
+
+        # Cosine regulariser schedule built from the draft length: strength reg_strength (the session
+        # parameter) on an empty roster, decaying to 0 by the midpoint (indexed by roster size). The
+        # REG_PEAK env var overrides the peak and PUNT_REG_SCHEDULE overrides the whole schedule.
+        reg_peak = float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None else reg_strength
+        self.reg_schedule = ([float(x) for x in _schedule_override.split(',')] if _schedule_override
+                             else [reg_peak * np.cos(np.pi * k / n_picks)
+                                   for k in range(n_picks) if k < n_picks / 2])
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
@@ -702,10 +721,8 @@ class HAgent:
             # Shares are optimised in softmax-logit space (see the update below). A logit must travel
             # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
             # logit learning rate is an order of magnitude larger than the old share-space 0.01.
-            'Shares': {
-                pos_code: AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE)
-                for pos_code in self.position_structure['flex'].keys()
-            },
+            # One optimiser for the shared per-position logits (every flex slot's softmax reads them).
+            'Shares': AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE),
         }
 
         if self.sport == 'MLB':
@@ -717,15 +734,24 @@ class HAgent:
         category_weights_current  = category_weights
         position_shares_current   = position_shares
 
-        # Flex shares live on the probability simplex. We optimise them in unconstrained softmax-logit
-        # space: position_shares stays the working set of shares (what the objective reads), and
-        # position_logits is its pre-image, so softmax(logits) reproduces the initial shares exactly
-        # (softmax is shift-invariant, so log(shares) is a valid pre-image). Clip to a tiny floor first
-        # so a warm-started zero share yields a finite (very negative) logit rather than -inf.
-        position_logits = {
-            pos_code: np.log(np.clip(position_shares[pos_code].values, 1e-12, None))
-            for pos_code in self.position_structure['flex'].keys()
-        }
+        # All flex slots share one logit per position (the position_means columns): each slot's shares are
+        # the softmax over its own subset of positions, so e.g. the guard slot's PG:SG ratio is exactly the
+        # utility slot's. We optimise these shared per-position logits directly. Seed them from the slot that
+        # spans every position (Util), then derive each slot's shares so they start mutually consistent.
+        # (softmax is shift-invariant, so log(shares) is a valid pre-image; clip so a zero share is finite.)
+        if self.position_means is not None:
+            n_positions   = self.position_means.shape[1]
+            n_cand        = len(next(iter(position_shares.values())))
+            # Seed from the slot spanning every position (Util) so the shared logits carry a consistent
+            # warm start; if no single slot spans all positions, start uniform (still correct, just no warm
+            # start on the shared vector).
+            master_pc     = next((pc for pc in self.position_structure['flex']
+                                  if len(self.position_indices[pc]) == n_positions), None)
+            master_logits = (np.log(np.clip(position_shares[master_pc].values, 1e-12, None))
+                             if master_pc is not None else np.zeros((n_cand, n_positions)))
+            for pos_code in self.position_structure['flex']:
+                position_shares[pos_code].values[:] = _softmax_rows(
+                    master_logits[:, self.position_indices[pos_code]])
 
         if (n_players_selected < self.n_picks - 1) and self.dynamic:
 
@@ -760,11 +786,11 @@ class HAgent:
                     sigma_2_m, pitching_preference,
                 )
 
-            # Robustness regulariser (PUNT_REG=1): each iteration pull the category weights a fraction
-            # toward neutral v, strongest when the roster is small (see _PUNT_REG_SCHEDULE) -- the proximal
-            # step for a -lambda*||w-v||^2 penalty, so early picks don't over-commit to a punt they may drop.
-            reg_lambda  = (_PUNT_REG_SCHEDULE[len(self.players)]
-                           if (self.regulariser_on and len(self.players) < len(_PUNT_REG_SCHEDULE)) else 0.0)
+            # Robustness regulariser: soft-threshold the category weights toward neutral v each iteration
+            # (proximal step for an L1 penalty -lambda*||w-v||_1), strongest on an empty roster and
+            # decaying to 0 by mid-draft (see self.reg_schedule), so early picks stay flexible.
+            reg_lambda  = (self.reg_schedule[len(self.players)]
+                           if (self.regulariser_on and len(self.players) < len(self.reg_schedule)) else 0.0)
             neutral_row = self.v.reshape(1, self.n_categories)
 
             for iteration in range(max(1, n_iterations)):
@@ -798,7 +824,13 @@ class HAgent:
                 cat_updates       = optimizers['Categories'].minimize(cat_grad_centered)
                 category_weights  = category_weights + cat_updates
                 if reg_lambda > 0.0:
-                    category_weights = category_weights + reg_lambda * (neutral_row - category_weights)
+                    # L1 proximal step: shrink each weight toward neutral v by up to reg_lambda (a linear
+                    # penalty, so a committed punt is not over-penalised the way L2's proportional pull
+                    # would). _REG_FLOOR stops the shrink short of v, keeping weights off the singular w==v
+                    # ray. Renormalised to the simplex just below.
+                    deviation        = category_weights - neutral_row
+                    shrink           = np.minimum(reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
+                    category_weights = category_weights - np.sign(deviation) * shrink
                 category_weights[category_weights < 0] = 0
 
                 if self.sport == 'NBA':
@@ -812,23 +844,32 @@ class HAgent:
                     pitching_preference = np.clip(pitching_preference + pp_update, -0.5, 0.5)
 
                 if self.position_means is not None:
-                    for pos_code, optimizer in optimizers['Shares'].items():
-                        shares      = position_shares[pos_code].values
-                        share_grad  = gradient_result['Gradients']['Shares'][pos_code]
-                        # Step in logit space: the chain rule through the softmax Jacobian turns the
-                        # share gradient g into the logit gradient s ⊙ (g − ⟨g, s⟩). That Jacobian,
-                        # ∂sⱼ/∂zᵢ = sⱼ(δᵢⱼ − sᵢ), is just the quotient rule applied to sⱼ = e^{zⱼ}/Σe^{zₖ}:
-                        # both the numerator term (u'v) and the denominator term (−uv') bring down an
-                        # e^{zᵢ} — since d/dz e^z = e^z — and each e^{zᵢ}/Σe^{zₖ} is exactly the share sᵢ,
-                        # so every raw exponential is replaced by the share it represents. The numerator
-                        # term gives the leading s (the update vanishes at the boundary, so a share can
-                        # never be driven negative); the denominator term gives the ⟨g, s⟩ share-weighted
-                        # centering (positions already near 0 drop out instead of dragging a plain mean).
-                        # No clip or renormalise is needed — softmax(logits) is always a valid distribution.
-                        logit_grad   = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
-                        logit_update = optimizer.minimize(logit_grad)
-                        position_logits[pos_code] = position_logits[pos_code] + logit_update
-                        position_shares[pos_code].values[:] = _softmax_rows(position_logits[pos_code])
+                    # All flex slots share one logit per position, so each slot's shares are the softmax
+                    # over its own subset of positions (position_indices). Accumulate every slot's logit-
+                    # space gradient -- the softmax Jacobian s ⊙ (g − ⟨g, s⟩) applied to its restricted
+                    # shares -- into the shared per-position gradient, then take one optimiser step.
+                    # Overlapping positions (PG is in both the guard and utility slots) sum their gradients.
+                    master_grad = np.zeros_like(master_logits)
+                    for pos_code in self.position_structure['flex']:
+                        shares     = position_shares[pos_code].values
+                        share_grad = gradient_result['Gradients']['Shares'][pos_code]
+                        logit_grad = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
+                        master_grad[:, self.position_indices[pos_code]] += logit_grad
+                    master_logits = master_logits + optimizers['Shares'].minimize(master_grad)
+                    if reg_lambda > 0.0:
+                        # L1 reg toward uniform on the shared per-position shares (mirrors the category
+                        # weights x _POSITION_REG_MULT); re-derive the logits so the pull persists.
+                        pos_reg       = reg_lambda * _POSITION_REG_MULT
+                        master_shares = _softmax_rows(master_logits)
+                        uniform       = 1.0 / master_shares.shape[1]
+                        dev           = master_shares - uniform
+                        shrink        = np.minimum(pos_reg, np.maximum(np.abs(dev) - _REG_FLOOR, 0.0))
+                        master_shares = np.clip(master_shares - np.sign(dev) * shrink, 1e-12, None)
+                        master_logits = np.log(master_shares / master_shares.sum(axis=1, keepdims=True))
+                    # Derive each flex slot's shares from the shared logits (softmax over its own positions).
+                    for pos_code in self.position_structure['flex']:
+                        position_shares[pos_code].values[:] = _softmax_rows(
+                            master_logits[:, self.position_indices[pos_code]])
 
             # Warm-start the next pick from the converged best candidate. Computed once after the loop
             # (only the final iteration's values are ever kept) and read straight from the numpy arrays,

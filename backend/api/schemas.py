@@ -39,6 +39,7 @@ class ModelParameters(BaseModel):
     psi: float
     chi: float
     aleph: float
+    reg_strength: float = 0.00005
     n_iterations: int
     streaming_noise: float
 

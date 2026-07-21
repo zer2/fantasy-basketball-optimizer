@@ -66,6 +66,7 @@ def _build_session_request(
             'psi':             nba_options['psi']['default'],
             'chi':             nba_options['chi']['default'],
             'aleph':           nba_options['aleph']['default'],
+            'reg_strength':    nba_options['reg_strength']['default'],
             'streaming_noise': nba_options['S']['default'],
         },
         'data_source': {

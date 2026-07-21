@@ -50,10 +50,10 @@ _TEAM_2 = [
 # drafter's weakest-category punt mid-draft, replacing the old heuristic) in algorithm_agents, which
 # raises the optimised H-scores across the board.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '70e9262ae54cbf45333bb1aa0d4ab8ad3c7678f87b3f1343471e3b5c9a7a5c11',
-    ('Head to Head: Each Category',  'mid'):   '38b1c4ed07a56ab9268b4480e7718591cade8c339813e22dbbbbeb6e74885fa2',
-    ('Head to Head: Most Categories','empty'): '45589b15586b0897a0ca7eb0403555b356836e5068860275f0acc51904ceeca5',
-    ('Head to Head: Most Categories','mid'):   '01027ada3633ad3df671c49b7ef7fd1b60dbf2d14911dc73ef4d8ba88fe52d5e',
+    ('Head to Head: Each Category',  'empty'): 'bb0d1e29ef7a8a735dec7304e618b6efca99e41987ff84af8fa4a40fdce3ef6b',
+    ('Head to Head: Each Category',  'mid'):   '8f2ce9c587242336c59d69dc128923abcf97293bee19340549f202ffa9f80e74',
+    ('Head to Head: Most Categories','empty'): '4d4919a72d1405396b1a8649c934b59c26a672767a5e0bdd23b079f86bb9335e',
+    ('Head to Head: Most Categories','mid'):   'efeab8b78b0fdee96efd7957041acef28245cf2857fbe1a033a74e1aecf1ef27',
 }
 
 

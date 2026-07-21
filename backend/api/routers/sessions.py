@@ -53,6 +53,7 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
         'psi':              p.psi,
         'chi':              p.chi,
         'aleph':            p.aleph,
+        'reg_strength':     p.reg_strength,
         'n_iterations':     p.n_iterations,
         'streaming_noise':  p.streaming_noise,
         # auction
