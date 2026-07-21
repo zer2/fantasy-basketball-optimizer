@@ -12,6 +12,8 @@ The original src/ file is untouched.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 from scipy.special import ndtr, ndtri
@@ -54,6 +56,30 @@ def _softmax_rows(logits):
 # because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
 # gradient-iteration budget rather than still drifting at the final iteration.
 _SHARES_LEARNING_RATE = 0.3
+
+# Punt-seeding for the cold-start category weights (replaces the old heuristic init). Each seed gently
+# down-weights one category to this fraction of neutral; a gentle seed starts near the 30-iteration
+# optimum so the short descent can reach it, whereas an aggressive punt starts too far and loses.
+_PUNT_SEED_FACTOR = 0.9
+# From this many of the drafter's own picks on, the roster has a real shape, so seed a single punt of
+# its weakest category. Earlier than that there is no reliable weakness, so multi-start over every punt.
+_WEAKNESS_SEED_MIN_ROSTER = 3
+
+# Per-format best-practice configuration, resolved per agent in __init__:
+#   Rotisserie:  lowvar seed (tilts weight off the noisy categories), NO regulariser, unified stability v
+#   H2H (EC/MC): multi-start punt seeding + robustness regulariser (5x schedule)
+# The env vars below override individual fields for A/B testing only; when unset (the production path)
+# each format uses its per-format default. Leave them unset in production.
+_SEED_MODE_OVERRIDE      = os.environ.get('SEED_MODE')        # multistart | heuristic | neutral | lowvar
+_PUNT_REG_OVERRIDE       = os.environ.get('PUNT_REG')         # '0' | '1'
+_ROTO_V_UNIFIED_OVERRIDE = os.environ.get('ROTO_V_UNIFIED')   # '0' | '1'
+_PUNT_REG_MULT = float(os.environ.get('PUNT_REG_MULT', '5'))  # scales the regulariser schedule (5 = "5x")
+# lowvar seed (Roto): exponent on the seed tilt that down-weights high-v (less stable) categories.
+_LOWVAR_TILT = float(os.environ.get('LOWVAR_TILT', '0.5'))
+# Per-iteration pull of the category weights toward neutral v (a proximal step for a -lambda*||w-v||^2
+# robustness penalty), indexed by the drafter's roster size (pick 1 = 0 players). Strong when the roster
+# is empty and the build is undetermined; decays to none once it has committed.
+_PUNT_REG_SCHEDULE = [x * _PUNT_REG_MULT for x in (0.01, 0.005, 0.003, 0.002, 0.001)]
 from itertools import combinations
 
 from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
@@ -102,6 +128,15 @@ class HAgent:
         self.n_drafters    = n_drafters
         self.collect_info  = collect_info
         self.scoring_format = scoring_format
+
+        # Per-format best-practice config (the env vars above override any field for A/B testing). Roto
+        # punts are structural (best players share the same scarce categories, so no build can contest
+        # every one), so it seeds with the lowvar tilt and runs no regulariser; the H2H formats use
+        # multi-start punt seeding plus the robustness regulariser so early picks avoid over-committing.
+        is_rotisserie       = scoring_format == 'Rotisserie'
+        self.seed_mode      = _SEED_MODE_OVERRIDE or ('lowvar' if is_rotisserie else 'multistart')
+        self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else (not is_rotisserie)
+        roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
@@ -175,7 +210,7 @@ class HAgent:
             self.x_scores = x_scores.loc[
                 info['G-scores'].sum(axis=1).sort_values(ascending=False).index
             ]
-            v = np.sqrt(mov / vom)
+            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
 
             categories = list(x_scores.columns)
 
@@ -343,28 +378,43 @@ class HAgent:
             x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
-        default_weights = self.v.T.reshape(1, self.n_categories, 1)
-        category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
-
-
-
         if self.initial_category_weights is None:
-
-            #we want to subtract out roughly the player's position means 
-            #to account for the fact that they are taking up that slot
-            if self.pos_avg is not None:
-                pos_avg = self.pos_avg.loc[x_scores_batch.index]
-                pos_avg_array = np.expand_dims(np.array(pos_avg), axis=2)
-            else: 
-                pos_avg_array = 0 #not an array, but this will work fine
-
-            initial_category_weights = (
-                (diff_means + x_scores_batch_array - pos_avg_array)
-                / (default_weights * category_momentum_factor)
-                + default_weights
-            ).mean(axis=2)
-            initial_category_weights /= initial_category_weights.sum(axis=1).reshape(-1, 1)
-
+            # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
+            # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
+            # heuristic init instead, for A/B testing the seeding against the baseline.
+            if self.seed_mode == 'heuristic':
+                default_weights = self.v.T.reshape(1, self.n_categories, 1)
+                category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
+                if self.pos_avg is not None:
+                    pos_avg_array = np.expand_dims(np.array(self.pos_avg.loc[x_scores_batch.index]), axis=2)
+                else:
+                    pos_avg_array = 0
+                initial_category_weights = (
+                    (diff_means + x_scores_batch_array - pos_avg_array)
+                    / (default_weights * category_momentum_factor)
+                    + default_weights
+                ).mean(axis=2)
+                initial_category_weights /= initial_category_weights.sum(axis=1).reshape(-1, 1)
+            elif self.seed_mode == 'neutral':
+                # Start at neutral v (no punt bias) and let the descent re-balance. Nudge off the exact
+                # singular ray -- term_five_b (a Cauchy-Schwarz Gram determinant) vanishes when w is
+                # parallel to v, giving a 0/0 -- so a negligible jitter keeps it finite for every format.
+                neutral = self.v.reshape(self.n_categories)
+                jitter  = 1.0 + 1e-9 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
+                initial_category_weights = np.array(
+                    [(neutral * jitter) / (neutral * jitter).sum()] * len(x_scores_batch)
+                )
+            elif self.seed_mode == 'lowvar':
+                # Roto: tilt the initial seed to down-weight the high-v (less stable) categories, since
+                # a high v means more within-period noise relative to signal, so the category is less
+                # reliably winnable and worth less as an initial lean. The descent then re-balances. The
+                # tilt also lands a finite distance off the singular w||v ray, dodging the near-v blow-up.
+                neutral = self.v.reshape(self.n_categories)
+                tilt    = (neutral / neutral.mean()) ** (-_LOWVAR_TILT)
+                seed    = neutral * tilt
+                initial_category_weights = np.array([seed / seed.sum()] * len(x_scores_batch))
+            else:
+                initial_category_weights = None
             initial_position_shares = {
                 pos_code: pd.DataFrame({
                     base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
@@ -585,6 +635,54 @@ class HAgent:
         return pd.DataFrame({'value': score},
                             index=[x * step_size for x in range(int(max_money / step_size))])
 
+    def _select_starting_weights(self
+                                 , position_shares
+                                 , diff_means
+                                 , diff_vars
+                                 , x_scores_batch_array
+                                 , candidate_player_array
+                                 , team_so_far_array
+                                 , n_players_selected
+                                 , sigma_2_m
+                                 , pitching_preference):
+        """Choose the cold-start category-weight init per candidate (replaces the old heuristic).
+
+        Each seed gently punts one category to _PUNT_SEED_FACTOR of neutral. Once the drafter holds
+        _WEAKNESS_SEED_MIN_ROSTER+ players the roster has a real shape, so seed the single punt of its
+        weakest category (same for every candidate). Earlier -- no reliable weakness -- multi-start:
+        score one punt per category and keep, per candidate, the one with the best pre-descent objective.
+        """
+        neutral      = self.v.reshape(self.n_categories)
+        n_candidates = x_scores_batch_array.shape[0]
+
+        def gentle_punt(category_index):
+            weights = neutral.copy()
+            weights[category_index] *= _PUNT_SEED_FACTOR
+            return weights / weights.sum()
+
+        if len(self.players) >= _WEAKNESS_SEED_MIN_ROSTER:
+            weakest = int(np.argmin(self.x_scores.loc[self.players].sum(axis=0).to_numpy()))
+            return np.array([gentle_punt(weakest)] * n_candidates)
+
+        # Multi-start: score every gentle punt with a clean full solve (throttle off, so the seeds do
+        # not share cached rosters) and keep each candidate's best-scoring seed.
+        seed_vectors   = [gentle_punt(i) for i in range(self.n_categories)]
+        saved_priority = self._candidate_priority
+        self._candidate_priority     = None
+        self._position_rosters_cache = None
+        seed_scores = np.vstack([
+            self.get_objective_and_gradient(
+                np.array([seed] * n_candidates), position_shares, diff_means, diff_vars,
+                x_scores_batch_array, candidate_player_array, team_so_far_array,
+                n_players_selected, sigma_2_m, 0, pitching_preference,
+            )['Score']
+            for seed in seed_vectors
+        ])
+        self._candidate_priority     = saved_priority
+        self._position_rosters_cache = None
+        best = np.argmax(seed_scores, axis=0)
+        return np.array([seed_vectors[b] for b in best])
+
     def perform_iterations(self
                            , category_weights
                            , position_shares
@@ -653,6 +751,22 @@ class HAgent:
             # 5th batch" are deep-bench players, not worth a Hungarian solve every iteration.
             self._candidate_offset       = candidate_offset
 
+            # Cold start (get_h_scores passes None): choose the starting category weights by punt-seeding
+            # instead of the old heuristic. Done here, where the objective machinery is already set up.
+            if category_weights is None:
+                category_weights = self._select_starting_weights(
+                    position_shares, diff_means, diff_vars, x_scores_batch_array,
+                    candidate_player_array, team_so_far_array, n_players_selected,
+                    sigma_2_m, pitching_preference,
+                )
+
+            # Robustness regulariser (PUNT_REG=1): each iteration pull the category weights a fraction
+            # toward neutral v, strongest when the roster is small (see _PUNT_REG_SCHEDULE) -- the proximal
+            # step for a -lambda*||w-v||^2 penalty, so early picks don't over-commit to a punt they may drop.
+            reg_lambda  = (_PUNT_REG_SCHEDULE[len(self.players)]
+                           if (self.regulariser_on and len(self.players) < len(_PUNT_REG_SCHEDULE)) else 0.0)
+            neutral_row = self.v.reshape(1, self.n_categories)
+
             for iteration in range(max(1, n_iterations)):
                 category_weights_current  = category_weights
                 position_shares_current   = position_shares
@@ -683,6 +797,8 @@ class HAgent:
                 cat_grad_centered = gradients['Categories'] - gradients['Categories'].mean(axis=1).reshape(-1, 1)
                 cat_updates       = optimizers['Categories'].minimize(cat_grad_centered)
                 category_weights  = category_weights + cat_updates
+                if reg_lambda > 0.0:
+                    category_weights = category_weights + reg_lambda * (neutral_row - category_weights)
                 category_weights[category_weights < 0] = 0
 
                 if self.sport == 'NBA':

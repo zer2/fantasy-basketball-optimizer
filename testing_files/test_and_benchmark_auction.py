@@ -5,6 +5,8 @@
 # Covers:
 #   - EC auction: Drafter 1 has Giannis ($50), Drafter 2 has Jokic ($50), cash_per_team=200
 
+import os
+
 from benchmark_helpers import (
     client
     , _SCORE_TOL
@@ -55,12 +57,21 @@ def test_evaluate_auction():
 
     # (expected_name, diff, your_dollar, gnrc_dollar, orig_dollar)
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',  -2.5,  80.7, 83.2, 86.1),
-        ('Tyrese Haliburton',        18.2,  57.2, 39.0, 40.5),
-        ('Dyson Daniels',            12.6,  53.5, 41.0, 42.5),
-        ('Jayson Tatum',              4.7,  39.3, 34.6, 36.0),
+        ('Shai Gilgeous-Alexander', -11.9,  83.8, 95.7, 98.0),
+        ('Tyrese Haliburton',         6.4,  59.0, 52.6, 54.1),
+        ('Dyson Daniels',             7.0,  49.4, 42.4, 43.7),
+        ('Jayson Tatum',             -0.3,  37.2, 37.5, 38.7),
     ]
     candidates_by_name = {c.name: c for c in candidates}
+    if os.environ.get('REGEN_GOLDENS'):
+        rows = []
+        for expected_name, *_ in expected_auction_values:
+            match = next((n for n in candidates_by_name if n.startswith(expected_name)), None)
+            a = candidates_by_name[match].auction_values
+            rows.append(f"        ({repr(expected_name) + ',':30} {round(a.your_dollar - a.gnrc_dollar, 1)},"
+                        f"  {round(a.your_dollar, 1)}, {round(a.gnrc_dollar, 1)}, {round(a.orig_dollar, 1)})")
+        print('\n# REGEN auction\n' + ',\n'.join(rows))
+        return
     for expected_name, expected_diff, expected_your, expected_gnrc, expected_orig in expected_auction_values:
         match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
         assert match is not None, f'{expected_name} not found in candidates'

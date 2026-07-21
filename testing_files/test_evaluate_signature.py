@@ -46,15 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# The 'empty' goldens were regenerated 2026-07-18 when the neutral baseline moved into the agent
-# (agent.default_h_scores, built once at session creation): an empty board now short-circuits to that
-# full-exact baseline instead of re-running the throttle, so the draft-start payload is the exact solve.
-# The 'mid' goldens are unchanged — the throttled result the baseline primes is identical to before.
+# All four were regenerated 2026-07-19 for the punt-seed init (multi-start on an empty board, the
+# drafter's weakest-category punt mid-draft, replacing the old heuristic) in algorithm_agents, which
+# raises the optimised H-scores across the board.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '8f3fe8c406e135bb5e8ea54722fdff99acc3130e377d57fe2fc94a7f7ccf3421',
-    ('Head to Head: Each Category',  'mid'):   'ff2e9a2359d6eeda1eadccd6f0c0bdadce52dba71c41340fa0bbf8e0d5db8d26',
-    ('Head to Head: Most Categories','empty'): '48fc23d88c4658ee8238200ee694310e1b376fc144975153c4b07e321a896cff',
-    ('Head to Head: Most Categories','mid'):   '10f46b3cc7e9487bda109f052324a6192460e4cadcd48a503669c1a51683ca00',
+    ('Head to Head: Each Category',  'empty'): '70e9262ae54cbf45333bb1aa0d4ab8ad3c7678f87b3f1343471e3b5c9a7a5c11',
+    ('Head to Head: Each Category',  'mid'):   '38b1c4ed07a56ab9268b4480e7718591cade8c339813e22dbbbbeb6e74885fa2',
+    ('Head to Head: Most Categories','empty'): '45589b15586b0897a0ca7eb0403555b356836e5068860275f0acc51904ceeca5',
+    ('Head to Head: Most Categories','mid'):   '01027ada3633ad3df671c49b7ef7fd1b60dbf2d14911dc73ef4d8ba88fe52d5e',
 }
 
 

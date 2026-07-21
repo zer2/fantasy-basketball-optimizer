@@ -1,6 +1,7 @@
 # testing_files/benchmark_helpers.py
 # Shared constants, client, and session-request builder used across all benchmark files.
 
+import os
 import yaml
 from fastapi.testclient import TestClient
 
@@ -72,3 +73,22 @@ def _build_session_request(
             'season': _SEASON,
         },
     }
+
+
+def check_top_scores(label, expected_top_scores, candidates):
+    """Assert each expected player's H-score is within _SCORE_TOL of its golden. With REGEN_GOLDENS set,
+    print the actuals in paste-ready form and skip the assertions instead (golden regeneration)."""
+    by_name  = {c.name: c for c in candidates}
+    resolved = []
+    for expected_name, expected_score in expected_top_scores:
+        match = next((n for n in by_name if n.startswith(expected_name)), None)
+        assert match is not None, f'{expected_name} not found in candidates'
+        resolved.append((expected_name, expected_score, by_name[match].h_score, match))
+    if os.environ.get('REGEN_GOLDENS'):
+        rows = ',\n'.join(f"            ({repr(name) + ',':38} {round(actual, 1)})"
+                          for name, _, actual, _ in resolved)
+        print(f'\n# REGEN [{label}]\n{rows}')
+        return
+    for expected_name, expected_score, actual_score, match in resolved:
+        assert abs(actual_score - expected_score) <= _SCORE_TOL, \
+            f'{match} ({label}): expected H-score {expected_score}, got {actual_score:.1f}'

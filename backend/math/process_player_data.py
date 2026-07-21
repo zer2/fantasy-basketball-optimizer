@@ -243,9 +243,14 @@ def process_player_data(player_stats_v2: pd.DataFrame
                                              mean_of_variances, counting_stats,
                                              ratio_stats, params)
 
-    beta_weight = chi if scoring_format == 'Rotisserie' else 1
+    # Bake the chi factor into the noise term (Mean of Variances) up front -- Rotisserie only -- so it
+    # propagates consistently to the scores AND to v (the x->g weighting) and w (the opponent-variance
+    # term). Previously chi was applied only in the score denominators, leaving v and w computed as if
+    # chi = 1, which over-weighted the high-signal categories and under-stated opponent variance.
+    chi_factor = chi if scoring_format == 'Rotisserie' else 1
+    coeff_first['Mean of Variances'] = coeff_first['Mean of Variances'] * chi_factor
 
-    g_first = calculate_scores_from_coefficients(player_means, coeff_first, params, 1, beta_weight,
+    g_first = calculate_scores_from_coefficients(player_means, coeff_first, params, 1, 1,
                                                   counting_stats, ratio_stats, categories)
     representative_player_set = (
         g_first.sum(axis=1).sort_values(ascending=False).index[:n_starters * n_drafters]
@@ -258,15 +263,17 @@ def process_player_data(player_stats_v2: pd.DataFrame
         coefficients = calculate_coefficients(player_means, representative_player_set,
                                              mean_of_variances, counting_stats, ratio_stats, params)
 
+    coefficients['Mean of Variances'] = coefficients['Mean of Variances'] * chi_factor
+
     mov = coefficients.loc[categories, 'Mean of Variances']
     vom = coefficients.loc[categories, 'Variance of Means']
     v_original = np.sqrt(mov / (mov + vom))
     v = v_original / v_original.sum()
     w = vom / mov
 
-    g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1, beta_weight,
+    g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1, 1,
                                                    counting_stats, ratio_stats, categories)
-    x_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 0, beta_weight,
+    x_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 0, 1,
                                                    counting_stats, ratio_stats, categories)
 
     replacement_games_rate = (1 - player_means['Games Played %'] / 100) * psi
