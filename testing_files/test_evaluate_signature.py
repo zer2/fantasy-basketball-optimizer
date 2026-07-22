@@ -46,14 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# All four were regenerated 2026-07-19 for the punt-seed init (multi-start on an empty board, the
-# drafter's weakest-category punt mid-draft, replacing the old heuristic) in algorithm_agents, which
-# raises the optimised H-scores across the board.
+# The empty-board hashes are unchanged from the punt-seed init; the two 'mid' hashes were regenerated
+# 2026-07-21 for the Gaussian (phi, B=4) regulariser decay schedule, which shifts only the mid-draft
+# optimisation (empty-board reg strength is the schedule's peak, identical to the prior cosine peak).
 _GOLDEN = {
     ('Head to Head: Each Category',  'empty'): 'bb0d1e29ef7a8a735dec7304e618b6efca99e41987ff84af8fa4a40fdce3ef6b',
-    ('Head to Head: Each Category',  'mid'):   '8f2ce9c587242336c59d69dc128923abcf97293bee19340549f202ffa9f80e74',
+    ('Head to Head: Each Category',  'mid'):   'ef3a31da5784d7d92e015a13233678a4cbd8b29728640ce49ab9855a48f0eef5',
     ('Head to Head: Most Categories','empty'): '4d4919a72d1405396b1a8649c934b59c26a672767a5e0bdd23b079f86bb9335e',
-    ('Head to Head: Most Categories','mid'):   'efeab8b78b0fdee96efd7957041acef28245cf2857fbe1a033a74e1aecf1ef27',
+    ('Head to Head: Most Categories','mid'):   'e7b7e00add5cd689eec9f719ed10ec5595a9c093eefe0ed9ed8c83eba1741fd3',
 }
 
 

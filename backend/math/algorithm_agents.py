@@ -89,6 +89,10 @@ _REG_FLOOR = float(os.environ.get('REG_FLOOR', '0.0'))
 # Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
 # (few bases), so they need a firmer pull toward uniform to have a comparable effect.
 _POSITION_REG_MULT = float(os.environ.get('POSITION_REG_MULT', '1000'))
+# Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
+# empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
+# before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
+_REG_SHAPE_B = float(os.environ.get('REG_SHAPE_B', '4'))
 _schedule_override = os.environ.get('PUNT_REG_SCHEDULE')
 from itertools import combinations
 
@@ -149,13 +153,16 @@ class HAgent:
         self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else True
         roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
 
-        # Cosine regulariser schedule built from the draft length: strength reg_strength (the session
-        # parameter) on an empty roster, decaying to 0 by the midpoint (indexed by roster size). The
-        # REG_PEAK env var overrides the peak and PUNT_REG_SCHEDULE overrides the whole schedule.
+        # Gaussian (phi) regulariser schedule built from the draft length: strength reg_strength (the
+        # session parameter) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
+        # with a concave shoulder set by _REG_SHAPE_B. REG_PEAK overrides the peak; PUNT_REG_SCHEDULE the
+        # whole schedule.
         reg_peak = float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None else reg_strength
+        _phi0    = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
         self.reg_schedule = ([float(x) for x in _schedule_override.split(',')] if _schedule_override
-                             else [reg_peak * np.cos(np.pi * k / n_picks)
-                                   for k in range(n_picks) if k < n_picks / 2])
+                             else [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
+                                               - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
+                                   for k in range(n_picks)])
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport

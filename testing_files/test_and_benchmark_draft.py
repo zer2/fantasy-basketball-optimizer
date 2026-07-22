@@ -52,7 +52,7 @@ _FIRST_ROUND_CONFIGS = [
         ('Head to Head: Each Category', [
             ('Karl-Anthony Towns',  50.6),
             ('Brook Lopez',         50.0),
-            ('Jaren Jackson Jr.',   49.9),
+            ('Jaren Jackson Jr.',   50.0),
             ('Derrick White',       50.0),
         ], None),
         id='EC-first-round',
@@ -61,7 +61,7 @@ _FIRST_ROUND_CONFIGS = [
         ('Head to Head: Most Categories', [
             ('Karl-Anthony Towns',  52.7),
             ('Brook Lopez',         50.5),
-            ('Jaren Jackson Jr.',   50.3),
+            ('Jaren Jackson Jr.',   50.4),
             ('Myles Turner',        49.8),
         ], None),
         id='MC-first-round',
@@ -78,18 +78,18 @@ _FIRST_ROUND_CONFIGS = [
     pytest.param(
         ('Head to Head: Each Category', [
             ('Karl-Anthony Towns',  51.8),
-            ('Cade Cunningham',     51.4),
+            ('Cade Cunningham',     51.3),
             ('Devin Booker',        51.2),
-            ('Jaren Jackson Jr.',   50.9),
+            ('Jaren Jackson Jr.',   51.0),
         ], _NO_TO_CATEGORIES),
         id='EC-first-round-noTO',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  54.5),
+            ('Karl-Anthony Towns',  54.6),
             ('Cade Cunningham',     54.1),
-            ('Devin Booker',        53.0),
-            ('Jaren Jackson Jr.',   52.9),
+            ('Devin Booker',        52.9),
+            ('Jaren Jackson Jr.',   53.0),
         ], _NO_TO_CATEGORIES),
         id='MC-first-round-noTO',
     ),
@@ -98,7 +98,7 @@ _FIRST_ROUND_CONFIGS = [
             ('Karl-Anthony Towns',   9.8),
             ('Ivica Zubac',          8.8),
             ('Cade Cunningham',      9.3),
-            ('Dyson Daniels',        9.1),
+            ('Dyson Daniels',        9.2),
         ], _NO_TO_CATEGORIES),
         id='Roto-first-round-noTO',
     ),
@@ -384,8 +384,8 @@ def test_evaluate_two_category_roto():
     expected_top_scores = [
         ('Tyler Herro',    6.0),
         ('Jordan Poole',   8.7),
-        ('Dillon Brooks',  4.5),
-        ('Klay Thompson',  4.3),
+        ('Dillon Brooks',  4.3),
+        ('Klay Thompson',  4.8),
     ]
     check_top_scores('Rotisserie, 2-cat', expected_top_scores, candidates)
 
