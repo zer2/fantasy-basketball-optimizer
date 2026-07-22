@@ -230,7 +230,7 @@ It also supports any combination of categories, across the default nine categori
 
 For the alternative categories, when using projections, make sure to include them when sourcing the projections. ESPN and DARKO do not forecast them so all of the weight will be from Hashtag or BBM projections. 
 
-### Algorithmic parameters
+### H-scoring parameters
 
 The H-scoring algorithm has three input parameters- $\omega$ (omega), $\gamma$ (gamma), and the number of iterations- which are configurable by the user through the sidebar. Different parameter choices will lead to different H-scoring results.
 
@@ -257,9 +257,9 @@ The updating spinner, which indicates that the algorithm is running
 
 ## Limitations and corrections
 
-H-scoring as presented in the papers has numerous limitations. The website has procedures in place to mitigate some, but these procedures are not perfect and do not ameliorate every flaw. 
+H-scoring as presented in the papers has numerous limitations. The website has procedures in place to mitigate some of the limitations, but these procedures are imperfect and not comprehensive. 
 
-### Only a single set of projections is considered 
+### Reliance on one projection set 
 
 H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
 
@@ -385,40 +385,61 @@ The justification for this adjustment is a Bayesian model for updating expectati
 
 ### Only one strategy is evaluated 
 
-The optimization process for H-scoring only considers one strategy profile. It does not consider how robust players are to different strategy profiles, which may be relevant because circumstances can change during a draft. In fantasy basketball terms, the issue is that a series of surprising player selections can turn the draft on its head. If all of a sudden, an amazing shot blocker becomes available, a manager will regret having already committed to punting blocks. This isn't necessarily likely, but it can happen, so it merits consideration. 
+Fantasy basketball analysts often advocate for taking the best player available for the first few picks, and waiting until later to commit to a punt. The idea is to start flexibly, and decide which categories to punt based on which star players end up on the team. A manager would not want to commit to e.g. punting blocks before a star shot-blocker falls into their lap. 
 
-In order to enhance flexibility, the algorithm uses a technique called regularization to push away from extreme strategies and stay more balanced, especially at the beginning of the draft. It can still plan on punting with players like Giannis. But all else held equal, it would prefer a more balanced strategy, which will be more robust to changing circumstances. 
+This idea exposes a weakness in the H-scoring procedure. It optimizes based on a single strategy profile, quantifying player value purely based on that single strategy profile. It does not build in resilience to the possibility that the optimal strategy could change as the draft continues. 
+
+In order to ameliorate this issue, the algorithm uses a technique called regularization to push away from extreme strategies and stay more balanced at the beginning of the draft. Regularization adds a small reward for simplicity into H-scores. The algorithm can still plan on a punt, but the regularization reward incentivizes it to punt less harshly, and to choose players who rely less on punting for their value. 
 
 ??? note "How does the website enforce regularization?"
-    The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. 
+    The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring, plus an equivalent mechanism for flex positions. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. 
 
-    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, if the weight for the first pick is A, the weight for pick $n$ is A multiplied by the phi function evaluated at $\frac{4n}{k}$ where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
+    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, if the weight for the first pick is $A$, the weight for pick $n$ is $A$ multiplied by the phi function evaluated at $\frac{4n}{k}$ where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
 
-### Gradient descent only finds local minima 
+    The absolute values of $A$ for both category weightings and position weightings are hardcoded into the algorithm, and cannot be configured by the user. They were calibrated to regularize meaningfully without collapsing weights to neutral across the board. 
 
-Another fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. 
+### Gradient descent optimizes locally
 
-The website mitigates this flaw by choosing its starting point carefully. It evaluates a few potential punts, and starts optimizing with the best one. 
+A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. 
+
+For Each Category and Most Categories, the website mitigates this flaw by choosing its starting point carefully for the first few picks. It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. For picks after the first few, it is no longer necessary to prove every punt, because the team already has a defined shape. The algorithm instead starts punting the team's weakest category.  
+
+Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position. 
 
 ??? note "How does the website check multiple punts?"
-    The website checks potential punts by calculating the current objective function with one category at a time set to a 90% weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent. 
+    The website checks potential punts by calculating the current objective function with one category at a time set to a 95% weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent. 
 
     Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. 
 
-It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. 
+### No model of other managers
 
-### No model of behavior for other managers
+The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates.
 
-The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates
+This is a difficult problem to solve because there is no way to reliably predict the choices of other fantasy managers. Some will punt aggressively, some will prioritize balance, some will chose players from their favorite teams, etc. Assuming that other teams will be roughly balanced is not necessarily a worse guess than any other assumption. 
 
 ### Constant categorical variance
 
 H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
 
-### Simplified model of available players
+![alt text](img/cwinrates.png)
+/// caption
+Win rates, expected by H-scoring vs. actual, from the paper. There is a clear gap at values below 10% 
+///
 
-H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles
+The paper shows that when hard-punting free throws, teams still win the category surprisingly often. This probably happens because a single poor free throw shooter like Giannis being out can make a team that punts free throws suddenly competitive. On the flipside, teams that punt threes lose even more consistently in the category than predicted. This is because players that don't shoot threes have low variance in how many threes they hit; Rudy Gobert cannot possibly go on a streak from three because he does not attempt them. 
 
-### Incomplete modeling of the real season 
+These statistics come from simulations of real seasons using actual player data. Reality is less predictable- players outperform or underperform projections, players get traded or substitued, etc. This increased variance provides a counterbalance to the underprediction for threes. For free throw percent, it compounds, meaning that the algorithm likely underestimates the probability of winning the category despite punting by quite a bit. 
+
+??? note "Why doesn't the algorithm take into account player-level variance?"
+
+    Mathematically, the central reason for the algorithm not taking player-level variance into account is that assuming constant variance makes the math significantly easier. It is what allows the algorithm to think only in the space of differentials- true magnitudes do not matter. 
+    
+    Another reason is that predicting variance is hard, even ignoring the complicated reality of real fantasy basketball. Most likely, accounting for variance would require individual player-and-category-level forecasts of variance, which would require a massive overhaul of existing forecasting procedures. It might be possible to predict category variance as a function of expected value instead, but that would not necessarily be accurate. 
+
+### Simplified player model 
+
+H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles. A classic example is prime Ben Simmons, who was an all-NBA point guard with a 61% free throw rate during the 2020-21 season. Point guards with low free throw percentages are unusual, and can provide prime opportunities for builds that punt free throws. H-scoring's player model lumps all players together into one giant pile, and so is not aware of particular opportunities for punting like Simmons. 
+
+### Incomplete fantasy model
 
 H-scoring does not take into account the effect of streaming players, trading, etc. These all may add additional strategic considerations

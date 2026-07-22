@@ -287,7 +287,6 @@ def run_step5(session: Session) -> None:
         params         = params,
         slot_counts    = slot_counts,
         aleph          = cp['aleph'],
-        reg_strength   = cp['reg_strength'],
         beth           = cp['beth'],
     )
 

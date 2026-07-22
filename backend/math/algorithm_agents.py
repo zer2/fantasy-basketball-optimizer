@@ -78,10 +78,13 @@ _LOWVAR_TILT = float(os.environ.get('LOWVAR_TILT', '0.5'))
 # Robustness regulariser: each iteration soft-thresholds the category weights toward neutral v -- the
 # proximal step for an L1 penalty -lambda*||w-v||_1. L1 rewards balance without over-penalising a
 # committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
-# deviate. The per-pick strength lambda follows a cosine schedule (built per agent from n_picks in
-# __init__): it starts at REG_PEAK on an empty roster and decays to 0 by the midpoint of the draft.
+# deviate. The per-pick strength lambda follows a Gaussian (phi) schedule (built per agent from n_picks
+# in __init__): it starts at the peak on an empty roster and decays to ~0 by the final pick.
 # REG_PEAK tunes the peak; PUNT_REG_SCHEDULE (comma-separated floats) overrides the whole schedule.
-_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides the reg_strength parameter
+# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster). Hardcoded --
+# not user-configurable -- since testing settled on this value; REG_PEAK overrides it for sweeps.
+_REG_STRENGTH = 0.00005
+_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides the hardcoded _REG_STRENGTH
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
 # component from the singular w==v ray. Only needed if REG_PEAK is raised past ~5e-4, where the small
 # empty-board deviations let the shrink reach v and term_five goes singular (EC in particular).
@@ -130,7 +133,6 @@ class HAgent:
                  , params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
-                 , reg_strength: float = 0.00005
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -153,11 +155,11 @@ class HAgent:
         self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else True
         roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
 
-        # Gaussian (phi) regulariser schedule built from the draft length: strength reg_strength (the
-        # session parameter) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
+        # Gaussian (phi) regulariser schedule built from the draft length: strength _REG_STRENGTH (the
+        # hardcoded peak) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
         # with a concave shoulder set by _REG_SHAPE_B. REG_PEAK overrides the peak; PUNT_REG_SCHEDULE the
         # whole schedule.
-        reg_peak = float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None else reg_strength
+        reg_peak = float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None else _REG_STRENGTH
         _phi0    = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
         self.reg_schedule = ([float(x) for x in _schedule_override.split(',')] if _schedule_override
                              else [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)

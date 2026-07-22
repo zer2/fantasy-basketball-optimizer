@@ -39,10 +39,6 @@ const PARAM_SPECS: ParamSpec[] = [
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
-        id: 'mp-reg-strength', key: 'reg_strength', label: 'λ (regularization)', step: 0.0001,
-        caption: 'L1 regularization strength. Pulls early-draft category weights toward neutral so early picks stay flexible; higher values commit to a punt more slowly.',
-    },
-    {
         id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
@@ -132,7 +128,6 @@ export function getModelParameters(): ModelParameters {
         psi:             readNumberInput('mp-psi'),
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
-        reg_strength:    readNumberInput('mp-reg-strength'),
         omega:           readNumberInput('mp-omega'),
         gamma:           readNumberInput('mp-gamma'),
         beth:            readNumberInput('mp-beth'),
