@@ -48,7 +48,7 @@ The website's calculations take a number of user-configurable parameters, availa
 | Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | Position requirements | The roster/position structure a team must satisfy | [H-scoring → Position structure](hscores.md#position-structure) |
 | υ, ψ (upsilon, psi) | How projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |
-| ℶ (beth) | How strongly a team's projected strength is regressed toward average | [Player Stats → Bayesian strength adjustment](projections.md#bayesian-strength-adjustment) |
+| ℶ (beth) | How strongly a team's projected strength is regressed toward average | [H-scoring → Only a single set of projections is considered](hscores.md#only-a-single-set-of-projections-is-considered) |
 | χ, ℵ (chi, aleph) | Rotisserie projection uncertainty and cross-category correlation | [Player Stats → Projection uncertainty](projections.md#projection-uncertainty) |
 | $S_\sigma$ (S-sigma) | The spread of auction dollar values across a season (SAVOR) | [Auction Mode → The SAVOR adjustment](auctions.md#the-savor-adjustment) |
 | Trade thresholds | Which candidate trades are considered and shown | [Season Mode → Trade suggestions](season.md#trade-suggestions) |

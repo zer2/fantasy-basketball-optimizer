@@ -255,13 +255,170 @@ H-scoring is not an instantaneous process. In general, the algorithm will take l
 The updating spinner, which indicates that the algorithm is running
 ///
 
-## Limitations
+## Limitations and corrections
 
-H-scoring has numerous limitations. Some of the most major are
+H-scoring as presented in the papers has numerous limitations. The website has procedures in place to mitigate some, but these procedures are not perfect and do not ameliorate every flaw. 
 
-- H-scoring is reliant on a single set of projections which may differ from the beliefs of other drafters. Assuming its projections are correct, the algorithm can become overconfident and assess its own team as being so strong that the only way to improve it is to "un-punt" a category. This can lead to late round picks which run counter to the build of a team. The website does have a way to mitigate this, to a degree- see [the section on the Bayesian strength adjustment](projections.md#bayesian-strength-adjustment)
-- The optimization process for H-scoring only considers one strategy profile. It does not consider how robust players are to different strategy profiles, which may be relevant because circumstances can change during a draft, and the algorithm might switch strategies drastically
-- The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates
-- H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
-- H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles
-- H-scoring does not take into account the effect of streaming players, trading, etc. These all may add additional strategic considerations
+### Only a single set of projections is considered 
+
+H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
+
+This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. 
+
+The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. 
+
+The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.
+
+??? note "The math: how the adjustment is computed"
+    Say that $w$ is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
+
+    $$
+    w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
+    $$
+
+    Where $n$ is the number of categories and ℶ is a parameter. The intuition on what this expression is doing is not immediately clear, but some intuition can be gleaned from the justification below. 
+
+    These corrected win rates are then used to reverse engineer an adjusted expectation of the team's current strength, like so: 
+
+    $$
+    x^* = \text{CDF}^{-1} \left( w^* \right)
+    $$
+
+    Since this adjustment is made before any gradient descent is performed, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. 
+
+The justification for this adjustment is a Bayesian model for updating expectations of team strengths, given drafting decisions made by all drafters. 
+
+??? note "The math: the Bayesian justification"
+    Say that there are prior expectations that 
+
+    - H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error $\epsilon_a$. 
+    - The team's true average win rate across all categories is a random variable with mean 50% and Normally distributed error $\epsilon_b$. 
+
+    This information provides a Bayesian framework for re-calculating adjusted category-level win rates. 
+
+    By Bayes' rule, the probability of a certain set of category win rates being correct is proportional to its likelihood times the prior. In this case, the likelihood is 
+
+    $$
+    \prod_c \phi (\frac{w^*_c - w_c}{\epsilon_a})
+    $$
+
+    And the prior probability is 
+
+    $$
+    \phi \left( \frac{\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{n}}{\epsilon_b} \right) = 
+    \phi \left( \frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)
+    $$
+
+    Multiplying them together yields 
+
+    $$
+    \left[ \prod_c \phi \left(\frac{w^*_c - w_c}{\epsilon_a} \right) \right] \left[ \phi \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n } \right) \right]
+    $$
+
+    Taking the natural logarithm of both sides (converting to log odds) simplifies the expression to 
+
+    $$
+    \left[ \sum_c \left(\frac{w^*_c - w_c}{\epsilon_a} \right)^2 \right] +  \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)^2 
+    $$
+
+    To optimize this, the derivative is set to zero. Applying the chain rule for category d results in
+
+    $$
+    0 = 2 \left(\frac{w^*_d - w_d}{\epsilon_a} \right) \frac{1}{\epsilon_a} + 2 \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}
+    $$
+
+    Isolating $w^*_d$- 
+
+    $$
+    2 \left(\frac{w_d}{\epsilon_a^2} \right) - 2 \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}= 2 \left(\frac{w^*_d}{\epsilon_a} \right) \frac{1}{\epsilon_a} + 2 \frac{w^*_d}{\epsilon_b^2 n^2}
+    $$
+
+    $$
+    2 \left(\frac{w_d}{\epsilon_a^2} \right) - 2 \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}= w^*_d \left( 2 \frac{1}{\epsilon_a^2} + 2 \frac{1}{\epsilon_b^2 n^2} \right) 
+    $$
+
+    So 
+
+    $$
+    w^*_d = \frac{\frac{w_d}{\epsilon_a^2} - \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{\epsilon_b^2 n^2} \right) }{\frac{1}{\epsilon_a^2} + \frac{1}{\epsilon_b^2 n^2}}
+    $$
+
+    With $\beth = \frac{\epsilon_a^2}{\epsilon_b^2}$, this is 
+
+    $$
+    w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{ n^2} \right) }{1 + \frac{\beth}{ n^2}}
+    $$
+
+    This expression is the best for gleaning intuition behind the adjustment. When the average win rate is high, a larger quantity is subtracted out from all the win rates. If the win rates are all 50%, the numerator becomes $\frac{1}{2} + \frac{\beth}{2n}$, cancelling with the denominator and keeping win rates 50%. Higher values of $\beth$ increase the importance of the distortion term and decrease the importance of the original win rate.
+
+    While being relatively interpretable, this expression unfortunately cannot be used directly because all of the $w^*_c$ values are unknowns. Some linear algebra is required with the vector forms of $w$ and $w^*$. 
+
+    With $J$ as matrix with $0$ on all diagonals and $1$ on all non-diagonals, the equation can be written 
+
+    $$
+    w^* = \frac{w - \frac{\beth J_{n \times n} w^*}{n^2} + \frac{\beth}{2n}\mathbf{1}_n }{\left( 1 + \frac{\beth}{ n^2} \right)}
+    $$
+
+    Or 
+
+    $$
+    \left( 1 + \frac{\beth}{ n^2}\right) I_{n \times n} w^* = w - \frac{\beth J_{n \times n} w^*}{n^2} + \frac{\beth}{2n} \mathbf{1}_n
+    $$
+
+    Isolating $w^*$ yields 
+
+    $$
+    \left[ \left( 1 + \frac{\beth}{ n^2}\right) I_{n \times n} + \frac{\beth}{ n^2}  J_{n \times n} \right] w^* = w + \frac{\beth}{2n} \mathbf{1}_n
+    $$
+
+    The $J$ can be simplified out 
+
+    $$
+    \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right] w^* = w + \frac{\beth}{2n} \mathbf{1}_n
+    $$
+
+    Finally, the matrix can be inverted to yield an expression for $w^*$
+
+    $$
+    w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
+    $$
+
+### Only one strategy is evaluated 
+
+The optimization process for H-scoring only considers one strategy profile. It does not consider how robust players are to different strategy profiles, which may be relevant because circumstances can change during a draft. In fantasy basketball terms, the issue is that a series of surprising player selections can turn the draft on its head. If all of a sudden, an amazing shot blocker becomes available, a manager will regret having already committed to punting blocks. This isn't necessarily likely, but it can happen, so it merits consideration. 
+
+In order to enhance flexibility, the algorithm uses a technique called regularization to push away from extreme strategies and stay more balanced, especially at the beginning of the draft. It can still plan on punting with players like Giannis. But all else held equal, it would prefer a more balanced strategy, which will be more robust to changing circumstances. 
+
+??? note "How does the website enforce regularization?"
+    The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. 
+
+    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, if the weight for the first pick is A, the weight for pick $n$ is A multiplied by the phi function evaluated at $\frac{4n}{k}$ where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
+
+### Gradient descent only finds local minima 
+
+Another fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. 
+
+The website mitigates this flaw by choosing its starting point carefully. It evaluates a few potential punts, and starts optimizing with the best one. 
+
+??? note "How does the website check multiple punts?"
+    The website checks potential punts by calculating the current objective function with one category at a time set to a 90% weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent. 
+
+    Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. 
+
+It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. 
+
+### No model of behavior for other managers
+
+The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates
+
+### Constant categorical variance
+
+H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
+
+### Simplified model of available players
+
+H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles
+
+### Incomplete modeling of the real season 
+
+H-scoring does not take into account the effect of streaming players, trading, etc. These all may add additional strategic considerations
