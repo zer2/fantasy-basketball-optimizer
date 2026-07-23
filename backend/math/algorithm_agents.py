@@ -92,6 +92,15 @@ _REG_FLOOR = float(os.environ.get('REG_FLOOR', '0.0'))
 # Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
 # (few bases), so they need a firmer pull toward uniform to have a comparable effect.
 _POSITION_REG_MULT = float(os.environ.get('POSITION_REG_MULT', '1000'))
+# Anti-crowded-punt coupling ("kappa"): a linear penalty in the objective on punting categories the
+# FIELD is crowding into. On the empty-board first run, the multi-start seed scan reveals which single
+# punts the top _PUNT_POPULARITY_TOP_N players most want (the popularity vector); the penalty then
+# discourages joining those popular punts, dispersing the crowd (crowded punts are competed away). It
+# acts only in the early multi-start rounds (roster < _WEAKNESS_SEED_MIN_ROSTER). 0 disables it (no
+# behaviour change); higher = firmer defection from the crowd. Surfaced as the per-session `kappa`
+# parameter (default 0.5); the env KAPPA overrides that per-session value for sweeps.
+_KAPPA_OVERRIDE = os.environ.get('KAPPA')   # None unless set
+_PUNT_POPULARITY_TOP_N = int(os.environ.get('PUNT_POPULARITY_TOP_N', '40'))
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
 # empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
@@ -133,6 +142,7 @@ class HAgent:
                  , params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
+                 , kappa: float = 0.3
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -196,14 +206,14 @@ class HAgent:
             self.position_means = np.array(info['Position-Means']).reshape(1, -1, self.n_categories)
             
             position_means_df = info['Position-Means']
-            position_means_df.loc['NP'] = 0 
+            position_means_df.loc['NP'] = 0
 
-            #TODO: This should probably use the average of the position means for a player
-            #E.g. if they are a PF/C, this should be the average of the means for PF and C
-            #that get subtracted out 
+            # A player's positional baseline is the average of the position means over ALL of their
+            # eligible positions (e.g. a PF/C uses the mean of the PF and C means, not just PF). reindex
+            # then mean(axis=0) skips any listed position absent from position_means_df.
             rel_players = [p for p in x_scores.index if p != 'RP']
             self.pos_avg = pd.DataFrame(
-                [position_means_df.loc[self.positions.get(p)[0]]
+                [position_means_df.reindex(self.positions.get(p)).mean(axis=0)
                 for p in rel_players],
                 index= rel_players,
                 columns=x_scores.columns
@@ -291,6 +301,12 @@ class HAgent:
         self.position_indices   = self._pos_cfg.position_indices
 
         self.initial_category_weights = None
+        # Anti-crowded-punt coupling (session parameter; env KAPPA overrides for sweeps).
+        self.kappa = float(_KAPPA_OVERRIDE) if _KAPPA_OVERRIDE is not None else kappa
+        # Field punt-popularity vector (per category), measured once on the empty-board multi-start scan
+        # and reused for the early picks; drives the anti-crowded-punt (kappa) objective penalty. None
+        # until measured (and whenever kappa=0), which makes the penalty inert.
+        self._punt_popularity = None
 
         # ── MLB-specific setup (replaces get_pitcher_stats() / get_league_type()) ──
         if sport == 'MLB':
@@ -694,20 +710,37 @@ class HAgent:
 
         # Multi-start: score every gentle punt with a clean full solve (throttle off, so the seeds do
         # not share cached rosters) and keep each candidate's best-scoring seed.
-        seed_vectors   = [gentle_punt(i) for i in range(self.n_categories)]
-        saved_priority = self._candidate_priority
-        self._candidate_priority     = None
-        self._position_rosters_cache = None
-        seed_scores = np.vstack([
-            self.get_objective_and_gradient(
-                np.array([seed] * n_candidates), position_shares, diff_means, diff_vars,
-                x_scores_batch_array, candidate_player_array, team_so_far_array,
-                n_players_selected, sigma_2_m, 0, pitching_preference,
-            )['Score']
-            for seed in seed_vectors
-        ])
-        self._candidate_priority     = saved_priority
-        self._position_rosters_cache = None
+        seed_vectors = [gentle_punt(i) for i in range(self.n_categories)]
+
+        def score_seeds():
+            saved_priority = self._candidate_priority
+            self._candidate_priority     = None
+            self._position_rosters_cache = None
+            scores = np.vstack([
+                self.get_objective_and_gradient(
+                    np.array([seed] * n_candidates), position_shares, diff_means, diff_vars,
+                    x_scores_batch_array, candidate_player_array, team_so_far_array,
+                    n_players_selected, sigma_2_m, 0, pitching_preference,
+                )['Score']
+                for seed in seed_vectors
+            ])
+            self._candidate_priority     = saved_priority
+            self._position_rosters_cache = None
+            return scores
+
+        # Empty-board first run with kappa on: two passes. Pass 1 (penalty inert, popularity=None) reveals
+        # which single punt the top _PUNT_POPULARITY_TOP_N players each crowd into; store that popularity
+        # so pass 2's seed scan -- and the descent that follows -- defect from the crowd (the penalty lives
+        # in get_objective_and_gradient). Later picks reuse the empty-board popularity, so no re-measure.
+        if self.kappa > 0.0 and len(self.players) == 0:
+            self._punt_popularity = None
+            raw_scores = score_seeds()
+            best_raw   = np.argmax(raw_scores, axis=0)
+            top        = np.argsort(-raw_scores.max(axis=0))[:_PUNT_POPULARITY_TOP_N]
+            counts     = np.bincount(best_raw[top], minlength=self.n_categories).astype(float)
+            self._punt_popularity = counts / max(len(top), 1)
+
+        seed_scores = score_seeds()
         best = np.argmax(seed_scores, axis=0)
         return np.array([seed_vectors[b] for b in best])
 
@@ -1114,6 +1147,18 @@ class HAgent:
         )
 
         category_gradient = np.einsum('ai,aik -> ak', pdf_weights, del_full)
+
+        # Anti-crowded-punt penalty (kappa): in the early multi-start rounds, subtract a linear penalty
+        # for punting (w<v) categories the field is crowding into (self._punt_popularity), so both the
+        # seed scan and the descent defect from popular punts. Inert until the empty-board scan has
+        # measured popularity and whenever kappa=0. A full roster has no meaningful weights, and the
+        # roster<3 gate keeps the penalty off later picks -- so the final scored H-score is unaffected.
+        if (self.kappa > 0.0 and self._punt_popularity is not None
+                and len(self.players) < _WEAKNESS_SEED_MIN_ROSTER):
+            neutral    = self.v.reshape(1, -1)
+            punt_depth = np.maximum(neutral - category_weights, 0.0)
+            score             = score - self.kappa * (punt_depth @ self._punt_popularity)
+            category_gradient = category_gradient + self.kappa * self._punt_popularity.reshape(1, -1) * (category_weights < neutral)
 
         if self.position_means is not None:
             position_gradient = np.einsum('ai,aki -> ak', pdf_weights, self.position_means)

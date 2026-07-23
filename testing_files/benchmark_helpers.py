@@ -66,6 +66,10 @@ def _build_session_request(
             'psi':             nba_options['psi']['default'],
             'chi':             nba_options['chi']['default'],
             'aleph':           nba_options['aleph']['default'],
+            # kappa (anti-crowded-punt) is OFF for benchmarks and the G-score season sims: against a
+            # non-punting G-drafter field the penalty has no crowd to defect from, and it would drift
+            # the goldens. The real app defaults it to 0.5 (see parameters.yaml / schema).
+            'kappa':           0.0,
             'streaming_noise': nba_options['S']['default'],
         },
         'data_source': {

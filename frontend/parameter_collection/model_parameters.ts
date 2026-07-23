@@ -39,6 +39,10 @@ const PARAM_SPECS: ParamSpec[] = [
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
+        id: 'mp-kappa', key: 'kappa', label: 'κ (kappa)', step: 0.1,
+        caption: 'Anti-crowded-punt strength. Early picks are gently steered away from punts the field is crowding into. 0 disables it.',
+    },
+    {
         id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
@@ -128,6 +132,7 @@ export function getModelParameters(): ModelParameters {
         psi:             readNumberInput('mp-psi'),
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
+        kappa:           readNumberInput('mp-kappa'),
         omega:           readNumberInput('mp-omega'),
         gamma:           readNumberInput('mp-gamma'),
         beth:            readNumberInput('mp-beth'),

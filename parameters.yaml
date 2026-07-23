@@ -258,6 +258,10 @@ NBA:
       default : 0.2
       min : 0.0
       max: 1.0
+    kappa :
+      default : 0.3
+      min : 0.0
+      max: 5.0
     beth:
       default : 3
       min : 0

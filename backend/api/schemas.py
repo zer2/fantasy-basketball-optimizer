@@ -39,6 +39,7 @@ class ModelParameters(BaseModel):
     psi: float
     chi: float
     aleph: float
+    kappa: float = 0.3
     n_iterations: int
     streaming_noise: float
 
