@@ -393,17 +393,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#bayesian-strength-adjustment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bayesian strength adjustment
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -662,17 +651,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#bayesian-strength-adjustment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bayesian strength adjustment
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -744,7 +722,7 @@
 <p>Correlations between categories are an input to the algorithm for Rotisserie. Base correlations are set in the same way as projection uncertainty; calculated from real historical data. </p>
 <details class="note">
 <summary>Why are correlations considered in the Rotisserie context, but not for other formats?</summary>
-<p>See the <a href="../hscores/#main-h-score-table">H-scoring section</a> for details on the objective functions used for each objective function.</p>
+<p>See the <a href="../hscores/#main-h-score-table">H-scoring section</a> for details on the objective functions used for each format.</p>
 <p>For Each Category, correlations are irrelevant to the objective function. The correlations between categories have no influence on the expected value of their total. </p>
 <p>For Most Categories, correlations do theoretically matter, since they can influence the probabilities of winning scenarios occuring. Ideally, the algorithm would take them into account. However, calculating the probability of winning scenarios is much harder when factoring in correlations between categories. The Multivariate correlated Normal distribution has no explicit solution, and must be solved with numerical methods. Solving 256 9-dimensional Multivariate Normal CDFs with numerical methods for each player and each iteration is impractical. On the other hand, assuming that categories are independent facilitates the use of dynamic programming to greatly speed up the calculation. And while correlations are not included in the objective function directly, they are included in the model of player statistics, leading the algorithm towards category combinations that tend to be correlated favorably across players. And cross-player correlations are generally similar to correlations for a single player on a weekly level. So the algorithm assumes that the categories are independent for the sake of keeping computations tractable, hopefully without causing a significant distortion. </p>
 <p>For Rotisserie, ignoring correlations would be problematic. The goal in Rotisserie is to win the entire league, and that requires a certain number of fantasy points. The number of fantasy points needed to win is highly related to the correlations between categories, because the more correlated they are, the more points the luckiest manager would expect to get. Fortunately, H-scoring's approach to Rotisserie is more amenable to incorporating correlations than the approach for Most Categories. Win totals are modeled as Normal distributions, and all that is necessary to calculate the mean and variance of a Normal distribution is the sum of the individual parts and their covariance matrix. This is a much simpler calculation than computing individual winning scenarios separately. </p>
@@ -754,92 +732,6 @@
 <details class="note">
 <summary>How is ℵ applied?</summary>
 <p>Concretely, ℵ is added directly to the entries of the category correlation matrix that Rotisserie scoring uses, for pairs of counting (volume-based) categories — points, rebounds, assists, threes, and so on. Percentage categories like Field Goal % and Free Throw % are left alone. Each entry is capped at 1, so the already-1 diagonal is unaffected while the off-diagonal correlations rise by ℵ.</p>
-</details>
-<h3 id="bayesian-strength-adjustment">Bayesian strength adjustment</h3>
-<p>H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. </p>
-<p>This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. </p>
-<p>The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. </p>
-<p>The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.</p>
-<details class="note">
-<summary>The math: how the adjustment is computed</summary>
-<p>Say that <span class="arithmatex">\(w\)</span> is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as</p>
-<div class="arithmatex">\[
-w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
-\]</div>
-<p>Where <span class="arithmatex">\(n\)</span> is the number of categories and ℶ is a parameter. The intuition on what this expression is doing is not immediately clear, but some intuition can be gleaned from the justification below. </p>
-<p>These corrected win rates are then used to reverse engineer an adjusted expectation of the team's current strength, like so: </p>
-<div class="arithmatex">\[
-x^* = \text{CDF}^{-1} \left( w^* \right)
-\]</div>
-<p>Since this adjustment is made before any gradient descent is performed, as the punting strategy changes, the algorithm's opinion of its own team does not change. Re-adjusting the win rates every for every iteration of the algorithm based on the current expected win rates would implicitly change the algorithm's opinion of its pre-existing team based on its strategy for the future, which does not make much sense. </p>
-</details>
-<p>The justification for this adjustment is a Bayesian model for updating expectations of team strengths, given drafting decisions made by all drafters. </p>
-<details class="note">
-<summary>The math: the Bayesian justification</summary>
-<p>Say that there are prior expectations that </p>
-<ul>
-<li>H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error <span class="arithmatex">\(\epsilon_a\)</span>. </li>
-<li>The team's true average win rate across all categories is a random variable with mean 50% and Normally distributed error <span class="arithmatex">\(\epsilon_b\)</span>. </li>
-</ul>
-<p>This information provides a Bayesian framework for re-calculating adjusted category-level win rates. </p>
-<p>By Bayes' rule, the probability of a certain set of category win rates being correct is proportional to its likelihood time the prior. In this case, the likelihood is </p>
-<div class="arithmatex">\[
-\prod_c \phi (\frac{w^*_c - w_c}{\epsilon_a})
-\]</div>
-<p>And the prior probability is </p>
-<div class="arithmatex">\[
-\phi \left( \frac{\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{n}}{\epsilon_b} \right) = 
-\phi \left( \frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)
-\]</div>
-<p>Multiplying them together yields </p>
-<div class="arithmatex">\[
-\left[ \prod_c \phi \left(\frac{w^*_c - w_c}{\epsilon_a} \right) \right] \left[ \phi \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n } \right) \right]
-\]</div>
-<p>Taking the natural logarithm of both sides (converting to log odds) simplifies the expression to </p>
-<div class="arithmatex">\[
-\left[ \sum_c \left(\frac{w^*_c - w_c}{\epsilon_a} \right)^2 \right] +  \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right)^2 
-\]</div>
-<p>To optimize this, the derivative is set to zero. Applying the chain rule for category d results in</p>
-<div class="arithmatex">\[
-0 = 2 \left(\frac{w^*_d - w_d}{\epsilon_a} \right) \frac{1}{\epsilon_a} + 2 \left(\frac{ \sum_c \left( w^*_c - \frac{1}{2} \right)}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}
-\]</div>
-<p>Isolating <span class="arithmatex">\(w^*_d\)</span>- </p>
-<div class="arithmatex">\[
-2 \left(\frac{w_d}{\epsilon_a^2} \right) - 2 \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}= 2 \left(\frac{w^*_d}{\epsilon_a} \right) \frac{1}{\epsilon_a} + 2 \frac{w^*_d}{\epsilon_b^2 n^2}
-\]</div>
-<div class="arithmatex">\[
-2 \left(\frac{w_d}{\epsilon_a^2} \right) - 2 \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{\epsilon_b n} \right) \frac{1}{\epsilon_b n}= w^*_d \left( 2 \frac{1}{\epsilon_a^2} + 2 \frac{1}{\epsilon_b^2 n^2} \right) 
-\]</div>
-<p>So </p>
-<div class="arithmatex">\[
-w^*_d = \frac{\frac{w_d}{\epsilon_a^2} - \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{\epsilon_b^2 n^2} \right) }{\frac{1}{\epsilon_a^2} + \frac{1}{\epsilon_b^2 n^2}}
-\]</div>
-<p>With <span class="arithmatex">\(\beth = \frac{\epsilon_a^2}{\epsilon_b^2}\)</span>, this is </p>
-<div class="arithmatex">\[
-w^*_d = \frac{w_d - \beth \left(\frac{ \sum_{c \neq d}  \left( w^*_c \right) - \frac{n}{2}}{ n^2} \right) }{1 + \frac{\beth}{ n^2}}
-\]</div>
-<p>This expression is the best for gleaning intution behind the adjustment. When the average win rate is high, a larger quantity is subtracted out from all the win rates. If the win rates are all 50%, the numerator becomes <span class="arithmatex">\(\frac{1}{2} + \frac{\beth}{2n}\)</span>, cancelling with the denominator and keeping win rates 50%. Higher values of <span class="arithmatex">\(\beth\)</span> increase the importance of the distortion term and decrease the importance of the original win rate.</p>
-<p>While being relatively interpretable, this expression unfortunately cannot be used directly because all of the <span class="arithmatex">\(w^*_c\)</span> values are unknowns. Some linear algebra is required with the vector forms of <span class="arithmatex">\(w\)</span> and <span class="arithmatex">\(w^*\)</span>. </p>
-<p>With <span class="arithmatex">\(J\)</span> as matrix with <span class="arithmatex">\(0\)</span> on all diagonals and <span class="arithmatex">\(1\)</span> on all non-diagonals, the equation can be written </p>
-<div class="arithmatex">\[
-w^* = \frac{w - \frac{\beth J_{n \times n} w^*}{n^2} + \frac{\beth}{2n}\mathbf{1}_n }{\left( 1 + \frac{\beth}{ n^2} \right)}
-\]</div>
-<p>Or </p>
-<div class="arithmatex">\[
-\left( 1 + \frac{\beth}{ n^2}\right) I_{n \times n} w^* = w - \frac{\beth J_{n \times n} w^*}{n^2} + \frac{\beth}{2n} \mathbf{1}_n
-\]</div>
-<p>Isolating <span class="arithmatex">\(w^*\)</span> yields </p>
-<div class="arithmatex">\[
-\left[ \left( 1 + \frac{\beth}{ n^2}\right) I_{n \times n} + \frac{\beth}{ n^2}  J_{n \times n} \right] w^* = w + \frac{\beth}{2n} \mathbf{1}_n
-\]</div>
-<p>The <span class="arithmatex">\(J\)</span> can be simplified out </p>
-<div class="arithmatex">\[
-\left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right] w^* = w + \frac{\beth}{2n} \mathbf{1}_n
-\]</div>
-<p>Finally, the matrix can be inverted to yield an expression for <span class="arithmatex">\(w^*\)</span></p>
-<div class="arithmatex">\[
-w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
-\]</div>
 </details>
 
 
