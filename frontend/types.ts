@@ -71,6 +71,7 @@ export interface ModelParameters {
     psi: number
     chi: number
     aleph: number
+    kappa: number
     n_iterations: number
     streaming_noise: number   // S_σ: SAVOR noise parameter, only meaningful in Auction Mode
 }

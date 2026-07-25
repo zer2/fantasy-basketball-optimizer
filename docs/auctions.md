@@ -8,13 +8,13 @@ The auction mode of this website implements some basic methods for converting G-
 
 ## Using auction mode 
 
-When the selected mode is 'Auction', the website will provide analysis for either synthetic or live auctions. 
+When the selected mode from the left sidebar is 'Auction', the website will provide analysis for either synthetic or live auctions. 
 
 ### Manual entry 
 
 ![Manual auction entry table](img/mauction.png)
 
-Player selection information can be entered into the table through the selectors above it. 
+Player selection information can be entered into the table through the selectors above it. There is no autodrafting option because the website does not simulate actual auctions, it only provides reference material for a given auction state. 
 
 ### Live connection 
 

@@ -9,9 +9,9 @@
 # This is NOT a correctness test — the benchmark suites already assert H-scores with tolerances.
 # This guards SERIALIZATION and hot-path STABILITY: the exact bytes the frontend receives.
 #
-# The signature is captured from a WARMED session (generic_h_scores cached, so the position-optimiser
-# throttle is active and the result is reproducible). The very first evaluate on a fresh session runs
-# the throttle un-primed and would produce a different, non-reproducible payload.
+# The agent's neutral baseline (agent.default_h_scores) is computed once at session build, so every
+# evaluate is reproducible from the first call. An empty board short-circuits to that baseline — the
+# full-exact, un-throttled solve; a non-empty board runs the position-optimiser throttle primed by it.
 #
 # Values in the payload are already rounded to 2 dp by the backend, which absorbs sub-0.005 numeric
 # jitter, so the hash is stable run-to-run. If you intentionally change the algorithm, data, or
@@ -26,8 +26,8 @@ import os
 import pytest
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.ranking import rank_candidates
 
 # A fixed mid-draft board using players guaranteed present in the 2024-25 dataset (shared with the
 # draft benchmark fixtures). Team 1 is the evaluating team; its own picks are excluded as candidates.
@@ -44,13 +44,16 @@ _TEAM_2 = [
     'LeBron James (SF,PF)',
 ]
 
-# sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True) on a warmed session,
-# keyed by (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
+# sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
+# (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
+# The empty-board hashes are unchanged from the punt-seed init; the two 'mid' hashes were regenerated
+# 2026-07-21 for the Gaussian (phi, B=4) regulariser decay schedule, which shifts only the mid-draft
+# optimisation (empty-board reg strength is the schedule's peak, identical to the prior cosine peak).
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '1d64ea31b3856f7f266f5f18d72b27c94f97f2c950e170faffb8187c1c38e1ac',
-    ('Head to Head: Each Category',  'mid'):   'b50fc4b9f717ebee418b4f4c2b8589b66731cca4665519039b16a62434759e02',
-    ('Head to Head: Most Categories','empty'): '03985ba0cce4f558d9533838869dfee4f52052c7e7801230e55e22c37a621253',
-    ('Head to Head: Most Categories','mid'):   '8ee0f03774684f687a2a78a058edec4b15c0f6adfe5e1193731944e115bb9717',
+    ('Head to Head: Each Category',  'empty'): 'bb0d1e29ef7a8a735dec7304e618b6efca99e41987ff84af8fa4a40fdce3ef6b',
+    ('Head to Head: Each Category',  'mid'):   'ef3a31da5784d7d92e015a13233678a4cbd8b29728640ce49ab9855a48f0eef5',
+    ('Head to Head: Most Categories','empty'): '4d4919a72d1405396b1a8649c934b59c26a672767a5e0bdd23b079f86bb9335e',
+    ('Head to Head: Most Categories','mid'):   'e7b7e00add5cd689eec9f719ed10ec5595a9c093eefe0ed9ed8c83eba1741fd3',
 }
 
 
@@ -65,16 +68,13 @@ def _signature(result) -> str:
     params=['Head to Head: Each Category', 'Head to Head: Most Categories'],
 )
 def warmed_session(request):
-    """Create one session per scoring format and warm it (caches generic_h_scores so the throttle is
-    primed and subsequent evaluates are reproducible)."""
+    """Create one session per scoring format. The neutral baseline the throttle primes from is built
+    at session creation, so no warm-up evaluate is needed for reproducibility."""
     scoring_format = request.param
     response = client.post('/sessions', json=_build_session_request(scoring_format=scoring_format))
     assert response.status_code == 201, f'Session creation failed ({scoring_format}): {response.text}'
     session    = get_session(response.json()['session_id'])
     n_drafters = session.current_params['n_drafters']
-
-    empty_board = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    run_evaluate(session, empty_board, 'Team 1', [], None, 0, None)   # warm-up
     return session, scoring_format, n_drafters
 
 
@@ -83,14 +83,15 @@ def test_evaluate_signature(warmed_session, board):
     """Pin the serialized /evaluate payload for a fixed board so refactors can't silently change it."""
     session, scoring_format, n_drafters = warmed_session
 
-    assignments   = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    exclusion_list = []
+    assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     if board == 'mid':
         assignments['Team 1'] = _TEAM_1
         assignments['Team 2'] = _TEAM_2
         exclusion_list        = _TEAM_1
+    else:
+        exclusion_list = []
 
-    result = run_evaluate(session, assignments, 'Team 1', exclusion_list, None, 0, None)
+    result = rank_candidates(session, assignments, 'Team 1', exclusion_list, None, 0, None)
     assert len(result.candidates) > 0, 'No candidates returned'
 
     digest = _signature(result)

@@ -18,8 +18,8 @@ sys.path.insert(0, str(_HERE.parent))   # repo root, so `backend` and `testing_f
 sys.path.insert(0, str(_HERE))          # so `benchmark_helpers` resolves as a top-level module
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.ranking import rank_candidates
 
 SEASON      = '2025-26'
 N_DRAFTERS  = 12
@@ -46,7 +46,7 @@ def generate_snake_draft_rosters() -> dict[str, list[str]]:
             drafter_index = slot if pick_row % 2 == 0 else (N_DRAFTERS - 1 - slot)
             drafter_name  = team_names[drafter_index]
 
-            result = run_evaluate(
+            result = rank_candidates(
                 session            = session
                 , player_assignments = assignments
                 , my_team_id         = drafter_name

@@ -11,7 +11,7 @@ import yaml
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.session import get_session
+from backend.state.session import get_session
 
 client = TestClient(app)
 
@@ -129,6 +129,15 @@ def test_session_creation_stores_correct_params():
     assert cp['n_picks']    == yaml_options['n_picks']['default']
 
 
+def test_session_creation_insufficient_player_pool():
+    """A league whose total roster capacity exceeds the available player pool is rejected with 400."""
+    request = _build_default_session_request()
+    request['league']['n_drafters'] = 200   # 200 teams x roster spots far exceeds the NBA player pool
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 400
+    assert 'fill every roster' in response.json()['detail']
+
+
 def test_evaluate_empty_board():
     """POST /sessions + evaluate with an empty board returns a valid candidate list."""
     session_response = client.post('/sessions', json=_build_default_session_request())
@@ -159,6 +168,24 @@ def test_evaluate_empty_board():
         assert candidate['name']   != ''
         assert candidate['position'] != ''
         assert len(candidate['g_score_rows']) > 0
+
+
+def test_evaluate_cash_mode_mismatch():
+    """Sending remaining_cash to a draft session (no cash_per_team) is rejected with 400."""
+    session_response = client.post('/sessions', json=_build_default_session_request())
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+
+    response = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={
+            'player_assignments': {'Team 1': []}
+            , 'my_team_id': 'Team 1'
+            , 'remaining_cash': {'Team 1': 200.0}
+        }
+    )
+    assert response.status_code == 400
+    assert 'remaining_cash' in response.json()['detail']
 
 
 def test_evaluate_nonexistent_session():

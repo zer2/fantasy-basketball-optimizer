@@ -5,13 +5,15 @@
 # Covers:
 #   - EC auction: Drafter 1 has Giannis ($50), Drafter 2 has Jokic ($50), cash_per_team=200
 
+import os
+
 from benchmark_helpers import (
     client
     , _SCORE_TOL
     , _build_session_request
 )
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.ranking import rank_candidates
 
 
 def test_evaluate_auction():
@@ -26,22 +28,11 @@ def test_evaluate_auction():
 
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
 
     team_names = [f'Drafter {i + 1}' for i in range(n_drafters)]
-    full_cash  = {name: 200.0 for name in team_names}
 
-    # Mirrors the frontend workflow: first evaluate with an empty board so
-    # session.generic_h_scores is populated from the neutral (full-cash) state,
-    # then evaluate with the actual assignments.
-    run_evaluate(
-        session            = session
-        , player_assignments = {name: [] for name in team_names}
-        , my_team_id         = 'Drafter 1'
-        , exclusion_list     = []
-        , remaining_cash     = full_cash
-    )
-
+    # The neutral (full-cash) baseline that anchors the dollar values is built once at session
+    # creation (agent.populate_default_h_scores), so we go straight to the real assignments.
     player_assignments = {name: [] for name in team_names}
     player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
     player_assignments['Drafter 2'] = ['Nikola Jokic (C)']
@@ -50,7 +41,7 @@ def test_evaluate_auction():
     remaining_cash['Drafter 1'] = 150.0
     remaining_cash['Drafter 2'] = 150.0
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Drafter 1'
@@ -66,12 +57,21 @@ def test_evaluate_auction():
 
     # (expected_name, diff, your_dollar, gnrc_dollar, orig_dollar)
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',  -2.5,  80.7, 83.2, 86.1),
-        ('Tyrese Haliburton',        18.2,  57.2, 39.0, 40.5),
-        ('Dyson Daniels',            12.6,  53.5, 41.0, 42.5),
-        ('Jayson Tatum',              4.7,  39.3, 34.6, 36.0),
+        ('Shai Gilgeous-Alexander',  -9.4,  78.2, 87.6, 90.7),
+        ('Tyrese Haliburton',         5.0,  56.8, 51.8, 53.8),
+        ('Dyson Daniels',            14.0,  50.9, 36.9, 38.3),
+        ('Jayson Tatum',              1.9,  41.8, 39.9, 41.5),
     ]
     candidates_by_name = {c.name: c for c in candidates}
+    if os.environ.get('REGEN_GOLDENS'):
+        rows = []
+        for expected_name, *_ in expected_auction_values:
+            match = next((n for n in candidates_by_name if n.startswith(expected_name)), None)
+            a = candidates_by_name[match].auction_values
+            rows.append(f"        ({repr(expected_name) + ',':30} {round(a.your_dollar - a.gnrc_dollar, 1)},"
+                        f"  {round(a.your_dollar, 1)}, {round(a.gnrc_dollar, 1)}, {round(a.orig_dollar, 1)})")
+        print('\n# REGEN auction\n' + ',\n'.join(rows))
+        return
     for expected_name, expected_diff, expected_your, expected_gnrc, expected_orig in expected_auction_values:
         match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
         assert match is not None, f'{expected_name} not found in candidates'

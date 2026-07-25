@@ -12,6 +12,8 @@ The original src/ file is untouched.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 from scipy.special import ndtr, ndtri
@@ -54,6 +56,56 @@ def _softmax_rows(logits):
 # because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
 # gradient-iteration budget rather than still drifting at the final iteration.
 _SHARES_LEARNING_RATE = 0.3
+
+# Punt-seeding for the cold-start category weights (replaces the old heuristic init). Each seed gently
+# down-weights one category to this fraction of neutral; a gentle seed starts near the 30-iteration
+# optimum so the short descent can reach it, whereas an aggressive punt starts too far and loses.
+_PUNT_SEED_FACTOR = 0.9
+# From this many of the drafter's own picks on, the roster has a real shape, so seed a single punt of
+# its weakest category. Earlier than that there is no reliable weakness, so multi-start over every punt.
+_WEAKNESS_SEED_MIN_ROSTER = 3
+
+# Per-format best-practice configuration, resolved per agent in __init__:
+#   Rotisserie:  lowvar seed (tilts weight off the noisy categories), regulariser on, unified stability v
+#   H2H (EC/MC): multi-start punt seeding, regulariser on (5x schedule)
+# The env vars below override individual fields for A/B testing only; when unset (the production path)
+# each format uses its per-format default. Leave them unset in production.
+_SEED_MODE_OVERRIDE      = os.environ.get('SEED_MODE')        # multistart | heuristic | neutral | lowvar
+_PUNT_REG_OVERRIDE       = os.environ.get('PUNT_REG')         # '0' | '1'
+_ROTO_V_UNIFIED_OVERRIDE = os.environ.get('ROTO_V_UNIFIED')   # '0' | '1'
+# lowvar seed (Roto): exponent on the seed tilt that down-weights high-v (less stable) categories.
+_LOWVAR_TILT = float(os.environ.get('LOWVAR_TILT', '0.5'))
+# Robustness regulariser: each iteration soft-thresholds the category weights toward neutral v -- the
+# proximal step for an L1 penalty -lambda*||w-v||_1. L1 rewards balance without over-penalising a
+# committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
+# deviate. The per-pick strength lambda follows a Gaussian (phi) schedule (built per agent from n_picks
+# in __init__): it starts at the peak on an empty roster and decays to ~0 by the final pick.
+# REG_PEAK tunes the peak; PUNT_REG_SCHEDULE (comma-separated floats) overrides the whole schedule.
+# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster). Hardcoded --
+# not user-configurable -- since testing settled on this value; REG_PEAK overrides it for sweeps.
+_REG_STRENGTH = 0.00005
+_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides the hardcoded _REG_STRENGTH
+# Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
+# component from the singular w==v ray. Only needed if REG_PEAK is raised past ~5e-4, where the small
+# empty-board deviations let the shrink reach v and term_five goes singular (EC in particular).
+_REG_FLOOR = float(os.environ.get('REG_FLOOR', '0.0'))
+# Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
+# (few bases), so they need a firmer pull toward uniform to have a comparable effect.
+_POSITION_REG_MULT = float(os.environ.get('POSITION_REG_MULT', '1000'))
+# Anti-crowded-punt coupling ("kappa"): a linear penalty in the objective on punting categories the
+# FIELD is crowding into. On the empty-board first run, the multi-start seed scan reveals which single
+# punts the top _PUNT_POPULARITY_TOP_N players most want (the popularity vector); the penalty then
+# discourages joining those popular punts, dispersing the crowd (crowded punts are competed away). It
+# acts only in the early multi-start rounds (roster < _WEAKNESS_SEED_MIN_ROSTER). 0 disables it (no
+# behaviour change); higher = firmer defection from the crowd. Surfaced as the per-session `kappa`
+# parameter (default 0.5); the env KAPPA overrides that per-session value for sweeps.
+_KAPPA_OVERRIDE = os.environ.get('KAPPA')   # None unless set
+_PUNT_POPULARITY_TOP_N = int(os.environ.get('PUNT_POPULARITY_TOP_N', '40'))
+# Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
+# empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
+# before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
+_REG_SHAPE_B = float(os.environ.get('REG_SHAPE_B', '4'))
+_schedule_override = os.environ.get('PUNT_REG_SCHEDULE')
 from itertools import combinations
 
 from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
@@ -61,10 +113,8 @@ from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
     get_player_rows,
-    check_single_player_eligibility,
-    check_all_player_eligibility,
 )
-from backend.session import PositionConfig, build_position_config
+from backend.math.position_config import PositionConfig, build_position_config
 
 
 class HAgent:
@@ -92,6 +142,7 @@ class HAgent:
                  , params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
+                 , kappa: float = 0.3
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -105,9 +156,40 @@ class HAgent:
         self.collect_info  = collect_info
         self.scoring_format = scoring_format
 
+        # Per-format config (the env vars above override any field for A/B testing). All formats run the
+        # robustness regulariser; they differ only in the cold-start seed -- Rotisserie uses the lowvar
+        # tilt (its punts are structural, not a strategic fork), the H2H formats use multi-start punt
+        # seeding so early picks avoid over-committing to a punt they may drop.
+        is_rotisserie       = scoring_format == 'Rotisserie'
+        self.seed_mode      = _SEED_MODE_OVERRIDE or ('lowvar' if is_rotisserie else 'multistart')
+        self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else True
+        roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
+
+        # Gaussian (phi) regulariser schedule built from the draft length: strength _REG_STRENGTH (the
+        # hardcoded peak) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
+        # with a concave shoulder set by _REG_SHAPE_B. REG_PEAK overrides the peak; PUNT_REG_SCHEDULE the
+        # whole schedule.
+        reg_peak = float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None else _REG_STRENGTH
+        _phi0    = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
+        self.reg_schedule = ([float(x) for x in _schedule_override.split(',')] if _schedule_override
+                             else [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
+                                               - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
+                                   for k in range(n_picks)])
+
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
         self.params = params
+
+        # Retain the processed player data so callers read G-scores / positions off the agent
+        # (it is explanation-oriented — see _build_candidates). Consumers use agent.info directly.
+        self.info = info
+
+        # Neutral empty-board baseline: ranks players so the position-optimiser throttle prioritises
+        # the ones most likely to be picked, and anchors auction dollar values. Populated by
+        # populate_default_h_scores at the end of the build. None => "not built yet", which makes
+        # get_h_scores run a full exact solve (no throttle).
+        self.default_h_scores = None   # sorted pd.Series
+        self._default_result  = None   # full empty-board result dict (for the empty-board short-circuit)
 
         # Build position config (replaces all get_position_*() calls)
         self._pos_cfg: PositionConfig = build_position_config(params, slot_counts)
@@ -124,14 +206,14 @@ class HAgent:
             self.position_means = np.array(info['Position-Means']).reshape(1, -1, self.n_categories)
             
             position_means_df = info['Position-Means']
-            position_means_df.loc['NP'] = 0 
+            position_means_df.loc['NP'] = 0
 
-            #TODO: This should probably use the average of the position means for a player
-            #E.g. if they are a PF/C, this should be the average of the means for PF and C
-            #that get subtracted out 
+            # A player's positional baseline is the average of the position means over ALL of their
+            # eligible positions (e.g. a PF/C uses the mean of the PF and C means, not just PF). reindex
+            # then mean(axis=0) skips any listed position absent from position_means_df.
             rel_players = [p for p in x_scores.index if p != 'RP']
             self.pos_avg = pd.DataFrame(
-                [position_means_df.loc[self.positions.get(p)[0]]
+                [position_means_df.reindex(self.positions.get(p)).mean(axis=0)
                 for p in rel_players],
                 index= rel_players,
                 columns=x_scores.columns
@@ -166,7 +248,7 @@ class HAgent:
             self.x_scores = x_scores.loc[
                 info['G-scores'].sum(axis=1).sort_values(ascending=False).index
             ]
-            v = np.sqrt(mov / vom)
+            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
 
             categories = list(x_scores.columns)
 
@@ -219,6 +301,12 @@ class HAgent:
         self.position_indices   = self._pos_cfg.position_indices
 
         self.initial_category_weights = None
+        # Anti-crowded-punt coupling (session parameter; env KAPPA overrides for sweeps).
+        self.kappa = float(_KAPPA_OVERRIDE) if _KAPPA_OVERRIDE is not None else kappa
+        # Field punt-popularity vector (per category), measured once on the empty-board multi-start scan
+        # and reused for the early picks; drives the anti-crowded-punt (kappa) objective penalty. None
+        # until measured (and whenever kappa=0), which makes the penalty inert.
+        self._punt_popularity = None
 
         # ── MLB-specific setup (replaces get_pitcher_stats() / get_league_type()) ──
         if sport == 'MLB':
@@ -268,9 +356,18 @@ class HAgent:
                      , n_iterations: int
                      , cash_remaining_per_team: dict = None
                      , exclusion_list: list = []
-                     , baseline_h_scores=None
                      , candidate_subset: list = None
                      , candidate_offset: int = 0) -> dict:
+
+        # Empty-board short-circuit: the neutral baseline is exactly an all-empty, no-exclusions,
+        # full-pool run, which populate_default_h_scores already computed at build. Reuse it rather
+        # than re-solving (this is the draft-start evaluate). Guarded so a filtered empty-board call
+        # (exclusions or a candidate subset) still computes.
+        if (self._default_result is not None
+                and not exclusion_list
+                and candidate_subset is None
+                and all(len(roster) == 0 for roster in player_assignments.values())):
+            return self._default_result
 
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
@@ -325,28 +422,43 @@ class HAgent:
             x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
-        default_weights = self.v.T.reshape(1, self.n_categories, 1)
-        category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
-
-
-
         if self.initial_category_weights is None:
-
-            #we want to subtract out roughly the player's position means 
-            #to account for the fact that they are taking up that slot
-            if self.pos_avg is not None:
-                pos_avg = self.pos_avg.loc[x_scores_batch.index]
-                pos_avg_array = np.expand_dims(np.array(pos_avg), axis=2)
-            else: 
-                pos_avg_array = 0 #not an array, but this will work fine
-
-            initial_category_weights = (
-                (diff_means + x_scores_batch_array - pos_avg_array)
-                / (default_weights * category_momentum_factor)
-                + default_weights
-            ).mean(axis=2)
-            initial_category_weights /= initial_category_weights.sum(axis=1).reshape(-1, 1)
-
+            # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
+            # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
+            # heuristic init instead, for A/B testing the seeding against the baseline.
+            if self.seed_mode == 'heuristic':
+                default_weights = self.v.T.reshape(1, self.n_categories, 1)
+                category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
+                if self.pos_avg is not None:
+                    pos_avg_array = np.expand_dims(np.array(self.pos_avg.loc[x_scores_batch.index]), axis=2)
+                else:
+                    pos_avg_array = 0
+                initial_category_weights = (
+                    (diff_means + x_scores_batch_array - pos_avg_array)
+                    / (default_weights * category_momentum_factor)
+                    + default_weights
+                ).mean(axis=2)
+                initial_category_weights /= initial_category_weights.sum(axis=1).reshape(-1, 1)
+            elif self.seed_mode == 'neutral':
+                # Start at neutral v (no punt bias) and let the descent re-balance. Nudge off the exact
+                # singular ray -- term_five_b (a Cauchy-Schwarz Gram determinant) vanishes when w is
+                # parallel to v, giving a 0/0 -- so a negligible jitter keeps it finite for every format.
+                neutral = self.v.reshape(self.n_categories)
+                jitter  = 1.0 + 1e-9 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
+                initial_category_weights = np.array(
+                    [(neutral * jitter) / (neutral * jitter).sum()] * len(x_scores_batch)
+                )
+            elif self.seed_mode == 'lowvar':
+                # Roto: tilt the initial seed to down-weight the high-v (less stable) categories, since
+                # a high v means more within-period noise relative to signal, so the category is less
+                # reliably winnable and worth less as an initial lean. The descent then re-balances. The
+                # tilt also lands a finite distance off the singular w||v ray, dodging the near-v blow-up.
+                neutral = self.v.reshape(self.n_categories)
+                tilt    = (neutral / neutral.mean()) ** (-_LOWVAR_TILT)
+                seed    = neutral * tilt
+                initial_category_weights = np.array([seed / seed.sum()] * len(x_scores_batch))
+            else:
+                initial_category_weights = None
             initial_position_shares = {
                 pos_code: pd.DataFrame({
                     base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
@@ -370,8 +482,8 @@ class HAgent:
         # H-scores so the exact-solve tier covers the players most likely to actually be picked.
         # Missing/uncached players sort last; with no cached ranking at all we pass None, which
         # disables throttling entirely (a full, exact solve every iteration).
-        if baseline_h_scores is not None:
-            ranked = baseline_h_scores.reindex(x_scores_batch.index).to_numpy()
+        if self.default_h_scores is not None:
+            ranked = self.default_h_scores.reindex(x_scores_batch.index).to_numpy()
             candidate_priority = np.argsort(-np.nan_to_num(ranked, nan=-np.inf))
         else:
             candidate_priority = None
@@ -567,6 +679,71 @@ class HAgent:
         return pd.DataFrame({'value': score},
                             index=[x * step_size for x in range(int(max_money / step_size))])
 
+    def _select_starting_weights(self
+                                 , position_shares
+                                 , diff_means
+                                 , diff_vars
+                                 , x_scores_batch_array
+                                 , candidate_player_array
+                                 , team_so_far_array
+                                 , n_players_selected
+                                 , sigma_2_m
+                                 , pitching_preference):
+        """Choose the cold-start category-weight init per candidate (replaces the old heuristic).
+
+        Each seed gently punts one category to _PUNT_SEED_FACTOR of neutral. Once the drafter holds
+        _WEAKNESS_SEED_MIN_ROSTER+ players the roster has a real shape, so seed the single punt of its
+        weakest category (same for every candidate). Earlier -- no reliable weakness -- multi-start:
+        score one punt per category and keep, per candidate, the one with the best pre-descent objective.
+        """
+        neutral      = self.v.reshape(self.n_categories)
+        n_candidates = x_scores_batch_array.shape[0]
+
+        def gentle_punt(category_index):
+            weights = neutral.copy()
+            weights[category_index] *= _PUNT_SEED_FACTOR
+            return weights / weights.sum()
+
+        if len(self.players) >= _WEAKNESS_SEED_MIN_ROSTER:
+            weakest = int(np.argmin(self.x_scores.loc[self.players].sum(axis=0).to_numpy()))
+            return np.array([gentle_punt(weakest)] * n_candidates)
+
+        # Multi-start: score every gentle punt with a clean full solve (throttle off, so the seeds do
+        # not share cached rosters) and keep each candidate's best-scoring seed.
+        seed_vectors = [gentle_punt(i) for i in range(self.n_categories)]
+
+        def score_seeds():
+            saved_priority = self._candidate_priority
+            self._candidate_priority     = None
+            self._position_rosters_cache = None
+            scores = np.vstack([
+                self.get_objective_and_gradient(
+                    np.array([seed] * n_candidates), position_shares, diff_means, diff_vars,
+                    x_scores_batch_array, candidate_player_array, team_so_far_array,
+                    n_players_selected, sigma_2_m, 0, pitching_preference,
+                )['Score']
+                for seed in seed_vectors
+            ])
+            self._candidate_priority     = saved_priority
+            self._position_rosters_cache = None
+            return scores
+
+        # Empty-board first run with kappa on: two passes. Pass 1 (penalty inert, popularity=None) reveals
+        # which single punt the top _PUNT_POPULARITY_TOP_N players each crowd into; store that popularity
+        # so pass 2's seed scan -- and the descent that follows -- defect from the crowd (the penalty lives
+        # in get_objective_and_gradient). Later picks reuse the empty-board popularity, so no re-measure.
+        if self.kappa > 0.0 and len(self.players) == 0:
+            self._punt_popularity = None
+            raw_scores = score_seeds()
+            best_raw   = np.argmax(raw_scores, axis=0)
+            top        = np.argsort(-raw_scores.max(axis=0))[:_PUNT_POPULARITY_TOP_N]
+            counts     = np.bincount(best_raw[top], minlength=self.n_categories).astype(float)
+            self._punt_popularity = counts / max(len(top), 1)
+
+        seed_scores = score_seeds()
+        best = np.argmax(seed_scores, axis=0)
+        return np.array([seed_vectors[b] for b in best])
+
     def perform_iterations(self
                            , category_weights
                            , position_shares
@@ -586,10 +763,8 @@ class HAgent:
             # Shares are optimised in softmax-logit space (see the update below). A logit must travel
             # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
             # logit learning rate is an order of magnitude larger than the old share-space 0.01.
-            'Shares': {
-                pos_code: AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE)
-                for pos_code in self.position_structure['flex'].keys()
-            },
+            # One optimiser for the shared per-position logits (every flex slot's softmax reads them).
+            'Shares': AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE),
         }
 
         if self.sport == 'MLB':
@@ -601,15 +776,24 @@ class HAgent:
         category_weights_current  = category_weights
         position_shares_current   = position_shares
 
-        # Flex shares live on the probability simplex. We optimise them in unconstrained softmax-logit
-        # space: position_shares stays the working set of shares (what the objective reads), and
-        # position_logits is its pre-image, so softmax(logits) reproduces the initial shares exactly
-        # (softmax is shift-invariant, so log(shares) is a valid pre-image). Clip to a tiny floor first
-        # so a warm-started zero share yields a finite (very negative) logit rather than -inf.
-        position_logits = {
-            pos_code: np.log(np.clip(position_shares[pos_code].values, 1e-12, None))
-            for pos_code in self.position_structure['flex'].keys()
-        }
+        # All flex slots share one logit per position (the position_means columns): each slot's shares are
+        # the softmax over its own subset of positions, so e.g. the guard slot's PG:SG ratio is exactly the
+        # utility slot's. We optimise these shared per-position logits directly. Seed them from the slot that
+        # spans every position (Util), then derive each slot's shares so they start mutually consistent.
+        # (softmax is shift-invariant, so log(shares) is a valid pre-image; clip so a zero share is finite.)
+        if self.position_means is not None:
+            n_positions   = self.position_means.shape[1]
+            n_cand        = len(next(iter(position_shares.values())))
+            # Seed from the slot spanning every position (Util) so the shared logits carry a consistent
+            # warm start; if no single slot spans all positions, start uniform (still correct, just no warm
+            # start on the shared vector).
+            master_pc     = next((pc for pc in self.position_structure['flex']
+                                  if len(self.position_indices[pc]) == n_positions), None)
+            master_logits = (np.log(np.clip(position_shares[master_pc].values, 1e-12, None))
+                             if master_pc is not None else np.zeros((n_cand, n_positions)))
+            for pos_code in self.position_structure['flex']:
+                position_shares[pos_code].values[:] = _softmax_rows(
+                    master_logits[:, self.position_indices[pos_code]])
 
         if (n_players_selected < self.n_picks - 1) and self.dynamic:
 
@@ -634,6 +818,22 @@ class HAgent:
             # so a batch that starts past them (offset >= 70) exact-solves nobody: the "top 30 of the
             # 5th batch" are deep-bench players, not worth a Hungarian solve every iteration.
             self._candidate_offset       = candidate_offset
+
+            # Cold start (get_h_scores passes None): choose the starting category weights by punt-seeding
+            # instead of the old heuristic. Done here, where the objective machinery is already set up.
+            if category_weights is None:
+                category_weights = self._select_starting_weights(
+                    position_shares, diff_means, diff_vars, x_scores_batch_array,
+                    candidate_player_array, team_so_far_array, n_players_selected,
+                    sigma_2_m, pitching_preference,
+                )
+
+            # Robustness regulariser: soft-threshold the category weights toward neutral v each iteration
+            # (proximal step for an L1 penalty -lambda*||w-v||_1), strongest on an empty roster and
+            # decaying to 0 by mid-draft (see self.reg_schedule), so early picks stay flexible.
+            reg_lambda  = (self.reg_schedule[len(self.players)]
+                           if (self.regulariser_on and len(self.players) < len(self.reg_schedule)) else 0.0)
+            neutral_row = self.v.reshape(1, self.n_categories)
 
             for iteration in range(max(1, n_iterations)):
                 category_weights_current  = category_weights
@@ -665,6 +865,14 @@ class HAgent:
                 cat_grad_centered = gradients['Categories'] - gradients['Categories'].mean(axis=1).reshape(-1, 1)
                 cat_updates       = optimizers['Categories'].minimize(cat_grad_centered)
                 category_weights  = category_weights + cat_updates
+                if reg_lambda > 0.0:
+                    # L1 proximal step: shrink each weight toward neutral v by up to reg_lambda (a linear
+                    # penalty, so a committed punt is not over-penalised the way L2's proportional pull
+                    # would). _REG_FLOOR stops the shrink short of v, keeping weights off the singular w==v
+                    # ray. Renormalised to the simplex just below.
+                    deviation        = category_weights - neutral_row
+                    shrink           = np.minimum(reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
+                    category_weights = category_weights - np.sign(deviation) * shrink
                 category_weights[category_weights < 0] = 0
 
                 if self.sport == 'NBA':
@@ -678,23 +886,32 @@ class HAgent:
                     pitching_preference = np.clip(pitching_preference + pp_update, -0.5, 0.5)
 
                 if self.position_means is not None:
-                    for pos_code, optimizer in optimizers['Shares'].items():
-                        shares      = position_shares[pos_code].values
-                        share_grad  = gradient_result['Gradients']['Shares'][pos_code]
-                        # Step in logit space: the chain rule through the softmax Jacobian turns the
-                        # share gradient g into the logit gradient s ⊙ (g − ⟨g, s⟩). That Jacobian,
-                        # ∂sⱼ/∂zᵢ = sⱼ(δᵢⱼ − sᵢ), is just the quotient rule applied to sⱼ = e^{zⱼ}/Σe^{zₖ}:
-                        # both the numerator term (u'v) and the denominator term (−uv') bring down an
-                        # e^{zᵢ} — since d/dz e^z = e^z — and each e^{zᵢ}/Σe^{zₖ} is exactly the share sᵢ,
-                        # so every raw exponential is replaced by the share it represents. The numerator
-                        # term gives the leading s (the update vanishes at the boundary, so a share can
-                        # never be driven negative); the denominator term gives the ⟨g, s⟩ share-weighted
-                        # centering (positions already near 0 drop out instead of dragging a plain mean).
-                        # No clip or renormalise is needed — softmax(logits) is always a valid distribution.
-                        logit_grad   = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
-                        logit_update = optimizer.minimize(logit_grad)
-                        position_logits[pos_code] = position_logits[pos_code] + logit_update
-                        position_shares[pos_code].values[:] = _softmax_rows(position_logits[pos_code])
+                    # All flex slots share one logit per position, so each slot's shares are the softmax
+                    # over its own subset of positions (position_indices). Accumulate every slot's logit-
+                    # space gradient -- the softmax Jacobian s ⊙ (g − ⟨g, s⟩) applied to its restricted
+                    # shares -- into the shared per-position gradient, then take one optimiser step.
+                    # Overlapping positions (PG is in both the guard and utility slots) sum their gradients.
+                    master_grad = np.zeros_like(master_logits)
+                    for pos_code in self.position_structure['flex']:
+                        shares     = position_shares[pos_code].values
+                        share_grad = gradient_result['Gradients']['Shares'][pos_code]
+                        logit_grad = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
+                        master_grad[:, self.position_indices[pos_code]] += logit_grad
+                    master_logits = master_logits + optimizers['Shares'].minimize(master_grad)
+                    if reg_lambda > 0.0:
+                        # L1 reg toward uniform on the shared per-position shares (mirrors the category
+                        # weights x _POSITION_REG_MULT); re-derive the logits so the pull persists.
+                        pos_reg       = reg_lambda * _POSITION_REG_MULT
+                        master_shares = _softmax_rows(master_logits)
+                        uniform       = 1.0 / master_shares.shape[1]
+                        dev           = master_shares - uniform
+                        shrink        = np.minimum(pos_reg, np.maximum(np.abs(dev) - _REG_FLOOR, 0.0))
+                        master_shares = np.clip(master_shares - np.sign(dev) * shrink, 1e-12, None)
+                        master_logits = np.log(master_shares / master_shares.sum(axis=1, keepdims=True))
+                    # Derive each flex slot's shares from the shared logits (softmax over its own positions).
+                    for pos_code in self.position_structure['flex']:
+                        position_shares[pos_code].values[:] = _softmax_rows(
+                            master_logits[:, self.position_indices[pos_code]])
 
             # Warm-start the next pick from the converged best candidate. Computed once after the loop
             # (only the final iteration's values are ever kept) and read straight from the numpy arrays,
@@ -931,6 +1148,18 @@ class HAgent:
 
         category_gradient = np.einsum('ai,aik -> ak', pdf_weights, del_full)
 
+        # Anti-crowded-punt penalty (kappa): in the early multi-start rounds, subtract a linear penalty
+        # for punting (w<v) categories the field is crowding into (self._punt_popularity), so both the
+        # seed scan and the descent defect from popular punts. Inert until the empty-board scan has
+        # measured popularity and whenever kappa=0. A full roster has no meaningful weights, and the
+        # roster<3 gate keeps the penalty off later picks -- so the final scored H-score is unaffected.
+        if (self.kappa > 0.0 and self._punt_popularity is not None
+                and len(self.players) < _WEAKNESS_SEED_MIN_ROSTER):
+            neutral    = self.v.reshape(1, -1)
+            punt_depth = np.maximum(neutral - category_weights, 0.0)
+            score             = score - self.kappa * (punt_depth @ self._punt_popularity)
+            category_gradient = category_gradient + self.kappa * self._punt_popularity.reshape(1, -1) * (category_weights < neutral)
+
         if self.position_means is not None:
             position_gradient = np.einsum('ai,aki -> ak', pdf_weights, self.position_means)
             share_gradients = {
@@ -1042,6 +1271,22 @@ class HAgent:
         self.initial_category_weights = None
         self.initial_position_shares  = None
         return self
+
+    def populate_default_h_scores(self, n_iterations: int, cash_remaining_per_team: dict = None) -> None:
+        """Compute and cache the neutral (empty-board) H-scores. Run once at the end of the build so
+        the agent is always primed — the throttle has a ranking to prioritise by, auction values have
+        their anchor, and the draft-start evaluate can short-circuit to this result. Pass full cash
+        only in auction mode. Runs full-exact (default_h_scores is still None here, so no throttling)."""
+        empty = {f'Team {i + 1}': [] for i in range(self.n_drafters)}
+        self.clear_initial_weights()
+        result = self.get_h_scores(
+            player_assignments      = empty,
+            drafter                 = 'Team 1',
+            n_iterations            = n_iterations,
+            cash_remaining_per_team = cash_remaining_per_team,
+        )
+        self.default_h_scores = result['Scores'].sort_values(ascending=False)
+        self._default_result  = result
 
     # ── simplified-form x_mu helpers (unchanged) ──────────────────────────────
 

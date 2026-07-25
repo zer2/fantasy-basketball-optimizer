@@ -6,7 +6,7 @@ A route handler calls begin_timing() at the start; instrumented code wraps phase
 in `with record_phase(name):`; the handler reads server_timing_header() and sets it
 on the response. A request-total entry is added by the middleware in main.py.
 
-Phase timings live in a ContextVar so instrumented functions (e.g. run_evaluate)
+Phase timings live in a ContextVar so instrumented functions (e.g. rank_candidates)
 don't need a collector threaded through their signatures. A sync route handler and
 the code it calls run in a single context, so set / record / read all see the same
 dict. When begin_timing() was never called (tests, the trade routes, direct calls),

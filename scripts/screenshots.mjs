@@ -88,6 +88,85 @@ async function waitEval(page) {
     await page.waitForTimeout(200)
 }
 
+// Lock in the current top-ranked candidate for whoever is on the clock (name-agnostic, so it works on
+// any season). Used to give a team its first pick before letting the rest of the field autodraft.
+async function lockInTopPick(page) {
+    const wrap = page.locator('[data-testid="draft-pick-select-wrapper"]').first()
+    await wrap.locator('.cs-trigger').click()
+    await wrap.locator('.cs-dropdown .cs-option').first().click()
+    await page.locator('.pick-control-row .pick-btn', { hasText: 'Lock in selection' }).click()
+    await waitEval(page)
+}
+
+// Set one seat's autodraft toggle to a desired on/off state, idempotently — the "A" trigger toggles on
+// each click, so we click only when the current state (aria-pressed) differs. Deterministic regardless of
+// what a prior shot left toggled.
+async function setSeatAutodraft(page, index, on) {
+    const trigger = page.locator('.entry-table thead .method-dd-trigger').nth(index)
+    const isOn = (await trigger.getAttribute('aria-pressed')) === 'true'
+    if (isOn !== on) await trigger.click()
+}
+
+// Turn every seat into an autodrafter. Seat 0 is toggled LAST: it is the current drafter, and toggling
+// the current drafter to autodraft is what kicks off autopilot — by then all other seats are already
+// autodrafters, so autopilot runs the entire board rather than stopping at the first manual seat.
+async function setAllSeatsAutodraft(page) {
+    const count = await page.locator('.entry-table thead .method-dd-trigger').count()
+    for (let i = 1; i < count; i++) await setSeatAutodraft(page, i, true)
+    await setSeatAutodraft(page, 0, true)
+}
+
+// Every seat EXCEPT seat 0 becomes an autodrafter. With seat 0 manual and on the clock, locking its pick
+// lets autopilot fill the rest of round one and wrap back down to seat 0's next turn, then stop — a
+// deterministic mid-draft board with seat 0 on the clock.
+async function setLaterSeatsAutodraft(page) {
+    const count = await page.locator('.entry-table thead .method-dd-trigger').count()
+    for (let i = 1; i < count; i++) await setSeatAutodraft(page, i, true)
+    await setSeatAutodraft(page, 0, false)
+}
+
+// Clear the draft board back to empty via the pick control, if the button is present.
+async function clearDraftBoard(page) {
+    const clearBtn = page.locator('.pick-control-row .pick-btn', { hasText: 'Clear draft board' })
+    if (await clearBtn.count()) { await clearBtn.first().click(); await waitEval(page) }
+}
+
+// Autopilot hides the seat selector while it runs and restores it when done. Wait for it to go hidden
+// (autopilot started) and then visible again (finished) — robust to a full-board run taking minutes.
+async function waitAutopilotDone(page) {
+    const hidden = () => getComputedStyle(document.getElementById('seat-selector-container')).visibility === 'hidden'
+    await page.waitForFunction(hidden, { timeout: 8000 }).catch(() => {})
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('seat-selector-container')).visibility !== 'hidden',
+                               { timeout: 240000 }).catch(() => {})
+    await waitEval(page)
+    await page.waitForTimeout(300)
+}
+
+// Wait for the team-statistics G-score table to fill in the full roster (13 players) before capturing.
+async function waitTeamGscore(page) {
+    await waitEval(page)
+    await page.waitForFunction(() => {
+        const table = document.querySelector('[data-testid="team-gscore"]')
+        return table && table.querySelectorAll('tbody tr').length >= 13
+    }, { timeout: 30000 }).catch(() => {})
+    await page.waitForTimeout(200)
+}
+
+// A full 12-seat autodraft in 2025-26 EC, built ONCE and reused by both team-shot states (Team 5 / Team 2)
+// so the expensive whole-board draft runs a single time. Switching the season first resets the board and
+// the drafter methods, so this starts from a clean slate regardless of earlier shots.
+let fullAutodraftReady = false
+async function ensureFullAutodraft(page) {
+    if (fullAutodraftReady) return
+    await setMode(page, 'Draft Mode')
+    await setFmt(page, 'Each Category')
+    await selectHistoricalSeason(page, '2025-26')   // resets the board + methods
+    await setAllSeatsAutodraft(page)
+    await waitAutopilotDone(page)
+    await page.locator('.draft-tab-bar .pick-btn[data-tab="my-team"]').click()   // Show team statistics
+    fullAutodraftReady = true
+}
+
 // ─── memoized app states ────────────────────────────────────────────────────────
 // The page is loaded ONCE (STATES.load, before the loop). Every other state is a live UI
 // transition — no reloads (a reload re-pulls Snowflake data and loses our mode/format).
@@ -226,6 +305,34 @@ const STATES = {
         await page.locator('[data-testid="roster-inspection-hscore"]').waitFor({ timeout: 30000 }).catch(() => {})
         await page.waitForTimeout(200)
     },
+
+    // mid_draft: the candidate view partway through a draft. Clear any prior picks, make every seat but
+    // Team 1 an autodrafter, then lock Team 1's first pick — autopilot fills round one and wraps back to
+    // Team 1's next turn and stops, leaving a populated board with Team 1 on the clock. Stays on the
+    // draft base season (2024-25). Runs late because it mutates the board heavily.
+    async 'mid-draft'(page) {
+        await ensure(page, 'draft-EC')
+        await clearDraftBoard(page)
+        await setLaterSeatsAutodraft(page)
+        await lockInTopPick(page)          // Team 1 takes the top pick; autopilot then fills the field
+        await waitAutopilotDone(page)
+        await setSelect(page, 'seat-select', 'Team 1')   // view the candidate board from Team 1
+        await waitEval(page)
+    },
+
+    // scottie_autodraft / sga_autodraft: two teams from ONE full 12-seat autodraft in 2025-26 EC, shown in
+    // the team-statistics view. The whole-board draft is built once (ensureFullAutodraft) and reused; each
+    // state just points the seat selector at its team. Team 5 / Team 2 match the doc captions' draft slots.
+    async 'autodraft-team5'(page) {
+        await ensureFullAutodraft(page)
+        await setSelect(page, 'seat-select', 'Team 5')
+        await waitTeamGscore(page)
+    },
+    async 'autodraft-team2'(page) {
+        await ensureFullAutodraft(page)
+        await setSelect(page, 'seat-select', 'Team 2')
+        await waitTeamGscore(page)
+    },
 }
 
 // ─── manifest / COVERAGE TRACKER (working toward 100% automated) ─────────────────
@@ -242,6 +349,11 @@ const STATES = {
 //     hstrat hflex hroster projections 1984-85 lsettings fantraxsettings espnpop hdollars
 //     auctiondetail hwaiver hwaiverexp tradeanalysis tradeanalysisg tradesuggestions tp3 rosters
 //     rosterinspection rosterh autodraft
+//
+//   NEW (3, wired up but NOT yet verified against a live run — confirm framing/timing once):
+//     mid_draft (candidate view mid-draft), scottie_autodraft (Team 5 team-stats after a full 2025-26
+//     autodraft), sga_autodraft (Team 2, same draft). The two team shots reproduce the doc captions'
+//     draft (SGA at seat 2 / Scottie at seat 5) using the current defaults, kappa included.
 //
 //   NOTE: removed as low-value-out-of-context: the single-parameter crops (chi aleph beth iterations
 //     puntcontrol injury savorinput) and the settings dropdowns (formats categories historical =
@@ -317,6 +429,15 @@ const SHOTS = [
     // Autodraft — runs late because toggling the "A" squares triggers autopilot, which mutates the
     // draft/candidate board for anything after it. Draft-mode state, so it precedes the platform shots.
     { name: 'autodraft',   state: 'draft-autodraft', selector: '.entry-table thead' },
+
+    // Mid-draft candidate view + the two full-autodraft team shots. All three heavily mutate the board,
+    // so they run after every clean draft shot. mid_draft clears + rebuilds on the 2024-25 base; the two
+    // team shots switch to 2025-26 for a single full autodraft (which resets the board on season change).
+    { name: 'mid_draft',         state: 'mid-draft',       selector: '#hscoretable', rows: 12 },
+    // #draft-gscore wraps both the roster table (team-gscore) and the separate H-Score (est. win rate)
+    // summary table below it — capture the container so the team's H-score row is in frame.
+    { name: 'scottie_autodraft', state: 'autodraft-team5', selector: '#draft-gscore' },
+    { name: 'sga_autodraft',     state: 'autodraft-team2', selector: '#draft-gscore' },
 
     // Live-platform settings — MUST stay last: these switch ls-platform to a live provider, which
     // poisons every own-data auction/season state above (blank rosters, no eval). Nothing own-data

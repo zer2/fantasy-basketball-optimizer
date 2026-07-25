@@ -14,13 +14,14 @@
 # These act as a regression guard: if any change shifts the top suggestions,
 # this test will catch it.
 
+import os
 import time
 
 import pytest
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.math.trading import run_trade_suggest
+from backend.state.session import get_session
+from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
 
 from test_and_benchmark_trading import _DEFAULT_SEASON_ROSTERS
@@ -31,10 +32,9 @@ _COMBO_THRESHOLD = 2.0
 
 _SCORE_TOL = 0.0001   # allowed absolute deviation on H-score diffs (0–1 scale)
 
-# Top expected suggestions per combo size, verified 2026-07-16.
-# Snapshots regenerated for the softmax flex-share optimiser + trimmed position-means best-practice,
-# and after removing the phantom-+1 opponent padding in build_baseline_diff_means (complete rosters
-# are now compared at their true size).
+# Top expected suggestions per combo size.
+# Regenerated 2026-07-19 for the punt-seed init (multi-start / weakest-category, replacing the old
+# heuristic) in algorithm_agents -- the H-score shifts reshuffle the 2v2/3v3 top trades (1v1 unchanged).
 # send / receive are sorted lists so order within the group does not matter.
 _EXPECTED = {
     '1v1': [
@@ -53,30 +53,30 @@ _EXPECTED = {
     ],
     '2v2': [
         {
+            'send':    ['Andrew Nembhard (PG,SG)', 'Rudy Gobert (C)'],
+            'receive': ['Andrew Wiggins (SF,PF)', 'Tyrese Maxey (PG,SG)'],
+            'your_score':  0.0045,
+            'their_score': 0.0003,
+        },
+        {
             'send':    ['Andrew Nembhard (PG,SG)', 'Daniel Gafford (C,PF)'],
             'receive': ['Andrew Wiggins (SF,PF)', 'Derrick Jones Jr. (SF,PF)'],
             'your_score':  0.0042,
             'their_score': 0.0007,
         },
-        {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Isaiah Hartenstein (C)'],
-            'receive': ['Derrick Jones Jr. (SF,PF)', 'Malik Monk (PG,SG,SF)'],
-            'your_score':  0.0038,
-            'their_score': 0.0007,
-        },
     ],
     '3v3': [
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Bam Adebayo (C,PF)', 'Daniel Gafford (C,PF)'],
-            'receive': ['Kyshawn George (SG,SF)', 'Malik Monk (PG,SG,SF)', 'Pascal Siakam (C,SF,PF)'],
-            'your_score':  0.0057,
-            'their_score': 0.0003,
+            'send':    ['Andrew Nembhard (PG,SG)', 'Isaiah Hartenstein (C)', 'Rudy Gobert (C)'],
+            'receive': ['Kyshawn George (SG,SF)', 'Pascal Siakam (C,SF,PF)', 'Ty Jerome (PG,SG)'],
+            'your_score':  0.0059,
+            'their_score': 0.0011,
         },
         {
-            'send':    ['Isaiah Hartenstein (C)', 'Mike Conley (PG)', 'Rudy Gobert (C)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Derrick Jones Jr. (SF,PF)', 'Pascal Siakam (C,SF,PF)'],
-            'your_score':  0.0055,
-            'their_score': 0.0006,
+            'send':    ['Daniel Gafford (C,PF)', 'Isaiah Hartenstein (C)', 'Mike Conley (PG)'],
+            'receive': ['Andrew Wiggins (SF,PF)', 'Malik Monk (PG,SG,SF)', 'Ty Jerome (PG,SG)'],
+            'your_score':  0.0057,
+            'their_score': 0.0001,
         },
     ],
 }
@@ -127,6 +127,19 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
     suggestions = result.suggestions
     print(f'\n[benchmark] Trade suggest — {label}: {elapsed:.2f}s  ({len(suggestions)} suggestions)')
     expected    = _EXPECTED[label]
+
+    if os.environ.get('REGEN_GOLDENS'):
+        rows = [
+            "        {\n"
+            f"            'send':    {sorted(s.send)},\n"
+            f"            'receive': {sorted(s.receive)},\n"
+            f"            'your_score':  {round(s.your_score, 4)},\n"
+            f"            'their_score': {round(s.their_score, 4)},\n"
+            "        }"
+            for s in suggestions[:len(expected)]
+        ]
+        print(f"\n# REGEN trading\n    {label!r}: [\n" + ',\n'.join(rows) + "\n    ],")
+        return
 
     assert len(suggestions) >= len(expected), (
         f'{label}: expected at least {len(expected)} suggestions, got {len(suggestions)}'

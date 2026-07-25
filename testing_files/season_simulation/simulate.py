@@ -3,7 +3,7 @@
 #
 # For each (season, scoring format) we build one backend session (the expensive pipeline runs once)
 # and then run one snake draft per seat. In each draft exactly one seat is the "H-score drafter"
-# (picks the top candidate from run_evaluate); the other eleven are "G-score drafters" (pick the
+# (picks the top candidate from rank_candidates); the other eleven are "G-score drafters" (pick the
 # highest-Total-G-score available player that keeps their roster position-eligible). We record the
 # H-score drafter's final team H-score + per-category rates, plus, for each of its picks, the ranked
 # candidate table (top N) and the picked player's expand-view detail — i.e. the tables the website
@@ -32,8 +32,8 @@ sys.path.insert(0, str(_HERE.parent.parent))   # repo root -> `backend`
 sys.path.insert(0, str(_HERE.parent))           # testing_files -> `benchmark_helpers`
 
 from benchmark_helpers import client, _build_session_request
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.ranking import rank_candidates
 from backend.data_retrieval import get_available_seasons
 from backend.math.position_optimization import check_single_player_eligibility
 
@@ -84,12 +84,12 @@ def _has_position_data(session) -> bool:
     seasons whose positions are blank ('()'). This is authoritative — sniffing the Positions strings
     missed the empty-string sentinel and mis-flagged ~1999-00 as having positions, which then made the
     G-score drafter run eligibility against position-less players."""
-    return session.H.position_means is not None
+    return session.agent.position_means is not None
 
 
 def _gscore_ranking(session) -> list[str]:
     """Player names ordered by descending total G-score (the G-score drafter's preference order)."""
-    g_scores = session.info['G-scores']
+    g_scores = session.agent.info['G-scores']
     return list(g_scores.sort_values('Total', ascending=False).index)
 
 
@@ -147,7 +147,7 @@ def _score_team(session, assignments: dict[str, list[str]], team_name: str, n_it
     """Final H-score + per-category rates for a completed team. Scored directly on the full roster — now
     correct because get_diff_distributions no longer pads a full team's opponents with a phantom +1
     player (see algorithm_agents.py). A full roster yields a single-row result."""
-    result = session.H.get_h_scores(assignments, team_name, n_iterations)
+    result = session.agent.get_h_scores(assignments, team_name, n_iterations)
     scores = result['Scores']
     rates  = result['Rates']
     index  = scores.idxmax()
@@ -165,7 +165,7 @@ def _simulate_one_seat(
 ) -> dict:
     """Run one snake draft where `hscore_seat` drafts by H-score and the rest by G-score. Returns the
     H-score drafter's final score, its roster, and its per-pick candidate tables."""
-    position_config = session.H._pos_cfg
+    position_config = session.agent._pos_cfg
     n_iterations    = session.current_params['n_iterations']
     team_names      = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments     = {name: [] for name in team_names}
@@ -180,7 +180,7 @@ def _simulate_one_seat(
             drafter_name  = team_names[drafter_index]
 
             if drafter_index == hscore_seat:
-                result = run_evaluate(session, assignments, drafter_name, [], None, 0, None)
+                result = rank_candidates(session, assignments, drafter_name, [], None, 0, None)
                 assert result.candidates, f'No candidates for {drafter_name}, round {pick_row + 1}'
                 top_candidate = result.candidates[0]
                 picks.append({

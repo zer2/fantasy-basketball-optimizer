@@ -103,7 +103,7 @@ document.addEventListener('platform-connected', () => {
  * base players cache, and full-team result.
  * Retries once if the session has expired (404).
  */
-async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
+async function evaluateSeat(seat: string, forAutopilot = false): Promise<string | null> {
     if (evaluateController) evaluateController.abort()
     evaluateController = new AbortController()
     const { signal } = evaluateController
@@ -111,7 +111,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
     setIndicatorState('evaluating')
 
     try {
-        await withSessionRetry(async () => {
+        return await withSessionRetry(async () => {
             const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
             const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
 
@@ -161,7 +161,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
                     }
                     document.dispatchEvent(new Event('full-team-result-updated'))
                 }
-                return
+                return null
             }
             latestFullTeamResult = null
 
@@ -183,7 +183,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
                         { ...evalReq, candidate_offset: offset, candidate_limit: CANDIDATE_BATCH_SIZE },
                         signal,
                     )
-                    if (signal.aborted) return
+                    if (signal.aborted) return null
                     const batch = candidatesToPlayerResults(resp.candidates)
                     players.push(...batch)
                     if (forAutopilot) break   // the top pick is in the first batch; the rest is wasted work
@@ -202,10 +202,11 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
             }
 
             if (forAutopilot) {
-                // Expose the top candidate for the pick decision, but don't cache this partial
-                // first-batch-only list as the base players or touch the rendered table.
+                // Return the top candidate for the pick decision. The caller uses this return value
+                // rather than a shared global, so a later evaluate that aborts this one can't leave a
+                // stale pick behind. Don't cache this partial first-batch-only list as the base players.
                 setCandidatePlayerResults(players)
-                return
+                return players[0]?.name ?? null
             }
 
             if (!basePlayersBySession.has(getSessionId()!)) {
@@ -214,9 +215,10 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
 
             setBasePlayerResults(basePlayersBySession.get(getSessionId()!)!)
             setCandidatePlayerResults(players)
+            return null
         })
     } catch (err: any) {
-        if (err.name === 'AbortError') return
+        if (err.name === 'AbortError') return null
         throw err
     } finally {
         if (evaluateGeneration === generation) setIndicatorState('idle')
@@ -226,13 +228,13 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<void> {
 /** Evaluates the current draft/auction state for the current seat and rebuilds the candidate table.
  *  With `forAutopilot`, it scores only the first batch and renders nothing — the caller only needs the
  *  top candidate for an autopilot pick. */
-export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Promise<void> {
+export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Promise<string | null> {
     const forAutopilot = options.forAutopilot ?? false
     // No explicit seat selected falls back to the first team; an empty league is a bug, not a default.
     const seat = getCurrentSeat() ?? getLeagueSettings().team_names[0]
     if (seat === undefined) throw new Error('runEvaluate: no seat selected and league has no team names')
-    await evaluateSeat(seat, forAutopilot)
-    if (forAutopilot) return   // autopilot needs only the top candidate; nothing is shown
+    const topPick = await evaluateSeat(seat, forAutopilot)
+    if (forAutopilot) return topPick   // autopilot needs only the top candidate; nothing is shown
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
     if (mode !== 'Season Mode') {
         if (getFullTeamResult()) {
@@ -242,6 +244,7 @@ export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Pro
             buildTable(getCandidatePlayerResults()!)
         }
     }
+    return null
 }
 
 /**

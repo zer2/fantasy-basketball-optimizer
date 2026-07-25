@@ -4,7 +4,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { isMobileViewport, readRequiredIntInput } from '../helper_functions.js'
-import { getPlayerResults, getCandidatePlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
+import { getPlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
@@ -36,6 +36,10 @@ let pickListenerController:   AbortController | null = null
 let headerListenerController: AbortController | null = null
 
 let _autopilotRunning = false
+// Set only around autopilot's own end-of-run re-render, so that render doesn't re-trigger autopilot via
+// renderDraftBoard's auto-start. Without it, an autopilot run that stops on an autopilot seat (e.g. an
+// evaluate came back empty) would be restarted by its own final render — a tight "autopiloting…" loop.
+let _suppressAutostart = false
 
 // Mobile transposes the board (teams as rows, rounds as columns) with a frozen team-name column.
 // `transposed` is the orientation the current scaffold was built for; the scaffold rebuilds when
@@ -88,7 +92,7 @@ export function renderDraftBoard(container: HTMLElement): void {
     // Guard on G-scores being loaded — on initial page render the session hasn't been created yet,
     // and applyLayout() will re-render once runModeEval() completes, at which point this fires correctly.
     const dataIsReady = getSessionPhase() !== 'uninitialized'
-    if (!_autopilotRunning && dataIsReady && getPickRow() < getNPicks() && getDrafterMethod(getPickDrafter()) !== 'Manual input') {
+    if (!_autopilotRunning && !_suppressAutostart && dataIsReady && getPickRow() < getNPicks() && getDrafterMethod(getPickDrafter()) !== 'Manual input') {
         fireAutopilotPicks(container).catch(err => console.error('Autopilot failed:', err))
     }
 }
@@ -116,10 +120,22 @@ function buildScaffold(container: HTMLElement): void {
 
 // ─── Autopilot helpers ────────────────────────────────────────────────────────
 
-/** Returns the top-ranked candidate from the latest evaluate response.
- *  Candidates are always undrafted (the backend only includes available players). */
-function pickByHScore(): string | null {
-    return getCandidatePlayerResults()?.[0]?.name ?? null
+/** Re-render the board after a pick-state change, then refresh whatever the *new* current drafter
+ *  needs. renderDraftBoard already fires autopilot for an autopilot drafter, so here we only trigger
+ *  the available-players evaluate for a manual drafter. Deliberately scoped to real pick mutations
+ *  (clear / undo / lock-in / autopilot-end) rather than baked into renderDraftBoard — the latter also
+ *  runs on cosmetic and config re-renders, which runModeEval already evaluates, so evaluating there
+ *  would double-fire and reset the table needlessly. */
+function reflectDraftChange(container: HTMLElement): void {
+    renderDraftBoard(container)
+    // Fire the evaluate whenever renderDraftBoard did NOT hand off to autopilot — i.e. a manual drafter
+    // is on the clock, or the draft is complete. The done case matters: it is the evaluate that computes
+    // the full-team result, so the team-statistics tab shows the finished team's H-score. (A guard that
+    // required picks remaining skipped that final evaluate, leaving the H-score blank once a team filled.)
+    const willAutostart = getPickRow() < getNPicks() && getDrafterMethod(getPickDrafter()) !== 'Manual input'
+    if (!_autopilotRunning && getSessionPhase() !== 'uninitialized' && !willAutostart) {
+        _draftDebouncer.fire()
+    }
 }
 
 /**
@@ -131,6 +147,10 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     if (_autopilotRunning) return
     _autopilotRunning = true
     setAutopilotOn()
+    // Cancel any pending debounced evaluate: if it fired mid-run it would start a competing evaluate that
+    // aborts autopilot's own evaluate, which now returns null and stops the run short (then the end render
+    // could restart it — the "autopiloting…" loop). Autopilot refreshes the board itself when it finishes.
+    _draftDebouncer.cancel()
     const userSeat = getCurrentSeat()
     ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
     try {
@@ -139,9 +159,10 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
 
             clearFullTeamResult()
             setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Team ${getPickDrafter() + 1}`)
-            // Autopilot only needs the top pick: score just the first batch and render nothing.
-            await runEvaluate({ forAutopilot: true })
-            const player = pickByHScore()
+            // Autopilot only needs the top pick: score just the first batch and render nothing. Use the
+            // value this evaluate returns — not a shared global — so a competing evaluate that aborts
+            // this one yields null (stop cleanly) instead of a stale pick from a previous drafter.
+            const player = await runEvaluate({ forAutopilot: true })
 
             if (!player) break
             recordDraftPick(getPickRow(), getPickDrafter(), player)
@@ -154,10 +175,13 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
         setAutopilotOff()
         ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = ''
     }
-    // Re-render now that _autopilotRunning is false so the pick control
-    // switches back to the normal Manual input state.
-    renderDraftBoard(container)
-    _draftDebouncer.fire()
+    // Re-render now that _autopilotRunning is false so the pick control switches back to the normal
+    // Manual input state, and refresh the available players / full-team result. Suppress auto-start for
+    // this one render: autopilot has already run to its stopping point (a manual seat, the draft's end,
+    // or a seat it couldn't pick for), so re-triggering it here would only spin.
+    _suppressAutostart = true
+    reflectDraftChange(container)
+    _suppressAutostart = false
 }
 
 // ─── Pick control ─────────────────────────────────────────────────────────────
@@ -218,13 +242,14 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         lockBtn.className = 'pick-btn'
         lockBtn.textContent = 'Lock in selection'
         lockBtn.disabled = available.length === 0
-        lockBtn.addEventListener('click', async () => {
+        lockBtn.addEventListener('click', () => {
             const chosen = sel.getValue()
             if (!chosen || getPickRow() >= getNPicks()) return
             recordDraftPick(getPickRow(), getPickDrafter(), chosen)
             advanceDraftPick()
-            renderDraftBoard(container)
-            await fireAutopilotPicks(container)
+            // renderDraftBoard (inside reflectDraftChange) fires autopilot for the next drafter if it is
+            // an autodrafter, so no explicit fireAutopilotPicks call is needed here.
+            reflectDraftChange(container)
         })
         btns.append(lockBtn)
     }
@@ -243,8 +268,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
             getDrafterMethod(getPickDrafter()) !== 'Manual input'
             && !(getPickRow() === 0 && getPickDrafter() === 0)
         )
-        renderDraftBoard(container)
-        _draftDebouncer.fire()
+        reflectDraftChange(container)
     })
 
     const clearBtn = document.createElement('button')
@@ -252,8 +276,10 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     clearBtn.textContent = 'Clear draft board'
     clearBtn.addEventListener('click', () => {
         clearAllDraftPicks()
-        renderDraftBoard(container)
-        runEvaluate().catch(err => console.error('Evaluate after clear failed:', err))
+        // reflectDraftChange re-renders and, if drafter 0 is an autodrafter, lets renderDraftBoard own
+        // the autopilot run — so we no longer fire a competing runEvaluate that would abort it and leave
+        // the first autopilot pick reading a stale candidate list.
+        reflectDraftChange(container)
     })
 
     btns.append(undoBtn, clearBtn)

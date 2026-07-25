@@ -5,24 +5,31 @@ to the /evaluate response payload.
 
 from __future__ import annotations
 
-import re
 import numpy as np
 import pandas as pd
 from typing import Optional
 
-from backend.session import Session
+from backend.state.session import Session
 from backend.models import (
     Candidate, GScoreRow, FlexAllocations, FlexRow,
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
-from backend.helper_functions import extract_last_name
-from backend.server_timing import record_phase
+from backend.infra.server_timing import record_phase
+
+
+def extract_last_name(player_full_name: str) -> str:
+    """Return the player's last name, stripping any trailing position suffix.
+
+    For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
+    "Nikola Jokic" → "Jokic".
+    """
+    return ' '.join(player_full_name.split(' (')[0].split(' ')[1:])
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def run_evaluate(
+def rank_candidates(
     session: Session,
     player_assignments: dict[str, list[str]],
     my_team_id: str,
@@ -50,31 +57,31 @@ def run_evaluate(
     Returns:
         EvaluateResponse containing the iteration count and ranked Candidate list.
     """
-    info           = session.info
-    H              = session.H
+    info           = session.agent.info
+    H              = session.agent
     current_params = session.current_params
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
 
     # ── Candidate batching (draft/waiver only) ────────────────────────────────
-    # Slice the available pool by the cached default/generic ranking so the top-ranked players are
-    # scored (and can paint) first. Auction always evaluates the whole pool — its dollar values anchor
-    # on the full-distribution replacement level. The first eval also evaluates everyone: it is what
-    # builds session.generic_h_scores, so there is no ranking to slice by yet.
-    is_auction       = remaining_cash is not None
-    candidate_subset = None
-    has_more         = False
-    total_candidates = None   # set when batching; falls back to the scored count below
-    if candidate_limit is not None and not is_auction and session.generic_h_scores is not None:
+    # Slice the available pool by the agent's default (neutral-board) ranking so the top-ranked players
+    # are scored (and can paint) first. Auction always evaluates the whole pool — its dollar values anchor
+    # on the full-distribution replacement level.
+    is_auction = remaining_cash is not None
+    if candidate_limit is not None and not is_auction:
         unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
         unavailable |= set(exclusion_list)
-        available_ranked = [p for p in session.generic_h_scores.index if p not in unavailable]
+        available_ranked = [p for p in session.agent.default_h_scores.index if p not in unavailable]
         candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
         has_more         = len(available_ranked) > candidate_offset + candidate_limit
-        total_candidates = len(available_ranked)
+        total_candidates = len(available_ranked)   # falls back to the scored count below when not batching
         if len(candidate_subset) == 0:
             return EvaluateResponse(iteration=0, candidates=[], has_more=False,
                                     total_candidates=total_candidates)
+    else:
+        candidate_subset = None
+        has_more         = False
+        total_candidates = None
 
     # Clear warm-start weights so this call is independent of any previous one.
     H = H.clear_initial_weights()
@@ -85,7 +92,6 @@ def run_evaluate(
             n_iterations            = n_iterations,
             cash_remaining_per_team = remaining_cash,
             exclusion_list          = exclusion_list,
-            baseline_h_scores       = session.generic_h_scores,
             candidate_subset        = candidate_subset,
             # Global rank of this batch's first candidate, so the throttle's exact-solve tiers stay
             # global: batches past the first fall outside them and exact-solve nobody. Zero when we
@@ -97,42 +103,11 @@ def run_evaluate(
     if h_score_result is None:
         return EvaluateResponse(iteration=0, candidates=[])
 
-    # ── Generic (default, first-pick) H-scores cache ──────────────────────────
-    # These neutral-state scores (no players taken) serve two purposes: in auction mode they anchor
-    # gnrc_dollar / orig_dollar, and in every mode they give the position-optimiser throttle a ranking
-    # to prioritise by (so the exact-solve tier tracks the players most likely to be picked).
-    # On the first call (no players assigned), the current result already represents that neutral
-    # state, so we cache it directly — avoiding a redundant run. If the session connects mid-draft/
-    # auction (players already assigned on first call), run a separate clean evaluation for it.
-    if session.generic_h_scores is None:
-        all_assigned = [
-            p for team_players in player_assignments.values()
-            for p in team_players if isinstance(p, str)
-        ]
-        if len(all_assigned) == 0:
-            # No players taken yet — current scores are the neutral baseline.
-            session.generic_h_scores = h_score_result['Scores'].sort_values(ascending=False)
-        else:
-            # Mid-draft/auction start: run a clean evaluation with all slots empty. Mirror the teams
-            # actually in play (same identities as player_assignments) so the drafter is always present.
-            empty_assignments = {name: [] for name in player_assignments}
-            generic_H         = H.clear_initial_weights()
-            with record_phase('hscores_generic'):
-                generic_result = generic_H.get_h_scores(
-                    player_assignments      = empty_assignments,
-                    drafter                 = my_team_id,
-                    n_iterations            = n_iterations,
-                    cash_remaining_per_team = remaining_cash,
-                    exclusion_list          = [],
-                )
-            if generic_result is not None:
-                session.generic_h_scores = generic_result['Scores'].sort_values(ascending=False)
-
     with record_phase('build_candidates'):
         candidates = _build_candidates(
             h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
             remaining_cash,
-            generic_h_scores=session.generic_h_scores,
+            generic_h_scores=session.agent.default_h_scores,
         )
 
     return EvaluateResponse(
@@ -254,7 +229,9 @@ def _build_candidates(
     # n_remaining-th best available player), which anchors the dollar scale.
     player_auction_values: dict[str, AuctionValues] | None = None
     if remaining_cash is not None:
-        cash_per_team   = current_params.get('cash_per_team')
+        # The evaluate route enforces that remaining_cash and cash_per_team are set together, so an
+        # auction evaluate always has cash_per_team here (no defensive fallback needed).
+        cash_per_team   = current_params['cash_per_team']
         streaming_noise = float(current_params.get('streaming_noise', 10.0))
         total_picks     = H.n_drafters * H.n_picks
 
@@ -265,7 +242,7 @@ def _build_candidates(
         n_remaining          = total_picks - len(all_players_chosen)
         total_cash_remaining = float(sum(remaining_cash.values()))
 
-        if cash_per_team is not None and n_remaining > 0:
+        if n_remaining > 0:
             total_original_cash = float(H.n_drafters * cash_per_team)
 
             # G-scores for available (undrafted) players, used for G-score dollar values.
@@ -276,38 +253,37 @@ def _build_candidates(
             # otherwise fall back to the current team-specific scores.
             baseline_scores = generic_h_scores if generic_h_scores is not None else h_scores_sorted
 
-            try:
-                # your_dollar: team-specific H-scores, current state (remaining cash + picks)
-                your_dollar_series = auction_value_adjuster(
-                    h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+            # No defensive guard here: build_agent rejects any league whose pool can't fill every
+            # roster, so the replacement-level index inside auction_value_adjuster always resolves.
+            # your_dollar: team-specific H-scores, current state (remaining cash + picks)
+            your_dollar_series = auction_value_adjuster(
+                h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
+            )
+            # gnrc_dollar: neutral baseline H-scores, current cash/picks remaining
+            gnrc_dollar_series = auction_value_adjuster(
+                baseline_scores, n_remaining, total_cash_remaining, streaming_noise,
+            )
+            # orig_dollar: neutral baseline H-scores, full original cash/picks
+            orig_dollar_series = auction_value_adjuster(
+                baseline_scores, total_picks, total_original_cash, streaming_noise,
+            )
+            # G-score variants: generic value using G-scores instead of H-scores.
+            gnrc_dollar_g_series = auction_value_adjuster(
+                g_scores_available, n_remaining, total_cash_remaining, streaming_noise,
+            )
+            orig_dollar_g_series = auction_value_adjuster(
+                player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
+            )
+            player_auction_values = {
+                p: AuctionValues(
+                    your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
+                    gnrc_dollar   = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
+                    orig_dollar   = round(float(orig_dollar_series.get(p, 0.0)), 2),
+                    gnrc_dollar_g = round(float(gnrc_dollar_g_series.get(p, 0.0)), 2),
+                    orig_dollar_g = round(float(orig_dollar_g_series.get(p, 0.0)), 2),
                 )
-                # gnrc_dollar: neutral baseline H-scores, current cash/picks remaining
-                gnrc_dollar_series = auction_value_adjuster(
-                    baseline_scores, n_remaining, total_cash_remaining, streaming_noise,
-                )
-                # orig_dollar: neutral baseline H-scores, full original cash/picks
-                orig_dollar_series = auction_value_adjuster(
-                    baseline_scores, total_picks, total_original_cash, streaming_noise,
-                )
-                # G-score variants: generic value using G-scores instead of H-scores.
-                gnrc_dollar_g_series = auction_value_adjuster(
-                    g_scores_available, n_remaining, total_cash_remaining, streaming_noise,
-                )
-                orig_dollar_g_series = auction_value_adjuster(
-                    player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
-                )
-                player_auction_values = {
-                    p: AuctionValues(
-                        your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
-                        gnrc_dollar   = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
-                        orig_dollar   = round(float(orig_dollar_series.get(p, 0.0)), 2),
-                        gnrc_dollar_g = round(float(gnrc_dollar_g_series.get(p, 0.0)), 2),
-                        orig_dollar_g = round(float(orig_dollar_g_series.get(p, 0.0)), 2),
-                    )
-                    for p in h_scores_sorted.index
-                }
-            except Exception:
-                player_auction_values = None  # degrade gracefully on edge cases
+                for p in h_scores_sorted.index
+            }
 
     # ── Vectorised expand-view precompute ─────────────────────────────────────
     # Every arithmetic input to the three expand-view tables (G-score rows, flex

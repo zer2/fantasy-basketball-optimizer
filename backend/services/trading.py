@@ -2,7 +2,7 @@
 Trade analysis and suggestion engine.
 
 Ported from src/tabs/trading.py, adapted to use the backend Session pattern
-(session.H, session.info) instead of Streamlit session state.
+(session.agent, session.agent.info) instead of Streamlit session state.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from backend.session import Session
+from backend.state.session import Session
 from backend.models import (
     TeamHScore, TeamTradeResult, TradeAnalyzeResponse,
     TradeSuggestion, TradeSuggestResponse, ComboParam,
@@ -38,15 +38,15 @@ def analyze_trade(
     Returns None if the trade violates position structure for either team.
     Otherwise returns {1: {pre: ..., post: ...}, 2: {pre: ..., post: ...}}.
     """
-    info = session.info
-    H = session.H
+    info = session.agent.info
+    H = session.agent
 
     post_trade_team_1 = [p for p in player_assignments[team_1] if p not in team_1_trade] + team_2_trade
     post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
 
     # Check position eligibility for both teams
     if not ignore_position_check:
-        pos_cfg = session.H._pos_cfg
+        pos_cfg = session.agent._pos_cfg
         team_1_positions = info['Positions'].loc[post_trade_team_1]
         if not check_team_eligibility(team_1_positions, pos_cfg):
             return None
@@ -123,7 +123,7 @@ def run_trade_analyze(
 # ── Fast trade evaluation ────────────────────────────────────────────────────
 
 def _build_trade_context(
-    session: Session
+    H: object
     , player_assignments: dict[str, list[str]]
     , my_team: str
     , their_team: str
@@ -137,7 +137,6 @@ def _build_trade_context(
       - Baseline diff_means change only in the single column corresponding to the
         counterparty team — the delta is pure arithmetic per combo
     """
-    H          = session.H
     team_names = list(player_assignments.keys())
     n_drafters = len(player_assignments)
 
@@ -226,80 +225,6 @@ def _build_trade_context(
     }
 
 
-# ── Trade value estimation ───────────────────────────────────────────────────
-
-def _analyze_trade_value(
-    H: object
-    , player: str
-    , team: str
-    , player_assignments: dict[str, list[str]]
-    , n_iterations: int
-) -> float:
-    """Estimate how valuable a player is to a particular team.
-
-    Compares H-score with vs. without the player.
-    """
-    without_player = player_assignments.copy()
-    without_player[team] = [p for p in without_player[team] if p != player]
-
-    with_player = player_assignments.copy()
-    if player not in with_player[team]:
-        with_player[team] = with_player[team] + [player]
-
-    res_without = H.get_h_scores(without_player, team, n_iterations, exclusion_list=[player])
-    res_with    = H.get_h_scores(with_player, team, n_iterations)
-
-    return float(res_with['Scores'].max() - res_without['Scores'].max())
-
-
-def _identify_trade_candidates(
-    H: object
-    , my_team: str
-    , their_team: str
-    , player_assignments: dict[str, list[str]]
-    , n_iterations: int
-) -> tuple[list[str], list[str]]:
-    """Filter each roster to players relatively more valuable to the other team.
-
-    Returns the bottom half by own-team value differential — roughly the players
-    each side would be most willing to trade — as (my_candidates, their_candidates).
-    """
-    my_players    = player_assignments[my_team]
-    their_players = player_assignments[their_team]
-
-    my_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team,    player_assignments, n_iterations) for p in my_players],
-        index=my_players,
-    )
-    my_values_to_me -= my_values_to_me.mean()
-
-    their_values_to_me = pd.Series(
-        [_analyze_trade_value(H, p, my_team,    player_assignments, n_iterations) for p in their_players],
-        index=their_players,
-    )
-    their_values_to_me -= their_values_to_me.mean()
-
-    my_values_to_them = pd.Series(
-        [_analyze_trade_value(H, p, their_team, player_assignments, n_iterations) for p in my_players],
-        index=my_players,
-    )
-    my_values_to_them -= my_values_to_them.mean()
-
-    their_values_to_them = pd.Series(
-        [_analyze_trade_value(H, p, their_team, player_assignments, n_iterations) for p in their_players],
-        index=their_players,
-    )
-    their_values_to_them -= their_values_to_them.mean()
-
-    my_differences    = my_values_to_me    - my_values_to_them
-    their_differences = their_values_to_them - their_values_to_me
-
-    my_candidates    = [p for p in my_players    if my_differences[p]    < 0]
-    their_candidates = [p for p in their_players if their_differences[p] < 0]
-
-    return my_candidates, their_candidates
-
-
 # ── Combination generation ───────────────────────────────────────────────────
 
 def _get_combos(
@@ -352,7 +277,7 @@ def _get_cross_combos(
 
 
 def _make_combo_df(
-    session: Session
+    H: object
     , all_combos: pd.DataFrame
     , my_team: str
     , their_team: str
@@ -369,8 +294,7 @@ def _make_combo_df(
     the counterparty column (their roster also weakened). Both perspectives are
     computed in a single batched call to compute_h_scores_batched.
     """
-    H   = session.H
-    ctx = _build_trade_context(session, player_assignments, my_team, their_team)
+    ctx = _build_trade_context(H, player_assignments, my_team, their_team)
 
     n_combos = len(all_combos)
     if n_combos == 0:
@@ -416,28 +340,12 @@ def _make_combo_df(
 # ── Suggestion orchestrator ──────────────────────────────────────────────────
 
 def _get_general_values(session: Session) -> pd.Series:
-    """Get default H-score values for all players (no assignments).
+    """The default (neutral-board) H-score ranking for all players.
 
-    Cached on session.generic_h_scores after the first call — the same field
-    used by auction mode — so repeated trade searches within a session pay
-    the cost only once.
+    Computed once at build time (agent.populate_default_h_scores) and shared with
+    auction dollar anchoring and the ranking throttle — so a trade search reuses it.
     """
-    if session.generic_h_scores is not None:
-        return session.generic_h_scores
-
-    H = session.H
-    cp = session.current_params
-    n_drafters = cp['n_drafters']
-    n_iterations = cp['n_iterations']
-
-    H_clean = H.clear_initial_weights()
-    result = H_clean.get_h_scores(
-        player_assignments={f'Team {i+1}': [] for i in range(n_drafters)},
-        drafter='Team 1',
-        n_iterations=n_iterations,
-    )
-    session.generic_h_scores = result['Scores'].sort_values(ascending=False)
-    return session.generic_h_scores
+    return session.agent.default_h_scores
 
 
 def run_trade_suggest(
@@ -466,8 +374,8 @@ def run_trade_suggest(
 
     # Step 2b: pre-extract x_scores for the two teams as numpy arrays.
     # Avoids per-combo pandas .loc[].sum() overhead in _make_combo_df.
-    my_x_numpy    = session.H.x_scores.loc[my_candidates].to_numpy()
-    their_x_numpy = session.H.x_scores.loc[their_candidates].to_numpy()
+    my_x_numpy    = session.agent.x_scores.loc[my_candidates].to_numpy()
+    their_x_numpy = session.agent.x_scores.loc[their_candidates].to_numpy()
     my_name_to_index    = {name: i for i, name in enumerate(my_candidates)}
     their_name_to_index = {name: i for i, name in enumerate(their_candidates)}
 
@@ -490,7 +398,7 @@ def run_trade_suggest(
 
     # Step 3: evaluate all combos vectorized
     df = _make_combo_df(
-        session
+        session.agent
         , all_combos
         , my_team
         , their_team
@@ -507,14 +415,14 @@ def run_trade_suggest(
 
     # Step 5: position check only on the small set that passed the thresholds
     if not ignore_position_check and len(df) > 0:
-        pos_cfg = session.H._pos_cfg
+        pos_cfg = session.agent._pos_cfg
         valid = []
         for _, row in df.iterrows():
             sent, received = row['Send'], row['Receive']
             post_my_roster    = [p for p in player_assignments[my_team]    if p not in sent]    + received
             post_their_roster = [p for p in player_assignments[their_team] if p not in received] + sent
-            if (check_team_eligibility(session.info['Positions'].loc[post_my_roster],    pos_cfg)
-            and check_team_eligibility(session.info['Positions'].loc[post_their_roster], pos_cfg)):
+            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    pos_cfg)
+            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], pos_cfg)):
                 valid.append(row)
         df = pd.DataFrame(valid) if valid else df.iloc[:0]
 

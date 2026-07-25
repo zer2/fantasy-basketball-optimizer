@@ -3,7 +3,7 @@
 # Tests backend math via the FastAPI TestClient instead of AppTest.
 #
 # Pure-math tests (combinatorial, tipping_point, savor) require no session setup.
-# Gradient tests create a session through the API to obtain session.info, then
+# Gradient tests create a session through the API to obtain session.agent.info, then
 # build HAgent instances directly for targeted testing.
 
 import numpy as np
@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from scipy.stats import norm
 
 from backend.main import app
-from backend.session import get_session
+from backend.state.session import get_session
 from backend.math.algorithm_agents import HAgent
 from backend.math.algorithm_helpers import (
     combinatorial_calculation
@@ -72,7 +72,7 @@ def _create_session() -> tuple[str, dict]:
     assert response.status_code == 201, response.text
     session_id = response.json()['session_id']
     session = get_session(session_id)
-    return session_id, session.info
+    return session_id, session.agent.info
 
 
 def _build_h_agent(info: dict, scoring_format: str) -> HAgent:

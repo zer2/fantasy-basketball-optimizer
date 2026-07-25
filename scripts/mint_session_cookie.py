@@ -17,7 +17,7 @@ import itsdangerous
 
 # Run-from-anywhere: put the repo root (parent of scripts/) on the path so `backend` imports.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from backend.auth import session_secret_key
+from backend.infra.auth import session_secret_key
 
 # Matches the shape written by the OAuth callback (main.py: sub/email/name/picture).
 # /auth/me requires 'name' to be present, else it treats the session as stale (401).

@@ -7,7 +7,7 @@
 #
 # The suggest pipeline has three main cost centres:
 #   1. _identify_trade_candidates — one get_h_scores call per player on each team
-#   2. _get_general_values        — one empty-board evaluate
+#   2. _get_general_values        — reads the agent's prebuilt default baseline (no evaluate)
 #   3. _make_combo_df             — four get_h_scores calls per surviving combo
 #
 # Covers:
@@ -26,8 +26,8 @@ from benchmark_helpers import (
     , _SEASON
     , _build_session_request
 )
-from backend.session import get_session
-from backend.math.trading import run_trade_suggest
+from backend.state.session import get_session
+from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
 
 # 2024-25 snapshot of an H-score snake draft used by the trading benchmarks below.

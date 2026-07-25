@@ -23,9 +23,10 @@ from benchmark_helpers import (
     , _NO_TO_CATEGORIES
     , _ALL_CATEGORIES
     , _build_session_request
+    , check_top_scores
 )
-from backend.session import get_session
-from backend.evaluate import run_evaluate
+from backend.state.session import get_session
+from backend.services.ranking import rank_candidates
 
 # Snake-draft first round: pick i goes to Team (i+1), in this order.
 _FIRST_ROUND_PICKS = [
@@ -50,54 +51,54 @@ _FIRST_ROUND_CONFIGS = [
     pytest.param(
         ('Head to Head: Each Category', [
             ('Karl-Anthony Towns',  50.6),
-            ('Brook Lopez',         50.2),
-            ('Jaren Jackson Jr.',   50.1),
+            ('Brook Lopez',         50.0),
+            ('Jaren Jackson Jr.',   50.0),
             ('Derrick White',       50.0),
         ], None),
         id='EC-first-round',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  52.3),
-            ('Brook Lopez',         51.0),
-            ('Jaren Jackson Jr.',   51.0),
-            ('Myles Turner',        50.1),
+            ('Karl-Anthony Towns',  52.7),
+            ('Brook Lopez',         50.5),
+            ('Jaren Jackson Jr.',   50.4),
+            ('Myles Turner',        49.8),
         ], None),
         id='MC-first-round',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Karl-Anthony Towns',  10.7),
-            ('Ivica Zubac',         10.2),
-            ('Dyson Daniels',       10.0),
-            ('Josh Hart',            9.7),
+            ('Karl-Anthony Towns',  10.3),
+            ('Ivica Zubac',          9.3),
+            ('Dyson Daniels',        9.1),
+            ('Josh Hart',            9.1),
         ], None),
         id='Roto-first-round',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Karl-Anthony Towns',  51.9),
-            ('Cade Cunningham',     51.5),
-            ('Devin Booker',        51.4),
-            ('Jaren Jackson Jr.',   51.4),
+            ('Karl-Anthony Towns',  51.8),
+            ('Cade Cunningham',     51.3),
+            ('Devin Booker',        51.2),
+            ('Jaren Jackson Jr.',   51.0),
         ], _NO_TO_CATEGORIES),
         id='EC-first-round-noTO',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  54.9),
+            ('Karl-Anthony Towns',  54.6),
             ('Cade Cunningham',     54.1),
-            ('Devin Booker',        54.1),
-            ('Jaren Jackson Jr.',   54.2),
+            ('Devin Booker',        52.9),
+            ('Jaren Jackson Jr.',   53.0),
         ], _NO_TO_CATEGORIES),
         id='MC-first-round-noTO',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Karl-Anthony Towns',  10.5),
-            ('Ivica Zubac',         10.2),
-            ('Cade Cunningham',     10.1),
-            ('Dyson Daniels',        9.9),
+            ('Karl-Anthony Towns',   9.8),
+            ('Ivica Zubac',          8.8),
+            ('Cade Cunningham',      9.3),
+            ('Dyson Daniels',        9.2),
         ], _NO_TO_CATEGORIES),
         id='Roto-first-round-noTO',
     ),
@@ -108,64 +109,64 @@ _FIRST_ROUND_CONFIGS = [
 _FORMAT_CONFIGS = [
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Shai Gilgeous-Alexander',  63.3),
-            ('Nikola Jokic',             60.8),
-            ('Tyrese Haliburton',        54.0),
-            ('Giannis Antetokounmpo',    54.8),
+            ('Shai Gilgeous-Alexander',  61.9),
+            ('Nikola Jokic',             60.5),
+            ('Tyrese Haliburton',        54.6),
+            ('Giannis Antetokounmpo',    53.0),
         ], None),
         id='MC',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Shai Gilgeous-Alexander',  54.8),
-            ('Nikola Jokic',             54.0),
-            ('Tyrese Haliburton',        51.4),
+            ('Shai Gilgeous-Alexander',  54.5),
+            ('Nikola Jokic',             53.9),
+            ('Tyrese Haliburton',        51.5),
             ('Karl-Anthony Towns',       50.9),
         ], None),
         id='EC',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Shai Gilgeous-Alexander',  15.0),
-            ('Nikola Jokic',             14.5),
-            ('James Harden',              11.0),
-            ('Tyrese Haliburton',         10.9),
+            ('Shai Gilgeous-Alexander',  13.5),
+            ('Nikola Jokic',             12.5),
+            ('James Harden',             10.0),
+            ('Tyrese Haliburton',         9.1),
         ], None),
         id='Roto',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Shai Gilgeous-Alexander',  60.6),
-            ('Nikola Jokic',             60.0),
-            ('James Harden',             55.1),
-            ('Giannis Antetokounmpo',    54.9),
+            ('Shai Gilgeous-Alexander',  61.1),
+            ('Nikola Jokic',             60.4),
+            ('James Harden',             54.2),
+            ('Giannis Antetokounmpo',    52.7),
         ], _NO_TO_CATEGORIES),
         id='MC-noTO',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Nikola Jokic',             54.5),
-            ('Shai Gilgeous-Alexander',  54.5),
-            ('James Harden',             52.0),
-            ('Giannis Antetokounmpo',    51.5),
+            ('Nikola Jokic',             54.4),
+            ('Shai Gilgeous-Alexander',  54.6),
+            ('James Harden',             51.7),
+            ('Giannis Antetokounmpo',    50.8),
         ], _NO_TO_CATEGORIES),
         id='EC-noTO',
     ),
     pytest.param(
         ('Rotisserie', [
-            ('Shai Gilgeous-Alexander',  14.0),
-            ('Nikola Jokic',             13.1),
-            ('James Harden',              10.1),
-            ('Tyrese Haliburton',         9.6),
+            ('Shai Gilgeous-Alexander',  12.7),
+            ('Nikola Jokic',             12.3),
+            ('James Harden',              9.3),
+            ('Tyrese Haliburton',         8.3),
         ], _NO_TO_CATEGORIES),
         id='Roto-noTO',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Nikola Jokic',                  64.0),
-            ('Shai Gilgeous-Alexander',        58.4),
-            ('Karl-Anthony Towns',             55.9),
-            ('Giannis Antetokounmpo',          54.9),
+            ('Nikola Jokic',             64.2),
+            ('Shai Gilgeous-Alexander',  58.4),
+            ('Karl-Anthony Towns',       55.1),
+            ('Giannis Antetokounmpo',    55.1),
         ], _ALL_CATEGORIES),
         id='MC-all-cats',
     ),
@@ -213,7 +214,7 @@ def test_evaluate_empty_board(session_for_format):
     profiler = cProfile.Profile()
     start    = time.perf_counter()
     result   = profiler.runcall(
-        run_evaluate
+        rank_candidates
         , session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 1'
@@ -250,14 +251,7 @@ def test_evaluate_empty_board(session_for_format):
             f'{candidate.name}: win rate out of [0, 100]'
 
     # Each expected player must have the correct H-score within tolerance.
-    candidates_by_name = {c.name: c for c in candidates}
-    for expected_name, expected_score in expected_top_scores:
-        match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
-        assert match is not None, f'{expected_name} not found in candidates'
-        actual_score = candidates_by_name[match].h_score
-        assert abs(actual_score - expected_score) <= _SCORE_TOL, (
-            f'{match} ({scoring_format}): expected H-score {expected_score}, got {actual_score:.1f}'
-        )
+    check_top_scores(scoring_format, expected_top_scores, candidates)
 
 
 def test_evaluate_mid_draft(session_for_format):
@@ -267,7 +261,7 @@ def test_evaluate_mid_draft(session_for_format):
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
     n_iterations = session.current_params['n_iterations']
-    g_scores     = session.info['G-scores']
+    g_scores     = session.agent.info['G-scores']
 
     # Take the top 8 G-score players and split them across two teams.
     top_eight      = list(g_scores.sort_values('Total', ascending=False).head(8).index)
@@ -279,7 +273,7 @@ def test_evaluate_mid_draft(session_for_format):
     player_assignments['Team 2'] = team_two_picks
 
     start  = time.perf_counter()
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 1'
@@ -331,7 +325,7 @@ def test_evaluate_first_round(session_for_first_round):
     player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
 
     start  = time.perf_counter()
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 5'
@@ -348,14 +342,7 @@ def test_evaluate_first_round(session_for_first_round):
     h_scores = [c.h_score for c in candidates]
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
-    candidates_by_name = {c.name: c for c in candidates}
-    for expected_name, expected_score in expected_top_scores:
-        match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
-        assert match is not None, f'{expected_name} not found in candidates'
-        actual_score = candidates_by_name[match].h_score
-        assert abs(actual_score - expected_score) <= _SCORE_TOL, (
-            f'{match} ({scoring_format}): expected H-score {expected_score}, got {actual_score:.1f}'
-        )
+    check_top_scores(scoring_format, expected_top_scores, candidates)
 
 
 def test_evaluate_two_category_roto():
@@ -371,7 +358,6 @@ def test_evaluate_two_category_roto():
     session_id = response.json()['session_id']
 
     session      = get_session(session_id)
-    n_iterations = session.current_params['n_iterations']
 
     assert len(_FIRST_ROUND_PICKS) == n_drafters, (
         f'_FIRST_ROUND_PICKS has {len(_FIRST_ROUND_PICKS)} entries but n_drafters={n_drafters}'
@@ -379,7 +365,7 @@ def test_evaluate_two_category_roto():
 
     player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Team 12'
@@ -396,19 +382,12 @@ def test_evaluate_two_category_roto():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Tyler Herro',    5.6),
-        ('Jordan Poole',   5.8),
-        ('Dillon Brooks',  4.5),
-        ('Klay Thompson',  3.8),
+        ('Tyler Herro',    6.0),
+        ('Jordan Poole',   8.7),
+        ('Dillon Brooks',  4.3),
+        ('Klay Thompson',  4.8),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
-    for expected_name, expected_score in expected_top_scores:
-        match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
-        assert match is not None, f'{expected_name} not found in candidates'
-        actual_score = candidates_by_name[match].h_score
-        assert abs(actual_score - expected_score) <= _SCORE_TOL, (
-            f'{match} (Rotisserie, 2-cat): expected H-score {expected_score}, got {actual_score:.1f}'
-        )
+    check_top_scores('Rotisserie, 2-cat', expected_top_scores, candidates)
 
 
 def test_evaluate_twenty_five_drafters():
@@ -423,9 +402,8 @@ def test_evaluate_twenty_five_drafters():
 
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
         , my_team_id         = 'Team 1'
@@ -442,19 +420,12 @@ def test_evaluate_twenty_five_drafters():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Shai Gilgeous-Alexander',  55.1),
-        ('Nikola Jokic',             54.8),
+        ('Shai Gilgeous-Alexander',  55.4),
+        ('Nikola Jokic',             55.0),
         ('James Harden',             51.8),
-        ('Giannis Antetokounmpo',    51.6),
+        ('Giannis Antetokounmpo',    51.9),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
-    for expected_name, expected_score in expected_top_scores:
-        match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
-        assert match is not None, f'{expected_name} not found in candidates'
-        actual_score = candidates_by_name[match].h_score
-        assert abs(actual_score - expected_score) <= _SCORE_TOL, (
-            f'{match} (EC, 25 drafters): expected H-score {expected_score}, got {actual_score:.1f}'
-        )
+    check_top_scores('EC, 25 drafters', expected_top_scores, candidates)
 
 
 def test_evaluate_three_drafters():
@@ -469,9 +440,8 @@ def test_evaluate_three_drafters():
 
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
 
-    result = run_evaluate(
+    result = rank_candidates(
         session            = session
         , player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
         , my_team_id         = 'Team 1'
@@ -488,16 +458,9 @@ def test_evaluate_three_drafters():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Shai Gilgeous-Alexander',  53.1),
-        ('Nikola Jokic',             52.0),
-        ('Karl-Anthony Towns',       50.6),
-        ('Stephen Curry',            50.5),
+        ('Shai Gilgeous-Alexander',  52.1),
+        ('Nikola Jokic',             51.7),
+        ('Karl-Anthony Towns',       49.8),
+        ('Stephen Curry',            49.2),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
-    for expected_name, expected_score in expected_top_scores:
-        match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
-        assert match is not None, f'{expected_name} not found in candidates'
-        actual_score = candidates_by_name[match].h_score
-        assert abs(actual_score - expected_score) <= _SCORE_TOL, (
-            f'{match} (EC, 3 drafters): expected H-score {expected_score}, got {actual_score:.1f}'
-        )
+    check_top_scores('EC, 3 drafters', expected_top_scores, candidates)
