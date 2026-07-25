@@ -19,16 +19,19 @@ def trade_analyze_route(session_id: str, req: TradeAnalyzeRequest):
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
 
+    # Trade scoring runs get_h_scores, which mutates shared agent state; hold the per-session lock so
+    # it cannot overlap an evaluate or another trade call on the same session (see Session.lock).
     try:
-        return run_trade_analyze(
-            session,
-            player_assignments=req.player_assignments,
-            my_team=req.my_team,
-            their_team=req.their_team,
-            my_trade=req.my_trade,
-            their_trade=req.their_trade,
-            ignore_position_check=req.ignore_position_check,
-        )
+        with session.lock:
+            return run_trade_analyze(
+                session,
+                player_assignments=req.player_assignments,
+                my_team=req.my_team,
+                their_team=req.their_team,
+                my_trade=req.my_trade,
+                their_trade=req.their_trade,
+                ignore_position_check=req.ignore_position_check,
+            )
     except Exception:
         raise fail(500, 'Trade analysis failed.')
 
@@ -40,15 +43,16 @@ def trade_suggest_route(session_id: str, req: TradeSuggestRequest):
         raise HTTPException(status_code=404, detail='Session not found or expired.')
 
     try:
-        return run_trade_suggest(
-            session,
-            player_assignments=req.player_assignments,
-            my_team=req.my_team,
-            their_team=req.their_team,
-            combo_params=req.combo_params,
-            your_threshold=req.your_differential_threshold,
-            their_threshold=req.their_differential_threshold,
-            ignore_position_check=req.ignore_position_check,
-        )
+        with session.lock:
+            return run_trade_suggest(
+                session,
+                player_assignments=req.player_assignments,
+                my_team=req.my_team,
+                their_team=req.their_team,
+                combo_params=req.combo_params,
+                your_threshold=req.your_differential_threshold,
+                their_threshold=req.their_differential_threshold,
+                ignore_position_check=req.ignore_position_check,
+            )
     except Exception:
         raise fail(500, 'Trade suggestion failed.')

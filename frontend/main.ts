@@ -27,14 +27,14 @@ import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCount
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
 // depending on the current mode selector value.
-function runModeEval(): Promise<void> {
+async function runModeEval(): Promise<void> {
     const { platform, mode } = getLeagueSettings()
     if (mode === 'Season Mode') return runSeasonInit()
     // A live platform that isn't connected yet has no draft state to evaluate, and a normal
     // evaluate would throw (then its finally would flip the indicator to 'Updated'). Show the
     // base ("default") rankings instead, which leaves the indicator on 'Unconnected'.
     if (platform !== 'Enter your own data' && !isPlatformConnected()) return showDefaultRankings()
-    return runEvaluate()
+    await runEvaluate()   // discard the autopilot-only top-pick return; runModeEval yields void
 }
 
 // ─── Async init: fetch config, then build sidebar ────────────────────────────

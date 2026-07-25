@@ -199,16 +199,19 @@ def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[s
         if req.platform is not None else None
     )
 
+    # A PATCH rebuilds the pipeline (and the agent) in place; hold the per-session lock so it cannot
+    # overlap an in-flight evaluate on the same session, which would read a half-rebuilt agent and 500.
     try:
-        apply_patch(
-            session,
-            patch           = _build_patch(req),
-            from_step       = req.from_step,
-            platform_config = platform_config,
-            csv_bytes       = csv_bytes,
-            file_type       = file_type_str,
-            uploaded_dfs    = uploaded_dfs,
-        )
+        with session.lock:
+            apply_patch(
+                session,
+                patch           = _build_patch(req),
+                from_step       = req.from_step,
+                platform_config = platform_config,
+                csv_bytes       = csv_bytes,
+                file_type       = file_type_str,
+                uploaded_dfs    = uploaded_dfs,
+            )
     except InsufficientPlayerPoolError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
@@ -219,7 +222,10 @@ def get_g_scores_route(session_id: str):
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
-    return GScoresResponse(g_scores=_serialize_g_scores(session))
+    # Reads agent/info state that a concurrent PATCH rebuilds in place — hold the lock so it never
+    # observes a half-rebuilt pipeline.
+    with session.lock:
+        return GScoresResponse(g_scores=_serialize_g_scores(session))
 
 
 @router.post('/cache/clear', status_code=status.HTTP_204_NO_CONTENT)

@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from pathlib import Path
@@ -103,6 +104,103 @@ def draft_and_score(field_session, deviator_session, seat: int, candidate_limit:
     return float(scores[scores.idxmax()])
 
 
+def draft_population(session_by_seat: dict
+                     , n_drafters: int
+                     , n_picks: int
+                     , candidate_limit: int) -> dict:
+    """Run one snake draft where every seat drafts with its OWN configured session (its own theta),
+    rather than a single field agent plus one deviator. session_by_seat maps a seat index to the session
+    that seat drafts with. Returns the completed assignments."""
+    team_names  = [f'Drafter {i + 1}' for i in range(n_drafters)]
+    assignments = {name: [] for name in team_names}
+
+    for pick_row in range(n_picks):
+        for slot in range(n_drafters):
+            drafter_index = slot if pick_row % 2 == 0 else (n_drafters - 1 - slot)   # serpentine
+            drafter_name  = team_names[drafter_index]
+            session       = session_by_seat[drafter_index]
+            result        = rank_candidates(session, assignments, drafter_name, [], None, 0, candidate_limit)
+            assert result.candidates, f'no candidates for {drafter_name}, round {pick_row + 1}'
+            assignments[drafter_name].append(result.candidates[0].name)
+    return assignments
+
+
+def score_all_teams(scorer_session
+                    , assignments: dict
+                    , n_iterations: int) -> dict:
+    """Final-roster H-score for every team, all scored by one agent so they are directly comparable. A
+    completed roster's H-score is parameter-independent (no future-pick weights), so which agent scores it
+    does not matter -- the same call draft_and_score uses, looped over the twelve teams."""
+    agent = scorer_session.agent
+    return {team: float(scores[scores.idxmax()])
+            for team in assignments
+            for scores in [agent.get_h_scores(assignments, team, n_iterations)['Scores']]}
+
+
+def estimate_gradient_population(pool: list
+                                 , theta: np.ndarray
+                                 , delta: float
+                                 , candidate_limit: int
+                                 , rng: np.random.Generator) -> np.ndarray:
+    """Antithetic multi-deviator simultaneous perturbation. The seats of a single draft are split into
+    len(PARAMS) equal groups; within each group half draft at theta+delta*e_i and half at theta-delta*e_i.
+    TWO drafts are run with the +/- roles flipped between them, so every seat serves once on each side and
+    seat-position bias cancels in the +delta-vs--delta contrast. The gradient is read off the collective
+    final-roster H-scores of the +delta seats vs the -delta seats. Cheaper (2 drafts vs coord's 6) and
+    higher-signal (4-vs-4 samples per parameter vs 1-vs-1), at the cost of a field that is itself perturbed
+    rather than exactly theta -- a population / evolution-strategies estimate of the same gradient.
+
+    pool holds 2*len(PARAMS) reusable sessions: pool[2*i] is configured to theta+delta*e_i and
+    pool[2*i+1] to theta-delta*e_i."""
+    n_params     = len(PARAMS)
+    n_drafters   = pool[0].current_params['n_drafters']
+    n_picks      = pool[0].current_params['n_picks']
+    n_iterations = pool[0].current_params['n_iterations']
+    assert n_drafters % (2 * n_params) == 0, (
+        f'population gradient needs n_drafters ({n_drafters}) divisible by 2*len(PARAMS) ({2 * n_params})')
+    seats_per_param = n_drafters // n_params
+    half            = seats_per_param // 2
+    E               = np.eye(n_params)
+
+    for i in range(n_params):
+        configure(pool[2 * i],     _clip(theta + delta * E[i]))
+        configure(pool[2 * i + 1], _clip(theta - delta * E[i]))
+
+    team_names   = [f'Drafter {j + 1}' for j in range(n_drafters)]
+    groups       = rng.permutation(n_drafters).reshape(n_params, seats_per_param)
+    plus_scores  = [[] for _ in range(n_params)]
+    minus_scores = [[] for _ in range(n_params)]
+
+    for test in range(2):   # test 1, then its exact +/- flip -> seat-position bias cancels
+        session_by_seat = {}
+        seat_side       = {}
+        for i in range(n_params):
+            group       = groups[i]
+            plus_seats  = group[:half] if test == 0 else group[half:]
+            minus_seats = group[half:] if test == 0 else group[:half]
+            for seat in plus_seats:
+                session_by_seat[int(seat)] = pool[2 * i];     seat_side[int(seat)] = (i, +1)
+            for seat in minus_seats:
+                session_by_seat[int(seat)] = pool[2 * i + 1]; seat_side[int(seat)] = (i, -1)
+
+        assignments = draft_population(session_by_seat, n_drafters, n_picks, candidate_limit)
+        team_scores = score_all_teams(pool[0], assignments, n_iterations)
+        for seat, (i, sign) in seat_side.items():
+            (plus_scores if sign > 0 else minus_scores)[i].append(team_scores[team_names[seat]])
+
+    return np.array([(np.mean(plus_scores[i]) - np.mean(minus_scores[i])) / (2.0 * delta)
+                     for i in range(n_params)])
+
+
+def save_checkpoint(path, scoring_format, theta, theta_avg, velocity, step, A, hyper) -> None:
+    """Persist enough to resume the same SPSA trajectory: the current point, its Polyak average, the
+    momentum velocity, the global step counter (so the alpha/delta decay continues rather than
+    restarting), the stability offset A, and the schedule hyper-parameters."""
+    json.dump({'format': scoring_format, 'theta': [float(x) for x in theta],
+               'theta_avg': [float(x) for x in theta_avg], 'velocity': [float(x) for x in velocity],
+               'step': int(step), 'A': int(A), **hyper}, open(path, 'w'), indent=1)
+
+
 def spsa(scoring_format: str
          , seasons: list[str]
          , theta0: np.ndarray
@@ -113,44 +211,87 @@ def spsa(scoring_format: str
          , gamma_decay: float
          , polyak_beta: float
          , candidate_limit: int
-         , rng: np.random.Generator) -> np.ndarray:
-    """SPSA on the deviator's advantage. Returns the Polyak-averaged parameter vector."""
+         , rng: np.random.Generator
+         , start_step: int = 0
+         , A: int | None = None
+         , theta_avg0: np.ndarray | None = None
+         , momentum: float = 0.0
+         , velocity0: np.ndarray | None = None
+         , gradient_mode: str = 'spsa'
+         , checkpoint_path: str | None = None) -> np.ndarray:
+    """SPSA on the deviator's advantage. Returns the Polyak-averaged parameter vector. Resumes by
+    continuing the global step counter from `start_step` (so the decay schedule is unbroken).
+    momentum>0 accumulates a heavy-ball velocity, so a consistent gradient direction builds up while
+    noisy ones cancel -- note the effective step scales ~1/(1-momentum), so pair a high momentum with a
+    smaller `a`."""
     theta     = _clip(theta0.copy())
-    theta_avg = theta.copy()
-    A         = max(1, n_steps // 10)   # SPSA stability offset
+    theta_avg = theta.copy() if theta_avg0 is None else theta_avg0.copy()
+    velocity  = np.zeros(len(PARAMS)) if velocity0 is None else velocity0.copy()
+    E         = np.eye(len(PARAMS))
+    if A is None:
+        A = max(1, n_steps // 10)   # SPSA stability offset
+    hyper = dict(a=a, c=c, alpha_decay=alpha_decay, gamma_decay=gamma_decay,
+                 polyak_beta=polyak_beta, momentum=momentum, gradient_mode=gradient_mode)
 
     # Two reusable sessions per season (field + deviator, which hold different theta at once during a
     # draft). Built on first use of a season and reconfigured each step -- no per-step rebuilds.
     sessions: dict[str, tuple] = {}
+    pools: dict[str, list]     = {}
 
     def sessions_for(season):
         if season not in sessions:
             sessions[season] = (build_session(season, scoring_format), build_session(season, scoring_format))
         return sessions[season]
 
-    for step in range(1, n_steps + 1):
+    def pool_for(season):   # 2*len(PARAMS) sessions for the multi-deviator population gradient
+        if season not in pools:
+            pools[season] = [build_session(season, scoring_format) for _ in range(2 * len(PARAMS))]
+        return pools[season]
+
+    for step in range(start_step + 1, start_step + n_steps + 1):
         season = seasons[rng.integers(len(seasons))]
         alpha  = a / (step + A) ** alpha_decay
         delta  = c / step ** gamma_decay
-        Delta  = rng.choice([-1.0, 1.0], size=len(PARAMS))
 
-        field_session, deviator_session = sessions_for(season)
-        configure(field_session, theta)
-        seat = int(rng.integers(field_session.current_params['n_drafters']))
+        if gradient_mode == 'population':
+            # Pack all six perturbations into one draft's seats; read the gradient off the +/- cross-section.
+            ghat        = estimate_gradient_population(pool_for(season), theta, delta, candidate_limit, rng)
+            batch_label = 'pop 2x'
+        else:
+            field_session, deviator_session = sessions_for(season)
+            configure(field_session, theta)
+            seat = int(rng.integers(field_session.current_params['n_drafters']))
 
-        configure(deviator_session, _clip(theta + delta * Delta))
-        f_plus = draft_and_score(field_session, deviator_session, seat, candidate_limit)
-        configure(deviator_session, _clip(theta - delta * Delta))
-        f_minus = draft_and_score(field_session, deviator_session, seat, candidate_limit)
+            def probe(offset):   # deviator's final H-score at theta+offset, vs the field at theta
+                configure(deviator_session, _clip(theta + offset))
+                return draft_and_score(field_session, deviator_session, seat, candidate_limit)
 
-        ghat  = (f_plus - f_minus) / (2.0 * delta) * Delta   # central-difference SPSA gradient
-        theta = _clip(theta + alpha * ghat)
+            if gradient_mode == 'coord':
+                # Coordinate finite-differences: perturb each parameter alone (6 evals), so every
+                # component's step reflects ITS OWN gradient magnitude, not one shared scalar.
+                ghat = np.array([(probe(delta * E[i]) - probe(-delta * E[i])) / (2.0 * delta)
+                                 for i in range(len(PARAMS))])
+            else:
+                # SPSA: one shared central difference along a random +/-1 direction (2 evals, any dimension).
+                Delta = rng.choice([-1.0, 1.0], size=len(PARAMS))
+                ghat  = (probe(delta * Delta) - probe(-delta * Delta)) / (2.0 * delta) * Delta
+            batch_label = f'seat {seat:2d}'
+
+        velocity = momentum * velocity + ghat                   # heavy-ball (no-op when momentum=0)
+        theta    = _clip(theta + alpha * velocity)
         theta_avg = (1.0 - polyak_beta) * theta_avg + polyak_beta * theta
 
-        print(f'step {step:3d} | season {season} seat {seat:2d} | f+={f_plus:.4f} f-={f_minus:.4f} '
-              f'| theta=({theta[0]:.3f},{theta[1]:.3f},{theta[2]:.3f}) '
-              f'avg=({theta_avg[0]:.3f},{theta_avg[1]:.3f},{theta_avg[2]:.3f})', flush=True)
+        # log the gradient estimate directly (5 dp: the true per-step move is ~1e-4).
+        print(f'step {step:4d} | {season} {batch_label} | ghat=({ghat[0]:+.4f},{ghat[1]:+.4f},{ghat[2]:+.4f}) '
+              f'| theta=({theta[0]:.5f},{theta[1]:.5f},{theta[2]:.5f}) '
+              f'avg=({theta_avg[0]:.5f},{theta_avg[1]:.5f},{theta_avg[2]:.5f})', flush=True)
 
+        if checkpoint_path and step % 25 == 0:
+            save_checkpoint(checkpoint_path, scoring_format, theta, theta_avg, velocity, step, A, hyper)
+
+    if checkpoint_path:
+        save_checkpoint(checkpoint_path, scoring_format, theta, theta_avg, velocity,
+                        start_step + n_steps, A, hyper)
     return theta_avg
 
 
@@ -170,21 +311,53 @@ def main() -> None:
     parser.add_argument('--candidate-limit', type=int, default=40,
                         help='Prune each pick to the top-N by the cached ranking (autodrafter gate).')
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--momentum', type=float, default=None,
+                        help='Heavy-ball momentum (default off; resume inherits the checkpoint). '
+                             'Effective step ~1/(1-momentum), so pair a high value with a smaller --a.')
+    parser.add_argument('--gradient', choices=['spsa', 'coord', 'population'], default='spsa',
+                        help='spsa: 1 random +/-1 direction, 2 evals/step (uniform per-param magnitude). '
+                             'coord: per-parameter finite differences, 6 evals/step (true per-param gradient). '
+                             'population: antithetic multi-deviator, 2 drafts/step, all seats perturbed at '
+                             'once (4-vs-4 samples/param; cheaper and higher-signal, slightly noisier field).')
+    parser.add_argument('--checkpoint', default=None, help='Path to write/refresh a resume checkpoint.')
+    parser.add_argument('--resume', default=None, help='Resume from a checkpoint; --steps adds more steps.')
     args = parser.parse_args()
-
-    theta0 = DEFAULT.copy()
-    for i, override in enumerate([args.gamma0, args.omega0, args.kappa0]):
-        if override is not None:
-            theta0[i] = override
 
     seasons = args.seasons if args.seasons else get_available_seasons()
     rng = np.random.default_rng(args.seed)
 
-    print(f'self-play SPSA | format={args.format} | {len(seasons)} seasons | {args.steps} steps '
-          f'| theta0=({theta0[0]:.3f},{theta0[1]:.3f},{theta0[2]:.3f})', flush=True)
-    theta_star = spsa(SCORING_FORMATS[args.format], seasons, theta0, args.steps,
-                      args.a, args.c, args.alpha_decay, args.gamma_decay, args.polyak_beta,
-                      args.candidate_limit, rng)
+    if args.resume:
+        # Continue an existing trajectory: point, Polyak average, velocity, step counter, offset and
+        # schedule all come from the checkpoint, so the decay is unbroken. --steps is how many MORE steps.
+        ck = json.load(open(args.resume))
+        scoring_format = ck['format']
+        theta0, theta_avg0 = np.array(ck['theta']), np.array(ck['theta_avg'])
+        velocity0 = np.array(ck['velocity']) if 'velocity' in ck else None
+        start_step, A = ck['step'], ck['A']
+        a, c, alpha_decay, gamma_decay, polyak_beta = (
+            ck['a'], ck['c'], ck['alpha_decay'], ck['gamma_decay'], ck['polyak_beta'])
+        momentum = args.momentum if args.momentum is not None else ck.get('momentum', 0.0)
+        gradient_mode = ck.get('gradient_mode', 'spsa')
+        print(f'resume {scoring_format} from step {start_step} | +{args.steps} steps | {gradient_mode} '
+              f'| theta=({theta0[0]:.4f},{theta0[1]:.4f},{theta0[2]:.4f}) | momentum={momentum}', flush=True)
+    else:
+        scoring_format = SCORING_FORMATS[args.format]
+        theta0 = DEFAULT.copy()
+        for i, override in enumerate([args.gamma0, args.omega0, args.kappa0]):
+            if override is not None:
+                theta0[i] = override
+        theta_avg0, velocity0, start_step, A = None, None, 0, None
+        a, c, alpha_decay, gamma_decay, polyak_beta = (
+            args.a, args.c, args.alpha_decay, args.gamma_decay, args.polyak_beta)
+        momentum = args.momentum if args.momentum is not None else 0.0
+        gradient_mode = args.gradient
+        print(f'self-play | format={args.format} | {len(seasons)} seasons | {args.steps} steps | '
+              f'{gradient_mode} | a={a} momentum={momentum} '
+              f'| theta0=({theta0[0]:.4f},{theta0[1]:.4f},{theta0[2]:.4f})', flush=True)
+
+    theta_star = spsa(scoring_format, seasons, theta0, args.steps, a, c, alpha_decay, gamma_decay,
+                      polyak_beta, args.candidate_limit, rng, start_step, A, theta_avg0,
+                      momentum, velocity0, gradient_mode, args.checkpoint)
     print(f'\nPolyak-averaged theta* = gamma={theta_star[0]:.4f} omega={theta_star[1]:.4f} '
           f'kappa={theta_star[2]:.4f}', flush=True)
     print('Validate on the full season set before trusting (run a full-batch fitness at theta*).')

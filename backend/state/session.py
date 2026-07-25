@@ -52,6 +52,15 @@ class Session:
     # live platform is connected.
     platform_name_lookup: Optional[dict[str, str]] = None
 
+    # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
+    # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
+    # requests on the same session corrupt each other and 500. The frontend aborts its previous
+    # request before firing the next, but an aborted fetch does not stop the server-side handler,
+    # so the two still overlap here. Every request that reads or mutates agent/pipeline state holds
+    # this lock, restoring the one-operation-at-a-time-per-session invariant the Streamlit app had.
+    # Per session (not global) so different sessions still run fully in parallel.
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
 # ── Store ────────────────────────────────────────────────────────────────────
 # Grouped here rather than above Session because the _store annotation below is
 # evaluated at import time, so Session must already be defined.

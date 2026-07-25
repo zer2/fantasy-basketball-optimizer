@@ -34,16 +34,20 @@ def rank_candidates_route(session_id: str, req: EvaluateRequest, response: Respo
             detail='remaining_cash is required for auction leagues and must be omitted for draft leagues.',
         )
 
+    # Hold the per-session lock for the whole evaluate: get_h_scores mutates shared agent state, so a
+    # second evaluate (or a PATCH) overlapping this one on the same session would corrupt it and 500.
+    # Serialised per session, so other sessions are unaffected.
     try:
-        result = rank_candidates(
-            session            = session,
-            player_assignments = req.player_assignments,
-            my_team_id         = req.my_team_id,
-            exclusion_list     = req.exclusion_list,
-            remaining_cash     = req.remaining_cash,
-            candidate_offset   = req.candidate_offset,
-            candidate_limit    = req.candidate_limit,
-        )
+        with session.lock:
+            result = rank_candidates(
+                session            = session,
+                player_assignments = req.player_assignments,
+                my_team_id         = req.my_team_id,
+                exclusion_list     = req.exclusion_list,
+                remaining_cash     = req.remaining_cash,
+                candidate_offset   = req.candidate_offset,
+                candidate_limit    = req.candidate_limit,
+            )
     except Exception:
         raise fail(500, 'Evaluation failed.')
 

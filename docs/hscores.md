@@ -234,7 +234,7 @@ For the alternative categories, when using projections, make sure to include the
 
 The H-scoring algorithm has three input parameters- $\omega$ (omega), $\gamma$ (gamma), and the number of iterations- which are configurable by the user through the sidebar. Different parameter choices will lead to different H-scoring results.
 
-$\omega$ and $\gamma$ control how the algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values (ω = 0.7 and γ = 0.25) were configured based on what worked well in testing.
+$\omega$ and $\gamma$ control how the algorithm thinks about the landscape of player statistics that it will have to choose from in the future. Roughly, when ω is high, the algorithm punts more. The default values (ω = 0.7 and γ = 0.25) were configured based on what worked well in testing against a field of G-score drafters.
 
 The number of iterations essentially determines how many times the algorithm can try improving its results. Theoretically the algorithm will be more precise with more iterations; in practice the default of thirty is probably easily enough.
 
@@ -257,11 +257,11 @@ The updating spinner, which indicates that the algorithm is running
 
 ## Limitations and corrections
 
-H-scoring as presented in the papers has numerous limitations. The website has procedures in place to mitigate some of the limitations, but these procedures are imperfect and not comprehensive. 
+H-scoring as presented in the papers has numerous limitations. The website does have some procedures in place to mitigate these limitations, but they are imperfect and not comprehensive. 
 
 ### Reliance on one projection set 
 
-H-scoring as described by the papers is fully reliant on a single set of projections. If a drafter takes a player it projects to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
+H-scoring as described by the papers is fully reliant on a single set of projections. If another drafter takes a player projected to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
 
 This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. 
 
@@ -387,9 +387,9 @@ The justification for this adjustment is a Bayesian model for updating expectati
 
 Fantasy basketball analysts often advocate for taking the best player available for the first few picks, and waiting until later to commit to a punt. The idea is to start flexibly, and decide which categories to punt based on which star players end up on the team. A manager would not want to commit to e.g. punting blocks before a star shot-blocker falls into their lap. 
 
-This idea exposes a weakness in the H-scoring procedure. It optimizes based on a single strategy profile, quantifying player value purely based on that single strategy profile. It does not build in resilience to the possibility that the optimal strategy could change as the draft continues. 
+Ideally, the algorithm would model a probability distribution of how circumstances could change, and choose a strategy based on expected value. Instead, for practical reasons, the algorithm is designed to maximize the best strategy under a point estimate of how its strategies would turn out. The lack of understanding of alternate scenarios is a weakness of H-scoring. It does not consider a spectrum of possibilities, so it does not know which strategies are resilient and which are flimsy. 
 
-In order to ameliorate this issue, the algorithm uses a technique called regularization to push away from extreme strategies and stay more balanced at the beginning of the draft. Regularization adds a small reward for simplicity into H-scores. The algorithm can still plan on a punt, but the regularization reward incentivizes it to punt less harshly, and to choose players who rely less on punting for their value. 
+In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights into H-scores. The algorithm can still plan on a punt, but regularization incentivizess it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
 
 ??? note "How does the website enforce regularization?"
     The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring, plus an equivalent mechanism for flex positions. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. 
@@ -413,9 +413,21 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
 
 ### No model of other managers
 
-The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, and therefore inaccurate projections of expected win rates.
+The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, inaccurate projections of which players will be available in later rounds, and inaccurate projections of expected win rates. 
 
-This is a difficult problem to solve because there is no way to reliably predict the choices of other fantasy managers. Some will punt aggressively, some will prioritize balance, some will chose players from their favorite teams, etc. Assuming that other teams will be roughly balanced is not necessarily a worse guess than any other assumption. 
+Ideally, the algorithm would be able to predict what other managers are trying to do and react accordingly. But predicting the choices of other fantasy managers is difficult because each one has their own habits. Some will punt aggressively, some will prioritize balance, some will chose players from their favorite teams, etc. So instead, the algorithm has a few crude ways of accounting for general behavior that it expects. 
+
+One is the κ (kappa) factor, which subtly discourages the algorithm from using potentially popular punting strategies. It does an initial round of checking which punts are most beneficial to the top forty players, then adds small punishments for punting those categories, scaled by the value of κ. This is to make the cost of competing for a crowded punt explicit. The algorithm would not otherwise understand that if a punting strategy is popular, other managers are likely to take players well-suited for that strategy, leaving fewer of them for the algorithm's team. Of course, this is only necessary when other managers are expected to punt. When other managers are punting, a reasonable value for κ is $0.3$. Otherwise, it should be set to zero. 
+
+Another way to account for other other manager's behavior is modifying the H-scoring parameters. When autodrafters play against each other, the optimum values for $\omega$ and $\gamma$ are approximately $0.5$ and $0.1$, respectively, with κ set to $0.3$. This setting leads to slightly less aggressive punting than the default parameters, which are designed to do well against managers who do not punt. Punting less aggressively against strategic managers is likely appropriate because there is more competition for the best players for punt builds.  
+
+??? note "How do we know what the optimal parameters are for H-scoring agents against other H-scoring agents?"
+
+    The optimal values were found via a self-play experiment: across thousands of simulations of different seasons, a full league of identical H-scoring agents drafted against each other, slightly perturbing their parameters each time. Simulations were paired such that each one would have two drafters with a positive $\omega$ peturbation, two with a negative $\omega$ peturbation, etc. and the other simulation would have the same drafters moving in the opposite direction- Spall's method with antithetic variates. After each pair of simulations, the success of the perturbations was judged, and the parameter stepped in the direction that produced better results. This kept going until there was no clear better direction, meaning that the parameters were at a symmetric equilibrium, in which no agent could improve by unilaterally changing its own parameters.
+
+    This procedure repeatedly settled near $\gamma \approx 0.1$ and $\omega \approx 0.5$, with κ free to vary landing near $0.3$ — consistent with the recommendation above, since a field of H-scoring agents is itself a punting field. To confirm the result was a genuine optimum rather than a degenerate local trap, a head-to-head test of these parameters against the defaults was also run; the tuned parameters won consistently, ruling out a bad basin. 
+
+    These parameters specifically work well in the H-scoring vs H-scoring context. Against G-scores, a similar procedure yielded parameters close to the defaults of $\omega \approx 0.7$ and $\gamma \approx 0.25$.
 
 ### Constant categorical variance
 
@@ -442,4 +454,4 @@ H-scoring's model for what sorts of players will be available in the future is s
 
 ### Incomplete fantasy model
 
-H-scoring does not take into account the effect of streaming players, trading, etc. These all may add additional strategic considerations
+The most fundamental flaw of H-scoring is that it does not take into account decisions made during the actual fantasy season streaming players, trading, etc. These all add additional strategic considerations
