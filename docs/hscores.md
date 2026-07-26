@@ -246,15 +246,6 @@ The position structure used by the algorithm — also shown in the [detailed dro
 
 It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accomodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
 
-## Timing 
-
-H-scoring is not an instantaneous process. In general, the algorithm will take less than a second to complete. But it could take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake.
-
-![The updating spinner](img/updating.png)
-/// caption
-The updating spinner, which indicates that the algorithm is running
-///
-
 ## Limitations and corrections
 
 H-scoring as presented in the papers has numerous limitations. The website does have some procedures in place to mitigate these limitations, but they are imperfect and not comprehensive. 
@@ -450,8 +441,14 @@ These statistics come from simulations of real seasons using actual player data.
 
 ### Simplified player model 
 
-H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles. A classic example is prime Ben Simmons, who was an all-NBA point guard with a 61% free throw rate during the 2020-21 season. Point guards with low free throw percentages are unusual, and can provide prime opportunities for builds that punt free throws. H-scoring's player model lumps all players together into one giant pile, and so is not aware of particular opportunities for punting like Simmons. 
+H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles. 
+
+A classic example of an exceptional profile is prime Ben Simmons, who was an All-Star point guard with a free throw rate barely above 60% between 2019 and 2021. Point guards with low free throw percentages are unusual, and can provide prime opportunities for builds that punt free throws. H-scoring's player model lumps all players together into one giant pile, and so is not aware of particular opportunities for punting like Simmons. 
+
+The best fantasy managers are likely aware of these individual players and how they can be composed into a team. Their insight might help them draft better than H-scoring, especially at the beginning of a draft, before the team has settled on a build. 
 
 ### Incomplete fantasy model
 
-The most fundamental flaw of H-scoring is that it does not take into account decisions made during the actual fantasy season streaming players, trading, etc. These all add additional strategic considerations
+The most fundamental flaw of H-scoring is that it does not take into account moves that can be made during an actual fantasy season: streaming players, trading, etc. Beyond adding multifaceted strategic considerations to the drafting process, these options also represent important decision points in and of themselves. Expert fantasy managers can greatly improve their chances by making smart moves during the fantasy season. 
+
+The website does have [season mode](season.md) for applying H-scoring during the season, but H-scoring relies on projections, and most expert fantasy managers can move faster than projections when a player becomes poised for a breakout. They also understand schedules and streaming rules. So H-scoring by itself is missing quite a bit when it comes to managing a team throughout a season, and human expertise can outperform it easily on that axis. 
