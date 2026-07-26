@@ -245,10 +245,43 @@ const STATES = {
         await page.waitForTimeout(200)
     },
 
+    // mdraft: the manual-entry draft view — pick controls + board captured together (#right-header
+    // holds both). Clear any picks left by the candidate state (Giannis), then lock Nikola Jokic in
+    // as the first overall pick so the board shows a real entry with Drafter 2 on the clock.
+    async 'draft-manual'(page) {
+        await ensure(page, 'draft-EC')
+        await clearDraftBoard(page)
+        await lockInDraftPick(page, 'Nikola Jok')
+    },
+
     // Auction / Season are not the H-scoring page, so they reset to 2025-26 (Season also *needs* it —
     // its default rosters are 2025-26 players, who have no stats in 2024-25).
     async 'auction'(page)           { await setMode(page, 'Auction Mode'); await selectHistoricalSeason(page, '2025-26') },
     async 'auction-candidate'(page) { await ensure(page, 'auction'); await expandCandidate(page, 0) },
+
+    // mauction: auction manual entry — record Nikola Jokic to Team 1 for $70 as the first board
+    // entry, so the shot shows the pick controls plus a populated board (Team 1's remaining
+    // budget drops to $130). Runs after auctiondetail, which wants the pristine empty board.
+    async 'auction-manual'(page) {
+        await ensure(page, 'auction')
+        await setSelect(page, 'auction-pick-player', 'Nikola Jok')
+        await setSelect(page, 'auction-pick-team', 'Team 1')
+        await page.fill('.auction-cost-input', '70')
+        await page.locator('.pick-control-row .pick-btn', { hasText: 'Lock in selection' }).click()
+        await waitEval(page)
+    },
+
+    // hdollars: the $-value candidate table AFTER the first auction entry (Jokic to Team 1 for
+    // $70), evaluated from Team 1's perspective — so the dollar values reflect Team 1's reduced
+    // budget and filled roster spot. Toggle the seat via Team 2 so the final selection fires a
+    // change-driven evaluate (selecting the already-active Team 1 directly fires no change event).
+    async 'auction-manual-team1'(page) {
+        await ensure(page, 'auction-manual')
+        await setSelect(page, 'seat-select', 'Team 2')
+        await waitEval(page)
+        await setSelect(page, 'seat-select', 'Team 1')
+        await waitEval(page)
+    },
 
     async 'league-fantrax'(page) { await ensure(page, 'league-settings'); await setSelect(page, 'ls-platform', 'Fantrax') },
     async 'league-espn'(page)    { await ensure(page, 'league-settings'); await setSelect(page, 'ls-platform', 'ESPN') },
@@ -320,6 +353,43 @@ const STATES = {
         await waitEval(page)
     },
 
+    // hec2: the candidate table at a round-7 pick — the docs' example of H-scores stabilising
+    // across categories once a team's direction is set. Builds on mid-draft (Team 1 on the clock
+    // in round 2): each lock-in hands the board to autopilot, which fills the field and stops at
+    // Team 1's next turn (at the snake turns Team 1 picks back-to-back, so no autopilot fires).
+    // Five more locks leave Team 1 on the clock for its round-7 pick. Expensive — two full
+    // autopilot sweeps of ~22 picks each.
+    async 'draft-round7'(page) {
+        await ensure(page, 'mid-draft')
+        for (let lockCount = 0; lockCount < 5; lockCount++) {
+            await lockInTopPick(page)
+            await waitAutopilotDone(page)
+        }
+    },
+
+    // gteam: the team-statistics G-score table for a team mid-draft. Reuses the round-7 board —
+    // Team 1 holds six players — and switches to the "Show team statistics" tab.
+    async 'draft-round7-team'(page) {
+        await ensure(page, 'draft-round7')
+        await page.locator('.draft-tab-bar .pick-btn[data-tab="my-team"]').click()
+        await page.waitForFunction(() => {
+            const table = document.querySelector('[data-testid="team-gscore"]')
+            return table && table.querySelectorAll('tbody tr').length >= 6
+        }, { timeout: 30000 }).catch(() => {})
+        await page.waitForTimeout(200)
+    },
+
+    // rosterjokic: the in-cell player search on the rosters grid. Double-click Team 2's first
+    // roster cell and type "Niko" — the dropdown lists Nikola Jokic even though Team 1's roster
+    // already has him (the caption's point: taken players remain selectable).
+    async 'season-roster-search'(page) {
+        await ensure(page, 'season-rosters')
+        const cellWrapper = page.locator('[data-testid="sr-player-0-1-wrapper"]')
+        await cellWrapper.locator('.cs-trigger').dblclick()
+        await cellWrapper.locator('.cs-search-input').pressSequentially('Niko', { delay: 60 })
+        await page.waitForTimeout(200)
+    },
+
     // scottie_autodraft / sga_autodraft: two teams from ONE full 12-seat autodraft in 2025-26 EC, shown in
     // the team-statistics view. The whole-board draft is built once (ensureFullAutodraft) and reused; each
     // state just points the seat selector at its team. Team 5 / Team 2 match the doc captions' draft slots.
@@ -345,10 +415,14 @@ const STATES = {
 //   ranks top-6 there); auction & season use 2025-26 (Season needs it — its rosters are 2025-26
 //   players). Set in the runner + auction/season states via selectHistoricalSeason().
 //
-//   AUTO (26, capture cleanly & verified light-theme): main hec hmc rototop positions hexp
+//   AUTO (32, capture cleanly & verified light-theme): main hec hmc rototop positions hexp
 //     hstrat hflex hroster projections 1984-85 lsettings fantraxsettings espnpop hdollars
 //     auctiondetail hwaiver hwaiverexp tradeanalysis tradeanalysisg tradesuggestions tp3 rosters
-//     rosterinspection rosterh autodraft
+//     rosterinspection rosterh autodraft mdraft (draft manual entry, Jokic locked in as pick 1)
+//     mauction (auction manual entry, Jokic to Team 1 for $70) moreinfo (league-settings
+//     manual-entry inputs, union capture) hec2 (candidate table at a round-7 pick) gteam
+//     (team-statistics G-score table on the round-7 board) rosterjokic (rosters-grid player
+//     search, union capture)
 //
 //   NEW (3, wired up but NOT yet verified against a live run — confirm framing/timing once):
 //     mid_draft (candidate view mid-draft), scottie_autodraft (Team 5 team-stats after a full 2025-26
@@ -359,9 +433,7 @@ const STATES = {
 //     puntcontrol injury savorinput) and the settings dropdowns (formats categories historical =
 //     season selector). Only the position-structure control (positions) is kept. tp1/tp2 and notbegun
 //     were removed too (trade UI reworked to one inline row = tp3; no "auction not begun" state exists).
-//
-//   TODO (skipped; doable — need one extra interaction/data step, see each `skip`):
-//     hec2 updating mdraft moreinfo mauction gteam rosterjokic
+//     updating (the transient eval spinner) was dropped from the docs entirely.
 //
 //   BLOCKED (skipped; external/live login — need real third-party credentials):
 //     yahoopop yahoosettings livedraft
@@ -377,9 +449,8 @@ const SHOTS = [
     { name: 'hstrat',      state: 'candidate',   selector: '[data-testid="future-pick-strategy-table"]' },
     { name: 'hflex',       state: 'candidate',   selector: '[data-testid="flex-allocations-table"]' },
     { name: 'hroster',     state: 'candidate',   selector: '[data-testid="roster-assignments-table"]' },
-    { name: 'hec2',        state: 'draft-EC',    selector: '#hscoretable', skip: 'needs the board driven to a round-7 pick first' },
-    { name: 'updating',    state: 'draft-EC',    selector: '#eval-indicator', skip: 'transient — capture during an evaluate, not after' },
-    { name: 'mdraft',      state: 'draft-EC',    selector: '.entry-table', skip: 'wants pick controls + board together; pick a container/region' },
+    // #right-header holds the pick-control row and the board grid together in own-data mode.
+    { name: 'mdraft',      state: 'draft-manual', selector: '#right-header' },
     // autodraft is defined LAST (before the platform shots) — toggling the "A" autodrafters kicks
     // off autopilot, which mutates the persistent draft/candidate state for every shot after it.
     { name: 'livedraft',   state: 'load',        selector: '#hscoretable', skip: 'needs a live platform connection' },
@@ -394,14 +465,21 @@ const SHOTS = [
     // auction/season state into live-platform mode (blank rosters, no eval data). Keeping them
     // last means own-data states above capture correctly first.
     { name: 'lsettings',       state: 'league-settings', selector: '.ls-grid' },
-    { name: 'moreinfo',        state: 'league-settings', selector: '.ls-grid', skip: 'manual-entry inputs span several controls; pick the right region' },
+    // The manual-entry inputs (drafters / picks-per-drafter / third-round reversal) have no shared
+    // wrapper — the toggle sits outside .ls-grid — so this is a union capture of the three regions,
+    // clamped below the platform select so the padding never bleeds into it.
+    { name: 'moreinfo',        state: 'league-settings',
+      union:       ['.ls-cell:has(#ls-n-drafters)', '.ls-cell:has(#ls-n-picks)', '#ls-trr-row'],
+      clampAbove:  '[data-testid="ls-platform-wrapper"]',
+      clampWithin: 'details.sidebar-section:has(#ls-trr-row)' },
     { name: 'yahoopop',        state: 'load',          selector: 'body', skip: 'real external window.open to Yahoo login — needs popup-page handling, not deterministic' },
     { name: 'yahoosettings',   state: 'load',          selector: '#ls-connect-cell', skip: 'requires a live Yahoo auth session' },
 
-    // Auction
-    { name: 'auctiondetail', state: 'auction-candidate', selector: '[data-testid="auction-values-table"]' },
-    { name: 'hdollars',      state: 'auction',           selector: '#hscoretable', rows: 12 },
-    { name: 'mauction',      state: 'auction',           selector: '.pick-control-row', skip: 'auction manual-entry table + pick row; confirm the right container' },
+    // Auction — auctiondetail first (pristine empty board), then the Jokic entry, then the
+    // dollar table from Team 1's post-pick perspective.
+    { name: 'auctiondetail', state: 'auction-candidate',    selector: '[data-testid="auction-values-table"]' },
+    { name: 'mauction',      state: 'auction-manual',       selector: '#right-header' },
+    { name: 'hdollars',      state: 'auction-manual-team1', selector: '#hscoretable', rows: 12 },
 
     // Season
     { name: 'hwaiver',          state: 'season-waiver',     selector: '#hscoretable', rows: 12 },
@@ -412,13 +490,17 @@ const SHOTS = [
     { name: 'rosters',          state: 'season-rosters',    selector: '#rosters-left' },
     { name: 'rosterinspection', state: 'season-roster-insp', selector: '[data-testid="roster-inspection-gscore"]' },
     { name: 'rosterh',          state: 'season-roster-insp', selector: '[data-testid="roster-inspection-hscore"]' },
-    { name: 'rosterjokic',      state: 'season-rosters',    selector: '.cs-dropdown', skip: 'double-click a roster cell and type "Jokic" to open the search' },
+    // Union capture with no padding: the region is inside the roster table, and padding would
+    // show slivers of the pick-number column and Team 3's cells. Framing: the Team 1 + Team 2
+    // column headers, five rows of Team 1's roster (Jokic on top), and the open search dropdown.
+    { name: 'rosterjokic',      state: 'season-roster-search', pad: 0,
+      union: ['#rosters-left .entry-table thead th:nth-child(2)',
+              '#rosters-left .entry-table thead th:nth-child(3)',
+              '[data-testid="sr-player-4-0-wrapper"]',
+              '[data-testid="sr-player-0-1-wrapper"] .cs-dropdown'] },
     // The old sidebar "trade parameters popover" (tp1/tp2) is gone — the trade-size combos and
     // both differential thresholds are now one inline control row, captured as tp3.
     { name: 'tp3', state: 'season-trading', selector: '.trade-combo-row' },
-
-    // G-scores
-    { name: 'gteam', state: 'draft-EC', selector: '[data-testid="team-gscore"]', skip: 'open the "Show team statistics" tab first (Draft/Auction only)' },
 
     // Data-source config panels — defined here (not in the middle) because `projections` / `1984-85`
     // switch the data source, which must not leak into the historical-2025-26 auction/season shots.
@@ -434,6 +516,10 @@ const SHOTS = [
     // so they run after every clean draft shot. mid_draft clears + rebuilds on the 2024-25 base; the two
     // team shots switch to 2025-26 for a single full autodraft (which resets the board on season change).
     { name: 'mid_draft',         state: 'mid-draft',       selector: '#hscoretable', rows: 12 },
+    // hec2 + gteam extend mid_draft's board (five more lock/autopilot cycles → round 7), so they
+    // run directly after it; gteam then reuses the round-7 board on the team-statistics tab.
+    { name: 'hec2',              state: 'draft-round7',      selector: '#hscoretable', rows: 12 },
+    { name: 'gteam',             state: 'draft-round7-team', selector: '[data-testid="team-gscore"]' },
     // #draft-gscore wraps both the roster table (team-gscore) and the separate H-Score (est. win rate)
     // summary table below it — capture the container so the team's H-score row is in frame.
     { name: 'scottie_autodraft', state: 'autodraft-team5', selector: '#draft-gscore' },
@@ -464,6 +550,7 @@ async function captureShot(page, s) {
     try {
         await ensure(page, s.state)
         if (s.viewport) await shootViewport(page, s.name)
+        else if (s.union) await shootUnion(page, s)
         else if (s.rows) await shootRows(page, s.name, s.selector, s.rows)
         else await shoot(page, s.name, s.selector)
         return true
@@ -519,6 +606,51 @@ async function shootViewport(page, name) {
     await page.waitForTimeout(150)
     await page.screenshot({ path: path.join(IMG, `${name}.png`) })
     console.log('✓', name, '(viewport)')
+}
+
+// Union capture: some doc regions span sibling elements with no shared wrapper (e.g. the
+// league-settings manual-entry inputs, whose toggle sits outside .ls-grid). Clip to the union of
+// the `union` selectors' boxes plus padding (`pad` on the shot, PAD by default — use 0 for regions
+// inside a table, where padding would show slivers of neighbouring cells), clamped (a) below the
+// `clampAbove` element so the padding never bleeds into the control directly above, and (b) inside
+// the `clampWithin` element so the shot never crosses the containing section's edge.
+async function shootUnion(page, shot) {
+    const pad = shot.pad ?? PAD
+    for (const selector of shot.union) {
+        await page.locator(selector).first().scrollIntoViewIfNeeded().catch(() => {})
+    }
+    await page.waitForTimeout(120)
+    const boxes = []
+    for (const selector of shot.union) {
+        const box = await page.locator(selector).first().boundingBox()
+        if (box) boxes.push(box)
+    }
+    if (!boxes.length) throw new Error(`no visible elements for union: ${shot.union.join(' ')}`)
+    let left   = Math.min(...boxes.map(box => box.x)) - pad
+    let top    = Math.min(...boxes.map(box => box.y)) - pad
+    let right  = Math.max(...boxes.map(box => box.x + box.width)) + pad
+    let bottom = Math.max(...boxes.map(box => box.y + box.height)) + pad
+    if (shot.clampAbove) {
+        const aboveBox = await page.locator(shot.clampAbove).first().boundingBox()
+        if (aboveBox) top = Math.max(top, aboveBox.y + aboveBox.height + 2)
+    }
+    if (shot.clampWithin) {
+        const withinBox = await page.locator(shot.clampWithin).first().boundingBox()
+        if (withinBox) {
+            left   = Math.max(left, withinBox.x)
+            top    = Math.max(top, withinBox.y)
+            right  = Math.min(right, withinBox.x + withinBox.width)
+            bottom = Math.min(bottom, withinBox.y + withinBox.height)
+        }
+    }
+    const viewport = page.viewportSize()
+    left   = Math.max(0, left)
+    top    = Math.max(0, top)
+    right  = Math.min(viewport.width, right)
+    bottom = Math.min(viewport.height, bottom)
+    await page.screenshot({ path: path.join(IMG, `${shot.name}.png`),
+                            clip: { x: left, y: top, width: right - left, height: bottom - top } })
+    console.log('✓', shot.name, '(union)')
 }
 
 // Candidate/player tables render every player; clip to the header + first `rows` player rows.
