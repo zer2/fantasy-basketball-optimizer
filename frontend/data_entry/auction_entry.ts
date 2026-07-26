@@ -4,7 +4,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { readRequiredIntInput } from '../helper_functions.js'
-import { getCandidatePlayerResults } from '../app_state.js'
+import { getPlayerResults } from '../app_state.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
@@ -71,10 +71,13 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     const row = document.createElement('div')
     row.className = 'pick-control-row'
 
-    // Player dropdown — grows to fill available space
+    // Player dropdown — grows to fill available space. Filter the FULL player pool by the
+    // board's own picks (like the draft board), not the last evaluate's candidate list: that
+    // list already excludes picked players, so after an undo it is stale and would leave the
+    // undone player missing from the dropdown until some later re-render.
     const currentPicks = getPicks()
     const pickedSet = new Set(currentPicks.flat().filter(Boolean).map(p => p!.player))
-    const available = getCandidatePlayerResults()?.map(p => p.name).filter(n => !pickedSet.has(n)) ?? []
+    const available = getPlayerResults()?.map(p => p.name).filter(n => !pickedSet.has(n)) ?? []
     const playerSel = makeCustomSelect(
         'auction-pick-player',
         [{ value: '', label: '' }, ...available.map(n => ({ value: n, label: n }))],

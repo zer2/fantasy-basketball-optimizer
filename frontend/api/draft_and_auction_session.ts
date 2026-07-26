@@ -46,6 +46,13 @@ export function getFullTeamResult(): { h_score: number; win_rates: number[] } | 
     return latestFullTeamResult
 }
 
+/** Per-team full budgets — the remaining cash of an auction board with no picks. Auction sessions
+ *  require remaining_cash on every evaluate, including the empty-board base evaluation. */
+function buildFullBudgets(teamNames: string[]): Record<string, number> {
+    const { cash_per_team } = getLeagueSettings()
+    return Object.fromEntries(teamNames.map(name => [name, cash_per_team]))
+}
+
 export function clearFullTeamResult(): void {
     latestFullTeamResult = null
 }
@@ -142,11 +149,12 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<string 
                 const emptyAssignments: Record<string, string[]> = Object.fromEntries(
                     genericTeams.map(name => [name, []])
                 )
-                const baseResp = await evaluate(
-                    getSessionId()!
-                ,   { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
-                ,   signal
-                )
+                // An auction session requires remaining_cash on every evaluate; the empty board
+                // means every team still holds its full budget.
+                const baseEvalRequest: Parameters<typeof evaluate>[1] =
+                    { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
+                if (mode === 'Auction Mode') baseEvalRequest.remaining_cash = buildFullBudgets(genericTeams)
+                const baseResp = await evaluate(getSessionId()!, baseEvalRequest, signal)
                 basePlayersBySession.set(getSessionId()!, candidatesToPlayerResults(baseResp.candidates))
             }
 
@@ -265,12 +273,17 @@ export async function showDefaultRankings(): Promise<void> {
     setIndicatorState('fetching')
     try {
         await withSessionRetry(async () => {
-            const { n_drafters } = getLeagueSettings()
+            const { n_drafters, mode } = getLeagueSettings()
             const genericTeams = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
             const emptyAssignments: Record<string, string[]> = Object.fromEntries(
                 genericTeams.map(name => [name, []])
             )
-            const resp = await evaluate(getSessionId()!, { player_assignments: emptyAssignments, my_team_id: genericTeams[0] })
+            // An auction session requires remaining_cash on every evaluate; with no picks made,
+            // every team still holds its full budget.
+            const evalRequest: Parameters<typeof evaluate>[1] =
+                { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
+            if (mode === 'Auction Mode') evalRequest.remaining_cash = buildFullBudgets(genericTeams)
+            const resp = await evaluate(getSessionId()!, evalRequest)
             const players = candidatesToPlayerResults(resp.candidates)
             setBasePlayerResults(players)
             setCandidatePlayerResults(players)
