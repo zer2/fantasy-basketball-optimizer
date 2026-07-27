@@ -152,6 +152,17 @@ export function pickControlButton(page, label) {
     return page.locator('.pick-control-row .pick-btn', { hasText: label })
 }
 
+/** Locks whichever player tops the pick dropdown — for driving a draft forward when the
+ *  specific player doesn't matter (e.g. walking the pick order through several rounds). */
+export async function lockInTopDraftPick(app) {
+    const { page } = app
+    const wrap = page.locator('[data-testid="draft-pick-select-wrapper"]').first()
+    await openSelectDropdown(page, wrap)
+    await wrap.locator('.cs-dropdown .cs-option').first().click()
+    await pickControlButton(page, 'Lock in selection').click()
+    await waitAppSettled(app)
+}
+
 /** Locks an auction pick: player + team + cost, then "Lock in selection". */
 export async function lockInAuctionPick(app, playerName, teamLabel, cost) {
     const { page } = app

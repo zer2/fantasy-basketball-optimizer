@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
-    lockInDraftPick, readDropdownOptionLabels, pickControlButton,
+    lockInDraftPick, lockInTopDraftPick, readDropdownOptionLabels, pickControlButton,
 } from './helpers.mjs'
 
 test('draft board entry controls', async t => {
@@ -64,6 +64,52 @@ test('draft board entry controls', async t => {
             assert.equal(await boardCellsWith('('), 0, 'clear should empty every board cell')
             assert.match(await pickLabel(), /Select Pick 1 for Team 1/, 'clear should rewind to the first pick')
             expectCleanSession(app, 'clear board')
+        })
+
+        // ── Pick order across the round-2/3 boundary, with and without third round reversal ──
+        // A 2-drafter league reaches round 3 in four locks: rounds go [T1,T2], [T2,T1], then
+        // round 3 is [T1,T2] under normal snaking but repeats [T2,T1] under reversal.
+
+        async function setDrafterCount(count) {
+            const draftersInput = page.locator('#ls-n-drafters')
+            await draftersInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+            await draftersInput.fill(String(count))
+            await draftersInput.dispatchEvent('change')
+            await waitAppSettled(app)
+        }
+
+        async function setThirdRoundReversal(enabled) {
+            const checkbox = page.locator('#ls-third-round-reversal')
+            await checkbox.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+            const currentlyEnabled = await checkbox.evaluate(el => el.checked)
+            if (currentlyEnabled !== enabled) {
+                await checkbox.evaluate(el => el.click())   // styled toggle; the input itself is not clickable
+                // The board applies a config change on its next render — force one now so the
+                // following locks run against the new pick order from a clean board.
+                await pickControlButton(page, 'Clear draft board').click()
+                await waitAppSettled(app)
+            }
+        }
+
+        async function walkToRoundThree() {
+            for (let lockCount = 0; lockCount < 4; lockCount++) await lockInTopDraftPick(app)
+        }
+
+        await t.test('third round reversal repeats the round-two order', async () => {
+            await setDrafterCount(2)
+            await setThirdRoundReversal(true)
+            await walkToRoundThree()
+            assert.match(await pickLabel(), /Select Pick 3 for Team 2/,
+                         'with reversal, round 3 should open with the same drafter that opened round 2')
+            expectCleanSession(app, 'third round reversal on')
+        })
+
+        await t.test('without reversal, round three snakes back to the first drafter', async () => {
+            await setThirdRoundReversal(false)
+            await walkToRoundThree()
+            assert.match(await pickLabel(), /Select Pick 3 for Team 1/,
+                         'without reversal, round 3 should open with the first drafter again')
+            expectCleanSession(app, 'third round reversal off')
         })
     } finally {
         await app.close()
