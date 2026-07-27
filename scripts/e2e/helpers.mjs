@@ -154,6 +154,17 @@ export function pickControlButton(page, label) {
     return page.locator('.pick-control-row .pick-btn', { hasText: label })
 }
 
+/** Sets the league's drafter count via the sidebar input and waits for the rebuild. A small
+ *  count (e.g. 2) makes multi-round flows affordable — evaluates shrink with the league. */
+export async function setLeagueDrafterCount(app, count) {
+    const { page } = app
+    const draftersInput = page.locator('#ls-n-drafters')
+    await draftersInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+    await draftersInput.fill(String(count))
+    await draftersInput.dispatchEvent('change')
+    await waitAppSettled(app)
+}
+
 /** Locks whichever player tops the pick dropdown — for driving a draft forward when the
  *  specific player doesn't matter (e.g. walking the pick order through several rounds). */
 export async function lockInTopDraftPick(app) {

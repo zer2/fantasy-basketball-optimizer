@@ -7,20 +7,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
-    setSelect,
+    setSelect, setLeagueDrafterCount,
 } from './helpers.mjs'
 
 test('tables track league dimensions', async t => {
     const app = await launchAppPage()
     const { page } = app
-
-    async function setDrafterCount(count) {
-        const draftersInput = page.locator('#ls-n-drafters')
-        await draftersInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
-        await draftersInput.fill(String(count))
-        await draftersInput.dispatchEvent('change')
-        await waitAppSettled(app)
-    }
 
     try {
         await loadApp(app)
@@ -33,7 +25,7 @@ test('tables track league dimensions', async t => {
         })
 
         await t.test('changing the drafter count resizes the draft board', async () => {
-            await setDrafterCount(8)
+            await setLeagueDrafterCount(app, 8)
             assert.equal(await page.locator('.entry-table thead .team-header-cell').count(), 8)
             assert.equal(await page.locator('.entry-table tbody tr').count(), 13,
                          'row count should be unchanged by a drafter-count change')

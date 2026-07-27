@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
     lockInDraftPick, lockInTopDraftPick, readDropdownOptionLabels, pickControlButton,
+    setLeagueDrafterCount,
 } from './helpers.mjs'
 
 test('draft board entry controls', async t => {
@@ -73,14 +74,6 @@ test('draft board entry controls', async t => {
         // before the crossing applies live (and never resets the board); a toggle after it
         // stays pending until an undo brings the draft back before the boundary.
 
-        async function setDrafterCount(count) {
-            const draftersInput = page.locator('#ls-n-drafters')
-            await draftersInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
-            await draftersInput.fill(String(count))
-            await draftersInput.dispatchEvent('change')
-            await waitAppSettled(app)
-        }
-
         async function setThirdRoundReversal(enabled) {
             const checkbox = page.locator('#ls-third-round-reversal')
             await checkbox.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
@@ -91,7 +84,7 @@ test('draft board entry controls', async t => {
         }
 
         await t.test('reversal toggled before round 3 applies at the crossing without a reset', async () => {
-            await setDrafterCount(2)
+            await setLeagueDrafterCount(app, 2)
             await setThirdRoundReversal(true)
             for (let lockCount = 0; lockCount < 4; lockCount++) await lockInTopDraftPick(app)
             assert.equal((await page.locator('.entry-table td.drafted').count()), 4,
