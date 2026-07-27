@@ -94,10 +94,9 @@ export async function createOrPatchSession(
 // No recreate needed — platform_config feeds nothing the pipeline computes. Driven by an
 // event so league_settings doesn't import this module (it imports league_settings — a cycle).
 document.addEventListener('platform-connected', () => {
-    const { platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-    // cash_per_team only belongs on auction-league sessions — see the mode-change handler.
+    const { platform, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     createOrPatchSession(4, {
-        league: { n_drafters, n_picks, cash_per_team: mode === 'Auction Mode' ? cash_per_team : null },
+        league: { n_drafters, n_picks, cash_per_team },
         slot_counts: getSlotCounts(),
         platform,
         platform_config: getPlatformConfig(),

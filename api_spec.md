@@ -159,6 +159,7 @@ This is the most expensive call; all subsequent calls are faster.
     "categories": ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"],
     "cash_per_team": null
   },
+  "mode": "Draft Mode",
   "slot_counts": {
     "PG": 1, "SG": 1, "SF": 1, "PF": 1, "C": 2,
     "G": 2, "F": 2, "Util": 3
@@ -191,7 +192,13 @@ loads (counting vs ratio stat definitions, negative stats, conversion factors, e
 `league.scoring_format` — one of `"Head to Head: Most Categories"`,
 `"Head to Head: Each Category"`, `"Rotisserie"`.
 
-`league.cash_per_team` — Auction Mode only; omit or set to `null` for Draft Mode.
+`league.cash_per_team` — Auction Mode only; omit or set to `null` for Draft Mode. Only
+consulted when the session's `mode` is `"Auction Mode"`, so a value left over from an
+earlier auction is inert in other modes.
+
+`mode` — one of `"Draft Mode"`, `"Auction Mode"`, `"Season Mode"`; the session's league
+type. `"Auction Mode"` sessions require `remaining_cash` on every evaluate and every other
+(or unset) mode forbids it. Patchable — the frontend patches it on every mode switch.
 
 `slot_counts` — maps each position type to the number of roster slots of that type.
 Valid position types (base positions and flex slot categories) are defined server-side per

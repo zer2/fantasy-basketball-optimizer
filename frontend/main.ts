@@ -110,10 +110,9 @@ seatSelect.element.addEventListener('change', () => {
 // Mode change: rebuild table and sync session.
 // Registered before the applyLayout listener so buildTableHeader fires first, ensuring
 // hscoretable.style.width is correct when applyLayout reads it.
-// cash_per_team is the session's league-type discriminator: the backend requires
-// remaining_cash on every evaluate exactly when it is set. Entering Auction Mode sets it;
-// entering Draft or Season Mode clears it (explicit null) so their evaluates — which never
-// send remaining_cash — don't hit an auction-league session.
+// The mode is a session parameter (its league type): the backend requires remaining_cash on
+// every evaluate exactly when the session's mode is Auction. Entering Auction Mode also
+// patches cash_per_team so the backend can compute dollar values.
 // AbortController cancels stale backend calls on rapid mode switches.
 let modeChangeController: AbortController | null = null
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
@@ -122,14 +121,14 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
     const { signal } = modeChangeController
 
     const { mode, cash_per_team } = getLeagueSettings()
-    const patch = { league: { cash_per_team: mode === 'Auction Mode' ? cash_per_team : null } }
+    const patch = mode === 'Auction Mode' ? { mode, league: { cash_per_team } } : { mode }
 
     if (mode === 'Season Mode') {
         // The table is hidden in season mode, so there is no rebuild or evaluate here — but the
-        // session must still be patched back to a draft league BEFORE the season layout renders,
-        // because rendering fires season evaluates (waiver, roster inspection) that omit
-        // remaining_cash. The standalone applyLayout listener below skips Season Mode for the
-        // same reason: layout comes after the patch, not concurrently with it.
+        // session's mode must be patched BEFORE the season layout renders, because rendering
+        // fires season evaluates (waiver, roster inspection) that omit remaining_cash. The
+        // standalone applyLayout listener below skips Season Mode for the same reason: layout
+        // comes after the patch, not concurrently with it.
         createOrPatchSession(4, patch, signal)
             .then(() => { if (!signal.aborted) applyLayout() })
             .catch(err => {
@@ -211,11 +210,8 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
         applyLayout()  // re-renders draft board with new n_drafters/n_picks so getDraftState() is current before evaluate
         revalidateSlotCounts()
         if (!isSlotCountsValid()) return
-        // cash_per_team only belongs on auction-league sessions (see the mode-change handler);
-        // sending it in Draft Mode would silently flip the session into an auction league.
-        const { mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-        const league = { n_drafters, n_picks, cash_per_team: mode === 'Auction Mode' ? cash_per_team : null }
-        createOrPatchSession(4, { league, slot_counts: getSlotCounts() }, signal)
+        const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
+        createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() }, signal)
             .then(() => { if (!signal.aborted) return runModeEval() })
             .then(() => { if (!signal.aborted) applyLayout() })
             .catch(err => {

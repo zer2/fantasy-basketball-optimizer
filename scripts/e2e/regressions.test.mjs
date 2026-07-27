@@ -52,7 +52,7 @@ test('auction-league session regressions', async t => {
         })
 
         await t.test('auction -> draft: draft evaluates keep working after leaving auction mode', async () => {
-            // Leaving Auction Mode must clear cash_per_team on the session — a draft
+            // Leaving Auction Mode must update the session's mode (its league type) — a draft
             // evaluate never sends remaining_cash, so an auction-league session 400s.
             await setSelect(page, 'ls-mode', 'Draft Mode')
             await waitAppSettled(app)
@@ -63,8 +63,8 @@ test('auction-league session regressions', async t => {
         })
 
         await t.test('draft: changing the drafter count keeps evaluates working', async () => {
-            // The league-settings patch must not send cash_per_team in Draft Mode —
-            // doing so silently turns the session into an auction league.
+            // League-settings patches carry cash_per_team, which must be inert outside
+            // Auction Mode — the session's mode, not cash presence, is its league type.
             const draftersInput = page.locator('#ls-n-drafters')
             await draftersInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
             await draftersInput.fill('8')

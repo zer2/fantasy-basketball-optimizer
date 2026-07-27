@@ -5,7 +5,7 @@ in backend.models (this module imports from it, never the reverse).
 """
 
 from __future__ import annotations
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 from backend.models import ComboParam
@@ -58,6 +58,9 @@ class PlatformConfigRequest(BaseModel):
 
 class SessionRequest(BaseModel):
     league: LeagueSettings
+    # The session's league type. 'Auction Mode' sessions require remaining_cash on every
+    # evaluate; every other mode (or an unset mode) forbids it. Patched on mode switches.
+    mode: Optional[Literal['Draft Mode', 'Auction Mode', 'Season Mode']] = None
     platform: str = 'Enter your own data'
     slot_counts: dict[str, int]
     parameters: ModelParameters
@@ -93,6 +96,7 @@ class PatchLeague(BaseModel):
 
 class PatchRequest(BaseModel):
     from_step: int
+    mode: Optional[Literal['Draft Mode', 'Auction Mode', 'Season Mode']] = None
     parameters: Optional[ModelParameters] = None
     league: Optional[PatchLeague] = None
     data_source: Optional[DataSource] = None

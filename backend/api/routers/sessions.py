@@ -38,6 +38,7 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 
     return {
         'sport':            sport,
+        'mode':             req.mode,
         'n_drafters':       n,
         'n_picks':          req.league.n_picks,
         'scoring_format':   req.league.scoring_format,
@@ -69,18 +70,14 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 def _build_patch(req: PatchRequest) -> dict:
     """Assemble the current_params patch from the non-None pieces of a PatchRequest."""
     patch: dict = {}
+    if req.mode is not None:
+        patch['mode'] = req.mode
     if req.parameters is not None:
         patch.update(req.parameters.model_dump())
     if req.league is not None:
         for key, val in req.league.model_dump().items():
             if val is not None:
                 patch[key] = val
-        # cash_per_team is the league-type discriminator (auction vs draft): the evaluate
-        # route requires remaining_cash exactly when it is set. An explicitly provided null
-        # clears it — turning the session back into a draft league when the user leaves
-        # Auction Mode — while an omitted field still leaves it untouched.
-        if 'cash_per_team' in req.league.model_fields_set and req.league.cash_per_team is None:
-            patch['cash_per_team'] = None
     if req.slot_counts is not None:
         patch['slot_counts'] = req.slot_counts
     if req.injured_players is not None:
