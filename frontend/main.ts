@@ -110,9 +110,9 @@ seatSelect.element.addEventListener('change', () => {
 // Mode change: rebuild table and sync session.
 // Registered before the applyLayout listener so buildTableHeader fires first, ensuring
 // hscoretable.style.width is correct when applyLayout reads it.
-// The mode is a session parameter (its league type): the backend requires remaining_cash on
-// every evaluate exactly when the session's mode is Auction. Entering Auction Mode also
-// patches cash_per_team so the backend can compute dollar values.
+// is_auction is a session parameter (its league type): the backend requires remaining_cash
+// on every evaluate exactly when it is set. Entering Auction Mode also patches cash_per_team
+// so the backend can compute dollar values.
 // AbortController cancels stale backend calls on rapid mode switches.
 let modeChangeController: AbortController | null = null
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
@@ -121,14 +121,16 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
     const { signal } = modeChangeController
 
     const { mode, cash_per_team } = getLeagueSettings()
-    const patch = mode === 'Auction Mode' ? { mode, league: { cash_per_team } } : { mode }
+    const patch = mode === 'Auction Mode'
+        ? { is_auction: true, league: { cash_per_team } }
+        : { is_auction: false }
 
     if (mode === 'Season Mode') {
         // The table is hidden in season mode, so there is no rebuild or evaluate here — but the
-        // session's mode must be patched BEFORE the season layout renders, because rendering
-        // fires season evaluates (waiver, roster inspection) that omit remaining_cash. The
-        // standalone applyLayout listener below skips Season Mode for the same reason: layout
-        // comes after the patch, not concurrently with it.
+        // session's league type must be patched BEFORE the season layout renders, because
+        // rendering fires season evaluates (waiver, roster inspection) that omit remaining_cash.
+        // The standalone applyLayout listener below skips Season Mode for the same reason:
+        // layout comes after the patch, not concurrently with it.
         createOrPatchSession(4, patch, signal)
             .then(() => { if (!signal.aborted) applyLayout() })
             .catch(err => {

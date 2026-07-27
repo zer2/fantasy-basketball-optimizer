@@ -38,7 +38,7 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 
     return {
         'sport':            sport,
-        'mode':             req.mode,
+        'is_auction':       req.is_auction,
         'n_drafters':       n,
         'n_picks':          req.league.n_picks,
         'scoring_format':   req.league.scoring_format,
@@ -70,8 +70,8 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 def _build_patch(req: PatchRequest) -> dict:
     """Assemble the current_params patch from the non-None pieces of a PatchRequest."""
     patch: dict = {}
-    if req.mode is not None:
-        patch['mode'] = req.mode
+    if req.is_auction is not None:
+        patch['is_auction'] = req.is_auction
     if req.parameters is not None:
         patch.update(req.parameters.model_dump())
     if req.league is not None:

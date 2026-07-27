@@ -92,9 +92,9 @@ export interface SessionRequest {
         categories: string[]
         cash_per_team?: number   // only consulted by the backend in Auction Mode
     }
-    // League type: Auction Mode sessions require remaining_cash on every evaluate, all
-    // other modes forbid it. Patched whenever the user switches modes.
-    mode: string
+    // League type: auction sessions require remaining_cash on every evaluate, non-auction
+    // sessions forbid it. Patched whenever the user switches modes.
+    is_auction: boolean
     platform: string
     platform_config?: { league_id: string; division_id?: string | null }   // live platforms only
     slot_counts: Record<string, number>

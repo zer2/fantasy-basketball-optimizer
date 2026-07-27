@@ -188,10 +188,10 @@ def test_evaluate_cash_mode_mismatch():
     assert 'remaining_cash' in response.json()['detail']
 
 
-def test_mode_patch_toggles_league_type():
-    """The session's mode is its league type: Auction Mode requires remaining_cash on every
-    evaluate, every other (or unset) mode forbids it. Patching the mode toggles the requirement;
-    a cash_per_team value left over from an earlier auction lingers harmlessly. Regression test
+def test_is_auction_patch_toggles_league_type():
+    """is_auction is the session's league type: auction sessions require remaining_cash on every
+    evaluate, non-auction sessions forbid it. Patching is_auction toggles the requirement; a
+    cash_per_team value left over from an earlier auction lingers harmlessly. Regression test
     for the bug where league type was inferred from cash_per_team presence, which no patch could
     ever unset — poisoning every draft/season evaluate after visiting Auction Mode."""
     session_response = client.post('/sessions', json=_build_default_session_request())
@@ -206,14 +206,14 @@ def test_mode_patch_toggles_league_type():
     # Entering Auction Mode: auction evaluates work, draft-style evaluates 400
     patch_response = client.patch(
         f'/sessions/{session_id}'
-        , json={'from_step': 4, 'mode': 'Auction Mode', 'league': {'cash_per_team': 200}}
+        , json={'from_step': 4, 'is_auction': True, 'league': {'cash_per_team': 200}}
     )
     assert patch_response.status_code == 200, patch_response.text
     assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200
     assert client.post(f'/sessions/{session_id}/evaluate', json=draft_request).status_code == 400
 
-    # A patch that doesn't mention the mode must preserve it: e.g. a scoring-format change
-    # in Auction Mode must not flip the session's league type.
+    # A patch that omits is_auction must preserve it: e.g. a scoring-format change in
+    # Auction Mode must not flip the session's league type.
     patch_response = client.patch(
         f'/sessions/{session_id}'
         , json={'from_step': 4, 'league': {'scoring_format': 'Head to Head: Most Categories'}}
@@ -221,11 +221,11 @@ def test_mode_patch_toggles_league_type():
     assert patch_response.status_code == 200, patch_response.text
     assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200
 
-    # Leaving Auction Mode: the mode patch alone flips the league type back, even though
+    # Leaving Auction Mode: is_auction False flips the league type back, even though
     # cash_per_team is still set on the session.
     patch_response = client.patch(
         f'/sessions/{session_id}'
-        , json={'from_step': 4, 'mode': 'Draft Mode'}
+        , json={'from_step': 4, 'is_auction': False}
     )
     assert patch_response.status_code == 200, patch_response.text
     assert client.post(f'/sessions/{session_id}/evaluate', json=draft_request).status_code == 200

@@ -52,8 +52,8 @@ test('auction-league session regressions', async t => {
         })
 
         await t.test('auction -> draft: draft evaluates keep working after leaving auction mode', async () => {
-            // Leaving Auction Mode must update the session's mode (its league type) — a draft
-            // evaluate never sends remaining_cash, so an auction-league session 400s.
+            // Leaving Auction Mode must patch is_auction off (the session's league type) — a
+            // draft evaluate never sends remaining_cash, so an auction-league session 400s.
             await setSelect(page, 'ls-mode', 'Draft Mode')
             await waitAppSettled(app)
 

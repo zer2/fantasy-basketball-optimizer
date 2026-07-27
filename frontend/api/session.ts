@@ -82,7 +82,7 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
     if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
     const req: SessionRequest = {
         league,
-        mode,
+        is_auction: mode === 'Auction Mode',
         platform,
         slot_counts: getSlotCounts(),
         parameters: getModelParameters(),
