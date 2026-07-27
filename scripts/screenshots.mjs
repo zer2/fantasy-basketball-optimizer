@@ -20,9 +20,9 @@
 //   roto_equations, normal, HistEC, crazyformula, assignmentproblem, savor
 
 import { chromium } from 'playwright'
-import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { mintSessionCookie, setSelect, waitEval, lockInDraftPick } from './browser_helpers.mjs'
 
 const APP  = process.env.APP_URL ?? 'http://localhost:8000'
 // Defaults to docs/img; set SHOT_OUT to a scratch dir when debugging so real images aren't clobbered.
@@ -47,16 +47,7 @@ async function expandSection(page, titleRegex) {
     }
 }
 
-// Custom selects put the id on a hidden input; the wrapper carries data-testid="<id>-wrapper".
-// Click .cs-trigger to open, then the matching .cs-option.
-async function setSelect(page, id, optionText) {
-    const wrap = page.locator(`[data-testid="${id}-wrapper"]`).first()
-    // Open the containing collapsed <details> sidebar section, if any, so the trigger is visible.
-    await wrap.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
-    await wrap.locator('.cs-trigger').click()
-    await page.locator('.cs-dropdown .cs-option', { hasText: optionText }).first().click()
-    await page.waitForTimeout(100)
-}
+// setSelect / waitEval / lockInDraftPick are shared with the e2e suite — see browser_helpers.mjs.
 
 // Expand a candidate's detail drop-down (the expectation / strategy tables live inside it).
 async function expandCandidate(page, i = 0) {
@@ -68,24 +59,6 @@ async function expandCandidate(page, i = 0) {
 async function expandCandidateByName(page, name) {
     await page.locator('#hscoretable .playerheaderdiv', { hasText: name }).first().click()
     await page.waitForTimeout(250)
-}
-
-// Draft a player for the current pick via the pick-control select + "Lock in selection".
-async function lockInDraftPick(page, playerName) {
-    const wrap = page.locator('[data-testid="draft-pick-select-wrapper"]').first()
-    await wrap.locator('.cs-trigger').click()
-    await wrap.locator('.cs-dropdown .cs-option').filter({ hasText: playerName }).first().click()
-    await page.locator('.pick-control-row .pick-btn', { hasText: 'Lock in selection' }).click()
-    await waitEval(page)
-}
-
-// Wait for an evaluate to finish (#eval-indicator reaches "idle"; it starts at "fetching").
-async function waitEval(page) {
-    await page.waitForFunction(() => {
-        const el = document.querySelector('#eval-indicator')
-        return el && el.dataset.state === 'idle'
-    }, { timeout: 40000 }).catch(() => {})
-    await page.waitForTimeout(200)
 }
 
 // Lock in the current top-ranked candidate for whoever is on the clock (name-agnostic, so it works on
@@ -535,8 +508,7 @@ const SHOTS = [
 // Auth: the app UI is gated behind Google login. Inject a session cookie minted with the
 // app's own SESSION_SECRET_KEY (scripts/mint_session_cookie.py) so it loads headlessly.
 const repoRoot   = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const authCookie = JSON.parse(execFileSync('python', ['scripts/mint_session_cookie.py'],
-                                           { cwd: repoRoot, encoding: 'utf8' }).trim())
+const authCookie = mintSessionCookie(repoRoot)
 
 const browser = await chromium.launch()
 const ctx     = await browser.newContext(CONTEXT)
