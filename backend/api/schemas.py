@@ -58,6 +58,9 @@ class PlatformConfigRequest(BaseModel):
 
 class SessionRequest(BaseModel):
     league: LeagueSettings
+    # The session's league type: auction sessions require remaining_cash on every evaluate,
+    # non-auction sessions forbid it. Patched whenever the user switches modes.
+    is_auction: bool = False
     platform: str = 'Enter your own data'
     slot_counts: dict[str, int]
     parameters: ModelParameters
@@ -93,6 +96,7 @@ class PatchLeague(BaseModel):
 
 class PatchRequest(BaseModel):
     from_step: int
+    is_auction: Optional[bool] = None   # omitted = unchanged; True/False sets the league type
     parameters: Optional[ModelParameters] = None
     league: Optional[PatchLeague] = None
     data_source: Optional[DataSource] = None

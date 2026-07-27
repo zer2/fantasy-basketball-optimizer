@@ -24,14 +24,21 @@ def rank_candidates_route(session_id: str, req: EvaluateRequest, response: Respo
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found or expired.')
 
-    # Auction vs draft is all-or-nothing: an auction session (cash_per_team set at creation) must get
-    # per-team remaining_cash on every evaluate, and a draft session must never get it. Reject a request
-    # that mixes the two rather than silently producing a draft-style result for an auction (or vice versa).
-    is_auction_league = session.current_params.get('cash_per_team') is not None
+    # Auction vs draft is all-or-nothing: an auction session must get per-team remaining_cash
+    # on every evaluate, and any other session must never get it. Reject a request that mixes the
+    # two rather than silently producing a draft-style result for an auction (or vice versa).
+    # is_auction is patched whenever the user switches modes; a cash_per_team value left over
+    # from an earlier auction lingers harmlessly — it is only consulted on auction sessions.
+    is_auction_league = bool(session.current_params.get('is_auction'))
     if is_auction_league != (req.remaining_cash is not None):
         raise HTTPException(
             status_code=400,
             detail='remaining_cash is required for auction leagues and must be omitted for draft leagues.',
+        )
+    if is_auction_league and session.current_params.get('cash_per_team') is None:
+        raise HTTPException(
+            status_code=400,
+            detail='cash_per_team must be set on the session for auction evaluates.',
         )
 
     # Hold the per-session lock for the whole evaluate: get_h_scores mutates shared agent state, so a

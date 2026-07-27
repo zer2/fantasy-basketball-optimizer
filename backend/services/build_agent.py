@@ -292,9 +292,10 @@ def run_step5(session: Session) -> None:
     )
 
     # Prime the neutral (empty-board) baseline as part of the build — this workflow always evaluates,
-    # so the throttle ranking + auction anchor are always needed. Auction passes full cash (every
-    # team at cash_per_team); draft passes None.
-    cash_per_team = cp.get('cash_per_team')
+    # so the throttle ranking + auction anchor are always needed. Auction sessions pass full cash
+    # (every team at cash_per_team); everything else passes None — the is_auction gate matters
+    # because a cash_per_team value can linger on the session after the user leaves Auction Mode.
+    cash_per_team = cp.get('cash_per_team') if cp.get('is_auction') else None
     default_cash = (
         {f'Team {i + 1}': cash_per_team for i in range(n_drafters)}
         if cash_per_team is not None else None
