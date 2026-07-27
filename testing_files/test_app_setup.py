@@ -211,6 +211,15 @@ def test_patch_toggles_league_type_via_cash_per_team():
     assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200
     assert client.post(f'/sessions/{session_id}/evaluate', json=draft_request).status_code == 400
 
+    # A league patch that OMITS cash_per_team must preserve it (only an explicit null clears):
+    # e.g. a scoring-format change in Auction Mode must not flip the session to a draft league.
+    patch_response = client.patch(
+        f'/sessions/{session_id}'
+        , json={'from_step': 4, 'league': {'scoring_format': 'Head to Head: Most Categories'}}
+    )
+    assert patch_response.status_code == 200, patch_response.text
+    assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200
+
     # Leaving Auction Mode: an explicit null clears cash_per_team -> the reverse holds
     patch_response = client.patch(
         f'/sessions/{session_id}'
