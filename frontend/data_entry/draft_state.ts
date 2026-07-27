@@ -81,10 +81,19 @@ function isForwardRow(row: number): boolean {
     return row % 2 === 0
 }
 
-/** Advance pick position one step in serpentine order. */
-export function advanceDraftPick(): void {
+/** Advance pick position one step in serpentine order.
+ *
+ *  The third-round-reversal decision is consumed exactly when the draft steps past the second
+ *  round, so the in-effect value refreshes from the sidebar setting at that moment — toggling
+ *  the sidebar before the boundary is crossed always applies. Past the boundary the stored
+ *  value keeps governing navigation (an undo must retrace the path the draft actually took),
+ *  until an undo or clear brings the position back and a later crossing refreshes it again. */
+export function advanceDraftPick(thirdRoundReversalSetting: boolean): void {
+    const atSecondRoundBoundary = pickRow === 1 && pickDrafter === 0
+    if (atSecondRoundBoundary) thirdRoundReversal = thirdRoundReversalSetting
+
     // Third-round reversal: end of row 1 jumps directly to row 2 at the far end
-    if (thirdRoundReversal && pickRow === 1 && pickDrafter === 0) {
+    if (thirdRoundReversal && atSecondRoundBoundary) {
         pickRow     = 2
         pickDrafter = nDrafters - 1
         return

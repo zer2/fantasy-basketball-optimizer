@@ -166,7 +166,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
 
             if (!player) break
             recordDraftPick(getPickRow(), getPickDrafter(), player)
-            advanceDraftPick()
+            advanceDraftPick(readDraftConfig().thirdRoundReversal)
             renderDraftBoard(container)
         }
     } finally {
@@ -246,7 +246,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
             const chosen = sel.getValue()
             if (!chosen || getPickRow() >= getNPicks()) return
             recordDraftPick(getPickRow(), getPickDrafter(), chosen)
-            advanceDraftPick()
+            // Read the reversal setting fresh from the sidebar: the stepping consumes it at the
+            // round-2/3 boundary, so a toggle made any time before then must take effect.
+            advanceDraftPick(readDraftConfig().thirdRoundReversal)
             // renderDraftBoard (inside reflectDraftChange) fires autopilot for the next drafter if it is
             // an autodrafter, so no explicit fireAutopilotPicks call is needed here.
             reflectDraftChange(container)
@@ -466,11 +468,13 @@ function readDraftConfig(): DraftConfig {
     // teamNames are excluded from the key: identities are constant "Team N" (so they never
     // trigger a reset), and editable display labels are presentation-only — a rename must not
     // reset the draft or rebuild the header. n_drafters covers any change in team count.
+    // thirdRoundReversal is also excluded: toggling it must not reset the board — the setting
+    // is passed into advanceDraftPick, which consumes it at the round-2/3 boundary.
     return {
         nDrafters
         , nPicks
         , teamNames
         , thirdRoundReversal
-        , key: `${nDrafters}:${nPicks}:${dataSource}:${thirdRoundReversal}`
+        , key: `${nDrafters}:${nPicks}:${dataSource}`
     }
 }

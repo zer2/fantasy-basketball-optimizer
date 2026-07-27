@@ -13,9 +13,11 @@ import { chromium } from 'playwright'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
-import { mintSessionCookie, setSelect, waitEval, lockInDraftPick, openSelectDropdown } from '../browser_helpers.mjs'
+import {
+    mintSessionCookie, setSelect, waitEval, lockInDraftPick, openSelectDropdown, chooseDropdownOption,
+} from '../browser_helpers.mjs'
 
-export { setSelect, waitEval, lockInDraftPick, openSelectDropdown }
+export { setSelect, waitEval, lockInDraftPick, openSelectDropdown, chooseDropdownOption }
 
 export const APP = process.env.APP_URL ?? 'http://localhost:8000'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -157,8 +159,7 @@ export function pickControlButton(page, label) {
 export async function lockInTopDraftPick(app) {
     const { page } = app
     const wrap = page.locator('[data-testid="draft-pick-select-wrapper"]').first()
-    await openSelectDropdown(page, wrap)
-    await wrap.locator('.cs-dropdown .cs-option').first().click()
+    await chooseDropdownOption(page, wrap, wrapper => wrapper.locator('.cs-dropdown .cs-option').first())
     await pickControlButton(page, 'Lock in selection').click()
     await waitAppSettled(app)
 }

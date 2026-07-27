@@ -68,7 +68,10 @@ test('draft board entry controls', async t => {
 
         // ── Pick order across the round-2/3 boundary, with and without third round reversal ──
         // A 2-drafter league reaches round 3 in four locks: rounds go [T1,T2], [T2,T1], then
-        // round 3 is [T1,T2] under normal snaking but repeats [T2,T1] under reversal.
+        // round 3 is [T1,T2] under normal snaking but repeats [T2,T1] under reversal. The
+        // stepping consumes the sidebar setting exactly at the round-2/3 boundary: a toggle
+        // before the crossing applies live (and never resets the board); a toggle after it
+        // stays pending until an undo brings the draft back before the boundary.
 
         async function setDrafterCount(count) {
             const draftersInput = page.locator('#ls-n-drafters')
@@ -84,32 +87,44 @@ test('draft board entry controls', async t => {
             const currentlyEnabled = await checkbox.evaluate(el => el.checked)
             if (currentlyEnabled !== enabled) {
                 await checkbox.evaluate(el => el.click())   // styled toggle; the input itself is not clickable
-                // The board applies a config change on its next render — force one now so the
-                // following locks run against the new pick order from a clean board.
-                await pickControlButton(page, 'Clear draft board').click()
-                await waitAppSettled(app)
             }
         }
 
-        async function walkToRoundThree() {
-            for (let lockCount = 0; lockCount < 4; lockCount++) await lockInTopDraftPick(app)
-        }
-
-        await t.test('third round reversal repeats the round-two order', async () => {
+        await t.test('reversal toggled before round 3 applies at the crossing without a reset', async () => {
             await setDrafterCount(2)
             await setThirdRoundReversal(true)
-            await walkToRoundThree()
+            for (let lockCount = 0; lockCount < 4; lockCount++) await lockInTopDraftPick(app)
+            assert.equal((await page.locator('.entry-table td.drafted').count()), 4,
+                         'toggling reversal before the draft must not have reset the board')
             assert.match(await pickLabel(), /Select Pick 3 for Team 2/,
                          'with reversal, round 3 should open with the same drafter that opened round 2')
-            expectCleanSession(app, 'third round reversal on')
+            expectCleanSession(app, 'reversal applied at crossing')
         })
 
-        await t.test('without reversal, round three snakes back to the first drafter', async () => {
+        await t.test('reversal toggled past the boundary stays pending until undone back before it', async () => {
+            // The draft sits at round 3 (laid out under reversal). Toggling off now must NOT
+            // re-interpret the current position: the next pick still follows the [T2, T1]
+            // reversal order rather than jumping to round 4.
             await setThirdRoundReversal(false)
-            await walkToRoundThree()
+            await lockInTopDraftPick(app)
             assert.match(await pickLabel(), /Select Pick 3 for Team 1/,
-                         'without reversal, round 3 should open with the first drafter again')
-            expectCleanSession(app, 'third round reversal off')
+                         "a toggle past the boundary must not change round 3's in-progress order")
+
+            // Undo back across the boundary (two steps: T2's round-3 pick, then T1's round-2
+            // pick). The retrace must follow the reversal path the draft actually took.
+            await pickControlButton(page, 'Undo previous selection').click()
+            await waitAppSettled(app)
+            await pickControlButton(page, 'Undo previous selection').click()
+            await waitAppSettled(app)
+            assert.match(await pickLabel(), /Select Pick 2 for Team 1/,
+                         'undoing across the boundary should land on the last round-2 pick')
+
+            // Re-crossing the boundary consumes the pending OFF: round 3 now snakes normally,
+            // opening with Team 1 (it would open with Team 2 if reversal still applied).
+            await lockInTopDraftPick(app)
+            assert.match(await pickLabel(), /Select Pick 3 for Team 1/,
+                         're-crossing the boundary should apply the pending reversal-off setting')
+            expectCleanSession(app, 'pending reversal consumed on re-crossing')
         })
     } finally {
         await app.close()

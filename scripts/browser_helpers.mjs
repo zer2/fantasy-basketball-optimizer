@@ -33,15 +33,34 @@ export async function openSelectDropdown(page, wrapperLocator) {
     throw new Error('custom-select dropdown did not open after 5 attempts')
 }
 
+/**
+ * Opens a custom select's dropdown and clicks the option produced by `resolveOption`,
+ * retrying the whole open-and-click sequence: a late app render can close or replace an
+ * already-open dropdown, leaving Playwright's own click retry waiting forever on a node
+ * that is now hidden — reopening is the only recovery.
+ */
+export async function chooseDropdownOption(page, wrapperLocator, resolveOption) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        await openSelectDropdown(page, wrapperLocator)
+        try {
+            await resolveOption(wrapperLocator).click({ timeout: 2000 })
+            await page.waitForTimeout(100)
+            return
+        } catch {
+            // Dropdown was closed or replaced mid-click — reopen and try again.
+        }
+    }
+    throw new Error('could not click a custom-select option after 5 attempts')
+}
+
 /** Custom selects put the id on a hidden input; the wrapper carries data-testid="<id>-wrapper".
  *  Opens the containing collapsed <details> sidebar section, if any, so the control is visible,
  *  then opens the dropdown and clicks the matching option. */
 export async function setSelect(page, id, optionText) {
     const wrap = page.locator(`[data-testid="${id}-wrapper"]`).first()
     await wrap.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
-    await openSelectDropdown(page, wrap)
-    await wrap.locator('.cs-dropdown .cs-option', { hasText: optionText }).first().click()
-    await page.waitForTimeout(100)
+    await chooseDropdownOption(page, wrap,
+        wrapper => wrapper.locator('.cs-dropdown .cs-option', { hasText: optionText }).first())
 }
 
 /** Waits for an evaluate to finish (#eval-indicator reaches "idle"; it starts at "fetching"). */
@@ -56,8 +75,8 @@ export async function waitEval(page) {
 /** Drafts a player for the current pick via the pick-control select + "Lock in selection". */
 export async function lockInDraftPick(page, playerName) {
     const wrap = page.locator('[data-testid="draft-pick-select-wrapper"]').first()
-    await openSelectDropdown(page, wrap)
-    await wrap.locator('.cs-dropdown .cs-option').filter({ hasText: playerName }).first().click()
+    await chooseDropdownOption(page, wrap,
+        wrapper => wrapper.locator('.cs-dropdown .cs-option').filter({ hasText: playerName }).first())
     await page.locator('.pick-control-row .pick-btn', { hasText: 'Lock in selection' }).click()
     await waitEval(page)
 }
