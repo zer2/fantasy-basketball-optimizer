@@ -188,6 +188,39 @@ def test_evaluate_cash_mode_mismatch():
     assert 'remaining_cash' in response.json()['detail']
 
 
+def test_patch_toggles_league_type_via_cash_per_team():
+    """cash_per_team is the auction-vs-draft discriminator: a patch can set it (session becomes
+    an auction league, remaining_cash required) and an explicit null clears it (back to a draft
+    league, remaining_cash forbidden). Regression test for the mode-switch bug where leaving
+    Auction Mode could never un-set cash_per_team and every draft/season evaluate 400'd."""
+    session_response = client.post('/sessions', json=_build_default_session_request())
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+
+    n_drafters         = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    draft_request      = {'player_assignments': player_assignments, 'my_team_id': 'Team 1'}
+    auction_request    = {**draft_request, 'remaining_cash': {team: 200.0 for team in player_assignments}}
+
+    # Entering Auction Mode: patch sets cash_per_team -> auction evaluates work, draft evaluates 400
+    patch_response = client.patch(
+        f'/sessions/{session_id}'
+        , json={'from_step': 4, 'league': {'cash_per_team': 200}}
+    )
+    assert patch_response.status_code == 200, patch_response.text
+    assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200
+    assert client.post(f'/sessions/{session_id}/evaluate', json=draft_request).status_code == 400
+
+    # Leaving Auction Mode: an explicit null clears cash_per_team -> the reverse holds
+    patch_response = client.patch(
+        f'/sessions/{session_id}'
+        , json={'from_step': 4, 'league': {'cash_per_team': None}}
+    )
+    assert patch_response.status_code == 200, patch_response.text
+    assert client.post(f'/sessions/{session_id}/evaluate', json=draft_request).status_code == 200
+    assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 400
+
+
 def test_evaluate_nonexistent_session():
     """Evaluate against a session ID that does not exist returns 404."""
     response = client.post(

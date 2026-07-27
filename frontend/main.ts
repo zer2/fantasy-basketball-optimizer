@@ -110,7 +110,10 @@ seatSelect.element.addEventListener('change', () => {
 // Mode change: rebuild table and sync session.
 // Registered before the applyLayout listener so buildTableHeader fires first, ensuring
 // hscoretable.style.width is correct when applyLayout reads it.
-// When switching to Auction Mode, patch cash_per_team so the backend can compute dollar values.
+// cash_per_team is the session's league-type discriminator: the backend requires
+// remaining_cash on every evaluate exactly when it is set. Entering Auction Mode sets it;
+// entering Draft or Season Mode clears it (explicit null) so their evaluates — which never
+// send remaining_cash — don't hit an auction-league session.
 // AbortController cancels stale backend calls on rapid mode switches.
 let modeChangeController: AbortController | null = null
 document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
@@ -119,12 +122,25 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
     const { signal } = modeChangeController
 
     const { mode, cash_per_team } = getLeagueSettings()
+    const patch = { league: { cash_per_team: mode === 'Auction Mode' ? cash_per_team : null } }
 
-    if (mode === 'Season Mode') return   // table is hidden in season mode; skip rebuild and backend call
+    if (mode === 'Season Mode') {
+        // The table is hidden in season mode, so there is no rebuild or evaluate here — but the
+        // session must still be patched back to a draft league BEFORE the season layout renders,
+        // because rendering fires season evaluates (waiver, roster inspection) that omit
+        // remaining_cash. The standalone applyLayout listener below skips Season Mode for the
+        // same reason: layout comes after the patch, not concurrently with it.
+        createOrPatchSession(4, patch, signal)
+            .then(() => { if (!signal.aborted) applyLayout() })
+            .catch(err => {
+                if (err.name === 'AbortError') return
+                console.error('Mode change failed:', err)
+            })
+        return
+    }
 
     buildTableHeader()
 
-    const patch = mode === 'Auction Mode' ? { league: { cash_per_team } } : {}
     createOrPatchSession(4, patch, signal)
         .then(() => { if (!signal.aborted) return runModeEval() })
         .then(() => { if (!signal.aborted) applyLayout() })
@@ -133,7 +149,11 @@ document.getElementById('ls-mode')!.parentElement!.addEventListener('change', ()
             console.error('Mode change failed:', err)
         })
 })
-document.getElementById('ls-mode')!.parentElement!.addEventListener('change', applyLayout)
+// Instant layout switch for draft/auction (their evaluates are sequenced after the patch by
+// the handler above). Season Mode's layout is deferred until its session patch lands — see above.
+document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
+    if (getLeagueSettings().mode !== 'Season Mode') applyLayout()
+})
 document.getElementById('ls-platform')!.parentElement!.addEventListener('change', applyLayout)
 
 // Season Mode + live platform: pull the platform's rosters into the grid when the user
@@ -191,8 +211,11 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
         applyLayout()  // re-renders draft board with new n_drafters/n_picks so getDraftState() is current before evaluate
         revalidateSlotCounts()
         if (!isSlotCountsValid()) return
-        const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-        createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() }, signal)
+        // cash_per_team only belongs on auction-league sessions (see the mode-change handler);
+        // sending it in Draft Mode would silently flip the session into an auction league.
+        const { mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
+        const league = { n_drafters, n_picks, cash_per_team: mode === 'Auction Mode' ? cash_per_team : null }
+        createOrPatchSession(4, { league, slot_counts: getSlotCounts() }, signal)
             .then(() => { if (!signal.aborted) return runModeEval() })
             .then(() => { if (!signal.aborted) applyLayout() })
             .catch(err => {
