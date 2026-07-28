@@ -78,8 +78,10 @@ export interface ModelParameters {
 
 export interface DataSource {
     type: 'projections' | 'historical' | 'csv'
-    blend_weights: { ESPN: number; DARKO: number; HTB: number; BBM: number }
-    custom_data_ids: { HTB: string | null; BBM: string | null }
+    // Keys: 'ESPN', 'DARKO', plus one entry per uploaded custom projection, keyed by its
+    // upload data_id (the id is the source's identity; display titles are presentation-only).
+    blend_weights: Record<string, number>
+    custom_data_ids: string[]
     season?: string | null   // for 'historical' type
 }
 

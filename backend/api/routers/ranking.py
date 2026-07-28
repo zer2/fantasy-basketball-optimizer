@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Response
 
 from backend.state.session import get_session
-from backend.services.ranking import rank_candidates
+from backend.services.ranking import rank_candidates, UnknownRosterPlayersError
 from backend.infra.server_timing import begin_timing, server_timing_header
 from backend.api.schemas import EvaluateRequest
 from backend.models import EvaluateResponse
@@ -55,6 +55,8 @@ def rank_candidates_route(session_id: str, req: EvaluateRequest, response: Respo
                 candidate_offset   = req.candidate_offset,
                 candidate_limit    = req.candidate_limit,
             )
+    except UnknownRosterPlayersError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Evaluation failed.')
 

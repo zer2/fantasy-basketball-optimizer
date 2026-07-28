@@ -188,6 +188,42 @@ def get_darko_data(params: dict) -> pd.DataFrame:
     return df[list(set(required))]
 
 
+# ── Canonical position eligibility ────────────────────────────────────────────
+
+def get_canonical_position_eligibility(params: dict) -> pd.Series:
+    """Per-player position eligibility from Yahoo — the single authority for the blend.
+
+    Positions are never blended across projection sources: every source contributes
+    stats only, and eligibility comes from the latest season in
+    YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE. Composite slots (Util/G/F) are dropped
+    and base positions are emitted in base_list order, so a player's
+    'Player (Position)' identity cannot depend on which sources are active, on a
+    file's comma spacing, or on the order a file lists positions in.
+
+    Returns a Series indexed by MASTER_PLAYER_NAME with 'PG,SG'-style values.
+    """
+    base_order = {
+        position: rank
+        for rank, position in enumerate(params['position_structure']['base_list'])
+    }
+
+    eligibility = query('YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE')
+    eligibility = eligibility[
+        eligibility['ELIGIBLE'] & eligibility['POSITION'].isin(base_order)
+    ]
+    eligibility = eligibility[eligibility['SEASON_ID'] == eligibility['SEASON_ID'].max()]
+
+    unified = get_unified_player_table()[['YAHOO_PLAYER_ID', 'MASTER_PLAYER_NAME']].dropna()
+    unified = unified.astype({'YAHOO_PLAYER_ID': 'int64'})
+    merged = eligibility.astype({'YAHOO_PLAYER_ID': 'int64'}).merge(unified, on='YAHOO_PLAYER_ID')
+
+    return (
+        merged.sort_values('POSITION', key=lambda column: column.map(base_order))
+              .groupby('MASTER_PLAYER_NAME')['POSITION']
+              .agg(','.join)
+    )
+
+
 # ── Blended projections ───────────────────────────────────────────────────────
 
 def combine_projections(
@@ -197,23 +233,24 @@ def combine_projections(
 ) -> pd.DataFrame:
     """Blend multiple projection sources using provided weights.
 
-    blend_weights keys: 'HTB', 'BBM', 'DARKO', 'ESPN'
-    uploaded_dfs: pre-parsed DataFrames for user-uploaded sources (HTB, BBM).
-    Snowflake sources (DARKO, ESPN) are fetched automatically if weight > 0.
+    blend_weights keys: 'DARKO', 'ESPN', plus one key per uploaded source. Uploaded
+    sources are keyed by their upload data_id (the id is the source's identity);
+    uploaded_dfs maps those same ids to their pre-parsed DataFrames. Snowflake
+    sources (DARKO, ESPN) are fetched automatically if weight > 0.
     """
     uploaded = uploaded_dfs or {}
-    source_keys = ['HTB', 'BBM', 'DARKO', 'ESPN']
 
     # Every source is gated on its weight — an uploaded file at weight zero must not
     # participate: its columns would still join the blend's column union, where players
     # from other sources are "missing" them, and the eligibility filter below would then
     # drop those players even though the source contributes nothing.
     sources: dict[str, Optional[pd.DataFrame]] = {
-        'HTB':  uploaded.get('HTB') if blend_weights.get('HTB', 0) > 0 else None,
-        'BBM':  uploaded.get('BBM') if blend_weights.get('BBM', 0) > 0 else None,
-        'DARKO': get_darko_data(params)   if blend_weights.get('DARKO', 0) > 0 else None,
-        'ESPN':  get_espn_projections(params) if blend_weights.get('ESPN', 0)  > 0 else None,
+        key: uploaded_df if blend_weights.get(key, 0) > 0 else None
+        for key, uploaded_df in sorted(uploaded.items())
     }
+    sources['DARKO'] = get_darko_data(params)       if blend_weights.get('DARKO', 0) > 0 else None
+    sources['ESPN']  = get_espn_projections(params) if blend_weights.get('ESPN', 0)  > 0 else None
+    source_keys = list(sources.keys())
 
     weights = [blend_weights.get(k, 0.0) for k in source_keys]
 
@@ -230,8 +267,8 @@ def combine_projections(
     )
     df = df.reindex(new_index)
 
-    # Drop players missing from all sources
-    ineligible = (df.isna().groupby('Player').sum() == 4).sum(axis=1) > 0
+    # Drop players missing a column from every source
+    ineligible = (df.isna().groupby('Player').sum() == len(source_keys)).sum(axis=1) > 0
     df = df[~df.index.get_level_values('Player').isin(ineligible.index[ineligible])]
 
     df = df.groupby('Player').agg(
@@ -244,6 +281,14 @@ def combine_projections(
 
     if 'Double Doubles' in df.columns:
         df['Double Doubles'] = df['Double Doubles'].astype(float)
+
+    # Positions are not blended: overwrite with the canonical eligibility wherever the
+    # player is known, so identity is stable across any combination of active sources.
+    # A source's own Position survives only for players the canonical table lacks —
+    # who, in practice, exist in that source alone, so no identity conflict is possible.
+    canonical_positions = get_canonical_position_eligibility(params)
+    mapped_positions = pd.Series(df.index.map(canonical_positions), index=df.index)
+    df['Position'] = mapped_positions.fillna(df['Position'])
 
     df['Position'] = df['Position'].fillna('NP')
     df = df.fillna(0)

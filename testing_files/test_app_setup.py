@@ -245,22 +245,23 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
     base_blend = {
         'sport': 'NBA',
         'data_source_type': 'projections',
-        'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'HTB': 0.0, 'BBM': 0.5},
-        'custom_data_ids': {'BBM': 'data_abc123'},
+        'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'data_abc123': 0.5},
+        'custom_data_ids': ['data_abc123'],
     }
     assert _v0_cache_key(base_blend) is not None, 'uploaded blends are cacheable when fully keyed'
 
-    bbm_reweighted = {**base_blend,
-                      'blend_weights': {**base_blend['blend_weights'], 'BBM': 1.0}}
-    assert _v0_cache_key(bbm_reweighted) != _v0_cache_key(base_blend), \
+    upload_reweighted = {**base_blend,
+                         'blend_weights': {**base_blend['blend_weights'], 'data_abc123': 1.0}}
+    assert _v0_cache_key(upload_reweighted) != _v0_cache_key(base_blend), \
         "changing an upload's weight must change the key"
 
-    different_upload = {**base_blend, 'custom_data_ids': {'BBM': 'data_def456'}}
+    different_upload = {**base_blend, 'custom_data_ids': ['data_def456'],
+                        'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'data_def456': 0.5}}
     assert _v0_cache_key(different_upload) != _v0_cache_key(base_blend), \
         'a different uploaded table must change the key'
 
     no_upload = {**base_blend, 'custom_data_ids': None,
-                 'blend_weights': {**base_blend['blend_weights'], 'BBM': 0.0}}
+                 'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5}}
     assert _v0_cache_key(no_upload) != _v0_cache_key(base_blend), \
         'an upload-less blend must never share a key with an uploaded one'
 
@@ -286,7 +287,8 @@ def test_parse_projection_csv_validates_stat_columns():
         'Rank,Name,Pos,Value,g,m/g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
         '1,Test Player,C,12.3,70,34.0,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
     ).encode()
-    parsed = parse_projection_csv(valid_csv, 'BBM', params)
+    parsed, detected_format = parse_projection_csv(valid_csv, params)
+    assert detected_format == 'BBM', 'the format should be auto-detected from the headers'
     assert parsed.loc['Test Player', 'Points'] == 25.0
     for junk_column in ('Rank', 'Value', 'm/g'):
         assert junk_column not in parsed.columns, f'unmapped column {junk_column} should be dropped'
@@ -296,9 +298,139 @@ def test_parse_projection_csv_validates_stat_columns():
         'Test Player,C,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0\n'
     ).encode()
     with pytest.raises(ValueError) as exc_info:
-        parse_projection_csv(old_format_csv, 'BBM', params)
+        parse_projection_csv(old_format_csv, params)
     assert 'Points' in str(exc_info.value), 'the error should name the missing canonical stats'
     assert 'pts' in str(exc_info.value), "the error should list the file's unrecognized headers"
+
+
+def test_parse_projection_csv_filters_non_numeric_rows():
+    """hashtagbasketball.com exports repeat the header row inside the table body (every
+    stat cell a string) and format ratio stats as '0.583 (10.2/17.5)'. The parser must
+    extract the leading numbers, drop the embedded header rows, and never crash dividing
+    a string by 82."""
+    from backend.services.build_agent import parse_projection_csv
+    params = _load_params()['NBA']
+
+    htb_csv = (
+        'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
+        '1,1.5,Nikola Jokic,C,DEN,70,34.0,"0.583 (10.2/17.5)","0.821 (6.0/7.3)",1.1,26.5,12.5,9.0,1.3,0.9,3.0,15.2\n'
+        'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
+        '2,2.1,Luka Doncic,PG,DAL,72,36.0,"0.490 (9.8/20.0)","0.786 (7.0/8.9)",3.0,32.0,9.0,9.5,1.4,0.5,4.0,14.8\n'
+    ).encode()
+    parsed, detected_format = parse_projection_csv(htb_csv, params)
+    assert detected_format == 'HTB', 'the format should be auto-detected from the headers'
+    assert len(parsed) == 2, 'embedded header rows must be dropped'
+    assert parsed.loc['Nikola Jokic', 'Points'] == 26.5
+    assert parsed.loc['Nikola Jokic', 'Field Goal %'] == 0.583, 'leading number extracted from the compound cell'
+    assert abs(parsed.loc['Luka Doncic', 'Games Played %'] - 72 / 82.0) < 1e-9
+
+
+def test_uploaded_positions_use_canonical_eligibility():
+    """Player identity is 'Name (Position)', so position strings must not depend on which
+    blend sources are active. An upload carrying its own position formatting ('PF, C' with
+    a space, or a different eligibility order) previously became the position source for
+    its players, silently renaming them mid-session — any draft board built before the
+    change then crashed every evaluate. Positions now come from the canonical Yahoo
+    eligibility table for every known player, regardless of sources."""
+    darko_only = _build_default_session_request()
+    darko_only['data_source'] = {
+        'type': 'projections',
+        'blend_weights': {'ESPN': 0.0, 'DARKO': 1.0},
+        'custom_data_ids': [],
+    }
+    darko_response = client.post('/sessions', json=darko_only)
+    assert darko_response.status_code == 201, darko_response.text
+    darko_names = {entry['name'] for entry in darko_response.json()['g_scores']}
+    jokic_identity = next(name for name in darko_names if name.startswith('Nikola Jokic ('))
+
+    conflicting_upload = (
+        'Rank,Name,Pos,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
+        '1,Nikola Jokic,"PF, C",70,26.5,12.2,9.0,1.3,0.9,3.0,1.1,0.583,17.5,0.820,7.4\n'
+    ).encode()
+    upload_response = client.post('/data/upload',
+                                  files={'file': ('bbm.csv', conflicting_upload, 'text/csv')})
+    assert upload_response.status_code == 200, upload_response.text
+    data_id = upload_response.json()['data_id']
+
+    blended = _build_default_session_request()
+    blended['data_source'] = {
+        'type': 'projections',
+        'blend_weights': {'ESPN': 0.0, 'DARKO': 1.0, data_id: 1.0},
+        'custom_data_ids': [data_id],
+    }
+    blended_response = client.post('/sessions', json=blended)
+    assert blended_response.status_code == 201, blended_response.text
+    blended_names = {entry['name'] for entry in blended_response.json()['g_scores']}
+
+    assert jokic_identity in blended_names, \
+        "blending an upload must not change a known player's identity — the upload's own " \
+        f"position string must be ignored (expected {jokic_identity!r})"
+
+
+def test_evaluate_rejects_rostered_players_missing_from_pool():
+    """A board whose players no longer exist in the pool (identities changed by a
+    data-source switch) must get a clear 400 naming the players, not a KeyError 500."""
+    session_response = client.post('/sessions', json=_build_default_session_request())
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+
+    n_drafters = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    player_assignments['Team 1'] = ['Giannis Antetokounmpo (PF, C)']
+
+    evaluate_response = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={'player_assignments': player_assignments, 'my_team_id': 'Team 1'}
+    )
+    assert evaluate_response.status_code == 400, evaluate_response.text
+    detail = evaluate_response.json()['detail']
+    assert 'Giannis Antetokounmpo (PF, C)' in detail, 'the error should name the missing player'
+    assert 'player pool' in detail, 'the error should explain the cause'
+
+
+def test_pipeline_cache_restores_prior_builds():
+    """Returning to a configuration the session already built must restore that build's
+    agent from the per-session pipeline cache instead of re-running the pipeline (and its
+    expensive baseline H-scoring pass) — the toggling-weights-mid-draft scenario. Asserted
+    by object identity: the exact agent instance comes back."""
+    request_body = _build_default_session_request()
+    session_response = client.post('/sessions', json=request_body)
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+
+    original_agent = get_session(session_id).agent
+    assert original_agent is not None
+
+    base_parameters = request_body['parameters']
+    changed_parameters = {**base_parameters, 'upsilon': base_parameters['upsilon'] + 0.1}
+
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 3, 'parameters': changed_parameters})
+    assert patch_response.status_code == 200, patch_response.text
+    changed_agent = get_session(session_id).agent
+    assert changed_agent is not original_agent, 'a new configuration builds a new agent'
+
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 3, 'parameters': base_parameters})
+    assert patch_response.status_code == 200, patch_response.text
+    assert get_session(session_id).agent is original_agent, \
+        'returning to the original configuration must restore its cached build'
+
+    # The restored build must still serve evaluates
+    n_drafters         = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    evaluate_response  = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={'player_assignments': player_assignments, 'my_team_id': 'Team 1'}
+    )
+    assert evaluate_response.status_code == 200, evaluate_response.text
+
+    # And the other configuration was stashed too — toggling forward restores it as well
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 3, 'parameters': changed_parameters})
+    assert patch_response.status_code == 200, patch_response.text
+    assert get_session(session_id).agent is changed_agent, \
+        'both sides of a toggle should be served from the cache'
 
 
 def test_evaluate_nonexistent_session():

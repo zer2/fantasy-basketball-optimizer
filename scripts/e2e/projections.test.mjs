@@ -92,31 +92,35 @@ test('projection blend weights', async t => {
         })
 
         await t.test('a format-mismatched upload is rejected at upload time, visibly', async () => {
-            const bbmSlider = page.locator('#ps-w-bbm')
-            assert.ok(await bbmSlider.isDisabled(), 'an upload-backed weight starts locked at zero')
+            const firstSlider = page.locator('#ps-w-custom-1')
+            assert.ok(await firstSlider.isDisabled(), 'a custom weight starts locked at zero')
+            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
+                         'the first custom slot should carry its default title')
 
-            const uploadInput = page.locator('#ps-upload-bbm')
+            const uploadInput = page.locator('#ps-upload-custom-1')
             await uploadInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
             await uploadInput.setInputFiles({
-                name: 'old-format-bbm.csv',
+                name: 'unknown-format.csv',
                 mimeType: 'text/csv',
                 buffer: Buffer.from('Name,Pos,g,pts,reb,ast\nSome Player,C,70,25,10,5\n'),
             })
 
-            const uploadStatus = page.locator('#ps-upload-bbm ~ .sidebar-caption')
+            const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
             await uploadStatus.filter({ hasText: 'Upload failed' }).waitFor({ timeout: 15000 })
-            assert.match(await uploadStatus.textContent(), /missing expected stat columns/,
+            assert.match(await uploadStatus.textContent(), /does not match any known projection format/,
                          'the status should say WHY the file was rejected')
             await waitAppSettled(app)
-            assert.ok(await bbmSlider.isDisabled(), 'a rejected upload must leave the weight locked')
+            assert.ok(await firstSlider.isDisabled(), 'a rejected upload must leave the weight locked')
+            assert.equal(await page.locator('#ps-w-custom-2').count(), 0,
+                         'a failed upload must not open the next slot')
 
             const { errors } = drainSessionFailures(app)
-            assert.ok(errors.some(error => error.includes('BBM upload failed')),
+            assert.ok(errors.some(error => error.includes('upload failed')),
                       'the rejection is an expected failure, logged for diagnosis')
             expectCleanSession(app, 'after rejected upload')
         })
 
-        await t.test('a well-formed upload changes results, and its weight resets on reload', async () => {
+        await t.test('a well-formed upload is auto-detected, retitleable, and changes results', async () => {
             // Build a valid BBM-format CSV from real pool players with uniform stat lines —
             // blended in at full weight, it must visibly move the results.
             const pooledPlayers = await page.evaluate(() =>
@@ -133,18 +137,32 @@ test('projection blend weights', async t => {
             const csvText = 'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n' + csvRows.join('\n')
 
             const beforeUploadSnapshot = await readCandidateSnapshot()
-            const uploadInput = page.locator('#ps-upload-bbm')
-            await uploadInput.setInputFiles({
-                name: 'generated-bbm.csv', mimeType: 'text/csv', buffer: Buffer.from(csvText),
+            await page.locator('#ps-upload-custom-1').setInputFiles({
+                name: 'generated-projections.csv', mimeType: 'text/csv', buffer: Buffer.from(csvText),
             })
-            await page.locator('#ps-upload-bbm ~ .sidebar-caption')
-                .filter({ hasText: 'players loaded' }).waitFor({ timeout: 15000 })
+            const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
+            await uploadStatus.filter({ hasText: 'players loaded' }).waitFor({ timeout: 15000 })
             await waitAppSettled(app)
-            assert.ok(!(await page.locator('#ps-w-bbm').isDisabled()),
+            assert.match(await uploadStatus.textContent(), /BBM format/,
+                         'the status should report the auto-detected format')
+            assert.ok(!(await page.locator('#ps-w-custom-1').isDisabled()),
                       'a successful upload should unlock the weight')
+            assert.equal(await page.locator('#ps-w-custom-2').count(), 1,
+                         'a successful upload should open the next empty slot')
+            assert.ok(await page.locator('#ps-w-custom-2').isDisabled(),
+                      'the next slot starts locked')
             expectCleanSession(app, 'valid upload accepted')
 
-            await setBlendWeight('ps-w-bbm', 1)
+            // Retitling is presentation-only: it must not touch the backend at all.
+            const requestsBeforeRetitle = app.sessionRequestLog.length
+            await page.locator('#ps-custom-title-1').fill('My projections')
+            await page.locator('#ps-custom-title-1').evaluate(el => el.blur())
+            await waitAppSettled(app)
+            assert.equal(app.sessionRequestLog.length, requestsBeforeRetitle,
+                         'renaming a custom source must not trigger any backend call')
+            expectCleanSession(app, 'retitled upload')
+
+            await setBlendWeight('ps-w-custom-1', 1)
             const withUploadSnapshot = await readCandidateSnapshot()
             assert.notDeepEqual(withUploadSnapshot, beforeUploadSnapshot,
                                 'blending the uploaded projections must change the results')
@@ -152,18 +170,22 @@ test('projection blend weights', async t => {
 
             // Back to zero with the upload still attached: the upload must drop out of the
             // blend entirely (historically it kept participating and could 400 every patch).
-            await setBlendWeight('ps-w-bbm', 0)
+            await setBlendWeight('ps-w-custom-1', 0)
             assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
                       'a zero-weight upload must leave the blend fully working')
             expectCleanSession(app, 'upload weight back to zero')
 
-            // Uploads cannot survive a reload, so the restored page must not resurrect the
-            // weight of a file it no longer has.
+            // The whole custom structure resets on reload: uploads cannot survive one, so
+            // the restored page starts back at a single locked, untitled slot.
             await loadApp(app)
-            assert.equal(await page.locator('#ps-w-bbm').inputValue(), '0',
+            assert.equal(await page.locator('#ps-w-custom-1').inputValue(), '0',
                          "an uploaded source's weight must reset to zero on reload")
-            assert.ok(await page.locator('#ps-w-bbm').isDisabled(),
+            assert.ok(await page.locator('#ps-w-custom-1').isDisabled(),
                       "an uploaded source's weight must be locked again on reload")
+            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
+                         'titles reset with the structure')
+            assert.equal(await page.locator('#ps-w-custom-2').count(), 0,
+                         'the added slot disappears on reload')
             assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
                       'the reloaded page should evaluate cleanly without the upload')
             expectCleanSession(app, 'reload without the upload')
