@@ -21,7 +21,7 @@ import { setTheme } from './styles/styler_functions.js'
 import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsParams, waitForInitialSeasons } from './parameter_collection/player_stats.js'
+import { renderPlayerStats, getPlayerStatsParams, waitForInitialSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
 
@@ -247,29 +247,52 @@ document.addEventListener(TEAM_LABELS_CHANGED, () => {
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
 
-const applyPlayerStats = (signal?: AbortSignal) => {
+const applyPlayerStats = (signal?: AbortSignal, keepsPlayerPool = false) => {
     const { data_source, injured_players } = getPlayerStatsParams()
-    resetDraftBoard()
-    resetAuctionEntry()
+    // The boards reset when the player pool's identity changes (data source, season,
+    // uploads, injured list) so stale names are never sent to the backend. A blend-weight
+    // change re-weights the same pool, so in-progress draft/auction boards survive it.
+    if (!keepsPlayerPool) {
+        resetDraftBoard()
+        resetAuctionEntry()
+    }
     buildTableHeader()
     createOrPatchSession(1, { data_source, injured_players }, signal)
         .then(() => { if (!signal || !signal.aborted) return runModeEval() })
         .then(() => { if (!signal || !signal.aborted) applyLayout() })
         .catch(err => {
             if (err.name === 'AbortError') return
+            // A dead upload id (backend restart, or the upload store's TTL) fails every
+            // patch that carries it, regardless of what the user changed. Surface it on
+            // the upload's status line, drop the dead ids, and retry without them so the
+            // rest of the change still lands.
+            if (String(err).includes('data_id') && markUploadedSourcesExpired()) {
+                applyPlayerStats(signal, keepsPlayerPool)
+                return
+            }
             console.error('Player stats apply failed:', err)
         })
 }
 
-const playerStatsDebouncer = makeDebouncer(() => applyPlayerStats(), 800)
+/** Blend-weight inputs re-weight the existing pool; everything else in the section
+ *  (data type, season, uploads, injured list) changes which players exist. */
+const changeKeepsPlayerPool = (eventTarget: EventTarget | null): boolean =>
+    eventTarget instanceof HTMLElement && eventTarget.id.startsWith('ps-w-')
+
+let playerStatsChangeKeepsPool = false
+const playerStatsDebouncer = makeDebouncer(() => applyPlayerStats(undefined, playerStatsChangeKeepsPool), 800)
 let playerStatsController: AbortController | null = null
 
-playerStatsSection.addEventListener('input', () => playerStatsDebouncer.fire())
-playerStatsSection.addEventListener('change', () => {
+playerStatsSection.addEventListener('input', (event) => {
+    playerStatsChangeKeepsPool = changeKeepsPlayerPool(event.target)
+    playerStatsDebouncer.fire()
+})
+playerStatsSection.addEventListener('change', (event) => {
+    playerStatsChangeKeepsPool = changeKeepsPlayerPool(event.target)
     playerStatsDebouncer.cancel()
     if (playerStatsController) playerStatsController.abort()
     playerStatsController = new AbortController()
-    applyPlayerStats(playerStatsController.signal)
+    applyPlayerStats(playerStatsController.signal, playerStatsChangeKeepsPool)
 })
 
 // ─── 3. Format & Categories ───────────────────────────────────────────────────

@@ -204,9 +204,13 @@ def combine_projections(
     uploaded = uploaded_dfs or {}
     source_keys = ['HTB', 'BBM', 'DARKO', 'ESPN']
 
+    # Every source is gated on its weight — an uploaded file at weight zero must not
+    # participate: its columns would still join the blend's column union, where players
+    # from other sources are "missing" them, and the eligibility filter below would then
+    # drop those players even though the source contributes nothing.
     sources: dict[str, Optional[pd.DataFrame]] = {
-        'HTB':  uploaded.get('HTB'),
-        'BBM':  uploaded.get('BBM'),
+        'HTB':  uploaded.get('HTB') if blend_weights.get('HTB', 0) > 0 else None,
+        'BBM':  uploaded.get('BBM') if blend_weights.get('BBM', 0) > 0 else None,
         'DARKO': get_darko_data(params)   if blend_weights.get('DARKO', 0) > 0 else None,
         'ESPN':  get_espn_projections(params) if blend_weights.get('ESPN', 0)  > 0 else None,
     }

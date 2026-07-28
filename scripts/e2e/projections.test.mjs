@@ -1,0 +1,174 @@
+// scripts/e2e/projections.test.mjs
+// Projection blend weights: changing a weight must re-weight the SAME player pool —
+// the draft board survives it (only pool-identity changes reset the boards), and the
+// results must actually move (regression for the v0 cache serving a stale blend when
+// a weight excluded from its key changed — no error anywhere, just identical output).
+
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+    launchAppPage, loadApp, expectCleanSession, drainSessionFailures, waitAppSettled,
+    setSelect, lockInDraftPick, pickControlButton,
+} from './helpers.mjs'
+
+test('projection blend weights', async t => {
+    const app = await launchAppPage()
+    const { page } = app
+
+    async function setBlendWeight(inputId, value) {
+        const weightInput = page.locator(`#${inputId}`)
+        await weightInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+        await weightInput.fill(String(value))
+        await weightInput.evaluate(el => el.blur())
+        await waitAppSettled(app, { timeout: 120000 })
+    }
+
+    /** Snapshot of the top candidates as (name, h_score) pairs. */
+    function readCandidateSnapshot() {
+        return page.evaluate(() =>
+            [...document.querySelectorAll('#hscoretable tbody tr')].slice(0, 50)
+                .map(row => `${row.querySelector('.playername')?.textContent}:${row.querySelector('.overallhscore')?.textContent}`)
+                .filter(entry => !entry.startsWith('undefined')))
+    }
+
+    try {
+        await loadApp(app)
+        await setSelect(page, 'ps-data-type', 'Projections')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
+                  'projections mode should render candidates')
+        expectCleanSession(app, 'switch to projections')
+
+        await t.test('a blend-weight change keeps the draft board intact', async () => {
+            await lockInDraftPick(page, 'Nikola Jokic')
+            await waitAppSettled(app)
+            assert.equal(await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count(), 1)
+
+            await setBlendWeight('ps-w-darko', 0.9)
+
+            assert.equal(await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count(), 1,
+                         'the locked pick must survive a blend-weight change')
+            assert.match(await page.locator('.pick-control-row .pick-control-label').first().textContent(),
+                         /Select Pick 1 for Team 2/, 'the pick position must survive too')
+            expectCleanSession(app, 'weight change with a live board')
+
+            await pickControlButton(page, 'Clear draft board').click()
+            await waitAppSettled(app)
+            expectCleanSession(app, 'board cleared')
+        })
+
+        await t.test('blend weights actually change the results', async () => {
+            // Order matters within each transition: raise the new source before zeroing
+            // the old one, so the blend never passes through an all-zero state.
+            await setBlendWeight('ps-w-espn', 1)
+            await setBlendWeight('ps-w-darko', 0)
+            const espnOnlySnapshot = await readCandidateSnapshot()
+            assert.ok(espnOnlySnapshot.length > 10, 'the ESPN-only blend should render candidates')
+            expectCleanSession(app, 'ESPN-only blend')
+
+            await setBlendWeight('ps-w-darko', 1)
+            await setBlendWeight('ps-w-espn', 0)
+            const darkoOnlySnapshot = await readCandidateSnapshot()
+            assert.ok(darkoOnlySnapshot.length > 10, 'the DARKO-only blend should render candidates')
+            expectCleanSession(app, 'DARKO-only blend')
+
+            assert.notDeepEqual(darkoOnlySnapshot, espnOnlySnapshot,
+                                'opposite blends must produce different candidate results')
+        })
+
+        await t.test('all-zero blend weights are rejected clearly and the app recovers', async () => {
+            await setBlendWeight('ps-w-darko', 0)   // ESPN is already 0 — blend is now empty
+
+            const { failures } = drainSessionFailures(app)
+            assert.ok(failures.length > 0, 'an empty blend should be rejected by the backend')
+            assert.ok(failures.some(failure => failure.startsWith('400') && failure.includes('blend weights')),
+                      `the rejection should be a clear 400, not an opaque 500 — saw: ${failures.join(' | ')}`)
+
+            await setBlendWeight('ps-w-espn', 0.5)
+            await setBlendWeight('ps-w-darko', 0.5)
+            assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
+                      'restoring the weights should recover fully')
+            expectCleanSession(app, 'recovered from empty blend')
+        })
+
+        await t.test('a format-mismatched upload is rejected at upload time, visibly', async () => {
+            const bbmSlider = page.locator('#ps-w-bbm')
+            assert.ok(await bbmSlider.isDisabled(), 'an upload-backed weight starts locked at zero')
+
+            const uploadInput = page.locator('#ps-upload-bbm')
+            await uploadInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+            await uploadInput.setInputFiles({
+                name: 'old-format-bbm.csv',
+                mimeType: 'text/csv',
+                buffer: Buffer.from('Name,Pos,g,pts,reb,ast\nSome Player,C,70,25,10,5\n'),
+            })
+
+            const uploadStatus = page.locator('#ps-upload-bbm ~ .sidebar-caption')
+            await uploadStatus.filter({ hasText: 'Upload failed' }).waitFor({ timeout: 15000 })
+            assert.match(await uploadStatus.textContent(), /missing expected stat columns/,
+                         'the status should say WHY the file was rejected')
+            await waitAppSettled(app)
+            assert.ok(await bbmSlider.isDisabled(), 'a rejected upload must leave the weight locked')
+
+            const { errors } = drainSessionFailures(app)
+            assert.ok(errors.some(error => error.includes('BBM upload failed')),
+                      'the rejection is an expected failure, logged for diagnosis')
+            expectCleanSession(app, 'after rejected upload')
+        })
+
+        await t.test('a well-formed upload changes results, and its weight resets on reload', async () => {
+            // Build a valid BBM-format CSV from real pool players with uniform stat lines —
+            // blended in at full weight, it must visibly move the results.
+            const pooledPlayers = await page.evaluate(() =>
+                [...document.querySelectorAll('#hscoretable .playername')].slice(0, 30)
+                    .map(span => span.textContent))
+            // Includes unmapped junk columns (Rank, Value) like real exports carry — the
+            // parser must drop them; historically one junk column in an upload silently
+            // wiped the entire pool ("0 players available") at ANY weight.
+            const csvRows = pooledPlayers.map((fullName, playerIndex) => {
+                const [, name, position] = fullName.match(/^(.*) \(([^)]+)\)$/)
+                // Multi-position values contain commas (e.g. "C,PF") — quote them, as real exports do.
+                return `${playerIndex + 1},${name},"${position}",9.9,70,20.0,8.0,4.0,1.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0`
+            })
+            const csvText = 'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n' + csvRows.join('\n')
+
+            const beforeUploadSnapshot = await readCandidateSnapshot()
+            const uploadInput = page.locator('#ps-upload-bbm')
+            await uploadInput.setInputFiles({
+                name: 'generated-bbm.csv', mimeType: 'text/csv', buffer: Buffer.from(csvText),
+            })
+            await page.locator('#ps-upload-bbm ~ .sidebar-caption')
+                .filter({ hasText: 'players loaded' }).waitFor({ timeout: 15000 })
+            await waitAppSettled(app)
+            assert.ok(!(await page.locator('#ps-w-bbm').isDisabled()),
+                      'a successful upload should unlock the weight')
+            expectCleanSession(app, 'valid upload accepted')
+
+            await setBlendWeight('ps-w-bbm', 1)
+            const withUploadSnapshot = await readCandidateSnapshot()
+            assert.notDeepEqual(withUploadSnapshot, beforeUploadSnapshot,
+                                'blending the uploaded projections must change the results')
+            expectCleanSession(app, 'uploaded blend evaluated')
+
+            // Back to zero with the upload still attached: the upload must drop out of the
+            // blend entirely (historically it kept participating and could 400 every patch).
+            await setBlendWeight('ps-w-bbm', 0)
+            assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
+                      'a zero-weight upload must leave the blend fully working')
+            expectCleanSession(app, 'upload weight back to zero')
+
+            // Uploads cannot survive a reload, so the restored page must not resurrect the
+            // weight of a file it no longer has.
+            await loadApp(app)
+            assert.equal(await page.locator('#ps-w-bbm').inputValue(), '0',
+                         "an uploaded source's weight must reset to zero on reload")
+            assert.ok(await page.locator('#ps-w-bbm').isDisabled(),
+                      "an uploaded source's weight must be locked again on reload")
+            assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
+                      'the reloaded page should evaluate cleanly without the upload')
+            expectCleanSession(app, 'reload without the upload')
+        })
+    } finally {
+        await app.close()
+    }
+})
