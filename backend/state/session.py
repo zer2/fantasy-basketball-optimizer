@@ -13,6 +13,7 @@ Each Session holds:
 import time
 import threading
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -42,6 +43,14 @@ class Session:
     # The built HAgent — the whole scoring model (retains info; owns the neutral baseline).
     # None until the pipeline runs.
     agent: Optional[object] = None
+
+    # Recently built pipelines, keyed by the full parameter snapshot that produced them —
+    # {key: {'agent', 'info', 'v0_clean', 'v1_clean', 'v2'}}. A PATCH stashes the current
+    # build here before rebuilding, so returning to a configuration this session already
+    # built (e.g. toggling blend weights back mid-draft) restores it instead of re-running
+    # the pipeline and the expensive baseline H-scoring pass. Session-private: agents are
+    # stateful and must never be shared across sessions. See session_management.apply_patch.
+    pipeline_cache: "OrderedDict[tuple, dict]" = field(default_factory=OrderedDict)
 
     # Live-platform connection (None for 'Enter your own data'). Set during session
     # creation when a live platform is selected; used by the draft-state poll.

@@ -322,6 +322,51 @@ def test_parse_projection_csv_filters_non_numeric_rows():
     assert abs(parsed.loc['Luka Doncic', 'Games Played %'] - 72 / 82.0) < 1e-9
 
 
+def test_pipeline_cache_restores_prior_builds():
+    """Returning to a configuration the session already built must restore that build's
+    agent from the per-session pipeline cache instead of re-running the pipeline (and its
+    expensive baseline H-scoring pass) — the toggling-weights-mid-draft scenario. Asserted
+    by object identity: the exact agent instance comes back."""
+    request_body = _build_default_session_request()
+    session_response = client.post('/sessions', json=request_body)
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+
+    original_agent = get_session(session_id).agent
+    assert original_agent is not None
+
+    base_parameters = request_body['parameters']
+    changed_parameters = {**base_parameters, 'upsilon': base_parameters['upsilon'] + 0.1}
+
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 3, 'parameters': changed_parameters})
+    assert patch_response.status_code == 200, patch_response.text
+    changed_agent = get_session(session_id).agent
+    assert changed_agent is not original_agent, 'a new configuration builds a new agent'
+
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 3, 'parameters': base_parameters})
+    assert patch_response.status_code == 200, patch_response.text
+    assert get_session(session_id).agent is original_agent, \
+        'returning to the original configuration must restore its cached build'
+
+    # The restored build must still serve evaluates
+    n_drafters         = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    evaluate_response  = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={'player_assignments': player_assignments, 'my_team_id': 'Team 1'}
+    )
+    assert evaluate_response.status_code == 200, evaluate_response.text
+
+    # And the other configuration was stashed too — toggling forward restores it as well
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 3, 'parameters': changed_parameters})
+    assert patch_response.status_code == 200, patch_response.text
+    assert get_session(session_id).agent is changed_agent, \
+        'both sides of a toggle should be served from the cache'
+
+
 def test_evaluate_nonexistent_session():
     """Evaluate against a session ID that does not exist returns 404."""
     response = client.post(
