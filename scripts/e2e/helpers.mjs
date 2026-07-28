@@ -136,14 +136,24 @@ export async function selectHistoricalSeason(app, season) {
 }
 
 /**
- * Asserts that no backend call failed and no console error fired since the last check,
- * then drains both monitors — so each test step owns exactly the failures it caused.
+ * Drains the failure monitors and returns their contents — for steps where a backend
+ * failure is EXPECTED (error-handling tests assert on what failed and that the app
+ * recovered, rather than on cleanliness).
  */
-export function expectCleanSession(app, stepLabel) {
+export function drainSessionFailures(app) {
     const failures = app.failedApiCalls.map(f => `${f.status} ${f.url} — ${f.body}`)
     const errors = [...app.consoleErrors]
     app.failedApiCalls.length = 0
     app.consoleErrors.length = 0
+    return { failures, errors }
+}
+
+/**
+ * Asserts that no backend call failed and no console error fired since the last check,
+ * then drains both monitors — so each test step owns exactly the failures it caused.
+ */
+export function expectCleanSession(app, stepLabel) {
+    const { failures, errors } = drainSessionFailures(app)
     assert.deepEqual(failures, [], `${stepLabel}: backend calls failed:\n  ${failures.join('\n  ')}`)
     assert.deepEqual(errors, [], `${stepLabel}: console errors:\n  ${errors.join('\n  ')}`)
 }

@@ -70,22 +70,31 @@ export async function createOrPatchSession(
   , signal?: AbortSignal
 ): Promise<void> {
     setIndicatorState('fetching')
-    if (!getSessionId()) {
-        await startFreshSession(signal)
-        return
-    }
     try {
-        const patchResp = await patchSession(getSessionId()!, { from_step: fromStep, ...patchBody }, signal)
-        basePlayersBySession.delete(getSessionId()!)
-        latestFullTeamResult = null
-        if (patchResp.steps_rerun.includes(4)) {
-            const freshGScores = await fetchGScores(getSessionId()!)
-            setGScores(freshGScores)
+        if (!getSessionId()) {
+            await startFreshSession(signal)
+            return
         }
-    } catch (err) {
-        if (!(err instanceof HTTPError) || err.status !== 404) throw err
-        resetSession()
-        await startFreshSession(signal)
+        try {
+            const patchResp = await patchSession(getSessionId()!, { from_step: fromStep, ...patchBody }, signal)
+            basePlayersBySession.delete(getSessionId()!)
+            latestFullTeamResult = null
+            if (patchResp.steps_rerun.includes(4)) {
+                const freshGScores = await fetchGScores(getSessionId()!)
+                setGScores(freshGScores)
+            }
+        } catch (err) {
+            if (!(err instanceof HTTPError) || err.status !== 404) throw err
+            resetSession()
+            await startFreshSession(signal)
+        }
+    } catch (err: any) {
+        // This function flips the indicator to 'fetching', so it must restore it when the
+        // create/patch fails — no evaluate runs after a failure, and nothing else would
+        // reset it, leaving the spinner stuck on "Starting..." forever. Aborted calls are
+        // excluded: their successor has already set its own indicator state.
+        if (err.name !== 'AbortError') setIndicatorState('idle')
+        throw err
     }
 }
 
