@@ -301,6 +301,27 @@ def test_parse_projection_csv_validates_stat_columns():
     assert 'pts' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_parse_projection_csv_filters_non_numeric_rows():
+    """hashtagbasketball.com exports repeat the header row inside the table body (every
+    stat cell a string) and format ratio stats as '0.583 (10.2/17.5)'. The parser must
+    extract the leading numbers, drop the embedded header rows, and never crash dividing
+    a string by 82."""
+    from backend.services.build_agent import parse_projection_csv
+    params = _load_params()['NBA']
+
+    htb_csv = (
+        'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
+        '1,1.5,Nikola Jokic,C,DEN,70,34.0,"0.583 (10.2/17.5)","0.821 (6.0/7.3)",1.1,26.5,12.5,9.0,1.3,0.9,3.0,15.2\n'
+        'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
+        '2,2.1,Luka Doncic,PG,DAL,72,36.0,"0.490 (9.8/20.0)","0.786 (7.0/8.9)",3.0,32.0,9.0,9.5,1.4,0.5,4.0,14.8\n'
+    ).encode()
+    parsed = parse_projection_csv(htb_csv, 'HTB', params)
+    assert len(parsed) == 2, 'embedded header rows must be dropped'
+    assert parsed.loc['Nikola Jokic', 'Points'] == 26.5
+    assert parsed.loc['Nikola Jokic', 'Field Goal %'] == 0.583, 'leading number extracted from the compound cell'
+    assert abs(parsed.loc['Luka Doncic', 'Games Played %'] - 72 / 82.0) < 1e-9
+
+
 def test_evaluate_nonexistent_session():
     """Evaluate against a session ID that does not exist returns 404."""
     response = client.post(

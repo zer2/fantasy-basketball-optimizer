@@ -196,9 +196,32 @@ def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.D
             f"This may be an export format from a different {file_type.upper()} version."
         )
 
-    # HTB/BBM provide per-game stats directly; ensure Position + Games Played %
+    # HTB/BBM provide per-game stats directly; ensure Position is present
     if 'Position' not in df.columns:
         raise ValueError("CSV missing Position column after rename")
+
+    # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
+    # would otherwise join the blend's column union, where every player from the OTHER
+    # sources is "missing" them — and the blend drops any player missing any column
+    # across all sources, so a single junk column can wipe out the entire pool.
+    canonical_columns = set(renamer.values()) | {'Games Played %'}
+    df = df[[column for column in df.columns if column in canonical_columns]]
+
+    # Exports carry non-numeric stat values: hashtagbasketball.com repeats its header row
+    # inside the table body (every stat cell a string), and formats ratio stats as
+    # "0.474 (5.2/11.0)". Extract the leading number where a stat column holds strings,
+    # then drop rows with no numeric stats at all — those are the embedded header/junk rows.
+    def coerce_stat_column(column: pd.Series) -> pd.Series:
+        if column.dtype == object:
+            # Leading number only, and not one embedded in a word — the repeated header
+            # rows contain cells like "3PM", which must NOT read as the number 3.
+            column = column.astype(str).str.extract(
+                r'^\s*(-?(?:\d+\.?\d*|\.\d+))(?![A-Za-z])', expand=False)
+        return pd.to_numeric(column, errors='coerce')
+
+    stat_columns = [column for column in df.columns if column not in ('Player', 'Position')]
+    df[stat_columns] = df[stat_columns].apply(coerce_stat_column)
+    df = df.dropna(subset=stat_columns, how='all')
 
     if 'Games Played %' not in df.columns:
         if 'Games Played' in df.columns:
@@ -210,13 +233,6 @@ def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.D
 
     # Clamp GP to 0–1
     df['Games Played %'] = df['Games Played %'].clip(0, 1)
-
-    # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
-    # would otherwise join the blend's column union, where every player from the OTHER
-    # sources is "missing" them — and the blend drops any player missing any column
-    # across all sources, so a single junk column can wipe out the entire pool.
-    canonical_columns = set(renamer.values()) | {'Games Played %'}
-    df = df[[column for column in df.columns if column in canonical_columns]]
 
     if 'Player' in df.columns:
         df = df.set_index('Player')
