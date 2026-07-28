@@ -73,6 +73,46 @@ test('auction board entry controls', async t => {
             assert.ok(!remainingText.includes('$130'), 'every budget should reset after clear')
             expectCleanSession(app, 'clear board')
         })
+
+        await t.test('the auction candidate table has all its columns', async () => {
+            const headerTexts = await page.locator('#hscoretable thead th').allTextContents()
+            for (const scoreColumn of ['Player', 'Diff.', 'Your $', 'Gnrc. $', 'Orig. $']) {
+                assert.ok(headerTexts.includes(scoreColumn), `auction table should have a ${scoreColumn} column`)
+            }
+            const categoryColumnCount = headerTexts.length - 5   // minus Player + the four $ columns
+            assert.equal(categoryColumnCount, 9, 'one column per selected category (default nine)')
+
+            // Every candidate row carries the four dollar cells plus one win-rate cell per category.
+            const firstRowCellCounts = await page.evaluate(() => {
+                const row = document.querySelector('#hscoretable tbody tr')
+                return {
+                    dollarCells: row.querySelectorAll('td.auction-dollar').length,
+                    categoryCells: row.querySelectorAll('td.categoricalhscore').length,
+                }
+            })
+            assert.equal(firstRowCellCounts.dollarCells, 4, 'each row should show Diff/Your/Gnrc/Orig dollars')
+            assert.equal(firstRowCellCounts.categoryCells, 9, 'each row should show a win rate per category')
+            expectCleanSession(app, 'auction column structure')
+        })
+
+        await t.test('auction team statistics track the board, refreshing on board changes', async () => {
+            await lockInAuctionPick(app, 'Nikola Jokic', 'Team 1', 70)
+            await lockInAuctionPick(app, 'Shai Gilgeous-Alexander', 'Team 1', 50)
+
+            await page.locator('.auction-tab-bar .pick-btn[data-tab="my-team"]').click()
+            const teamTable = page.locator('#auction-gscore [data-testid="team-gscore"]')
+            await teamTable.waitFor({ timeout: 30000 })
+            assert.equal(await teamTable.locator('tbody tr').count(), 3,
+                         'two player rows plus the Team Total row')
+
+            // Undo WITHOUT re-clicking the tab: the auction-board-change event must refresh
+            // the open team view on its own — this wiring is auction-specific.
+            await pickControlButton(page, 'Undo previous selection').click()
+            await waitAppSettled(app)
+            assert.equal(await teamTable.locator('tbody tr').count(), 2,
+                         'the team view should follow the undo without a manual refresh')
+            expectCleanSession(app, 'auction team statistics')
+        })
     } finally {
         await app.close()
     }

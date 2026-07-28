@@ -37,6 +37,8 @@ export async function launchAppPage() {
 
     const browser = await chromium.launch()
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    // The season rosters grid pastes via navigator.clipboard — grant it up front.
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: APP })
     const cookie = mintSessionCookie(repoRoot)
     await context.addCookies([{ name: cookie.name, value: cookie.value, url: APP }])
     const page = await context.newPage()
@@ -55,9 +57,15 @@ export async function launchAppPage() {
     // In-flight backend calls, for waitAppSettled: the eval indicator alone is not a
     // settledness signal — the app deliberately drops the spinner after the first
     // candidate batch while further batches (and a final re-render) are still landing.
+    // sessionRequestLog records every backend call, so tests can assert an action did
+    // NOT talk to the backend (e.g. an invalid input blocking its patch).
     const pendingSessionRequests = new Set()
+    const sessionRequestLog = []
     page.on('request', request => {
-        if (request.url().includes('/sessions')) pendingSessionRequests.add(request)
+        if (request.url().includes('/sessions')) {
+            pendingSessionRequests.add(request)
+            sessionRequestLog.push(`${request.method()} ${request.url()}`)
+        }
     })
     page.on('requestfinished', request => pendingSessionRequests.delete(request))
     page.on('requestfailed', request => pendingSessionRequests.delete(request))
@@ -78,6 +86,7 @@ export async function launchAppPage() {
         failedApiCalls,
         consoleErrors,
         pendingSessionRequests,
+        sessionRequestLog,
         async close() { await browser.close() },
     }
     return app
@@ -155,13 +164,15 @@ export function pickControlButton(page, label) {
 }
 
 /** Sets the league's drafter count via the sidebar input and waits for the rebuild. A small
- *  count (e.g. 2) makes multi-round flows affordable — evaluates shrink with the league. */
+ *  count (e.g. 2) makes multi-round flows affordable — evaluates shrink with the league.
+ *  Blur (not a synthetic change dispatch) fires the native change exactly once and clears
+ *  the input's dirty flag, so a later focus shift can't fire a surprise second change. */
 export async function setLeagueDrafterCount(app, count) {
     const { page } = app
     const draftersInput = page.locator('#ls-n-drafters')
     await draftersInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
     await draftersInput.fill(String(count))
-    await draftersInput.dispatchEvent('change')
+    await draftersInput.evaluate(el => el.blur())
     await waitAppSettled(app)
 }
 
