@@ -8,16 +8,21 @@ import { pref, savePref } from '../preferences.js'
 
 // ─── Module state ──────────────────────────────────────────────────────────────
 
-// Stored data_ids from POST /data/upload; updated immediately on file selection.
-let customDataIds: { HTB: string | null; BBM: string | null } = { HTB: null, BBM: null }
-
-// The upload sources' UI controls, registered at render time so expired uploads can be
-// surfaced (status message + weight re-locked) from outside the render closure.
-const uploadControlsByFileType: Record<string, {
+// One row per custom projection slot. The upload's data_id is its identity everywhere
+// (blend-weight key, session requests); the title is presentation-only, like team labels
+// on the draft board. Deliberately not persisted: uploads cannot survive a reload (they
+// live in the backend's memory), so the whole structure resets with the page.
+interface CustomUploadRow {
+    dataId: string | null
+    titleInput: HTMLInputElement
     slider: HTMLInputElement
     valueDisplay: HTMLSpanElement
     statusSpan: HTMLSpanElement
-}> = {}
+    uploadInput: HTMLInputElement
+}
+
+const MAX_CUSTOM_UPLOADS = 5
+let customUploadRows: CustomUploadRow[] = []
 
 /**
  * Marks every uploaded source as expired: clears its data_id, locks its weight back to
@@ -27,17 +32,16 @@ const uploadControlsByFileType: Record<string, {
  */
 export function markUploadedSourcesExpired(): boolean {
     let clearedAny = false
-    for (const fileType of ['HTB', 'BBM'] as const) {
-        if (customDataIds[fileType] === null) continue
-        customDataIds[fileType] = null
+    for (const row of customUploadRows) {
+        if (row.dataId === null) continue
+        row.dataId = null
         clearedAny = true
-        const controls = uploadControlsByFileType[fileType]
-        if (controls) {
-            controls.slider.disabled = true
-            controls.slider.value = '0'
-            controls.valueDisplay.textContent = '0.00'
-            controls.statusSpan.textContent = 'Upload expired — please re-upload the file.'
-        }
+        row.slider.disabled = true
+        row.slider.value = '0'
+        row.valueDisplay.textContent = '0.00'
+        row.statusSpan.textContent = 'Upload expired — please re-upload the file.'
+        // Clear the input so re-selecting the same file fires a fresh change event.
+        row.uploadInput.value = ''
     }
     return clearedAny
 }
@@ -154,7 +158,10 @@ export function renderPlayerStats(container: HTMLElement): void {
     
 }
 
-/** Renders blend weight sliders and CSV upload inputs for HTB and BBM sources. */
+/** Renders the projection source weights: ESPN and DARKO sliders, then the custom
+ *  projections section — up to five uploadable sources, each with an editable title,
+ *  a weight slider locked until its upload succeeds, and a file chooser. A fresh empty
+ *  row appears after each successful upload. */
 function renderBlendWeights(container: HTMLElement): void {
 
     const weightLabel = document.createElement('div')
@@ -162,14 +169,12 @@ function renderBlendWeights(container: HTMLElement): void {
     weightLabel.textContent = 'Projection blend weights'
     container.append(weightLabel)
 
-    const sources: { id: string; label: string; prefKey: string; defaultValue: number; requiresUpload?: boolean }[] = [
+    const snowflakeSources: { id: string; label: string; prefKey: string; defaultValue: number }[] = [
         { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 0.5 },
         { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.5 },
-        { id: 'ps-w-htb',   label: 'HTB',   prefKey: 'blend_w_htb',   defaultValue: 0.0, requiresUpload: true },
-        { id: 'ps-w-bbm',   label: 'BBM',   prefKey: 'blend_w_bbm',   defaultValue: 0.0, requiresUpload: true },
     ]
 
-    for (const source of sources) {
+    for (const source of snowflakeSources) {
         const row = document.createElement('div')
         row.className = 'sidebar-slider-row'
 
@@ -178,85 +183,131 @@ function renderBlendWeights(container: HTMLElement): void {
         label.textContent = source.label
         row.append(label)
 
-        // Uploaded sources never survive a reload (files live in the backend's memory and
-        // the data_id in this page's), so restoring their saved weight would show a live-
-        // looking weight with no file behind it. They always start back at zero.
-        const savedWeight = source.requiresUpload ? 0 : pref(source.prefKey, source.defaultValue)
-
-        const slider = document.createElement('input')
-        slider.type = 'range'
-        slider.id = source.id
-        slider.min = '0'
-        slider.max = '1'
-        slider.step = '0.05'
-        slider.value = String(savedWeight)
-        // A weight for a source with no file behind it is meaningless — uploaded sources
-        // stay locked at zero until their upload succeeds (re-locked if it fails).
-        slider.disabled = source.requiresUpload === true
-        row.append(slider)
-
-        const valueDisplay = document.createElement('span')
-        valueDisplay.className = 'slider-value'
-        valueDisplay.textContent = savedWeight.toFixed(2)
-        row.append(valueDisplay)
-
-        slider.addEventListener('input', () => {
-            valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
-            savePref(source.prefKey, parseFloat(slider.value))
-        })
-
+        const savedWeight = pref(source.prefKey, source.defaultValue)
+        const { slider, valueDisplay } = makeWeightSlider(source.id, savedWeight)
+        slider.addEventListener('input', () => savePref(source.prefKey, parseFloat(slider.value)))
+        row.append(slider, valueDisplay)
         container.append(row)
-
-        // File upload for HTB and BBM (user-supplied CSV projections)
-        if (source.id === 'ps-w-htb' || source.id === 'ps-w-bbm') {
-            const fileType = source.id === 'ps-w-htb' ? 'HTB' : 'BBM'
-            const uploadId = `ps-upload-${fileType.toLowerCase()}`
-
-            const uploadRow = document.createElement('div')
-            uploadRow.className = 'sidebar-upload-row'
-
-            const uploadInput = document.createElement('input')
-            uploadInput.type = 'file'
-            uploadInput.id = uploadId
-            uploadInput.accept = '.csv'
-            uploadInput.className = 'sidebar-file-input'
-            uploadRow.append(uploadInput)
-
-            const statusSpan = document.createElement('span')
-            statusSpan.className = 'sidebar-caption'
-            uploadRow.append(statusSpan)
-
-            uploadInput.addEventListener('change', async () => {
-                const file = uploadInput.files?.[0]
-                if (!file) return
-                statusSpan.textContent = 'Uploading…'
-                try {
-                    const resp = await uploadCsv(file, fileType)
-                    customDataIds[fileType] = resp.data_id
-                    statusSpan.textContent = `✓ ${resp.n_players} players loaded`
-                    slider.disabled = false
-                } catch (err) {
-                    customDataIds[fileType] = null
-                    statusSpan.textContent = `Upload failed: ${err}`
-                    console.error(`${fileType} upload failed:`, err)
-                    // No file behind the source any more — lock its weight back to zero.
-                    slider.disabled = true
-                    slider.value = '0'
-                    valueDisplay.textContent = '0.00'
-                    savePref(source.prefKey, 0)
-                } finally {
-                    // Browsers don't fire change when the same file is re-selected while the
-                    // input still holds it — and re-uploading the same file is the normal
-                    // recovery after a failure or an expired upload. Clear the input so every
-                    // selection fires.
-                    uploadInput.value = ''
-                }
-            })
-
-            uploadControlsByFileType[fileType] = { slider, valueDisplay, statusSpan }
-            container.append(uploadRow)
-        }
     }
+
+    const customLabel = document.createElement('div')
+    customLabel.className = 'sidebar-label'
+    customLabel.textContent = 'Custom projections'
+    container.append(customLabel)
+
+    const customCaption = document.createElement('div')
+    customCaption.className = 'sidebar-caption'
+    customCaption.textContent =
+        'Upload projection CSVs (Hashtag Basketball, Basketball Monster, or any file with ' +
+        'standard stat columns — the format is detected automatically). Uploads last for ' +
+        'this page visit only.'
+    container.append(customCaption)
+
+    const customRowsContainer = document.createElement('div')
+    customRowsContainer.id = 'ps-custom-uploads'
+    container.append(customRowsContainer)
+
+    customUploadRows = []
+    appendCustomUploadRow(customRowsContainer)
+}
+
+/** Builds a weight slider + its value display (shared by Snowflake and custom sources). */
+function makeWeightSlider(
+    id: string
+    , initialWeight: number
+): { slider: HTMLInputElement; valueDisplay: HTMLSpanElement } {
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    slider.id = id
+    slider.min = '0'
+    slider.max = '1'
+    slider.step = '0.05'
+    slider.value = String(initialWeight)
+
+    const valueDisplay = document.createElement('span')
+    valueDisplay.className = 'slider-value'
+    valueDisplay.textContent = initialWeight.toFixed(2)
+
+    slider.addEventListener('input', () => {
+        valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
+    })
+    return { slider, valueDisplay }
+}
+
+/** Appends one custom-projection row: [editable title | weight slider] + [file chooser | status].
+ *  The slider stays locked at zero until this row's upload succeeds. */
+function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
+    const rowNumber = customUploadRows.length + 1
+
+    const sliderRow = document.createElement('div')
+    sliderRow.className = 'sidebar-slider-row'
+
+    // Editable display title, like team labels on the draft board: presentation only —
+    // the upload's identity is its data_id. Title events stay out of the section's
+    // change/input listeners so typing a name never triggers a session patch.
+    const titleInput = document.createElement('input')
+    titleInput.type = 'text'
+    titleInput.id = `ps-custom-title-${rowNumber}`
+    titleInput.className = 'sidebar-input custom-projection-title'
+    titleInput.value = `Data ${rowNumber}`
+    titleInput.addEventListener('input', event => event.stopPropagation())
+    titleInput.addEventListener('change', event => event.stopPropagation())
+    sliderRow.append(titleInput)
+
+    const { slider, valueDisplay } = makeWeightSlider(`ps-w-custom-${rowNumber}`, 0)
+    // A weight for a source with no file behind it is meaningless — locked until upload succeeds.
+    slider.disabled = true
+    sliderRow.append(slider, valueDisplay)
+    customRowsContainer.append(sliderRow)
+
+    const uploadRow = document.createElement('div')
+    uploadRow.className = 'sidebar-upload-row'
+
+    const uploadInput = document.createElement('input')
+    uploadInput.type = 'file'
+    uploadInput.id = `ps-upload-custom-${rowNumber}`
+    uploadInput.accept = '.csv'
+    uploadInput.className = 'sidebar-file-input'
+    uploadRow.append(uploadInput)
+
+    const statusSpan = document.createElement('span')
+    statusSpan.className = 'sidebar-caption'
+    uploadRow.append(statusSpan)
+    customRowsContainer.append(uploadRow)
+
+    const row: CustomUploadRow = { dataId: null, titleInput, slider, valueDisplay, statusSpan, uploadInput }
+    customUploadRows.push(row)
+
+    uploadInput.addEventListener('change', async () => {
+        const file = uploadInput.files?.[0]
+        if (!file) return
+        statusSpan.textContent = 'Uploading…'
+        const hadUploadAlready = row.dataId !== null
+        try {
+            const resp = await uploadCsv(file)
+            row.dataId = resp.data_id
+            statusSpan.textContent = `✓ ${resp.n_players} players loaded (${resp.detected_format} format)`
+            slider.disabled = false
+            // Open the next slot once this one is filled (first upload into this row only).
+            if (!hadUploadAlready && customUploadRows.length < MAX_CUSTOM_UPLOADS) {
+                appendCustomUploadRow(customRowsContainer)
+            }
+        } catch (err) {
+            row.dataId = null
+            statusSpan.textContent = `Upload failed: ${err}`
+            console.error('Custom projection upload failed:', err)
+            // No file behind the source any more — lock its weight back to zero.
+            slider.disabled = true
+            slider.value = '0'
+            valueDisplay.textContent = '0.00'
+            // Browsers don't fire change when the same file is re-selected while the
+            // input still holds it — and retrying the same file is the normal recovery
+            // from a failure. Clear the input so the retry fires. On success the input
+            // keeps the filename (clearing it would display "No file chosen" beside a
+            // live upload); the expiry path clears it too, in markUploadedSourcesExpired.
+            uploadInput.value = ''
+        }
+    })
 }
 
 // ─── Getter ───────────────────────────────────────────────────────────────────
@@ -268,11 +319,16 @@ function renderBlendWeights(container: HTMLElement): void {
 export function getPlayerStatsParams(): { data_source: DataSource; injured_players: string[] } {
     const type = (document.getElementById('ps-data-type') as HTMLInputElement).value as DataSource['type']
 
-    const blend_weights = {
+    // Snowflake sources plus one entry per live upload, keyed by its data_id.
+    const blend_weights: Record<string, number> = {
         ESPN:  parseFloat((document.getElementById('ps-w-espn')  as HTMLInputElement).value),
         DARKO: parseFloat((document.getElementById('ps-w-darko') as HTMLInputElement).value),
-        HTB:   parseFloat((document.getElementById('ps-w-htb')   as HTMLInputElement).value),
-        BBM:   parseFloat((document.getElementById('ps-w-bbm')   as HTMLInputElement).value),
+    }
+    const custom_data_ids: string[] = []
+    for (const row of customUploadRows) {
+        if (row.dataId === null) continue
+        custom_data_ids.push(row.dataId)
+        blend_weights[row.dataId] = parseFloat(row.slider.value)
     }
 
     let season: string | null = null
@@ -286,7 +342,7 @@ export function getPlayerStatsParams(): { data_source: DataSource; injured_playe
     const data_source: DataSource = {
         type,
         blend_weights,
-        custom_data_ids: { HTB: customDataIds.HTB, BBM: customDataIds.BBM },
+        custom_data_ids,
         season,
     }
 

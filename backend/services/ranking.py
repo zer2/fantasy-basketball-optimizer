@@ -18,6 +18,15 @@ from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.infra.server_timing import record_phase
 
 
+class UnknownRosterPlayersError(ValueError):
+    """A rostered player is not in the current player pool.
+
+    Happens when a data-source change alters player identities (or removes players)
+    after a board was built against the previous pool. Surfaced as a 400 so the
+    user gets an actionable message instead of a KeyError-turned-500.
+    """
+
+
 def extract_last_name(player_full_name: str) -> str:
     """Return the player's last name, stripping any trailing position suffix.
 
@@ -62,6 +71,21 @@ def rank_candidates(
     current_params = session.current_params
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
+
+    # Every rostered player must exist in the pool under exactly the identity the board
+    # holds. A stale board (identities changed by a data-source switch) would otherwise
+    # crash on a KeyError deep inside the H-score math.
+    rostered_players = [
+        player for team_players in player_assignments.values()
+        for player in team_players if isinstance(player, str)
+    ]
+    missing_players = sorted({p for p in rostered_players if p not in H.x_scores.index})
+    if missing_players:
+        raise UnknownRosterPlayersError(
+            'These rostered players are not in the current player pool: '
+            + ', '.join(missing_players)
+            + '. The data-source change altered the pool; clear the board or restore the previous sources.'
+        )
 
     # ── Candidate batching (draft/waiver only) ────────────────────────────────
     # Slice the available pool by the agent's default (neutral-board) ranking so the top-ranked players

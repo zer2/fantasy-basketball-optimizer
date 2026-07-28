@@ -690,6 +690,14 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     gap: 8px;
 }
 
+/* Editable display title of a custom projection source, sitting where the fixed
+   source label (ESPN / DARKO) does on the Snowflake rows. */
+.custom-projection-title {
+    width: 4.5rem;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
 .sidebar-slider-row label {
     color: light-dark(#555555, darkgrey);
     font-size: 0.78rem;
@@ -700,6 +708,9 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 
 .sidebar-slider-row input[type="range"] {
     flex: 1;
+    /* Ranges have an intrinsic ~130px width; without this the flex item cannot
+       shrink below it and the row overflows the sidebar horizontally. */
+    min-width: 0;
     accent-color: light-dark(#999999, #666688);
 }
 

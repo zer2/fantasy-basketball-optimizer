@@ -93,31 +93,26 @@ def _build_patch(req: PatchRequest) -> dict:
     return patch
 
 
-def _resolve_csv(custom_data_ids: Optional[dict]) -> tuple[Optional[bytes], Optional[str]]:
-    """Return (csv_bytes, file_type) for the first valid custom data_id ('csv' source)."""
-    if not custom_data_ids:
-        return None, None
-    for _ft, did in custom_data_ids.items():
-        if did is not None:
-            entry = get_upload(did)
-            if entry is None:
-                raise HTTPException(status_code=404, detail=f'data_id {did!r} not found or expired.')
-            return entry['bytes'], entry['file_type']
-    return None, None
-
-
-def _resolve_uploaded_dfs(custom_data_ids: Optional[dict], params: dict) -> dict:
-    """Return {file_type: DataFrame} for all valid custom data_ids ('projections' source)."""
-    if not custom_data_ids:
-        return {}
-    result = {}
-    for file_type_key, did in custom_data_ids.items():
-        if did is None:
-            continue
-        entry = get_upload(did)
+def _resolve_csv(custom_data_ids: Optional[list[str]]) -> Optional[bytes]:
+    """Return csv_bytes for the first custom data_id ('csv' source; format auto-detected later)."""
+    for data_id in custom_data_ids or []:
+        entry = get_upload(data_id)
         if entry is None:
-            raise HTTPException(status_code=404, detail=f'data_id {did!r} not found or expired.')
-        result[file_type_key.upper()] = parse_projection_csv(entry['bytes'], entry['file_type'], params)
+            raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
+        return entry['bytes']
+    return None
+
+
+def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) -> dict:
+    """Return {data_id: DataFrame} for all custom data_ids ('projections' source). The data_id
+    is the upload's identity throughout the blend — it keys the blend weights too."""
+    result = {}
+    for data_id in custom_data_ids or []:
+        entry = get_upload(data_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
+        parsed, _detected_format = parse_projection_csv(entry['bytes'], params)
+        result[data_id] = parsed
     return result
 
 
@@ -146,13 +141,13 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     params = all_params[req.league.sport]
     source_type = req.data_source.type
     if source_type == 'csv':
-        csv_bytes, file_type_str = _resolve_csv(req.data_source.custom_data_ids)
+        csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         uploaded_dfs = None
     elif source_type == 'projections':
-        csv_bytes, file_type_str = None, None
+        csv_bytes = None
         uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
     else:
-        csv_bytes, file_type_str, uploaded_dfs = None, None, None
+        csv_bytes, uploaded_dfs = None, None
 
     # Resolve any live-platform connection up front so a bad league fails before the pipeline.
     platform_config = resolve_platform_config(req.platform, req.platform_config, user_key)
@@ -163,7 +158,6 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
             current_params  = current_params,
             platform_config = platform_config,
             csv_bytes       = csv_bytes,
-            file_type       = file_type_str,
             uploaded_dfs    = uploaded_dfs,
         )
     except InsufficientPlayerPoolError as exc:
@@ -187,12 +181,11 @@ def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[s
         raise HTTPException(status_code=404, detail='Session not found or expired.')
 
     csv_bytes: Optional[bytes] = None
-    file_type_str: Optional[str] = None
     uploaded_dfs: Optional[dict] = None
     if req.data_source is not None and req.data_source.custom_data_ids is not None:
         params = load_all_params()[session.current_params['sport']]
         if req.data_source.type == 'csv':
-            csv_bytes, file_type_str = _resolve_csv(req.data_source.custom_data_ids)
+            csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         elif req.data_source.type == 'projections':
             uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
 
@@ -212,7 +205,6 @@ def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[s
                 from_step       = req.from_step,
                 platform_config = platform_config,
                 csv_bytes       = csv_bytes,
-                file_type       = file_type_str,
                 uploaded_dfs    = uploaded_dfs,
             )
     except InsufficientPlayerPoolError as exc:

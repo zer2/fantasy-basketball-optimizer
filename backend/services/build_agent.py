@@ -86,11 +86,9 @@ def _v0_cache_key(cp: dict) -> tuple | None:
         return (sport, 'historical', cp['season'])
     if source_type == 'projections':
         blend_weights = cp.get('blend_weights', {})
-        custom_data_ids = cp.get('custom_data_ids') or {}
+        custom_data_ids = cp.get('custom_data_ids') or []
         weight_keys = tuple(sorted(blend_weights.items()))
-        upload_keys = tuple(sorted(
-            (source, data_id) for source, data_id in custom_data_ids.items() if data_id is not None
-        ))
+        upload_keys = tuple(sorted(custom_data_ids))
         return (sport, 'projections', weight_keys, upload_keys)
     return None
 
@@ -98,13 +96,12 @@ def _v0_cache_key(cp: dict) -> tuple | None:
 def run_step1(
     session: Session,
     csv_bytes: bytes | None = None,
-    file_type: str | None = None,
     uploaded_dfs: dict | None = None,
 ) -> None:
     """Load player_stats_v0 into session.v0_clean.
 
     Branches on current_params['data_source_type']:
-      'csv'        — single uploaded CSV (csv_bytes + file_type required)
+      'csv'        — single uploaded CSV (csv_bytes required; format auto-detected)
       'historical' — Snowflake historical stats for current_params['season']
       'projections' — weighted blend of Snowflake sources + any uploaded_dfs
 
@@ -125,7 +122,7 @@ def run_step1(
                 return
 
     if source_type == 'csv':
-        v0 = parse_projection_csv(csv_bytes, file_type, params)
+        v0, _detected_format = parse_projection_csv(csv_bytes, params)
 
     elif source_type == 'historical':
         from backend.data_retrieval import get_specified_historical_stats
@@ -163,42 +160,52 @@ def run_step1(
     session.v0_clean = v0.copy()
 
 
-# The per-game stats every HTB/BBM export must map to. A format-drifted file (e.g. an
+# The per-game stats every projection export must map to. A format-drifted file (e.g. an
 # older export with renamed headers) would otherwise sail through parsing and only fail
 # much later, deep in the blend, as a baffling "0 players available" error.
 _CORE_PROJECTION_COLUMNS = ('Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers', 'Threes')
 
+# Known export formats, in detection order. A file already using canonical column names
+# passes under the first mapping (renaming is a no-op), so "any common projection file"
+# includes plain canonical CSVs for free.
+_PROJECTION_FORMATS = (
+    ('HTB', 'htb-renamer'),
+    ('BBM', 'bbm-renamer'),
+)
 
-def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.DataFrame:
-    """Parse an uploaded CSV (HTB or BBM format) into the canonical column set."""
-    df = pd.read_csv(io.BytesIO(csv_bytes))
-    original_columns = list(df.columns)
 
-    renamer_keys_by_file_type = {
-        'HTB': 'htb-renamer',
-        'BBM': 'bbm-renamer',
-    }
-    if file_type.upper() not in renamer_keys_by_file_type:
-        raise ValueError(
-            f"Unknown file_type {file_type!r}; expected one of {sorted(renamer_keys_by_file_type)}"
-        )
-    renamer_key = renamer_keys_by_file_type[file_type.upper()]
+def parse_projection_csv(csv_bytes: bytes, params: dict) -> tuple[pd.DataFrame, str]:
+    """Parse an uploaded projection CSV into the canonical column set, auto-detecting the
+    export format. Returns (parsed frame, detected format name). Raises ValueError with an
+    aggregated, per-format diagnosis when no known format fits."""
+    df_raw = pd.read_csv(io.BytesIO(csv_bytes))
 
-    renamer = params.get(renamer_key, {})
-    df = df.rename(columns=renamer)
+    failures: list[str] = []
+    best_format = None
+    best_missing_count = None
+    for format_name, renamer_key in _PROJECTION_FORMATS:
+        renamer = params.get(renamer_key, {})
+        renamed_columns = set(df_raw.rename(columns=renamer).columns)
+        missing = [column for column in _CORE_PROJECTION_COLUMNS if column not in renamed_columns]
+        if not missing and 'Position' in renamed_columns:
+            return _parse_with_renamer(df_raw, renamer), format_name
+        problem = f"missing {', '.join(missing)}" if missing else 'missing Position'
+        failures.append(f'{format_name}: {problem}')
+        if best_missing_count is None or len(missing) < best_missing_count:
+            best_missing_count = len(missing)
+            best_format = (format_name, renamer)
 
-    missing_stats = [column for column in _CORE_PROJECTION_COLUMNS if column not in df.columns]
-    if missing_stats:
-        unmapped = [column for column in original_columns if column not in renamer]
-        raise ValueError(
-            f"{file_type.upper()} file is missing expected stat columns: {', '.join(missing_stats)}. "
-            f"Headers in the file that were not recognized: {', '.join(map(str, unmapped))}. "
-            f"This may be an export format from a different {file_type.upper()} version."
-        )
+    unmapped = [column for column in df_raw.columns
+                if best_format is None or column not in best_format[1]]
+    raise ValueError(
+        f"File does not match any known projection format ({'; '.join(failures)}). "
+        f"Headers in the file that were not recognized: {', '.join(map(str, unmapped))}."
+    )
 
-    # HTB/BBM provide per-game stats directly; ensure Position is present
-    if 'Position' not in df.columns:
-        raise ValueError("CSV missing Position column after rename")
+
+def _parse_with_renamer(df_raw: pd.DataFrame, renamer: dict) -> pd.DataFrame:
+    """The format-specific parse: rename to canonical columns, drop junk, coerce stats."""
+    df = df_raw.rename(columns=renamer)
 
     # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
     # would otherwise join the blend's column union, where every player from the OTHER
@@ -233,6 +240,12 @@ def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.D
 
     # Clamp GP to 0–1
     df['Games Played %'] = df['Games Played %'].clip(0, 1)
+
+    # Raw games played is only an intermediate for the % above. Left in, it becomes an
+    # upload-only column in the blend's union, and the blend's coverage rule (a player
+    # must have every column covered by some source that carries them) would then drop
+    # every player the upload doesn't cover — a partial upload would gut the pool.
+    df = df.drop(columns=['Games Played'], errors='ignore')
 
     if 'Player' in df.columns:
         df = df.set_index('Player')
@@ -362,12 +375,11 @@ def build_agent(
     session: Session,
     from_step: int = 1,
     csv_bytes: bytes | None = None,
-    file_type: str | None = None,
     uploaded_dfs: dict | None = None,
 ) -> None:
     """Re-run the pipeline starting from the given step number (1–5), leaving session.agent built."""
     if from_step <= 1:
-        run_step1(session, csv_bytes=csv_bytes, file_type=file_type, uploaded_dfs=uploaded_dfs)
+        run_step1(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
     if from_step <= 2:
         run_step2(session)
     if from_step <= 3:

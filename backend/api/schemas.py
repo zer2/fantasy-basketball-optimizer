@@ -15,7 +15,7 @@ from backend.models import ComboParam
 
 class UploadResponse(BaseModel):
     data_id: str
-    file_type: str
+    detected_format: str   # which known export format the file matched (e.g. 'HTB', 'BBM')
     n_players: int
     expires_at: str
 
@@ -46,9 +46,9 @@ class ModelParameters(BaseModel):
 
 class DataSource(BaseModel):
     type: str
-    season: Optional[str] = None                           # 'historical' type only
-    blend_weights: Optional[dict[str, float]] = None          # 'projections' type only
-    custom_data_ids: Optional[dict[str, Optional[str]]] = None  # 'csv' / 'projections'
+    season: Optional[str] = None                     # 'historical' type only
+    blend_weights: Optional[dict[str, float]] = None    # 'projections' — keys: ESPN, DARKO, and upload data_ids
+    custom_data_ids: Optional[list[str]] = None         # 'csv' / 'projections' — uploaded data_ids
 
 
 class PlatformConfigRequest(BaseModel):

@@ -115,8 +115,10 @@ Returns a list of season strings that can be used as `data_source.season` when c
 ## `POST /data/upload` — Upload projection file
 
 Accepts a user-supplied CSV projection file and stores it server-side. Returns a short-lived
-`data_id` to reference it when creating a session. Supported file types are third-party
-projection sources (HTB = Hashtag Basketball, BBM = Basketball Monster).
+`data_id` to reference it when creating or patching a session — the `data_id` is the upload's
+identity everywhere (including as its blend-weight key). The export format is auto-detected
+from the file's headers; known formats are HTB (Hashtag Basketball), BBM (Basketball Monster),
+and any CSV already using the canonical stat column names.
 
 Files expire after 2 hours if not referenced by a session.
 
@@ -125,13 +127,12 @@ Files expire after 2 hours if not referenced by a session.
 | Field       | Type   | Required | Description                                  |
 |-------------|--------|----------|----------------------------------------------|
 | `file`      | file   | yes      | CSV projection file                          |
-| `file_type` | string | yes      | One of `"HTB"`, `"BBM"`                     |
 
 **Response `200`:**
 ```json
 {
   "data_id": "f3a9c2",
-  "file_type": "HTB",
+  "detected_format": "HTB",
   "n_players": 312,
   "expires_at": "2025-03-01T15:30:00Z"
 }
@@ -210,14 +211,19 @@ IDs (e.g. `"C2"`, `"Util3"`) from these counts, and also stores flex eligibility
 
 `data_source.type` — one of `"projections"`, `"historical"`, or `"csv"`.
 - `"projections"`: blends ESPN, DARKO, and optionally custom uploads using `blend_weights`.
-  Weights do not need to sum to 1; they are normalized. Omit a source to exclude it entirely.
+  Weights do not need to sum to 1; they are normalized. A source at weight 0 is fully
+  excluded from the blend. Position eligibility is never blended: it comes from the
+  canonical Yahoo eligibility table (base positions in a fixed order) for every player
+  that table knows, so `"Name (Position)"` identities are stable no matter which sources
+  are active. A source's own position column is used only for players unknown to the
+  canonical table.
 - `"historical"`: uses stored historical season data. Requires `season` field. `blend_weights`
   and `custom_data_ids` are ignored.
-- `"csv"`: uses a single custom-uploaded CSV. Requires a valid `data_id` in `custom_data_ids`.
+- `"csv"`: uses a single custom-uploaded CSV. Requires a `data_id` in `custom_data_ids`.
 
-`data_source.custom_data_ids` — references files uploaded via `POST /data/upload`.
-If provided, the corresponding source in `blend_weights` is replaced by the uploaded file.
-Set to `null` to use the default server-side source.
+`data_source.custom_data_ids` — a list of `data_id`s from `POST /data/upload` (up to 5).
+Each uploaded source's blend weight is keyed by its `data_id` in `blend_weights`, e.g.
+`{"ESPN": 0.5, "DARKO": 0.5, "f3a9c2": 0.7}`.
 
 `injured_players` — list of player names to drop before coefficient calculation. Optional; defaults to `[]`.
 
@@ -274,8 +280,8 @@ table above. All fields except `from_step` are optional — only send what chang
   },
   "data_source": {
     "type": "projections",
-    "blend_weights": { "espn": 0.5, "darko": 0.5 },
-    "custom_data_ids": { "HTB": null, "BBM": null }
+    "blend_weights": { "ESPN": 0.5, "DARKO": 0.5, "f3a9c2": 0.7 },
+    "custom_data_ids": ["f3a9c2"]
   },
   "slot_counts": { "PG": 1, "SG": 1, "SF": 1, "PF": 1, "C": 2, "G": 2, "F": 2, "Util": 3 },
   "injured_players": ["Joel Embiid", "Kawhi Leonard", "Damian Lillard"]
@@ -439,6 +445,10 @@ the algorithm converged early.
 position data is absent.
 
 **Errors:**
+- `400` — `remaining_cash` present on a non-auction session, or missing on an auction session
+- `400` — a rostered player in `player_assignments` is not in the current player pool
+  (a data-source change altered player identities after the board was built); the
+  message names the missing players
 - `404` — session not found or expired
 
 ---

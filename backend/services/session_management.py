@@ -38,7 +38,6 @@ def build_session(
     current_params: dict
     , platform_config: Optional[PlatformConfig]
     , csv_bytes: Optional[bytes]
-    , file_type: Optional[str]
     , uploaded_dfs: Optional[dict]
 ) -> Session:
     """Create a session from already-built params + resolved inputs, run the pipeline, return it.
@@ -52,8 +51,7 @@ def build_session(
         session.platform_config = platform_config
         session.current_params['team_names'] = list(platform_config.teams_dict.keys())
     try:
-        build_agent(session, from_step=1, csv_bytes=csv_bytes, file_type=file_type,
-                     uploaded_dfs=uploaded_dfs)
+        build_agent(session, from_step=1, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
         if session.platform_config is not None:
             refresh_platform_name_lookup(session)
     except Exception:
@@ -85,7 +83,6 @@ def apply_patch(
     , from_step: int
     , platform_config: Optional[PlatformConfig]
     , csv_bytes: Optional[bytes]
-    , file_type: Optional[str]
     , uploaded_dfs: Optional[dict]
 ) -> None:
     """Apply an already-built patch dict to a session and re-run the pipeline from from_step.
@@ -126,8 +123,7 @@ def apply_patch(
         session.v2       = cached_pipeline['v2']
         session.pipeline_cache.move_to_end(_pipeline_cache_key(session.current_params))
     else:
-        build_agent(session, from_step=from_step, csv_bytes=csv_bytes, file_type=file_type,
-                     uploaded_dfs=uploaded_dfs)
+        build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
 
     # Rebuild the lookup when either of its inputs changed: the player set (from_step <= 2)
     # or player_name_column (a platform_config was just set).
