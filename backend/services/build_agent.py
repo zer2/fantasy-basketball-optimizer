@@ -73,7 +73,12 @@ def _sport_params(session: Session) -> tuple[dict, dict, str]:
 def _v0_cache_key(cp: dict) -> tuple | None:
     """Return a hashable cache key for v0_clean based on data source params.
 
-    Returns None for CSV uploads (not cacheable by params alone).
+    A projections blend is fully described by every source weight plus the ids of any
+    uploaded tables feeding it: uploads are stored immutably under their data_id, so the
+    id doubles as a content key. (Leaving the HTB/BBM weights or the upload ids out of
+    the key — as an earlier version did — served stale blends when an upload's weight
+    changed, and could leak an uploaded blend into sessions that never uploaded anything.)
+    Returns None only for single-CSV mode, whose bytes arrive outside current_params.
     """
     source_type = cp['data_source_type']
     sport = cp.get('sport', '')
@@ -81,11 +86,12 @@ def _v0_cache_key(cp: dict) -> tuple | None:
         return (sport, 'historical', cp['season'])
     if source_type == 'projections':
         blend_weights = cp.get('blend_weights', {})
-        # Only Snowflake-backed sources are cacheable; uploaded DFs are session-specific
-        snowflake_keys = tuple(sorted(
-            (k, v) for k, v in blend_weights.items() if k not in ('HTB', 'BBM')
+        custom_data_ids = cp.get('custom_data_ids') or {}
+        weight_keys = tuple(sorted(blend_weights.items()))
+        upload_keys = tuple(sorted(
+            (source, data_id) for source, data_id in custom_data_ids.items() if data_id is not None
         ))
-        return (sport, 'projections', snowflake_keys)
+        return (sport, 'projections', weight_keys, upload_keys)
     return None
 
 
@@ -133,8 +139,16 @@ def run_step1(
 
     elif source_type == 'projections':
         from backend.data_retrieval import combine_projections
+
+        blend_weights = cp.get('blend_weights', {})
+        # All-zero weights would blend nothing and crash deep in the pipeline with an
+        # opaque 500 — reject it up front with an actionable message instead.
+        if not any(weight > 0 for weight in blend_weights.values()):
+            raise InsufficientPlayerPoolError(
+                'All projection blend weights are zero. Set at least one source weight above zero.'
+            )
         v0 = combine_projections(
-            blend_weights = cp.get('blend_weights', {}),
+            blend_weights = blend_weights,
             params        = params,
             uploaded_dfs  = uploaded_dfs,
         )
@@ -149,9 +163,16 @@ def run_step1(
     session.v0_clean = v0.copy()
 
 
+# The per-game stats every HTB/BBM export must map to. A format-drifted file (e.g. an
+# older export with renamed headers) would otherwise sail through parsing and only fail
+# much later, deep in the blend, as a baffling "0 players available" error.
+_CORE_PROJECTION_COLUMNS = ('Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers', 'Threes')
+
+
 def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.DataFrame:
     """Parse an uploaded CSV (HTB or BBM format) into the canonical column set."""
     df = pd.read_csv(io.BytesIO(csv_bytes))
+    original_columns = list(df.columns)
 
     renamer_keys_by_file_type = {
         'HTB': 'htb-renamer',
@@ -165,6 +186,15 @@ def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.D
 
     renamer = params.get(renamer_key, {})
     df = df.rename(columns=renamer)
+
+    missing_stats = [column for column in _CORE_PROJECTION_COLUMNS if column not in df.columns]
+    if missing_stats:
+        unmapped = [column for column in original_columns if column not in renamer]
+        raise ValueError(
+            f"{file_type.upper()} file is missing expected stat columns: {', '.join(missing_stats)}. "
+            f"Headers in the file that were not recognized: {', '.join(map(str, unmapped))}. "
+            f"This may be an export format from a different {file_type.upper()} version."
+        )
 
     # HTB/BBM provide per-game stats directly; ensure Position + Games Played %
     if 'Position' not in df.columns:
@@ -180,6 +210,13 @@ def parse_projection_csv(csv_bytes: bytes, file_type: str, params: dict) -> pd.D
 
     # Clamp GP to 0–1
     df['Games Played %'] = df['Games Played %'].clip(0, 1)
+
+    # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
+    # would otherwise join the blend's column union, where every player from the OTHER
+    # sources is "missing" them — and the blend drops any player missing any column
+    # across all sources, so a single junk column can wipe out the entire pool.
+    canonical_columns = set(renamer.values()) | {'Games Played %'}
+    df = df[[column for column in df.columns if column in canonical_columns]]
 
     if 'Player' in df.columns:
         df = df.set_index('Player')

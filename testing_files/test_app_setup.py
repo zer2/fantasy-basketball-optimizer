@@ -7,6 +7,7 @@
 #   - POST /sessions   creates a session with expected defaults
 #   - POST /sessions/{id}/evaluate  returns a valid candidate list
 
+import pytest
 import yaml
 from fastapi.testclient import TestClient
 
@@ -230,6 +231,74 @@ def test_is_auction_patch_toggles_league_type():
     assert patch_response.status_code == 200, patch_response.text
     assert client.post(f'/sessions/{session_id}/evaluate', json=draft_request).status_code == 200
     assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 400
+
+
+def test_v0_cache_key_reflects_blend_weights_and_uploads():
+    """The v0 cache serves blended player pools across sessions, so its key must fully
+    describe the blend: every source weight, plus the data_id of any uploaded table
+    (uploads are immutable per data_id, so the id doubles as a content key). Regression
+    test for the key that excluded HTB/BBM weights and upload ids — changing an upload's
+    weight served the stale cached blend, silently, and an uploaded blend could leak
+    into sessions that never uploaded anything."""
+    from backend.services.build_agent import _v0_cache_key
+
+    base_blend = {
+        'sport': 'NBA',
+        'data_source_type': 'projections',
+        'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'HTB': 0.0, 'BBM': 0.5},
+        'custom_data_ids': {'BBM': 'data_abc123'},
+    }
+    assert _v0_cache_key(base_blend) is not None, 'uploaded blends are cacheable when fully keyed'
+
+    bbm_reweighted = {**base_blend,
+                      'blend_weights': {**base_blend['blend_weights'], 'BBM': 1.0}}
+    assert _v0_cache_key(bbm_reweighted) != _v0_cache_key(base_blend), \
+        "changing an upload's weight must change the key"
+
+    different_upload = {**base_blend, 'custom_data_ids': {'BBM': 'data_def456'}}
+    assert _v0_cache_key(different_upload) != _v0_cache_key(base_blend), \
+        'a different uploaded table must change the key'
+
+    no_upload = {**base_blend, 'custom_data_ids': None,
+                 'blend_weights': {**base_blend['blend_weights'], 'BBM': 0.0}}
+    assert _v0_cache_key(no_upload) != _v0_cache_key(base_blend), \
+        'an upload-less blend must never share a key with an uploaded one'
+
+    espn_reweighted = {**no_upload,
+                       'blend_weights': {**no_upload['blend_weights'], 'ESPN': 1.0, 'DARKO': 0.0}}
+    assert _v0_cache_key(espn_reweighted) != _v0_cache_key(no_upload), \
+        'changing a Snowflake source weight must change the key'
+
+
+def test_parse_projection_csv_validates_stat_columns():
+    """A projection upload whose headers don't map to the canonical stat columns must be
+    rejected at parse time with a message naming the missing stats and the unrecognized
+    headers — previously such a file (e.g. an older BBM export format) parsed 'fine' and
+    only failed deep in the blend as an opaque '0 players available' error."""
+    from backend.services.build_agent import parse_projection_csv
+    params = _load_params()['NBA']
+
+    # Extra unmapped columns (Rank, Value, m/g) must be dropped: they would otherwise
+    # join the blend's column union, where every player from the other sources is
+    # "missing" them — and the blend drops players missing any column across all
+    # sources, so one junk column can wipe out the entire pool.
+    valid_csv = (
+        'Rank,Name,Pos,Value,g,m/g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
+        '1,Test Player,C,12.3,70,34.0,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
+    ).encode()
+    parsed = parse_projection_csv(valid_csv, 'BBM', params)
+    assert parsed.loc['Test Player', 'Points'] == 25.0
+    for junk_column in ('Rank', 'Value', 'm/g'):
+        assert junk_column not in parsed.columns, f'unmapped column {junk_column} should be dropped'
+
+    old_format_csv = (
+        'Name,Pos,g,pts,reb,ast,stl,blk,tov,3pm\n'
+        'Test Player,C,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0\n'
+    ).encode()
+    with pytest.raises(ValueError) as exc_info:
+        parse_projection_csv(old_format_csv, 'BBM', params)
+    assert 'Points' in str(exc_info.value), 'the error should name the missing canonical stats'
+    assert 'pts' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
 def test_evaluate_nonexistent_session():

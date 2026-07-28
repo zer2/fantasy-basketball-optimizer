@@ -11,6 +11,37 @@ import { pref, savePref } from '../preferences.js'
 // Stored data_ids from POST /data/upload; updated immediately on file selection.
 let customDataIds: { HTB: string | null; BBM: string | null } = { HTB: null, BBM: null }
 
+// The upload sources' UI controls, registered at render time so expired uploads can be
+// surfaced (status message + weight re-locked) from outside the render closure.
+const uploadControlsByFileType: Record<string, {
+    slider: HTMLInputElement
+    valueDisplay: HTMLSpanElement
+    statusSpan: HTMLSpanElement
+}> = {}
+
+/**
+ * Marks every uploaded source as expired: clears its data_id, locks its weight back to
+ * zero, and says so in its status line. Called when a session patch fails because a
+ * data_id no longer exists server-side (backend restart, or the upload store's TTL).
+ * Returns whether anything was cleared, so the caller can retry without the dead uploads.
+ */
+export function markUploadedSourcesExpired(): boolean {
+    let clearedAny = false
+    for (const fileType of ['HTB', 'BBM'] as const) {
+        if (customDataIds[fileType] === null) continue
+        customDataIds[fileType] = null
+        clearedAny = true
+        const controls = uploadControlsByFileType[fileType]
+        if (controls) {
+            controls.slider.disabled = true
+            controls.slider.value = '0'
+            controls.valueDisplay.textContent = '0.00'
+            controls.statusSpan.textContent = 'Upload expired — please re-upload the file.'
+        }
+    }
+    return clearedAny
+}
+
 // Resolves when the initial historical-seasons fetch (kicked off inside
 // renderPlayerStats when the default data source is 'historical') has finished
 // populating the ps-season dropdown. Resolves immediately when the default data
@@ -131,11 +162,11 @@ function renderBlendWeights(container: HTMLElement): void {
     weightLabel.textContent = 'Projection blend weights'
     container.append(weightLabel)
 
-    const sources: { id: string; label: string; prefKey: string; defaultValue: number }[] = [
+    const sources: { id: string; label: string; prefKey: string; defaultValue: number; requiresUpload?: boolean }[] = [
         { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 0.5 },
         { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.5 },
-        { id: 'ps-w-htb',   label: 'HTB',   prefKey: 'blend_w_htb',   defaultValue: 0.0 },
-        { id: 'ps-w-bbm',   label: 'BBM',   prefKey: 'blend_w_bbm',   defaultValue: 0.0 },
+        { id: 'ps-w-htb',   label: 'HTB',   prefKey: 'blend_w_htb',   defaultValue: 0.0, requiresUpload: true },
+        { id: 'ps-w-bbm',   label: 'BBM',   prefKey: 'blend_w_bbm',   defaultValue: 0.0, requiresUpload: true },
     ]
 
     for (const source of sources) {
@@ -147,7 +178,10 @@ function renderBlendWeights(container: HTMLElement): void {
         label.textContent = source.label
         row.append(label)
 
-        const savedWeight = pref(source.prefKey, source.defaultValue)
+        // Uploaded sources never survive a reload (files live in the backend's memory and
+        // the data_id in this page's), so restoring their saved weight would show a live-
+        // looking weight with no file behind it. They always start back at zero.
+        const savedWeight = source.requiresUpload ? 0 : pref(source.prefKey, source.defaultValue)
 
         const slider = document.createElement('input')
         slider.type = 'range'
@@ -156,6 +190,9 @@ function renderBlendWeights(container: HTMLElement): void {
         slider.max = '1'
         slider.step = '0.05'
         slider.value = String(savedWeight)
+        // A weight for a source with no file behind it is meaningless — uploaded sources
+        // stay locked at zero until their upload succeeds (re-locked if it fails).
+        slider.disabled = source.requiresUpload === true
         row.append(slider)
 
         const valueDisplay = document.createElement('span')
@@ -197,13 +234,26 @@ function renderBlendWeights(container: HTMLElement): void {
                     const resp = await uploadCsv(file, fileType)
                     customDataIds[fileType] = resp.data_id
                     statusSpan.textContent = `✓ ${resp.n_players} players loaded`
+                    slider.disabled = false
                 } catch (err) {
                     customDataIds[fileType] = null
                     statusSpan.textContent = `Upload failed: ${err}`
                     console.error(`${fileType} upload failed:`, err)
+                    // No file behind the source any more — lock its weight back to zero.
+                    slider.disabled = true
+                    slider.value = '0'
+                    valueDisplay.textContent = '0.00'
+                    savePref(source.prefKey, 0)
+                } finally {
+                    // Browsers don't fire change when the same file is re-selected while the
+                    // input still holds it — and re-uploading the same file is the normal
+                    // recovery after a failure or an expired upload. Clear the input so every
+                    // selection fires.
+                    uploadInput.value = ''
                 }
             })
 
+            uploadControlsByFileType[fileType] = { slider, valueDisplay, statusSpan }
             container.append(uploadRow)
         }
     }
