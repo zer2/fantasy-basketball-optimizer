@@ -106,9 +106,19 @@ _PUNT_POPULARITY_TOP_N = int(os.environ.get('PUNT_POPULARITY_TOP_N', '40'))
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
 _REG_SHAPE_B = float(os.environ.get('REG_SHAPE_B', '4'))
 _schedule_override = os.environ.get('PUNT_REG_SCHEDULE')
+# Correlation-correction refresh interval, mirroring the position-optimiser throttle: the
+# correction terms are recomputed on iterations where (iteration+1) % interval == 0 (plus
+# the cold start) and reused between — they drift slowly with the category weights, so a
+# small staleness buys back most of the correction's per-iteration cost. One-shot scoring
+# calls (full team, trades, auction values) always compute fresh.
+_MC_CORRELATION_REFRESH_INTERVAL = int(os.environ.get('MC_CORRELATION_REFRESH', '4'))
 from itertools import combinations
 
-from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
+from backend.math.algorithm_helpers import (
+    compute_win_probability,
+    calculate_tipping_points,
+    calculate_correction_terms,
+)
 from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
@@ -244,15 +254,11 @@ class HAgent:
         mov = info['Mov']
         vom = info['Vom']
 
-        if scoring_format == 'Rotisserie':
-            self.x_scores = x_scores.loc[
-                info['G-scores'].sum(axis=1).sort_values(ascending=False).index
-            ]
-            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
-
-            categories = list(x_scores.columns)
-
-            # ── correlations (replaces get_correlations()) ────────────────────
+        # ── differential correlation matrix (replaces get_correlations()) ──────
+        # Used by Rotisserie's variance model and by the Most-Categories correlation
+        # correction. Sign-flipped for negative statistics so it matches the "good
+        # direction" orientation of the differential z-scores.
+        if scoring_format in ('Rotisserie', 'Head to Head: Most Categories'):
             if sport == 'NBA':
                 rho = pd.read_csv('backend/data/basketball_correlations.csv').set_index('Category')
             else:
@@ -267,7 +273,29 @@ class HAgent:
             rho.loc[negative_stats, :] = -rho.loc[negative_stats, :]
             rho.loc[negative_stats, negative_stats] = 1
 
-            self.rho = np.expand_dims(np.array(rho.loc[categories, categories]), 0)
+            correlation_categories = list(x_scores.columns)
+            self.rho = np.expand_dims(
+                np.array(rho.loc[correlation_categories, correlation_categories]), 0
+            )
+        else:
+            self.rho = None
+
+        # Most-Categories correlation correction (see docs: correlation-correction note, eq (C4)).
+        # On by default for Most-Categories; set MC_CORRELATION=0 to disable — to regenerate the
+        # pre-correction goldens, or to A/B the correction's effect on rankings.
+        self.mc_correlation_enabled = (
+            scoring_format == 'Head to Head: Most Categories'
+            and os.environ.get('MC_CORRELATION', '1') == '1'
+        )
+        # Per-descent cache of correction terms (see get_objective_and_pdf_weights_mc);
+        # reset at the start of every perform_iterations run.
+        self._correction_cache = None
+
+        if scoring_format == 'Rotisserie':
+            self.x_scores = x_scores.loc[
+                info['G-scores'].sum(axis=1).sort_values(ascending=False).index
+            ]
+            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
 
             # ── max_info (replaces get_max_info()) ────────────────────────────
             if self.n_drafters <= 21:
@@ -721,6 +749,7 @@ class HAgent:
                     np.array([seed] * n_candidates), position_shares, diff_means, diff_vars,
                     x_scores_batch_array, candidate_player_array, team_so_far_array,
                     n_players_selected, sigma_2_m, 0, pitching_preference,
+                    correction_mode='skip',
                 )['Score']
                 for seed in seed_vectors
             ])
@@ -757,6 +786,9 @@ class HAgent:
                            , n_iterations
                            , candidate_priority=None
                            , candidate_offset=0):
+
+        # Stale correction terms must never leak across boards or candidate batches.
+        self._correction_cache = None
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=0.001),
@@ -1053,7 +1085,8 @@ class HAgent:
                                     , n_players_selected
                                     , sigma_2_m
                                     , iteration
-                                    , pitching_preference=None):
+                                    , pitching_preference=None
+                                    , correction_mode='full'):
 
         if self.position_means is not None:
             position_rewards = self.get_position_priorities_from_category_weights(category_weights)
@@ -1144,6 +1177,7 @@ class HAgent:
         score, pdf_weights = self.get_objective_and_pdf_weights(
             x_diff_array, diff_vars, cdf_estimates, pdf_estimates, sigma_2_m,
             calculate_pdf_weights=True,
+            correction_mode=correction_mode, iteration=iteration,
         )
 
         category_gradient = np.einsum('ai,aik -> ak', pdf_weights, del_full)
@@ -1193,10 +1227,14 @@ class HAgent:
                                        , cdf_estimates
                                        , pdf_estimates
                                        , sigma_2_m=None
-                                       , calculate_pdf_weights=False):
+                                       , calculate_pdf_weights=False
+                                       , correction_mode='full'
+                                       , iteration=None):
         if self.scoring_format == 'Head to Head: Most Categories':
-            return self.get_objective_and_pdf_weights_mc(cdf_estimates, pdf_estimates,
-                                                          calculate_pdf_weights)
+            return self.get_objective_and_pdf_weights_mc(x_diff_array, diff_vars,
+                                                          cdf_estimates, pdf_estimates,
+                                                          calculate_pdf_weights,
+                                                          correction_mode, iteration)
         elif self.scoring_format == 'Rotisserie':
             return self.get_objective_and_pdf_weights_rotisserie(
                 x_diff_array, diff_vars, cdf_estimates, pdf_estimates,
@@ -1206,14 +1244,66 @@ class HAgent:
                                                           calculate_pdf_weights)
 
     def get_objective_and_pdf_weights_mc(self
+                                          , x_diff_array
+                                          , diff_vars
                                           , cdf_estimates
                                           , pdf_estimates
-                                          , calculate_pdf_weights=False):
-        objective = compute_win_probability(np.array(cdf_estimates)).mean(axis=1)
-        if calculate_pdf_weights:
-            tipping_points = calculate_tipping_points(np.array(cdf_estimates))
-            return objective, (tipping_points * pdf_estimates).mean(axis=2)
-        return objective
+                                          , calculate_pdf_weights=False
+                                          , correction_mode='full'
+                                          , iteration=None):
+        """correction_mode: 'full' applies the correlation correction (recomputing per the
+        refresh throttle when an iteration index is given), 'skip' turns it off — used by
+        the multi-start seed scan, whose coarse pre-descent ranking doesn't warrant it."""
+        probs = np.array(cdf_estimates)
+        win_probability = compute_win_probability(probs)      # (n_players, n_opponents)
+
+        # First-order correlation correction (eq (C4) of the correlation-correction note):
+        #   P(win | R) ≈ P_indep + ½ φ(z)ᵀ [(R − I) ∘ B] φ(z)
+        # with B the exact leave-two-out bracket matrix, evaluated at complex nodes
+        # (see calculate_correction_terms). Terms are cached across descent iterations
+        # and refreshed on the position-throttle-style schedule.
+        correction_terms = None
+        apply_correction = self.mc_correlation_enabled and correction_mode != 'skip'
+        if apply_correction:
+            z_scores     = x_diff_array / np.sqrt(diff_vars)
+            standard_pdf = _normal_pdf(z_scores)              # φ(z), NOT the 1/σ-scaled pdf
+
+            cached = self._correction_cache
+            refresh = (
+                iteration is None
+                or cached is None
+                or cached['correction'].shape != win_probability.shape
+                or (calculate_pdf_weights and cached['probability_gradient'] is None)
+                or (iteration + 1) % _MC_CORRELATION_REFRESH_INTERVAL == 0
+            )
+            if refresh:
+                correction, m_phi, probability_gradient = calculate_correction_terms(
+                    probs
+                    , self.rho[0] - np.eye(self.n_categories)
+                    , standard_pdf
+                    , calculate_gradient=calculate_pdf_weights
+                )
+                correction_terms = {'correction': correction, 'm_phi': m_phi,
+                                    'probability_gradient': probability_gradient}
+                if iteration is not None:
+                    self._correction_cache = correction_terms
+            else:
+                correction_terms = cached
+            win_probability = win_probability + correction_terms['correction']
+
+        objective = win_probability.mean(axis=1)
+        if not calculate_pdf_weights:
+            return objective
+
+        pdf_weights = calculate_tipping_points(probs) * pdf_estimates
+        if correction_terms is not None:
+            # Exact correction gradient, two pieces chained through pdf_estimates = φ(z)/σ:
+            #   through the densities:       −z_c [Mφ(z)]_c
+            #   through B (leave-three-out): ∂(correction)/∂p_c
+            pdf_weights = pdf_weights + (
+                -z_scores * correction_terms['m_phi'] + correction_terms['probability_gradient']
+            ) * pdf_estimates
+        return objective, pdf_weights.mean(axis=2)
 
     def get_objective_and_pdf_weights_ec(self
                                           , cdf_estimates
