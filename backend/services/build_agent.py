@@ -354,6 +354,8 @@ def run_step5(session: Session) -> None:
         slot_counts    = slot_counts,
         aleph          = cp['aleph'],
         kappa          = cp['kappa'],
+        # .get: mirrors the schema default for sessions persisted before the parameter existed.
+        use_opponent_awareness = cp.get('use_opponent_awareness', True),
         beth           = cp['beth'],
     )
 

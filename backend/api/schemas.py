@@ -40,6 +40,9 @@ class ModelParameters(BaseModel):
     chi: float
     aleph: float
     kappa: float = 0.3
+    # Rational-opponent modelling (predict opponents as punting H-drafters). On by default; the formal
+    # behaviour tests toggle this per session instead of pinning environment variables.
+    use_opponent_awareness: bool = True
     n_iterations: int
     streaming_noise: float
 

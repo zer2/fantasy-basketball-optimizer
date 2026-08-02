@@ -194,6 +194,7 @@ class HAgent:
                  , slot_counts: dict
                  , aleph: float = 0.0
                  , kappa: float = 0.3
+                 , use_opponent_awareness: bool = True
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -334,19 +335,25 @@ class HAgent:
         self._correction_cache = None
 
         # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_states).
-        # On by default; OPPONENT_MODEL=0 restores neutral-opponent behaviour byte-for-byte.
-        self.opponent_model_enabled = os.environ.get('OPPONENT_MODEL', '1') == '1'
+        # The session parameter (use_opponent_awareness, default on) is the primary switch; the
+        # OPPONENT_MODEL env var, when set, overrides it globally — same pattern as kappa/KAPPA.
+        # Off restores neutral-opponent behaviour byte-for-byte.
+        awareness_env_override = os.environ.get('OPPONENT_MODEL')
+        self.use_opponent_awareness = (awareness_env_override == '1' if awareness_env_override is not None
+                                       else use_opponent_awareness)
         # Per-team inferred build, keyed by team name:
         #   {'roster_key': frozenset(their non-NaN roster), 'category_weights': (n_cat,), 'mu_edge': (n_cat,)}.
         # roster_key self-invalidates as rosters grow (a new roster is a new key).
         self._team_states = {}
         # Round-one prior: mu_edge per top player, harvested from the base-H-score build run. Empty
         # opponents (no picks yet) borrow the archetype of the player they are most likely to draft.
-        self._predicted_anchor_teams = None
-        # Committed per-player build (mu_edge) for every candidate, from the neutral pass-1 solve. When an
-        # opponent drafts player X as its first pick we reuse X's committed build verbatim, so a priced-in
-        # pick confirms the predicted field instead of re-inferring a different build.
-        self._player_committed_builds = None
+        # An Index of the top-3N players by served H-score: purely the ORDERING seat assignment walks.
+        self._anchor_player_order = None
+        # Committed per-player Future-Diff, scaled per remaining pick (= result['Future-Diff'] /
+        # (n_picks - 1), the mu_edge the maths docs describe), for every candidate. When an opponent
+        # drafts player X as its first pick we reuse X's committed row verbatim, so a priced-in pick
+        # confirms the predicted field instead of re-inferring a different build.
+        self._player_committed_future_diffs = None
         # Per-player self-play weights and flex position shares, frozen at populate (each player's
         # converged build vs the equilibrium field). The two are ALWAYS stored and applied together — a
         # build is (category weights + flex allocation), and warm-starting one half while cold-starting
@@ -492,7 +499,7 @@ class HAgent:
         # Bring a bounded number of stale opponent builds up to date before the field model reads them.
         # Draft and auction alike: the inference is roster-based, and the auction layers the same punt tilt
         # (slots_left * mu_edge) on top of its replacement/cash fill (see get_diff_distributions).
-        if self.opponent_model_enabled:
+        if self.use_opponent_awareness:
             self.refresh_stale_team_states(player_assignments, drafter, x_scores_available,
                                                cash_remaining_per_team)
 
@@ -548,7 +555,7 @@ class HAgent:
             warm_start_shares  = None   # flex shares are PAIRED with the weights: same source, same rows
             self._partial_warm_start_rows = None
             self._warm_start_row_rate_scales = None   # per-row learning-rate multipliers (None = all cold)
-            team_state = self._team_states.get(drafter) if self.opponent_model_enabled else None
+            team_state = self._team_states.get(drafter) if self.use_opponent_awareness else None
             if (n_players_selected >= _WEAKNESS_SEED_MIN_ROSTER and team_state is not None
                     and team_state['category_weights'] is not None):
                 # Tier by staleness: an unchanged roster means only the field moved since the entry was
@@ -696,7 +703,7 @@ class HAgent:
         # reads a different entry). The next evaluate for this drafter warm-starts from these weights; the
         # entry mirrors the inferred-opponent shape, with the top-ranked candidate standing in for the
         # not-yet-made pick. mu_edge = 0 for a full roster is exact (no future picks), not a fallback.
-        if self.opponent_model_enabled and result['Weights'] is not None:
+        if self.use_opponent_awareness and result['Weights'] is not None:
             best_candidate = result['Scores'].idxmax()
             picks_left     = self.n_picks - 1 - n_players_selected
             future_diff    = result['Future-Diff']
@@ -756,7 +763,7 @@ class HAgent:
             # cash). Then slots_left * mu_edge tilts the remaining generic fill -- the zero-sum DIRECTION on
             # top of the replacement/cash MAGNITUDE. Off / neutral recursion => no anchors, no tilt =>
             # byte-identical to the pre-feature auction model.
-            model_opponents = self.opponent_model_enabled and opponent_model == 'inferred'
+            model_opponents = self.use_opponent_awareness and opponent_model == 'inferred'
             empty_seat_anchor, spare_anchor = (self._assign_empty_seat_anchors(player_assignments, drafter)
                                                if model_opponents else ({}, None))
             opponent_teams = [team for team in team_names if team != drafter]
@@ -781,7 +788,7 @@ class HAgent:
                     roster_sum = np.array(self.x_scores.loc[[anchor]].sum(axis=0))
                     seat_cash  = cash_remaining_per_team[team]
                     roster_len = 1
-                    mu_edge    = self._player_committed_builds.loc[anchor].to_numpy()
+                    mu_edge    = self._player_committed_future_diffs.loc[anchor].to_numpy()
                 else:
                     roster_sum = np.zeros(self.n_categories)
                     seat_cash  = cash_remaining_per_team[team]
@@ -837,7 +844,7 @@ class HAgent:
             # pick, mirroring the edge the objective already adds for our own remaining picks). Off, or on an
             # inner inference solve (opponent_model='neutral'), the opponents stay category-neutral and the
             # construction below is byte-identical to the pre-feature model.
-            model_opponents = self.opponent_model_enabled and opponent_model == 'inferred'
+            model_opponents = self.use_opponent_awareness and opponent_model == 'inferred'
             opponent_teams = [team for team in team_names if team != drafter]
             if model_opponents:
                 totals, empty_slot_player, spare_total = self.compute_opponent_totals(
@@ -961,8 +968,8 @@ class HAgent:
         anchor, swapped in by self-exclusion when the candidate being scored is itself a predicted first
         pick. Both come back empty when there is no bootstrap / no anchors remain."""
         players_chosen = {x for roster in player_assignments.values() for x in roster if x == x}
-        anchor_players = ([] if self._predicted_anchor_teams is None
-                          else list(self._predicted_anchor_teams.index))
+        anchor_players = ([] if self._anchor_player_order is None
+                          else list(self._anchor_player_order))
         anchor_cursor  = 0
 
         empty_seat_anchor = {}
@@ -1016,12 +1023,12 @@ class HAgent:
                 totals[team] = team_total(roster, None if state is None else state['mu_edge'])
             elif team in empty_seat_anchor:
                 predicted = empty_seat_anchor[team]
-                totals[team] = team_total([predicted], self._player_committed_builds.loc[predicted].to_numpy())
+                totals[team] = team_total([predicted], self._player_committed_future_diffs.loc[predicted].to_numpy())
             else:
                 totals[team] = team_total(roster, None)   # no prediction left: neutral padding
 
         spare_total = (None if spare_anchor is None
-                       else team_total([spare_anchor], self._player_committed_builds.loc[spare_anchor].to_numpy()))
+                       else team_total([spare_anchor], self._player_committed_future_diffs.loc[spare_anchor].to_numpy()))
         return totals, empty_seat_anchor, spare_total
 
     def refresh_stale_team_states(self, player_assignments, drafter, x_scores_available,
@@ -1043,9 +1050,9 @@ class HAgent:
                 stale.append((len(roster) - stored_size, team, roster))
 
         for _, team, roster in sorted(stale, key=lambda item: item[0], reverse=True)[:_OPPONENT_REFRESH_BUDGET]:
-            committed = (None if self._player_committed_builds is None or len(roster) != 1
-                         or roster[0] not in self._player_committed_builds.index
-                         else self._player_committed_builds.loc[roster[0]].to_numpy())
+            committed = (None if self._player_committed_future_diffs is None or len(roster) != 1
+                         or roster[0] not in self._player_committed_future_diffs.index
+                         else self._player_committed_future_diffs.loc[roster[0]].to_numpy())
             if committed is not None:
                 # First pick of a priced-in player: reuse its committed build verbatim so the field does
                 # not move. category_weights (for the next pick's warm start) comes from the tally.
@@ -1907,14 +1914,14 @@ class HAgent:
         # Fresh build: drop any prior cache so the passes recompute (the empty-board short-circuit and the
         # throttle both key off these) instead of short-circuiting to stale results.
         self._team_states              = {}
-        self._predicted_anchor_teams   = None
-        self._player_committed_builds  = None
+        self._anchor_player_order   = None
+        self._player_committed_future_diffs  = None
         self._player_frozen_weights    = None
         self._player_frozen_shares     = None
         self._default_result           = None
         self.default_h_scores          = None
 
-        bootstrap = (self.opponent_model_enabled and self.n_picks > 1)
+        bootstrap = (self.use_opponent_awareness and self.n_picks > 1)
         if not bootstrap:
             result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team)
             self.default_h_scores = result['Scores'].sort_values(ascending=False)
@@ -1927,10 +1934,9 @@ class HAgent:
         # best-response — a committed per-player equilibrium — so player-specific punts survive.
         top_count = 3 * self.n_drafters
         def refresh_field(from_result):
-            self._player_committed_builds = committed
-            self._predicted_anchor_teams  = committed.loc[
-                from_result['Scores'].sort_values(ascending=False).index[: top_count]
-            ]
+            self._player_committed_future_diffs = committed
+            # Just the ordering (an Index): seat assignment consumes only the ranking, never the values.
+            self._anchor_player_order = from_result['Scores'].sort_values(ascending=False).index[: top_count]
 
         # The field only needs the committed builds of the top-3N anchors, so the iteration passes score
         # just those players (~36) instead of the whole pool (~577) — the position solve is the cost and it
@@ -1969,7 +1975,7 @@ class HAgent:
 
     def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
                             preserve_frozen_weights=False):
-        """One empty-board base-H-score solve against the current _predicted_anchor_teams field. Clears the
+        """One empty-board base-H-score solve against the current _anchor_player_order field. Clears the
         per-pass warm start and inferred-opponent store first (the empty board has no real opponents, so
         only the committed archetype field differs between passes). candidate_subset narrows which players
         are scored — the field-building passes only need the top-2N anchors. preserve_frozen_weights keeps
@@ -2196,7 +2202,8 @@ def build_h_agent(info
                   , sport
                   , params
                   , slot_counts
-                  , aleph=0.0):
+                  , aleph=0.0
+                  , use_opponent_awareness=True):
     return HAgent(
         info           = info,
         omega          = omega,
@@ -2209,5 +2216,6 @@ def build_h_agent(info
         params         = params,
         slot_counts    = slot_counts,
         aleph          = aleph,
+        use_opponent_awareness = use_opponent_awareness,
         beth           = beth,
     )
