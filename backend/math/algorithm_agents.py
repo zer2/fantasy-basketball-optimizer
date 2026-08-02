@@ -144,10 +144,14 @@ _OPPONENT_PASS_ITERATIONS = int(os.environ.get('OPPONENT_PASS_ITERATIONS', '15')
 # genuine-change cases (the gain there comes from the board, not from weight travel; measured
 # H 52.37 -> 52.51 on the Jokic-joins-my-team case). Three tiers:
 #   cold start (no stored weights)              -> full rate: must travel from a generic punt seed.
-#   warm, MY roster changed since storage       -> 1/10th: real context shift, moderate adjustment.
+#   warm, MY roster changed since storage       -> full rate: a real pick decision needs full
+#       adaptation -- running this tier at 1/10th measurably cost drafting strength in the all-H-field
+#       awareness validation (aware-field gain -0.0015 at 0.1 vs +0.0008 at 1.0, the no-regret
+#       equilibrium level), so only the warm INIT and the regulariser exemption apply here.
 #   warm, MY roster unchanged since storage     -> 1/100th: only the field moved (opponent picks are
-#       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust.
-_WARM_START_LEARNING_RATE_SCALE = float(os.environ.get('WARM_START_LR_SCALE', '0.1'))
+#       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust. This
+#       static tier is where the display-stability guarantees live.
+_WARM_START_LEARNING_RATE_SCALE = float(os.environ.get('WARM_START_LR_SCALE', '1.0'))
 _WARM_START_STATIC_ROSTER_SCALE = float(os.environ.get('WARM_START_STATIC_LR_SCALE', '0.01'))
 from itertools import combinations
 
