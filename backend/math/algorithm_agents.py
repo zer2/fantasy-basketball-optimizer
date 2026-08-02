@@ -347,9 +347,13 @@ class HAgent:
         # opponent drafts player X as its first pick we reuse X's committed build verbatim, so a priced-in
         # pick confirms the predicted field instead of re-inferring a different build.
         self._player_committed_builds = None
-        # Per-player self-play weights, frozen at populate (each player's converged build vs the
-        # equilibrium field). Warm-starts thin-roster candidate descents and opponent inference.
+        # Per-player self-play weights and flex position shares, frozen at populate (each player's
+        # converged build vs the equilibrium field). The two are ALWAYS stored and applied together — a
+        # build is (category weights + flex allocation), and warm-starting one half while cold-starting
+        # the other would start the descent internally inconsistent. Warm-start thin-roster candidate
+        # descents and seed opponent inference.
         self._player_frozen_weights = None
+        self._player_frozen_shares  = None
         # Row-positions + weights for a partial warm start (set per evaluate when the frozen table only
         # covers part of the batch, e.g. the serve pass); consumed by perform_iterations' seed step.
         self._partial_warm_start_rows = None
@@ -541,6 +545,7 @@ class HAgent:
             # reset before every bootstrap pass, so gate-off behaviour and the populate fixed-point are
             # untouched; uncovered cases fall through to the cold-start seeding below.
             warm_start_weights = None
+            warm_start_shares  = None   # flex shares are PAIRED with the weights: same source, same rows
             self._partial_warm_start_rows = None
             self._warm_start_row_rate_scales = None   # per-row learning-rate multipliers (None = all cold)
             team_state = self._team_states.get(drafter) if self.opponent_model_enabled else None
@@ -553,6 +558,14 @@ class HAgent:
                               else _WARM_START_LEARNING_RATE_SCALE)
                 warm_start_weights = np.array([team_state['category_weights']] * len(x_scores_batch))
                 self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
+                if team_state['position_shares'] is not None:
+                    warm_start_shares = {
+                        pos_code: pd.DataFrame(
+                            np.tile(team_state['position_shares'][pos_code], (len(x_scores_batch), 1)),
+                            columns=pos_info['bases'],
+                        )
+                        for pos_code, pos_info in self.position_structure['flex'].items()
+                    }
             elif self._player_frozen_weights is not None:
                 # Frozen rows were computed on the EMPTY board, so an empty roster is the
                 # unchanged-context case; rosters 1-2 have genuinely diverged from that context.
@@ -560,17 +573,36 @@ class HAgent:
                               else _WARM_START_LEARNING_RATE_SCALE)
                 stored_for_batch = self._player_frozen_weights.reindex(x_scores_batch.index)
                 covered          = ~stored_for_batch.isna().to_numpy().any(axis=1)
+                # Shares come from the same serve result as the weights, so coverage is identical.
+                frozen_shares = self._player_frozen_shares
+                shares_usable = (frozen_shares is not None
+                                 and all(frame is not None for frame in frozen_shares.values()))
                 if covered.all():
                     warm_start_weights = stored_for_batch.to_numpy()
                     self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
+                    if shares_usable:
+                        warm_start_shares = {
+                            pos_code: frame.reindex(x_scores_batch.index).reset_index(drop=True)
+                            for pos_code, frame in frozen_shares.items()
+                        }
                 elif covered.any():
                     # Partial coverage (the serve pass: the bootstrap's final iteration pass only covers
                     # the top-3N anchors). Covered rows warm-start; the rest cold-start via the punt seed
-                    # scan -- the override is applied right after the scan in perform_iterations.
+                    # scan -- the override is applied right after the scan in perform_iterations. Shares
+                    # need no handoff: uniform IS the cold share init, so build the mix directly here.
+                    covered_positions = np.flatnonzero(covered)
                     self._partial_warm_start_rows = (
-                        np.flatnonzero(covered), stored_for_batch.to_numpy()[covered]
+                        covered_positions, stored_for_batch.to_numpy()[covered]
                     )
                     self._warm_start_row_rate_scales = np.where(covered, warm_scale, 1.0)
+                    if shares_usable:
+                        warm_start_shares = {}
+                        for pos_code, pos_info in self.position_structure['flex'].items():
+                            mixed = np.full((len(x_scores_batch), len(pos_info['bases'])),
+                                            1.0 / len(pos_info['bases']))
+                            stored_rows = frozen_shares[pos_code].reindex(x_scores_batch.index).to_numpy()
+                            mixed[covered_positions] = stored_rows[covered_positions]
+                            warm_start_shares[pos_code] = pd.DataFrame(mixed, columns=pos_info['bases'])
 
             # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
             # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
@@ -610,13 +642,18 @@ class HAgent:
                 initial_category_weights = np.array([seed / seed.sum()] * len(x_scores_batch))
             else:
                 initial_category_weights = None
-            initial_position_shares = {
-                pos_code: pd.DataFrame({
-                    base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
-                    for base in pos_info['bases']
-                })
-                for pos_code, pos_info in self.position_structure['flex'].items()
-            }
+            # Flex shares: warm rows carry their stored allocation (paired with the weights above);
+            # everything else starts uniform, which is and was the cold share init.
+            if warm_start_shares is not None:
+                initial_position_shares = warm_start_shares
+            else:
+                initial_position_shares = {
+                    pos_code: pd.DataFrame({
+                        base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
+                        for base in pos_info['bases']
+                    })
+                    for pos_code, pos_info in self.position_structure['flex'].items()
+                }
         else:
             initial_category_weights = np.array(
                 [self.initial_category_weights] * len(x_scores_batch)
@@ -663,12 +700,19 @@ class HAgent:
             best_candidate = result['Scores'].idxmax()
             picks_left     = self.n_picks - 1 - n_players_selected
             future_diff    = result['Future-Diff']
+            shares_frames  = result['Position-Shares']
             self._team_states[drafter] = {
                 'roster_key'       : frozenset(my_players),
                 'category_weights' : result['Weights'].loc[best_candidate].to_numpy(),
                 'mu_edge'          : (future_diff.loc[best_candidate].to_numpy() / picks_left
                                       if future_diff is not None and picks_left > 0
                                       else np.zeros(self.n_categories)),
+                # Paired with the weights: the same candidate's converged flex allocation.
+                'position_shares'  : (
+                    {pos_code: frame.loc[best_candidate].to_numpy()
+                     for pos_code, frame in shares_frames.items()}
+                    if all(frame is not None for frame in shares_frames.values()) else None
+                ),
             }
         return result
 
@@ -1010,10 +1054,14 @@ class HAgent:
                 category_weights, mu_edge = self.infer_opponent_category_weights(
                     team, roster, player_assignments, x_scores_available, cash_remaining_per_team
                 )
+            # position_shares stays None on this path: the inference descent holds flex shares uniform,
+            # so there is no converged allocation to pair with the inferred weights. (An entry with real
+            # shares only comes from the drafter's own evaluates.)
             self._team_states[team] = {
                 'roster_key'       : frozenset(roster),
                 'category_weights' : category_weights,
                 'mu_edge'          : mu_edge,
+                'position_shares'  : None,
             }
 
     def _seed_opponent_weights(self, opponent_team_name, opponent_players, drafted_player):
@@ -1238,13 +1286,18 @@ class HAgent:
         self._correction_cache = None
 
         # Warm-started rows descend at reduced, staleness-tiered rates (see the warm-start scale
-        # constants); cold rows keep the full rate. Per-row rates broadcast through Adam's update.
+        # constants); cold rows keep the full rate. Per-row rates broadcast through Adam's update, and
+        # apply to BOTH optimisers -- weights and flex shares are paired halves of one build, so they
+        # must move (and hold still) together.
         warm_start_row_rate_scales = self._warm_start_row_rate_scales
         self._warm_start_row_rate_scales = None
         if warm_start_row_rate_scales is not None:
-            category_learning_rate = 0.001 * warm_start_row_rate_scales.reshape(-1, 1)
+            rate_column            = warm_start_row_rate_scales.reshape(-1, 1)
+            category_learning_rate = 0.001 * rate_column
+            shares_learning_rate   = _SHARES_LEARNING_RATE * rate_column
         else:
             category_learning_rate = 0.001
+            shares_learning_rate   = _SHARES_LEARNING_RATE
 
         optimizers = {
             'Categories': AdamOptimizer(learning_rate=category_learning_rate),
@@ -1252,7 +1305,7 @@ class HAgent:
             # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
             # logit learning rate is an order of magnitude larger than the old share-space 0.01.
             # One optimiser for the shared per-position logits (every flex slot's softmax reads them).
-            'Shares': AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE),
+            'Shares': AdamOptimizer(learning_rate=shares_learning_rate),
         }
 
         if self.sport == 'MLB':
@@ -1333,9 +1386,10 @@ class HAgent:
             # reduced warm-start step sizes its pull exceeds the descent step, snapping weights exactly
             # onto the singular w==v ray (0/0 -> NaN gradients). Cold rows keep the full schedule.
             if warm_start_row_rate_scales is not None:
-                category_reg_lambda = reg_lambda * (warm_start_row_rate_scales >= 1.0).astype(float).reshape(-1, 1)
+                cold_row_multiplier = (warm_start_row_rate_scales >= 1.0).astype(float).reshape(-1, 1)
             else:
-                category_reg_lambda = reg_lambda
+                cold_row_multiplier = 1.0
+            category_reg_lambda = reg_lambda * cold_row_multiplier
             neutral_row = self.v.reshape(1, self.n_categories)
 
             for iteration in range(max(1, n_iterations)):
@@ -1405,7 +1459,8 @@ class HAgent:
                     if reg_lambda > 0.0:
                         # L1 reg toward uniform on the shared per-position shares (mirrors the category
                         # weights x _POSITION_REG_MULT); re-derive the logits so the pull persists.
-                        pos_reg       = reg_lambda * _POSITION_REG_MULT
+                        # Warm rows are exempt, exactly like the category weights (paired build halves).
+                        pos_reg       = reg_lambda * _POSITION_REG_MULT * cold_row_multiplier
                         master_shares = _softmax_rows(master_logits)
                         uniform       = 1.0 / master_shares.shape[1]
                         dev           = master_shares - uniform
@@ -1822,6 +1877,18 @@ class HAgent:
         self.initial_position_shares  = None
         return self
 
+    def reset_draft_state(self):
+        """Clear all in-draft mutable state, returning the agent to its just-populated condition: the
+        rolling per-team store (inferred opponents + own-build entries) and any injected start weights.
+        Populate artifacts survive -- the frozen player tables, anchor order, default result and punt
+        popularity are properties of the BUILD, not of a draft. Call this at the start of every fresh
+        draft, simulation, or test so nothing leaks across boards (harnesses that poked private
+        attributes for this went silently stale when the attributes were renamed)."""
+        self._team_states                = {}
+        self._partial_warm_start_rows    = None
+        self._warm_start_row_rate_scales = None
+        return self.clear_initial_weights()
+
     def populate_default_h_scores(self, n_iterations: int, cash_remaining_per_team: dict = None) -> None:
         """Compute and cache the base (empty-board) H-scores. Run once at the end of the build so the
         agent is always primed — the throttle has a ranking to prioritise by, auction values have their
@@ -1839,10 +1906,11 @@ class HAgent:
         empty = {f'Team {i + 1}': [] for i in range(self.n_drafters)}
         # Fresh build: drop any prior cache so the passes recompute (the empty-board short-circuit and the
         # throttle both key off these) instead of short-circuiting to stale results.
-        self._team_states           = {}
+        self._team_states              = {}
         self._predicted_anchor_teams   = None
         self._player_committed_builds  = None
-        self._player_frozen_weights = None
+        self._player_frozen_weights    = None
+        self._player_frozen_shares     = None
         self._default_result           = None
         self.default_h_scores          = None
 
@@ -1885,16 +1953,19 @@ class HAgent:
         # elsewhere on flat plateaus, and the first in-draft evaluate then visibly "switches" the build).
         # The rest of the pool cold-starts via the punt seed scan and may drift slightly; acceptable.
         refresh_field(result)
-        self._player_frozen_weights = result['Weights']   # anchor rows: warm-start source for the serve
+        # Anchor rows: warm-start source for the serve (weights and flex shares always travel together).
+        self._player_frozen_weights = result['Weights']
+        self._player_frozen_shares  = result['Position-Shares']
         result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
                                           preserve_frozen_weights=True)
         self.default_h_scores = result['Scores'].sort_values(ascending=False)
         self._default_result  = result
-        # Freeze the per-player self-play weights (each player's converged build vs the equilibrium field,
-        # sitting alongside the committed mu_edge tilts). FROZEN from here on: empty-roster evaluates
-        # warm-start each candidate from its row, and opponent inference seeds from the row of a newly
-        # drafted player. In-draft refresh happens at the TEAM level only (_team_states).
+        # Freeze the per-player self-play weights AND flex shares (each player's converged build vs the
+        # equilibrium field, sitting alongside the committed mu_edge tilts). FROZEN from here on:
+        # empty-roster evaluates warm-start each candidate from its rows, and opponent inference seeds
+        # from the row of a newly drafted player. In-draft refresh is at the TEAM level only (_team_states).
         self._player_frozen_weights = result['Weights']
+        self._player_frozen_shares  = result['Position-Shares']
 
     def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
                             preserve_frozen_weights=False):
@@ -1904,10 +1975,10 @@ class HAgent:
         are scored — the field-building passes only need the top-2N anchors. preserve_frozen_weights keeps
         the frozen table so this pass warm-starts from it (the second serve pass, which polishes the cold
         serve's weights to stationary points)."""
-        self._team_states = {}
+        self.reset_draft_state()
         if not preserve_frozen_weights:
             self._player_frozen_weights = None
-        self.clear_initial_weights()
+            self._player_frozen_shares  = None
         return self.get_h_scores(
             player_assignments      = empty,
             drafter                 = 'Team 1',

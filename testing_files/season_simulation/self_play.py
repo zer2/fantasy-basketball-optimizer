@@ -83,6 +83,9 @@ def draft_and_score(field_session, deviator_session, seat: int, candidate_limit:
     the score is parameter-independent (no future-pick weights), so it is a clean fitness signal.
     candidate_limit prunes each pick to the top-N by the cached generic ranking (same gate the
     autodrafters use) -- the chosen player is essentially always in that slice."""
+    # Fresh draft: clear both agents' in-draft state so nothing leaks from a previous draft.
+    field_session.agent.reset_draft_state()
+    deviator_session.agent.reset_draft_state()
     n_drafters   = field_session.current_params['n_drafters']
     n_picks      = field_session.current_params['n_picks']
     n_iterations = field_session.current_params['n_iterations']
@@ -112,6 +115,8 @@ def draft_population(session_by_seat: dict
     that seat drafts with. Returns the completed assignments."""
     team_names  = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments = {name: [] for name in team_names}
+    for session in set(session_by_seat.values()):
+        session.agent.reset_draft_state()   # fresh draft: no state leaks from a previous draft
 
     for pick_row in range(n_picks):
         for slot in range(n_drafters):
