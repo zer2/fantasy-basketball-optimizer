@@ -29,5 +29,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if report_text:
         terminalreporter.write_sep('=', 'BEHAVIOURAL PROPERTIES REPORT')
         terminalreporter.write(report_text + '\n')
-        page_path = behavior_module.write_behavior_report_files(os.path.dirname(__file__))
-        terminalreporter.write(f'(tabbed report: {page_path}; per-section results in behavior_reports/)\n')
+        if getattr(behavior_module, '_RUN_SIMS', False):
+            # Report mode only: quick default runs must not overwrite full multi-season results.
+            page_path = behavior_module.write_behavior_report_files(os.path.dirname(__file__))
+            terminalreporter.write(f'(tabbed report: {page_path}; per-section results in behavior_reports/)\n')
+        else:
+            terminalreporter.write('(quick mode: stored reports untouched; RUN_BEHAVIOR_SIMS=1 regenerates them)\n')
