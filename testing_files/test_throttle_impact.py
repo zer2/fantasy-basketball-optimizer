@@ -22,6 +22,11 @@ _TOP_N      = 30
 def _evaluate(session, mode, **kwargs):
     """Run an evaluate forcing a specific throttle schedule; return {name: candidate}, [name order]."""
     session.agent._position_mode_override = mode
+    # Control the warm-start hysteresis confound: an evaluate stores the drafter's converged build in
+    # _team_states and the NEXT evaluate warm-starts from it (by design, in the app). Here the two arms
+    # must differ ONLY by throttle schedule, so reset the team store before each arm — both then
+    # warm-start identically (from the frozen per-player table).
+    session.agent._team_states = {}
     res = rank_candidates(session=session, **kwargs)
     return {c.name: c for c in res.candidates}, [c.name for c in res.candidates]
 
