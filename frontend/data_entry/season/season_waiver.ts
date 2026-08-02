@@ -7,8 +7,9 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readTeamNames, readRosterAssignments } from './season_helpers.js'
-import { getCandidatePlayerResults, getPlayerResultsByName } from '../../app_state.js'
+import { getPlayerResultsByName } from '../../app_state.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
+import { highlightCandidate } from '../../table/player_table.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -28,14 +29,10 @@ function lowestGRankPlayer(playerNames: string[]): string | null {
     return worst
 }
 
-/** Adds a highlight class to the dropped player's row in the candidate table. */
+/** Marks the dropped player's row in the candidate table (virtualization-aware: the candidate may be
+ *  outside the current render window, so the mark is tracked by name and applied when its row renders). */
 function highlightDropPlayer(dropPlayer: string): void {
-    const players = getCandidatePlayerResults()
-    if (players === null) return
-    const idx = players.findIndex(p => p.name === dropPlayer)
-    const table = document.getElementById('hscoretable') as HTMLTableElement
-    // table.rows[0] is the thead header; player rows start at 1, interleaved with expand rows
-    table.rows[1 + idx * 2].cells[0].classList.add('waiver-drop-highlight')
+    highlightCandidate(dropPlayer)
 }
 
 // Tracks the listeners attached by the most recent renderWaiverControls call so
