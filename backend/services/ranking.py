@@ -107,8 +107,6 @@ def rank_candidates(
         has_more         = False
         total_candidates = None
 
-    # Clear warm-start weights so this call is independent of any previous one.
-    H = H.clear_initial_weights()
     with record_phase('hscores'):
         h_score_result = H.get_h_scores(
             player_assignments      = player_assignments,

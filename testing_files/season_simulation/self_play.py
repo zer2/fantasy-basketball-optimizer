@@ -74,7 +74,6 @@ def configure(session, theta: np.ndarray) -> None:
     popularity). No rebuild, no data reprocessing."""
     agent = session.agent
     agent.gamma, agent.omega, agent.kappa = float(theta[0]), float(theta[1]), float(theta[2])
-    agent.clear_initial_weights()
     agent.populate_default_h_scores(session.current_params['n_iterations'])
 
 
