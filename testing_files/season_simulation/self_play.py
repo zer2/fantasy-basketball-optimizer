@@ -115,7 +115,7 @@ def draft_population(session_by_seat: dict
     that seat drafts with. Returns the completed assignments."""
     team_names  = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments = {name: [] for name in team_names}
-    for session in set(session_by_seat.values()):
+    for session in {id(s): s for s in session_by_seat.values()}.values():   # Session is unhashable
         session.agent.reset_draft_state()   # fresh draft: no state leaks from a previous draft
 
     for pick_row in range(n_picks):

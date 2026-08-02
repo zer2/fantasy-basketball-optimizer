@@ -10,3 +10,26 @@ os.environ.setdefault('SESSION_SECRET_KEY', 'test-only-session-secret')
 # Pytest's working directory is the project root, so this directory would
 # not otherwise be on the path.
 sys.path.insert(0, os.path.dirname(__file__))
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Render the behavioural-properties report (measurements for a human to read — the behavioural
+    tier is not green/red; the details matter) at the end of the run, and write it to
+    testing_files/behavior_report.md. No-op when no behavioural test recorded anything."""
+    import sys as _sys
+    behavior_module = next(
+        (module for name, module in _sys.modules.items()
+         if name.rsplit('.', 1)[-1] == 'test_behavior_properties' and module is not None),
+        None,
+    )
+    if behavior_module is None:      # behavioural tests were not part of this run
+        return
+    render_behavior_report = behavior_module.render_behavior_report
+    report_text = render_behavior_report()
+    if report_text:
+        terminalreporter.write_sep('=', 'BEHAVIOURAL PROPERTIES REPORT')
+        terminalreporter.write(report_text + '\n')
+        report_path = os.path.join(os.path.dirname(__file__), 'behavior_report.md')
+        with open(report_path, 'w', encoding='utf-8') as report_file:
+            report_file.write(render_behavior_report(markdown=True))
+        terminalreporter.write(f'(written to {report_path})\n')
