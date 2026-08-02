@@ -44,7 +44,8 @@ from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
 _RUN_SIMS = bool(os.environ.get('RUN_BEHAVIOR_SIMS'))
-_SIM_SEATS = int(os.environ.get('BEHAVIOR_SIM_SEATS', '4'))
+# 0 = every seat in the league (the default: one full season's worth of draft positions).
+_SIM_SEATS = int(os.environ.get('BEHAVIOR_SIM_SEATS', '0'))
 
 _FORMATS = {
     'EC':   'Head to Head: Each Category',
@@ -64,10 +65,76 @@ _SHORT_CATEGORY = {
 
 _REPORT: dict = {}
 
+# What each section MEANS — rendered under its header so the report stands alone. Keys must match the
+# titles passed to _record().
+_SECTION_EXPLANATIONS = {
+    'Punt diversity (top-12 anchors)':
+        'For each of the top 12 players, the build the self-play process predicts a team drafted around '
+        'that player would commit to, expressed by its PUNTED categories (expected win rate under 40%). '
+        'Hard punts (under 20%, marked with !) are abandoned categories; soft punts (20-40%) are '
+        'de-emphasised. Shown: how many of the 12 share each punt combination. Healthy: several distinct '
+        'combinations (historically 5-8); one combination shared by everyone = the opponent model has '
+        'collapsed and the app steers every drafter into the same build.',
+    'Rotisserie punting (hard <20% / soft 20-40% expected win rate)':
+        'Rotisserie scores every standings point, so abandoning a category is (mostly) irrational there. '
+        'Hard punt = a top-12 build expecting to win a category under 20% of the time (want ZERO); soft '
+        'punt = 20-40% (a mild lean; a few are fine). Also shown: the single weakest category expectation '
+        'across all 12 builds. H2H formats, by contrast, punt hard on purpose.',
+    'Predicted-pick stability (EC; opponent takes its predicted player)':
+        'Evaluate all candidates, let an opponent take exactly the player the model already predicted '
+        'for them, evaluate again. "Level shift" = how much every candidate moved together (drafts: ~0; '
+        'auctions: legitimately nonzero, the bought player leaves the market and prices rescale). '
+        '"Max residual |dH|" = the biggest movement of any single candidate RELATIVE to the field, in '
+        'H-score percentage points — this is the lurch number; a predicted pick should be pre-priced, so '
+        'want well under 1. "Max |dweight|" = biggest change in any displayed build weight (display '
+        'units, 100 = neutral); want a few points at most.',
+    'Self-play convergence (MC bootstrap)':
+        'The pre-draft bootstrap alternates predict-field / best-respond for ~15 passes. "Consecutive-'
+        'cos" = how little the predicted field\'s punt profile rotates between the final passes (1.0 = '
+        'not rotating at all = settled; low or bouncing = oscillation). "Locks by pass N/M" = the pass '
+        'after which the field\'s top-3 punt set stopped changing — want it locked well before the end.',
+    'H-scoring vs a G-score field (kappa exception applies)':
+        'Full snake drafts: one seat drafts by H-score, the other 11 pick greedily by G-score. The '
+        'number = the H seat\'s expected head-to-head category win rate against that field (50.0 = '
+        'break-even; every point above is real edge). Per-seat values are draft positions 1..N — later '
+        'positions are genuinely harder. This is the most basic utility claim of the whole system.',
+    'Awareness (opponent model on vs off)':
+        'Identical drafts by the same seat with the opponent model ON minus OFF; gain is in H-score '
+        'percentage points (+1.0 = one extra point of expected category win rate). vs an UNAWARE H '
+        'field: kappa already prices punt-crowding, so expect a small positive-to-zero gain — clearly '
+        'negative would mean the model hurts against naive H-drafters. vs a G field: the model\'s '
+        'predictions are simply wrong there (G drafters never punt), so the property is harmlessness, '
+        'gain ~0.',
+    'Warm start (purpose: display stability, not better answers)':
+        'Same evaluate with descents warm-started from stored builds vs cold-started from seed scans, '
+        'equal iteration budget; numbers are mean H (percentage points) of the top 12 candidates. Warm '
+        'starting exists to keep displayed strategies CONSISTENT with what the user was already shown — '
+        'the expectation here is parity (stability must not cost convergence), and the stability itself '
+        'is measured by predicted-pick stability above.',
+    'Multi-start seeding':
+        'Base H-scores computed with the punt seed scan (try one gentle punt per category, keep each '
+        'candidate\'s best) vs a single neutral seed; numbers are mean H (percentage points) of the top '
+        '12. The scan should win: without it, candidates whose true build is a committed punt get stuck '
+        'near neutral.',
+}
+
 
 def _record(section, line):
     _REPORT.setdefault(section, []).append(line)
     print(f'\n[{section}] {line}')
+
+
+def _wrap(text, width=96):
+    words, lines, current = text.split(), [], ''
+    for word in words:
+        if current and len(current) + 1 + len(word) > width:
+            lines.append(current)
+            current = word
+        else:
+            current = f'{current} {word}'.strip()
+    if current:
+        lines.append(current)
+    return lines
 
 
 def render_behavior_report(markdown=False):
@@ -76,14 +143,147 @@ def render_behavior_report(markdown=False):
     lines = []
     for section, entries in _REPORT.items():
         lines.append(f'## {section}' if markdown else section)
+        explanation = _SECTION_EXPLANATIONS.get(section)
+        if explanation:
+            if markdown:
+                lines.append(f'*{explanation}*')
+                lines.append('')
+            else:
+                lines.extend(f'  | {wrapped}' for wrapped in _wrap(explanation))
         for entry in entries:
-            lines.append(f'- {entry}' if markdown else f'    {entry}')
+            lines.append(f'- **{entry}**' if markdown else f'    {entry}')
         lines.append('')
     return '\n'.join(lines)
 
 
 def _short_names(categories, indices):
     return '/'.join(_SHORT_CATEGORY.get(categories[i], categories[i]) for i in sorted(indices))
+
+
+# ── persistent per-section results + one tabbed report page ──────────────────
+# Each run persists ONLY the sections it measured to behavior_reports/<slug>.json — so running any
+# subset of tests (pytest -k ...) regenerates just those results while the rest keep their last
+# measurement — then rebuilds ONE tabbed behavior_report.html from every stored section, fresh and
+# stale alike, each tab labelled with its own generation time.
+
+_REPORT_PAGE_CSS = """
+  :root { --bg:#ffffff; --fg:#26282e; --muted:#6a6f7a; --line:#e4e6ea; --card:#f7f8fa; --accent:#33556e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161c; --fg:#e6e8ec; --muted:#9aa0ab; --line:#2c303a; --card:#1b1e26; --accent:#8fb4d1; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 940px; margin: 0 auto; padding: 28px 20px 64px; }
+  h1 { font-size: 1.35rem; margin: 0 0 2px; }
+  .stamp { color: var(--muted); font-size: .85rem; margin-bottom: 18px; }
+  nav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  nav button { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:8px;
+               padding:6px 11px; font-size:.85rem; cursor:pointer; }
+  nav button.active { border-color:var(--accent); color:var(--accent); font-weight:600; }
+  section { display:none; }
+  section.active { display:block; }
+  h2 { font-size: 1.05rem; margin: 4px 0 2px; color: var(--accent); }
+  .generated { color: var(--muted); font-size: .8rem; margin-bottom: 10px; }
+  .explain { color: var(--muted); font-size: .9rem; margin: 0 0 12px; max-width: 75ch; }
+  ul { list-style:none; margin:0; padding:0; background:var(--card); border:1px solid var(--line);
+       border-radius:10px; }
+  li { font-family: ui-monospace, Consolas, monospace; font-size: .87rem; padding: 8px 12px;
+       border-top: 1px solid var(--line); overflow-x:auto; white-space:nowrap; }
+  li:first-child { border-top:none; }
+"""
+
+
+def _section_slug(title):
+    import re
+    return re.sub(r'[^a-z0-9]+', '_', title.lower()).strip('_')[:60]
+
+
+def _load_stored_sections(reports_dir):
+    """All persisted section results, in the canonical _SECTION_EXPLANATIONS order."""
+    import json
+    import os as _os
+    stored = {}
+    if _os.path.isdir(reports_dir):
+        for name in _os.listdir(reports_dir):
+            if name.endswith('.json'):
+                with open(_os.path.join(reports_dir, name), encoding='utf-8') as stored_file:
+                    data = json.load(stored_file)
+                stored[data['title']] = data
+    ordered = [stored.pop(title) for title in _SECTION_EXPLANATIONS if title in stored]
+    return ordered + list(stored.values())
+
+
+def write_behavior_report_files(base_directory):
+    """Persist this run's sections, rebuild the tabbed page from everything stored. Returns the page path."""
+    import json
+    import os as _os
+    from datetime import datetime
+    from html import escape
+
+    reports_dir = _os.path.join(base_directory, 'behavior_reports')
+    _os.makedirs(reports_dir, exist_ok=True)
+    stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    for section, entries in _REPORT.items():
+        payload = {
+            'title':       section,
+            'explanation': _SECTION_EXPLANATIONS.get(section, ''),
+            'entries':     entries,
+            'generated':   stamp,
+        }
+        with open(_os.path.join(reports_dir, f'{_section_slug(section)}.json'), 'w',
+                  encoding='utf-8') as stored_file:
+            json.dump(payload, stored_file, indent=1)
+
+    sections = _load_stored_sections(reports_dir)
+    tabs, panels = [], []
+    for position, data in enumerate(sections):
+        title = data['title']
+        short = title.split(' (')[0]
+        active = ' class="active"' if position == 0 else ''
+        tabs.append(f'<button data-tab="{position}"{active}>{escape(short)}</button>')
+        rows = '\n'.join(f'<li>{escape(entry)}</li>' for entry in data['entries'])
+        panels.append(
+            f'<section id="tab-{position}"{active}>\n<h2>{escape(title)}</h2>\n'
+            f'<div class="generated">generated {escape(data["generated"])}</div>\n'
+            f'<p class="explain">{escape(data["explanation"])}</p>\n<ul>{rows}</ul>\n</section>'
+        )
+
+    newline = '\n'
+    page = (
+        '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        '<title>Behavioural properties report</title>\n'
+        f'<style>{_REPORT_PAGE_CSS}</style></head><body><main>\n'
+        '<h1>Behavioural properties report</h1>\n'
+        '<div class="stamp">Season 2024-25 &middot; measurements for human judgment — this tier has no '
+        'exact right answers; each tab regenerates independently when its test runs and keeps its own '
+        'timestamp.</div>\n'
+        f'<nav>{"".join(tabs)}</nav>\n'
+        f'{newline.join(panels)}\n'
+        '<script>\n'
+        'document.querySelectorAll("nav button").forEach(function (button) {\n'
+        '  button.addEventListener("click", function () {\n'
+        '    document.querySelectorAll("nav button, section").forEach(function (node) {\n'
+        '      node.classList.remove("active");\n'
+        '    });\n'
+        '    button.classList.add("active");\n'
+        '    document.getElementById("tab-" + button.dataset.tab).classList.add("active");\n'
+        '  });\n'
+        '});\n'
+        '</script>\n</main></body></html>'
+    )
+    page_path = _os.path.join(base_directory, 'behavior_report.html')
+    with open(page_path, 'w', encoding='utf-8') as page_file:
+        page_file.write(page)
+
+    with open(_os.path.join(base_directory, 'behavior_report.md'), 'w', encoding='utf-8') as md_file:
+        for data in sections:
+            md_file.write(f'# {data["title"]}\n\n_{data["explanation"]}_\n\n')
+            for entry in data['entries']:
+                md_file.write(f'- {entry}\n')
+            md_file.write(f'\n(generated {data["generated"]})\n\n')
+    return page_path
 
 
 # ── session helpers ───────────────────────────────────────────────────────────
@@ -112,17 +312,34 @@ def sessions():
     return get
 
 
-def _punt_set(weight_row, neutral_v, n_punts=3):
-    """The n_punts most-punted categories of a weight vector, judged relative to neutral v."""
-    ratio = np.asarray(weight_row, dtype=float) / neutral_v
-    return tuple(sorted(np.argsort(ratio)[:n_punts].tolist()))
+# Punt classification, in expected category WIN RATE (the percentages shown in the app):
+#   hard punt: < 20% -- the build has abandoned the category
+#   soft punt: 20-40% -- deliberately de-emphasised but not abandoned
+_HARD_PUNT_RATE = 0.20
+_SOFT_PUNT_RATE = 0.40
 
 
-def _anchor_weight_rows(agent, count=12):
-    """(player, weight_row) for the top `count` players by served H-score, from the frozen table."""
-    assert agent._player_frozen_weights is not None, 'populate should have frozen the player weights'
-    top = [p for p in agent.default_h_scores.index if p in agent._player_frozen_weights.index][:count]
-    return [(p, agent._player_frozen_weights.loc[p].to_numpy()) for p in top]
+def _anchor_rate_rows(agent, count=12):
+    """(player, per-category expected win rates 0-1) for the top `count` players by served H-score."""
+    rates = agent._default_result['Rates']
+    top = [p for p in agent.default_h_scores.index if p in rates.index][:count]
+    return [(p, rates.loc[p].to_numpy()) for p in top]
+
+
+def _classify_punts(rate_row):
+    """frozenset of (category_index, is_hard) for every punted category of one build."""
+    rates = np.asarray(rate_row, dtype=float)
+    return frozenset((i, bool(rates[i] < _HARD_PUNT_RATE))
+                     for i in np.flatnonzero(rates < _SOFT_PUNT_RATE))
+
+
+def _punt_label(categories, punt_set):
+    """Readable label: hard punts marked '!', e.g. '3s!/FT%/TO' (3s abandoned, FT%+TO soft)."""
+    if not punt_set:
+        return '(no punts)'
+    parts = sorted((_SHORT_CATEGORY.get(categories[i], categories[i]) + ('!' if hard else ''))
+                   for i, hard in punt_set)
+    return '/'.join(parts)
 
 
 # ── FAST: punt diversity (MC + EC, draft + auction) ──────────────────────────
@@ -135,14 +352,16 @@ def test_punt_diversity(sessions, format_key, auction):
     session = sessions(format_key, auction)
     agent   = session.agent
     categories = session.current_params['categories']
-    neutral = agent.v.reshape(-1)
-    punts   = [_punt_set(row, neutral) for _, row in _anchor_weight_rows(agent)]
+    punts   = [_classify_punts(rates) for _, rates in _anchor_rate_rows(agent)]
     distinct = len(set(punts))
     from collections import Counter
-    breakdown = ', '.join(f'{_short_names(categories, s)} x{n}'
-                          for s, n in Counter(punts).most_common())
+    breakdown = ', '.join(f'{_punt_label(categories, punt_set)} x{count}'
+                          for punt_set, count in Counter(punts).most_common())
+    hard_total = sum(1 for punt_set in punts for _, hard in punt_set if hard)
+    soft_total = sum(1 for punt_set in punts for _, hard in punt_set if not hard)
     _record('Punt diversity (top-12 anchors)',
-            f'{format_key:4} {"auction" if auction else "draft":7}: {distinct} distinct — {breakdown}')
+            f'{format_key:4} {"auction" if auction else "draft":7}: {distinct} distinct builds, '
+            f'{hard_total} hard / {soft_total} soft punts — {breakdown}')
     assert distinct >= 3, (
         f'{format_key}: the top {len(punts)} anchors share only {distinct} punt set(s) — '
         f'the predicted field has collapsed: {breakdown}'
@@ -155,15 +374,21 @@ def test_punt_diversity(sessions, format_key, auction):
 def test_roto_minimal_punting(sessions, auction):
     """Rotisserie rewards every category point, so committed hard punts are (mostly) irrational; the
     self-play field should learn shallow leans, not the H2H-style full punts."""
-    agent   = sessions('Roto', auction).agent
-    neutral = agent.v.reshape(-1)
-    depths  = [1.0 - float(np.min(np.asarray(row) / neutral))
-               for _, row in _anchor_weight_rows(agent)]
-    _record('Rotisserie punt depth (1.0 = full punt; want shallow)',
-            f'{"auction" if auction else "draft":7}: max {max(depths):.2f}, mean {np.mean(depths):.2f} '
-            f'across top-{len(depths)} anchors')
-    assert max(depths) < 0.75, f'a Roto anchor fully punts a category (depth {max(depths):.2f})'
-    assert float(np.mean(depths)) < 0.45, f'Roto anchors punt too deep on average ({np.mean(depths):.2f})'
+    session = sessions('Roto', auction)
+    agent   = session.agent
+    categories = session.current_params['categories']
+    rows = _anchor_rate_rows(agent)
+    hard_count = sum(1 for _, rates in rows for r in rates if r < _HARD_PUNT_RATE)
+    soft_count = sum(1 for _, rates in rows for r in rates if _HARD_PUNT_RATE <= r < _SOFT_PUNT_RATE)
+    weakest_player, weakest_rates = min(rows, key=lambda pr: float(np.min(pr[1])))
+    weakest_idx = int(np.argmin(weakest_rates))
+    _record('Rotisserie punting (hard <20% / soft 20-40% expected win rate)',
+            f'{"auction" if auction else "draft":7}: {hard_count} hard, {soft_count} soft punts across '
+            f'top-{len(rows)} anchors; weakest category '
+            f'{_SHORT_CATEGORY.get(categories[weakest_idx], categories[weakest_idx])} at '
+            f'{100 * float(np.min(weakest_rates)):.0f}% ({weakest_player.split(" (")[0]})')
+    assert hard_count == 0, f'{hard_count} HARD punt(s) in Rotisserie — irrational category abandonment'
+    assert soft_count <= 2 * len(rows), f'Roto anchors soft-punting excessively ({soft_count})'
 
 
 # ── FAST: early-pick stability (draft + auction) ─────────────────────────────
@@ -320,10 +545,11 @@ def test_h_scoring_beats_g_field(format_key):
     # beth=0, the season-sim convention: historical stats are objectively correct, and the Bayesian
     # self-doubt (beth) only regresses draft-time H toward average, diluting the measurement.
     session = _build_session(_FORMATS[format_key], kappa=0.0, beth=0)
-    scores  = [_draft_h_seat_in_g_field(session, seat) for seat in range(_SIM_SEATS)]
+    n_seats = _SIM_SEATS or session.current_params['n_drafters']
+    scores  = [_draft_h_seat_in_g_field(session, seat) for seat in range(n_seats)]
     _record('H-scoring vs a G-score field (kappa exception applies)',
-            f'{format_key:4}: mean {np.mean(scores):.4f} over {len(scores)} seats — '
-            f'per-seat {[round(s, 3) for s in scores]}')
+            f'{format_key:4}: mean win rate {100 * np.mean(scores):.1f} over {len(scores)} seats — '
+            f'per-seat {[round(100 * s, 1) for s in scores]}')
     assert float(np.mean(scores)) > 0.52, f'H-scoring failed to beat a G field: {scores}'
 
 
@@ -359,14 +585,14 @@ def test_awareness_vs_unaware_h_field():
         return float(scores[scores.idxmax()])
 
     gains = []
-    for seat in range(_SIM_SEATS):
+    for seat in range(_SIM_SEATS or n_drafters):
         unaware_field = {i: field_sessions[i] for i in range(n_drafters)}
         aware_arm     = dict(unaware_field)
         aware_arm[seat] = aware_deviator
         gains.append(deviator_score(aware_arm, seat) - deviator_score(unaware_field, seat))
     _record('Awareness (opponent model on vs off)',
-            f'vs UNAWARE H field (app kappa): mean gain {np.mean(gains):+.4f} — '
-            f'per-seat {[round(g, 4) for g in gains]}')
+            f'vs UNAWARE H field (app kappa): mean gain {100 * np.mean(gains):+.2f}pp over {len(gains)} seats — '
+            f'per-seat {[round(100 * g, 2) for g in gains]}')
     assert float(np.mean(gains)) > -0.01, f'awareness materially harmful vs an unaware H field: {gains}'
 
 
@@ -375,12 +601,13 @@ def test_awareness_not_harmful_vs_g_field():
     """Awareness mispredicts a G field (G drafters do not punt) — that misprediction must be harmless."""
     aware   = _build_session(_FORMATS['EC'], kappa=0.0, use_opponent_awareness=True, beth=0)
     unaware = _build_session(_FORMATS['EC'], kappa=0.0, use_opponent_awareness=False, beth=0)
+    n_seats = _SIM_SEATS or aware.current_params['n_drafters']
     gains = []
-    for seat in range(_SIM_SEATS):
+    for seat in range(n_seats):
         gains.append(_draft_h_seat_in_g_field(aware, seat) - _draft_h_seat_in_g_field(unaware, seat))
     _record('Awareness (opponent model on vs off)',
-            f'vs G field (kappa exception): mean gain {np.mean(gains):+.4f} '
-            f'(want: not materially negative) — per-seat {[round(g, 4) for g in gains]}')
+            f'vs G field (kappa exception): mean gain {100 * np.mean(gains):+.2f}pp over {len(gains)} seats '
+            f'(want: not materially negative) — per-seat {[round(100 * g, 2) for g in gains]}')
     assert float(np.mean(gains)) > -0.01, f'awareness is harmful against a G field: {gains}'
 
 
@@ -431,10 +658,10 @@ def test_multi_start_seeding_helps():
     neutral.agent.reset_draft_state()
     neutral.agent.populate_default_h_scores(neutral.current_params['n_iterations'])
 
-    scan_mean    = float(punt_scan.agent.default_h_scores.head(12).mean())
-    neutral_mean = float(neutral.agent.default_h_scores.head(12).mean())
+    scan_mean    = float(100 * punt_scan.agent.default_h_scores.head(12).mean())
+    neutral_mean = float(100 * neutral.agent.default_h_scores.head(12).mean())
     _record('Multi-start seeding',
-            f'top-12 mean base H: punt seed scan {scan_mean:.3f} vs single neutral seed {neutral_mean:.3f}')
-    assert scan_mean >= neutral_mean - 0.001, (
+            f'top-12 mean base H: punt seed scan {scan_mean:.1f} vs single neutral seed {neutral_mean:.1f} (percentage points)')
+    assert scan_mean >= neutral_mean - 0.1, (
         f'the punt seed scan scores below a single neutral seed ({scan_mean:.3f} vs {neutral_mean:.3f})'
     )

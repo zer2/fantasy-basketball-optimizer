@@ -29,7 +29,5 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if report_text:
         terminalreporter.write_sep('=', 'BEHAVIOURAL PROPERTIES REPORT')
         terminalreporter.write(report_text + '\n')
-        report_path = os.path.join(os.path.dirname(__file__), 'behavior_report.md')
-        with open(report_path, 'w', encoding='utf-8') as report_file:
-            report_file.write(render_behavior_report(markdown=True))
-        terminalreporter.write(f'(written to {report_path})\n')
+        page_path = behavior_module.write_behavior_report_files(os.path.dirname(__file__))
+        terminalreporter.write(f'(tabbed report: {page_path}; per-section results in behavior_reports/)\n')

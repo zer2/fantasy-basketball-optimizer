@@ -63,3 +63,5 @@ screenshot_review/
 # Node deps (screenshot tooling etc.) — installed, not committed
 node_modules/
 testing_files/behavior_report.md
+testing_files/behavior_report.html
+testing_files/behavior_reports/
