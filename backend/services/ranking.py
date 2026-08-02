@@ -457,14 +457,21 @@ def _build_g_score_rows(
     where diff_means is the current team's x-score differential versus all
     opponents simultaneously (axis=2 of diff_means is the opponent dimension;
     the mean collapses it to a single average-across-opponents value).
-    diff_means is the same for every candidate since it depends only on the
-    players already drafted.  expected_future_diff is the algorithm's
-    projection for the picks remaining, which does vary per candidate.
+    expected_future_diff is the algorithm's projection for the picks
+    remaining, which varies per candidate.
 
     Therefore:
         current_diff = res['Diff'] - res['Future-Diff']
                      = (future_diff + diff_means) - future_diff
-                     = diff_means        ← same value for every candidate
+                     = diff_means
+
+    With the opponent model OFF, diff_means depends only on the players
+    already drafted, so Current diff is identical for every candidate. With
+    the model ON it is candidate-dependent for the predicted-anchor
+    candidates: self-exclusion swaps the candidate's own predicted team out
+    of its field for the spare anchor's team (you never play against your own
+    team), so a stronger anchor shows a less negative Current diff, while
+    every non-anchor candidate shares one identical field.
 
     Both diff DataFrames store values in x-score space (divided by v during
     computation).  Multiplying by original_v converts them back to G-score
