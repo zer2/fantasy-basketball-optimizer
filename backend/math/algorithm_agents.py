@@ -503,10 +503,27 @@ class HAgent:
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
         if self.initial_category_weights is None:
+            # Warm start from each candidate's own stored converged weights (the running tally kept
+            # alongside the committed mu_edge builds) whenever the whole batch is covered. Starting a
+            # candidate inside its previously-chosen basin removes the evaluate-to-evaluate vacillation of
+            # the multi-start seed scan: near a boundary between two near-tied builds, a cold scan's argmax
+            # flips on tiny field changes and the descent can stall midway between basins (seen as sudden
+            # dollar-value dips), while a warm start converges fully and only switches builds when the
+            # field genuinely favours the other basin. The store is None with the opponent model off and is
+            # reset before every bootstrap pass, so gate-off behaviour and the populate fixed-point are
+            # untouched; uncovered batches (new pool players) fall back to the cold-start seeding below.
+            warm_start_weights = None
+            if self._latest_candidate_weights is not None:
+                stored_for_batch = self._latest_candidate_weights.reindex(x_scores_batch.index)
+                if not stored_for_batch.isna().to_numpy().any():
+                    warm_start_weights = stored_for_batch.to_numpy()
+
             # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
             # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
             # heuristic init instead, for A/B testing the seeding against the baseline.
-            if self.seed_mode == 'heuristic':
+            if warm_start_weights is not None:
+                initial_category_weights = warm_start_weights
+            elif self.seed_mode == 'heuristic':
                 default_weights = self.v.T.reshape(1, self.n_categories, 1)
                 category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
                 if self.pos_avg is not None:
