@@ -136,6 +136,14 @@ _OPPONENT_SMOOTHING = float(os.environ.get('OPPONENT_SMOOTHING', '0.3'))
 # (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
 # the session's full n_iterations for accurate base H-scores.
 _OPPONENT_PASS_ITERATIONS = int(os.environ.get('OPPONENT_PASS_ITERATIONS', '15'))
+# Learning-rate scale for WARM-STARTED category descents. A warm start begins inside an established
+# basin, so the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds),
+# full-size Adam steps wander a full step-length per evaluate regardless of how converged the start is,
+# visibly flipping the displayed build between evaluates. Small steps pin the plateau AND converge
+# better in genuine-change cases (the gain there comes from the board, not from weight travel; measured
+# H 52.37 -> 52.51 on the Jokic-joins-my-team case). Cold-started rows keep the full rate: they must
+# travel from a generic punt seed to their basin.
+_WARM_START_LEARNING_RATE_SCALE = float(os.environ.get('WARM_START_LR_SCALE', '0.1'))
 from itertools import combinations
 
 from backend.math.algorithm_helpers import (
@@ -330,9 +338,14 @@ class HAgent:
         # opponent drafts player X as its first pick we reuse X's committed build verbatim, so a priced-in
         # pick confirms the predicted field instead of re-inferring a different build.
         self._player_committed_builds = None
-        # Running tally of our own converged per-candidate weights, merged across picks; warm-starts
-        # opponent inference for the player an opponent just took.
+        # Per-player self-play weights, frozen at populate (each player's converged build vs the
+        # equilibrium field). Warm-starts thin-roster candidate descents and opponent inference.
         self._player_frozen_weights = None
+        # Row-positions + weights for a partial warm start (set per evaluate when the frozen table only
+        # covers part of the batch, e.g. the serve pass); consumed by perform_iterations' seed step.
+        self._partial_warm_start_rows = None
+        # Per-row flag: which candidate rows were warm-started (they descend at the reduced rate).
+        self._warm_start_row_mask = None
 
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[
@@ -519,14 +532,27 @@ class HAgent:
             # reset before every bootstrap pass, so gate-off behaviour and the populate fixed-point are
             # untouched; uncovered cases fall through to the cold-start seeding below.
             warm_start_weights = None
+            self._partial_warm_start_rows = None
+            self._warm_start_row_mask     = None   # rows descending at the reduced warm-start rate
             team_state = self._team_states.get(drafter) if self.opponent_model_enabled else None
             if (n_players_selected >= _WEAKNESS_SEED_MIN_ROSTER and team_state is not None
                     and team_state['category_weights'] is not None):
                 warm_start_weights = np.array([team_state['category_weights']] * len(x_scores_batch))
+                self._warm_start_row_mask = np.ones(len(x_scores_batch), dtype=bool)
             elif self._player_frozen_weights is not None:
                 stored_for_batch = self._player_frozen_weights.reindex(x_scores_batch.index)
-                if not stored_for_batch.isna().to_numpy().any():
+                covered          = ~stored_for_batch.isna().to_numpy().any(axis=1)
+                if covered.all():
                     warm_start_weights = stored_for_batch.to_numpy()
+                    self._warm_start_row_mask = np.ones(len(x_scores_batch), dtype=bool)
+                elif covered.any():
+                    # Partial coverage (the serve pass: the bootstrap's final iteration pass only covers
+                    # the top-3N anchors). Covered rows warm-start; the rest cold-start via the punt seed
+                    # scan -- the override is applied right after the scan in perform_iterations.
+                    self._partial_warm_start_rows = (
+                        np.flatnonzero(covered), stored_for_batch.to_numpy()[covered]
+                    )
+                    self._warm_start_row_mask = covered
 
             # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
             # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
@@ -1193,8 +1219,19 @@ class HAgent:
         # Stale correction terms must never leak across boards or candidate batches.
         self._correction_cache = None
 
+        # Warm-started rows descend at a reduced rate (see _WARM_START_LEARNING_RATE_SCALE); cold rows
+        # keep the full rate. Per-row rates broadcast through Adam's elementwise update.
+        if self._warm_start_row_mask is not None:
+            category_learning_rate = np.where(
+                self._warm_start_row_mask.reshape(-1, 1),
+                0.001 * _WARM_START_LEARNING_RATE_SCALE, 0.001,
+            )
+            self._warm_start_row_mask = None
+        else:
+            category_learning_rate = 0.001
+
         optimizers = {
-            'Categories': AdamOptimizer(learning_rate=0.001),
+            'Categories': AdamOptimizer(learning_rate=category_learning_rate),
             # Shares are optimised in softmax-logit space (see the update below). A logit must travel
             # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
             # logit learning rate is an order of magnitude larger than the old share-space 0.01.
@@ -1262,6 +1299,13 @@ class HAgent:
                     candidate_player_array, team_so_far_array, n_players_selected,
                     sigma_2_m, pitching_preference,
                 )
+                # Mixed warm start: rows with stored converged weights (set by get_h_scores when the
+                # frozen table only partially covers the batch) override their cold seeds.
+                if self._partial_warm_start_rows is not None:
+                    covered_positions, covered_weights = self._partial_warm_start_rows
+                    category_weights = category_weights.copy()
+                    category_weights[covered_positions] = covered_weights
+                    self._partial_warm_start_rows = None
 
             # Robustness regulariser: soft-threshold the category weights toward neutral v each iteration
             # (proximal step for an L1 penalty -lambda*||w-v||_1), strongest on an empty roster and
@@ -1810,8 +1854,15 @@ class HAgent:
                         + _OPPONENT_SMOOTHING * (result['Future-Diff'] / (self.n_picks - 1))
 
         # Serve the full-pool base H-scores against the converged field (in-draft evaluates use it too).
+        # The serve WARM-STARTS from the final iteration pass's weights where they exist -- the top-3N
+        # anchors, the players whose displayed builds actually get scrutinised -- so their served builds
+        # continue the bootstrap's converged builds instead of re-deriving cold (a cold re-derive lands
+        # elsewhere on flat plateaus, and the first in-draft evaluate then visibly "switches" the build).
+        # The rest of the pool cold-starts via the punt seed scan and may drift slightly; acceptable.
         refresh_field(result)
-        result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team, candidate_subset=None)
+        self._player_frozen_weights = result['Weights']   # anchor rows: warm-start source for the serve
+        result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
+                                          preserve_frozen_weights=True)
         self.default_h_scores = result['Scores'].sort_values(ascending=False)
         self._default_result  = result
         # Freeze the per-player self-play weights (each player's converged build vs the equilibrium field,
@@ -1820,13 +1871,17 @@ class HAgent:
         # drafted player. In-draft refresh happens at the TEAM level only (_team_states).
         self._player_frozen_weights = result['Weights']
 
-    def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None):
+    def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
+                            preserve_frozen_weights=False):
         """One empty-board base-H-score solve against the current _predicted_anchor_teams field. Clears the
         per-pass warm start and inferred-opponent store first (the empty board has no real opponents, so
         only the committed archetype field differs between passes). candidate_subset narrows which players
-        are scored — the field-building passes only need the top-2N anchors."""
-        self._team_states           = {}
-        self._player_frozen_weights = None
+        are scored — the field-building passes only need the top-2N anchors. preserve_frozen_weights keeps
+        the frozen table so this pass warm-starts from it (the second serve pass, which polishes the cold
+        serve's weights to stationary points)."""
+        self._team_states = {}
+        if not preserve_frozen_weights:
+            self._player_frozen_weights = None
         self.clear_initial_weights()
         return self.get_h_scores(
             player_assignments      = empty,
