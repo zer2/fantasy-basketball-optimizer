@@ -136,14 +136,19 @@ _OPPONENT_SMOOTHING = float(os.environ.get('OPPONENT_SMOOTHING', '0.3'))
 # (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
 # the session's full n_iterations for accurate base H-scores.
 _OPPONENT_PASS_ITERATIONS = int(os.environ.get('OPPONENT_PASS_ITERATIONS', '15'))
-# Learning-rate scale for WARM-STARTED category descents. A warm start begins inside an established
-# basin, so the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds),
-# full-size Adam steps wander a full step-length per evaluate regardless of how converged the start is,
-# visibly flipping the displayed build between evaluates. Small steps pin the plateau AND converge
-# better in genuine-change cases (the gain there comes from the board, not from weight travel; measured
-# H 52.37 -> 52.51 on the Jokic-joins-my-team case). Cold-started rows keep the full rate: they must
-# travel from a generic punt seed to their basin.
+# Learning-rate scales for WARM-STARTED category descents, tiered by how far the optimum can plausibly
+# have moved since the stored weights were computed. A warm start begins inside an established basin, so
+# the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds), full-size Adam
+# steps wander a full step-length per evaluate regardless of how converged the start is, visibly flipping
+# the displayed build between evaluates. Small steps pin the plateau AND converge better in
+# genuine-change cases (the gain there comes from the board, not from weight travel; measured
+# H 52.37 -> 52.51 on the Jokic-joins-my-team case). Three tiers:
+#   cold start (no stored weights)              -> full rate: must travel from a generic punt seed.
+#   warm, MY roster changed since storage       -> 1/10th: real context shift, moderate adjustment.
+#   warm, MY roster unchanged since storage     -> 1/100th: only the field moved (opponent picks are
+#       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust.
 _WARM_START_LEARNING_RATE_SCALE = float(os.environ.get('WARM_START_LR_SCALE', '0.1'))
+_WARM_START_STATIC_ROSTER_SCALE = float(os.environ.get('WARM_START_STATIC_LR_SCALE', '0.01'))
 from itertools import combinations
 
 from backend.math.algorithm_helpers import (
@@ -344,8 +349,8 @@ class HAgent:
         # Row-positions + weights for a partial warm start (set per evaluate when the frozen table only
         # covers part of the batch, e.g. the serve pass); consumed by perform_iterations' seed step.
         self._partial_warm_start_rows = None
-        # Per-row flag: which candidate rows were warm-started (they descend at the reduced rate).
-        self._warm_start_row_mask = None
+        # Per-row learning-rate multipliers for warm-started candidate rows (None = all cold/full rate).
+        self._warm_start_row_rate_scales = None
 
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[
@@ -533,18 +538,27 @@ class HAgent:
             # untouched; uncovered cases fall through to the cold-start seeding below.
             warm_start_weights = None
             self._partial_warm_start_rows = None
-            self._warm_start_row_mask     = None   # rows descending at the reduced warm-start rate
+            self._warm_start_row_rate_scales = None   # per-row learning-rate multipliers (None = all cold)
             team_state = self._team_states.get(drafter) if self.opponent_model_enabled else None
             if (n_players_selected >= _WEAKNESS_SEED_MIN_ROSTER and team_state is not None
                     and team_state['category_weights'] is not None):
+                # Tier by staleness: an unchanged roster means only the field moved since the entry was
+                # stored, so the optimum has barely moved and the descent should barely move either.
+                roster_unchanged = team_state['roster_key'] == frozenset(my_players)
+                warm_scale = (_WARM_START_STATIC_ROSTER_SCALE if roster_unchanged
+                              else _WARM_START_LEARNING_RATE_SCALE)
                 warm_start_weights = np.array([team_state['category_weights']] * len(x_scores_batch))
-                self._warm_start_row_mask = np.ones(len(x_scores_batch), dtype=bool)
+                self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
             elif self._player_frozen_weights is not None:
+                # Frozen rows were computed on the EMPTY board, so an empty roster is the
+                # unchanged-context case; rosters 1-2 have genuinely diverged from that context.
+                warm_scale = (_WARM_START_STATIC_ROSTER_SCALE if n_players_selected == 0
+                              else _WARM_START_LEARNING_RATE_SCALE)
                 stored_for_batch = self._player_frozen_weights.reindex(x_scores_batch.index)
                 covered          = ~stored_for_batch.isna().to_numpy().any(axis=1)
                 if covered.all():
                     warm_start_weights = stored_for_batch.to_numpy()
-                    self._warm_start_row_mask = np.ones(len(x_scores_batch), dtype=bool)
+                    self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
                 elif covered.any():
                     # Partial coverage (the serve pass: the bootstrap's final iteration pass only covers
                     # the top-3N anchors). Covered rows warm-start; the rest cold-start via the punt seed
@@ -552,7 +566,7 @@ class HAgent:
                     self._partial_warm_start_rows = (
                         np.flatnonzero(covered), stored_for_batch.to_numpy()[covered]
                     )
-                    self._warm_start_row_mask = covered
+                    self._warm_start_row_rate_scales = np.where(covered, warm_scale, 1.0)
 
             # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
             # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
@@ -1219,14 +1233,12 @@ class HAgent:
         # Stale correction terms must never leak across boards or candidate batches.
         self._correction_cache = None
 
-        # Warm-started rows descend at a reduced rate (see _WARM_START_LEARNING_RATE_SCALE); cold rows
-        # keep the full rate. Per-row rates broadcast through Adam's elementwise update.
-        if self._warm_start_row_mask is not None:
-            category_learning_rate = np.where(
-                self._warm_start_row_mask.reshape(-1, 1),
-                0.001 * _WARM_START_LEARNING_RATE_SCALE, 0.001,
-            )
-            self._warm_start_row_mask = None
+        # Warm-started rows descend at reduced, staleness-tiered rates (see the warm-start scale
+        # constants); cold rows keep the full rate. Per-row rates broadcast through Adam's update.
+        warm_start_row_rate_scales = self._warm_start_row_rate_scales
+        self._warm_start_row_rate_scales = None
+        if warm_start_row_rate_scales is not None:
+            category_learning_rate = 0.001 * warm_start_row_rate_scales.reshape(-1, 1)
         else:
             category_learning_rate = 0.001
 
@@ -1312,6 +1324,14 @@ class HAgent:
             # decaying to 0 by mid-draft (see self.reg_schedule), so early picks stay flexible.
             reg_lambda  = (self.reg_schedule[len(self.players)]
                            if (self.regulariser_on and len(self.players) < len(self.reg_schedule)) else 0.0)
+            # Warm-started rows skip the regulariser: it is a COLD-start robustness device, and on a warm
+            # start it drags an already-converged equilibrium build back toward neutral -- worse, at the
+            # reduced warm-start step sizes its pull exceeds the descent step, snapping weights exactly
+            # onto the singular w==v ray (0/0 -> NaN gradients). Cold rows keep the full schedule.
+            if warm_start_row_rate_scales is not None:
+                category_reg_lambda = reg_lambda * (warm_start_row_rate_scales >= 1.0).astype(float).reshape(-1, 1)
+            else:
+                category_reg_lambda = reg_lambda
             neutral_row = self.v.reshape(1, self.n_categories)
 
             for iteration in range(max(1, n_iterations)):
@@ -1348,9 +1368,10 @@ class HAgent:
                     # L1 proximal step: shrink each weight toward neutral v by up to reg_lambda (a linear
                     # penalty, so a committed punt is not over-penalised the way L2's proportional pull
                     # would). _REG_FLOOR stops the shrink short of v, keeping weights off the singular w==v
-                    # ray. Renormalised to the simplex just below.
+                    # ray. Renormalised to the simplex just below. category_reg_lambda is per-row: zero
+                    # for warm-started rows (see above), the full schedule for cold rows.
                     deviation        = category_weights - neutral_row
-                    shrink           = np.minimum(reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
+                    shrink           = np.minimum(category_reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
                     category_weights = category_weights - np.sign(deviation) * shrink
                 category_weights[category_weights < 0] = 0
 
