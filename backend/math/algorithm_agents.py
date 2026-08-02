@@ -316,7 +316,7 @@ class HAgent:
         # reset at the start of every perform_iterations run.
         self._correction_cache = None
 
-        # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_statess).
+        # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_states).
         # On by default; OPPONENT_MODEL=0 restores neutral-opponent behaviour byte-for-byte.
         self.opponent_model_enabled = os.environ.get('OPPONENT_MODEL', '1') == '1'
         # Per-team inferred build, keyed by team name:
@@ -467,7 +467,7 @@ class HAgent:
         # Draft and auction alike: the inference is roster-based, and the auction layers the same punt tilt
         # (slots_left * mu_edge) on top of its replacement/cash fill (see get_diff_distributions).
         if self.opponent_model_enabled:
-            self.refresh_stale_team_statess(player_assignments, drafter, x_scores_available,
+            self.refresh_stale_team_states(player_assignments, drafter, x_scores_available,
                                                cash_remaining_per_team)
 
         # x_scores_batch is the slice we actually score. candidate_subset (draft/waiver batching) narrows
@@ -936,7 +936,7 @@ class HAgent:
                        else team_total([spare_anchor], self._player_committed_builds.loc[spare_anchor].to_numpy()))
         return totals, empty_seat_anchor, spare_total
 
-    def refresh_stale_team_statess(self, player_assignments, drafter, x_scores_available,
+    def refresh_stale_team_states(self, player_assignments, drafter, x_scores_available,
                                       cash_remaining_per_team=None):
         """Re-infer up to _OPPONENT_REFRESH_BUDGET opponents whose stored build no longer matches their
         current roster, most out-of-date first. The rest keep their last mu_edge (it drifts slowly).
