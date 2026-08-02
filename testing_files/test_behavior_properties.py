@@ -317,7 +317,9 @@ def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
 def test_h_scoring_beats_g_field(format_key):
     """The most basic utility claim: an H-scoring drafter in a league of G-score drafters should win
     more than it loses. kappa=0 here — the G field does not punt, so there is no crowd to defect from."""
-    session = _build_session(_FORMATS[format_key], kappa=0.0)
+    # beth=0, the season-sim convention: historical stats are objectively correct, and the Bayesian
+    # self-doubt (beth) only regresses draft-time H toward average, diluting the measurement.
+    session = _build_session(_FORMATS[format_key], kappa=0.0, beth=0)
     scores  = [_draft_h_seat_in_g_field(session, seat) for seat in range(_SIM_SEATS)]
     _record('H-scoring vs a G-score field (kappa exception applies)',
             f'{format_key:4}: mean {np.mean(scores):.4f} over {len(scores)} seats — '
@@ -338,16 +340,16 @@ def test_awareness_vs_unaware_h_field():
     of B instead of B's own last build. Separate agents make each drafter genuinely self-contained."""
     from self_play import draft_population
 
-    reference = _build_session(_FORMATS['EC'], use_opponent_awareness=False)
+    reference = _build_session(_FORMATS['EC'], use_opponent_awareness=False, beth=0)
     n_drafters   = reference.current_params['n_drafters']
     n_picks      = reference.current_params['n_picks']
     n_iterations = reference.current_params['n_iterations']
 
     field_sessions = [reference] + [
-        _build_session(_FORMATS['EC'], use_opponent_awareness=False)
+        _build_session(_FORMATS['EC'], use_opponent_awareness=False, beth=0)
         for _ in range(n_drafters - 1)
     ]
-    aware_deviator = _build_session(_FORMATS['EC'], use_opponent_awareness=True)
+    aware_deviator = _build_session(_FORMATS['EC'], use_opponent_awareness=True, beth=0)
 
     def deviator_score(session_by_seat, seat):
         assignments = draft_population(session_by_seat, n_drafters, n_picks, 40)
@@ -371,8 +373,8 @@ def test_awareness_vs_unaware_h_field():
 @sims
 def test_awareness_not_harmful_vs_g_field():
     """Awareness mispredicts a G field (G drafters do not punt) — that misprediction must be harmless."""
-    aware   = _build_session(_FORMATS['EC'], kappa=0.0, use_opponent_awareness=True)
-    unaware = _build_session(_FORMATS['EC'], kappa=0.0, use_opponent_awareness=False)
+    aware   = _build_session(_FORMATS['EC'], kappa=0.0, use_opponent_awareness=True, beth=0)
+    unaware = _build_session(_FORMATS['EC'], kappa=0.0, use_opponent_awareness=False, beth=0)
     gains = []
     for seat in range(_SIM_SEATS):
         gains.append(_draft_h_seat_in_g_field(aware, seat) - _draft_h_seat_in_g_field(unaware, seat))
