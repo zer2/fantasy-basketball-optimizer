@@ -467,7 +467,8 @@ class HAgent:
         # Draft and auction alike: the inference is roster-based, and the auction layers the same punt tilt
         # (slots_left * mu_edge) on top of its replacement/cash fill (see get_diff_distributions).
         if self.opponent_model_enabled:
-            self.refresh_stale_opponent_states(player_assignments, drafter, x_scores_available)
+            self.refresh_stale_opponent_states(player_assignments, drafter, x_scores_available,
+                                               cash_remaining_per_team)
 
         # x_scores_batch is the slice we actually score. candidate_subset (draft/waiver batching) narrows
         # it to one batch; without it we score the whole pool. The future-pick model below still sees the
@@ -624,50 +625,77 @@ class HAgent:
             )
             replacement_value_by_category = np.array(replacement_value_by_category).reshape(self.n_categories, 1)
 
-            diff_means = np.vstack([
-                self.get_diff_means_auction(
-                    x_self_sum.reshape(1, self.n_categories, 1)
-                    - np.array(self.x_scores.loc[player_assignments[team]].sum(axis=0)).reshape(1, self.n_categories, 1),
-                    cash_remaining_per_team[drafter] - cash_remaining_per_team[team],
-                    len(my_players) - len(player_assignments[team]),
+            # Rational-opponent modelling (auction), parallel to the draft. An EMPTY seat with a predicted
+            # first buy is modelled as having ALREADY bought it: the anchor's real stats are priced into the
+            # score diff and its estimated price is deducted from the seat's cash, so the field does not jump
+            # when the anchor is actually bought (the draft gets this for free; auctions must also charge the
+            # cash). Then slots_left * mu_edge tilts the remaining generic fill -- the zero-sum DIRECTION on
+            # top of the replacement/cash MAGNITUDE. Off / neutral recursion => no anchors, no tilt =>
+            # byte-identical to the pre-feature auction model.
+            model_opponents = self.opponent_model_enabled and opponent_model == 'inferred'
+            empty_seat_anchor, spare_anchor = (self._assign_empty_seat_anchors(player_assignments, drafter)
+                                               if model_opponents else ({}, None))
+            opponent_teams = [team for team in team_names if team != drafter]
+
+            def seat_diff(team, anchor_override=None):
+                """Auction diff (1, n_cat, 1) of the drafter vs one opponent seat, punt tilt included.
+                anchor_override forces the spare anchor (self-exclusion's whole-seat swap)."""
+                roster = [p for p in player_assignments[team] if p == p]
+                anchor = anchor_override if anchor_override is not None else empty_seat_anchor.get(team)
+                if roster:
+                    roster_sum = np.array(self.x_scores.loc[roster].sum(axis=0))
+                    seat_cash  = cash_remaining_per_team[team]
+                    roster_len = len(roster)
+                    state      = self._opponent_state.get(team)
+                    mu_edge    = None if (roster_len >= self.n_picks or state is None) else state['mu_edge']
+                elif model_opponents and anchor is not None:
+                    # Seed the anchor's STATS (so the field does not lurch when it is actually bought) but do
+                    # NOT charge for it: on an empty board nobody has spent, so keeping every seat at its real
+                    # cash keeps money_diff symmetric (= 0). Real cash differences appear on their own as
+                    # players are actually bought. Charging only the opponents (not the drafter) was what
+                    # added a flat pro-drafter money block and flattened the field.
+                    roster_sum = np.array(self.x_scores.loc[[anchor]].sum(axis=0))
+                    seat_cash  = cash_remaining_per_team[team]
+                    roster_len = 1
+                    mu_edge    = self._player_committed_builds.loc[anchor].to_numpy()
+                else:
+                    roster_sum = np.zeros(self.n_categories)
+                    seat_cash  = cash_remaining_per_team[team]
+                    roster_len = 0
+                    mu_edge    = None
+                base = self.get_diff_means_auction(
+                    x_self_sum.reshape(1, self.n_categories, 1) - roster_sum.reshape(1, self.n_categories, 1),
+                    cash_remaining_per_team[drafter] - seat_cash,
+                    len(my_players) - roster_len,
                     category_value_per_dollar,
                     replacement_value_by_category,
                 )
-                for team in team_names if team != drafter
-            ]).T
+                if mu_edge is not None:
+                    base = base - ((self.n_picks - roster_len) * mu_edge).reshape(1, self.n_categories, 1)
+                return base
 
-            # Rational-opponent modelling (auction): opponents fill their remaining SLOTS with players that
-            # fit their build, so subtract each opponent's punt tilt (slots_left * mu_edge, the same zero-sum
-            # reshaping used in the draft) from the diff. The replacement/cash terms above carry the fill
-            # MAGNITUDE; this adds only the DIRECTION. Empty seats are anchored to their predicted first buy.
-            # Off / neutral recursion => no tilt => byte-identical to the pre-feature auction model.
+            diff_means = np.concatenate([seat_diff(team) for team in opponent_teams], axis=2)  # (1, n_cat, n_opp)
+
+            # value_of_money is the drafter's money value against the FIELD -- candidate-independent -- so it
+            # reads this field before self-exclusion rewrites individual candidates' slices.
             value_of_money_field = diff_means
-            if self.opponent_model_enabled and opponent_model == 'inferred':
-                opponent_teams = [team for team in team_names if team != drafter]
-                tilts, empty_slot_player, spare_tilt = self.compute_opponent_tilts(player_assignments, drafter)
-                tilt_row   = np.concatenate([tilts[team] for team in opponent_teams], axis=2)  # (1, n_cat, n_opp)
-                diff_means = diff_means - tilt_row
 
-                # value_of_money is the drafter's money value against the FIELD -- candidate-independent -- so
-                # it reads the tilted field BEFORE self-exclusion rewrites individual candidates' slices.
-                value_of_money_field = diff_means
-
-                # Self-exclusion (parallel to the draft): a candidate that is itself an empty seat's predicted
-                # first buy is not scored against a copy of itself -- swap that seat's tilt for the spare
-                # anchor's. This makes the returned (scoring) diff_means candidate-dependent (N, n_cat, n_opp);
-                # value_of_money keeps the candidate-independent field snapshotted above.
-                if candidate_batch is not None and spare_tilt is not None and empty_slot_player:
-                    player_to_slot = {player: opponent_teams.index(team)
-                                      for team, player in empty_slot_player.items()}
-                    affected = {i: player_to_slot[p]
-                                for i, p in enumerate(candidate_batch) if p in player_to_slot}
-                    if affected:
-                        spare_tilt_row = spare_tilt.reshape(self.n_categories)
-                        diff_means = np.repeat(diff_means, len(candidate_batch), axis=0)   # (N, n_cat, n_opp)
-                        for candidate_index, slot in affected.items():
-                            own_tilt = tilts[opponent_teams[slot]].reshape(self.n_categories)
-                            # undo this seat's own tilt and apply the spare's => diff against the spare anchor
-                            diff_means[candidate_index, :, slot] += own_tilt - spare_tilt_row
+            # Self-exclusion: a candidate that is itself an empty seat's predicted first buy is not scored
+            # against a copy of itself -- rebuild that seat with the spare anchor (whole seat: stats, cost,
+            # tilt). Makes the returned diff_means candidate-dependent (N, n_cat, n_opp).
+            if model_opponents and candidate_batch is not None and spare_anchor is not None and empty_seat_anchor:
+                anchor_to_slot = {anchor: opponent_teams.index(team)
+                                  for team, anchor in empty_seat_anchor.items()}
+                affected = {i: opponent_teams[anchor_to_slot[p]]
+                            for i, p in enumerate(candidate_batch) if p in anchor_to_slot}
+                if affected:
+                    diff_means = np.repeat(diff_means, len(candidate_batch), axis=0)   # (N, n_cat, n_opp)
+                    spare_seat_by_team = {}
+                    for candidate_index, team in affected.items():
+                        if team not in spare_seat_by_team:
+                            spare_seat_by_team[team] = seat_diff(team, anchor_override=spare_anchor)[0, :, 0]
+                        slot = anchor_to_slot[candidate_batch[candidate_index]]
+                        diff_means[candidate_index, :, slot] = spare_seat_by_team[team]
 
         else:
             # While the roster still has room a candidate is being added, so the drafter's team grows to
@@ -800,21 +828,50 @@ class HAgent:
         extra_sum   = np.array(mean_extra_players) * n_extra
         return (player_sum + extra_sum).reshape(1, self.n_categories, 1)
 
-    def compute_opponent_totals(self, player_assignments, drafter, mean_extra, target_team_size):
-        """Full expected-team vector per opponent, (1, n_categories, 1) each. An opponent that has drafted
-        is its real roster + picks_left * mu_edge (its inferred/committed build — a zero-sum punt tilt that
-        reshapes future picks without changing net strength). An EMPTY opponent is modelled as if it had
-        already drafted its predicted starting player X: roster [X] + X's committed future. Pricing X's real
-        stats in now means that when the seat actually drafts X the field does not move.
-
-        Returns (totals, empty_slot_player, spare_total). empty_slot_player maps each empty seat to its
-        predicted player; spare_total is the next predicted team, swapped in for self-exclusion when the
-        candidate being scored is itself one of those predicted players (so nobody drafts a copy of it)."""
-        team_names     = list(player_assignments.keys())
+    def _assign_empty_seat_anchors(self, player_assignments, drafter):
+        """Assign each EMPTY opponent seat its predicted first player: the best available committed anchor,
+        skipping any already drafted and any claimed by an earlier empty seat. Shared by the draft
+        (compute_opponent_totals) and the auction (get_diff_distributions) so the seat->anchor mapping is
+        identical in both. Returns (empty_seat_anchor, spare_anchor): empty_seat_anchor maps each empty seat
+        to its predicted player (a seat is absent when no anchor is left); spare_anchor is the next unclaimed
+        anchor, swapped in by self-exclusion when the candidate being scored is itself a predicted first
+        pick. Both come back empty when there is no bootstrap / no anchors remain."""
         players_chosen = {x for roster in player_assignments.values() for x in roster if x == x}
         anchor_players = ([] if self._predicted_anchor_teams is None
                           else list(self._predicted_anchor_teams.index))
         anchor_cursor  = 0
+
+        empty_seat_anchor = {}
+        for team, roster_players in player_assignments.items():
+            if team == drafter or any(p == p for p in roster_players):   # skip me and any non-empty seat
+                continue
+            while anchor_cursor < len(anchor_players) and anchor_players[anchor_cursor] in players_chosen:
+                anchor_cursor += 1
+            if anchor_cursor < len(anchor_players):
+                empty_seat_anchor[team] = anchor_players[anchor_cursor]
+                anchor_cursor += 1
+
+        spare_anchor = None
+        while anchor_cursor < len(anchor_players):
+            spare = anchor_players[anchor_cursor]
+            anchor_cursor += 1
+            if spare not in players_chosen:
+                spare_anchor = spare
+                break
+        return empty_seat_anchor, spare_anchor
+
+    def compute_opponent_totals(self, player_assignments, drafter, mean_extra, target_team_size):
+        """Full expected-team vector per opponent, (1, n_categories, 1) each. An opponent that has drafted
+        is its real roster + picks_left * mu_edge (its inferred/committed build — a zero-sum punt tilt that
+        reshapes future picks without changing net strength). An EMPTY opponent is modelled as if it had
+        already drafted its predicted starting player X (see _assign_empty_seat_anchors): roster [X] + X's
+        committed future. Pricing X's real stats in now means that when the seat actually drafts X the field
+        does not move.
+
+        Returns (totals, empty_slot_player, spare_total). empty_slot_player maps each empty seat to its
+        predicted player; spare_total is the next predicted team, swapped in for self-exclusion when the
+        candidate being scored is itself one of those predicted players (so nobody drafts a copy of it)."""
+        empty_seat_anchor, spare_anchor = self._assign_empty_seat_anchors(player_assignments, drafter)
 
         def team_total(roster, mu_edge):
             base = self.get_opposing_team_means(roster, mean_extra, target_team_size)
@@ -824,8 +881,7 @@ class HAgent:
             return base + (picks_left * mu_edge).reshape(1, self.n_categories, 1)
 
         totals = {}
-        empty_slot_player = {}
-        for team in team_names:
+        for team in player_assignments:
             if team == drafter:
                 continue
             roster = [p for p in player_assignments[team] if p == p]
@@ -834,91 +890,22 @@ class HAgent:
             elif roster:
                 state = self._opponent_state.get(team)
                 totals[team] = team_total(roster, None if state is None else state['mu_edge'])
+            elif team in empty_seat_anchor:
+                predicted = empty_seat_anchor[team]
+                totals[team] = team_total([predicted], self._player_committed_builds.loc[predicted].to_numpy())
             else:
-                # Predict this empty seat's starting player: best available committed anchor not already
-                # drafted and not claimed by an earlier empty seat. Model the seat AS that one-player team.
-                while anchor_cursor < len(anchor_players) and anchor_players[anchor_cursor] in players_chosen:
-                    anchor_cursor += 1
-                if anchor_cursor < len(anchor_players):
-                    predicted = anchor_players[anchor_cursor]
-                    anchor_cursor += 1
-                    totals[team] = team_total([predicted], self._player_committed_builds.loc[predicted].to_numpy())
-                    empty_slot_player[team] = predicted
-                else:
-                    totals[team] = team_total(roster, None)   # no prediction left: neutral padding
+                totals[team] = team_total(roster, None)   # no prediction left: neutral padding
 
-        spare_total = None
-        while anchor_cursor < len(anchor_players):
-            spare = anchor_players[anchor_cursor]
-            anchor_cursor += 1
-            if spare not in players_chosen:
-                spare_total = team_total([spare], self._player_committed_builds.loc[spare].to_numpy())
-                break
-        return totals, empty_slot_player, spare_total
+        spare_total = (None if spare_anchor is None
+                       else team_total([spare_anchor], self._player_committed_builds.loc[spare_anchor].to_numpy()))
+        return totals, empty_seat_anchor, spare_total
 
-    def compute_opponent_tilts(self, player_assignments, drafter):
-        """Per-opponent punt-tilt vector (slots_left * mu_edge), each (1, n_categories, 1) -- the auction
-        analog of compute_opponent_totals. The auction's replacement/cash model already supplies the fill
-        MAGNITUDE, so here we add only the zero-sum DIRECTION: a rostered opponent uses its inferred mu_edge
-        over its remaining slots; an EMPTY seat is anchored to its predicted first buy (best available
-        committed anchor) and tilts as that build. The anchor's raw stats are NOT priced in (that is the
-        auction's fill's job) -- only its punt direction. Returns (tilts, empty_slot_player, spare_tilt);
-        empty_slot_player / spare_tilt mirror compute_opponent_totals for a future auction self-exclusion.
-
-        A missing bootstrap (no predicted anchors) leaves empty seats untilted -- the field just falls back
-        to the generic auction fill for those seats, exactly as before the feature."""
-        team_names     = list(player_assignments.keys())
-        players_chosen = {x for roster in player_assignments.values() for x in roster if x == x}
-        anchor_players = ([] if self._predicted_anchor_teams is None
-                          else list(self._predicted_anchor_teams.index))
-        anchor_cursor  = 0
-        zero = np.zeros((1, self.n_categories, 1))
-
-        def tilt(mu_edge, roster_size):
-            if mu_edge is None:
-                return zero
-            slots_left = self.n_picks - roster_size
-            return (slots_left * mu_edge).reshape(1, self.n_categories, 1)
-
-        tilts = {}
-        empty_slot_player = {}
-        for team in team_names:
-            if team == drafter:
-                continue
-            roster = [p for p in player_assignments[team] if p == p]
-            if len(roster) >= self.n_picks:
-                tilts[team] = zero
-            elif roster:
-                state = self._opponent_state.get(team)
-                tilts[team] = tilt(None if state is None else state['mu_edge'], len(roster))
-            elif anchor_players and self._player_committed_builds is not None:
-                while anchor_cursor < len(anchor_players) and anchor_players[anchor_cursor] in players_chosen:
-                    anchor_cursor += 1
-                if anchor_cursor < len(anchor_players):
-                    predicted = anchor_players[anchor_cursor]
-                    anchor_cursor += 1
-                    # Model the seat as having drafted its predicted first buy: tilt over the remaining slots.
-                    tilts[team] = tilt(self._player_committed_builds.loc[predicted].to_numpy(), 1)
-                    empty_slot_player[team] = predicted
-                else:
-                    tilts[team] = zero
-            else:
-                tilts[team] = zero
-
-        spare_tilt = None
-        while anchor_cursor < len(anchor_players):
-            spare = anchor_players[anchor_cursor]
-            anchor_cursor += 1
-            if spare not in players_chosen:
-                spare_tilt = tilt(self._player_committed_builds.loc[spare].to_numpy(), 1)
-                break
-        return tilts, empty_slot_player, spare_tilt
-
-    def refresh_stale_opponent_states(self, player_assignments, drafter, x_scores_available):
+    def refresh_stale_opponent_states(self, player_assignments, drafter, x_scores_available,
+                                      cash_remaining_per_team=None):
         """Re-infer up to _OPPONENT_REFRESH_BUDGET opponents whose stored build no longer matches their
         current roster, most out-of-date first. The rest keep their last mu_edge (it drifts slowly).
         Empty opponents use round-one archetypes, and full opponents have no future picks, so neither is
-        inferred here."""
+        inferred here. cash_remaining_per_team (auction only) makes the inference run auction H-scoring."""
         stale = []
         for team, roster_players in player_assignments.items():
             if team == drafter:
@@ -941,7 +928,7 @@ class HAgent:
                 category_weights, mu_edge = None, committed
             else:
                 category_weights, mu_edge = self.infer_opponent_category_weights(
-                    team, roster, player_assignments, x_scores_available
+                    team, roster, player_assignments, x_scores_available, cash_remaining_per_team
                 )
             self._opponent_state[team] = {
                 'roster_key'       : frozenset(roster),
@@ -973,18 +960,21 @@ class HAgent:
                                         , opponent_team_name
                                         , opponent_players
                                         , player_assignments
-                                        , x_scores_available):
+                                        , x_scores_available
+                                        , cash_remaining_per_team=None):
         """Infer an opponent's category weights and per-pick mu_edge by replaying the pick they just made
         as a fresh, short H-descent from their own roster against a neutral field (opponent_model='neutral'
-        terminates the recursion at one level of best-response). Returns (category_weights, mu_edge), both
-        shape (n_categories,)."""
+        terminates the recursion at one level of best-response). cash_remaining_per_team (auction only)
+        makes that field the auction field rather than the draft one. Returns (category_weights, mu_edge),
+        both shape (n_categories,)."""
         drafted_player = opponent_players[-1]
         prior_players  = opponent_players[:-1]
         picks_left     = self.n_picks - len(opponent_players)
         assignments_view = {**player_assignments, opponent_team_name: prior_players}
 
         diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(
-            assignments_view, opponent_team_name, x_scores_available, opponent_model='neutral'
+            assignments_view, opponent_team_name, x_scores_available,
+            cash_remaining_per_team=cash_remaining_per_team, opponent_model='neutral'
         )
 
         x_scores_batch_array = np.expand_dims(
