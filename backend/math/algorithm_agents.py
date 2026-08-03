@@ -632,9 +632,13 @@ class HAgent:
             elif self.seed_mode == 'neutral':
                 # Start at neutral v (no punt bias) and let the descent re-balance. Nudge off the exact
                 # singular ray -- term_five_b (a Cauchy-Schwarz Gram determinant) vanishes when w is
-                # parallel to v, giving a 0/0 -- so a negligible jitter keeps it finite for every format.
+                # parallel to v, giving a 0/0. The nudge must comfortably exceed the L1 regulariser's
+                # capture radius (reg_lambda ~ 5e-5): the prox shrinks toward EXACT v each iteration and
+                # _REG_FLOOR defaults to 0, so a sub-radius jitter gets snapped onto the singularity
+                # (2022-23 collapsed every neutral-seeded descent to NaN this way). 1% is ~20x the
+                # radius while still being neutral for all practical purposes.
                 neutral = self.v.reshape(self.n_categories)
-                jitter  = 1.0 + 1e-9 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
+                jitter  = 1.0 + 1e-2 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
                 initial_category_weights = np.array(
                     [(neutral * jitter) / (neutral * jitter).sum()] * len(x_scores_batch)
                 )
