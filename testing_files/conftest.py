@@ -13,25 +13,25 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    """Render the behavioural-properties report (measurements for a human to read — the behavioural
-    tier is not green/red; the details matter) at the end of the run, and write it to
-    testing_files/behavior_report.md. No-op when no behavioural test recorded anything."""
+    """Render the experiment report (measurements for a human to read — the experiment tier is not
+    green/red; the details matter) at the end of the run. In report mode (RUN_EXPERIMENTS=1) also
+    persist per-section results and rebuild the tabbed experiment_report.html; quick default runs
+    leave the stored reports untouched. No-op when no experiment recorded anything."""
     import sys as _sys
-    behavior_module = next(
+    experiments_module = next(
         (module for name, module in _sys.modules.items()
-         if name.rsplit('.', 1)[-1] == 'test_behavior_properties' and module is not None),
+         if name.rsplit('.', 1)[-1] == 'test_experiments' and module is not None),
         None,
     )
-    if behavior_module is None:      # behavioural tests were not part of this run
+    if experiments_module is None:      # experiments were not part of this run
         return
-    render_behavior_report = behavior_module.render_behavior_report
-    report_text = render_behavior_report()
+    report_text = experiments_module.render_experiment_report()
     if report_text:
-        terminalreporter.write_sep('=', 'BEHAVIOURAL PROPERTIES REPORT')
+        terminalreporter.write_sep('=', 'EXPERIMENT REPORT')
         terminalreporter.write(report_text + '\n')
-        if getattr(behavior_module, '_RUN_SIMS', False):
+        if getattr(experiments_module, '_RUN_SIMS', False):
             # Report mode only: quick default runs must not overwrite full multi-season results.
-            page_path = behavior_module.write_behavior_report_files(os.path.dirname(__file__))
-            terminalreporter.write(f'(tabbed report: {page_path}; per-section results in behavior_reports/)\n')
+            page_path = experiments_module.write_experiment_report_files(os.path.dirname(__file__))
+            terminalreporter.write(f'(tabbed report: {page_path}; per-section results in experiment_results/)\n')
         else:
-            terminalreporter.write('(quick mode: stored reports untouched; RUN_BEHAVIOR_SIMS=1 regenerates them)\n')
+            terminalreporter.write('(quick mode: stored reports untouched; RUN_EXPERIMENTS=1 regenerates them)\n')

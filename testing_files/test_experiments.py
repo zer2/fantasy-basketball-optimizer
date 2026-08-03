@@ -1,20 +1,20 @@
-# testing_files/test_behavior_properties.py
-# BEHAVIOURAL tests — the fourth tier of the test taxonomy:
+# testing_files/test_experiments.py
+# EXPERIMENTS — the fourth tier of the test taxonomy:
 #   1. backend tests   (deterministic, must be green)
 #   2. frontend tests  (deterministic, must be green)
 #   3. golden tests    (regenerated whenever the algorithm intentionally changes)
-#   4. BEHAVIOURAL     (this file: no exact right answer — measurements to LOOK AT so a human can judge
+#   4. EXPERIMENTS     (this file: no exact right answer — measurements to LOOK AT so a human can judge
 #      that everything still looks right. Assertions here are only loose catastrophic floors — e.g. "the
 #      field collapsed to one punt" — not tight expectations.)
 #
 # TWO MODES:
 #   default pytest run       — one season, quick catastrophic-floor smoke; prints measurements but does
 #                              NOT touch the stored reports (a quick run can't clobber full data).
-#   RUN_BEHAVIOR_SIMS=1      — the REPORT GENERATOR: every property across seasons 2020-21..2025-26
-#                              (BEHAVIOR_SEASONS to override), full-draft simulations at every seat,
-#                              and the per-section results + tabbed behavior_report.html are rewritten.
+#   RUN_EXPERIMENTS=1      — the REPORT GENERATOR: every property across seasons 2020-21..2025-26
+#                              (EXPERIMENT_SEASONS to override), full-draft simulations at every seat,
+#                              and the per-section results + tabbed experiment_report.html are rewritten.
 #
-# Results persist per section in behavior_reports/<slug>.json, so running a subset of tests with -k in
+# Results persist per section in experiment_results/<slug>.json, so running a subset of tests with -k in
 # report mode regenerates only those sections; the tabbed page is rebuilt from everything stored.
 #
 # KAPPA POLICY: kappa = 0.3 (the app default, via the fixture) EVERYWHERE, with exactly one exception:
@@ -41,11 +41,11 @@ from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
-_RUN_SIMS  = bool(os.environ.get('RUN_BEHAVIOR_SIMS'))
+_RUN_SIMS  = bool(os.environ.get('RUN_EXPERIMENTS'))
 # 0 = every seat in the league (a full season's worth of draft positions).
-_SIM_SEATS = int(os.environ.get('BEHAVIOR_SIM_SEATS', '0'))
+_SIM_SEATS = int(os.environ.get('EXPERIMENT_SEATS', '0'))
 _ALL_SEASONS = '2020-21,2021-22,2022-23,2023-24,2024-25,2025-26'
-_SEASONS = (os.environ.get('BEHAVIOR_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(',')
+_SEASONS = (os.environ.get('EXPERIMENT_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(',')
 
 _FORMATS = {
     'EC':   'Head to Head: Each Category',
@@ -60,7 +60,7 @@ _SHORT_CATEGORY = {
 
 
 # ── measurement report ────────────────────────────────────────────────────────
-# The behavioural tier is read by a human: every test records structured table rows here; the conftest
+# The experiment tier is read by a human: every test records structured table rows here; the conftest
 # terminal-summary hook renders the tables (console + markdown + one tabbed HTML page).
 
 _REPORT: dict = {}
@@ -157,7 +157,7 @@ def _console_table(columns, rows, indent='    '):
     return [indent + header, indent + rule] + [indent + line for line in body]
 
 
-def render_behavior_report(markdown=False):
+def render_experiment_report(markdown=False):
     if not _REPORT:
         return ''
     lines = []
@@ -185,8 +185,8 @@ def _short_names(categories, indices):
 
 
 # ── persistent per-section results + one tabbed report page ──────────────────
-# Written ONLY in report mode (RUN_BEHAVIOR_SIMS=1): each run persists the sections it measured to
-# behavior_reports/<slug>.json, then rebuilds ONE tabbed behavior_report.html from every stored section,
+# Written ONLY in report mode (RUN_EXPERIMENTS=1): each run persists the sections it measured to
+# experiment_results/<slug>.json, then rebuilds ONE tabbed experiment_report.html from every stored section,
 # fresh and stale alike, each tab labelled with its own generation time.
 
 _REPORT_PAGE_CSS = """
@@ -239,14 +239,14 @@ def _load_stored_sections(reports_dir):
     return ordered + list(stored.values())
 
 
-def write_behavior_report_files(base_directory):
+def write_experiment_report_files(base_directory):
     """Persist this run's sections, rebuild the tabbed page from everything stored. Returns the page path."""
     import json
     import os as _os
     from datetime import datetime
     from html import escape
 
-    reports_dir = _os.path.join(base_directory, 'behavior_reports')
+    reports_dir = _os.path.join(base_directory, 'experiment_results')
     _os.makedirs(reports_dir, exist_ok=True)
     stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
@@ -289,12 +289,12 @@ def write_behavior_report_files(base_directory):
     page = (
         '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        '<title>Behavioural properties report</title>\n'
+        '<title>Experiment report</title>\n'
         f'<style>{_REPORT_PAGE_CSS}</style></head><body><main>\n'
-        '<h1>Behavioural properties report</h1>\n'
+        '<h1>Experiment report</h1>\n'
         '<div class="stamp">Seasons 2020-21 to 2025-26 &middot; measurements for human judgment — this '
         'tier has no exact right answers; each tab regenerates independently when its test runs in '
-        'report mode (RUN_BEHAVIOR_SIMS=1) and keeps its own timestamp.</div>\n'
+        'report mode (RUN_EXPERIMENTS=1) and keeps its own timestamp.</div>\n'
         f'<nav>{"".join(tabs)}</nav>\n'
         f'{newline.join(panels)}\n'
         '<script>\n'
@@ -309,11 +309,11 @@ def write_behavior_report_files(base_directory):
         '});\n'
         '</script>\n</main></body></html>'
     )
-    page_path = _os.path.join(base_directory, 'behavior_report.html')
+    page_path = _os.path.join(base_directory, 'experiment_report.html')
     with open(page_path, 'w', encoding='utf-8') as page_file:
         page_file.write(page)
 
-    with open(_os.path.join(base_directory, 'behavior_report.md'), 'w', encoding='utf-8') as md_file:
+    with open(_os.path.join(base_directory, 'experiment_report.md'), 'w', encoding='utf-8') as md_file:
         for data in sections:
             md_file.write(f'# {data["title"]}\n\n_{data["explanation"]}_\n\n')
             if 'columns' in data:
@@ -544,7 +544,7 @@ def test_self_play_convergence(sessions):
 
 # ── SLOW simulation properties ────────────────────────────────────────────────
 
-sims = pytest.mark.skipif(not _RUN_SIMS, reason='full-draft simulation; set RUN_BEHAVIOR_SIMS=1')
+sims = pytest.mark.skipif(not _RUN_SIMS, reason='full-draft simulation; set RUN_EXPERIMENTS=1')
 
 
 def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
