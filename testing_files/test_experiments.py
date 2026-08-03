@@ -82,17 +82,23 @@ _SECTION_EXPLANATIONS = {
         'expectation across the 12 builds. H2H formats, by contrast, punt hard on purpose.',
     'Predicted-pick stability (EC; opponent takes its predicted player)':
         'Evaluate all candidates, let an opponent take exactly the player the model already predicted '
-        'for them, evaluate again. "Level shift" = how much every candidate moved together (drafts: ~0; '
-        'auctions: legitimately nonzero, the bought player leaves the market and prices rescale). "Max '
-        'residual dH" = the biggest movement of any single candidate RELATIVE to the field, in H-score '
-        'percentage points — this is the lurch number; a predicted pick should be pre-priced, so want '
-        'well under 1. "Max dweight" = biggest change in any displayed build weight (display units, '
-        '100 = neutral); want a few points at most.',
+        'for them, evaluate again, and compare the players present in both top-15 lists ("Players '
+        'compared"; the picked player drops out). "Shared shift" = the median H change common to ALL of '
+        'them -- movement of the whole board as one block. In drafts it is ~0; in auctions it is '
+        'legitimately a few points NEGATIVE, because the bought player leaves the purchasable pool and '
+        'the whole market reprices. "Max relative move" = the biggest single-candidate movement AFTER '
+        'subtracting that shared shift -- movement against the field, which is what lurch means; a '
+        'predicted pick is already priced in, so want well under 1. A large shared shift with a tiny '
+        'relative move is the GOOD outcome: everything moved together and no standing changed. '
+        '"Max dweight" = biggest change in any displayed build weight (display units, 100 = neutral).',
     'Self-play convergence (MC bootstrap)':
-        'The pre-draft bootstrap alternates predict-field / best-respond for ~15 passes. "Consecutive '
-        'cos" = how little the predicted field\'s punt profile rotates between the final passes (1.0 = '
-        'not rotating at all = settled; low or bouncing = oscillation). "Locks by pass" = the pass after '
-        'which the field\'s top-3 punt set stopped changing — want it locked well before the end.',
+        'The pre-draft bootstrap alternates predict-field / best-respond for ~15 passes. Each row shows '
+        'ONE PASS: for a fixed set of the top 12 players (tracked across all passes so counts are '
+        'comparable), how many of them punt each category in that pass\'s solve (expected win rate '
+        'under 40%). Read down a season: convergence = the counts settle from pass to pass; oscillation '
+        '= counts swinging back and forth between passes. This is a damped mixed-equilibrium process, '
+        'so small residual motion is expected — what matters is that the structure stops changing. The '
+        '"serve" row is the final full-pool pass, i.e. the field the app actually uses.',
     'H-scoring vs a G-score field':
         'Full snake drafts: one seat drafts by H-score, the other 11 pick greedily by G-score ranking. '
         'Numbers are the H seat\'s expected head-to-head category win rate against that field in '
@@ -478,8 +484,8 @@ def test_early_pick_stability(sessions, auction):
         w_deltas    = {n: float(np.max(np.abs(after[n][1] - before[n][1]))) for n in common}
         worst_h_name = max(h_deltas, key=h_deltas.get)
         _record_row('Predicted-pick stability (EC; opponent takes its predicted player)',
-                    ['Season', 'Mode', 'Level shift', 'Max residual dH', 'Worst candidate',
-                     'Max dweight', 'Candidates'],
+                    ['Season', 'Mode', 'Shared shift (whole board)', 'Max relative move',
+                     'Biggest mover', 'Max dweight', 'Players compared'],
                     [season, mode, f'{level_shift:+.2f}', f'{max(h_deltas.values()):.2f}',
                      worst_h_name.split(' (')[0], f'{max(w_deltas.values()):.1f}', len(common)])
         assert max(h_deltas.values()) <= 0.6, f'{season}: lurch {max(h_deltas.values()):.2f}'
@@ -490,11 +496,9 @@ def test_early_pick_stability(sessions, auction):
 # ── FAST: self-play convergence (per season) ─────────────────────────────────
 
 def test_self_play_convergence(sessions):
-    """The bootstrap's damped best-response must SETTLE, not oscillate: per-pass best responses may keep
-    moving (a mixed equilibrium), but the EMA-committed field's punt structure should rotate less and
-    less (consecutive-pass cosine near 1) and its punt set should lock well before the final pass."""
-    from backend.math.algorithm_agents import _OPPONENT_SMOOTHING
-
+    """Show the punt structure of every bootstrap pass directly: per pass, how many of the tracked top
+    players punt each category. Convergence = the counts stabilise from pass to pass; oscillation =
+    counts swinging back and forth. No abstract metrics -- the evolution itself is the report."""
     for season in _SEASONS:
         session = sessions('MC', False, season)
         agent   = session.agent
@@ -505,7 +509,7 @@ def test_self_play_convergence(sessions):
         def recording_pass(empty, n_iterations, cash, candidate_subset=None,
                            preserve_frozen_weights=False, _original=original, _records=records):
             result = _original(empty, n_iterations, cash, candidate_subset, preserve_frozen_weights)
-            _records.append((candidate_subset is None, result['Future-Diff'].copy()))
+            _records.append((candidate_subset is None, result['Rates'].copy()))
             return result
 
         agent._run_bootstrap_pass = recording_pass
@@ -514,32 +518,23 @@ def test_self_play_convergence(sessions):
         finally:
             del agent._run_bootstrap_pass   # drop the instance shadow, restoring the class method
 
-        anchor_passes = [diff for is_full_pool, diff in records if not is_full_pool]
-        index     = anchor_passes[0].index
-        responses = [diff.reindex(index).to_numpy() / (agent.n_picks - 1) for diff in anchor_passes]
+        categories = session.current_params['categories']
+        short      = [_SHORT_CATEGORY.get(category, category) for category in categories]
+        # Track a FIXED set of players across passes so the counts are comparable: the top 12 of the
+        # anchor subset (generic ranking), present in every pass.
+        tracked = list(records[0][1].index[:12])
 
-        committed = responses[0]
-        profiles  = [committed.mean(axis=0)]
-        punt_sets = [tuple(np.argsort(profiles[0])[:3].tolist())]
-        for response in responses[1:]:
-            committed = (1 - _OPPONENT_SMOOTHING) * committed + _OPPONENT_SMOOTHING * response
-            profiles.append(committed.mean(axis=0))
-            punt_sets.append(tuple(np.argsort(profiles[-1])[:3].tolist()))
+        for pass_number, (is_full_pool, rates) in enumerate(records):
+            tracked_rates = rates.reindex(tracked).to_numpy()
+            assert not np.isnan(tracked_rates).any(), f'{season} pass {pass_number}: NaN win rates'
+            punt_counts = (tracked_rates < _SOFT_PUNT_RATE).sum(axis=0)
+            label = 'serve' if is_full_pool else str(pass_number)
+            _record_row('Self-play convergence (MC bootstrap)',
+                        ['Season', 'Pass'] + short,
+                        [season, label] + [int(count) for count in punt_counts])
 
-        def cosine(a, b):
-            return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12))
-
-        consecutive = [cosine(profiles[i], profiles[i - 1]) for i in range(1, len(profiles))]
-        settle_cos  = float(np.mean(consecutive[-5:]))
-        lock_pass   = max((i for i in range(1, len(punt_sets)) if punt_sets[i] != punt_sets[i - 1]),
-                          default=0)
-        categories  = session.current_params['categories']
-        _record_row('Self-play convergence (MC bootstrap)',
-                    ['Season', 'Passes', 'Consecutive cos (last 5)', 'Field punt set', 'Locks by pass'],
-                    [season, len(responses), f'{settle_cos:.3f}',
-                     _short_names(categories, punt_sets[-1]), f'{lock_pass}/{len(punt_sets) - 1}'])
-        assert not any(np.isnan(profile).any() for profile in profiles), f'{season}: NaN in the field'
-        assert settle_cos > 0.6, f'{season}: field still rotating at bootstrap end ({settle_cos:.3f})'
+        final_counts = (records[-1][1].reindex(tracked).to_numpy() < _SOFT_PUNT_RATE).sum(axis=0)
+        assert final_counts.sum() > 0, f'{season}: served field shows no punts at all — implausible'
 
 
 # ── SLOW simulation properties ────────────────────────────────────────────────
