@@ -86,7 +86,41 @@ export function renderModelParameters(container: HTMLElement): void {
     for (const spec of PARAM_SPECS) {
         grid.append(makeParamItem(spec))
     }
+    grid.append(makeOpponentSophisticationItem())
+}
 
+/** The one boolean parameter: a checkbox styled like the numeric param items. */
+function makeOpponentSophisticationItem(): HTMLElement {
+    const item = document.createElement('div')
+    item.className = 'param-item'
+
+    const labelRow = document.createElement('div')
+    labelRow.className = 'param-label-row'
+
+    const label = document.createElement('label')
+    label.htmlFor = 'mp-opponent-sophistication'
+    label.textContent = 'Opponent sophistication'
+    labelRow.append(label)
+
+    const infoBtn = document.createElement('button')
+    infoBtn.type = 'button'
+    infoBtn.className = 'info-btn'
+    infoBtn.textContent = 'ⓘ'
+    infoBtn.dataset.tooltip =
+        'When on, other drafters are assumed to choose players strategically — their picks and '
+        + 'future plans are predicted by running H-scoring from their seats. When off, other '
+        + 'drafters are assumed to choose players neutrally, with no strategic tendencies.'
+    labelRow.append(infoBtn)
+
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.id = 'mp-opponent-sophistication'
+    input.className = 'sidebar-input'
+    input.checked = Boolean(pref('opponent_sophistication', 1))
+    input.addEventListener('change', () => savePref('opponent_sophistication', input.checked ? 1 : 0))
+
+    item.append(labelRow, input)
+    return item
 }
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
@@ -133,6 +167,8 @@ export function getModelParameters(): ModelParameters {
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
         kappa:           readNumberInput('mp-kappa'),
+        opponent_sophistication:
+            (document.getElementById('mp-opponent-sophistication') as HTMLInputElement).checked,
         omega:           readNumberInput('mp-omega'),
         gamma:           readNumberInput('mp-gamma'),
         beth:            readNumberInput('mp-beth'),

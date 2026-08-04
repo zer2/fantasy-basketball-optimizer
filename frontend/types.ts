@@ -72,6 +72,11 @@ export interface ModelParameters {
     chi: number
     aleph: number
     kappa: number
+    // Whether other drafters are modeled as strategic players (predicted by running H-scoring from
+    // their seats) or as neutral pickers with no strategic tendencies.
+    opponent_sophistication: boolean
+    // behavior_model_confidence (weight on predicted opponent punting) is deliberately NOT sent by
+    // the frontend: it is not user-facing, so the backend schema default applies to every session.
     n_iterations: number
     streaming_noise: number   // S_σ: SAVOR noise parameter, only meaningful in Auction Mode
 }
