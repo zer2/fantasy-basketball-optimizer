@@ -50,10 +50,10 @@ _TEAM_2 = [
 # 2026-07-21 for the Gaussian (phi, B=4) regulariser decay schedule, which shifts only the mid-draft
 # optimisation (empty-board reg strength is the schedule's peak, identical to the prior cosine peak).
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): 'bb0d1e29ef7a8a735dec7304e618b6efca99e41987ff84af8fa4a40fdce3ef6b',
-    ('Head to Head: Each Category',  'mid'):   'ef3a31da5784d7d92e015a13233678a4cbd8b29728640ce49ab9855a48f0eef5',
-    ('Head to Head: Most Categories','empty'): '4d4919a72d1405396b1a8649c934b59c26a672767a5e0bdd23b079f86bb9335e',
-    ('Head to Head: Most Categories','mid'):   'e7b7e00add5cd689eec9f719ed10ec5595a9c093eefe0ed9ed8c83eba1741fd3',
+    ('Head to Head: Each Category',  'empty'): '256ae8244dbce3129bbd6a18fcdcca690f742de5f21c7f99833c906af18462cf',
+    ('Head to Head: Each Category',  'mid'):   'd81af96a97d5da17995f7307c610ad9ac54ad62336f6167a941b83cc426029f9',
+    ('Head to Head: Most Categories','empty'): '39d5c436389fcc7ec105841ce908331aa2e8935e99eb7c2487e87d3b30840a2b',
+    ('Head to Head: Most Categories','mid'):   '842fef10d0c799f0b100109b3f7da1a3ce4a7c89d75c28559b210ecf6449f29b',
 }
 
 

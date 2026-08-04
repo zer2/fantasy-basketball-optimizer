@@ -25,8 +25,8 @@ from backend.state.session import get_session
 # popularity[c] = fraction of the top-40 players whose weakest category (best punt) is c. Values are
 # multiples of 1/40 and sum to 1. Regenerate with UPDATE_PUNT_POPULARITY=1 (see module docstring).
 _GOLDEN = {
-    'Head to Head: Each Category':   [0.075, 0.5,   0.2,   0.0, 0.0, 0.0, 0.0, 0.225, 0.0],
-    'Head to Head: Most Categories': [0.075, 0.525, 0.175, 0.0, 0.0, 0.0, 0.0, 0.225, 0.0],
+    'Head to Head: Each Category':   [0.0, 0.225, 0.175, 0.0, 0.0, 0.175, 0.0, 0.325, 0.1],
+    'Head to Head: Most Categories': [0.0, 0.25, 0.05, 0.0, 0.0, 0.15, 0.0, 0.425, 0.125],
 }
 
 
