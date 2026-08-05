@@ -117,6 +117,37 @@ _SECTION_EXPLANATIONS = {
         'pools every season and seat, with its standard error. vs a G field (kappa=0 exception): the '
         'model\'s predictions are simply wrong there (G drafters never punt), so the property is '
         'harmlessness, mean ~0. Every seat drafts with its own independent agent.',
+    'MC correlation correction (off vs on)':
+        'The Most-Categories objective normally treats categories as independent; the correlation '
+        'correction (eq C4, a first-order adjustment using the measured cross-category correlation '
+        'matrix) re-couples them. Both arms are built at fully app-true settings and differ ONLY in '
+        'the correction flag. The worry is HERDING: the correction rewards contested categories '
+        '(it peaks at 50% win probability), which can drag every anchor toward the same hedged '
+        'build. Read the two arms side by side per season: "Distinct builds" and "Largest '
+        'same-build group" are the herd signals (12 distinct = fully individual, a large group = '
+        'crowding); "Builds changed vs off" counts anchors whose punt set changed when the '
+        'correction switched on — the size of its real effect on strategy, not just scores.',
+    'MC approximation vs Monte-Carlo oracle':
+        'How accurate are our closed-form ways of pricing category correlation? There is ONE exact '
+        'quantity — the probability of winning a majority of categories when the differentials are '
+        'jointly Gaussian with the measured correlation matrix R — but it has no closed form, so it is '
+        'approximated. This experiment measures both approximations against the truth. For each season '
+        'we take the top-12 EACH-CATEGORY builds (a clean, correction-agnostic source of realistic '
+        'per-category strength profiles), reduce each to its served category win rates, and compute the '
+        'single-matchup majority-win probability three ways: INDEPENDENT (the base objective, ignoring '
+        'correlation), FIRST-ORDER (the current correction), and a high-sample MONTE-CARLO draw over the '
+        'correlated Gaussian — the ground truth. It also carries the PROBIT-FACTOR estimate: condition '
+        'on a common "week" factor (the leading eigenvector of R), which makes the categories '
+        'conditionally independent, then approximate the resulting 1-D sigmoid g(u) with a probit '
+        '(matched at value and slope) so its Gaussian average is closed-form. GH-9 is the same '
+        'conditioned integral by 9-node Gauss-Hermite quadrature — a near-exact reference for what the '
+        'rank-1 factor model can reach. All errors are in percentage points of win probability. '
+        '"Indep |err|" is the size of the problem; "First-order |err|" is the current correction; '
+        '"Probit factor |err|" is the proposed cheap analytic method (one extra DP pass); "GH-9 ref" is '
+        'the model ceiling. NOTE: the naive 2nd-order Taylor of g(u) collapses here (the leading factor '
+        'is too strong for a parabola) — the probit match is what makes the conditioning cheap AND '
+        'accurate. See the write-up in docs/mc_correlation_factor_exploration.md. The oracle SE is the '
+        'Monte-Carlo noise floor.',
     'Warm start (purpose: display stability, not better answers)':
         'THE START-POLICY LADDER, tested here and in "Multi-start seeding": descents can start from '
         '(1) a single neutral seed, (2) the punt seed scan (cold multi-start), or (3) a warm start '
@@ -429,6 +460,183 @@ def test_punt_diversity(sessions, format_key, auction):
         assert distinct >= 3, (
             f'{format_key} {season}: only {distinct} distinct punt set(s) — field collapsed: {breakdown}'
         )
+
+
+# ── FAST: MC correlation correction A/B (draft + auction, per season) ────────
+
+@pytest.mark.parametrize('auction', [False, True], ids=['draft', 'auction'])
+def test_mc_correlation_punt_profiles(auction):
+    """Side-by-side served punt profiles with the MC correlation correction off vs on, at otherwise
+    app-true settings. The correction's known risk is HERDING: it peaks at win probability 0.5, so it
+    rewards contested categories and can push every anchor toward the same shallow, hedged build.
+    The env toggle wraps ONLY the session build (the flag is read once at agent construction)."""
+    mode = 'auction' if auction else 'draft'
+    for season in _SEASONS:
+        punts_by_arm = {}
+        for arm in ('off', 'on'):
+            saved = os.environ.get('MC_CORRELATION')
+            os.environ['MC_CORRELATION'] = '1' if arm == 'on' else '0'
+            try:
+                session = _build_session(_FORMATS['MC'], auction=auction, season=season)
+            finally:
+                if saved is None:
+                    os.environ.pop('MC_CORRELATION', None)
+                else:
+                    os.environ['MC_CORRELATION'] = saved
+            agent = session.agent
+            assert agent.mc_correlation_enabled == (arm == 'on'), 'env toggle did not reach the agent'
+            categories = session.current_params['categories']
+            rows  = _anchor_rate_rows(agent)
+            punts = {player: _classify_punts(rates) for player, rates in rows}
+            punts_by_arm[arm] = punts
+
+            counts     = Counter(punts.values())
+            distinct   = len(counts)
+            herd_size  = counts.most_common(1)[0][1]
+            hard_total = sum(1 for punt_set in punts.values() for _, hard in punt_set if hard)
+            soft_total = sum(1 for punt_set in punts.values() for _, hard in punt_set if not hard)
+            breakdown  = ', '.join(f'{_punt_label(categories, punt_set)} x{count}'
+                                   for punt_set, count in counts.most_common())
+            if arm == 'on':
+                shared  = [p for p in punts if p in punts_by_arm['off']]
+                changed = sum(1 for p in shared if punts[p] != punts_by_arm['off'][p])
+                changed_text = f'{changed} of {len(shared)}'
+            else:
+                changed_text = '-'
+            _record_row('MC correlation correction (off vs on)',
+                        ['Season', 'Mode', 'Correction', 'Distinct builds', 'Largest same-build group',
+                         'Hard', 'Soft', 'Builds changed vs off', 'Breakdown (! = hard)'],
+                        [season, mode, arm, distinct, herd_size, hard_total, soft_total,
+                         changed_text, breakdown])
+            assert distinct >= 3, (
+                f'{season} {mode} correction={arm}: only {distinct} distinct punt set(s) — herd: {breakdown}'
+            )
+
+
+def test_mc_correlation_vs_oracle():
+    """Validate the Most-Categories correlation approximations against a Monte-Carlo oracle, on REAL
+    served builds. The independent objective and the first-order correction are both closed-form
+    approximations of ONE exact quantity (the correlated-Gaussian majority-win probability); this
+    measures how far each lands from a high-sample MC draw of that quantity. Test inputs are the top-12
+    Each-Category builds per season, reduced to their served per-category win rates (a clean,
+    correction-agnostic source of realistic strength profiles). See the section explanation."""
+    import numpy as np
+    from backend.math.algorithm_agents import _normal_ppf, _normal_pdf, _normal_cdf
+    from backend.math.algorithm_helpers import (compute_win_probability, calculate_correction_terms,
+                                                calculate_tipping_points, calculate_pair_bracket_matrix)
+
+    # R (the differential correlation matrix) is season-independent — static CSV + aleph + sign-flip —
+    # so build it once from an MC session. Project to the nearest PSD correlation matrix so the oracle
+    # can sample it, and use that SAME R for every method so the comparison is apples-to-apples.
+    mc_agent = _build_session(_FORMATS['MC'], season=_SEASONS[0]).agent
+    R_raw = np.asarray(mc_agent.rho[0], dtype=float)
+    eigenvalues, eigenvectors = np.linalg.eigh((R_raw + R_raw.T) / 2)
+    R = (eigenvectors * np.clip(eigenvalues, 1e-6, None)) @ eigenvectors.T
+    scale = np.sqrt(np.diag(R))
+    R = R / np.outer(scale, scale)               # renormalise to unit diagonal
+    psd_shift = float(np.max(np.abs(R - R_raw)))
+    cholesky = np.linalg.cholesky(R)
+    n_categories = R.shape[0]
+    identity = np.eye(n_categories)
+    threshold = n_categories // 2 + 1
+
+    # ── common-factor decomposition for the g(u) approximation ──────────────────
+    # R ~ I + lambda lambda^T (off-diag) + E. lambda is the leading factor (sqrt(eig) * eigenvector),
+    # capped below 1 so sqrt(1 - lambda^2) is real; E (the residual) rides on the first-order patch.
+    factor_eigenvalues, factor_eigenvectors = np.linalg.eigh(R)
+    loadings = factor_eigenvectors[:, -1] * np.sqrt(max(float(factor_eigenvalues[-1]), 0.0))
+    loadings = np.clip(loadings, -0.98, 0.98)
+    residual_offdiag = (R - identity) - np.outer(loadings, loadings)
+    np.fill_diagonal(residual_offdiag, 0.0)
+    residual_norm = float(np.sqrt(np.sum(residual_offdiag ** 2)))
+    print(f'\n[mc-oracle] R projected to PSD: max entry shift {psd_shift:.4f}; '
+          f'min eigenvalue was {float(eigenvalues.min()):.4f}. '
+          f'Rank-1 factor leaves residual ||E||_F = {residual_norm:.3f} (of ||R-I||_F = '
+          f'{float(np.sqrt(np.sum((R - identity) ** 2))):.3f}).')
+
+    root = np.sqrt(1.0 - loadings ** 2)
+    from numpy.polynomial.hermite_e import hermegauss
+    gh_nodes, gh_weights = hermegauss(9)
+    gh_weights = gh_weights / np.sqrt(2 * np.pi)         # so sum w_i f(x_i) approximates E[f(U)]
+
+    def residual_first_order(rate):
+        """First-order correction for the residual E (what the rank-1 factor leaves), at the marginals."""
+        return float(calculate_correction_terms(
+            rate.reshape(1, n_categories, 1), residual_offdiag,
+            _normal_pdf(_normal_ppf(rate)).reshape(1, n_categories, 1))[0][0, 0])
+
+    def factor_probit(rate):
+        """P(win) via common-factor conditioning, evaluated by a PROBIT match of the sigmoid g(u):
+        g(u) ~ Phi(alpha + kappa u) matched at value and slope at u=0, so E_U[g] = Phi(alpha/sqrt(1+
+        kappa^2)) in closed form. Both anchors fall out of one DP-table build at the factor-sharpened
+        point (value from the win-count distribution, slope from the tipping points); the 2nd-order
+        Taylor of the same g(u) diverges because the leading factor is too strong for a parabola."""
+        z = _normal_ppf(rate)
+        a = z / root                                     # sharpened latent means
+        beta = (loadings / root) * _normal_pdf(a)        # p_c'(0)
+        p0 = _normal_cdf(a).reshape(1, n_categories, 1)
+        g0 = min(max(float(compute_win_probability(p0)[0, 0]), 1e-6), 1 - 1e-6)
+        slope = float(np.sum(calculate_tipping_points(p0)[0, :, 0] * beta))   # g'(0) = sum_c V_c beta_c
+        alpha = _normal_ppf(g0)
+        kappa = slope / _normal_pdf(alpha)
+        conditioned = float(_normal_cdf(alpha / np.sqrt(1 + kappa ** 2)))
+        return conditioned + residual_first_order(rate)
+
+    def factor_gauss_hermite(rate):
+        """Near-exact reference: the same conditioned integral by 9-node Gauss-Hermite quadrature."""
+        z = _normal_ppf(rate)
+        total = 0.0
+        for node, weight in zip(gh_nodes, gh_weights):
+            p = _normal_cdf((z + loadings * node) / root).reshape(1, n_categories, 1)
+            total += weight * float(compute_win_probability(p)[0, 0])
+        return total + residual_first_order(rate)
+
+    generator = np.random.default_rng(20260804)
+    n_samples = 300_000
+
+    for season in _SEASONS:
+        agent = _build_session(_FORMATS['EC'], season=season).agent
+        rate_frame = agent._default_result['Rates']
+        top_players = [p for p in agent.default_h_scores.index if p in rate_frame.index][:12]
+
+        oracle_levels = []
+        indep_abs, first_abs, probit_abs, gh_abs, probit_worst = [], [], [], [], []
+        standard_errors = []
+        for player in top_players:
+            rate = np.clip(rate_frame.loc[player].to_numpy(dtype=float), 1e-4, 1 - 1e-4)
+            z = _normal_ppf(rate)
+            probs = rate.reshape(1, n_categories, 1)               # P(win c) = Phi(z_c) = rate
+            pdf = _normal_pdf(z).reshape(1, n_categories, 1)
+
+            independent = float(compute_win_probability(probs)[0, 0])
+            first_order = independent + float(calculate_correction_terms(probs, R - identity, pdf)[0][0, 0])
+            probit = factor_probit(rate)
+            gauss_hermite = factor_gauss_hermite(rate)
+
+            draws = z[:, None] + cholesky @ generator.standard_normal((n_categories, n_samples))
+            oracle = float(((draws > 0).sum(axis=0) >= threshold).mean())
+
+            oracle_levels.append(oracle)
+            indep_abs.append(abs(independent - oracle))
+            first_abs.append(abs(first_order - oracle))
+            probit_abs.append(abs(probit - oracle))
+            probit_worst.append(abs(probit - oracle))
+            gh_abs.append(abs(gauss_hermite - oracle))
+            standard_errors.append(float(np.sqrt(oracle * (1 - oracle) / n_samples)))
+
+        _record_row('MC approximation vs Monte-Carlo oracle',
+                    ['Season', 'Oracle win%', 'Indep |err|', 'First-order |err|', 'Probit factor |err|',
+                     'Probit worst', 'GH-9 ref |err|', 'Oracle SE'],
+                    [season,
+                     f'{100 * float(np.mean(oracle_levels)):.1f}',
+                     f'{100 * float(np.mean(indep_abs)):.2f}',
+                     f'{100 * float(np.mean(first_abs)):.2f}',
+                     f'{100 * float(np.mean(probit_abs)):.2f}',
+                     f'{100 * float(np.max(probit_worst)):.2f}',
+                     f'{100 * float(np.mean(gh_abs)):.2f}',
+                     f'{100 * float(np.mean(standard_errors)):.3f}'])
+        assert len(top_players) >= 10, f'{season}: too few builds to test'
+        assert np.mean(standard_errors) < 0.002, f'{season}: oracle noise floor too high'
 
 
 # ── FAST: Rotisserie punts stay shallow (draft + auction, per season) ────────
