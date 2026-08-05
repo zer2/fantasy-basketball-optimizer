@@ -336,17 +336,40 @@ class HAgent:
         else:
             self.rho = None
 
-        # Most-Categories correlation correction (see docs: correlation-correction note, eq (C4)).
-        # Temporarily OFF by default while the opponent model is under development: the correction
-        # over-suppresses punting on a contested board (it peaks at win-prob 0.5), which fights the
-        # opponent-model work. Set MC_CORRELATION=1 to re-enable.
+        # Most-Categories correlation correction (see docs: correlation-correction note, eq (C4), and
+        # docs/mc_correlation_factor_exploration.md). OFF by default while the opponent model is under
+        # development: the correction over-suppresses punting on a contested board (it peaks at win-prob
+        # 0.5). Env MC_CORRELATION selects the mode:
+        #   0 = off; 1 = first-order pairwise correction; 2 = probit-factor (common-factor conditioning
+        #   evaluated by a probit match of the sigmoid g(u); see _probit_win_probability).
+        _mc_correlation_setting = os.environ.get('MC_CORRELATION', '0')
         self.mc_correlation_enabled = (
             scoring_format == 'Head to Head: Most Categories'
-            and os.environ.get('MC_CORRELATION', '0') == '1'
+            and _mc_correlation_setting in ('1', '2')
         )
+        self.mc_correlation_mode = 'probit' if _mc_correlation_setting == '2' else 'first_order'
         # Per-descent cache of correction terms (see get_objective_and_pdf_weights_mc);
         # reset at the start of every perform_iterations run.
         self._correction_cache = None
+        # Common-factor decomposition R ~ I + lambda lambda^T (off-diag) + E, for the probit-factor mode.
+        # lambda is the leading factor (sqrt(eig) * eigenvector) of the nearest-PSD correlation matrix,
+        # capped below 1 so sqrt(1 - lambda^2) is real; the residual E rides on the first-order patch.
+        self._factor_loadings = self._factor_root = self._factor_residual = None
+        if self.mc_correlation_enabled:
+            correlation = np.asarray(self.rho[0], dtype=float)
+            eigenvalues, eigenvectors = np.linalg.eigh((correlation + correlation.T) / 2)
+            psd = (eigenvectors * np.clip(eigenvalues, 1e-6, None)) @ eigenvectors.T
+            diag_scale = np.sqrt(np.diag(psd))
+            psd = psd / np.outer(diag_scale, diag_scale)
+            factor_values, factor_vectors = np.linalg.eigh(psd)
+            loadings = np.clip(factor_vectors[:, -1] * np.sqrt(max(float(factor_values[-1]), 0.0)),
+                               -0.98, 0.98)
+            self._factor_loadings = loadings
+            self._factor_root = np.sqrt(1.0 - loadings ** 2)
+            n_cat = correlation.shape[0]
+            residual = (psd - np.eye(n_cat)) - np.outer(loadings, loadings)
+            np.fill_diagonal(residual, 0.0)
+            self._factor_residual = residual
 
         # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_states).
         # The session parameter (opponent_sophistication, default on) is the primary switch; the
@@ -1834,6 +1857,31 @@ class HAgent:
             return self.get_objective_and_pdf_weights_ec(cdf_estimates, pdf_estimates,
                                                           calculate_pdf_weights)
 
+    def _probit_win_probability(self, z_scores, probs, standard_pdf):
+        """Probit-factor estimate of the correlated Most-Categories win probability (forward value only).
+
+        Condition on the common factor (leading eigenvector of R): conditional on the week factor u the
+        categories are independent with sharpened marginals p_c(u) = Phi((z_c + lambda_c u)/sqrt(1 -
+        lambda_c^2)), so the win probability is E_u[g(u)] over a 1-D sigmoid g(u). Approximate g by a
+        probit matched at value and slope at u=0, giving the closed form Phi(alpha / sqrt(1 + kappa^2)),
+        and add a first-order term for the rank-1 residual E. Both anchors come from one DP-table build
+        at the sharpened point (value from the win-count distribution, slope from the tipping points).
+        See docs/mc_correlation_factor_exploration.md. Shapes: (players, categories, opponents) in,
+        (players, opponents) out."""
+        loadings = self._factor_loadings.reshape(1, -1, 1)
+        root     = self._factor_root.reshape(1, -1, 1)
+        sharpened_z = z_scores / root
+        sharpened   = _normal_cdf(sharpened_z)                          # p_c(0) = Phi(a_c)
+        g0 = np.clip(compute_win_probability(sharpened), 1e-6, 1 - 1e-6)          # (players, opponents)
+        slope_weight = (loadings / root) * _normal_pdf(sharpened_z)     # p_c'(0)
+        slope = (calculate_tipping_points(sharpened) * slope_weight).sum(axis=1)  # g'(0), (players, opp)
+        alpha = _normal_ppf(g0)
+        kappa = slope / _normal_pdf(alpha)
+        conditioned = _normal_cdf(alpha / np.sqrt(1.0 + kappa ** 2))
+        residual, _, _ = calculate_correction_terms(probs, self._factor_residual, standard_pdf,
+                                                    calculate_gradient=False)
+        return conditioned + residual
+
     def get_objective_and_pdf_weights_mc(self
                                           , x_diff_array
                                           , diff_vars
@@ -1880,7 +1928,15 @@ class HAgent:
                     self._correction_cache = correction_terms
             else:
                 correction_terms = cached
-            win_probability = win_probability + correction_terms['correction']
+            if self.mc_correlation_mode == 'probit':
+                # Probit-factor FORWARD value (the g(u)-conditioned estimate). The descent still uses the
+                # first-order correction gradient assembled below as a PROXY — first-order and probit
+                # agree in direction (both discourage crowded punts), differing mainly in magnitude, so
+                # the field shape is guided correctly while the displayed scores get the better estimate.
+                # A full analytic probit gradient is a documented follow-up.
+                win_probability = self._probit_win_probability(z_scores, probs, standard_pdf)
+            else:
+                win_probability = win_probability + correction_terms['correction']
 
         objective = win_probability.mean(axis=1)
         if not calculate_pdf_weights:

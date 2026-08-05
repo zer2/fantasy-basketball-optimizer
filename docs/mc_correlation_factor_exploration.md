@@ -155,6 +155,25 @@ residual model floor, set by ‖E‖=0.65). Probit (0.62 on that run) sits near 
 5. **Probit anchoring:** whether `g(0)`/`g'(0)` can be approximated from marginal-point quantities to
    avoid even the one extra DP pass (trades accuracy — measure first).
 
+## 7b. Live implementation (branch only)
+
+The probit-factor method is wired into the MC objective as a third correlation mode, env-gated so it
+never touches default (off) behavior:
+
+- `MC_CORRELATION=0` (default) — off.
+- `MC_CORRELATION=1` — first-order pairwise correction (pre-existing).
+- `MC_CORRELATION=2` — **probit-factor** (`_probit_win_probability`): common-factor decomposition of R
+  computed at agent build; per evaluate the forward win probability is the probit estimate + residual E.
+
+**Caveat — the descent gradient is a first-order proxy.** The forward value is the true probit, but the
+gradient that drives category-weight descent reuses the first-order correction's (validated) gradient.
+First-order and probit agree in direction (both discourage crowded punts), so the *field shape* is
+guided correctly and the *displayed scores* get the more-accurate probit estimate; a full analytic
+probit gradient (derivation in hand) is a follow-up. In practice the probit field looks like the
+first-order field (same flattened soft-Turnovers hedge), with slightly different win-rate numbers.
+Build/evaluate cost is ~40% higher than first-order (the probit runs a DP-table pass at the sharpened
+point every objective call). Default-off behavior is byte-identical (verified: signature + MC goldens).
+
 ## 8. Where the code lives
 
 - Experiment: `testing_files/test_experiments.py :: test_mc_correlation_vs_oracle` (independent,
