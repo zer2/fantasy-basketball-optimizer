@@ -8,6 +8,7 @@
 import { ModelParameters } from '../types.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
+import { makeSidebarToggle } from '../helper_functions.js'
 
 interface ParamSpec {
     id:      string
@@ -89,18 +90,10 @@ export function renderModelParameters(container: HTMLElement): void {
     grid.append(makeOpponentSophisticationItem())
 }
 
-/** The one boolean parameter: a checkbox styled like the numeric param items. */
+/** The one boolean parameter: the standard sidebar toggle (like third-round reversal), so the
+ *  switch sits inline with its text instead of dropping onto its own row. */
 function makeOpponentSophisticationItem(): HTMLElement {
-    const item = document.createElement('div')
-    item.className = 'param-item'
-
-    const labelRow = document.createElement('div')
-    labelRow.className = 'param-label-row'
-
-    const label = document.createElement('label')
-    label.htmlFor = 'mp-opponent-sophistication'
-    label.textContent = 'Opponent sophistication'
-    labelRow.append(label)
+    const row = makeSidebarToggle('mp-opponent-sophistication', 'Opponent sophistication')
 
     const infoBtn = document.createElement('button')
     infoBtn.type = 'button'
@@ -110,17 +103,14 @@ function makeOpponentSophisticationItem(): HTMLElement {
         'When on, other drafters are assumed to choose players strategically — their picks and '
         + 'future plans are predicted by running H-scoring from their seats. When off, other '
         + 'drafters are assumed to choose players neutrally, with no strategic tendencies.'
-    labelRow.append(infoBtn)
+    // The row is a <label>: without this, clicking the info icon would also flip the toggle.
+    infoBtn.addEventListener('click', event => event.preventDefault())
+    row.append(infoBtn)
 
-    const input = document.createElement('input')
-    input.type = 'checkbox'
-    input.id = 'mp-opponent-sophistication'
-    input.className = 'sidebar-input'
+    const input = row.querySelector('input') as HTMLInputElement
     input.checked = Boolean(pref('opponent_sophistication', 1))
     input.addEventListener('change', () => savePref('opponent_sophistication', input.checked ? 1 : 0))
-
-    item.append(labelRow, input)
-    return item
+    return row
 }
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
