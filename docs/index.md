@@ -45,6 +45,8 @@ The website's calculations take a number of user-configurable parameters, availa
 | Parameter | Controls | Explained in |
 |---|---|---|
 | ω, γ (omega, gamma) | How aggressively H-scoring punts categories | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
+| κ (kappa) | How strongly the algorithm avoids punting categories that are popular punts for the field | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
+| Opponent sophistication | Whether other drafters are modeled as strategic (punting) drafters or as neutral pickers | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
 | Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | Position requirements | The roster/position structure a team must satisfy | [H-scoring → Position structure](hscores.md#position-structure) |
 | υ, ψ (upsilon, psi) | How projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |

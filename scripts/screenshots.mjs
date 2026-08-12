@@ -204,6 +204,13 @@ const STATES = {
     async 'candidate'(page) {
         await ensure(page, 'draft-EC')
         await lockInDraftPick(page, 'Giannis')          // Team 1 takes Giannis with the first pick
+        // The seat selector already sits on Team 1, and re-selecting the active seat fires no change
+        // event — the table can then be captured showing whatever evaluate the lock-in triggered
+        // (once observed as a different seat's perspective: a punt-3s build instead of Team 1's
+        // punt-FT% build). Toggle via Team 2 so the final selection fires a change-driven evaluate,
+        // the same trick auction-manual-team1 uses.
+        await setSelect(page, 'seat-select', 'Team 2')
+        await waitEval(page)
         await setSelect(page, 'seat-select', 'Team 1')  // evaluate from Team 1's perspective
         await waitEval(page)
         await expandCandidateByName(page, 'Dyson Daniels')

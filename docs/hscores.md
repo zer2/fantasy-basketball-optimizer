@@ -38,11 +38,11 @@ The overall H-score on the left side of the display is both the metric that H-sc
 
     Roughly, the function for H-scoring has three components: category strength expectations, category-level victory probabilities, and the outer-level objective function. The decisions made by the algorithm impact the category strength expectations, which in turn impact category-level victory probabilities, which in turn impact the outer-level objective function. The total gradient relative to an input decision is the gradient of all three steps relative to the previous, multiplied together.
 
-One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.
+One might note that Giannis Antetokounmpo ranks in the top dozen by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.
 
 The colored numbers to the right are category-level H-scores. They are _not direct reflections of the candidate player's characteristics_. Instead, they show what the algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates those expectations based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.
 
-Because other picks are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For example, Shai Gilgeous-Alexander's row as a candidate for first pick shows a very low probability of winning the Assist category, despite SGA getting a decent number himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing assists with future picks.
+Because other picks are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For example, Shai Gilgeous-Alexander's row as a candidate for first pick shows a very low probability of winning the Threes category, despite SGA hitting a decent number himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing threes with future picks.
 
 In later draft rounds, the importance of previously chosen players increases and the importance of the strategy for future picks decreases. Also, the strategy for future picks tends to become more stable across players, since the direction of the team is already decided. So categorical H-scores tend to become more consistent across candidate players as the draft goes on.
 
@@ -85,7 +85,7 @@ In Most Categories, teams get wins for every opponent they get a majority of fan
 Top Most Categories H-scores for the first pick, 2024-25 season
 ///
 
-The table above is based on the same dataset as the Each Category version. The overall H-scores are different because they are based on the Most Categories objective; the associated strategies are optimized accordingly to match the format and maximize the objective for each player. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories is not helpful. This leads to players like Giannis, who benefit greatly from punting, ranking better (sixth vs. fourth in this case).
+The table above is based on the same dataset as the Each Category version. The overall H-scores are different because they are based on the Most Categories objective; the associated strategies are optimized accordingly to match the format and maximize the objective for each player. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories is not helpful. This leads to players like Giannis, who benefit greatly from punting, ranking better (tenth vs. eleventh in this case).
 
 ??? note "What is different about the Most Categories algorithm, and why does it take longer to compute?"
     The format-dependent overall H-score is the outer-level objective function that the algorithm maximizes. Different formats necessitate different structures for that function, which then drive different behavior for the formats. They also require different amounts of computational time. 
@@ -107,7 +107,7 @@ Rotisserie is another degree more complicated than Most Categories, and its obje
 Top Rotisserie H-scores, for the 2024-25 season
 ///
 
-The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis falls to eleventh, which aligns with the traditional wisdom that punting is not as advantagous for that format. 
+The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis falls out of the top twelve entirely, which aligns with the traditional wisdom that punting is not as advantageous for that format. 
 
 Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head-to-Head formats. The average is around 8% instead of 50%. 
 
