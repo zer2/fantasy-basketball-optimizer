@@ -460,3 +460,44 @@ def calculate_tipping_points(x: np.ndarray) -> np.ndarray:
         result = result / 2 + tie_prob[:, np.newaxis, :] / 2
 
     return result
+
+
+def calculate_win_probability_and_tipping_points(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """compute_win_probability and calculate_tipping_points from ONE prefix/suffix build.
+
+    The two share the same win-count DP: the win probability is a reduction of the
+    full-prefix table, and the complement (1 - x) tables ride along by stacking
+    [x, 1 - x] on the opponent axis, so one build replaces the three the standalone
+    functions would run. Every DP operation is elementwise per opponent column, so
+    the results are bit-identical to calling the standalone functions.
+    """
+    n_players, n_categories, n_opponents = x.shape
+    k = n_categories // 2
+    k_to_win = k + 1
+
+    stacked = np.concatenate([x, 1 - x], axis=2)
+    prefix, suffix = _build_win_count_prefix_suffix(stacked)
+
+    full_prefix = prefix[n_categories][:, :, :n_opponents]
+    win_probability = full_prefix[:, k_to_win:, :].sum(axis=1)
+    if n_categories % 2 == 0:
+        win_probability = win_probability + full_prefix[:, k, :] / 2
+
+    tipping_points = np.zeros((n_players, n_categories, n_opponents))
+    for c in range(n_categories):
+        pre = prefix[c]
+        suf = suffix[c + 1]
+        win_exactly_k_stacked = np.zeros((n_players, 2 * n_opponents))
+        for a in range(min(k + 1, pre.shape[1])):
+            b = k - a
+            if 0 <= b < suf.shape[1]:
+                win_exactly_k_stacked += pre[:, a, :] * suf[:, b, :]
+        x_c = x[:, c, :]
+        tipping_points[:, c, :] = (x_c * win_exactly_k_stacked[:, :n_opponents]
+                                   + (1 - x_c) * win_exactly_k_stacked[:, n_opponents:])
+
+    if n_categories % 2 == 0:
+        tie_prob = prefix[n_categories][:, k, :n_opponents]
+        tipping_points = tipping_points / 2 + tie_prob[:, np.newaxis, :] / 2
+
+    return win_probability, tipping_points

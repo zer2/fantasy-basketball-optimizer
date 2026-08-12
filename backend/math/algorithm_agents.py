@@ -170,7 +170,7 @@ from itertools import combinations
 
 from backend.math.algorithm_helpers import (
     compute_win_probability,
-    calculate_tipping_points,
+    calculate_win_probability_and_tipping_points,
     calculate_correction_terms,
 )
 from backend.math.process_player_data import get_category_level_rv
@@ -859,6 +859,17 @@ class HAgent:
                     base = base - tilt.reshape(1, self.n_categories, 1)
                 return base
 
+            # On an all-empty board every seat is the same formula over a different (anchor, tilt) row,
+            # so a snapshot's whole block batches into a few array operations instead of a Python call
+            # per seat — the per-seat path costs ~2s of populate through thousands of tiny pandas
+            # lookups once the windowed passes stack the field (11 columns on pass one, 176 by the
+            # last). Any seat with a real roster (mid-draft) drops back to the per-seat construction.
+            all_seats_empty = all(not any(p == p for p in player_assignments[team])
+                                  for team in opponent_teams)
+            drafter_cash = cash_remaining_per_team[drafter]
+            seat_cash_diffs = np.array([drafter_cash - cash_remaining_per_team[team]
+                                        for team in opponent_teams])
+
             field_blocks, snapshot_exclusions = [], []
             for snapshot in field_snapshots:
                 committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
@@ -866,21 +877,44 @@ class HAgent:
                 empty_seat_anchor, spare_anchor = (
                     self._assign_empty_seat_anchors(player_assignments, drafter, anchor_order)
                     if model_opponents else ({}, None))
-                field_blocks.append(np.concatenate(
-                    [seat_diff(team, empty_seat_anchor, committed_diffs) for team in opponent_teams], axis=2))
-                snapshot_exclusions.append((empty_seat_anchor, spare_anchor, committed_diffs))
+                if all_seats_empty and len(empty_seat_anchor) == len(opponent_teams):
+                    # The spare (self-exclusion's replacement seat) batches with the real seats: it is
+                    # the same formula, and on an all-empty board every seat shares one drafter-vs-seat
+                    # cash diff (no opponent has spent), so the spare's column is seat-independent and
+                    # rides along as one extra row that is sliced off below. The uniformity check is a
+                    # guard for the impossible-in-practice case of unequal empty-seat cash.
+                    seats_share_cash = bool(np.all(seat_cash_diffs == seat_cash_diffs[0]))
+                    batch_spare  = spare_anchor is not None and seats_share_cash
+                    anchors      = [empty_seat_anchor[team] for team in opponent_teams]
+                    batch_names  = anchors + ([spare_anchor] if batch_spare else [])
+                    anchor_stats = self.x_scores.loc[batch_names].to_numpy()         # (S(+1), n_cat)
+                    anchor_tilts = committed_diffs.loc[batch_names].to_numpy()       # (S(+1), n_cat)
+                    batch_cash   = (np.append(seat_cash_diffs, seat_cash_diffs[0])
+                                    if batch_spare else seat_cash_diffs)
+                    # Mirrors seat_diff's anchored-empty-seat arithmetic exactly (same operation
+                    # order, so results are bit-identical): get_diff_means_auction at roster_len=1,
+                    # then the confidence-scaled punt tilt.
+                    score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
+                    player_diff_total = (len(my_players) - 1 - 1) * replacement_value_by_category.reshape(1, -1)
+                    money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
+                    tilt              = (self.n_picks - 1) * self.behavior_model_confidence * anchor_tilts
+                    columns           = score_diff - player_diff_total + money_diff_total - tilt
+                    field_blocks.append(columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
+                    spare_column = columns[len(anchors)] if batch_spare else None
+                else:
+                    field_blocks.append(np.concatenate(
+                        [seat_diff(team, empty_seat_anchor, committed_diffs) for team in opponent_teams],
+                        axis=2))
+                    spare_column = None   # computed lazily via seat_diff in the exclusion loop
+                snapshot_exclusions.append((empty_seat_anchor, spare_anchor, committed_diffs, spare_column))
             diff_means = np.concatenate(field_blocks, axis=2)                     # (1, n_cat, n_teams*K)
-
-            # value_of_money is the drafter's money value against the FIELD -- candidate-independent -- so it
-            # reads this field before self-exclusion rewrites individual candidates' slices.
-            value_of_money_field = diff_means
 
             # Self-exclusion: a candidate that is itself an empty seat's predicted first buy is not scored
             # against a copy of itself -- rebuild that seat with the spare anchor (whole seat: stats, cost,
             # tilt). Makes the returned diff_means candidate-dependent (N, n_cat, n_opp). Applied per
             # snapshot block — each snapshot has its own seat map, spare anchor, and tilt table.
             if model_opponents and candidate_batch is not None:
-                for snapshot_index, (empty_seat_anchor, spare_anchor, committed_diffs) \
+                for snapshot_index, (empty_seat_anchor, spare_anchor, committed_diffs, spare_column) \
                         in enumerate(snapshot_exclusions):
                     if spare_anchor is None or not empty_seat_anchor:
                         continue
@@ -896,8 +930,12 @@ class HAgent:
                     spare_seat_by_team = {}
                     for candidate_index, team in affected.items():
                         if team not in spare_seat_by_team:
-                            spare_seat_by_team[team] = seat_diff(team, empty_seat_anchor, committed_diffs,
-                                                                 anchor_override=spare_anchor)[0, :, 0]
+                            # Fast path precomputed the spare column (seat-independent when every
+                            # empty seat shares one cash diff); otherwise compute it per seat.
+                            spare_seat_by_team[team] = (
+                                spare_column if spare_column is not None
+                                else seat_diff(team, empty_seat_anchor, committed_diffs,
+                                               anchor_override=spare_anchor)[0, :, 0])
                         slot = anchor_to_slot[candidate_batch[candidate_index]] + slot_offset
                         diff_means[candidate_index, :, slot] = spare_seat_by_team[team]
 
@@ -925,12 +963,43 @@ class HAgent:
             field_snapshots = ((self._bootstrap_field_snapshots or [None]) if model_opponents else [None])
             field_copies    = len(field_snapshots)
             if model_opponents:
+                # On an all-empty board every seat is anchor stats + generic padding + its punt tilt,
+                # so a snapshot's block batches into a few array operations instead of a pandas lookup
+                # per seat (the windowed passes stack up to n_teams*K columns — the per-seat path was
+                # a measured chunk of populate time). Mixed rosters fall back to compute_opponent_totals.
+                all_seats_empty = all(not any(p == p for p in player_assignments[team])
+                                      for team in opponent_teams)
+                mean_extra_array = np.asarray(mean_extra)
                 field_blocks, snapshot_exclusions = [], []
                 for snapshot in field_snapshots:
-                    totals, empty_slot_player, spare_total = self.compute_opponent_totals(
-                        player_assignments, drafter, mean_extra, target_team_size, field_snapshot=snapshot
-                    )
-                    field_blocks.append(np.concatenate([totals[team] for team in opponent_teams], axis=2))
+                    committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
+                    anchor_order    = (None if snapshot is None else snapshot[1])
+                    if all_seats_empty:
+                        empty_slot_player, spare_anchor = self._assign_empty_seat_anchors(
+                            player_assignments, drafter, anchor_order)
+                    if all_seats_empty and len(empty_slot_player) == len(opponent_teams):
+                        # Mirrors team_total's anchored-empty-seat arithmetic exactly (same operation
+                        # order as get_opposing_team_means + the tilt, so results are bit-identical).
+                        anchors      = [empty_slot_player[team] for team in opponent_teams]
+                        anchor_stats = self.x_scores.loc[anchors].to_numpy()          # (S, n_cat)
+                        anchor_tilts = committed_diffs.loc[anchors].to_numpy()        # (S, n_cat)
+                        extra_sum    = mean_extra_array.reshape(1, -1) * (target_team_size - 1)
+                        tilt         = ((self.n_picks - 1) * self.behavior_model_confidence) * anchor_tilts
+                        totals_rows  = (anchor_stats + extra_sum) + tilt
+                        field_blocks.append(totals_rows.T.reshape(1, self.n_categories, len(anchors)))
+                        if spare_anchor is not None:
+                            spare_total = ((self.x_scores.loc[[spare_anchor]].sum(axis=0).to_numpy()
+                                            + extra_sum.reshape(-1))
+                                           + ((self.n_picks - 1) * self.behavior_model_confidence)
+                                           * committed_diffs.loc[spare_anchor].to_numpy()
+                                           ).reshape(1, self.n_categories, 1)
+                        else:
+                            spare_total = None
+                    else:
+                        totals, empty_slot_player, spare_total = self.compute_opponent_totals(
+                            player_assignments, drafter, mean_extra, target_team_size, field_snapshot=snapshot
+                        )
+                        field_blocks.append(np.concatenate([totals[team] for team in opponent_teams], axis=2))
                     snapshot_exclusions.append((empty_slot_player, spare_total))
                 other_team_sums = np.concatenate(field_blocks, axis=2)                # (1, n_cat, n_teams*K)
             else:
@@ -980,17 +1049,6 @@ class HAgent:
             # every opponent column has its variance (the empty board makes the blocks identical).
             diff_vars = np.tile(diff_vars, (1, field_copies))
         diff_vars = diff_vars.reshape(1, self.n_categories, -1)
-
-        if cash_remaining_per_team:
-            # value_of_money reads the candidate-independent field (see the auction branch): diff_means may
-            # now be candidate-dependent (N, n_cat, n_opp) after self-exclusion, but the money-value curve is
-            # a single field-level quantity, so it uses the snapshot taken before self-exclusion.
-            self.value_of_money = self.get_value_of_money_auction(
-                value_of_money_field, diff_vars, sigma_2_m,
-                category_value_per_dollar, replacement_value_by_category,
-            )
-        else:
-            self.value_of_money = None
 
         return diff_means, diff_vars, sigma_2_m
 
@@ -1258,24 +1316,10 @@ class HAgent:
     def get_diff_var(self, n_their_players):
         return self.n_picks * (2 + self.w * (self.n_picks - n_their_players) / self.n_picks)
 
-    def get_value_of_money_auction(self
-                                    , diff_means
-                                    , diff_vars
-                                    , sigma_2_m
-                                    , category_value_per_dollar
-                                    , replacement_value_by_category
-                                    , max_money=200
-                                    , step_size=0.1):
-        x_diff_array = np.concatenate([
-            diff_means + replacement_value_by_category + category_value_per_dollar * x * step_size
-            for x in range(int(max_money / step_size))
-        ])
-        cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
-        score = self.get_objective_and_pdf_weights(
-            x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m, calculate_pdf_weights=False
-        )
-        return pd.DataFrame({'value': score},
-                            index=[x * step_size for x in range(int(max_money / step_size))])
+    # NOTE: the money->win-probability curve (get_value_of_money_auction, stored as
+    # self.value_of_money) was removed 2026-08-11: nothing consumed it -- the service layer converts
+    # H-scores to dollars via auction_value_adjuster -- and rebuilding a 2000-price-point tensor
+    # against every opponent column on every auction call was a measured ~1.7s of populate time.
 
     def _select_starting_weights(self
                                  , position_shares
@@ -1846,7 +1890,12 @@ class HAgent:
         refresh throttle when an iteration index is given), 'skip' turns it off — used by
         the multi-start seed scan, whose coarse pre-descent ranking doesn't warrant it."""
         probs = np.array(cdf_estimates)
-        win_probability = compute_win_probability(probs)      # (n_players, n_opponents)
+        if calculate_pdf_weights:
+            # Gradient steps need the tipping points too, and both come out of one
+            # shared win-count DP build (bit-identical to the standalone functions).
+            win_probability, tipping_points = calculate_win_probability_and_tipping_points(probs)
+        else:
+            win_probability = compute_win_probability(probs)  # (n_players, n_opponents)
 
         # First-order correlation correction (eq (C4) of the correlation-correction note):
         #   P(win | R) ≈ P_indep + ½ φ(z)ᵀ [(R − I) ∘ B] φ(z)
@@ -1886,7 +1935,7 @@ class HAgent:
         if not calculate_pdf_weights:
             return objective
 
-        pdf_weights = calculate_tipping_points(probs) * pdf_estimates
+        pdf_weights = tipping_points * pdf_estimates
         if correction_terms is not None:
             # Exact correction gradient, two pieces chained through pdf_estimates = φ(z)/σ:
             #   through the densities:       −z_c [Mφ(z)]_c
@@ -2016,7 +2065,7 @@ class HAgent:
         pass_iters = _OPPONENT_PASS_ITERATIONS
         result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)  # neutral
         committed = result['Future-Diff'] / (self.n_picks - 1)
-        window_size = (_OPPONENT_FIELD_WINDOW if self.scoring_format != 'Rotisserie' else 0)
+        window_size = (_OPPONENT_FIELD_WINDOW if self.scoring_format != 'Rotisserie' else 0) #ZR: This could be reversed to 0 if Rotisserie
         if window_size >= 2:
             # Windowed fictitious play (see _OPPONENT_FIELD_WINDOW): each pass best-responds to the RAW
             # fields of the last K passes stacked as separate opponents — no EMA blending, the window
