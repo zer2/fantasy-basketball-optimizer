@@ -106,9 +106,82 @@ _PUNT_POPULARITY_TOP_N = int(os.environ.get('PUNT_POPULARITY_TOP_N', '40'))
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
 _REG_SHAPE_B = float(os.environ.get('REG_SHAPE_B', '4'))
 _schedule_override = os.environ.get('PUNT_REG_SCHEDULE')
+# Correlation-correction refresh interval, mirroring the position-optimiser throttle: the
+# correction terms are recomputed on iterations where (iteration+1) % interval == 0 (plus
+# the cold start) and reused between — they drift slowly with the category weights, so a
+# small staleness buys back most of the correction's per-iteration cost. One-shot scoring
+# calls (full team, trades, auction values) always compute fresh.
+_MC_CORRELATION_REFRESH_INTERVAL = int(os.environ.get('MC_CORRELATION_REFRESH', '4'))
+# Opponent modelling: instead of padding every opponent's future picks with a category-neutral
+# average, treat each opponent as a rational H-score drafter who punts. We track a per-opponent
+# mu_edge (the expected per-pick edge vector implied by their inferred category weights) and add
+# picks_left * mu_edge to their totals — mirroring the edge term the objective already adds for OUR
+# own remaining picks. Stale opponents are refreshed EAGERLY at the top of every evaluate: a pick makes
+# exactly one seat stale, and each refresh replays that seat's most recent pick through the real solver
+# as a single-candidate solve (~1/40th of an evaluate), so there is no lazy budget and the field model
+# is always current. _OPPONENT_INFERENCE_ITERATIONS bounds that nested solve's descent. Env
+# OPPONENT_MODEL=0 disables the whole feature and restores byte-identical neutral-opponent behaviour.
+_OPPONENT_INFERENCE_ITERATIONS = int(os.environ.get('OPPONENT_INFERENCE_ITERATIONS', '50'))
+# Build-time fictitious-play bootstrap: the base H-scores are recomputed several times, each pass
+# best-responding to the RUNNING AVERAGE of prior passes' builds rather than the latest one. Pure
+# best-response oscillates (every seat flips the same way each pass); averaging damps that and lets the
+# predicted field converge toward a mixed equilibrium where punts actually spread. 1 pass = neutral only.
+# 8 is the measured knee: the punt structure settles by pass 6-9 in all six seasons (see the self-play
+# convergence experiment), the 8-pass serve lands within 0.16pp of the 15-pass serve with an identical
+# top-40, and dropping to 7 or 6 quintuples that drift. Cost is quadratic in the pass count (pass k
+# faces k stacked field snapshots), so 15 -> 8 halves populate time.
+_OPPONENT_BOOTSTRAP_PASSES = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES', '8'))
+# Rotisserie keeps the longer run: it uses the EMA field path (window 0), whose fixed-rate smoothing
+# stabilises more slowly than the window's 1/t fictitious-play steps — at 8 passes a 2024-25 top-12
+# Roto build hard-punts a category (breaking the minimal-punting floor), at 15 none do. Roto passes
+# face a single 11-column field, so its cost is linear in the pass count and the longer run is cheap.
+_OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE', '15'))
+# Damping for the fixed-point field: each bootstrap pass nudges the committed field a fraction alpha
+# toward that pass's best-response (exponential smoothing), instead of a running mean. Smoothing
+# converges to a genuine fixed point (field == its own best-response — a committed equilibrium), whereas
+# a mean converges to a smeared blend of oscillating responses that erases specific punts.
+_OPPONENT_SMOOTHING = float(os.environ.get('OPPONENT_SMOOTHING', '0.3'))
+# Windowed fictitious play for the BOOTSTRAP PASSES ONLY (H2H formats). Each pass best-responds to the
+# raw fields of the last K passes stacked as separate opponents (11*K columns; the objective's mean over
+# the opponent axis weights them uniformly) instead of the single EMA-blended field above. At a mixed
+# equilibrium the true field is a DISTRIBUTION over builds — some seats punt one category, some another
+# — and stacking preserves each historical build's specific punts where blending smears them into a
+# build nobody would draft. The window also replaces the EMA's damping: one new pass moves at most 1/K
+# of the field's mass. The DEFAULT keeps the ENTIRE history (any value >= the pass count): that is true
+# fictitious play, whose 1/t step decay is what converges — measured settling in all six seasons,
+# whereas a small sliding window (fixed step size) sustains large limit cycles. 0 restores the EMA
+# path for A/B comparison. Strictly self-play machinery: the serve pass and everything mid-draft face
+# the FINAL pass's single field. Rotisserie always uses the EMA path (its standings objective scales
+# with opponent count, and its punts are structural anyway).
+_OPPONENT_FIELD_WINDOW = int(os.environ.get('OPPONENT_FIELD_WINDOW', '999'))
+# Descent iterations for the field-building bootstrap passes. These only need approximate opponent builds
+# (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
+# the session's full n_iterations for accurate base H-scores.
+_OPPONENT_PASS_ITERATIONS = int(os.environ.get('OPPONENT_PASS_ITERATIONS', '15'))
+# Learning-rate scales for WARM-STARTED category descents, tiered by how far the optimum can plausibly
+# have moved since the stored weights were computed. A warm start begins inside an established basin, so
+# the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds), full-size Adam
+# steps wander a full step-length per evaluate regardless of how converged the start is, visibly flipping
+# the displayed build between evaluates. Small steps pin the plateau AND converge better in
+# genuine-change cases (the gain there comes from the board, not from weight travel; measured
+# H 52.37 -> 52.51 on the Jokic-joins-my-team case). Three tiers:
+#   cold start (no stored weights)              -> full rate: must travel from a generic punt seed.
+#   warm, MY roster changed since storage       -> full rate: a real pick decision needs full
+#       adaptation -- running this tier at 1/10th measurably cost drafting strength in the all-H-field
+#       awareness validation (aware-field gain -0.0015 at 0.1 vs +0.0008 at 1.0, the no-regret
+#       equilibrium level), so only the warm INIT and the regulariser exemption apply here.
+#   warm, MY roster unchanged since storage     -> 1/100th: only the field moved (opponent picks are
+#       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust. This
+#       static tier is where the display-stability guarantees live.
+_WARM_START_LEARNING_RATE_SCALE = float(os.environ.get('WARM_START_LR_SCALE', '1.0'))
+_WARM_START_STATIC_ROSTER_SCALE = float(os.environ.get('WARM_START_STATIC_LR_SCALE', '0.01'))
 from itertools import combinations
 
-from backend.math.algorithm_helpers import compute_win_probability, calculate_tipping_points
+from backend.math.algorithm_helpers import (
+    compute_win_probability,
+    calculate_win_probability_and_tipping_points,
+    calculate_correction_terms,
+)
 from backend.math.process_player_data import get_category_level_rv
 from backend.math.position_optimization import (
     optimize_positions_all_players,
@@ -143,6 +216,8 @@ class HAgent:
                  , slot_counts: dict
                  , aleph: float = 0.0
                  , kappa: float = 0.3
+                 , opponent_sophistication: bool = True
+                 , behavior_model_confidence: float = 1.0
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -190,6 +265,11 @@ class HAgent:
         # get_h_scores run a full exact solve (no throttle).
         self.default_h_scores = None   # sorted pd.Series
         self._default_result  = None   # full empty-board result dict (for the empty-board short-circuit)
+        # Throttle ranking DURING populate, where default_h_scores is deliberately None (that also
+        # disarms the empty-board short-circuit): each bootstrap pass stores its scores here so the
+        # next pass -- and above all the full-pool serve -- runs its normal throttle schedule instead
+        # of exact-solving all ~577 candidates every iteration. Live only inside populate.
+        self._populate_pass_scores = None
 
         # Build position config (replaces all get_position_*() calls)
         self._pos_cfg: PositionConfig = build_position_config(params, slot_counts)
@@ -244,15 +324,11 @@ class HAgent:
         mov = info['Mov']
         vom = info['Vom']
 
-        if scoring_format == 'Rotisserie':
-            self.x_scores = x_scores.loc[
-                info['G-scores'].sum(axis=1).sort_values(ascending=False).index
-            ]
-            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
-
-            categories = list(x_scores.columns)
-
-            # ── correlations (replaces get_correlations()) ────────────────────
+        # ── differential correlation matrix (replaces get_correlations()) ──────
+        # Used by Rotisserie's variance model and by the Most-Categories correlation
+        # correction. Sign-flipped for negative statistics so it matches the "good
+        # direction" orientation of the differential z-scores.
+        if scoring_format in ('Rotisserie', 'Head to Head: Most Categories'):
             if sport == 'NBA':
                 rho = pd.read_csv('backend/data/basketball_correlations.csv').set_index('Category')
             else:
@@ -267,7 +343,73 @@ class HAgent:
             rho.loc[negative_stats, :] = -rho.loc[negative_stats, :]
             rho.loc[negative_stats, negative_stats] = 1
 
-            self.rho = np.expand_dims(np.array(rho.loc[categories, categories]), 0)
+            correlation_categories = list(x_scores.columns)
+            self.rho = np.expand_dims(
+                np.array(rho.loc[correlation_categories, correlation_categories]), 0
+            )
+        else:
+            self.rho = None
+
+        # Most-Categories correlation correction (see docs: correlation-correction note, eq (C4)).
+        # Temporarily OFF by default while the opponent model is under development: the correction
+        # over-suppresses punting on a contested board (it peaks at win-prob 0.5), which fights the
+        # opponent-model work. Set MC_CORRELATION=1 to re-enable.
+        self.mc_correlation_enabled = (
+            scoring_format == 'Head to Head: Most Categories'
+            and os.environ.get('MC_CORRELATION', '0') == '1'
+        )
+        # Per-descent cache of correction terms (see get_objective_and_pdf_weights_mc);
+        # reset at the start of every perform_iterations run.
+        self._correction_cache = None
+
+        # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_states).
+        # The session parameter (opponent_sophistication, default on) is the primary switch; the
+        # OPPONENT_MODEL env var, when set, overrides it globally — same pattern as kappa/KAPPA.
+        # Off restores neutral-opponent behaviour byte-for-byte.
+        awareness_env_override = os.environ.get('OPPONENT_MODEL')
+        self.opponent_sophistication = (awareness_env_override == '1' if awareness_env_override is not None
+                                       else opponent_sophistication)
+        # Per-team inferred build, keyed by team name:
+        #   {'roster_key': frozenset(their non-NaN roster), 'category_weights': (n_cat,), 'mu_edge': (n_cat,)}.
+        # roster_key self-invalidates as rosters grow (a new roster is a new key).
+        self._team_states = {}
+        # Round-one prior: mu_edge per top player, harvested from the base-H-score build run. Empty
+        # opponents (no picks yet) borrow the archetype of the player they are most likely to draft.
+        # An Index of the top-3N players by served H-score: purely the ORDERING seat assignment walks.
+        self._anchor_player_order = None
+        # Committed per-player Future-Diff, scaled per remaining pick (= result['Future-Diff'] /
+        # (n_picks - 1), the mu_edge the maths docs describe), for every candidate. When an opponent
+        # drafts player X as its first pick we reuse X's committed row verbatim, so a priced-in pick
+        # confirms the predicted field instead of re-inferring a different build.
+        self._player_committed_future_diffs = None
+        # Per-player self-play weights and flex position shares, frozen at populate (each player's
+        # converged build vs the equilibrium field). The two are ALWAYS stored and applied together — a
+        # build is (category weights + flex allocation), and warm-starting one half while cold-starting
+        # the other would start the descent internally inconsistent. Warm-start thin-roster candidate
+        # descents and seed opponent inference.
+        self._player_frozen_weights = None
+        self._player_frozen_shares  = None
+        # Row-positions + weights for a partial warm start (set per evaluate when the frozen table only
+        # covers part of the batch, e.g. the serve pass); consumed by perform_iterations' seed step.
+        self._partial_warm_start_rows = None
+        # Per-row learning-rate multipliers for warm-started candidate rows (None = all cold/full rate).
+        self._warm_start_row_rate_scales = None
+        # Windowed-fictitious-play field: list of (committed_future_diffs, anchor_player_order) snapshots
+        # from the last K bootstrap passes, newest last. ONLY ever set between passes inside
+        # populate_default_h_scores (and cleared before the serve) — it must never exist mid-draft, so
+        # reset_draft_state deliberately leaves it alone (passes reset state while the window is live).
+        self._bootstrap_field_snapshots = None
+        # True while a nested opponent-inference solve is running: caps the recursion at one level of
+        # best-response (the nested solve reads the stored team states, never refreshes them) and
+        # suppresses the post-evaluate team-entry hook (the refresh loop stores the entry itself, keyed
+        # by the opponent's FULL roster rather than the replay view's roster-minus-last-pick).
+        self._opponent_inference_active = False
+
+        if scoring_format == 'Rotisserie':
+            self.x_scores = x_scores.loc[
+                info['G-scores'].sum(axis=1).sort_values(ascending=False).index
+            ]
+            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
 
             # ── max_info (replaces get_max_info()) ────────────────────────────
             if self.n_drafters <= 21:
@@ -303,6 +445,18 @@ class HAgent:
         self.initial_category_weights = None
         # Anti-crowded-punt coupling (session parameter; env KAPPA overrides for sweeps).
         self.kappa = float(_KAPPA_OVERRIDE) if _KAPPA_OVERRIDE is not None else kappa
+        # How much weight the predicted punting behavior of other teams carries: every opponent tilt
+        # read (committed archetype, inferred build, spare seat — draft and auction alike) is scaled by
+        # this factor at field construction, so the bootstrap, the serve, and in-draft evaluates all
+        # model the same softened world. 1 = full self-play equilibrium; 0 = category-neutral opponents.
+        # Real leaguemates punt less sharply than the equilibrium, and against fully-rational punters
+        # the best response stops punting entirely (their punts concede those categories for free), so
+        # softening re-opens the drafter's own punt lines. ROTISSERIE PINS FULL CONFIDENCE: its
+        # self-play field is what suppresses the paper model's perverse hard punts (everyone shades the
+        # volatile categories, so abandoning one is punished) — at half strength that discouragement
+        # fails and extreme-profile players fall back into 2%-win-rate FT% punts (measured, 2020-21).
+        self.behavior_model_confidence = (1.0 if scoring_format == 'Rotisserie'
+                                          else float(behavior_model_confidence))
         # Field punt-popularity vector (per category), measured once on the empty-board multi-start scan
         # and reused for the early picks; drives the anti-crowded-punt (kappa) objective penalty. None
         # until measured (and whenever kappa=0), which makes the penalty inert.
@@ -369,6 +523,16 @@ class HAgent:
                 and all(len(roster) == 0 for roster in player_assignments.values())):
             return self._default_result
 
+        # Bring every stale seat's stored build up to date BEFORE this call's per-evaluate attributes are
+        # set (eager: a pick makes exactly one seat stale and a refresh is a cheap single-candidate
+        # solve, so the field is always current). The ordering is load-bearing: each nested inference
+        # solve is itself a get_h_scores run that overwrites self.players / self.n_drafters /
+        # self._position_mode with ITS view, so the refresh must finish before this evaluate assigns its
+        # own. Draft and auction alike; suppressed inside a nested inference solve — one level of
+        # best-response.
+        if self.opponent_sophistication and not self._opponent_inference_active:
+            self.refresh_stale_team_states(player_assignments, drafter, cash_remaining_per_team)
+
         self.n_drafters = len(player_assignments)
         my_players = [p for p in player_assignments[drafter] if p == p]
         self.players = my_players
@@ -400,10 +564,12 @@ class HAgent:
         else:
             x_scores_batch = x_scores_available
 
-        # diff_means/diff_vars/sigma_2_m are candidate-independent (shape (1, n_cat, n_drafters-1)),
-        # so they broadcast against whatever slice of candidates is being scored.
+        # diff_means/diff_vars/sigma_2_m broadcast against the candidate batch. With opponent modelling on,
+        # diff_means is candidate-DEPENDENT (N, n_cat, n_drafters-1) for candidates that are themselves a
+        # seated anchor — self-exclusion swaps their own team out of the field (see get_diff_distributions).
         diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(
-            player_assignments, drafter, x_scores_available, cash_remaining_per_team
+            player_assignments, drafter, x_scores_available, cash_remaining_per_team,
+            candidate_batch=list(x_scores_batch.index),
         )
 
         x_scores_batch_array = np.expand_dims(np.array(x_scores_batch), axis=2)
@@ -422,11 +588,109 @@ class HAgent:
             x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
+        # initial_category_weights / initial_shares are a TEST-INJECTION hook only (the multistart_*
+        # diagnostics set them to force a specific start); production never writes them. Real warm
+        # starts live in _team_states / _player_frozen_weights below.
         if self.initial_category_weights is None:
+            # Warm start (opponent model on). Weights track the OVERALL BUILD far more than the marginal
+            # candidate, so once the roster has a real shape (>= _WEAKNESS_SEED_MIN_ROSTER, the same
+            # threshold the cold start uses) every candidate starts from this drafter's own team-level
+            # entry -- the same per-team store the opponents live in, updated by this drafter's previous
+            # evaluate (or by inference, if this seat was an opponent until a perspective switch). Below
+            # that the candidate still largely IS the build (and the empty-board entry may reflect a
+            # candidate that was never actually picked), so each candidate starts from its own frozen
+            # self-play weights (the per-player table snapshotted at populate). Both paths start descents
+            # inside an established basin, which removes the cold seed-scan's near-tie vacillation (midway
+            # stalls that showed up as sudden dollar dips). The stores are absent with the model off and
+            # reset before every bootstrap pass, so gate-off behaviour and the populate fixed-point are
+            # untouched; uncovered cases fall through to the cold-start seeding below.
+            warm_start_weights = None
+            warm_start_shares  = None   # flex shares are PAIRED with the weights: same source, same rows
+            self._partial_warm_start_rows = None
+            self._warm_start_row_rate_scales = None   # per-row learning-rate multipliers (None = all cold)
+            team_state = self._team_states.get(drafter) if self.opponent_sophistication else None
+            # HYBRID start policy for a drafter's own evaluates: the first few picks (roster below
+            # _WEAKNESS_SEED_MIN_ROSTER) COLD multi-start via the punt seed scan — the strategic
+            # window where re-balancing is cheap and exploration pays — and from the third pick on,
+            # every candidate warm-starts from the drafter's own team entry (its identity). Inference
+            # replays use the entry at ANY roster size: the pick being explained is known, so "the
+            # Wemby team that added Duren" starts from the Wemby identity, never a fresh Duren-led
+            # derivation. Entries are always identity-true (committed anchor build or a replay of
+            # actual picks; evaluates never write them). Measured at behavior_model_confidence 0.5 over
+            # full 12-seat drafts: early punt-set re-balancing 44% vs 28% warm-only, late-round
+            # stability equal to warm-only (21% vs 19%), 12/12 distinct final builds, no herding.
+            # CAUTION: the cold window is only herd-safe on a softened field — at rationality 1.0 the
+            # equilibrium is knife-edge and cold solves crowd into its one open punt lane.
+            team_entry_applies = (n_players_selected >= _WEAKNESS_SEED_MIN_ROSTER
+                                  or self._opponent_inference_active)
+            if (team_entry_applies and team_state is not None
+                    and team_state['category_weights'] is not None):
+                # Tier by staleness: an unchanged roster means only the field moved since the entry was
+                # stored, so the optimum has barely moved and the descent should barely move either.
+                # Inference replays always land here (the eager refresh keys each entry to exactly the
+                # replay view's roster), which is what damps in-draft best-response herding: a build
+                # moves by one polish step per pick, never a full re-derivation.
+                roster_unchanged = team_state['roster_key'] == frozenset(my_players)
+                warm_scale = (_WARM_START_STATIC_ROSTER_SCALE if roster_unchanged
+                              else _WARM_START_LEARNING_RATE_SCALE)
+                warm_start_weights = np.array([team_state['category_weights']] * len(x_scores_batch))
+                self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
+                if team_state['position_shares'] is not None:
+                    warm_start_shares = {
+                        pos_code: pd.DataFrame(
+                            np.tile(team_state['position_shares'][pos_code], (len(x_scores_batch), 1)),
+                            columns=pos_info['bases'],
+                        )
+                        for pos_code, pos_info in self.position_structure['flex'].items()
+                    }
+            elif (self._player_frozen_weights is not None
+                  and (n_players_selected == 0 or self._opponent_inference_active)):
+                # Frozen rows were computed on the EMPTY board, so they warm-start only the
+                # unchanged-context cases: empty-roster evaluates (the serve pass and pre-draft
+                # browsing, which must reproduce the served builds) and inference replay views.
+                # A drafter with 1-2 picks deliberately falls through to the COLD punt seed scan —
+                # the hybrid policy's exploration window (see the team-entry comment above).
+                warm_scale = (_WARM_START_STATIC_ROSTER_SCALE if n_players_selected == 0
+                              else _WARM_START_LEARNING_RATE_SCALE)
+                stored_for_batch = self._player_frozen_weights.reindex(x_scores_batch.index)
+                covered          = ~stored_for_batch.isna().to_numpy().any(axis=1)
+                # Shares come from the same serve result as the weights, so coverage is identical.
+                frozen_shares = self._player_frozen_shares
+                shares_usable = (frozen_shares is not None
+                                 and all(frame is not None for frame in frozen_shares.values()))
+                if covered.all():
+                    warm_start_weights = stored_for_batch.to_numpy()
+                    self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
+                    if shares_usable:
+                        warm_start_shares = {
+                            pos_code: frame.reindex(x_scores_batch.index).reset_index(drop=True)
+                            for pos_code, frame in frozen_shares.items()
+                        }
+                elif covered.any():
+                    # Partial coverage (the serve pass: the bootstrap's final iteration pass only covers
+                    # the top-3N anchors). Covered rows warm-start; the rest cold-start via the punt seed
+                    # scan -- the override is applied right after the scan in perform_iterations. Shares
+                    # need no handoff: uniform IS the cold share init, so build the mix directly here.
+                    covered_positions = np.flatnonzero(covered)
+                    self._partial_warm_start_rows = (
+                        covered_positions, stored_for_batch.to_numpy()[covered]
+                    )
+                    self._warm_start_row_rate_scales = np.where(covered, warm_scale, 1.0)
+                    if shares_usable:
+                        warm_start_shares = {}
+                        for pos_code, pos_info in self.position_structure['flex'].items():
+                            mixed = np.full((len(x_scores_batch), len(pos_info['bases'])),
+                                            1.0 / len(pos_info['bases']))
+                            stored_rows = frozen_shares[pos_code].reindex(x_scores_batch.index).to_numpy()
+                            mixed[covered_positions] = stored_rows[covered_positions]
+                            warm_start_shares[pos_code] = pd.DataFrame(mixed, columns=pos_info['bases'])
+
             # Cold start: uniform flex shares. The category-weight init is normally left to punt-seeding
             # in perform_iterations (None signals it). SEED_MODE=heuristic restores the old per-candidate
             # heuristic init instead, for A/B testing the seeding against the baseline.
-            if self.seed_mode == 'heuristic':
+            if warm_start_weights is not None:
+                initial_category_weights = warm_start_weights
+            elif self.seed_mode == 'heuristic':
                 default_weights = self.v.T.reshape(1, self.n_categories, 1)
                 category_momentum_factor = 10000 if self.scoring_format == 'Rotisserie' else 1000
                 if self.pos_avg is not None:
@@ -442,9 +706,13 @@ class HAgent:
             elif self.seed_mode == 'neutral':
                 # Start at neutral v (no punt bias) and let the descent re-balance. Nudge off the exact
                 # singular ray -- term_five_b (a Cauchy-Schwarz Gram determinant) vanishes when w is
-                # parallel to v, giving a 0/0 -- so a negligible jitter keeps it finite for every format.
+                # parallel to v, giving a 0/0. The nudge must comfortably exceed the L1 regulariser's
+                # capture radius (reg_lambda ~ 5e-5): the prox shrinks toward EXACT v each iteration and
+                # _REG_FLOOR defaults to 0, so a sub-radius jitter gets snapped onto the singularity
+                # (2022-23 collapsed every neutral-seeded descent to NaN this way). 1% is ~20x the
+                # radius while still being neutral for all practical purposes.
                 neutral = self.v.reshape(self.n_categories)
-                jitter  = 1.0 + 1e-9 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
+                jitter  = 1.0 + 1e-2 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
                 initial_category_weights = np.array(
                     [(neutral * jitter) / (neutral * jitter).sum()] * len(x_scores_batch)
                 )
@@ -459,13 +727,18 @@ class HAgent:
                 initial_category_weights = np.array([seed / seed.sum()] * len(x_scores_batch))
             else:
                 initial_category_weights = None
-            initial_position_shares = {
-                pos_code: pd.DataFrame({
-                    base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
-                    for base in pos_info['bases']
-                })
-                for pos_code, pos_info in self.position_structure['flex'].items()
-            }
+            # Flex shares: warm rows carry their stored allocation (paired with the weights above);
+            # everything else starts uniform, which is and was the cold share init.
+            if warm_start_shares is not None:
+                initial_position_shares = warm_start_shares
+            else:
+                initial_position_shares = {
+                    pos_code: pd.DataFrame({
+                        base: [1 / len(pos_info['bases'])] * len(x_scores_batch_array)
+                        for base in pos_info['bases']
+                    })
+                    for pos_code, pos_info in self.position_structure['flex'].items()
+                }
         else:
             initial_category_weights = np.array(
                 [self.initial_category_weights] * len(x_scores_batch)
@@ -480,15 +753,22 @@ class HAgent:
 
         # Position-optimiser throttle priority: rank candidates by the cached default (first-pick)
         # H-scores so the exact-solve tier covers the players most likely to actually be picked.
-        # Missing/uncached players sort last; with no cached ranking at all we pass None, which
-        # disables throttling entirely (a full, exact solve every iteration).
-        if self.default_h_scores is not None:
-            ranked = self.default_h_scores.reindex(x_scores_batch.index).to_numpy()
+        # During populate that cache is deliberately None; the full-pool SERVE threads the final
+        # field pass's scores instead (players outside them sort last). Only the serve: the subset
+        # field passes must stay exact — throttling them (draft's 'tiered' schedule solves 30 of
+        # the 36 anchors) perturbs the anchor-field equilibria enough to reshuffle the served
+        # top-40 by whole ranks (measured ~9pp score moves). Missing/uncached players sort last;
+        # with no ranking at all we pass None, which disables throttling entirely.
+        ranking_scores = self.default_h_scores
+        if ranking_scores is None and candidate_subset is None:
+            ranking_scores = self._populate_pass_scores
+        if ranking_scores is not None:
+            ranked = ranking_scores.reindex(x_scores_batch.index).to_numpy()
             candidate_priority = np.argsort(-np.nan_to_num(ranked, nan=-np.inf))
         else:
             candidate_priority = None
 
-        return self.perform_iterations(
+        result = self.perform_iterations(
             initial_category_weights,
             initial_position_shares,
             my_players,
@@ -503,11 +783,22 @@ class HAgent:
             candidate_offset,
         )
 
+        # NOTE: evaluates deliberately write NOTHING to _team_states. The store is a pure function of
+        # the rosters, written only by refresh_stale_team_states (committed reuse or replay inference,
+        # every seat including the drafter), so the field a team faces never depends on which seats were
+        # viewed or how often — switching perspective computes nothing and therefore changes nothing.
+        # A post-evaluate hook that stored the drafter's own converged build here was the last source of
+        # view-dependence: it replaced replay-derived entries with best-candidate builds, visibly moving
+        # other teams' evaluates whenever a seat was viewed.
+        return result
+
     def get_diff_distributions(self
                                , player_assignments
                                , drafter
                                , x_scores_available
-                               , cash_remaining_per_team=None):
+                               , cash_remaining_per_team=None
+                               , opponent_model='inferred'
+                               , candidate_batch=None):
         team_names = list(player_assignments.keys())
         my_players = [p for p in player_assignments[drafter] if p == p]
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis=0))
@@ -534,17 +825,140 @@ class HAgent:
             )
             replacement_value_by_category = np.array(replacement_value_by_category).reshape(self.n_categories, 1)
 
-            diff_means = np.vstack([
-                self.get_diff_means_auction(
-                    x_self_sum.reshape(1, self.n_categories, 1)
-                    - np.array(self.x_scores.loc[player_assignments[team]].sum(axis=0)).reshape(1, self.n_categories, 1),
-                    cash_remaining_per_team[drafter] - cash_remaining_per_team[team],
-                    len(my_players) - len(player_assignments[team]),
+            # Rational-opponent modelling (auction), parallel to the draft. An EMPTY seat with a predicted
+            # first buy is modelled as having ALREADY bought it: the anchor's real stats are priced into the
+            # score diff and its estimated price is deducted from the seat's cash, so the field does not jump
+            # when the anchor is actually bought (the draft gets this for free; auctions must also charge the
+            # cash). Then slots_left * mu_edge tilts the remaining generic fill -- the zero-sum DIRECTION on
+            # top of the replacement/cash MAGNITUDE. Off / neutral recursion => no anchors, no tilt =>
+            # byte-identical to the pre-feature auction model.
+            model_opponents = self.opponent_sophistication and opponent_model == 'inferred'
+            opponent_teams = [team for team in team_names if team != drafter]
+            # Windowed bootstrap passes stack one complete field per snapshot along the opponent axis
+            # (see the draft branch); outside the windowed bootstrap this is a single None entry = the
+            # agent's committed field.
+            field_snapshots = ((self._bootstrap_field_snapshots or [None]) if model_opponents else [None])
+            field_copies    = len(field_snapshots)
+
+            def seat_diff(team, anchor_map, committed_diffs, anchor_override=None):
+                """Auction diff (1, n_cat, 1) of the drafter vs one opponent seat, punt tilt included.
+                anchor_map/committed_diffs carry one field snapshot's seat predictions and tilts;
+                anchor_override forces the spare anchor (self-exclusion's whole-seat swap)."""
+                roster = [p for p in player_assignments[team] if p == p]
+                anchor = anchor_override if anchor_override is not None else anchor_map.get(team)
+                if roster:
+                    roster_sum = np.array(self.x_scores.loc[roster].sum(axis=0))
+                    seat_cash  = cash_remaining_per_team[team]
+                    roster_len = len(roster)
+                    state      = self._team_states.get(team)
+                    mu_edge    = None if (roster_len >= self.n_picks or state is None) else state['mu_edge']
+                elif model_opponents and anchor is not None:
+                    # Seed the anchor's STATS (so the field does not lurch when it is actually bought) but do
+                    # NOT charge for it: on an empty board nobody has spent, so keeping every seat at its real
+                    # cash keeps money_diff symmetric (= 0). Real cash differences appear on their own as
+                    # players are actually bought. Charging only the opponents (not the drafter) was what
+                    # added a flat pro-drafter money block and flattened the field.
+                    roster_sum = np.array(self.x_scores.loc[[anchor]].sum(axis=0))
+                    seat_cash  = cash_remaining_per_team[team]
+                    roster_len = 1
+                    mu_edge    = committed_diffs.loc[anchor].to_numpy()
+                else:
+                    roster_sum = np.zeros(self.n_categories)
+                    seat_cash  = cash_remaining_per_team[team]
+                    roster_len = 0
+                    mu_edge    = None
+                base = self.get_diff_means_auction(
+                    x_self_sum.reshape(1, self.n_categories, 1) - roster_sum.reshape(1, self.n_categories, 1),
+                    cash_remaining_per_team[drafter] - seat_cash,
+                    len(my_players) - roster_len,
                     category_value_per_dollar,
                     replacement_value_by_category,
                 )
-                for team in team_names if team != drafter
-            ]).T
+                if mu_edge is not None:
+                    # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
+                    tilt = (self.n_picks - roster_len) * self.behavior_model_confidence * mu_edge
+                    base = base - tilt.reshape(1, self.n_categories, 1)
+                return base
+
+            # On an all-empty board every seat is the same formula over a different (anchor, tilt) row,
+            # so a snapshot's whole block batches into a few array operations instead of a Python call
+            # per seat — the per-seat path costs ~2s of populate through thousands of tiny pandas
+            # lookups once the windowed passes stack the field (11 columns on pass one, 176 by the
+            # last). Any seat with a real roster (mid-draft) drops back to the per-seat construction.
+            all_seats_empty = all(not any(p == p for p in player_assignments[team])
+                                  for team in opponent_teams)
+            drafter_cash = cash_remaining_per_team[drafter]
+            seat_cash_diffs = np.array([drafter_cash - cash_remaining_per_team[team]
+                                        for team in opponent_teams])
+
+            field_blocks, snapshot_exclusions = [], []
+            for snapshot in field_snapshots:
+                committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
+                anchor_order    = (None if snapshot is None else snapshot[1])
+                empty_seat_anchor, spare_anchor = (
+                    self._assign_empty_seat_anchors(player_assignments, drafter, anchor_order)
+                    if model_opponents else ({}, None))
+                if all_seats_empty and len(empty_seat_anchor) == len(opponent_teams):
+                    # The spare (self-exclusion's replacement seat) batches with the real seats: it is
+                    # the same formula, and on an all-empty board every seat shares one drafter-vs-seat
+                    # cash diff (no opponent has spent), so the spare's column is seat-independent and
+                    # rides along as one extra row that is sliced off below. The uniformity check is a
+                    # guard for the impossible-in-practice case of unequal empty-seat cash.
+                    seats_share_cash = bool(np.all(seat_cash_diffs == seat_cash_diffs[0]))
+                    batch_spare  = spare_anchor is not None and seats_share_cash
+                    anchors      = [empty_seat_anchor[team] for team in opponent_teams]
+                    batch_names  = anchors + ([spare_anchor] if batch_spare else [])
+                    anchor_stats = self.x_scores.loc[batch_names].to_numpy()         # (S(+1), n_cat)
+                    anchor_tilts = committed_diffs.loc[batch_names].to_numpy()       # (S(+1), n_cat)
+                    batch_cash   = (np.append(seat_cash_diffs, seat_cash_diffs[0])
+                                    if batch_spare else seat_cash_diffs)
+                    # Mirrors seat_diff's anchored-empty-seat arithmetic exactly (same operation
+                    # order, so results are bit-identical): get_diff_means_auction at roster_len=1,
+                    # then the confidence-scaled punt tilt.
+                    score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
+                    player_diff_total = (len(my_players) - 1 - 1) * replacement_value_by_category.reshape(1, -1)
+                    money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
+                    tilt              = (self.n_picks - 1) * self.behavior_model_confidence * anchor_tilts
+                    columns           = score_diff - player_diff_total + money_diff_total - tilt
+                    field_blocks.append(columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
+                    spare_column = columns[len(anchors)] if batch_spare else None
+                else:
+                    field_blocks.append(np.concatenate(
+                        [seat_diff(team, empty_seat_anchor, committed_diffs) for team in opponent_teams],
+                        axis=2))
+                    spare_column = None   # computed lazily via seat_diff in the exclusion loop
+                snapshot_exclusions.append((empty_seat_anchor, spare_anchor, committed_diffs, spare_column))
+            diff_means = np.concatenate(field_blocks, axis=2)                     # (1, n_cat, n_teams*K)
+
+            # Self-exclusion: a candidate that is itself an empty seat's predicted first buy is not scored
+            # against a copy of itself -- rebuild that seat with the spare anchor (whole seat: stats, cost,
+            # tilt). Makes the returned diff_means candidate-dependent (N, n_cat, n_opp). Applied per
+            # snapshot block — each snapshot has its own seat map, spare anchor, and tilt table.
+            if model_opponents and candidate_batch is not None:
+                for snapshot_index, (empty_seat_anchor, spare_anchor, committed_diffs, spare_column) \
+                        in enumerate(snapshot_exclusions):
+                    if spare_anchor is None or not empty_seat_anchor:
+                        continue
+                    anchor_to_slot = {anchor: opponent_teams.index(team)
+                                      for team, anchor in empty_seat_anchor.items()}
+                    affected = {i: opponent_teams[anchor_to_slot[p]]
+                                for i, p in enumerate(candidate_batch) if p in anchor_to_slot}
+                    if not affected:
+                        continue
+                    if diff_means.shape[0] == 1:
+                        diff_means = np.repeat(diff_means, len(candidate_batch), axis=0)  # (N, n_cat, n_opp)
+                    slot_offset = snapshot_index * len(opponent_teams)
+                    spare_seat_by_team = {}
+                    for candidate_index, team in affected.items():
+                        if team not in spare_seat_by_team:
+                            # Fast path precomputed the spare column (seat-independent when every
+                            # empty seat shares one cash diff); otherwise compute it per seat.
+                            spare_seat_by_team[team] = (
+                                spare_column if spare_column is not None
+                                else seat_diff(team, empty_seat_anchor, committed_diffs,
+                                               anchor_override=spare_anchor)[0, :, 0])
+                        slot = anchor_to_slot[candidate_batch[candidate_index]] + slot_offset
+                        diff_means[candidate_index, :, slot] = spare_seat_by_team[team]
 
         else:
             # While the roster still has room a candidate is being added, so the drafter's team grows to
@@ -556,14 +970,88 @@ class HAgent:
             target_team_size = len(my_players) + (1 if adding_candidate else 0)
             extra_needed     = target_team_size * self.n_drafters - len(players_chosen)
             mean_extra       = x_scores_available.iloc[:extra_needed].mean().fillna(0)
-            other_team_sums  = np.vstack([
-                self.get_opposing_team_means(player_assignments[team], mean_extra, target_team_size)
-                for team in team_names if team != drafter
-            ]).T
-            diff_means = (
-                x_self_sum.reshape(1, self.n_categories, 1)
-                - other_team_sums.reshape(1, self.n_categories, self.n_drafters - 1)
-            )
+
+            # Rational-opponent modelling: each opponent's future picks carry their own punt tilt, so we
+            # add picks_left * mu_edge to their totals (mu_edge = the expected per-pick edge over a generic
+            # pick, mirroring the edge the objective already adds for our own remaining picks). Off, or on an
+            # inner inference solve (opponent_model='neutral'), the opponents stay category-neutral and the
+            # construction below is byte-identical to the pre-feature model.
+            model_opponents = self.opponent_sophistication and opponent_model == 'inferred'
+            opponent_teams = [team for team in team_names if team != drafter]
+            # Windowed bootstrap passes stack one complete field per snapshot along the opponent axis
+            # (n_teams * K columns; the objective's mean over that axis weights snapshots uniformly).
+            # Outside the windowed bootstrap this is a single None entry = the agent's committed field.
+            field_snapshots = ((self._bootstrap_field_snapshots or [None]) if model_opponents else [None])
+            field_copies    = len(field_snapshots)
+            if model_opponents:
+                # On an all-empty board every seat is anchor stats + generic padding + its punt tilt,
+                # so a snapshot's block batches into a few array operations instead of a pandas lookup
+                # per seat (the windowed passes stack up to n_teams*K columns — the per-seat path was
+                # a measured chunk of populate time). Mixed rosters fall back to compute_opponent_totals.
+                all_seats_empty = all(not any(p == p for p in player_assignments[team])
+                                      for team in opponent_teams)
+                mean_extra_array = np.asarray(mean_extra)
+                field_blocks, snapshot_exclusions = [], []
+                for snapshot in field_snapshots:
+                    committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
+                    anchor_order    = (None if snapshot is None else snapshot[1])
+                    if all_seats_empty:
+                        empty_slot_player, spare_anchor = self._assign_empty_seat_anchors(
+                            player_assignments, drafter, anchor_order)
+                    if all_seats_empty and len(empty_slot_player) == len(opponent_teams):
+                        # Mirrors team_total's anchored-empty-seat arithmetic exactly (same operation
+                        # order as get_opposing_team_means + the tilt, so results are bit-identical).
+                        anchors      = [empty_slot_player[team] for team in opponent_teams]
+                        anchor_stats = self.x_scores.loc[anchors].to_numpy()          # (S, n_cat)
+                        anchor_tilts = committed_diffs.loc[anchors].to_numpy()        # (S, n_cat)
+                        extra_sum    = mean_extra_array.reshape(1, -1) * (target_team_size - 1)
+                        tilt         = ((self.n_picks - 1) * self.behavior_model_confidence) * anchor_tilts
+                        totals_rows  = (anchor_stats + extra_sum) + tilt
+                        field_blocks.append(totals_rows.T.reshape(1, self.n_categories, len(anchors)))
+                        if spare_anchor is not None:
+                            spare_total = ((self.x_scores.loc[[spare_anchor]].sum(axis=0).to_numpy()
+                                            + extra_sum.reshape(-1))
+                                           + ((self.n_picks - 1) * self.behavior_model_confidence)
+                                           * committed_diffs.loc[spare_anchor].to_numpy()
+                                           ).reshape(1, self.n_categories, 1)
+                        else:
+                            spare_total = None
+                    else:
+                        totals, empty_slot_player, spare_total = self.compute_opponent_totals(
+                            player_assignments, drafter, mean_extra, target_team_size, field_snapshot=snapshot
+                        )
+                        field_blocks.append(np.concatenate([totals[team] for team in opponent_teams], axis=2))
+                    snapshot_exclusions.append((empty_slot_player, spare_total))
+                other_team_sums = np.concatenate(field_blocks, axis=2)                # (1, n_cat, n_teams*K)
+            else:
+                snapshot_exclusions = [({}, None)]
+                other_team_sums = np.concatenate([
+                    self.get_opposing_team_means(player_assignments[team], mean_extra, target_team_size)
+                    for team in opponent_teams
+                ], axis=2)                                                            # (1, n_cat, n_opp)
+            diff_means = x_self_sum.reshape(1, self.n_categories, 1) - other_team_sums  # (1, n_cat, n_opp)
+
+            # Self-exclusion: when the candidate being scored is itself one of the predicted opponent teams,
+            # swap that seat for the spare predicted team, so a player is never evaluated against a copy of
+            # itself. This makes diff_means candidate-dependent (N, n_cat, n_opp) for the affected
+            # candidates. Applied per snapshot block — each snapshot has its own seat map and spare.
+            if candidate_batch is not None:
+                for snapshot_index, (empty_slot_player, spare_total) in enumerate(snapshot_exclusions):
+                    if spare_total is None or not empty_slot_player:
+                        continue
+                    slot_offset = snapshot_index * len(opponent_teams)
+                    player_to_slot = {player: opponent_teams.index(team) + slot_offset
+                                      for team, player in empty_slot_player.items()}
+                    affected = {i: player_to_slot[p]
+                                for i, p in enumerate(candidate_batch) if p in player_to_slot}
+                    if not affected:
+                        continue
+                    spare_column = (x_self_sum.reshape(self.n_categories)
+                                    - spare_total.reshape(self.n_categories))
+                    if diff_means.shape[0] == 1:
+                        diff_means = np.repeat(diff_means, len(candidate_batch), axis=0)  # (N, n_cat, n_opp)
+                    for candidate_index, slot in affected.items():
+                        diff_means[candidate_index, :, slot] = spare_column
 
         diff_vars = np.vstack([
             self.get_diff_var(len([p for p in player_assignments[team] if p == p]))
@@ -577,15 +1065,11 @@ class HAgent:
         else:
             sigma_2_m = None
 
-        diff_vars = diff_vars.reshape(1, self.n_categories, self.n_drafters - 1)
-
-        if cash_remaining_per_team:
-            self.value_of_money = self.get_value_of_money_auction(
-                diff_means, diff_vars, sigma_2_m,
-                category_value_per_dollar, replacement_value_by_category,
-            )
-        else:
-            self.value_of_money = None
+        if field_copies > 1:
+            # Windowed bootstrap: repeat the per-team variance block once per stacked field snapshot so
+            # every opponent column has its variance (the empty board makes the blocks identical).
+            diff_vars = np.tile(diff_vars, (1, field_copies))
+        diff_vars = diff_vars.reshape(1, self.n_categories, -1)
 
         return diff_means, diff_vars, sigma_2_m
 
@@ -647,6 +1131,199 @@ class HAgent:
         extra_sum   = np.array(mean_extra_players) * n_extra
         return (player_sum + extra_sum).reshape(1, self.n_categories, 1)
 
+    def _assign_empty_seat_anchors(self, player_assignments, drafter, anchor_player_order=None):
+        """Assign each EMPTY opponent seat its predicted first player: the best available committed anchor,
+        skipping any already drafted and any claimed by an earlier empty seat. Shared by the draft
+        (compute_opponent_totals) and the auction (get_diff_distributions) so the seat->anchor mapping is
+        identical in both. Returns (empty_seat_anchor, spare_anchor): empty_seat_anchor maps each empty seat
+        to its predicted player (a seat is absent when no anchor is left); spare_anchor is the next unclaimed
+        anchor, swapped in by self-exclusion when the candidate being scored is itself a predicted first
+        pick. Both come back empty when there is no bootstrap / no anchors remain. anchor_player_order
+        substitutes a windowed-bootstrap snapshot's ordering for the agent's committed one."""
+        if anchor_player_order is None:
+            anchor_player_order = self._anchor_player_order
+        players_chosen = {x for roster in player_assignments.values() for x in roster if x == x}
+        anchor_players = ([] if anchor_player_order is None
+                          else list(anchor_player_order))
+        anchor_cursor  = 0
+
+        empty_seat_anchor = {}
+        for team, roster_players in player_assignments.items():
+            if team == drafter or any(p == p for p in roster_players):   # skip me and any non-empty seat
+                continue
+            while anchor_cursor < len(anchor_players) and anchor_players[anchor_cursor] in players_chosen:
+                anchor_cursor += 1
+            if anchor_cursor < len(anchor_players):
+                empty_seat_anchor[team] = anchor_players[anchor_cursor]
+                anchor_cursor += 1
+
+        spare_anchor = None
+        while anchor_cursor < len(anchor_players):
+            spare = anchor_players[anchor_cursor]
+            anchor_cursor += 1
+            if spare not in players_chosen:
+                spare_anchor = spare
+                break
+        return empty_seat_anchor, spare_anchor
+
+    def compute_opponent_totals(self, player_assignments, drafter, mean_extra, target_team_size,
+                                field_snapshot=None):
+        """Full expected-team vector per opponent, (1, n_categories, 1) each. An opponent that has drafted
+        is its real roster + picks_left * mu_edge (its inferred/committed build — a zero-sum punt tilt that
+        reshapes future picks without changing net strength). An EMPTY opponent is modelled as if it had
+        already drafted its predicted starting player X (see _assign_empty_seat_anchors): roster [X] + X's
+        committed future. Pricing X's real stats in now means that when the seat actually drafts X the field
+        does not move.
+
+        Returns (totals, empty_slot_player, spare_total). empty_slot_player maps each empty seat to its
+        predicted player; spare_total is the next predicted team, swapped in for self-exclusion when the
+        candidate being scored is itself one of those predicted players (so nobody drafts a copy of it).
+        field_snapshot = (committed_future_diffs, anchor_player_order) reads one windowed-bootstrap
+        snapshot's field instead of the agent's committed one (None outside the windowed bootstrap)."""
+        if field_snapshot is None:
+            committed_future_diffs, anchor_player_order = self._player_committed_future_diffs, None
+        else:
+            committed_future_diffs, anchor_player_order = field_snapshot
+        empty_seat_anchor, spare_anchor = self._assign_empty_seat_anchors(player_assignments, drafter,
+                                                                          anchor_player_order)
+
+        def team_total(roster, mu_edge):
+            base = self.get_opposing_team_means(roster, mean_extra, target_team_size)
+            if mu_edge is None:
+                return base
+            picks_left = self.n_picks - len([p for p in roster if p == p])
+            # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
+            tilt = picks_left * self.behavior_model_confidence * mu_edge
+            return base + tilt.reshape(1, self.n_categories, 1)
+
+        totals = {}
+        for team in player_assignments:
+            if team == drafter:
+                continue
+            roster = [p for p in player_assignments[team] if p == p]
+            if len(roster) >= self.n_picks:
+                totals[team] = team_total(roster, None)
+            elif roster:
+                state = self._team_states.get(team)
+                totals[team] = team_total(roster, None if state is None else state['mu_edge'])
+            elif team in empty_seat_anchor:
+                predicted = empty_seat_anchor[team]
+                totals[team] = team_total([predicted], committed_future_diffs.loc[predicted].to_numpy())
+            else:
+                totals[team] = team_total(roster, None)   # no prediction left: neutral padding
+
+        spare_total = (None if spare_anchor is None
+                       else team_total([spare_anchor], committed_future_diffs.loc[spare_anchor].to_numpy()))
+        return totals, empty_seat_anchor, spare_total
+
+    def refresh_stale_team_states(self, player_assignments, drafter, cash_remaining_per_team=None):
+        """Bring EVERY seat whose stored build no longer matches its roster up to date — including the
+        drafter's own seat, so the store stays a pure function of the rosters (any evaluate leaves it in
+        the same state, no matter whose perspective ran first). First picks of priced-in players reuse
+        their committed build (a table lookup); everything else replays the seat's most recent pick
+        through the real solver (infer_opponent_category_weights) — a single-candidate solve, cheap
+        enough that refresh is eager and unbudgeted (a pick makes exactly one seat stale). Empty seats
+        use round-one archetypes, and full seats have no future picks, so neither is refreshed here.
+        cash_remaining_per_team (auction only) makes the inference run auction H-scoring."""
+        stale = []
+        for team, roster_players in player_assignments.items():
+            roster = [p for p in roster_players if p == p]
+            if not roster or len(roster) >= self.n_picks:
+                continue
+            state = self._team_states.get(team)
+            if state is None or state['roster_key'] != frozenset(roster):
+                stored_size = 0 if state is None else len(state['roster_key'])
+                stale.append((len(roster) - stored_size, team, roster))
+
+        needs_inference = []
+        for staleness, team, roster in sorted(stale, key=lambda item: item[0], reverse=True):
+            committed = (None if self._player_committed_future_diffs is None or len(roster) != 1
+                         or roster[0] not in self._player_committed_future_diffs.index
+                         else self._player_committed_future_diffs.loc[roster[0]].to_numpy())
+            if committed is None:
+                needs_inference.append((staleness, team, roster))
+                continue
+            # First pick of a priced-in player: reuse its committed build verbatim so the field does
+            # not move. The entry carries the anchor's FULL identity — tilt, weights, and flex shares
+            # all come from the same serve solve — so later inference replays warm-start from the
+            # team's identity ("the Wemby team that added Duren") instead of re-deriving the team from
+            # its newest pick, which let each seat flip its whole strategy every round.
+            anchor_shares = self._player_frozen_shares
+            self._team_states[team] = {
+                'roster_key'       : frozenset(roster),
+                'category_weights' : self._player_frozen_weights.loc[roster[0]].to_numpy(),
+                'mu_edge'          : committed,
+                'position_shares'  : (
+                    {pos_code: frame.loc[roster[0]].to_numpy() for pos_code, frame in anchor_shares.items()}
+                    if anchor_shares is not None
+                    and all(frame is not None for frame in anchor_shares.values()) else None
+                ),
+            }
+
+        for _, team, roster in needs_inference:
+            category_weights, mu_edge, position_shares = self.infer_opponent_category_weights(
+                team, roster, player_assignments, cash_remaining_per_team
+            )
+            self._team_states[team] = {
+                'roster_key'       : frozenset(roster),
+                'category_weights' : category_weights,
+                'mu_edge'          : mu_edge,
+                'position_shares'  : position_shares,
+            }
+
+    def infer_opponent_category_weights(self
+                                        , opponent_team_name
+                                        , opponent_players
+                                        , player_assignments
+                                        , cash_remaining_per_team=None):
+        """Infer an opponent's build by replaying the pick they just made through the REAL solver: their
+        roster minus that pick as the team, that pick as the sole candidate — reproducing what they were
+        thinking when they made it. The nested solve is a normal get_h_scores run (same seeding, warm
+        starts, kappa, and position machinery as any evaluate) against the current stored field;
+        _opponent_inference_active caps the recursion at one level of best-response and routes the entry
+        write through the refresh loop. The replay warm-starts from this team's entry at the polish
+        tier (the entry is keyed to exactly the replay view's roster), so the result is the team's
+        identity plus a small per-pick evidence nudge — see the tier comment in get_h_scores.
+        Single-candidate solves cost ~1/40th of an evaluate, which is what makes eager refresh viable.
+        Returns (category_weights, mu_edge, position_shares); mu_edge is per remaining pick."""
+        drafted_player = opponent_players[-1]
+        prior_players  = opponent_players[:-1]
+        picks_left     = self.n_picks - len(opponent_players)
+        assignments_view = {**player_assignments, opponent_team_name: prior_players}
+
+        # No other isolation is needed: every remaining piece of shared per-evaluate state the nested
+        # solve touches (self.players, _position_mode, throttle priority/cache/offset, warm-start rows)
+        # is assigned fresh by the outer evaluate AFTER the refresh completes — see the refresh call's
+        # ordering note in get_h_scores. The replay deliberately keeps the normal warm-start tiers: the
+        # eager refresh keeps each entry keyed to exactly this view's roster, so the polish tier applies
+        # and the inferred build is the team's identity plus a small per-pick evidence nudge. Running
+        # replays at the full warm rate instead let every seat re-derive itself each round and sprint to
+        # the field's one open punt lane — a best-response herd (measured: six seats flipping to the
+        # same assists punt) that no in-draft mechanism damps.
+        self._opponent_inference_active = True
+        try:
+            result = self.get_h_scores(
+                player_assignments      = assignments_view,
+                drafter                 = opponent_team_name,
+                n_iterations            = _OPPONENT_INFERENCE_ITERATIONS,
+                cash_remaining_per_team = cash_remaining_per_team,
+                candidate_subset        = [drafted_player],
+            )
+        finally:
+            self._opponent_inference_active = False
+
+        category_weights = result['Weights'].loc[drafted_player].to_numpy()
+        # Future-Diff sums the per-pick edge over the picks remaining AFTER the replayed pick joins,
+        # which is exactly picks_left — so dividing recovers the per-pick mu_edge the field model
+        # multiplies back by picks_left.
+        mu_edge = (result['Future-Diff'].loc[drafted_player].to_numpy() / picks_left
+                   if picks_left > 0 else np.zeros(self.n_categories))
+        shares_frames   = result['Position-Shares']
+        position_shares = ({pos_code: frame.loc[drafted_player].to_numpy()
+                            for pos_code, frame in shares_frames.items()}
+                           if all(frame is not None for frame in shares_frames.values()) else None)
+        return category_weights, mu_edge, position_shares
+
     def get_diff_means_auction(self
                                 , score_diff
                                 , money_diff
@@ -660,24 +1337,10 @@ class HAgent:
     def get_diff_var(self, n_their_players):
         return self.n_picks * (2 + self.w * (self.n_picks - n_their_players) / self.n_picks)
 
-    def get_value_of_money_auction(self
-                                    , diff_means
-                                    , diff_vars
-                                    , sigma_2_m
-                                    , category_value_per_dollar
-                                    , replacement_value_by_category
-                                    , max_money=200
-                                    , step_size=0.1):
-        x_diff_array = np.concatenate([
-            diff_means + replacement_value_by_category + category_value_per_dollar * x * step_size
-            for x in range(int(max_money / step_size))
-        ])
-        cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
-        score = self.get_objective_and_pdf_weights(
-            x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m, calculate_pdf_weights=False
-        )
-        return pd.DataFrame({'value': score},
-                            index=[x * step_size for x in range(int(max_money / step_size))])
+    # NOTE: the money->win-probability curve (get_value_of_money_auction, stored as
+    # self.value_of_money) was removed 2026-08-11: nothing consumed it -- the service layer converts
+    # H-scores to dollars via auction_value_adjuster -- and rebuilding a 2000-price-point tensor
+    # against every opponent column on every auction call was a measured ~1.7s of populate time.
 
     def _select_starting_weights(self
                                  , position_shares
@@ -721,6 +1384,7 @@ class HAgent:
                     np.array([seed] * n_candidates), position_shares, diff_means, diff_vars,
                     x_scores_batch_array, candidate_player_array, team_so_far_array,
                     n_players_selected, sigma_2_m, 0, pitching_preference,
+                    correction_mode='skip',
                 )['Score']
                 for seed in seed_vectors
             ])
@@ -758,13 +1422,30 @@ class HAgent:
                            , candidate_priority=None
                            , candidate_offset=0):
 
+        # Stale correction terms must never leak across boards or candidate batches.
+        self._correction_cache = None
+
+        # Warm-started rows descend at reduced, staleness-tiered rates (see the warm-start scale
+        # constants); cold rows keep the full rate. Per-row rates broadcast through Adam's update, and
+        # apply to BOTH optimisers -- weights and flex shares are paired halves of one build, so they
+        # must move (and hold still) together.
+        warm_start_row_rate_scales = self._warm_start_row_rate_scales
+        self._warm_start_row_rate_scales = None
+        if warm_start_row_rate_scales is not None:
+            rate_column            = warm_start_row_rate_scales.reshape(-1, 1)
+            category_learning_rate = 0.001 * rate_column
+            shares_learning_rate   = _SHARES_LEARNING_RATE * rate_column
+        else:
+            category_learning_rate = 0.001
+            shares_learning_rate   = _SHARES_LEARNING_RATE
+
         optimizers = {
-            'Categories': AdamOptimizer(learning_rate=0.001),
+            'Categories': AdamOptimizer(learning_rate=category_learning_rate),
             # Shares are optimised in softmax-logit space (see the update below). A logit must travel
             # ~±4 to move a share across most of [0, 1], versus a direct step in share space, so the
             # logit learning rate is an order of magnitude larger than the old share-space 0.01.
             # One optimiser for the shared per-position logits (every flex slot's softmax reads them).
-            'Shares': AdamOptimizer(learning_rate=_SHARES_LEARNING_RATE),
+            'Shares': AdamOptimizer(learning_rate=shares_learning_rate),
         }
 
         if self.sport == 'MLB':
@@ -827,12 +1508,28 @@ class HAgent:
                     candidate_player_array, team_so_far_array, n_players_selected,
                     sigma_2_m, pitching_preference,
                 )
+                # Mixed warm start: rows with stored converged weights (set by get_h_scores when the
+                # frozen table only partially covers the batch) override their cold seeds.
+                if self._partial_warm_start_rows is not None:
+                    covered_positions, covered_weights = self._partial_warm_start_rows
+                    category_weights = category_weights.copy()
+                    category_weights[covered_positions] = covered_weights
+                    self._partial_warm_start_rows = None
 
             # Robustness regulariser: soft-threshold the category weights toward neutral v each iteration
             # (proximal step for an L1 penalty -lambda*||w-v||_1), strongest on an empty roster and
             # decaying to 0 by mid-draft (see self.reg_schedule), so early picks stay flexible.
             reg_lambda  = (self.reg_schedule[len(self.players)]
                            if (self.regulariser_on and len(self.players) < len(self.reg_schedule)) else 0.0)
+            # Warm-started rows skip the regulariser: it is a COLD-start robustness device, and on a warm
+            # start it drags an already-converged equilibrium build back toward neutral -- worse, at the
+            # reduced warm-start step sizes its pull exceeds the descent step, snapping weights exactly
+            # onto the singular w==v ray (0/0 -> NaN gradients). Cold rows keep the full schedule.
+            if warm_start_row_rate_scales is not None:
+                cold_row_multiplier = (warm_start_row_rate_scales >= 1.0).astype(float).reshape(-1, 1)
+            else:
+                cold_row_multiplier = 1.0
+            category_reg_lambda = reg_lambda * cold_row_multiplier
             neutral_row = self.v.reshape(1, self.n_categories)
 
             for iteration in range(max(1, n_iterations)):
@@ -869,9 +1566,10 @@ class HAgent:
                     # L1 proximal step: shrink each weight toward neutral v by up to reg_lambda (a linear
                     # penalty, so a committed punt is not over-penalised the way L2's proportional pull
                     # would). _REG_FLOOR stops the shrink short of v, keeping weights off the singular w==v
-                    # ray. Renormalised to the simplex just below.
+                    # ray. Renormalised to the simplex just below. category_reg_lambda is per-row: zero
+                    # for warm-started rows (see above), the full schedule for cold rows.
                     deviation        = category_weights - neutral_row
-                    shrink           = np.minimum(reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
+                    shrink           = np.minimum(category_reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
                     category_weights = category_weights - np.sign(deviation) * shrink
                 category_weights[category_weights < 0] = 0
 
@@ -901,7 +1599,8 @@ class HAgent:
                     if reg_lambda > 0.0:
                         # L1 reg toward uniform on the shared per-position shares (mirrors the category
                         # weights x _POSITION_REG_MULT); re-derive the logits so the pull persists.
-                        pos_reg       = reg_lambda * _POSITION_REG_MULT
+                        # Warm rows are exempt, exactly like the category weights (paired build halves).
+                        pos_reg       = reg_lambda * _POSITION_REG_MULT * cold_row_multiplier
                         master_shares = _softmax_rows(master_logits)
                         uniform       = 1.0 / master_shares.shape[1]
                         dev           = master_shares - uniform
@@ -913,18 +1612,6 @@ class HAgent:
                         position_shares[pos_code].values[:] = _softmax_rows(
                             master_logits[:, self.position_indices[pos_code]])
 
-            # Warm-start the next pick from the converged best candidate. Computed once after the loop
-            # (only the final iteration's values are ever kept) and read straight from the numpy arrays,
-            # avoiding a per-iteration pandas column-select + .iloc scan of the share DataFrames.
-            best_player_idx = int(np.argmax(score))
-            self.initial_category_weights = category_weights[best_player_idx] / 2 + self.v.reshape(self.n_categories) / 2
-            self.initial_shares = {
-                pos_code: {
-                    base: float(position_shares[pos_code].values[best_player_idx, col_idx])
-                    for col_idx, base in enumerate(self.position_structure['flex'][pos_code]['bases'])
-                }
-                for pos_code in self.position_structure['flex'].keys()
-            }
 
         elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
             x_diff_array   = diff_means + x_scores_batch_array
@@ -1015,7 +1702,8 @@ class HAgent:
             'CDFs': [
                 pd.DataFrame(cdf_estimates[:, :, i], index=result_index,
                              columns=list(self.x_scores.columns))
-                for i in range(self.n_drafters - 1)
+                # One plane per opponent column: n_drafters-1 normally, n_teams*K during windowed passes.
+                for i in range(cdf_estimates.shape[2])
             ],
         }
 
@@ -1053,7 +1741,8 @@ class HAgent:
                                     , n_players_selected
                                     , sigma_2_m
                                     , iteration
-                                    , pitching_preference=None):
+                                    , pitching_preference=None
+                                    , correction_mode='full'):
 
         if self.position_means is not None:
             position_rewards = self.get_position_priorities_from_category_weights(category_weights)
@@ -1144,6 +1833,7 @@ class HAgent:
         score, pdf_weights = self.get_objective_and_pdf_weights(
             x_diff_array, diff_vars, cdf_estimates, pdf_estimates, sigma_2_m,
             calculate_pdf_weights=True,
+            correction_mode=correction_mode, iteration=iteration,
         )
 
         category_gradient = np.einsum('ai,aik -> ak', pdf_weights, del_full)
@@ -1193,10 +1883,14 @@ class HAgent:
                                        , cdf_estimates
                                        , pdf_estimates
                                        , sigma_2_m=None
-                                       , calculate_pdf_weights=False):
+                                       , calculate_pdf_weights=False
+                                       , correction_mode='full'
+                                       , iteration=None):
         if self.scoring_format == 'Head to Head: Most Categories':
-            return self.get_objective_and_pdf_weights_mc(cdf_estimates, pdf_estimates,
-                                                          calculate_pdf_weights)
+            return self.get_objective_and_pdf_weights_mc(x_diff_array, diff_vars,
+                                                          cdf_estimates, pdf_estimates,
+                                                          calculate_pdf_weights,
+                                                          correction_mode, iteration)
         elif self.scoring_format == 'Rotisserie':
             return self.get_objective_and_pdf_weights_rotisserie(
                 x_diff_array, diff_vars, cdf_estimates, pdf_estimates,
@@ -1206,14 +1900,71 @@ class HAgent:
                                                           calculate_pdf_weights)
 
     def get_objective_and_pdf_weights_mc(self
+                                          , x_diff_array
+                                          , diff_vars
                                           , cdf_estimates
                                           , pdf_estimates
-                                          , calculate_pdf_weights=False):
-        objective = compute_win_probability(np.array(cdf_estimates)).mean(axis=1)
+                                          , calculate_pdf_weights=False
+                                          , correction_mode='full'
+                                          , iteration=None):
+        """correction_mode: 'full' applies the correlation correction (recomputing per the
+        refresh throttle when an iteration index is given), 'skip' turns it off — used by
+        the multi-start seed scan, whose coarse pre-descent ranking doesn't warrant it."""
+        probs = np.array(cdf_estimates)
         if calculate_pdf_weights:
-            tipping_points = calculate_tipping_points(np.array(cdf_estimates))
-            return objective, (tipping_points * pdf_estimates).mean(axis=2)
-        return objective
+            # Gradient steps need the tipping points too, and both come out of one
+            # shared win-count DP build (bit-identical to the standalone functions).
+            win_probability, tipping_points = calculate_win_probability_and_tipping_points(probs)
+        else:
+            win_probability = compute_win_probability(probs)  # (n_players, n_opponents)
+
+        # First-order correlation correction (eq (C4) of the correlation-correction note):
+        #   P(win | R) ≈ P_indep + ½ φ(z)ᵀ [(R − I) ∘ B] φ(z)
+        # with B the exact leave-two-out bracket matrix, evaluated at complex nodes
+        # (see calculate_correction_terms). Terms are cached across descent iterations
+        # and refreshed on the position-throttle-style schedule.
+        correction_terms = None
+        apply_correction = self.mc_correlation_enabled and correction_mode != 'skip'
+        if apply_correction:
+            z_scores     = x_diff_array / np.sqrt(diff_vars)
+            standard_pdf = _normal_pdf(z_scores)              # φ(z), NOT the 1/σ-scaled pdf
+
+            cached = self._correction_cache
+            refresh = (
+                iteration is None
+                or cached is None
+                or cached['correction'].shape != win_probability.shape
+                or (calculate_pdf_weights and cached['probability_gradient'] is None)
+                or (iteration + 1) % _MC_CORRELATION_REFRESH_INTERVAL == 0
+            )
+            if refresh:
+                correction, m_phi, probability_gradient = calculate_correction_terms(
+                    probs
+                    , self.rho[0] - np.eye(self.n_categories)
+                    , standard_pdf
+                    , calculate_gradient=calculate_pdf_weights
+                )
+                correction_terms = {'correction': correction, 'm_phi': m_phi,
+                                    'probability_gradient': probability_gradient}
+                if iteration is not None:
+                    self._correction_cache = correction_terms
+            else:
+                correction_terms = cached
+            win_probability = win_probability + correction_terms['correction']
+
+        objective = win_probability.mean(axis=1)
+        if not calculate_pdf_weights:
+            return objective
+
+        pdf_weights = tipping_points * pdf_estimates
+        if correction_terms is not None:
+            # Exact correction gradient, two pieces chained through pdf_estimates = φ(z)/σ:
+            #   through the densities:       −z_c [Mφ(z)]_c
+            #   through B (leave-three-out): ∂(correction)/∂p_c
+            pdf_weights = pdf_weights + (
+                -z_scores * correction_terms['m_phi'] + correction_terms['probability_gradient']
+            ) * pdf_estimates
+        return objective, pdf_weights.mean(axis=2)
 
     def get_objective_and_pdf_weights_ec(self
                                           , cdf_estimates
@@ -1272,21 +2023,151 @@ class HAgent:
         self.initial_position_shares  = None
         return self
 
+    def reset_draft_state(self):
+        """Clear all in-draft mutable state, returning the agent to its just-populated condition: the
+        rolling per-team store (inferred opponents + own-build entries) and any injected start weights.
+        Populate artifacts survive -- the frozen player tables, anchor order, default result and punt
+        popularity are properties of the BUILD, not of a draft. Call this at the start of every fresh
+        draft, simulation, or test so nothing leaks across boards (harnesses that poked private
+        attributes for this went silently stale when the attributes were renamed)."""
+        self._team_states                = {}
+        self._partial_warm_start_rows    = None
+        self._warm_start_row_rate_scales = None
+        return self.clear_initial_weights()
+
     def populate_default_h_scores(self, n_iterations: int, cash_remaining_per_team: dict = None) -> None:
-        """Compute and cache the neutral (empty-board) H-scores. Run once at the end of the build so
-        the agent is always primed — the throttle has a ranking to prioritise by, auction values have
-        their anchor, and the draft-start evaluate can short-circuit to this result. Pass full cash
-        only in auction mode. Runs full-exact (default_h_scores is still None here, so no throttling)."""
+        """Compute and cache the base (empty-board) H-scores. Run once at the end of the build so the
+        agent is always primed — the throttle has a ranking to prioritise by, auction values have their
+        anchor, and the draft-start evaluate can short-circuit to this result. Pass full cash only in
+        auction mode.
+
+        With opponent modelling on this is a two-pass committed-anchor build. Pass 1 solves every
+        candidate against a neutral field; each candidate's Future-Diff is the committed build of a team
+        drafted around THAT player (its per-pick mu_edge), stored per player. Pass 2 serves the base
+        H-scores against that committed field. No averaging — the anchors are real per-player builds, so
+        (a) player-specific punts survive, and (b) they match the from-scratch inference verbatim, so
+        drafting a priced-in player confirms the prediction rather than moving the field. The bootstrap
+        runs for auctions too (full cash) — the passes solve in auction mode, so the committed anchors are
+        auction-shaped (top-heavy) rather than borrowed from the draft. Off, it is a single neutral pass."""
         empty = {f'Team {i + 1}': [] for i in range(self.n_drafters)}
-        self.clear_initial_weights()
+        # Fresh build: drop any prior cache so the passes recompute (the empty-board short-circuit and the
+        # throttle both key off these) instead of short-circuiting to stale results.
+        self._team_states              = {}
+        self._anchor_player_order   = None
+        self._player_committed_future_diffs  = None
+        self._player_frozen_weights    = None
+        self._player_frozen_shares     = None
+        self._default_result           = None
+        self.default_h_scores          = None
+        self._populate_pass_scores     = None
+        self._bootstrap_field_snapshots = None
+
+        bootstrap = (self.opponent_sophistication and self.n_picks > 1)
+        if not bootstrap:
+            result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team)
+            self.default_h_scores = result['Scores'].sort_values(ascending=False)
+            self._default_result  = result
+            self._populate_pass_scores = None   # populate-scoped; default_h_scores ranks from here on
+            return
+
+        # Damped best-response to a fixed point. Pass 0 solves against a neutral field; each later pass
+        # solves against the CURRENT committed field and smooths it a fraction alpha toward that pass's
+        # builds. Exponential smoothing (not a running mean) converges to a field that is its own
+        # best-response — a committed per-player equilibrium — so player-specific punts survive.
+        top_count = 3 * self.n_drafters
+        def refresh_field(from_result):
+            self._player_committed_future_diffs = committed
+            # Just the ordering (an Index): seat assignment consumes only the ranking, never the values.
+            self._anchor_player_order = from_result['Scores'].sort_values(ascending=False).index[: top_count]
+
+        # The field only needs the committed builds of the top-3N anchors, so the iteration passes score
+        # just those players (~36) instead of the whole pool (~577) — the position solve is the cost and it
+        # scales with the candidate count. Only the final serve pass ranks everyone.
+        anchor_subset = list(self.x_scores.index[: top_count])
+
+        pass_iters = _OPPONENT_PASS_ITERATIONS
+        result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)  # neutral
+        committed = result['Future-Diff'] / (self.n_picks - 1)
+        window_size = (_OPPONENT_FIELD_WINDOW if self.scoring_format != 'Rotisserie' else 0) #ZR: This could be reversed to 0 if Rotisserie
+        bootstrap_passes = (_OPPONENT_BOOTSTRAP_PASSES if self.scoring_format != 'Rotisserie'
+                            else _OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE)
+        if window_size >= 2:
+            # Windowed fictitious play (see _OPPONENT_FIELD_WINDOW): each pass best-responds to the RAW
+            # fields of the last K passes stacked as separate opponents — no EMA blending, the window
+            # itself provides the damping (one pass moves at most 1/K of the field's mass) while every
+            # historical build keeps its specific punts. The snapshots exist only between passes; the
+            # serve and everything mid-draft face the FINAL pass's single field, set after the loop.
+            snapshots = []
+            try:
+                for _ in range(bootstrap_passes):
+                    committed = result['Future-Diff'] / (self.n_picks - 1)
+                    refresh_field(result)   # single-field store tracks the latest pass throughout
+                    snapshots.append((committed, self._anchor_player_order))
+                    self._bootstrap_field_snapshots = snapshots[-window_size:]
+                    result = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)
+            finally:
+                self._bootstrap_field_snapshots = None
+            committed = result['Future-Diff'] / (self.n_picks - 1)
+        else:
+            for _ in range(bootstrap_passes):
+                refresh_field(result)
+                result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)
+                committed = (1 - _OPPONENT_SMOOTHING) * committed \
+                            + _OPPONENT_SMOOTHING * (result['Future-Diff'] / (self.n_picks - 1))
+
+        # Serve the full-pool base H-scores against the converged field (in-draft evaluates use it too).
+        # The serve WARM-STARTS from the final iteration pass's weights where they exist -- the top-3N
+        # anchors, the players whose displayed builds actually get scrutinised -- so their served builds
+        # continue the bootstrap's converged builds instead of re-deriving cold (a cold re-derive lands
+        # elsewhere on flat plateaus, and the first in-draft evaluate then visibly "switches" the build).
+        # The rest of the pool cold-starts via the punt seed scan and may drift slightly; acceptable.
+        refresh_field(result)
+        # Anchor rows: warm-start source for the serve (weights and flex shares always travel together).
+        self._player_frozen_weights = result['Weights']
+        self._player_frozen_shares  = result['Position-Shares']
+        # The serve keeps the polish tier for its warm rows IN BOTH PATHS. Under the window the final
+        # pass's weights answered the stacked-history field, not the single field the serve scores
+        # against — but re-converging them at the full rate against one converged field hands every
+        # candidate the SAME best defection and herds the whole board into one punt (measured: 12/12
+        # EC anchors punting 3s). The polish tier preserves each anchor's own equilibrium build, which
+        # is exactly the diversity a mixed equilibrium consists of; the mild score-at-mixture-weights
+        # inconsistency is the same approximation the EMA path has always lived with.
+        result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
+                                          candidate_subset=None, preserve_frozen_weights=True)
+        self.default_h_scores = result['Scores'].sort_values(ascending=False)
+        self._default_result  = result
+        # Freeze the per-player self-play weights AND flex shares (each player's converged build vs the
+        # equilibrium field, sitting alongside the committed mu_edge tilts). FROZEN from here on:
+        # empty-roster evaluates warm-start each candidate from its rows, and opponent inference seeds
+        # from the row of a newly drafted player. In-draft refresh is at the TEAM level only (_team_states).
+        self._player_frozen_weights = result['Weights']
+        self._player_frozen_shares  = result['Position-Shares']
+        self._populate_pass_scores  = None   # populate-scoped; default_h_scores ranks from here on
+
+    def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
+                            preserve_frozen_weights=False):
+        """One empty-board base-H-score solve against the current _anchor_player_order field. Clears the
+        per-pass warm start and inferred-opponent store first (the empty board has no real opponents, so
+        only the committed archetype field differs between passes). candidate_subset narrows which players
+        are scored — the field-building passes only need the top-2N anchors. preserve_frozen_weights keeps
+        the frozen table so this pass warm-starts from it (the second serve pass, which polishes the cold
+        serve's weights to stationary points)."""
+        self.reset_draft_state()
+        if not preserve_frozen_weights:
+            self._player_frozen_weights = None
+            self._player_frozen_shares  = None
         result = self.get_h_scores(
             player_assignments      = empty,
             drafter                 = 'Team 1',
             n_iterations            = n_iterations,
             cash_remaining_per_team = cash_remaining_per_team,
+            candidate_subset        = candidate_subset,
         )
-        self.default_h_scores = result['Scores'].sort_values(ascending=False)
-        self._default_result  = result
+        # Arm the next run's position-optimiser throttle (see _populate_pass_scores). The neutral
+        # first pass has no ranking and solves exact; the serve ranks the full pool by the final
+        # window pass's anchor scores, with the unranked rest of the pool sorting last.
+        self._populate_pass_scores = result['Scores']
+        return result
 
     # ── simplified-form x_mu helpers (unchanged) ──────────────────────────────
 
@@ -1497,7 +2378,8 @@ def build_h_agent(info
                   , sport
                   , params
                   , slot_counts
-                  , aleph=0.0):
+                  , aleph=0.0
+                  , opponent_sophistication=True):
     return HAgent(
         info           = info,
         omega          = omega,
@@ -1510,5 +2392,6 @@ def build_h_agent(info
         params         = params,
         slot_counts    = slot_counts,
         aleph          = aleph,
+        opponent_sophistication = opponent_sophistication,
         beth           = beth,
     )

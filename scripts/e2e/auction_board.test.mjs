@@ -84,7 +84,7 @@ test('auction board entry controls', async t => {
 
             // Every candidate row carries the four dollar cells plus one win-rate cell per category.
             const firstRowCellCounts = await page.evaluate(() => {
-                const row = document.querySelector('#hscoretable tbody tr')
+                const row = document.querySelector('#hscoretable tbody tr:not(.virtual-spacer)')
                 return {
                     dollarCells: row.querySelectorAll('td.auction-dollar').length,
                     categoryCells: row.querySelectorAll('td.categoricalhscore').length,

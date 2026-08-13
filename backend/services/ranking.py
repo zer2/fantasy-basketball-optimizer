@@ -107,8 +107,6 @@ def rank_candidates(
         has_more         = False
         total_candidates = None
 
-    # Clear warm-start weights so this call is independent of any previous one.
-    H = H.clear_initial_weights()
     with record_phase('hscores'):
         h_score_result = H.get_h_scores(
             player_assignments      = player_assignments,
@@ -245,8 +243,14 @@ def _build_candidates(
     #
     # Three values per player:
     #   your_dollar — SAVOR on H-scores (team-specific, uses remaining cash)
-    #   gnrc_dollar — SAVOR on generic H-scores (no players taken), remaining cash/picks
     #   orig_dollar — SAVOR on generic H-scores (no players taken), original full cash/picks
+    #   gnrc_dollar — orig_dollar restricted to the AVAILABLE players and rescaled so it sums to the
+    #                 current remaining cash. Not an independent SAVOR run: re-running SAVOR on the
+    #                 baseline mid-auction lets already-drafted players absorb part of the remaining
+    #                 cash, so the available players' values no longer exhaust the budget (and Diff
+    #                 drifts systematically positive). Every dollar column must sum to its budget:
+    #                 your$/gnrc$ to the remaining cash over available players, orig$ to the original
+    #                 cash over the full pool.
     #
     # n_remaining is the number of players still to be drafted across all teams.
     # The SAVOR function uses this to find the replacement-level player (the
@@ -283,21 +287,21 @@ def _build_candidates(
             your_dollar_series = auction_value_adjuster(
                 h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
             )
-            # gnrc_dollar: neutral baseline H-scores, current cash/picks remaining
-            gnrc_dollar_series = auction_value_adjuster(
-                baseline_scores, n_remaining, total_cash_remaining, streaming_noise,
-            )
             # orig_dollar: neutral baseline H-scores, full original cash/picks
             orig_dollar_series = auction_value_adjuster(
                 baseline_scores, total_picks, total_original_cash, streaming_noise,
             )
-            # G-score variants: generic value using G-scores instead of H-scores.
-            gnrc_dollar_g_series = auction_value_adjuster(
-                g_scores_available, n_remaining, total_cash_remaining, streaming_noise,
-            )
+            # gnrc_dollar: orig_dollar over the available players, rescaled to the remaining cash
+            # (see the column definitions above — the sum over available players must equal the
+            # remaining cash exactly, like your_dollar).
+            orig_available     = orig_dollar_series.reindex(h_scores_sorted.index).fillna(0.0)
+            gnrc_dollar_series = orig_available * (total_cash_remaining / orig_available.sum())
+            # G-score variants, same construction from the G-score original values.
             orig_dollar_g_series = auction_value_adjuster(
                 player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
             )
+            orig_g_available     = orig_dollar_g_series.reindex(g_scores_available.index).fillna(0.0)
+            gnrc_dollar_g_series = orig_g_available * (total_cash_remaining / orig_g_available.sum())
             player_auction_values = {
                 p: AuctionValues(
                     your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
@@ -453,14 +457,21 @@ def _build_g_score_rows(
     where diff_means is the current team's x-score differential versus all
     opponents simultaneously (axis=2 of diff_means is the opponent dimension;
     the mean collapses it to a single average-across-opponents value).
-    diff_means is the same for every candidate since it depends only on the
-    players already drafted.  expected_future_diff is the algorithm's
-    projection for the picks remaining, which does vary per candidate.
+    expected_future_diff is the algorithm's projection for the picks
+    remaining, which varies per candidate.
 
     Therefore:
         current_diff = res['Diff'] - res['Future-Diff']
                      = (future_diff + diff_means) - future_diff
-                     = diff_means        ← same value for every candidate
+                     = diff_means
+
+    With the opponent model OFF, diff_means depends only on the players
+    already drafted, so Current diff is identical for every candidate. With
+    the model ON it is candidate-dependent for the predicted-anchor
+    candidates: self-exclusion swaps the candidate's own predicted team out
+    of its field for the spare anchor's team (you never play against your own
+    team), so a stronger anchor shows a less negative Current diff, while
+    every non-anchor candidate shares one identical field.
 
     Both diff DataFrames store values in x-score space (divided by v during
     computation).  Multiplying by original_v converts them back to G-score

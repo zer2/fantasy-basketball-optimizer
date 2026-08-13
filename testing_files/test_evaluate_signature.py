@@ -46,14 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# The empty-board hashes are unchanged from the punt-seed init; the two 'mid' hashes were regenerated
-# 2026-07-21 for the Gaussian (phi, B=4) regulariser decay schedule, which shifts only the mid-draft
-# optimisation (empty-board reg strength is the schedule's peak, identical to the prior cosine peak).
+# Regenerated 2026-08-12 for the populate perf batch: the full-pool serve now runs its normal
+# position-optimiser throttle schedule, and the self-play bootstrap defaults to 8 passes (the
+# measured convergence knee) instead of 15.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): 'bb0d1e29ef7a8a735dec7304e618b6efca99e41987ff84af8fa4a40fdce3ef6b',
-    ('Head to Head: Each Category',  'mid'):   'ef3a31da5784d7d92e015a13233678a4cbd8b29728640ce49ab9855a48f0eef5',
-    ('Head to Head: Most Categories','empty'): '4d4919a72d1405396b1a8649c934b59c26a672767a5e0bdd23b079f86bb9335e',
-    ('Head to Head: Most Categories','mid'):   'e7b7e00add5cd689eec9f719ed10ec5595a9c093eefe0ed9ed8c83eba1741fd3',
+    ('Head to Head: Each Category',  'empty'): 'f2dc359f05760ffdb7cbf06f78f42e883cf51bbe963ac7d2862bdc5ad04deadd',
+    ('Head to Head: Each Category',  'mid'):   'd4495335aad489f551365b94ae30abce7837b9f74249c3736bfefb0e4a3154fd',
+    ('Head to Head: Most Categories','empty'): '6ac5e1cf5bf668c579f830c92c316f389c27ae2a83027708e89af7ddc5eeabcb',
+    ('Head to Head: Most Categories','mid'):   '21c74d34023a7b080d367f5e6338cf1dd86ebd1c755ce9685254232f7a6239ac',
 }
 
 

@@ -367,6 +367,87 @@ def test_uploaded_positions_use_canonical_eligibility():
         f"position string must be ignored (expected {jokic_identity!r})"
 
 
+def test_new_data_source_added_mid_draft_keeps_the_board_valid():
+    """Adding a projection source mid-draft must not invalidate the existing board.
+
+    The exact production sequence that used to 500: draft players under one blend, then
+    upload a file (with its own position formatting) and patch it into the blend. Player
+    identities are 'Name (Position)', so before positions came from the canonical
+    eligibility table, the upload's position strings renamed its players and every
+    subsequent evaluate crashed on the board's now-unknown names. The reverse case — a
+    drafted player genuinely leaving the pool — must be a 400 naming them, never a 500."""
+    request = _build_default_session_request()
+    request['data_source'] = {
+        'type': 'projections',
+        'blend_weights': {'ESPN': 0.0, 'DARKO': 1.0},
+        'custom_data_ids': [],
+    }
+    create_response = client.post('/sessions', json=request)
+    assert create_response.status_code == 201, create_response.text
+    session_id = create_response.json()['session_id']
+
+    n_drafters = _load_params()['NBA']['options']['n_drafters']['default']
+    board = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    drafted_identities = [entry['name'] for entry in create_response.json()['g_scores'][:4]]
+    board['Team 1'] = drafted_identities[:2]
+    board['Team 2'] = drafted_identities[2:]
+
+    def evaluate_board():
+        return client.post(
+            f'/sessions/{session_id}/evaluate'
+            , json={'player_assignments': board, 'my_team_id': 'Team 1',
+                    'candidate_offset': 0, 'candidate_limit': 10}
+        )
+
+    assert evaluate_board().status_code == 200, 'the board must evaluate under the original blend'
+
+    # Upload covering the drafted players, with deliberately hostile position formatting:
+    # reversed order plus a space ('PF,C' -> 'C, PF'). Under source-supplied positions
+    # this renamed the players; under canonical positions it must be ignored.
+    def scramble_position(identity: str) -> str:
+        position = identity.rsplit(' (', 1)[1].rstrip(')')
+        return ', '.join(reversed(position.split(',')))
+
+    upload_rows = [
+        f'{rank + 1},{identity.rsplit(" (", 1)[0]},"{scramble_position(identity)}"'
+        ',70,20.0,8.0,4.0,1.0,1.0,2.0,1.5,0.5,15.0,0.8,5.0'
+        for rank, identity in enumerate(drafted_identities)
+    ]
+    mid_draft_csv = (
+        'Rank,Name,Pos,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
+        + '\n'.join(upload_rows)
+    ).encode()
+    upload_response = client.post('/data/upload',
+                                  files={'file': ('mid_draft.csv', mid_draft_csv, 'text/csv')})
+    assert upload_response.status_code == 200, upload_response.text
+    data_id = upload_response.json()['data_id']
+
+    patch_response = client.patch(f'/sessions/{session_id}', json={
+        'from_step': 1,
+        'data_source': {
+            'type': 'projections',
+            'custom_data_ids': [data_id],
+            'blend_weights': {'ESPN': 0.0, 'DARKO': 1.0, data_id: 1.0},
+        },
+    })
+    assert patch_response.status_code == 200, patch_response.text
+
+    evaluate_response = evaluate_board()
+    assert evaluate_response.status_code == 200, \
+        f'the board drafted before the source change must still evaluate: {evaluate_response.text}'
+
+    # A drafted player genuinely leaving the pool (here: marked injured) is a clear,
+    # named 400 — not a KeyError 500 from deep inside the H-score math.
+    patch_response = client.patch(f'/sessions/{session_id}',
+                                  json={'from_step': 2, 'injured_players': [drafted_identities[0]]})
+    assert patch_response.status_code == 200, patch_response.text
+    evaluate_response = evaluate_board()
+    assert evaluate_response.status_code == 400, evaluate_response.text
+    detail = evaluate_response.json()['detail']
+    assert drafted_identities[0] in detail, 'the error should name the vanished player'
+    assert 'player pool' in detail, 'the error should explain the cause'
+
+
 def test_evaluate_rejects_rostered_players_missing_from_pool():
     """A board whose players no longer exist in the pool (identities changed by a
     data-source switch) must get a clear 400 naming the players, not a KeyError 500."""

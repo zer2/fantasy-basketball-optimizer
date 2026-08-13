@@ -8,6 +8,7 @@
 import { ModelParameters } from '../types.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
+import { makeSidebarToggle } from '../helper_functions.js'
 
 interface ParamSpec {
     id:      string
@@ -86,7 +87,30 @@ export function renderModelParameters(container: HTMLElement): void {
     for (const spec of PARAM_SPECS) {
         grid.append(makeParamItem(spec))
     }
+    grid.append(makeOpponentSophisticationItem())
+}
 
+/** The one boolean parameter: the standard sidebar toggle (like third-round reversal), so the
+ *  switch sits inline with its text instead of dropping onto its own row. */
+function makeOpponentSophisticationItem(): HTMLElement {
+    const row = makeSidebarToggle('mp-opponent-sophistication', 'Opponent sophistication')
+
+    const infoBtn = document.createElement('button')
+    infoBtn.type = 'button'
+    infoBtn.className = 'info-btn'
+    infoBtn.textContent = 'ⓘ'
+    infoBtn.dataset.tooltip =
+        'When on, other drafters are assumed to choose players strategically — their picks and '
+        + 'future plans are predicted by running H-scoring from their seats. When off, other '
+        + 'drafters are assumed to choose players neutrally, with no strategic tendencies.'
+    // The row is a <label>: without this, clicking the info icon would also flip the toggle.
+    infoBtn.addEventListener('click', event => event.preventDefault())
+    row.append(infoBtn)
+
+    const input = row.querySelector('input') as HTMLInputElement
+    input.checked = Boolean(pref('opponent_sophistication', 1))
+    input.addEventListener('change', () => savePref('opponent_sophistication', input.checked ? 1 : 0))
+    return row
 }
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
@@ -133,6 +157,8 @@ export function getModelParameters(): ModelParameters {
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
         kappa:           readNumberInput('mp-kappa'),
+        opponent_sophistication:
+            (document.getElementById('mp-opponent-sophistication') as HTMLInputElement).checked,
         omega:           readNumberInput('mp-omega'),
         gamma:           readNumberInput('mp-gamma'),
         beth:            readNumberInput('mp-beth'),

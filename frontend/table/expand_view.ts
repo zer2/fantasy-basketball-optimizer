@@ -20,85 +20,71 @@ function expandFlexLabel(label: string): string {
 
 
 /**
- * Toggles the expandable detail panel for a player row.
- * On expand: builds G-score, category weights, flex allocations, and roster tables.
- * On collapse: clears the panel and hides the row.
+ * Builds the expandable detail panel (G-score, category weights, flex allocations, roster) into the
+ * given expand row's single spanning cell. Pure content builder: the caller (player_table) owns showing,
+ * hiding, clearing, and measuring the row — this only fills an *empty* expand row.
  *
- * @param expandButton - The expand button that was clicked
- * @param expandedRow  - The detail row immediately associated with this player
- * @param playerData   - Full player data object
- * @param categories   - Ordered list of category names matching the table columns
+ * @param expandedRow - The (empty) detail row to fill
+ * @param playerData  - Full player data object
+ * @param categories  - Ordered list of category names matching the table columns
  */
-export function toggleExpandView(
-    expandButton: HTMLButtonElement
-    , expandedRow: HTMLTableRowElement
+export function buildExpandPanel(
+    expandedRow: HTMLTableRowElement
     , playerData: PlayerResult
     , categories: string[]
 ): void {
+    const scoreCols = playerData.auction_values ? 4 : 1
+    const totalCols = 1 + scoreCols + categories.length
 
-    if (expandedRow.style.display === 'table-row') {
-        // Collapse: clear content and hide
-        expandedRow.style.display = 'none'
-        expandedRow.innerHTML = ''
-        expandButton.classList.remove('popup-open')
-    } else {
-        // Expand: build the detail panel as a vertical stack
-        expandedRow.style.display = 'table-row'
-        expandButton.classList.add('popup-open')
+    // Single cell spanning all columns
+    const cell = expandedRow.insertCell(-1)
+    cell.colSpan = totalCols
+    cell.className = 'panel-cell'
 
-        const scoreCols = playerData.auction_values ? 4 : 1
-        const totalCols = 1 + scoreCols + categories.length
+    cell.appendChild(makePanelLabel('G-score expectations (difference vs. other teams)', '60px'))
+    cell.appendChild(makeGScoreTable(playerData, categories))
 
-        // Single cell spanning all columns
-        const cell = expandedRow.insertCell(-1)
-        cell.colSpan = totalCols
-        cell.className = 'panel-cell'
+    if (playerData.category_weights) {
+        cell.appendChild(makePanelLabel('Category strategy', '60px'))
+        cell.appendChild(makeWeightsTable(playerData, categories))
+    }
 
-        cell.appendChild(makePanelLabel('G-score expectations (difference vs. other teams)', '60px'))
-        cell.appendChild(makeGScoreTable(playerData, categories))
+    // Position-column count shared between the flex allocations and roster
+    // tables so each non-label column has the same width in both. The roster
+    // always includes every base position the flex table can allocate to plus
+    // extra flex types (G, F, Util), so its position-type count is the larger
+    // of the two and the flex table pads with invisible filler columns to match.
+    const nRosterPositionTypes = playerData.roster
+        ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
+        : 0
 
-        if (playerData.category_weights) {
-            cell.appendChild(makePanelLabel('Category strategy', '60px'))
-            cell.appendChild(makeWeightsTable(playerData, categories))
+    if (playerData.flex_allocations) {
+        cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'))
+
+        if (playerData.auction_values) {
+            // Side-by-side with auction values. The flex table keeps its natural
+            // per-column width (no roster filler) so the auction block fits beside it.
+            const sideRow = document.createElement('div')
+            sideRow.className = 'panel-flex-row'
+            sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false, playerData.flex_allocations.base_positions.length))
+
+            const auctionBlock = document.createElement('div')
+            auctionBlock.appendChild(makePanelLabel('All auction values'))
+            auctionBlock.appendChild(makeAuctionValuesTable(playerData))
+            sideRow.appendChild(auctionBlock)
+
+            cell.appendChild(sideRow)
+        } else {
+            cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true, nRosterPositionTypes))
         }
+    } else if (playerData.auction_values) {
+        cell.appendChild(makePanelLabel('All auction values', '60px'))
+        cell.appendChild(makeAuctionValuesTable(playerData))
+    }
 
-        // Position-column count shared between the flex allocations and roster
-        // tables so each non-label column has the same width in both. The roster
-        // always includes every base position the flex table can allocate to plus
-        // extra flex types (G, F, Util), so its position-type count is the larger
-        // of the two and the flex table pads with invisible filler columns to match.
-        const nRosterPositionTypes = playerData.roster
-            ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
-            : 0
-
-        if (playerData.flex_allocations) {
-            cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'))
-
-            if (playerData.auction_values) {
-                // Side-by-side with auction values. The flex table keeps its natural
-                // per-column width (no roster filler) so the auction block fits beside it.
-                const sideRow = document.createElement('div')
-                sideRow.className = 'panel-flex-row'
-                sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false, playerData.flex_allocations.base_positions.length))
-
-                const auctionBlock = document.createElement('div')
-                auctionBlock.appendChild(makePanelLabel('All auction values'))
-                auctionBlock.appendChild(makeAuctionValuesTable(playerData))
-                sideRow.appendChild(auctionBlock)
-
-                cell.appendChild(sideRow)
-            } else {
-                cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true, nRosterPositionTypes))
-            }
-        } else if (playerData.auction_values) {
-            cell.appendChild(makePanelLabel('All auction values', '60px'))
-            cell.appendChild(makeAuctionValuesTable(playerData))
-        }
-
-        if (playerData.roster) {
-            cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-            cell.appendChild(makeRosterGrid(playerData.roster, nRosterPositionTypes))
-        }
+    if (playerData.roster) {
+        cell.appendChild(makePanelLabel('Roster assignments', '60px'))
+        cell.appendChild(makeRosterGrid(playerData.roster, nRosterPositionTypes))
     }
 }
 

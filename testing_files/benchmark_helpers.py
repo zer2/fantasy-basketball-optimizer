@@ -56,6 +56,10 @@ def _build_session_request(
 
     return {
         'league': league,
+        # The league TYPE is a top-level session field, not inferred from cash: without it the build
+        # populates in draft mode and auction evaluates run against draft-shaped anchors (the app's
+        # router enforces this consistency; service-level tests must declare it themselves).
+        'is_auction': cash_per_team is not None,
         'slot_counts': slot_counts,
         'parameters': {
             'omega':           nba_options['omega']['default'],
@@ -66,10 +70,14 @@ def _build_session_request(
             'psi':             nba_options['psi']['default'],
             'chi':             nba_options['chi']['default'],
             'aleph':           nba_options['aleph']['default'],
-            # kappa (anti-crowded-punt) is OFF for benchmarks and the G-score season sims: against a
-            # non-punting G-drafter field the penalty has no crowd to defect from, and it would drift
-            # the goldens. The real app defaults it to 0.5 (see parameters.yaml / schema).
-            'kappa':           0.0,
+            # kappa follows the app default (parameters.yaml): goldens and benchmarks encode exactly what
+            # ships. The one place kappa is deliberately pinned to 0 is the G-score season-sim harness
+            # (simulate.py) -- against a non-punting G-drafter field the anti-crowded-punt penalty has no
+            # crowd to defect from, so it would only distort that comparison.
+            'kappa':           nba_options['kappa']['default'],
+            # Follows the app default like kappa: goldens, benchmarks, and experiments all encode
+            # exactly the opponent-punt softening the app ships with.
+            'behavior_model_confidence': nba_options['behavior_model_confidence']['default'],
             'streaming_noise': nba_options['S']['default'],
         },
         'data_source': {
