@@ -17,6 +17,7 @@ import { resetAuctionEntry } from './data_entry/auction_entry.js'
 import { makeCustomSelect } from './custom_select.js'
 import { pref, savePref } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
+import { loadNbaPlayerIds } from './player_headshots.js'
 
 import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
@@ -52,6 +53,10 @@ if (!currentUser) {
 // Fetch sport config before rendering sidebar so defaults come from parameters.yaml
 const config = await fetchConfig('NBA')
 setSportConfig(config)
+
+// Headshot id map: fire and forget — it resolves long before the first evaluate's rows
+// render, and every display degrades gracefully if it never does.
+loadNbaPlayerIds()
 
 const sidebar = document.getElementById('sidebar') as HTMLElement
 const sidebarSections = document.getElementById('sidebar-sections')!
@@ -383,16 +388,24 @@ identity.className = 'account-identity'
 
 const avatar = document.createElement('span')
 avatar.className = 'account-avatar'
+
+/** Default person icon — shown when no Google picture is available, and swapped in when a
+ *  stored picture URL stops resolving (Google's profile-photo URLs are tokenized and expire;
+ *  the session stores the URL from login, so a long-lived login eventually holds a dead link). */
+function showDefaultAccountIcon(): void {
+    avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        + '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>'
+}
+
 if (currentUser.picture) {
     const avatarImg = document.createElement('img')
     avatarImg.src = currentUser.picture
     avatarImg.alt = ''
     avatarImg.referrerPolicy = 'no-referrer'   // Google pic URLs 403 without this
+    avatarImg.addEventListener('error', showDefaultAccountIcon)
     avatar.append(avatarImg)
 } else {
-    // Default person icon when no Google picture is available.
-    avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
-        + '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>'
+    showDefaultAccountIcon()
 }
 
 const accountName = document.createElement('span')

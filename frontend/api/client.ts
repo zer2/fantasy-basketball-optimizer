@@ -78,7 +78,7 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
             assignments: Object.fromEntries(
                 Object.entries(c.roster.assignments).map(([slot, a]: [string, any]) => [
                     slot,
-                    a ? { name: a.name, isCandidate: a.is_candidate } : null,
+                    a ? { name: a.name, full_name: a.full_name, isCandidate: a.is_candidate } : null,
                 ]),
             ),
         } : undefined,

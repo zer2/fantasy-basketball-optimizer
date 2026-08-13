@@ -6,6 +6,7 @@ import { stat_styler_primary, stat_styler_tertiary } from '../styles/styler_func
 import { PlayerResult, FlexAllocations, Roster } from '../types.js'
 import { getPositionNames } from '../app_state.js'
 import { makeSpacerTh } from './table_helpers.js'
+import { makeHeadshotImage } from '../player_headshots.js'
 
 
 /** Expands a flex slot row label by expanding the position prefix.
@@ -406,12 +407,17 @@ function makeRosterGrid(roster: Roster, nTotalColumns: number): HTMLDivElement {
                 if (!assignment) {
                     cell.className = 'rosterabsent panel-datacell'
                     cell.textContent = '\u00A0'
-                } else if (assignment.isCandidate) {
-                    cell.className = 'rostercandidate panel-datacell'
-                    cell.textContent = assignment.name
                 } else {
-                    cell.className = 'rosteronteam panel-datacell'
-                    cell.textContent = assignment.name
+                    cell.className = (assignment.isCandidate ? 'rostercandidate' : 'rosteronteam')
+                        + ' panel-datacell roster-player-cell'
+                    const stack = document.createElement('div')
+                    stack.className = 'roster-player-stack'
+                    const headshot = makeHeadshotImage(assignment.full_name, 'roster-headshot')
+                    if (headshot) stack.appendChild(headshot)
+                    const nameLabel = document.createElement('span')
+                    nameLabel.textContent = assignment.name
+                    stack.appendChild(nameLabel)
+                    cell.appendChild(stack)
                 }
             }
         }

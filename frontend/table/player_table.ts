@@ -24,6 +24,7 @@ import { getScoringFormat, getSelectedCategories } from '../parameter_collection
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getShortCategoryNames } from '../app_state.js'
 import { isMobileViewport } from '../helper_functions.js'
+import { buildHeadshotImageHtml } from '../player_headshots.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
 
@@ -193,8 +194,8 @@ export function buildTableHeader(): void {
 function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
     let html = `<tr>`
 
-    // Player name cell with expand button
-    html += `<th class='playerheader'><div class='playerheaderdiv'><span class='playername'>${player.name}</span><button class='playerpopup'>▶</button></div></th>`
+    // Player name cell with headshot avatar and expand button
+    html += `<th class='playerheader'><div class='playerheaderdiv'>${buildHeadshotImageHtml(player.name, 'player-avatar')}<span class='playername'>${player.name}</span><button class='playerpopup'>▶</button></div></th>`
 
     // Score column(s)
     if (ctx.isAuction) {

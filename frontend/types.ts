@@ -52,7 +52,8 @@ export interface FlexAllocations {
 // ─── Roster grid ──────────────────────────────────────────────────────────────
 
 export interface RosterAssignment {
-    name: string;
+    name: string;           // short display name (last name)
+    full_name: string;      // full canonical name, for display-layer lookups (e.g. headshots)
     isCandidate: boolean;   // true = the player being evaluated; false = already rostered
 }
 

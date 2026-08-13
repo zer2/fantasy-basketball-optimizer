@@ -260,7 +260,7 @@ def _build_candidates(
         # The evaluate route enforces that remaining_cash and cash_per_team are set together, so an
         # auction evaluate always has cash_per_team here (no defensive fallback needed).
         cash_per_team   = current_params['cash_per_team']
-        streaming_noise = float(current_params.get('streaming_noise', 10.0))
+        streaming_noise = float(current_params.get('streaming_noise', 10.0)) #ZR: What is this dumb fallback? What does claude.md say about this?
         total_picks     = H.n_drafters * H.n_picks
 
         all_players_chosen = [
@@ -268,6 +268,8 @@ def _build_candidates(
             for p in team_players if isinstance(p, str)
         ]
         n_remaining          = total_picks - len(all_players_chosen)
+
+        #ZR: Why are these float calls needed? How would these be anything but floats or ints, which would also be fine I think?
         total_cash_remaining = float(sum(remaining_cash.values()))
 
         if n_remaining > 0:
@@ -388,6 +390,7 @@ def _build_candidates(
         None if no_position_data
         else _build_roster_assignments(
             candidate_last_names
+            , list(sorted_index)
             , my_players
             , rosters_rows
             , slot_names
@@ -709,6 +712,7 @@ def _build_flex_allocations(
 
 def _build_roster_assignments(
     candidate_last_names: list[str]
+    , candidate_full_names: list[str]
     , my_players: list[str]
     , rosters_rows: np.ndarray
     , slot_names: list[str]
@@ -727,6 +731,7 @@ def _build_roster_assignments(
 
     Args:
         candidate_last_names: Per-rank candidate last name for the candidate's own slot.
+        candidate_full_names: Per-rank candidate full name (display-layer asset lookups).
         my_players:           Players already on the user's team, in roster-column order.
         rosters_rows:         Slot-index matrix, shape (n_players, n_columns).
         slot_names:           Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
@@ -740,7 +745,8 @@ def _build_roster_assignments(
 
     # Shared, name-only assignments for the already-drafted players (built once).
     drafted_assignments = [
-        RosterAssignment(name=extract_last_name(player_name), is_candidate=False)
+        RosterAssignment(name=extract_last_name(player_name), full_name=player_name,
+                         is_candidate=False)
         for player_name in my_players
     ]
     # Cross the numpy→Python boundary once for all slot indices.
@@ -759,6 +765,7 @@ def _build_roster_assignments(
             if 0 <= candidate_slot_idx < n_slots:
                 assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
                     name=candidate_last_names[rank_idx],
+                    full_name=candidate_full_names[rank_idx],
                     is_candidate=True,
                 )
 

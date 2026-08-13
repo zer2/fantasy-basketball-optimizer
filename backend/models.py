@@ -43,7 +43,8 @@ class FlexAllocations:
 
 @dataclass
 class RosterAssignment:
-    name: str
+    name: str        # short display name (last name) shown in the roster grid cell
+    full_name: str   # full canonical name, for display-layer lookups (e.g. headshots)
     is_candidate: bool
 
 

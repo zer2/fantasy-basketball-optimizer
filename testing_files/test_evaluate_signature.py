@@ -46,14 +46,13 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# Regenerated 2026-08-12 for the populate perf batch: the full-pool serve now runs its normal
-# position-optimiser throttle schedule, and the self-play bootstrap defaults to 8 passes (the
-# measured convergence knee) instead of 15.
+# Regenerated 2026-08-13 on the player-headshots branch: RosterAssignment now carries
+# full_name (display-layer headshot lookups), a payload-shape change with identical scores.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): 'f2dc359f05760ffdb7cbf06f78f42e883cf51bbe963ac7d2862bdc5ad04deadd',
-    ('Head to Head: Each Category',  'mid'):   'd4495335aad489f551365b94ae30abce7837b9f74249c3736bfefb0e4a3154fd',
-    ('Head to Head: Most Categories','empty'): '6ac5e1cf5bf668c579f830c92c316f389c27ae2a83027708e89af7ddc5eeabcb',
-    ('Head to Head: Most Categories','mid'):   '21c74d34023a7b080d367f5e6338cf1dd86ebd1c755ce9685254232f7a6239ac',
+    ('Head to Head: Each Category',  'empty'): '83edb4d04b9116780e7ac278415649049c50412341bef74756c9a965c0b3d86c',
+    ('Head to Head: Each Category',  'mid'):   'caa333334415371eb6bf3f47ee56ebf3711fa0d79cfbf45bca817da174abbb4e',
+    ('Head to Head: Most Categories','empty'): '98d02f780477ddbfb222c045f22e569d5dedf81384a8ad78c6bf4c4e830f2377',
+    ('Head to Head: Most Categories','mid'):   '7c8d8a7b370463c92b4b2237fad26ef4e45cacbac82dfc6c57e301b00742ec03',
 }
 
 
