@@ -291,7 +291,8 @@ class HAgent:
             # A player's positional baseline is the average of the position means over ALL of their
             # eligible positions (e.g. a PF/C uses the mean of the PF and C means, not just PF). reindex
             # then mean(axis=0) skips any listed position absent from position_means_df.
-            rel_players = [p for p in x_scores.index if p != 'RP']
+            from backend.player_identity import RP_PLAYER_ID
+            rel_players = [p for p in x_scores.index if p != RP_PLAYER_ID]
             self.pos_avg = pd.DataFrame(
                 [position_means_df.reindex(self.positions.get(p)).mean(axis=0)
                 for p in rel_players],

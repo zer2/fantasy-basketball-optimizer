@@ -24,6 +24,7 @@ from benchmark_helpers import (
     , _ALL_CATEGORIES
     , _build_session_request
     , check_top_scores
+    , resolve_player_ids
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -322,7 +323,8 @@ def test_evaluate_first_round(session_for_first_round):
         f'_FIRST_ROUND_PICKS has {len(_FIRST_ROUND_PICKS)} entries but n_drafters={n_drafters}'
     )
 
-    player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
+    first_round_player_ids = resolve_player_ids(session, _FIRST_ROUND_PICKS)
+    player_assignments = {f'Team {i + 1}': [first_round_player_ids[i]] for i in range(n_drafters)}
 
     start  = time.perf_counter()
     result = rank_candidates(
@@ -363,7 +365,8 @@ def test_evaluate_two_category_roto():
         f'_FIRST_ROUND_PICKS has {len(_FIRST_ROUND_PICKS)} entries but n_drafters={n_drafters}'
     )
 
-    player_assignments = {f'Team {i + 1}': [_FIRST_ROUND_PICKS[i]] for i in range(n_drafters)}
+    first_round_player_ids = resolve_player_ids(session, _FIRST_ROUND_PICKS)
+    player_assignments = {f'Team {i + 1}': [first_round_player_ids[i]] for i in range(n_drafters)}
 
     result = rank_candidates(
         session            = session

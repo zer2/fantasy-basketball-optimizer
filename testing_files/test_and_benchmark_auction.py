@@ -11,6 +11,7 @@ from benchmark_helpers import (
     client
     , _SCORE_TOL
     , _build_session_request
+    , resolve_player_ids
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -34,8 +35,8 @@ def test_evaluate_auction():
     # The neutral (full-cash) baseline that anchors the dollar values is built once at session
     # creation (agent.populate_default_h_scores), so we go straight to the real assignments.
     player_assignments = {name: [] for name in team_names}
-    player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
-    player_assignments['Drafter 2'] = ['Nikola Jokic (C)']
+    player_assignments['Drafter 1'] = resolve_player_ids(session, ['Giannis Antetokounmpo'])
+    player_assignments['Drafter 2'] = resolve_player_ids(session, ['Nikola Jokic'])
 
     remaining_cash = {name: 200.0 for name in team_names}
     remaining_cash['Drafter 1'] = 150.0
@@ -45,7 +46,7 @@ def test_evaluate_auction():
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Drafter 1'
-        , exclusion_list     = ['Giannis Antetokounmpo (C,PF)']
+        , exclusion_list     = resolve_player_ids(session, ['Giannis Antetokounmpo'])
         , remaining_cash     = remaining_cash
     )
 

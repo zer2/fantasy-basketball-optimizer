@@ -11,6 +11,7 @@ from benchmark_helpers import (
     client
     , _SCORE_TOL
     , _build_session_request
+    , resolve_player_assignments
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -226,7 +227,7 @@ def test_season_mode_waiver():
 
     waiver_result = rank_candidates(
         session            = session
-        , player_assignments = waiver_assignments
+        , player_assignments = resolve_player_assignments(session, waiver_assignments)
         , my_team_id         = 'Drafter 1'
         , exclusion_list     = []
         , remaining_cash     = None

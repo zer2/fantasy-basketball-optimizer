@@ -25,7 +25,7 @@ import os
 
 import pytest
 
-from benchmark_helpers import client, _build_session_request
+from benchmark_helpers import client, _build_session_request, resolve_player_ids
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
@@ -84,9 +84,9 @@ def test_evaluate_signature(warmed_session, board):
 
     assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     if board == 'mid':
-        assignments['Team 1'] = _TEAM_1
-        assignments['Team 2'] = _TEAM_2
-        exclusion_list        = _TEAM_1
+        assignments['Team 1'] = resolve_player_ids(session, _TEAM_1)
+        assignments['Team 2'] = resolve_player_ids(session, _TEAM_2)
+        exclusion_list        = assignments['Team 1']
     else:
         exclusion_list = []
 

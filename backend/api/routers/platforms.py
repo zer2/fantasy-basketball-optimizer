@@ -100,11 +100,11 @@ def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(cu
     # connected session always has it here; no defensive rebuild (its absence would be an upstream bug).
     try:
         if mode == 'Auction Mode':
-            selections = integration.get_auction_results(config, mode, session.platform_name_lookup)
+            selections = integration.get_auction_results(config, mode, session.platform_player_id_lookup)
             if selections is None:
                 raise HTTPException(status_code=400, detail=f'{config.platform} does not support auctions.')
         else:
-            selections = integration.get_draft_results(config, mode, session.platform_name_lookup)
+            selections = integration.get_draft_results(config, mode, session.platform_player_id_lookup)
     except HTTPException:
         raise
     except Exception:
@@ -119,9 +119,15 @@ def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(cu
             team: cash_per_team - sum(team_costs)
             for team, team_costs in selections.costs.items()
         }
+    # Stage-A boundary: integrations now speak player ids; the wire still speaks labels.
+    from backend.api.legacy_identity_shim import convert_player_ids_to_labels
     return DraftStateResponse(
-        player_assignments = selections.player_assignments,
-        injured_players    = selections.injured_players,
+        player_assignments = {
+            team: convert_player_ids_to_labels(session.player_registry, roster)
+            for team, roster in selections.player_assignments.items()
+        },
+        injured_players    = convert_player_ids_to_labels(
+            session.player_registry, selections.injured_players),
         status             = selections.status,
         remaining_cash     = remaining_cash,
     )

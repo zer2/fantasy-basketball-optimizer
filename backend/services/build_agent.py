@@ -93,71 +93,116 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     return None
 
 
+def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
+    """Bring a single uploaded CSV (name-indexed by parse_projection_csv) to the id-keyed
+    contract: resolve names via the unified table, keep unresolved rows under synthetic
+    ids, and return an id-indexed frame with the display 'Player' column retained."""
+    from backend.data_retrieval import attach_player_ids_by_name
+    from backend.player_identity import allocate_synthetic_player_ids
+
+    frame = attach_player_ids_by_name(parsed_csv.reset_index())
+    synthetic_ids = allocate_synthetic_player_ids(
+        frame.loc[frame['player_id'].isna(), 'Player'])
+    resolved = frame['player_id'].astype('object').fillna(frame['Player'].map(synthetic_ids))
+    frame = frame.drop(columns=['player_id'])
+    frame.index = pd.Index(resolved.astype(int), name='Player')
+    if frame.index.has_duplicates:
+        duplicated = frame.index[frame.index.duplicated()].tolist()
+        raise ValueError(f'Uploaded CSV: multiple rows resolve to the same player id(s): {duplicated}')
+    return frame
+
+
+def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
+    """One PlayerIdentity per pool row (from the id index + 'Player'/'Position' columns),
+    plus the replacement-player sentinel."""
+    from backend.player_identity import (
+        RP_PLAYER_ID, make_player_identity, make_replacement_player_identity,
+    )
+
+    registry = {
+        int(player_id): make_player_identity(int(player_id), str(name), position_value)
+        for player_id, name, position_value in zip(
+            v0_with_names.index, v0_with_names['Player'], v0_with_names['Position'])
+    }
+    registry[RP_PLAYER_ID] = make_replacement_player_identity()
+    return registry
+
+
 def run_step1(
     session: Session,
     csv_bytes: bytes | None = None,
     uploaded_dfs: dict | None = None,
 ) -> None:
-    """Load player_stats_v0 into session.v0_clean.
+    """Load player_stats_v0 into session.v0_clean and build session.player_registry.
 
     Branches on current_params['data_source_type']:
       'csv'        — single uploaded CSV (csv_bytes required; format auto-detected)
       'historical' — Snowflake historical stats for current_params['season']
       'projections' — weighted blend of Snowflake sources + any uploaded_dfs
 
-    Results for Snowflake-backed sources are cached at the module level for
-    24 hours so repeated session creations with the same data source skip the
-    Snowflake round-trip entirely.
+    Every branch produces a frame INDEXED BY PLAYER ID with the display name in a
+    'Player' column; the name is popped into the registry so v0_clean carries exactly
+    the stats + Position columns the pipeline has always seen. Results for
+    Snowflake-backed sources are cached (with names) at the module level for 24 hours
+    so repeated session creations with the same data source skip the round-trip and
+    rebuild an identical registry.
     """
     _, params, _ = _sport_params(session)
     cp = session.current_params
     source_type = cp['data_source_type']
     cache_key = _v0_cache_key(cp)
 
+    v0_with_names = None
     if cache_key is not None:
         with _v0_cache_lock:
             entry = _v0_cache.get(cache_key)
             if entry is not None and time.time() - entry[0] < _V0_CACHE_TTL:
-                session.v0_clean = entry[1].copy()
-                return
+                v0_with_names = entry[1].copy()
 
-    if source_type == 'csv':
-        v0, _detected_format = parse_projection_csv(csv_bytes, params)
+    if v0_with_names is None:
+        if source_type == 'csv':
+            parsed_csv, _detected_format = parse_projection_csv(csv_bytes, params)
+            v0_with_names = _resolve_single_csv_player_ids(parsed_csv)
 
-    elif source_type == 'historical':
-        from backend.data_retrieval import get_specified_historical_stats
+        elif source_type == 'historical':
+            from backend.data_retrieval import get_specified_historical_stats
 
-        season = cp['season']
-        if not season:
-            raise ValueError(
-                "data_source.season is required when data_source.type == 'historical'"
+            season = cp['season']
+            if not season:
+                raise ValueError(
+                    "data_source.season is required when data_source.type == 'historical'"
+                )
+            v0_with_names = get_specified_historical_stats(season, params)
+
+        elif source_type == 'projections':
+            from backend.data_retrieval import combine_projections
+
+            blend_weights = cp.get('blend_weights', {})
+            # All-zero weights would blend nothing and crash deep in the pipeline with an
+            # opaque 500 — reject it up front with an actionable message instead.
+            if not any(weight > 0 for weight in blend_weights.values()):
+                raise InsufficientPlayerPoolError(
+                    'All projection blend weights are zero. Set at least one source weight above zero.'
+                )
+            v0_with_names = combine_projections(
+                blend_weights = blend_weights,
+                params        = params,
+                uploaded_dfs  = uploaded_dfs,
             )
-        v0 = get_specified_historical_stats(season, params)
 
-    elif source_type == 'projections':
-        from backend.data_retrieval import combine_projections
+        else:
+            raise ValueError(f"Unknown data_source_type: {source_type!r}")
 
-        blend_weights = cp.get('blend_weights', {})
-        # All-zero weights would blend nothing and crash deep in the pipeline with an
-        # opaque 500 — reject it up front with an actionable message instead.
-        if not any(weight > 0 for weight in blend_weights.values()):
-            raise InsufficientPlayerPoolError(
-                'All projection blend weights are zero. Set at least one source weight above zero.'
-            )
-        v0 = combine_projections(
-            blend_weights = blend_weights,
-            params        = params,
-            uploaded_dfs  = uploaded_dfs,
-        )
+        if not v0_with_names.index.is_unique:
+            duplicated = v0_with_names.index[v0_with_names.index.duplicated()].tolist()
+            raise ValueError(f'Player pool has duplicate player id(s): {duplicated}')
 
-    else:
-        raise ValueError(f"Unknown data_source_type: {source_type!r}")
+        if cache_key is not None:
+            with _v0_cache_lock:
+                _v0_cache[cache_key] = (time.time(), v0_with_names.copy())
 
-    if cache_key is not None:
-        with _v0_cache_lock:
-            _v0_cache[cache_key] = (time.time(), v0.copy())
-
-    session.v0_clean = v0.copy()
+    session.player_registry = _build_player_registry(v0_with_names)
+    session.v0_clean = v0_with_names.drop(columns=['Player'])
 
 
 # The per-game stats every projection export must map to. A format-drifted file (e.g. an
@@ -256,11 +301,13 @@ def _parse_with_renamer(df_raw: pd.DataFrame, renamer: dict) -> pd.DataFrame:
 # ── Step 2: drop injured players ──────────────────────────────────────────────
 
 def run_step2(session: Session) -> None:
-    """Run drop_injured_players and store in session.v1_clean."""
+    """Resolve the free-typed injured list to player ids and drop them into v1_clean."""
     from backend.math.process_player_data import drop_injured_players
+    from backend.player_identity import resolve_typed_player_names
 
-    injured = session.current_params.get('injured_players', [])
-    v1, _ = drop_injured_players(session.v0_clean, tuple(injured))
+    injured_names = session.current_params.get('injured_players', [])
+    injured_player_ids = resolve_typed_player_names(session.player_registry, injured_names)
+    v1, _ = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
 
 

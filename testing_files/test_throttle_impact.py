@@ -5,7 +5,7 @@
 # against the un-throttled ('exact') result and bound how far the approximation may move things.
 # Higher, deliberately looser tolerances; the point is "close enough", not "identical".
 
-from benchmark_helpers import client, _build_session_request
+from benchmark_helpers import client, _build_session_request, resolve_player_ids
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
@@ -61,15 +61,15 @@ def test_throttle_auction_close_to_exact():
     teams = [f'Drafter {i + 1}' for i in range(session.current_params['n_drafters'])]
 
     player_assignments = {t: [] for t in teams}
-    player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
-    player_assignments['Drafter 2'] = ['Nikola Jokic (C)']
+    player_assignments['Drafter 1'] = resolve_player_ids(session, ['Giannis Antetokounmpo'])
+    player_assignments['Drafter 2'] = resolve_player_ids(session, ['Nikola Jokic'])
     remaining_cash = {t: 200.0 for t in teams}
     remaining_cash['Drafter 1'] = 150.0
     remaining_cash['Drafter 2'] = 150.0
 
     def run(mode):
         return _evaluate(session, mode, player_assignments=player_assignments, my_team_id='Drafter 1',
-                         exclusion_list=['Giannis Antetokounmpo (C,PF)'], remaining_cash=remaining_cash)
+                         exclusion_list=player_assignments['Drafter 1'], remaining_cash=remaining_cash)
 
     exact_by, exact_order = run('exact')
     thr_by,   thr_order   = run('light')

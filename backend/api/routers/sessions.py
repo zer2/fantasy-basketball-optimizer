@@ -119,16 +119,21 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) ->
 
 
 def _serialize_g_scores(session) -> list[PlayerGScore]:
-    """Serialize the session's G-scores DataFrame into a list of PlayerGScore objects."""
+    """Serialize the session's G-scores DataFrame into a list of PlayerGScore objects.
+    Stage-A boundary: the frame is id-indexed; names come from the registry as the
+    string-identity era's labels."""
+    from backend.player_identity import build_legacy_display_label
+
     categories = session.current_params['categories']
     g_scores_df = session.agent.info['G-scores']
+    player_registry = session.player_registry
     return [
         PlayerGScore(
-            name=str(name),
+            name=build_legacy_display_label(player_registry[player_id]),
             total=round(float(row['Total']), 2),
             values=[round(float(row[cat]), 2) for cat in categories],
         )
-        for name, row in g_scores_df.iterrows()
+        for player_id, row in g_scores_df.iterrows()
     ]
 
 

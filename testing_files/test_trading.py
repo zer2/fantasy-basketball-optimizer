@@ -19,7 +19,7 @@ import time
 
 import pytest
 
-from benchmark_helpers import client, _build_session_request
+from benchmark_helpers import client, _build_session_request, resolve_player_assignments
 from backend.state.session import get_session
 from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
@@ -114,7 +114,7 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
     start  = time.perf_counter()
     result = run_trade_suggest(
         session              = session
-        , player_assignments = _DEFAULT_SEASON_ROSTERS
+        , player_assignments = resolve_player_assignments(session, _DEFAULT_SEASON_ROSTERS)
         , my_team            = 'Drafter 1'
         , their_team         = 'Drafter 2'
         , combo_params       = combo_params

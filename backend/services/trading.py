@@ -426,10 +426,18 @@ def run_trade_suggest(
                 valid.append(row)
         df = pd.DataFrame(valid) if valid else df.iloc[:0]
 
+    # Stage-A boundary: combos are player ids internally; the wire contract still speaks
+    # the legacy labels (the Stage-B contract puts ids in TradeSuggestion directly).
+    from backend.player_identity import build_legacy_display_label
+
+    def as_legacy_labels(player_ids) -> list[str]:
+        return [build_legacy_display_label(session.player_registry[player_id])
+                for player_id in player_ids]
+
     suggestions = [
         TradeSuggestion(
-            send=row['Send'],
-            receive=row['Receive'],
+            send=as_legacy_labels(row['Send']),
+            receive=as_legacy_labels(row['Receive']),
             your_score=round(float(row['Your Score']), 4),
             their_score=round(float(row['Their Score']), 4),
         )

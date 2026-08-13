@@ -98,17 +98,18 @@ class PlatformIntegration(abc.ABC):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
-        """Fetch the current draft board / rosters, mapping platform names to canonical
-        via name_lookup (built once upstream from session.agent.info)."""
+        """Fetch the current draft board / rosters, mapping platform keys to session
+        player ids via player_id_lookup (built once upstream from the session registry;
+        unmatched keys fall back to RP_PLAYER_ID)."""
 
     @abc.abstractmethod
     def get_auction_results(
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> Optional[PlatformSelections]:
         """Fetch the current auction state (with `costs`), or None when the platform has
         no auction support."""

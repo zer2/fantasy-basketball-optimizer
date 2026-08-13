@@ -16,10 +16,10 @@ unproven. Known risks to check first at E2E:
     Credentials live on the instance as `auth_dir` (the dir yfpy reads token.json/private.json
     from), supplied by get_integration(platform, {'auth_dir': ...}).
 
-  - Name mapping. player_name_column is 'YAHOO_PLAYER_ID' (the UNIFIED_PLAYER_TABLE column for
-    Yahoo is an id, not a name), so the prebuilt name_lookup maps Yahoo player ids -> canonical
-    'Name (POS)'. VERIFY the YAHOO_PLAYER_ID dtype (int vs str) matches yfpy's player_id — a
-    mismatch would silently map everyone to 'RP'.
+  - Player mapping. player_name_column is 'YAHOO_PLAYER_ID' (the UNIFIED_PLAYER_TABLE column for
+    Yahoo is an id, not a name), so the prebuilt player_id_lookup maps Yahoo player ids -> session
+    player ids. VERIFY the YAHOO_PLAYER_ID dtype (int vs str) matches yfpy's player_id — a
+    mismatch would silently map everyone to the RP fallback.
 
   - n_picks is hard-coded to 13 (as in Streamlit — a known TODO there).
 
@@ -43,6 +43,7 @@ from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
 from backend.platform_integration.helpers import deduplicate_team_names
+from backend.player_identity import RP_PLAYER_ID
 
 
 _GAME_CODE = 'nba'
@@ -189,28 +190,28 @@ class YahooIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
         """Season Mode → current rosters; otherwise → the live draft board."""
         if mode == 'Season Mode':
-            return self._get_season_rosters(config, name_lookup)
-        return self._get_draft_board(config, name_lookup)
+            return self._get_season_rosters(config, player_id_lookup)
+        return self._get_draft_board(config, player_id_lookup)
 
     def _get_season_rosters(
         self
         , config: PlatformConfig
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
-        injured_players: list[str] = []
-        player_assignments: dict[str, list[str]] = {}
+        injured_players: list[int] = []
+        player_assignments: dict[str, list[int]] = {}
 
         for team_name, team_id in config.teams_dict.items():
             roster = query.get_team_roster_by_week(team_id=int(team_id))
-            players: list[str] = []
+            players: list[int] = []
             for player in roster.players:
                 position = player.selected_position.position
-                canonical = name_lookup.get(player.player_id, 'RP')
+                canonical = player_id_lookup.get(player.player_id, RP_PLAYER_ID)
                 if position in _INJURED_POSITIONS:
                     injured_players.append(canonical)
                 elif position is not None:
@@ -226,7 +227,7 @@ class YahooIntegration(PlatformIntegration):
     def _get_draft_board(
         self
         , config: PlatformConfig
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
         try:
@@ -242,7 +243,7 @@ class YahooIntegration(PlatformIntegration):
                 injured_players=[],
             )
 
-        player_assignments, _ = self._assignments_from_draft(draft_results, config, name_lookup)
+        player_assignments, _ = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(
             player_assignments = player_assignments,
             status             = 'Success',
@@ -253,7 +254,7 @@ class YahooIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> Optional[PlatformSelections]:
         """Auction board as team -> players plus per-player costs (costs[team][i] is what
         player_assignments[team][i] sold for). The route turns costs into remaining_cash."""
@@ -270,7 +271,7 @@ class YahooIntegration(PlatformIntegration):
                 injured_players=[],
             )
 
-        player_assignments, costs = self._assignments_from_draft(draft_results, config, name_lookup)
+        player_assignments, costs = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(
             player_assignments = player_assignments,
             status             = 'Success',
@@ -282,8 +283,8 @@ class YahooIntegration(PlatformIntegration):
         self
         , draft_results: list
         , config: PlatformConfig
-        , name_lookup: dict[str, str]
-    ) -> tuple[dict[str, list[str]], dict[str, list]]:
+        , player_id_lookup: dict[str, int]
+    ) -> tuple[dict[str, list[int]], dict[str, list]]:
         """Group draft/auction picks into ({team: [player, ...]}, {team: [cost, ...]}).
 
         cost entries are None for a draft and floats for an auction; the caller passes
@@ -292,7 +293,7 @@ class YahooIntegration(PlatformIntegration):
         'Drafter <id>' (mirrors Streamlit).
         """
         team_name_by_id = {team_id: team_name for team_name, team_id in config.teams_dict.items()}
-        player_assignments: dict[str, list[str]] = {team_name: [] for team_name in config.teams_dict}
+        player_assignments: dict[str, list[int]] = {team_name: [] for team_name in config.teams_dict}
         costs: dict[str, list] = {team_name: [] for team_name in config.teams_dict}
 
         for draft_obj in draft_results:
@@ -301,7 +302,7 @@ class YahooIntegration(PlatformIntegration):
             player_id = int(draft_obj.player_key.split('.')[-1])
             team_id = draft_obj.team_key.split('.')[-1]
             team_name = team_name_by_id.get(team_id, f'Drafter {team_id}')
-            player_assignments.setdefault(team_name, []).append(name_lookup.get(player_id, 'RP'))
+            player_assignments.setdefault(team_name, []).append(player_id_lookup.get(player_id, RP_PLAYER_ID))
             raw_cost = getattr(draft_obj, 'cost', None)
             costs.setdefault(team_name, []).append(float(raw_cost) if raw_cost is not None else None)
 

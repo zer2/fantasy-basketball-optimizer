@@ -282,8 +282,9 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
                                         params, categories, v=v)
 
-    x_scores.loc['RP', :] = -1
-    g_scores.loc['RP', :] = -1
+    from backend.player_identity import RP_PLAYER_ID
+    x_scores.loc[RP_PLAYER_ID, :] = -1
+    g_scores.loc[RP_PLAYER_ID, :] = -1
 
     g_scores.insert(loc=0, column='Total', value=g_scores.sum(axis=1))
     g_scores.sort_values('Total', ascending=False, inplace=True)

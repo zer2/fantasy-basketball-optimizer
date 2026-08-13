@@ -125,16 +125,20 @@ class ESPNIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
         """Current rosters per team (ESPN supports only Season Mode)."""
+        from backend.player_identity import RP_PLAYER_ID
+
         league = self._make_league(config.league_id)
         team_by_id = {str(team.team_id): team for team in league.teams}
 
-        player_assignments: dict[str, list[str]] = {}
+        player_assignments: dict[str, list[int]] = {}
         for team_name, team_id in config.teams_dict.items():
             team = team_by_id.get(team_id)
-            roster = [] if team is None else [name_lookup.get(player.name, 'RP') for player in team.roster]
+            roster = [] if team is None else [
+                player_id_lookup.get(player.name, RP_PLAYER_ID) for player in team.roster
+            ]
             player_assignments[team_name] = roster
 
         return PlatformSelections(
@@ -147,7 +151,7 @@ class ESPNIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> Optional[PlatformSelections]:
         # ESPN auctions are not supported.
         return None

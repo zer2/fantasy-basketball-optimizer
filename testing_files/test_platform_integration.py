@@ -4,49 +4,52 @@
 import pandas as pd
 
 from backend.platform_integration.helpers import (
-    deduplicate_team_names, build_platform_name_lookup,
+    deduplicate_team_names, build_platform_player_id_lookup,
 )
 from backend.platform_integration.integrations.fantrax import FantraxIntegration
 from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.platform_integration.integrations.espn import ESPNIntegration
 from backend.platform_integration.base import PlatformConfig
+from backend.player_identity import RP_PLAYER_ID, make_player_identity
 
 
-def _info_with_positions() -> dict:
-    # info['Positions'] is indexed by the canonical 'Name (POS)' identifier with
-    # list-of-position-codes values, mirroring process_player_data.
-    positions = pd.Series({
-        'Nikola Jokic (C)':     ['C'],
-        'Bam Adebayo (C,PF)':   ['C', 'PF'],
-        'James Harden (PG,SG)': ['PG', 'SG'],
-    })
-    return {'Positions': positions}
+_JOKIC_ID, _ADEBAYO_ID, _HARDEN_ID = 203999, 1628389, 201935
+
+
+def _player_registry() -> dict:
+    return {
+        _JOKIC_ID:   make_player_identity(_JOKIC_ID,   'Nikola Jokic', 'C'),
+        _ADEBAYO_ID: make_player_identity(_ADEBAYO_ID, 'Bam Adebayo',  'C,PF'),
+        _HARDEN_ID:  make_player_identity(_HARDEN_ID,  'James Harden', 'PG,SG'),
+    }
 
 
 def _fantrax_unified_table() -> pd.DataFrame:
-    # UNIFIED_PLAYER_TABLE: Fantrax players bridge by FANTRAX_ID -> canonical MASTER_PLAYER_NAME.
+    # UNIFIED_PLAYER_TABLE: Fantrax players bridge by FANTRAX_ID -> the row's NBA id.
     return pd.DataFrame({
-        'FANTRAX_ID':         ['j01', 'b02', 'h03'],
-        'MASTER_PLAYER_NAME': ['Nikola Jokic', 'Bam Adebayo', 'James Harden'],
+        'FANTRAX_ID':    ['j01', 'b02', 'h03', 'x04'],
+        'NBA_PLAYER_ID': [_JOKIC_ID, _ADEBAYO_ID, _HARDEN_ID, 999999],
     })
 
 
-# ── Name lookup (UNIFIED_PLAYER_TABLE-backed) ─────────────────────────────────
+# ── Player-id lookup (UNIFIED_PLAYER_TABLE-backed) ────────────────────────────
 
-def test_build_platform_name_lookup_maps_platform_id_to_canonical():
-    lookup = build_platform_name_lookup(
-        _info_with_positions(), 'FANTRAX_ID', _fantrax_unified_table(),
+def test_build_platform_player_id_lookup_maps_platform_key_to_session_id():
+    lookup = build_platform_player_id_lookup(
+        _player_registry(), 'FANTRAX_ID', _fantrax_unified_table(),
     )
-    assert lookup['j01'] == 'Nikola Jokic (C)'
-    assert lookup['b02'] == 'Bam Adebayo (C,PF)'
-    assert lookup['h03'] == 'James Harden (PG,SG)'
+    assert lookup['j01'] == _JOKIC_ID
+    assert lookup['b02'] == _ADEBAYO_ID
+    assert lookup['h03'] == _HARDEN_ID
 
 
-def test_build_platform_name_lookup_omits_unknown_so_get_yields_rp():
-    lookup = build_platform_name_lookup(
-        _info_with_positions(), 'FANTRAX_ID', _fantrax_unified_table(),
+def test_build_platform_player_id_lookup_filters_to_registry_and_yields_rp():
+    lookup = build_platform_player_id_lookup(
+        _player_registry(), 'FANTRAX_ID', _fantrax_unified_table(),
     )
-    assert lookup.get('nobody', 'RP') == 'RP'
+    # 'x04' bridges to an id the session's registry lacks -> omitted, RP fallback applies.
+    assert 'x04' not in lookup
+    assert lookup.get('nobody', RP_PLAYER_ID) == RP_PLAYER_ID
 
 
 # ── Team-name dedup (the Fantrax bug fix) ─────────────────────────────────────
@@ -76,12 +79,12 @@ class _FakeFantraxAPI:
         raise AssertionError(f'unexpected _request method {method!r}')
 
 
-# Prebuilt platform-name -> canonical lookup (the integration consumes this; the
+# Prebuilt platform-key -> player-id lookup (the integration consumes this; the
 # builder that produces it is exercised separately above).
-_NAME_LOOKUP = {
-    'j01': 'Nikola Jokic (C)',
-    'b02': 'Bam Adebayo (C,PF)',
-    'h03': 'James Harden (PG,SG)',
+_PLAYER_ID_LOOKUP = {
+    'j01': _JOKIC_ID,
+    'b02': _ADEBAYO_ID,
+    'h03': _HARDEN_ID,
 }
 
 
@@ -92,7 +95,7 @@ def _fantrax_with_fake_api(monkeypatch, roster_rows_by_team) -> FantraxIntegrati
     return integration
 
 
-def test_get_draft_results_maps_names_and_excludes_injured_in_season(monkeypatch):
+def test_get_draft_results_maps_ids_and_excludes_injured_in_season(monkeypatch):
     roster_rows = {
         't1': [
             {'scorer': {'scorerId': 'j01'}, 'statusId': '1'},
@@ -109,12 +112,12 @@ def test_get_draft_results_maps_names_and_excludes_injured_in_season(monkeypatch
         teams_dict={'Team One': 't1', 'Team Two': 't2'},
         player_name_column='FANTRAX_ID',
     )
-    state = integration.get_draft_results(config, 'Season Mode', _NAME_LOOKUP)
+    state = integration.get_draft_results(config, 'Season Mode', _PLAYER_ID_LOOKUP)
 
-    assert state.injured_players == ['Bam Adebayo (C,PF)']
+    assert state.injured_players == [_ADEBAYO_ID]
     assert state.player_assignments == {
-        'Team One': ['Nikola Jokic (C)'],
-        'Team Two': ['James Harden (PG,SG)'],
+        'Team One': [_JOKIC_ID],
+        'Team Two': [_HARDEN_ID],
     }
 
 
@@ -125,10 +128,10 @@ def test_get_draft_results_keeps_injured_in_draft_mode(monkeypatch):
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
         teams_dict={'T': 't1'}, player_name_column='FANTRAX_ID',
     )
-    state = integration.get_draft_results(config, 'Draft Mode', _NAME_LOOKUP)
+    state = integration.get_draft_results(config, 'Draft Mode', _PLAYER_ID_LOOKUP)
 
     assert state.injured_players == []
-    assert state.player_assignments == {'T': ['Bam Adebayo (C,PF)']}
+    assert state.player_assignments == {'T': [_ADEBAYO_ID]}
 
 
 # ── Yahoo draft/auction parsing (pure logic, no yfpy) ─────────────────────────
@@ -146,15 +149,15 @@ def test_yahoo_assignments_from_draft_groups_by_team_with_costs():
         teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='YAHOO_PLAYER_ID',
     )
-    name_lookup = {100: 'Nikola Jokic (C)', 200: 'James Harden (PG,SG)'}
+    player_id_lookup = {100: _JOKIC_ID, 200: _HARDEN_ID}
     draft = [
         _FakeDraftObj('nba.p.100', 'nba.l.123.t.1', cost=50),
         _FakeDraftObj('nba.p.200', 'nba.l.123.t.2', cost=30),
         _FakeDraftObj('nba.p.999', 'nba.l.123.t.1', cost=5),   # unknown id -> RP
     ]
-    assignments, costs = YahooIntegration()._assignments_from_draft(draft, config, name_lookup)
+    assignments, costs = YahooIntegration()._assignments_from_draft(draft, config, player_id_lookup)
 
-    assert assignments == {'Team One': ['Nikola Jokic (C)', 'RP'], 'Team Two': ['James Harden (PG,SG)']}
+    assert assignments == {'Team One': [_JOKIC_ID, RP_PLAYER_ID], 'Team Two': [_HARDEN_ID]}
     assert costs == {'Team One': [50.0, 5.0], 'Team Two': [30.0]}
 
 
@@ -197,10 +200,10 @@ def test_espn_get_draft_results_maps_rosters(monkeypatch):
         teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='ESPN_NAME',
     )
-    name_lookup = {'Nikola Jokic': 'Nikola Jokic (C)', 'James Harden': 'James Harden (PG,SG)'}
-    state = integration.get_draft_results(config, 'Season Mode', name_lookup)
+    player_id_lookup = {'Nikola Jokic': _JOKIC_ID, 'James Harden': _HARDEN_ID}
+    state = integration.get_draft_results(config, 'Season Mode', player_id_lookup)
 
     assert state.player_assignments == {
-        'Team One': ['Nikola Jokic (C)'],
-        'Team Two': ['James Harden (PG,SG)', 'RP'],
+        'Team One': [_JOKIC_ID],
+        'Team Two': [_HARDEN_ID, RP_PLAYER_ID],
     }

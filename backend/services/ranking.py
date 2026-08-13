@@ -16,6 +16,7 @@ from backend.models import (
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.infra.server_timing import record_phase
+from backend.player_identity import build_legacy_display_label
 
 
 class UnknownRosterPlayersError(ValueError):
@@ -27,22 +28,13 @@ class UnknownRosterPlayersError(ValueError):
     """
 
 
-def extract_last_name(player_full_name: str) -> str:
-    """Return the player's last name, stripping any trailing position suffix.
-
-    For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
-    "Nikola Jokic" → "Jokic".
-    """
-    return ' '.join(player_full_name.split(' (')[0].split(' ')[1:])
-
-
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
     session: Session,
-    player_assignments: dict[str, list[str]],
+    player_assignments: dict[str, list[int]],
     my_team_id: str,
-    exclusion_list: list[str],
+    exclusion_list: list[int],
     remaining_cash: Optional[dict[str, float]],
     candidate_offset: int = 0,
     candidate_limit: Optional[int] = None,
@@ -56,10 +48,10 @@ def rank_candidates(
     Args:
         session:            The active session (fetched by the caller). n_iterations
                             is read from its current_params.
-        player_assignments: Maps each team name to the list of players already
+        player_assignments: Maps each team name to the list of player ids already
                             drafted/won by that team.
         my_team_id:         The team name whose perspective the evaluation is from.
-        exclusion_list:     Players to exclude from the candidate rankings
+        exclusion_list:     Player ids to exclude from the candidate rankings
                             (e.g. already drafted by the user, injured).
         remaining_cash:     Per-team auction budget remaining; None for draft mode.
 
@@ -71,19 +63,25 @@ def rank_candidates(
     current_params = session.current_params
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
+    player_registry = session.player_registry
 
     # Every rostered player must exist in the pool under exactly the identity the board
     # holds. A stale board (identities changed by a data-source switch) would otherwise
-    # crash on a KeyError deep inside the H-score math.
+    # crash on a KeyError deep inside the H-score math. Unknown ids resolve to names via
+    # the registry where possible, so the message stays actionable.
     rostered_players = [
-        player for team_players in player_assignments.values()
-        for player in team_players if isinstance(player, str)
+        player_id for team_players in player_assignments.values()
+        for player_id in team_players
     ]
     missing_players = sorted({p for p in rostered_players if p not in H.x_scores.index})
     if missing_players:
+        missing_display = [
+            build_legacy_display_label(player_registry[p]) if p in player_registry else str(p)
+            for p in missing_players
+        ]
         raise UnknownRosterPlayersError(
             'These rostered players are not in the current player pool: '
-            + ', '.join(missing_players)
+            + ', '.join(missing_display)
             + '. The data-source change altered the pool; clear the board or restore the previous sources.'
         )
 
@@ -93,7 +91,7 @@ def rank_candidates(
     # on the full-distribution replacement level.
     is_auction = remaining_cash is not None
     if candidate_limit is not None and not is_auction:
-        unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
+        unavailable = {p for team in player_assignments.values() for p in team}
         unavailable |= set(exclusion_list)
         available_ranked = [p for p in session.agent.default_h_scores.index if p not in unavailable]
         candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
@@ -128,6 +126,7 @@ def rank_candidates(
     with record_phase('build_candidates'):
         candidates = _build_candidates(
             h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
+            player_registry,
             remaining_cash,
             generic_h_scores=session.agent.default_h_scores,
         )
@@ -147,9 +146,10 @@ def _build_candidates(
     info: dict,
     H,
     categories: list[str],
-    player_assignments: dict[str, list[str]],
+    player_assignments: dict[str, list[int]],
     my_team_id: str,
     current_params: dict,
+    player_registry: dict,
     remaining_cash: Optional[dict[str, float]] = None,
     generic_h_scores: Optional[pd.Series] = None,
 ) -> list[Candidate]:
@@ -232,7 +232,7 @@ def _build_candidates(
         None if category_weights_normalized is None else np.round(category_weights_normalized, 1)
     )
 
-    my_players         = [p for p in player_assignments.get(my_team_id, []) if isinstance(p, str)]
+    my_players         = list(player_assignments.get(my_team_id, []))
     position_structure = H.position_structure
     base_list          = position_structure['base_list']
     slot_counts        = current_params.get('slot_counts', {})
@@ -265,7 +265,7 @@ def _build_candidates(
 
         all_players_chosen = [
             p for team_players in player_assignments.values()
-            for p in team_players if isinstance(p, str)
+            for p in team_players
         ]
         n_remaining          = total_picks - len(all_players_chosen)
 
@@ -340,9 +340,11 @@ def _build_candidates(
     )
     rosters_rows = rosters_sorted.values
 
-    # Candidate last names, computed once for the whole pool (previously recomputed per
-    # candidate inside both _build_g_score_rows and the roster builder).
-    candidate_last_names = [extract_last_name(player) for player in sorted_index]
+    # Candidate last names and legacy display labels, read once for the whole pool from the
+    # registry. The labels feed Candidate.name / RosterAssignment.full_name through Stage A
+    # of the identity refactor (the Stage-B contract replaces them with player ids).
+    candidate_last_names     = [player_registry[p].last_name for p in sorted_index]
+    candidate_display_labels = [build_legacy_display_label(player_registry[p]) for p in sorted_index]
 
     # Pre-extract position share arrays for each flex type, aligned to sorted_index.
     # Each entry is (numpy_array, base_to_col) where base_to_col maps base position
@@ -390,8 +392,9 @@ def _build_candidates(
         None if no_position_data
         else _build_roster_assignments(
             candidate_last_names
-            , list(sorted_index)
+            , candidate_display_labels
             , my_players
+            , player_registry
             , rosters_rows
             , slot_names
         )
@@ -418,7 +421,7 @@ def _build_candidates(
             continue  # skip players for whom no valid roster slot exists
 
         candidates.append(Candidate(
-            name             = player,
+            name             = candidate_display_labels[rank_idx],
             position         = position_displays[rank_idx],
             h_score          = h_scores_list[rank_idx],   # already × 100 and rounded to 2 dp
             h_rank           = rank_idx + 1,
@@ -712,8 +715,9 @@ def _build_flex_allocations(
 
 def _build_roster_assignments(
     candidate_last_names: list[str]
-    , candidate_full_names: list[str]
-    , my_players: list[str]
+    , candidate_display_labels: list[str]
+    , my_players: list[int]
+    , player_registry: dict
     , rosters_rows: np.ndarray
     , slot_names: list[str]
 ) -> list[Roster]:
@@ -723,18 +727,19 @@ def _build_roster_assignments(
     [team_so_far[0], ..., team_so_far[-1], candidate, future_player[0], ...].
     Columns beyond len(my_players) + 1 are future hypothetical players and are ignored.
 
-    The already-drafted players' RosterAssignment objects depend only on their name and
-    are identical across candidates, so they are built once and shared; the slot each one
-    lands in still varies per candidate (the optimiser may repack the roster around the
-    candidate) and is read straight from rosters_rows. Only the candidate's own assignment
-    is unique per rank. Slot indices are converted to Python ints in one array pass.
+    The already-drafted players' RosterAssignment objects depend only on their identity
+    and are identical across candidates, so they are built once and shared; the slot each
+    one lands in still varies per candidate (the optimiser may repack the roster around
+    the candidate) and is read straight from rosters_rows. Only the candidate's own
+    assignment is unique per rank. Slot indices are converted to Python ints in one pass.
 
     Args:
-        candidate_last_names: Per-rank candidate last name for the candidate's own slot.
-        candidate_full_names: Per-rank candidate full name (display-layer asset lookups).
-        my_players:           Players already on the user's team, in roster-column order.
-        rosters_rows:         Slot-index matrix, shape (n_players, n_columns).
-        slot_names:           Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
+        candidate_last_names:     Per-rank candidate last name for the candidate's own slot.
+        candidate_display_labels: Per-rank candidate display label (Stage-A legacy format).
+        my_players:               Player ids already on the user's team, in roster-column order.
+        player_registry:          The session's id -> PlayerIdentity registry.
+        rosters_rows:             Slot-index matrix, shape (n_players, n_columns).
+        slot_names:               Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
 
     Returns:
         One Roster per candidate rank.
@@ -743,11 +748,12 @@ def _build_roster_assignments(
     n_team_so_far = len(my_players)
     n_columns     = rosters_rows.shape[1]
 
-    # Shared, name-only assignments for the already-drafted players (built once).
+    # Shared assignments for the already-drafted players (built once).
     drafted_assignments = [
-        RosterAssignment(name=extract_last_name(player_name), full_name=player_name,
+        RosterAssignment(name=player_registry[player_id].last_name,
+                         full_name=build_legacy_display_label(player_registry[player_id]),
                          is_candidate=False)
-        for player_name in my_players
+        for player_id in my_players
     ]
     # Cross the numpy→Python boundary once for all slot indices.
     rosters_int = rosters_rows.astype(int).tolist()
@@ -765,7 +771,7 @@ def _build_roster_assignments(
             if 0 <= candidate_slot_idx < n_slots:
                 assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
                     name=candidate_last_names[rank_idx],
-                    full_name=candidate_full_names[rank_idx],
+                    full_name=candidate_display_labels[rank_idx],
                     is_candidate=True,
                 )
 

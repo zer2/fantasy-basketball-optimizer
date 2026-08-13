@@ -451,7 +451,8 @@ def test_roto_minimal_punting(sessions, auction):
         _record_row('Rotisserie punting (hard <20% / soft 20-40% expected win rate)',
                     ['Season', 'Mode', 'Hard', 'Soft', 'Weakest category', 'Weakest rate', 'Player'],
                     [season, mode, hard_count, soft_count, weakest_cat,
-                     f'{100 * float(np.min(weakest_rates)):.0f}%', weakest_player.split(' (')[0]])
+                     f'{100 * float(np.min(weakest_rates)):.0f}%',
+                     session.player_registry[weakest_player].name])
         assert hard_count == 0, f'{season}: {hard_count} HARD punt(s) in Rotisserie'
         # Soft counts measure roster SHAPE as much as strategy: an auction anchor's expected team is a
         # star plus budget-priced fill, which mechanically spreads category win rates wider than a

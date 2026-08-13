@@ -15,20 +15,20 @@ from backend.state.session import Session, create_session, delete_session
 from backend.services.build_agent import build_agent
 from backend.data_retrieval import get_unified_player_table
 from backend.platform_integration.base import PlatformConfig
-from backend.platform_integration.helpers import build_platform_name_lookup
+from backend.platform_integration.helpers import build_platform_player_id_lookup
 
 
-def refresh_platform_name_lookup(session: Session) -> None:
-    """Rebuild the session's platform name lookup from its current info.
+def refresh_platform_player_id_lookup(session: Session) -> None:
+    """Rebuild the session's platform-key -> player-id lookup from its current registry.
 
     Precondition: a live platform is connected (session.platform_config is set) — there is nothing
     to refresh otherwise, so callers guard on it. Lives here, not in build_agent, so the pipeline
     stays platform-agnostic. Call after the pipeline runs when the player set may have changed
     (session creation and data/injured patches, from_step <= 2); model/category/slot patches leave
-    info['Positions'] untouched.
+    the registry untouched.
     """
-    session.platform_name_lookup = build_platform_name_lookup(
-        session.agent.info,
+    session.platform_player_id_lookup = build_platform_player_id_lookup(
+        session.player_registry,
         session.platform_config.player_name_column,
         get_unified_player_table(),
     )
@@ -53,7 +53,7 @@ def build_session(
     try:
         build_agent(session, from_step=1, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
         if session.platform_config is not None:
-            refresh_platform_name_lookup(session)
+            refresh_platform_player_id_lookup(session)
     except Exception:
         delete_session(session.id)
         raise
@@ -98,11 +98,12 @@ def apply_patch(
     if session.agent is not None:
         outgoing_key = _pipeline_cache_key(session.current_params)
         session.pipeline_cache[outgoing_key] = {
-            'agent':    session.agent,
-            'info':     session.info,
-            'v0_clean': session.v0_clean,
-            'v1_clean': session.v1_clean,
-            'v2':       session.v2,
+            'agent':           session.agent,
+            'info':            session.info,
+            'v0_clean':        session.v0_clean,
+            'v1_clean':        session.v1_clean,
+            'v2':              session.v2,
+            'player_registry': session.player_registry,
         }
         session.pipeline_cache.move_to_end(outgoing_key)
         while len(session.pipeline_cache) > _PIPELINE_CACHE_ENTRIES:
@@ -116,11 +117,12 @@ def apply_patch(
 
     cached_pipeline = session.pipeline_cache.get(_pipeline_cache_key(session.current_params))
     if cached_pipeline is not None:
-        session.agent    = cached_pipeline['agent']
-        session.info     = cached_pipeline['info']
-        session.v0_clean = cached_pipeline['v0_clean']
-        session.v1_clean = cached_pipeline['v1_clean']
-        session.v2       = cached_pipeline['v2']
+        session.agent           = cached_pipeline['agent']
+        session.info            = cached_pipeline['info']
+        session.v0_clean        = cached_pipeline['v0_clean']
+        session.v1_clean        = cached_pipeline['v1_clean']
+        session.v2              = cached_pipeline['v2']
+        session.player_registry = cached_pipeline['player_registry']
         session.pipeline_cache.move_to_end(_pipeline_cache_key(session.current_params))
     else:
         build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
@@ -128,4 +130,4 @@ def apply_patch(
     # Rebuild the lookup when either of its inputs changed: the player set (from_step <= 2)
     # or player_name_column (a platform_config was just set).
     if session.platform_config is not None and (from_step <= 2 or platform_config is not None):
-        refresh_platform_name_lookup(session)
+        refresh_platform_player_id_lookup(session)

@@ -87,6 +87,46 @@ def _build_session_request(
     }
 
 
+def resolve_player_ids(session, player_names):
+    """Resolve human-readable test-fixture names to the session's player ids.
+
+    Accepts bare names, 'Name (POS)' labels, or prefixes (mirroring check_top_scores'
+    startswith semantics). Raises on no match or ambiguity — a fixture that silently
+    resolved to the wrong player would corrupt the test, so fail loudly instead.
+    """
+    registry = session.player_registry
+    resolved = []
+    for player_name in player_names:
+        bare_name = player_name.split(' (')[0]
+        matches = [identity.player_id for identity in registry.values()
+                   if identity.name == bare_name]
+        if not matches:
+            matches = [identity.player_id for identity in registry.values()
+                       if identity.name.startswith(bare_name)]
+        if len(matches) != 1:
+            raise ValueError(
+                f'{player_name!r} resolved to {len(matches)} registry entries: {matches}')
+        resolved.append(matches[0])
+    return resolved
+
+
+def resolve_player_assignments(session, player_assignments_by_name):
+    """resolve_player_ids over a whole {team: [name, ...]} board."""
+    return {
+        team: resolve_player_ids(session, names)
+        for team, names in player_assignments_by_name.items()
+    }
+
+
+def resolve_display_labels(session, player_ids):
+    """Player ids -> the legacy 'Name (POS)' labels, for comparing service-level results
+    against human-readable fixture snapshots."""
+    from backend.player_identity import build_legacy_display_label
+
+    return [build_legacy_display_label(session.player_registry[player_id])
+            for player_id in player_ids]
+
+
 def check_top_scores(label, expected_top_scores, candidates):
     """Assert each expected player's H-score is within _SCORE_TOL of its golden. With REGEN_GOLDENS set,
     print the actuals in paste-ready form and skip the assertions instead (golden regeneration)."""
