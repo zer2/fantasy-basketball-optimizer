@@ -50,7 +50,7 @@ _FIRST_ROUND_PICKS = [
 _FIRST_ROUND_CONFIGS = [
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Karl-Anthony Towns',  50.2),
+            ('Karl-Anthony Towns',  50.3),
             ('Brook Lopez',         49.8),
             ('Jaren Jackson Jr.',   49.8),
             ('Derrick White',       49.7),
@@ -59,10 +59,10 @@ _FIRST_ROUND_CONFIGS = [
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  51.6),
-            ('Brook Lopez',         49.9),
+            ('Karl-Anthony Towns',  51.5),
+            ('Brook Lopez',         49.8),
             ('Jaren Jackson Jr.',   49.8),
-            ('Myles Turner',        49.1),
+            ('Myles Turner',        49.0),
         ], None),
         id='MC-first-round',
     ),
@@ -79,17 +79,17 @@ _FIRST_ROUND_CONFIGS = [
         ('Head to Head: Each Category', [
             ('Karl-Anthony Towns',  51.5),
             ('Cade Cunningham',     51.2),
-            ('Devin Booker',        50.9),
-            ('Jaren Jackson Jr.',   50.7),
+            ('Devin Booker',        51.0),
+            ('Jaren Jackson Jr.',   50.8),
         ], _NO_TO_CATEGORIES),
         id='EC-first-round-noTO',
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Karl-Anthony Towns',  53.4),
-            ('Cade Cunningham',     53.3),
-            ('Devin Booker',        52.6),
-            ('Jaren Jackson Jr.',   52.3),
+            ('Karl-Anthony Towns',  53.7),
+            ('Cade Cunningham',     53.2),
+            ('Devin Booker',        52.5),
+            ('Jaren Jackson Jr.',   52.2),
         ], _NO_TO_CATEGORIES),
         id='MC-first-round-noTO',
     ),
@@ -109,19 +109,19 @@ _FIRST_ROUND_CONFIGS = [
 _FORMAT_CONFIGS = [
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Shai Gilgeous-Alexander',  61.3),
-            ('Nikola Jokic',             60.8),
-            ('Tyrese Haliburton',        53.0),
-            ('Giannis Antetokounmpo',    49.7),
+            ('Shai Gilgeous-Alexander',  61.4),
+            ('Nikola Jokic',             60.7),
+            ('Tyrese Haliburton',        53.1),
+            ('Giannis Antetokounmpo',    50.5),
         ], None),
         id='MC',
     ),
     pytest.param(
         ('Head to Head: Each Category', [
-            ('Shai Gilgeous-Alexander',  54.2),
+            ('Shai Gilgeous-Alexander',  54.3),
             ('Nikola Jokic',             53.9),
             ('Tyrese Haliburton',        51.0),
-            ('Karl-Anthony Towns',       50.6),
+            ('Karl-Anthony Towns',       50.5),
         ], None),
         id='EC',
     ),
@@ -136,10 +136,10 @@ _FORMAT_CONFIGS = [
     ),
     pytest.param(
         ('Head to Head: Most Categories', [
-            ('Shai Gilgeous-Alexander',  60.7),
-            ('Nikola Jokic',             60.6),
+            ('Shai Gilgeous-Alexander',  60.8),
+            ('Nikola Jokic',             60.5),
             ('James Harden',             53.7),
-            ('Giannis Antetokounmpo',    50.3),
+            ('Giannis Antetokounmpo',    50.9),
         ], _NO_TO_CATEGORIES),
         id='MC-noTO',
     ),
@@ -164,7 +164,7 @@ _FORMAT_CONFIGS = [
     pytest.param(
         ('Head to Head: Most Categories', [
             ('Nikola Jokic',             64.5),
-            ('Shai Gilgeous-Alexander',  58.3),
+            ('Shai Gilgeous-Alexander',  58.4),
             ('Karl-Anthony Towns',       54.7),
             ('Giannis Antetokounmpo',    53.7),
         ], _ALL_CATEGORIES),
@@ -458,9 +458,9 @@ def test_evaluate_three_drafters():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Shai Gilgeous-Alexander',  52.3),
-        ('Nikola Jokic',             51.8),
-        ('Karl-Anthony Towns',       48.0),
-        ('Stephen Curry',            47.8),
+        ('Shai Gilgeous-Alexander',  52.4),
+        ('Nikola Jokic',             52.0),
+        ('Karl-Anthony Towns',       48.6),
+        ('Stephen Curry',            48.1),
     ]
     check_top_scores('EC, 3 drafters', expected_top_scores, candidates)

@@ -126,7 +126,16 @@ _OPPONENT_INFERENCE_ITERATIONS = int(os.environ.get('OPPONENT_INFERENCE_ITERATIO
 # best-responding to the RUNNING AVERAGE of prior passes' builds rather than the latest one. Pure
 # best-response oscillates (every seat flips the same way each pass); averaging damps that and lets the
 # predicted field converge toward a mixed equilibrium where punts actually spread. 1 pass = neutral only.
-_OPPONENT_BOOTSTRAP_PASSES = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES', '15'))
+# 8 is the measured knee: the punt structure settles by pass 6-9 in all six seasons (see the self-play
+# convergence experiment), the 8-pass serve lands within 0.16pp of the 15-pass serve with an identical
+# top-40, and dropping to 7 or 6 quintuples that drift. Cost is quadratic in the pass count (pass k
+# faces k stacked field snapshots), so 15 -> 8 halves populate time.
+_OPPONENT_BOOTSTRAP_PASSES = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES', '8'))
+# Rotisserie keeps the longer run: it uses the EMA field path (window 0), whose fixed-rate smoothing
+# stabilises more slowly than the window's 1/t fictitious-play steps — at 8 passes a 2024-25 top-12
+# Roto build hard-punts a category (breaking the minimal-punting floor), at 15 none do. Roto passes
+# face a single 11-column field, so its cost is linear in the pass count and the longer run is cheap.
+_OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE', '15'))
 # Damping for the fixed-point field: each bootstrap pass nudges the committed field a fraction alpha
 # toward that pass's best-response (exponential smoothing), instead of a running mean. Smoothing
 # converges to a genuine fixed point (field == its own best-response — a committed equilibrium), whereas
@@ -256,6 +265,11 @@ class HAgent:
         # get_h_scores run a full exact solve (no throttle).
         self.default_h_scores = None   # sorted pd.Series
         self._default_result  = None   # full empty-board result dict (for the empty-board short-circuit)
+        # Throttle ranking DURING populate, where default_h_scores is deliberately None (that also
+        # disarms the empty-board short-circuit): each bootstrap pass stores its scores here so the
+        # next pass -- and above all the full-pool serve -- runs its normal throttle schedule instead
+        # of exact-solving all ~577 candidates every iteration. Live only inside populate.
+        self._populate_pass_scores = None
 
         # Build position config (replaces all get_position_*() calls)
         self._pos_cfg: PositionConfig = build_position_config(params, slot_counts)
@@ -739,10 +753,17 @@ class HAgent:
 
         # Position-optimiser throttle priority: rank candidates by the cached default (first-pick)
         # H-scores so the exact-solve tier covers the players most likely to actually be picked.
-        # Missing/uncached players sort last; with no cached ranking at all we pass None, which
-        # disables throttling entirely (a full, exact solve every iteration).
-        if self.default_h_scores is not None:
-            ranked = self.default_h_scores.reindex(x_scores_batch.index).to_numpy()
+        # During populate that cache is deliberately None; the full-pool SERVE threads the final
+        # field pass's scores instead (players outside them sort last). Only the serve: the subset
+        # field passes must stay exact — throttling them (draft's 'tiered' schedule solves 30 of
+        # the 36 anchors) perturbs the anchor-field equilibria enough to reshuffle the served
+        # top-40 by whole ranks (measured ~9pp score moves). Missing/uncached players sort last;
+        # with no ranking at all we pass None, which disables throttling entirely.
+        ranking_scores = self.default_h_scores
+        if ranking_scores is None and candidate_subset is None:
+            ranking_scores = self._populate_pass_scores
+        if ranking_scores is not None:
+            ranked = ranking_scores.reindex(x_scores_batch.index).to_numpy()
             candidate_priority = np.argsort(-np.nan_to_num(ranked, nan=-np.inf))
         else:
             candidate_priority = None
@@ -2038,6 +2059,7 @@ class HAgent:
         self._player_frozen_shares     = None
         self._default_result           = None
         self.default_h_scores          = None
+        self._populate_pass_scores     = None
         self._bootstrap_field_snapshots = None
 
         bootstrap = (self.opponent_sophistication and self.n_picks > 1)
@@ -2045,6 +2067,7 @@ class HAgent:
             result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team)
             self.default_h_scores = result['Scores'].sort_values(ascending=False)
             self._default_result  = result
+            self._populate_pass_scores = None   # populate-scoped; default_h_scores ranks from here on
             return
 
         # Damped best-response to a fixed point. Pass 0 solves against a neutral field; each later pass
@@ -2066,6 +2089,8 @@ class HAgent:
         result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)  # neutral
         committed = result['Future-Diff'] / (self.n_picks - 1)
         window_size = (_OPPONENT_FIELD_WINDOW if self.scoring_format != 'Rotisserie' else 0) #ZR: This could be reversed to 0 if Rotisserie
+        bootstrap_passes = (_OPPONENT_BOOTSTRAP_PASSES if self.scoring_format != 'Rotisserie'
+                            else _OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE)
         if window_size >= 2:
             # Windowed fictitious play (see _OPPONENT_FIELD_WINDOW): each pass best-responds to the RAW
             # fields of the last K passes stacked as separate opponents — no EMA blending, the window
@@ -2074,7 +2099,7 @@ class HAgent:
             # serve and everything mid-draft face the FINAL pass's single field, set after the loop.
             snapshots = []
             try:
-                for _ in range(_OPPONENT_BOOTSTRAP_PASSES):
+                for _ in range(bootstrap_passes):
                     committed = result['Future-Diff'] / (self.n_picks - 1)
                     refresh_field(result)   # single-field store tracks the latest pass throughout
                     snapshots.append((committed, self._anchor_player_order))
@@ -2084,7 +2109,7 @@ class HAgent:
                 self._bootstrap_field_snapshots = None
             committed = result['Future-Diff'] / (self.n_picks - 1)
         else:
-            for _ in range(_OPPONENT_BOOTSTRAP_PASSES):
+            for _ in range(bootstrap_passes):
                 refresh_field(result)
                 result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)
                 committed = (1 - _OPPONENT_SMOOTHING) * committed \
@@ -2117,6 +2142,7 @@ class HAgent:
         # from the row of a newly drafted player. In-draft refresh is at the TEAM level only (_team_states).
         self._player_frozen_weights = result['Weights']
         self._player_frozen_shares  = result['Position-Shares']
+        self._populate_pass_scores  = None   # populate-scoped; default_h_scores ranks from here on
 
     def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
                             preserve_frozen_weights=False):
@@ -2130,13 +2156,18 @@ class HAgent:
         if not preserve_frozen_weights:
             self._player_frozen_weights = None
             self._player_frozen_shares  = None
-        return self.get_h_scores(
+        result = self.get_h_scores(
             player_assignments      = empty,
             drafter                 = 'Team 1',
             n_iterations            = n_iterations,
             cash_remaining_per_team = cash_remaining_per_team,
             candidate_subset        = candidate_subset,
         )
+        # Arm the next run's position-optimiser throttle (see _populate_pass_scores). The neutral
+        # first pass has no ranking and solves exact; the serve ranks the full pool by the final
+        # window pass's anchor scores, with the unranked rest of the pool sorting last.
+        self._populate_pass_scores = result['Scores']
+        return result
 
     # ── simplified-form x_mu helpers (unchanged) ──────────────────────────────
 
