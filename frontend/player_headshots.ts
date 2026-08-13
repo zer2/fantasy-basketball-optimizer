@@ -48,13 +48,17 @@ export function getHeadshotUrl(displayName: string): string | null {
 
 /** Headshot <img> HTML for string-built rows (the candidate table builds row HTML as one
  *  string for speed). Empty string when the player has no known headshot. The inline
- *  error handler hides the element when the CDN has no image for the id. No loading='lazy':
- *  the virtualized table only attaches visible rows, so lazy would just add an
- *  intersection-observer delay and scatter the fill order. */
+ *  error handler hides the element when the CDN has no image for the id.
+ *
+ *  loading='lazy' is LOAD-BEARING here: the virtualized table pre-builds EVERY candidate
+ *  row as detached DOM and attaches only the visible window. A non-lazy <img> starts
+ *  fetching the moment it is created (the new Image() preload behavior), so without lazy
+ *  every evaluate fires one request per candidate (~570) instead of per visible row (~25)
+ *  — which starved autodraft evaluates behind thousands of image fetches. */
 export function buildHeadshotImageHtml(displayName: string, className: string): string {
     const url = getHeadshotUrl(displayName)
     if (url === null) return ''
-    return `<img class='${className}' src='${url}' alt='' onerror="this.style.display='none'">`
+    return `<img class='${className}' src='${url}' loading='lazy' alt='' onerror="this.style.display='none'">`
 }
 
 /** Headshot <img> element for DOM-built displays (roster grid, team views).
