@@ -48,11 +48,13 @@ export function getHeadshotUrl(displayName: string): string | null {
 
 /** Headshot <img> HTML for string-built rows (the candidate table builds row HTML as one
  *  string for speed). Empty string when the player has no known headshot. The inline
- *  error handler hides the element when the CDN has no image for the id. */
+ *  error handler hides the element when the CDN has no image for the id. No loading='lazy':
+ *  the virtualized table only attaches visible rows, so lazy would just add an
+ *  intersection-observer delay and scatter the fill order. */
 export function buildHeadshotImageHtml(displayName: string, className: string): string {
     const url = getHeadshotUrl(displayName)
     if (url === null) return ''
-    return `<img class='${className}' src='${url}' loading='lazy' alt='' onerror="this.style.display='none'">`
+    return `<img class='${className}' src='${url}' alt='' onerror="this.style.display='none'">`
 }
 
 /** Headshot <img> element for DOM-built displays (roster grid, team views).
@@ -63,7 +65,6 @@ export function makeHeadshotImage(displayName: string, className: string): HTMLI
     const image = document.createElement('img')
     image.className = className
     image.src = url
-    image.loading = 'lazy'
     image.alt = ''
     image.addEventListener('error', () => { image.style.display = 'none' })
     return image

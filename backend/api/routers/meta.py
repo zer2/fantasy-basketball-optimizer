@@ -3,6 +3,9 @@ player-asset lookups (NBA ids + proxied headshot images)."""
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -94,14 +97,42 @@ _NBA_HEADSHOT_URL_TEMPLATE = 'https://cdn.nba.com/headshots/nba/latest/260x190/{
 # nba_player_id -> PNG bytes, or None for a confirmed no-image id (the CDN 404s some
 # historical players). ~600 active players x ~30KB ~= 20MB fully warm — fine in memory.
 # Transient fetch errors are NOT cached, so a network blip doesn't permanently blank a face.
+# The DISK layer (same DISK_CACHE_DIR convention as the Snowflake view cache) makes the
+# warm set survive process restarts — dev auto-reloads and Cloud Run cold starts otherwise
+# wipe it and the next render trickles in hundreds of CDN round-trips in arrival order.
 _headshot_cache: dict[int, bytes | None] = {}
+_HEADSHOT_DISK_CACHE_DIR = (
+    Path(os.environ['DISK_CACHE_DIR']) / 'headshots'
+    if 'DISK_CACHE_DIR' in os.environ else None
+)
+
+
+def _read_headshot_from_disk(nba_player_id: int) -> bytes | None:
+    if _HEADSHOT_DISK_CACHE_DIR is None:
+        return None
+    disk_path = _HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png'
+    if not disk_path.exists():
+        return None
+    return disk_path.read_bytes()
+
+
+def _write_headshot_to_disk(nba_player_id: int, image_bytes: bytes) -> None:
+    if _HEADSHOT_DISK_CACHE_DIR is None:
+        return
+    _HEADSHOT_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    (_HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png').write_bytes(image_bytes)
 
 
 @router.get('/players/headshots/{nba_player_id}.png')
 def get_player_headshot_route(nba_player_id: int):
-    """The NBA CDN headshot for a player, proxied and cached server-side. Serving these
-    same-origin keeps the app independent of the CDN's hotlink/bot filtering (which rejects
-    some clients outright) and fetches each image from the NBA at most once per process."""
+    """The NBA CDN headshot for a player, proxied and cached server-side (memory + disk).
+    Serving these same-origin keeps the app independent of the CDN's hotlink/bot filtering
+    (which rejects some clients outright) and fetches each image from the NBA at most once."""
+    if nba_player_id not in _headshot_cache:
+        disk_bytes = _read_headshot_from_disk(nba_player_id)
+        if disk_bytes is not None:
+            _headshot_cache[nba_player_id] = disk_bytes
+
     if nba_player_id not in _headshot_cache:
         try:
             cdn_response = requests.get(
@@ -110,6 +141,7 @@ def get_player_headshot_route(nba_player_id: int):
             raise fail(502, 'Headshot fetch failed.')
         if cdn_response.status_code == 200:
             _headshot_cache[nba_player_id] = cdn_response.content
+            _write_headshot_to_disk(nba_player_id, cdn_response.content)
         elif cdn_response.status_code == 404:
             _headshot_cache[nba_player_id] = None
         else:
