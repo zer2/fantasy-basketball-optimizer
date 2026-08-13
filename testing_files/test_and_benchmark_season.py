@@ -12,6 +12,7 @@ from benchmark_helpers import (
     , _SCORE_TOL
     , _build_session_request
     , resolve_player_assignments
+    , name_candidates
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -245,7 +246,7 @@ def test_season_mode_waiver():
         ('Keyonte George',             52.5),
         ('Gary Trent',                 52.5),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
+    candidates_by_name = name_candidates(session, candidates)
     for expected_name, expected_score in expected_waiver_top:
         match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
         assert match is not None, f'{expected_name} not found in waiver candidates'

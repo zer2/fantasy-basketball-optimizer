@@ -467,8 +467,8 @@ def test_roto_minimal_punting(sessions, auction):
 
 def _snapshot_candidates(result, top_n=15):
     return {
-        c.name: (c.h_score, np.asarray(c.category_weights, dtype=float),
-                 np.asarray(c.win_rates, dtype=float))
+        c.player_id: (c.h_score, np.asarray(c.category_weights, dtype=float),
+                      np.asarray(c.win_rates, dtype=float))
         for c in result.candidates[:top_n]
     }
 
@@ -517,18 +517,18 @@ def test_early_pick_stability(sessions, auction):
             if crossed:
                 punt_flips[name] = crossed
         if punt_flips:
-            flip_name, flip_cats = max(punt_flips.items(), key=lambda kv: max(abs(a - b) for _, b, a in kv[1]))
+            flip_id, flip_cats = max(punt_flips.items(), key=lambda kv: max(abs(a - b) for _, b, a in kv[1]))
             categories = session.current_params['categories']
             worst_flip = ', '.join(f'{_SHORT_CATEGORY.get(categories[i], categories[i])} {b:.0f}->{a:.0f}'
                                    for i, b, a in flip_cats)
-            flip_text = f'{flip_name.split(" (")[0]}: {worst_flip}'
+            flip_text = f'{session.player_registry[flip_id].name}: {worst_flip}'
         else:
             flip_text = '(none)'
         _record_row('Predicted-pick stability (EC; opponent takes its predicted player)',
                     ['Season', 'Mode', 'Shared shift (whole board)', 'Max relative move',
                      'Biggest mover', 'Max dweight', 'Punt flips', 'Worst punt flip', 'Players compared'],
                     [season, mode, f'{level_shift:+.2f}', f'{max(h_deltas.values()):.2f}',
-                     worst_h_name.split(' (')[0], f'{max(w_deltas.values()):.1f}',
+                     session.player_registry[worst_h_name].name, f'{max(w_deltas.values()):.1f}',
                      len(punt_flips), flip_text, len(common)])
         # 1e-6: the deltas come from 2-decimal display scores, so a mover sitting exactly ON the floor
         # (0.60) must not fail on float dust.

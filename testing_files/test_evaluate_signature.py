@@ -46,13 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# Regenerated 2026-08-13 on the player-headshots branch: RosterAssignment now carries
-# full_name (display-layer headshot lookups), a payload-shape change with identical scores.
+# Regenerated 2026-08-13 for identity-refactor Stage B: the payload is id-keyed
+# (Candidate.player_id, RosterAssignment.player_id) — same scores, verified by the exact
+# value-identity probe before this regen.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '83edb4d04b9116780e7ac278415649049c50412341bef74756c9a965c0b3d86c',
-    ('Head to Head: Each Category',  'mid'):   'caa333334415371eb6bf3f47ee56ebf3711fa0d79cfbf45bca817da174abbb4e',
-    ('Head to Head: Most Categories','empty'): '98d02f780477ddbfb222c045f22e569d5dedf81384a8ad78c6bf4c4e830f2377',
-    ('Head to Head: Most Categories','mid'):   '7c8d8a7b370463c92b4b2237fad26ef4e45cacbac82dfc6c57e301b00742ec03',
+    ('Head to Head: Each Category',  'empty'): '185b9617336ef7d141134d523ecfef9f848171d7b0aac5535f34ce4abfbd980d',
+    ('Head to Head: Each Category',  'mid'):   '8ea761cd11fb9e76d67abd9440c74bf2d4dfcd6148c19cb83228d74105e86dc9',
+    ('Head to Head: Most Categories','empty'): '8f7fe3fb4d6deadaeb363b550501a616e3048c17e027dd6059b25bb0cf86ec6b',
+    ('Head to Head: Most Categories','mid'):   'c95cdeff60c75ee3c43da32212126034b2d3cc013c6789b391a5986fd0ef560e',
 }
 
 

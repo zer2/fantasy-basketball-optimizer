@@ -106,12 +106,15 @@ def test_session_creation_defaults():
     assert len(body['categories'])  > 0
     assert len(body['g_scores'])    > 0
 
-    # Every G-score entry should have a name, total, and per-category values
+    # Every G-score entry should carry a player id, total, and per-category values, and the
+    # registry payload should name every one of those ids.
+    registry_names = {entry['player_id']: entry['name'] for entry in body['players']}
     for entry in body['g_scores']:
-        assert 'name'   in entry
-        assert 'total'  in entry
-        assert 'values' in entry
+        assert 'player_id' in entry
+        assert 'total'     in entry
+        assert 'values'    in entry
         assert len(entry['values']) == len(body['categories'])
+        assert entry['player_id'] in registry_names
 
 
 def test_session_creation_stores_correct_params():
@@ -164,10 +167,9 @@ def test_evaluate_empty_board():
     h_scores = [c['h_score'] for c in candidates]
     assert h_scores == sorted(h_scores, reverse=True)
 
-    # Each candidate should have a name, position, and G-score rows
+    # Each candidate should carry a player id and G-score rows
     for candidate in candidates:
-        assert candidate['name']   != ''
-        assert candidate['position'] != ''
+        assert isinstance(candidate['player_id'], int)
         assert len(candidate['g_score_rows']) > 0
 
 
@@ -326,12 +328,11 @@ def test_parse_projection_csv_filters_non_numeric_rows():
 
 
 def test_uploaded_positions_use_canonical_eligibility():
-    """Player identity is 'Name (Position)', so position strings must not depend on which
-    blend sources are active. An upload carrying its own position formatting ('PF, C' with
-    a space, or a different eligibility order) previously became the position source for
-    its players, silently renaming them mid-session — any draft board built before the
-    change then crashed every evaluate. Positions now come from the canonical Yahoo
-    eligibility table for every known player, regardless of sources."""
+    """Positions must not depend on which blend sources are active. An upload carrying its
+    own position formatting ('PF, C' with a space, or a different eligibility order) must
+    not become the position source for a known player — eligibility comes from the
+    canonical Yahoo table regardless of sources. (Identity itself is now an id, so a
+    position string can no longer rename anyone; this guards the POSITIONS.)"""
     darko_only = _build_default_session_request()
     darko_only['data_source'] = {
         'type': 'projections',
@@ -340,8 +341,8 @@ def test_uploaded_positions_use_canonical_eligibility():
     }
     darko_response = client.post('/sessions', json=darko_only)
     assert darko_response.status_code == 201, darko_response.text
-    darko_names = {entry['name'] for entry in darko_response.json()['g_scores']}
-    jokic_identity = next(name for name in darko_names if name.startswith('Nikola Jokic ('))
+    jokic_entry = next(entry for entry in darko_response.json()['players']
+                       if entry['name'] == 'Nikola Jokic')
 
     conflicting_upload = (
         'Rank,Name,Pos,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
@@ -360,21 +361,23 @@ def test_uploaded_positions_use_canonical_eligibility():
     }
     blended_response = client.post('/sessions', json=blended)
     assert blended_response.status_code == 201, blended_response.text
-    blended_names = {entry['name'] for entry in blended_response.json()['g_scores']}
+    blended_by_id = {entry['player_id']: entry for entry in blended_response.json()['players']}
 
-    assert jokic_identity in blended_names, \
-        "blending an upload must not change a known player's identity — the upload's own " \
-        f"position string must be ignored (expected {jokic_identity!r})"
+    assert jokic_entry['player_id'] in blended_by_id, \
+        'blending an upload must not remove a known player from the pool'
+    assert blended_by_id[jokic_entry['player_id']]['positions'] == jokic_entry['positions'], \
+        "blending an upload must not change a known player's positions — the upload's own " \
+        'position string must be ignored'
 
 
 def test_new_data_source_added_mid_draft_keeps_the_board_valid():
     """Adding a projection source mid-draft must not invalidate the existing board.
 
     The exact production sequence that used to 500: draft players under one blend, then
-    upload a file (with its own position formatting) and patch it into the blend. Player
-    identities are 'Name (Position)', so before positions came from the canonical
-    eligibility table, the upload's position strings renamed its players and every
-    subsequent evaluate crashed on the board's now-unknown names. The reverse case — a
+    upload a file (with its own position formatting) and patch it into the blend. In the
+    string-identity era the upload's position strings renamed its players and every
+    subsequent evaluate crashed on the board's now-unknown names; ids make that
+    structurally impossible, and this guards the flow end-to-end. The reverse case — a
     drafted player genuinely leaving the pool — must be a 400 naming them, never a 500."""
     request = _build_default_session_request()
     request['data_source'] = {
@@ -388,9 +391,10 @@ def test_new_data_source_added_mid_draft_keeps_the_board_valid():
 
     n_drafters = _load_params()['NBA']['options']['n_drafters']['default']
     board = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    drafted_identities = [entry['name'] for entry in create_response.json()['g_scores'][:4]]
-    board['Team 1'] = drafted_identities[:2]
-    board['Team 2'] = drafted_identities[2:]
+    drafted_ids = [entry['player_id'] for entry in create_response.json()['g_scores'][:4]]
+    registry_by_id = {entry['player_id']: entry for entry in create_response.json()['players']}
+    board['Team 1'] = drafted_ids[:2]
+    board['Team 2'] = drafted_ids[2:]
 
     def evaluate_board():
         return client.post(
@@ -402,16 +406,15 @@ def test_new_data_source_added_mid_draft_keeps_the_board_valid():
     assert evaluate_board().status_code == 200, 'the board must evaluate under the original blend'
 
     # Upload covering the drafted players, with deliberately hostile position formatting:
-    # reversed order plus a space ('PF,C' -> 'C, PF'). Under source-supplied positions
-    # this renamed the players; under canonical positions it must be ignored.
-    def scramble_position(identity: str) -> str:
-        position = identity.rsplit(' (', 1)[1].rstrip(')')
-        return ', '.join(reversed(position.split(',')))
+    # reversed order plus a space ('PF,C' -> 'C, PF'). Positions come from the canonical
+    # eligibility table, so the upload's own formatting must be ignored.
+    def scramble_position(positions: list[str]) -> str:
+        return ', '.join(reversed(positions))
 
     upload_rows = [
-        f'{rank + 1},{identity.rsplit(" (", 1)[0]},"{scramble_position(identity)}"'
+        f'{rank + 1},{registry_by_id[player_id]["name"]},"{scramble_position(registry_by_id[player_id]["positions"])}"'
         ',70,20.0,8.0,4.0,1.0,1.0,2.0,1.5,0.5,15.0,0.8,5.0'
-        for rank, identity in enumerate(drafted_identities)
+        for rank, player_id in enumerate(drafted_ids)
     ]
     mid_draft_csv = (
         'Rank,Name,Pos,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
@@ -437,27 +440,29 @@ def test_new_data_source_added_mid_draft_keeps_the_board_valid():
         f'the board drafted before the source change must still evaluate: {evaluate_response.text}'
 
     # A drafted player genuinely leaving the pool (here: marked injured) is a clear,
-    # named 400 — not a KeyError 500 from deep inside the H-score math.
+    # named 400 — not a KeyError 500 from deep inside the H-score math. The injured list
+    # is the one name-typed input (free text), resolved server-side against the registry.
+    dropped_name = registry_by_id[drafted_ids[0]]['name']
     patch_response = client.patch(f'/sessions/{session_id}',
-                                  json={'from_step': 2, 'injured_players': [drafted_identities[0]]})
+                                  json={'from_step': 2, 'injured_players': [dropped_name]})
     assert patch_response.status_code == 200, patch_response.text
     evaluate_response = evaluate_board()
     assert evaluate_response.status_code == 400, evaluate_response.text
     detail = evaluate_response.json()['detail']
-    assert drafted_identities[0] in detail, 'the error should name the vanished player'
+    assert dropped_name in detail, 'the error should name the vanished player'
     assert 'player pool' in detail, 'the error should explain the cause'
 
 
 def test_evaluate_rejects_rostered_players_missing_from_pool():
-    """A board whose players no longer exist in the pool (identities changed by a
-    data-source switch) must get a clear 400 naming the players, not a KeyError 500."""
+    """A board whose players no longer exist in the pool (e.g. a stale board after a
+    data-source switch) must get a clear 400, not a KeyError 500."""
     session_response = client.post('/sessions', json=_build_default_session_request())
     assert session_response.status_code == 201
     session_id = session_response.json()['session_id']
 
     n_drafters = _load_params()['NBA']['options']['n_drafters']['default']
     player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    player_assignments['Team 1'] = ['Giannis Antetokounmpo (PF, C)']
+    player_assignments['Team 1'] = [999999999]   # no such player id in any pool
 
     evaluate_response = client.post(
         f'/sessions/{session_id}/evaluate'
@@ -465,7 +470,7 @@ def test_evaluate_rejects_rostered_players_missing_from_pool():
     )
     assert evaluate_response.status_code == 400, evaluate_response.text
     detail = evaluate_response.json()['detail']
-    assert 'Giannis Antetokounmpo (PF, C)' in detail, 'the error should name the missing player'
+    assert '999999999' in detail, 'the error should identify the missing player'
     assert 'player pool' in detail, 'the error should explain the cause'
 
 

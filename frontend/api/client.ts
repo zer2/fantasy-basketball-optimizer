@@ -3,6 +3,9 @@
 // All fetch calls go through this module; callers receive typed results.
 
 import { PlayerResult, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
+import {
+    setPlayerRegistry, getRegistryEntry, buildLegacyLabel, findPlayerIdByLegacyLabel,
+} from '../player_registry.js'
 
 
 // Empty string = same-origin deployment (frontend and backend served from the same host).
@@ -49,11 +52,13 @@ async function jsonRequest<T>(
 
 
 // Adapter between backend snake_case Candidate objects and frontend PlayerResult objects.
-// The backend follows Python naming conventions; this is the single place where that translation happens.
+// The backend follows Python naming conventions; this is the single place where that translation
+// happens. Stage B of the identity refactor: the wire carries player ids; the legacy 'Name (POS)'
+// keys the frontend interior still runs on are reconstructed here from the session registry.
 /** Converts raw backend Candidate objects to frontend PlayerResult objects, remapping snake_case keys to camelCase. */
 export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
     return candidates.filter(c => c.h_score != null).map((c, i) => ({
-        name:             c.name,
+        name:             buildLegacyLabel(c.player_id),
         h_score:          c.h_score,
         h_rank:           c.h_rank,
         g_rank:           i + 1,
@@ -78,7 +83,11 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
             assignments: Object.fromEntries(
                 Object.entries(c.roster.assignments).map(([slot, a]: [string, any]) => [
                     slot,
-                    a ? { name: a.name, full_name: a.full_name, isCandidate: a.is_candidate } : null,
+                    a ? {
+                        name:        getRegistryEntry(a.player_id).last_name,
+                        full_name:   buildLegacyLabel(a.player_id),
+                        isCandidate: a.is_candidate,
+                    } : null,
                 ]),
             ),
         } : undefined,
@@ -120,17 +129,29 @@ export async function getSeasons(): Promise<string[]> {
 
 // ── POST /sessions ─────────────────────────────────────────────────────────────
 
+/** The wire's id-keyed G-score rows, remapped to the interior's name-keyed shape after the
+ *  payload's registry has been installed. */
+function adoptRegistryAndNameGScores(body: any): PlayerGScore[] {
+    setPlayerRegistry(body.players)
+    return body.g_scores.map((entry: any) => ({
+        name:   buildLegacyLabel(entry.player_id),
+        total:  entry.total,
+        values: entry.values,
+    }))
+}
+
 /** Creates a new backend session, running the full 5-step pipeline. Returns session_id and resolved categories. */
 export async function createSession(
     req: SessionRequest
     , signal?: AbortSignal
 ): Promise<{ session_id: string; categories: string[]; g_scores: PlayerGScore[]; n_players_loaded: number; expires_at: string }> {
-    return jsonRequest(`${BASE_URL}/sessions`, 'Create session', {
+    const body: any = await jsonRequest(`${BASE_URL}/sessions`, 'Create session', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
         signal,
     })
+    return { ...body, g_scores: adoptRegistryAndNameGScores(body) }
 }
 
 // ── PATCH /sessions/{id} ──────────────────────────────────────────────────────
@@ -153,11 +174,22 @@ export async function patchSession(
 
 /** Fetches the current G-scores for a session directly from session state. */
 export async function fetchGScores(sessionId: string): Promise<PlayerGScore[]> {
-    const data = await jsonRequest<{ g_scores: PlayerGScore[] }>(`${BASE_URL}/sessions/${sessionId}/g-scores`, 'Fetch G-scores')
-    return data.g_scores
+    const data: any = await jsonRequest(`${BASE_URL}/sessions/${sessionId}/g-scores`, 'Fetch G-scores')
+    return adoptRegistryAndNameGScores(data)
 }
 
 // ── POST /sessions/{id}/evaluate ──────────────────────────────────────────────
+
+/** Legacy-keyed board -> the wire's id-keyed form (Stage-B outbound edge). */
+function convertAssignmentsToPlayerIds(
+    assignments: Record<string, string[]>
+): Record<string, number[]> {
+    return Object.fromEntries(
+        Object.entries(assignments).map(([team, names]) => [
+            team, names.map(findPlayerIdByLegacyLabel),
+        ]),
+    )
+}
 
 /** Runs the H-score algorithm for the given draft/auction state and returns ranked candidates. Supports AbortSignal for cancellation. */
 export async function evaluate(
@@ -172,10 +204,15 @@ export async function evaluate(
     }
     , signal?: AbortSignal
 ): Promise<{ iteration: number; candidates: any[]; has_more?: boolean; total_candidates?: number }> {
+    const wireRequest = {
+        ...req,
+        player_assignments: convertAssignmentsToPlayerIds(req.player_assignments),
+        exclusion_list:     (req.exclusion_list ?? []).map(findPlayerIdByLegacyLabel),
+    }
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(req),
+        body:    JSON.stringify(wireRequest),
         signal,
     })
 }
@@ -210,10 +247,16 @@ export async function analyzeTrade(
         ignore_position_check?: boolean
     }
 ): Promise<TradeAnalyzeResponse> {
+    const wireRequest = {
+        ...req,
+        player_assignments: convertAssignmentsToPlayerIds(req.player_assignments),
+        my_trade:           req.my_trade.map(findPlayerIdByLegacyLabel),
+        their_trade:        req.their_trade.map(findPlayerIdByLegacyLabel),
+    }
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/analyze`, 'Trade analyze', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(req),
+        body:    JSON.stringify(wireRequest),
     })
 }
 
@@ -243,11 +286,23 @@ export async function suggestTrades(
         ignore_position_check?: boolean
     }
 ): Promise<TradeSuggestResponse> {
-    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, 'Trade suggest', {
+    const wireRequest = {
+        ...req,
+        player_assignments: convertAssignmentsToPlayerIds(req.player_assignments),
+    }
+    const body: any = await jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, 'Trade suggest', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(req),
+        body:    JSON.stringify(wireRequest),
     })
+    return {
+        suggestions: body.suggestions.map((suggestion: any) => ({
+            send:        suggestion.send.map(buildLegacyLabel),
+            receive:     suggestion.receive.map(buildLegacyLabel),
+            your_score:  suggestion.your_score,
+            their_score: suggestion.their_score,
+        })),
+    }
 }
 
 // ── Platform integration (live: ESPN / Yahoo / Fantrax) ───────────────────────
@@ -346,8 +401,17 @@ export async function fetchDraftState(
     sessionId: string
     , mode: string
 ): Promise<DraftStateResponse> {
-    return jsonRequest(
+    const body: any = await jsonRequest(
         `${BASE_URL}/sessions/${sessionId}/draft-state?mode=${encodeURIComponent(mode)}`
         , 'Draft state'
     )
+    return {
+        ...body,
+        player_assignments: Object.fromEntries(
+            Object.entries(body.player_assignments).map(([team, playerIds]: [string, any]) => [
+                team, playerIds.map(buildLegacyLabel),
+            ]),
+        ),
+        injured_players: body.injured_players.map(buildLegacyLabel),
+    }
 }

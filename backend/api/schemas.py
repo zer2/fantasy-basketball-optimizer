@@ -79,15 +79,26 @@ class SessionRequest(BaseModel):
 
 
 class PlayerGScore(BaseModel):
-    name: str
+    player_id: int
     total: float
     values: list[float]   # per-category G-scores, same order as categories
+
+
+class PlayerRegistryEntry(BaseModel):
+    """One session player identity: everything the display layer needs to render a player.
+    has_headshot is False for the RP sentinel and synthetic ids (no NBA CDN image exists)."""
+    player_id: int
+    name: str
+    last_name: str
+    positions: list[str]
+    has_headshot: bool
 
 
 class SessionResponse(BaseModel):
     session_id: str
     n_players_loaded: int
     categories: list[str]
+    players: list[PlayerRegistryEntry]
     g_scores: list[PlayerGScore]
     expires_at: str
 
@@ -122,16 +133,17 @@ class PatchResponse(BaseModel):
 # ── /sessions/{id}/g-scores GET ───────────────────────────────────────────────
 
 class GScoresResponse(BaseModel):
+    players: list[PlayerRegistryEntry]
     g_scores: list[PlayerGScore]
 
 
 # ── /sessions/{id}/evaluate ───────────────────────────────────────────────────
 
 class EvaluateRequest(BaseModel):
-    player_assignments: dict[str, list[str]]
+    player_assignments: dict[str, list[int]]
     my_team_id: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
-    exclusion_list: list[str] = []
+    exclusion_list: list[int] = []
     # Draft/waiver batching: evaluate only a slice of the candidate pool (ordered by the cached
     # default/generic H-score ranking) so the top players can paint before the deep bench is scored.
     # candidate_limit=None evaluates everyone (auction always does; the first eval does too, since it
@@ -143,18 +155,18 @@ class EvaluateRequest(BaseModel):
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────
 
 class TradeAnalyzeRequest(BaseModel):
-    player_assignments: dict[str, list[str]]
+    player_assignments: dict[str, list[int]]
     my_team: str
     their_team: str
-    my_trade: list[str]
-    their_trade: list[str]
+    my_trade: list[int]
+    their_trade: list[int]
     ignore_position_check: bool = False
 
 
 # ── /sessions/{id}/trade/suggest ─────────────────────────────────────────────
 
 class TradeSuggestRequest(BaseModel):
-    player_assignments: dict[str, list[str]]
+    player_assignments: dict[str, list[int]]
     my_team: str
     their_team: str
     combo_params: list[ComboParam]
@@ -186,8 +198,8 @@ class ConnectResponse(BaseModel):
 
 
 class DraftStateResponse(BaseModel):
-    player_assignments: dict[str, list[str]]
-    injured_players: list[str]
+    player_assignments: dict[str, list[int]]
+    injured_players: list[int]
     status: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
 

@@ -118,19 +118,18 @@ def resolve_player_assignments(session, player_assignments_by_name):
     }
 
 
-def resolve_display_labels(session, player_ids):
-    """Player ids -> the legacy 'Name (POS)' labels, for comparing service-level results
-    against human-readable fixture snapshots."""
-    from backend.player_identity import build_legacy_display_label
-
-    return [build_legacy_display_label(session.player_registry[player_id])
-            for player_id in player_ids]
+def name_candidates(session, candidates):
+    """{registry display name: candidate} over an evaluate result — the human-readable view
+    of the id-keyed candidate payload for fixture matching."""
+    registry = session.player_registry
+    return {registry[c.player_id].name: c for c in candidates}
 
 
-def check_top_scores(label, expected_top_scores, candidates):
+def check_top_scores(session, label, expected_top_scores, candidates):
     """Assert each expected player's H-score is within _SCORE_TOL of its golden. With REGEN_GOLDENS set,
-    print the actuals in paste-ready form and skip the assertions instead (golden regeneration)."""
-    by_name  = {c.name: c for c in candidates}
+    print the actuals in paste-ready form and skip the assertions instead (golden regeneration).
+    Expected names are prefixes of registry display names."""
+    by_name  = name_candidates(session, candidates)
     resolved = []
     for expected_name, expected_score in expected_top_scores:
         match = next((n for n in by_name if n.startswith(expected_name)), None)

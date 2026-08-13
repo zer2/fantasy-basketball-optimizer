@@ -12,6 +12,7 @@ from benchmark_helpers import (
     , _SCORE_TOL
     , _build_session_request
     , resolve_player_ids
+    , name_candidates
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -63,7 +64,7 @@ def test_evaluate_auction():
         ('Dyson Daniels',             14.9,  54.6,  39.8,  39.2),
         ('Jayson Tatum',                7.2,  48.3,  41.1,  40.5),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
+    candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):
         rows = []
         for expected_name, *_ in expected_auction_values:

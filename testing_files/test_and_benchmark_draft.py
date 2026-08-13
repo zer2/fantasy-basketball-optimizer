@@ -228,7 +228,7 @@ def test_evaluate_empty_board(session_for_format):
     _print_profile(profiler, scoring_format, 'empty board')
 
     candidates      = result.candidates
-    candidate_names = [c.name for c in candidates]
+    candidate_names = [session.player_registry[c.player_id].name for c in candidates]
     assert len(candidates) >= 200, f'Expected 200+ candidates, got {len(candidates)}'
 
     # All expected top players must appear somewhere in the player pool.
@@ -247,12 +247,12 @@ def test_evaluate_empty_board(session_for_format):
     # Per-category win rates must be in the valid range.
     for candidate in candidates:
         assert len(candidate.win_rates) == len(categories), \
-            f'{candidate.name}: expected {len(categories)} win rates, got {len(candidate.win_rates)}'
+            f'{candidate.player_id}: expected {len(categories)} win rates, got {len(candidate.win_rates)}'
         assert all(0.0 <= rate <= 100.0 for rate in candidate.win_rates), \
-            f'{candidate.name}: win rate out of [0, 100]'
+            f'{candidate.player_id}: win rate out of [0, 100]'
 
     # Each expected player must have the correct H-score within tolerance.
-    check_top_scores(scoring_format, expected_top_scores, candidates)
+    check_top_scores(session, scoring_format, expected_top_scores, candidates)
 
 
 def test_evaluate_mid_draft(session_for_format):
@@ -288,10 +288,10 @@ def test_evaluate_mid_draft(session_for_format):
     candidates = result.candidates
     assert len(candidates) > 0
 
-    candidate_names = {c.name for c in candidates}
-    for drafted_player in team_one_picks:
-        assert drafted_player not in candidate_names, \
-            f'Drafted player {drafted_player} appeared in candidates'
+    candidate_player_ids = {c.player_id for c in candidates}
+    for drafted_player_id in team_one_picks:
+        assert drafted_player_id not in candidate_player_ids, \
+            f'Drafted player {drafted_player_id} appeared in candidates'
 
 
 @pytest.fixture(scope='module', params=_FIRST_ROUND_CONFIGS)
@@ -344,7 +344,7 @@ def test_evaluate_first_round(session_for_first_round):
     h_scores = [c.h_score for c in candidates]
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
-    check_top_scores(scoring_format, expected_top_scores, candidates)
+    check_top_scores(session, scoring_format, expected_top_scores, candidates)
 
 
 def test_evaluate_two_category_roto():
@@ -390,7 +390,7 @@ def test_evaluate_two_category_roto():
         ('Dillon Brooks',  8.8),
         ('Klay Thompson',  5.6),
     ]
-    check_top_scores('Rotisserie, 2-cat', expected_top_scores, candidates)
+    check_top_scores(session, 'Rotisserie, 2-cat', expected_top_scores, candidates)
 
 
 def test_evaluate_twenty_five_drafters():
@@ -428,7 +428,7 @@ def test_evaluate_twenty_five_drafters():
         ('James Harden',             51.2),
         ('Giannis Antetokounmpo',    50.4),
     ]
-    check_top_scores('EC, 25 drafters', expected_top_scores, candidates)
+    check_top_scores(session, 'EC, 25 drafters', expected_top_scores, candidates)
 
 
 def test_evaluate_three_drafters():
@@ -466,4 +466,4 @@ def test_evaluate_three_drafters():
         ('Karl-Anthony Towns',       48.6),
         ('Stephen Curry',            48.1),
     ]
-    check_top_scores('EC, 3 drafters', expected_top_scores, candidates)
+    check_top_scores(session, 'EC, 3 drafters', expected_top_scores, candidates)

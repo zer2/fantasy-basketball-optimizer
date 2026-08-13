@@ -124,11 +124,14 @@ def _pick_gscore_player(
     raise RuntimeError('Player pool exhausted — no undrafted players remain.')
 
 
-def _light_candidate(candidate) -> dict:
-    """Compact ranked-table row (no expand views) — what the candidate table shows at a glance."""
+def _light_candidate(session, candidate) -> dict:
+    """Compact ranked-table row (no expand views) — what the candidate table shows at a glance.
+    The report JSON carries display names (resolved from the session registry) so the rendered
+    pages stay human-readable."""
+    identity = session.player_registry[candidate.player_id]
     return {
-        'name':             candidate.name,
-        'position':         candidate.position,
+        'name':             identity.name,
+        'position':         ','.join(identity.positions),
         'h_score':          candidate.h_score,
         'h_rank':           candidate.h_rank,
         'win_rates':        candidate.win_rates,
@@ -189,11 +192,11 @@ def _simulate_one_seat(
                 top_candidate = result.candidates[0]
                 picks.append({
                     'round':         pick_row + 1,
-                    'picked':        top_candidate.name,
-                    'candidates':    [_light_candidate(c) for c in result.candidates[:top_n]],
+                    'picked':        session.player_registry[top_candidate.player_id].name,
+                    'candidates':    [_light_candidate(session, c) for c in result.candidates[:top_n]],
                     'picked_detail': _picked_detail(top_candidate),
                 })
-                chosen = top_candidate.name
+                chosen = top_candidate.player_id
             else:
                 chosen = _pick_gscore_player(
                     gscore_order, drafted, assignments[drafter_name], position_config, has_positions,
@@ -205,7 +208,8 @@ def _simulate_one_seat(
     team_h_score, team_rates = _score_team(session, assignments, hscore_name, n_iterations)
     return {
         'hscore_seat':  hscore_seat,
-        'roster':       assignments[hscore_name],
+        'roster':       [session.player_registry[player_id].name
+                         for player_id in assignments[hscore_name]],
         'team_h_score': round(team_h_score * 100, 2),
         'team_rates':   [round(x * 100, 2) for x in team_rates],
         'picks':        picks,

@@ -16,7 +16,6 @@ from backend.models import (
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.infra.server_timing import record_phase
-from backend.player_identity import build_legacy_display_label
 
 
 class UnknownRosterPlayersError(ValueError):
@@ -76,7 +75,7 @@ def rank_candidates(
     missing_players = sorted({p for p in rostered_players if p not in H.x_scores.index})
     if missing_players:
         missing_display = [
-            build_legacy_display_label(player_registry[p]) if p in player_registry else str(p)
+            player_registry[p].name if p in player_registry else str(p)
             for p in missing_players
         ]
         raise UnknownRosterPlayersError(
@@ -192,7 +191,6 @@ def _build_candidates(
     win_rate_cdfs            = h_score_result['Rates'].iloc[order]
     team_diff_df             = h_score_result['Diff'].iloc[order] if h_score_result['Diff'] is not None else None
     future_diff_df           = h_score_result['Future-Diff'].iloc[order] if h_score_result['Future-Diff'] is not None else None
-    player_position_map      = info['Positions']           # full-population: used by _build_roster for my_players
     player_g_scores          = info['G-scores']            # full-population: used for auction dollar values
 
     # res['Rosters'] column 0 encodes whether a valid slot assignment was found.
@@ -340,11 +338,9 @@ def _build_candidates(
     )
     rosters_rows = rosters_sorted.values
 
-    # Candidate last names and legacy display labels, read once for the whole pool from the
-    # registry. The labels feed Candidate.name / RosterAssignment.full_name through Stage A
-    # of the identity refactor (the Stage-B contract replaces them with player ids).
-    candidate_last_names     = [player_registry[p].last_name for p in sorted_index]
-    candidate_display_labels = [build_legacy_display_label(player_registry[p]) for p in sorted_index]
+    # Candidate last names, read once for the whole pool from the registry (they label each
+    # candidate's own G-score row).
+    candidate_last_names = [player_registry[p].last_name for p in sorted_index]
 
     # Pre-extract position share arrays for each flex type, aligned to sorted_index.
     # Each entry is (numpy_array, base_to_col) where base_to_col maps base position
@@ -391,10 +387,8 @@ def _build_candidates(
     roster_by_rank = (
         None if no_position_data
         else _build_roster_assignments(
-            candidate_last_names
-            , candidate_display_labels
+            list(sorted_index)
             , my_players
-            , player_registry
             , rosters_rows
             , slot_names
         )
@@ -407,10 +401,6 @@ def _build_candidates(
     h_scores_list          = h_scores_scaled.tolist()
     win_rates_lists        = win_rates_scaled.tolist()
     category_weights_lists = None if category_weights_scaled is None else category_weights_scaled.tolist()
-    position_displays      = [
-        ','.join(raw) if isinstance(raw, list) else str(raw)
-        for raw in (player_position_map.get(p, ['?']) for p in sorted_index)
-    ]
 
     # The remaining loop constructs one Candidate per fitting player, indexing into the
     # pre-built tables — no arithmetic left. rank_idx counts every sorted player (including
@@ -421,8 +411,7 @@ def _build_candidates(
             continue  # skip players for whom no valid roster slot exists
 
         candidates.append(Candidate(
-            name             = candidate_display_labels[rank_idx],
-            position         = position_displays[rank_idx],
+            player_id        = int(player),
             h_score          = h_scores_list[rank_idx],   # already × 100 and rounded to 2 dp
             h_rank           = rank_idx + 1,
             win_rates        = win_rates_lists[rank_idx],   # already × 100 and rounded to 2 dp
@@ -714,10 +703,8 @@ def _build_flex_allocations(
 # ── Roster assignment ─────────────────────────────────────────────────────────
 
 def _build_roster_assignments(
-    candidate_last_names: list[str]
-    , candidate_display_labels: list[str]
+    candidate_player_ids: list[int]
     , my_players: list[int]
-    , player_registry: dict
     , rosters_rows: np.ndarray
     , slot_names: list[str]
 ) -> list[Roster]:
@@ -734,12 +721,10 @@ def _build_roster_assignments(
     assignment is unique per rank. Slot indices are converted to Python ints in one pass.
 
     Args:
-        candidate_last_names:     Per-rank candidate last name for the candidate's own slot.
-        candidate_display_labels: Per-rank candidate display label (Stage-A legacy format).
-        my_players:               Player ids already on the user's team, in roster-column order.
-        player_registry:          The session's id -> PlayerIdentity registry.
-        rosters_rows:             Slot-index matrix, shape (n_players, n_columns).
-        slot_names:               Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
+        candidate_player_ids: Per-rank candidate player id for the candidate's own slot.
+        my_players:           Player ids already on the user's team, in roster-column order.
+        rosters_rows:         Slot-index matrix, shape (n_players, n_columns).
+        slot_names:           Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
 
     Returns:
         One Roster per candidate rank.
@@ -750,9 +735,7 @@ def _build_roster_assignments(
 
     # Shared assignments for the already-drafted players (built once).
     drafted_assignments = [
-        RosterAssignment(name=player_registry[player_id].last_name,
-                         full_name=build_legacy_display_label(player_registry[player_id]),
-                         is_candidate=False)
+        RosterAssignment(player_id=int(player_id), is_candidate=False)
         for player_id in my_players
     ]
     # Cross the numpy→Python boundary once for all slot indices.
@@ -770,8 +753,7 @@ def _build_roster_assignments(
             candidate_slot_idx = roster_row[n_team_so_far]
             if 0 <= candidate_slot_idx < n_slots:
                 assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
-                    name=candidate_last_names[rank_idx],
-                    full_name=candidate_display_labels[rank_idx],
+                    player_id=int(candidate_player_ids[rank_idx]),
                     is_candidate=True,
                 )
 

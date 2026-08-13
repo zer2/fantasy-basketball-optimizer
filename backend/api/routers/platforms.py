@@ -119,15 +119,9 @@ def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(cu
             team: cash_per_team - sum(team_costs)
             for team, team_costs in selections.costs.items()
         }
-    # Stage-A boundary: integrations now speak player ids; the wire still speaks labels.
-    from backend.api.legacy_identity_shim import convert_player_ids_to_labels
     return DraftStateResponse(
-        player_assignments = {
-            team: convert_player_ids_to_labels(session.player_registry, roster)
-            for team, roster in selections.player_assignments.items()
-        },
-        injured_players    = convert_player_ids_to_labels(
-            session.player_registry, selections.injured_players),
+        player_assignments = selections.player_assignments,
+        injured_players    = selections.injured_players,
         status             = selections.status,
         remaining_cash     = remaining_cash,
     )

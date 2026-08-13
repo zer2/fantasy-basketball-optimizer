@@ -19,7 +19,9 @@ import time
 
 import pytest
 
-from benchmark_helpers import client, _build_session_request, resolve_player_assignments
+from benchmark_helpers import (
+    client, _build_session_request, resolve_player_assignments, resolve_player_ids,
+)
 from backend.state.session import get_session
 from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
@@ -131,8 +133,8 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
     if os.environ.get('REGEN_GOLDENS'):
         rows = [
             "        {\n"
-            f"            'send':    {sorted(s.send)},\n"
-            f"            'receive': {sorted(s.receive)},\n"
+            f"            'send':    {sorted(session.player_registry[i].name for i in s.send)},\n"
+            f"            'receive': {sorted(session.player_registry[i].name for i in s.receive)},\n"
             f"            'your_score':  {round(s.your_score, 4)},\n"
             f"            'their_score': {round(s.their_score, 4)},\n"
             "        }"
@@ -147,9 +149,11 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
 
     for rank, exp in enumerate(expected):
         actual = suggestions[rank]
+        expected_send_ids    = resolve_player_ids(session, exp['send'])
+        expected_receive_ids = resolve_player_ids(session, exp['receive'])
 
-        assert sorted(actual.send)    == sorted(exp['send']),    f'{label} rank {rank+1}: send mismatch'
-        assert sorted(actual.receive) == sorted(exp['receive']), f'{label} rank {rank+1}: receive mismatch'
+        assert sorted(actual.send)    == sorted(expected_send_ids),    f'{label} rank {rank+1}: send mismatch'
+        assert sorted(actual.receive) == sorted(expected_receive_ids), f'{label} rank {rank+1}: receive mismatch'
 
         assert abs(actual.your_score  - exp['your_score'])  <= _SCORE_TOL, (
             f'{label} rank {rank+1}: your_score {actual.your_score} != {exp["your_score"]}'
