@@ -589,6 +589,7 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 .cs-trigger {
+    position: relative;   /* positioning context for .cs-value-display */
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -622,6 +623,26 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     min-width: 0;
     cursor: pointer;
     text-overflow: ellipsis;
+}
+
+/* Closed-state rich value: paints the selected player (headshot + name + positions) over
+   the search input while the select is closed. Clicks pass through to the input; opening
+   the dropdown hides the overlay (see custom_select.ts). The input's own text is made
+   transparent underneath so the two never double-render. */
+.cs-value-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 24px 0 8px;   /* clear of the ▾ arrow on the right */
+    overflow: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.cs-rich-value:not(.cs-open) .cs-search-input {
+    color: transparent;
 }
 
 .cs-search-input::placeholder {

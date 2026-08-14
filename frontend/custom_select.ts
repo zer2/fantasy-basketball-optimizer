@@ -135,7 +135,15 @@ export function makeCustomSelect(
     arrow.className   = 'cs-arrow'
     arrow.textContent = '▾'
 
-    trigger.append(searchInput, arrow)
+    // Rich closed-state display: an <input> can only show text, so options that carry
+    // html (player headshot + styled positions) paint here, overlaid on the search
+    // input while the select is closed. pointer-events pass through to the input, the
+    // input's value still holds the label (DOM readers, copy, e2e), and opening the
+    // dropdown hides the overlay so typing behaves exactly as before.
+    const valueDisplay = document.createElement('div')
+    valueDisplay.className = 'cs-value-display'
+
+    trigger.append(searchInput, valueDisplay, arrow)
 
     // Dropdown panel
     const dropdown = document.createElement('div')
@@ -150,10 +158,26 @@ export function makeCustomSelect(
         return currentOptions.find(o => o.value === value)?.label ?? value
     }
 
+    /** Paints the closed-state overlay: rich html when the selected option carries it,
+     *  hidden otherwise so the plain input text shows as always. */
+    function refreshValueDisplay(): void {
+        const selectedOption = currentOptions.find(o => o.value === currentValue)
+        if (selectedOption?.html !== undefined) {
+            valueDisplay.innerHTML = selectedOption.html
+            valueDisplay.hidden = false
+            wrapper.classList.add('cs-rich-value')
+        } else {
+            valueDisplay.innerHTML = ''
+            valueDisplay.hidden = true
+            wrapper.classList.remove('cs-rich-value')
+        }
+    }
+
     function commit(value: string, silent = false): void {
         currentValue       = value
         hiddenValueInput.value = value
         searchInput.value  = getLabelFor(value)
+        refreshValueDisplay()
         if (!silent) wrapper.dispatchEvent(new Event('change', { bubbles: true }))
     }
 
@@ -192,6 +216,7 @@ export function makeCustomSelect(
     function open(): void {
         searchInput.value = ''
         searchInput.placeholder = getLabelFor(currentValue)
+        valueDisplay.hidden = true   // typing takes over the box; the overlay returns on close
         renderDropdown()
         dropdown.hidden = false
         wrapper.classList.add('cs-open')
@@ -202,6 +227,7 @@ export function makeCustomSelect(
         wrapper.classList.remove('cs-open')
         searchInput.value       = getLabelFor(currentValue)
         searchInput.placeholder = ''
+        refreshValueDisplay()
         if (doubleClickToOpen) searchInput.readOnly = true
     }
 

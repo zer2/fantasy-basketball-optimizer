@@ -49,16 +49,6 @@ def extract_last_name(full_name: str) -> str:
     return ' '.join(parts[1:]) if len(parts) > 1 else full_name
 
 
-def build_legacy_display_label(identity: 'PlayerIdentity') -> str:
-    """TEMPORARY (deleted with the Stage-B API contract): reconstruct the string-identity
-    era's 'Name (POS)' label from a registry entry, byte-for-byte — position-less players
-    carried ' (NP)' and the RP sentinel was bare 'RP'."""
-    if identity.player_id == RP_PLAYER_ID:
-        return 'RP'
-    position_display = ','.join(identity.positions) if identity.positions else 'NP'
-    return f'{identity.name} ({position_display})'
-
-
 def make_player_identity(
     player_id: int
     , name: str

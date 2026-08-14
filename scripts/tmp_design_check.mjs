@@ -22,6 +22,13 @@ await page.waitForFunction(() => {
 await waitEval(page)
 await page.waitForTimeout(2500)   // let the deep-bench batches finish so no rebuild closes the dropdown
 const wrapperBox = await page.locator('[data-testid="draft-pick-select-wrapper"]').first().boundingBox()
+
+// 0. Closed trigger: the rich value display (headshot + name + positions).
+await page.waitForTimeout(400)
+await page.screenshot({
+    path: `${OUT}/design_trigger_closed.png`,
+    clip: { x: wrapperBox.x - 140, y: wrapperBox.y - 6, width: wrapperBox.width + 150, height: wrapperBox.height + 12 },
+})
 await openSelectDropdown(page, page.locator('[data-testid="draft-pick-select-wrapper"]').first())
 await page.waitForTimeout(250)   // let visible option headshots paint (proxy is warm)
 await page.screenshot({
