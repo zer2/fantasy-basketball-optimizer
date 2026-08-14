@@ -105,10 +105,7 @@ export function getHeadshotUrl(playerId: number): string | null {
 function buildHeadshotImageHtml(playerId: number, className: string): string {
     const url = getHeadshotUrl(playerId)
     if (url === null) return ''
-    // headshot-loaded drives the fade-in (styles.css): late arrivals ease in instead of
-    // popping. Cache hits fire load within a frame, so warmed images read as instant.
-    return `<img class='${className}' src='${url}' loading='lazy' alt='' `
-        + `onload="this.classList.add('headshot-loaded')" onerror="this.style.display='none'">`
+    return `<img class='${className}' src='${url}' loading='lazy' alt='' onerror="this.style.display='none'">`
 }
 
 /** Headshot <img> element for DOM-built displays. These attach to the live DOM
@@ -120,7 +117,6 @@ function makeHeadshotImage(playerId: number, className: string): HTMLImageElemen
     image.className = className
     image.src = url
     image.alt = ''
-    image.addEventListener('load', () => image.classList.add('headshot-loaded'))
     image.addEventListener('error', () => { image.style.display = 'none' })
     return image
 }

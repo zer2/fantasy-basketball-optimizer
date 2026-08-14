@@ -1027,20 +1027,6 @@ tr {
     flex-shrink: 0;
 }
 
-/* Headshots ease in on load instead of popping (player_display.ts adds headshot-loaded
-   from each img's load event). Cache-warmed images complete within a frame, so after the
-   registry preloader has run this reads as instant. */
-.player-avatar,
-.roster-headshot {
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
-.player-avatar.headshot-loaded,
-.roster-headshot.headshot-loaded {
-    opacity: 1;
-}
-
 
 .playername {
     flex: 1;
