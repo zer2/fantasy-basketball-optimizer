@@ -158,18 +158,23 @@ export function makeCustomSelect(
         return currentOptions.find(o => o.value === value)?.label ?? value
     }
 
-    /** Paints the closed-state overlay: rich html when the selected option carries it,
-     *  hidden otherwise so the plain input text shows as always. */
+    /** Paints the rich value overlay: shown when the selected option carries html and
+     *  the input isn't holding typed filter text — so the closed trigger always mirrors
+     *  the selection, and the OPEN trigger keeps mirroring it (dimmed, placeholder-like,
+     *  see styles.css) until the user starts typing. Options without html fall back to
+     *  the plain input text as always. */
     function refreshValueDisplay(): void {
         const selectedOption = currentOptions.find(o => o.value === currentValue)
-        if (selectedOption?.html !== undefined) {
-            valueDisplay.innerHTML = selectedOption.html
+        const showRichValue = selectedOption?.html !== undefined
+            && (dropdown.hidden || searchInput.value === '')
+        if (showRichValue) {
+            valueDisplay.innerHTML = selectedOption!.html!
             valueDisplay.hidden = false
             wrapper.classList.add('cs-rich-value')
         } else {
             valueDisplay.innerHTML = ''
             valueDisplay.hidden = true
-            wrapper.classList.remove('cs-rich-value')
+            if (selectedOption?.html === undefined) wrapper.classList.remove('cs-rich-value')
         }
     }
 
@@ -215,11 +220,14 @@ export function makeCustomSelect(
 
     function open(): void {
         searchInput.value = ''
-        searchInput.placeholder = getLabelFor(currentValue)
-        valueDisplay.hidden = true   // typing takes over the box; the overlay returns on close
+        // Rich selections keep their overlay as the "placeholder" while open (typing
+        // replaces it, see the input listener); plain ones use the text placeholder.
+        const selectedOption = currentOptions.find(o => o.value === currentValue)
+        searchInput.placeholder = selectedOption?.html !== undefined ? '' : getLabelFor(currentValue)
         renderDropdown()
         dropdown.hidden = false
         wrapper.classList.add('cs-open')
+        refreshValueDisplay()
     }
 
     function close(): void {
@@ -261,6 +269,7 @@ export function makeCustomSelect(
 
     searchInput.addEventListener('input', () => {
         if (dropdown.hidden) open()
+        refreshValueDisplay()   // typed text replaces the rich overlay; clearing restores it
         renderDropdown()
     }, listenerOpts)
 

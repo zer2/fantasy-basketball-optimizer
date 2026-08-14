@@ -642,9 +642,15 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 /* The display: flex above outranks the UA's [hidden] { display: none }, so the hidden
-   attribute custom_select.ts sets while the dropdown is open needs its own rule. */
+   attribute custom_select.ts sets while typed filter text owns the box needs its own rule. */
 .cs-value-display[hidden] {
     display: none;
+}
+
+/* While the dropdown is open the overlay plays the placeholder's role — the current
+   selection, dimmed to read as replaceable — until typing hides it. */
+.cs-open .cs-value-display {
+    opacity: 0.55;
 }
 
 .cs-rich-value:not(.cs-open) .cs-search-input {
