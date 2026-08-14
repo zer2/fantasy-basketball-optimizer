@@ -1033,6 +1033,22 @@ tr {
     flex-shrink: 0;
 }
 
+/* The name column is far narrower on a phone, and the avatar (plus the expand arrow beside
+   it) is fixed width — so every pixel it takes comes straight out of the name, which then
+   ellipsizes. Shrink the avatar there; it still reads as a face at this size, and the names
+   fit. Keeps the CDN's 260x190 aspect. */
+@media (max-width: 768px) {
+    .player-avatar {
+        width: 22px;
+        height: 16px;
+    }
+
+    .roster-headshot {
+        width: 28px;
+        height: 20px;
+    }
+}
+
 
 .playername {
     flex: 1;
