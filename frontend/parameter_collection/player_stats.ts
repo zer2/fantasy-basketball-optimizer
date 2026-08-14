@@ -286,11 +286,12 @@ function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
         try {
             const resp = await uploadCsv(file)
             row.dataId = resp.data_id
-            // League-paired exports only carry a league's active categories — say which
-            // standard stats this file lacks so a lighter file reads as deliberate.
+            // A source that pairs projections with a league only carries that league's
+            // categories — say which standard stats this file lacks so a lighter file
+            // reads as deliberate rather than as a parsing failure.
             const missingNote = resp.missing_stats.length > 0
-                ? `, no ${resp.missing_stats.join('/')}` : ''
-            statusSpan.textContent = `✓ ${resp.n_players} players loaded (${resp.detected_format} format${missingNote})`
+                ? ` (no ${resp.missing_stats.join('/')})` : ''
+            statusSpan.textContent = `✓ ${resp.n_players} players loaded${missingNote}`
             slider.disabled = false
             // Open the next slot once this one is filled (first upload into this row only).
             if (!hadUploadAlready && customUploadRows.length < MAX_CUSTOM_UPLOADS) {

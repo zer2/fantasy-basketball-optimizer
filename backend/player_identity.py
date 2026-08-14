@@ -7,7 +7,7 @@ passing through a name. Names exist only in the per-session registry built at in
 and are rendered only at display time.
 
 Name→id conversion therefore happens ONLY at the edges where names enter the system:
-  - ingesting name-keyed sources (ESPN projections, uploaded HTB/BBM CSVs), via
+  - ingesting name-keyed sources (ESPN projections, uploaded projection CSVs), via
     build_name_to_player_id_resolver — every name-variant column of UNIFIED_PLAYER_TABLE
     mapped to the row's NBA id, with MASTER_PLAYER_NAME applied last so the canonical
     spelling wins collisions;

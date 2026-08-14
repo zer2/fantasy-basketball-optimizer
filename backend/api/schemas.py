@@ -15,12 +15,12 @@ from backend.models import ComboParam
 
 class UploadResponse(BaseModel):
     data_id: str
-    detected_format: str   # which known export format the file matched (e.g. 'HTB', 'BBM')
     n_players: int
     expires_at: str
-    # Standard stat columns the file does NOT carry (league-paired exports only include a
-    # league's active categories) — shown in the upload caption so a lighter file is a
-    # visible, deliberate state rather than a surprise at category-selection time.
+    # Standard stat columns the file does NOT carry (a source that pairs projections with
+    # a league exports only that league's categories) — shown in the upload caption so a
+    # lighter file is a visible, deliberate state rather than a surprise at
+    # category-selection time.
     missing_stats: list[str] = []
 
 

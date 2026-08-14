@@ -75,7 +75,7 @@ def _v0_cache_key(cp: dict) -> tuple | None:
 
     A projections blend is fully described by every source weight plus the ids of any
     uploaded tables feeding it: uploads are stored immutably under their data_id, so the
-    id doubles as a content key. (Leaving the HTB/BBM weights or the upload ids out of
+    id doubles as a content key. (Leaving the uploaded-source weights or the upload ids out of
     the key — as an earlier version did — served stale blends when an upload's weight
     changed, and could leak an uploaded blend into sessions that never uploaded anything.)
     Returns None only for single-CSV mode, whose bytes arrive outside current_params.
@@ -161,8 +161,7 @@ def run_step1(
 
     if v0_with_names is None:
         if source_type == 'csv':
-            parsed_csv, _detected_format = parse_projection_csv(csv_bytes, params)
-            v0_with_names = _resolve_single_csv_player_ids(parsed_csv)
+            v0_with_names = _resolve_single_csv_player_ids(parse_projection_csv(csv_bytes, params))
 
         elif source_type == 'historical':
             from backend.data_retrieval import get_specified_historical_stats
@@ -205,77 +204,99 @@ def run_step1(
     session.v0_clean = v0_with_names.drop(columns=['Player'])
 
 
-# The per-game stats a projection export CAN map to. League-paired exports (Basketball
-# Monster pairs each projection set with a league and emits only that league's active
-# categories) may legitimately lack several — so recognition requires Player, Position,
-# and only _MIN_MATCHED_CORE_COLUMNS of these. That is still unmistakably a projection
-# file, while a format-drifted export (renamed headers) maps ~none and is rejected with
-# a clear message instead of failing much later, deep in the blend, as a baffling
-# "0 players available" error.
+# The per-game stats a projection file CAN carry. A file need not carry all of them:
+# sources that pair a projection set with a league export only that league's active
+# categories, so several may legitimately be absent. Recognition therefore asks only for
+# Player, Position, and _MIN_MATCHED_CORE_COLUMNS of these — still unmistakably a
+# projection file, while a spreadsheet of something else entirely maps ~nothing and is
+# rejected with a clear message instead of failing much later, deep in the blend, as a
+# baffling "0 players available" error.
 _CORE_PROJECTION_COLUMNS = ('Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers', 'Threes')
 _MIN_MATCHED_CORE_COLUMNS = 3
 
-# Known export formats, in detection order. A file already using canonical column names
-# passes under the first mapping (renaming is a no-op), so "any common projection file"
-# includes plain canonical CSVs for free.
-_PROJECTION_FORMATS = (
-    ('HTB', 'htb-renamer'),
-    ('BBM', 'bbm-renamer'),
-)
+_COLUMN_ALIASES_KEY = 'projection-column-aliases'
 
 
-def parse_projection_csv(csv_bytes: bytes, params: dict) -> tuple[pd.DataFrame, str]:
-    """Parse an uploaded projection CSV into the canonical column set, auto-detecting the
-    export format. Returns (parsed frame, detected format name). Raises ValueError with an
-    aggregated, per-format diagnosis when no known format fits."""
+def _normalize_projection_header(header) -> str:
+    """Header spellings differ only by case and padding far more often than by wording, so
+    both sides of an alias lookup are folded to one form."""
+    return str(header).strip().lower()
+
+
+def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
+    """{column in the file: canonical name} for every column the aliases recognize.
+
+    Columns that match nothing are left out (the parse drops them). A canonical name that
+    two of the file's columns both claim is taken by the first, so a file carrying e.g.
+    both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
+    """
+    aliases = {_normalize_projection_header(alias): canonical
+               for alias, canonical in params.get(_COLUMN_ALIASES_KEY, {}).items()}
+    mapping, claimed = {}, set()
+    for column in df_raw.columns:
+        canonical = aliases.get(_normalize_projection_header(column))
+        if canonical is not None and canonical not in claimed:
+            mapping[column] = canonical
+            claimed.add(canonical)
+    return mapping
+
+
+def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
+    """Parse an uploaded projection CSV into the canonical column set.
+
+    There is no format detection: each column is interpreted on its own through the alias
+    table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
+    as long as its header spellings are known, and a file already written in canonical
+    names needs no aliases at all. Raises ValueError naming what could not be found when
+    the file does not read as a projection set.
+    """
     df_raw = pd.read_csv(io.BytesIO(csv_bytes))
+    column_mapping  = _map_columns_to_canonical(df_raw, params)
+    # Unrecognized columns keep their own names, so a file already using canonical names
+    # is understood without any alias matching at all.
+    renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
 
-    failures: list[str] = []
-    for format_name, renamer_key in _PROJECTION_FORMATS:
-        renamer = params.get(renamer_key, {})
-        renamed_columns = set(df_raw.rename(columns=renamer).columns)
-        missing_identity = [column for column in ('Player', 'Position')
-                            if column not in renamed_columns]
-        matched_cores = [column for column in _CORE_PROJECTION_COLUMNS
-                         if column in renamed_columns]
-        if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
-            return _parse_with_renamer(df_raw, renamer), format_name
+    missing_identity = [column for column in ('Player', 'Position')
+                        if column not in renamed_columns]
+    matched_cores    = [column for column in _CORE_PROJECTION_COLUMNS
+                        if column in renamed_columns]
+    if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
+        # Every name the aliases can produce, so a file already written in canonical names
+        # keeps those columns even though they never went through the mapping.
+        canonical_columns = set(params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
+        return _parse_with_renamer(df_raw, column_mapping, canonical_columns)
+
+    if missing_identity:
+        problem = f"no column for {' or '.join(missing_identity)}"
+    else:
         missing_cores = [column for column in _CORE_PROJECTION_COLUMNS
                          if column not in renamed_columns]
-        problem = (
-            f"missing {', '.join(missing_identity)}" if missing_identity
-            else f'recognized only {len(matched_cores)} of {len(_CORE_PROJECTION_COLUMNS)} '
-                 f"core stats (missing {', '.join(missing_cores)})"
-        )
-        failures.append(f'{format_name}: {problem}')
-
-    def count_matched_cores(renamer: dict) -> int:
-        return len(set(df_raw.rename(columns=renamer).columns) & set(_CORE_PROJECTION_COLUMNS))
-
-    best_renamer = max(
-        (params.get(renamer_key, {}) for _, renamer_key in _PROJECTION_FORMATS),
-        key=count_matched_cores,
-    )
-    unmapped = [column for column in df_raw.columns if column not in best_renamer]
+        problem = (f'only {len(matched_cores)} of {len(_CORE_PROJECTION_COLUMNS)} core stats '
+                   f"were recognized (no {', '.join(missing_cores)})")
+    unrecognized = [column for column in df_raw.columns if column not in column_mapping]
     raise ValueError(
-        f"File does not match any known projection format ({'; '.join(failures)}). "
-        f"Headers in the file that were not recognized: {', '.join(map(str, unmapped))}."
+        f'File does not read as a projection set: {problem}. Headers that were not '
+        f"recognized: {', '.join(map(str, unrecognized))}. Add their spellings to "
+        f'{_COLUMN_ALIASES_KEY} to teach the parser this source.'
     )
 
 
-def _parse_with_renamer(df_raw: pd.DataFrame, renamer: dict) -> pd.DataFrame:
-    """The format-specific parse: rename to canonical columns, drop junk, coerce stats."""
-    df = df_raw.rename(columns=renamer)
+def _parse_with_renamer(
+    df_raw: pd.DataFrame
+    , column_mapping: dict
+    , canonical_columns: set
+) -> pd.DataFrame:
+    """Rename this file's columns to canonical names, drop junk, coerce stats."""
+    df = df_raw.rename(columns=column_mapping)
 
     # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
     # would otherwise join the blend's column union, where every player from the OTHER
     # sources is "missing" them — and the blend drops any player missing any column
     # across all sources, so a single junk column can wipe out the entire pool.
-    canonical_columns = set(renamer.values()) | {'Games Played %'}
     df = df[[column for column in df.columns if column in canonical_columns]]
 
-    # Exports carry non-numeric stat values: hashtagbasketball.com repeats its header row
-    # inside the table body (every stat cell a string), and formats ratio stats as
+    # Sources carry non-numeric stat values: some repeat the header row inside the table
+    # body (every stat cell a string), and some format ratio stats as
     # "0.474 (5.2/11.0)". Extract the leading number where a stat column holds strings,
     # then drop rows with no numeric stats at all — those are the embedded header/junk rows.
     def coerce_stat_column(column: pd.Series) -> pd.Series:

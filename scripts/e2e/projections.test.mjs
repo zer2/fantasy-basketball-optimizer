@@ -91,7 +91,7 @@ test('projection blend weights', async t => {
             expectCleanSession(app, 'recovered from empty blend')
         })
 
-        await t.test('a format-mismatched upload is rejected at upload time, visibly', async () => {
+        await t.test('an unreadable upload is rejected at upload time, visibly', async () => {
             const firstSlider = page.locator('#ps-w-custom-1')
             assert.ok(await firstSlider.isDisabled(), 'a custom weight starts locked at zero')
             assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
@@ -99,15 +99,17 @@ test('projection blend weights', async t => {
 
             const uploadInput = page.locator('#ps-upload-custom-1')
             await uploadInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+            // Headers the alias table cannot interpret at all. (A file with only a few
+            // recognizable stats is NOT rejected — sparse projection sets are legitimate.)
             await uploadInput.setInputFiles({
-                name: 'unknown-format.csv',
+                name: 'not-projections.csv',
                 mimeType: 'text/csv',
-                buffer: Buffer.from('Name,Pos,g,pts,reb,ast\nSome Player,C,70,25,10,5\n'),
+                buffer: Buffer.from('Ticker,Sector,Close,Volume\nABC,Tech,101.5,20000\n'),
             })
 
             const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
             await uploadStatus.filter({ hasText: 'Upload failed' }).waitFor({ timeout: 15000 })
-            assert.match(await uploadStatus.textContent(), /does not match any known projection format/,
+            assert.match(await uploadStatus.textContent(), /does not read as a projection set/,
                          'the status should say WHY the file was rejected')
             await waitAppSettled(app)
             assert.ok(await firstSlider.isDisabled(), 'a rejected upload must leave the weight locked')
@@ -121,7 +123,7 @@ test('projection blend weights', async t => {
         })
 
         await t.test('a well-formed upload is auto-detected, retitleable, and changes results', async () => {
-            // Build a valid BBM-format CSV from real pool players with uniform stat lines —
+            // Build a valid projection CSV from real pool players with uniform stat lines —
             // blended in at full weight, it must visibly move the results.
             // Candidate rows render the rich display: the bare name is the .playername
             // span's leading text node; positions ride in the nested .player-positions span.
@@ -146,8 +148,8 @@ test('projection blend weights', async t => {
             const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
             await uploadStatus.filter({ hasText: 'players loaded' }).waitFor({ timeout: 15000 })
             await waitAppSettled(app)
-            assert.match(await uploadStatus.textContent(), /BBM format/,
-                         'the status should report the auto-detected format')
+            assert.match(await uploadStatus.textContent(), /\d+ players loaded/,
+                         'the status should report how many players were read')
             assert.ok(!(await page.locator('#ps-w-custom-1').isDisabled()),
                       'a successful upload should unlock the weight')
             assert.equal(await page.locator('#ps-w-custom-2').count(), 1,

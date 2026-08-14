@@ -28,17 +28,15 @@ Based on the proxy for the real pool of players and forecasts for their performa
 
 ## Percentage-stat adjustment
 
-The website applies one refinement to percentage statistics that goes beyond the published paper. 
+The website applies one refinement to percentage statistics that goes beyond the paper. 
 
-For percentage stats like FG% and FT%, what matters is not a player's raw percentage but how much they move their team's overall percentage, which depends on their attempt volume. The paper handles this by weighting each player's percentage deviation by their share of attempts, using an approximation (equation 4) that treats a team's total attempts as fixed: the number of players per team, times the average attempts per player. That approximation is convenient, but it ignores that the player being evaluated contributes their own attempts to the team total. A team fielding a high-volume shooter takes more shots than an average team, which dilutes each attempt's influence on the team's percentage; a team fielding a low-volume shooter takes fewer, concentrating it.
-
-The website's calculation does not invoke the approximation. Evaluating a player against an otherwise-average team of N players, the team's attempts are (N - 1) times the average attempts per player, plus the player's own attempts — so relative to the paper's formulation, each percentage-stat score is multiplied by 
+The paper approximates (via equation 4) that the number of attempts for a team is fixed, and does not vary depending on the chosen player. That approximation is needed to make the only difference between G-scores and Z-scores the inclusion of the period-to-period variance term. The website does away with the approximation, instead leaving G-scores as what they would be without applying equation 4. That leads to an extra term of 
 
 ```
 N x average_attempts / ((N - 1) x average_attempts + this_player_attempts)
 ```
 
-where N is the number of starters per team. The factor is exactly 1 for a player with average volume, slightly below 1 for high-volume players, and slightly above 1 for low-volume players. In practice it moderates the percentage-stat impact — positive or negative — of extreme-volume players: for example, a large share of the FT% burden of a poor high-volume free-throw shooter is self-diluted by the extra attempts they bring, and their FT% penalty shrinks accordingly.
+where N is the number of starters per team. The factor is one for a player with average volume, slightly below one for high-volume players, and slightly above one for low-volume players. It moderates the percentage-stat impact of extreme-volume players, accounting for the fact that as a player's volume increases, the influence of their success rate is diluted by the increasing number of attempts rather than scaling linearly. It also subtly increases the influence of low-volume players' success rate, because each attempt matters more when a team is expected to have fewer of them. 
 
 ## Limitations 
 

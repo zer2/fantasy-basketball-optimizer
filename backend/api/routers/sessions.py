@@ -113,8 +113,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) ->
         entry = get_upload(data_id)
         if entry is None:
             raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        parsed, _detected_format = parse_projection_csv(entry['bytes'], params)
-        result[data_id] = parsed
+        result[data_id] = parse_projection_csv(entry['bytes'], params)
     return result
 
 

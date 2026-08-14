@@ -239,7 +239,7 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
     """The v0 cache serves blended player pools across sessions, so its key must fully
     describe the blend: every source weight, plus the data_id of any uploaded table
     (uploads are immutable per data_id, so the id doubles as a content key). Regression
-    test for the key that excluded HTB/BBM weights and upload ids — changing an upload's
+    test for the key that excluded uploaded-source weights and upload ids — changing an upload's
     weight served the stale cached blend, silently, and an uploaded blend could leak
     into sessions that never uploaded anything."""
     from backend.services.build_agent import _v0_cache_key
@@ -273,11 +273,10 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
         'changing a Snowflake source weight must change the key'
 
 
-def test_parse_projection_csv_validates_stat_columns():
-    """A projection upload whose headers don't map to the canonical stat columns must be
-    rejected at parse time with a message naming the missing stats and the unrecognized
-    headers — previously such a file (e.g. an older BBM export format) parsed 'fine' and
-    only failed deep in the blend as an opaque '0 players available' error."""
+def test_parse_projection_csv_reads_any_recognized_spelling():
+    """Files are interpreted column by column through the alias table, not matched against
+    named export formats: differently-spelled headers for the same stat all land on the
+    canonical column, casing is irrelevant, and unrecognized columns are dropped."""
     from backend.services.build_agent import parse_projection_csv
     params = _load_params()['NBA']
 
@@ -285,42 +284,50 @@ def test_parse_projection_csv_validates_stat_columns():
     # join the blend's column union, where every player from the other sources is
     # "missing" them — and the blend drops players missing any column across all
     # sources, so one junk column can wipe out the entire pool.
-    valid_csv = (
+    slash_per_game_csv = (
         'Rank,Name,Pos,Value,g,m/g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
         '1,Test Player,C,12.3,70,34.0,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
     ).encode()
-    parsed, detected_format = parse_projection_csv(valid_csv, params)
-    assert detected_format == 'BBM', 'the format should be auto-detected from the headers'
+    parsed = parse_projection_csv(slash_per_game_csv, params)
     assert parsed.loc['Test Player', 'Points'] == 25.0
     for junk_column in ('Rank', 'Value', 'm/g'):
         assert junk_column not in parsed.columns, f'unmapped column {junk_column} should be dropped'
 
-    old_format_csv = (
-        'Name,Pos,g,pts,reb,ast,stl,blk,tov,3pm\n'
-        'Test Player,C,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0\n'
+    # Entirely different spellings, mixed casing, and padded headers — same canonical result.
+    abbreviated_csv = (
+        'PLAYER , POS ,GP,PTS,TREB,AST,STL,BLK,TO,3PM,FG%,FGA,FT%,FTA\n'
+        'Test Player,C,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
+    ).encode()
+    abbreviated = parse_projection_csv(abbreviated_csv, params)
+    assert abbreviated.loc['Test Player', 'Points'] == 25.0
+    assert abbreviated.loc['Test Player', 'Rebounds'] == 10.0
+    assert abbreviated.loc['Test Player', 'Free Throw %'] == 0.8
+
+    # A spreadsheet of something else is still refused, naming what it could not find.
+    unrelated_csv = (
+        'Ticker,Sector,Close,Volume\n'
+        'ABC,Tech,101.5,20000\n'
     ).encode()
     with pytest.raises(ValueError) as exc_info:
-        parse_projection_csv(old_format_csv, params)
-    assert 'Points' in str(exc_info.value), 'the error should name the missing canonical stats'
-    assert 'pts' in str(exc_info.value), "the error should list the file's unrecognized headers"
+        parse_projection_csv(unrelated_csv, params)
+    assert 'Player' in str(exc_info.value), 'the error should name what could not be found'
+    assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
-def test_parse_projection_csv_tolerates_league_paired_exports():
-    """Basketball Monster pairs each projection set with a league and exports only that
-    league's active categories — a file without e.g. Turnovers or the free-throw columns
-    must still be detected and parsed as BBM. The absent stats simply stay absent: the
-    blend covers them from other active sources, and step 4 narrows the category list
-    when nothing carries them. The upload endpoint reports the absences so the caption
-    can show them."""
+def test_parse_projection_csv_tolerates_files_missing_categories():
+    """A source that pairs each projection set with a league exports only that league's
+    active categories, so a file may legitimately lack e.g. Turnovers or the free-throw
+    columns. It must still parse; the absent stats simply stay absent (the blend covers
+    them from other active sources, and step 4 narrows the category list when nothing
+    carries them). The upload endpoint reports the absences so the caption can show them."""
     from backend.services.build_agent import parse_projection_csv
     params = _load_params()['NBA']
 
-    league_paired_csv = (
+    partial_csv = (
         'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,3/g,fg%,fga/g\n'
         '1,Test Player,C,12.3,70,25.0,10.0,5.0,1.0,1.0,2.0,0.55,18.0\n'
     ).encode()
-    parsed, detected_format = parse_projection_csv(league_paired_csv, params)
-    assert detected_format == 'BBM', 'a league-paired partial export should still detect as BBM'
+    parsed = parse_projection_csv(partial_csv, params)
     assert parsed.loc['Test Player', 'Points'] == 25.0
     assert parsed.loc['Test Player', 'Field Goal %'] == 0.55
     for absent_column in ('Turnovers', 'Free Throw %', 'Free Throw Attempts'):
@@ -328,7 +335,7 @@ def test_parse_projection_csv_tolerates_league_paired_exports():
             f'{absent_column} is not in the file and must not be invented'
 
     upload_response = client.post('/data/upload', files={
-        'file': ('bbm-league.csv', league_paired_csv, 'text/csv'),
+        'file': ('partial.csv', partial_csv, 'text/csv'),
     })
     assert upload_response.status_code == 200, upload_response.text
     assert upload_response.json()['missing_stats'] == ['Turnovers', 'Free Throw %'], \
@@ -357,7 +364,7 @@ def test_uploads_survive_restarts_and_stay_alive_while_in_use():
         'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
         '1,Test Player,C,12.3,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
     ).encode()
-    response = client.post('/data/upload', files={'file': ('bbm.csv', csv_bytes, 'text/csv')})
+    response = client.post('/data/upload', files={'file': ('projections.csv', csv_bytes, 'text/csv')})
     assert response.status_code == 200, response.text
     data_id = response.json()['data_id']
 
@@ -366,7 +373,7 @@ def test_uploads_survive_restarts_and_stay_alive_while_in_use():
     rehydrated = upload_store.get_upload(data_id)
     assert rehydrated is not None, 'an upload must survive a process restart'
     assert rehydrated['bytes'] == csv_bytes, 'the rehydrated file must be byte-identical'
-    assert rehydrated['file_type'] == 'BBM', 'the detected format must survive too'
+    assert rehydrated['n_players'] == response.json()['n_players'], 'its metadata must survive too'
 
     # The TTL is idle time, not age: an upload still in use never expires. Backdate the
     # entry to just inside the window, read it, and confirm the clock restarted.
@@ -383,10 +390,10 @@ def test_uploads_survive_restarts_and_stay_alive_while_in_use():
 
 
 def test_partial_upload_as_sole_source_narrows_categories_and_builds():
-    """The user's league-paired-export scenario end to end: a BBM file without Turnovers
-    or free-throw data as the ONLY active projection source. The session must build, and
-    the categories the pool cannot score must be narrowed out of the response's category
-    list (the frontend syncs its checkboxes from it) instead of crashing the pipeline."""
+    """A file lacking Turnovers and free-throw data as the ONLY active projection source,
+    end to end. The session must build, and the categories the pool cannot score must be
+    narrowed out of the response's category list (the frontend syncs its checkboxes from
+    it) instead of crashing the pipeline."""
     positions = ('PG', 'SG', 'SF', 'PF', 'C')
     rows = ['Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,3/g,fg%,fga/g']
     for player_index in range(60):
@@ -396,7 +403,7 @@ def test_partial_upload_as_sole_source_narrows_categories_and_builds():
         )
     csv_bytes = '\n'.join(rows).encode()
 
-    upload_response = client.post('/data/upload', files={'file': ('bbm.csv', csv_bytes, 'text/csv')})
+    upload_response = client.post('/data/upload', files={'file': ('partial.csv', csv_bytes, 'text/csv')})
     assert upload_response.status_code == 200, upload_response.text
     data_id = upload_response.json()['data_id']
 
@@ -421,21 +428,19 @@ def test_partial_upload_as_sole_source_narrows_categories_and_builds():
 
 
 def test_parse_projection_csv_filters_non_numeric_rows():
-    """hashtagbasketball.com exports repeat the header row inside the table body (every
-    stat cell a string) and format ratio stats as '0.583 (10.2/17.5)'. The parser must
-    extract the leading numbers, drop the embedded header rows, and never crash dividing
-    a string by 82."""
+    """Some sources repeat the header row inside the table body (every stat cell a string)
+    and format ratio stats as '0.583 (10.2/17.5)'. The parser must extract the leading
+    numbers, drop the embedded header rows, and never crash dividing a string by 82."""
     from backend.services.build_agent import parse_projection_csv
     params = _load_params()['NBA']
 
-    htb_csv = (
+    messy_csv = (
         'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
         '1,1.5,Nikola Jokic,C,DEN,70,34.0,"0.583 (10.2/17.5)","0.821 (6.0/7.3)",1.1,26.5,12.5,9.0,1.3,0.9,3.0,15.2\n'
         'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
         '2,2.1,Luka Doncic,PG,DAL,72,36.0,"0.490 (9.8/20.0)","0.786 (7.0/8.9)",3.0,32.0,9.0,9.5,1.4,0.5,4.0,14.8\n'
     ).encode()
-    parsed, detected_format = parse_projection_csv(htb_csv, params)
-    assert detected_format == 'HTB', 'the format should be auto-detected from the headers'
+    parsed = parse_projection_csv(messy_csv, params)
     assert len(parsed) == 2, 'embedded header rows must be dropped'
     assert parsed.loc['Nikola Jokic', 'Points'] == 26.5
     assert parsed.loc['Nikola Jokic', 'Field Goal %'] == 0.583, 'leading number extracted from the compound cell'
@@ -464,7 +469,7 @@ def test_uploaded_positions_use_canonical_eligibility():
         '1,Nikola Jokic,"PF, C",70,26.5,12.2,9.0,1.3,0.9,3.0,1.1,0.583,17.5,0.820,7.4\n'
     ).encode()
     upload_response = client.post('/data/upload',
-                                  files={'file': ('bbm.csv', conflicting_upload, 'text/csv')})
+                                  files={'file': ('conflicting.csv', conflicting_upload, 'text/csv')})
     assert upload_response.status_code == 200, upload_response.text
     data_id = upload_response.json()['data_id']
 

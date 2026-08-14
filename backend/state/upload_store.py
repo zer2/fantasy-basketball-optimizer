@@ -1,4 +1,4 @@
-"""Store for user-uploaded projection CSVs (HTB / BBM), memory + disk, TTL-expiring.
+"""Store for user-uploaded projection CSVs, memory + disk, TTL-expiring.
 
 Application state, a peer of the session store: the /data/upload route stashes an
 uploaded file here and returns a short id; session creation/patch later pulls it back
@@ -51,7 +51,6 @@ def _write_upload_to_disk(data_id: str, entry: dict) -> None:
     csv_path, meta_path = _upload_paths(data_id)
     csv_path.write_bytes(entry['bytes'])
     meta_path.write_text(json.dumps({
-        'file_type':     entry['file_type'],
         'n_players':     entry['n_players'],
         'last_accessed': entry['last_accessed'],
     }), encoding='utf-8')
@@ -81,7 +80,6 @@ def _read_upload_from_disk(data_id: str) -> Optional[dict]:
         metadata = json.loads(meta_path.read_text(encoding='utf-8'))
         return {
             'bytes':         csv_path.read_bytes(),
-            'file_type':     metadata['file_type'],
             'n_players':     metadata['n_players'],
             'last_accessed': float(metadata['last_accessed']),
         }
@@ -115,10 +113,9 @@ def _evict_expired_uploads(now: float) -> None:
             _discard_upload(meta_path.stem)
 
 
-def store_upload(data_id: str, csv_bytes: bytes, file_type: str, n_players: int) -> None:
+def store_upload(data_id: str, csv_bytes: bytes, n_players: int) -> None:
     entry = {
         'bytes':         csv_bytes,
-        'file_type':     file_type,
         'n_players':     n_players,
         'last_accessed': time.time(),
     }
