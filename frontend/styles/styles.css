@@ -1042,11 +1042,6 @@ tr {
         width: 22px;
         height: 16px;
     }
-
-    .roster-headshot {
-        width: 28px;
-        height: 20px;
-    }
 }
 
 
@@ -1222,6 +1217,16 @@ tr {
     width: 37px;
     height: 27px;
     object-fit: cover;
+}
+
+/* Board cells are only 64px wide on a phone, where a 37px face crowds out the last name
+   under it. Must sit AFTER the rule above: a media query adds no specificity, so an
+   override placed earlier in the file would simply lose to it. */
+@media (max-width: 768px) {
+    .roster-headshot {
+        width: 26px;
+        height: 19px;
+    }
 }
 
 .rosteronteam {
