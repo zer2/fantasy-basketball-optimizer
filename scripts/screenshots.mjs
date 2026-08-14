@@ -153,6 +153,22 @@ async function ensure(page, state) {
 async function setMode(page, mode) { await setSelect(page, 'ls-mode', mode);          await waitEval(page) }
 async function setFmt(page, fmt)   { await setSelect(page, 'fc-scoring-format', fmt); await waitEval(page) }
 
+/** Waits until the candidate table actually holds player rows.
+ *
+ *  waitEval only watches the eval indicator, which is NOT sufficient after a sidebar change:
+ *  the Player Stats section debounces for 800ms, so the indicator still reads 'idle' from the
+ *  previous evaluate when waitEval looks at it, and it returns while the table sits emptied by
+ *  buildTableHeader and not yet refilled. That window is wide enough to photograph — it is how
+ *  `main` was captured showing a header row and nothing under it. */
+async function waitCandidateRows(page, minimum = 8) {
+    await page.waitForFunction(
+        min => document.querySelectorAll('#hscoretable .playerheaderdiv').length >= min,
+        minimum,
+        { timeout: 120000 },
+    )
+    await page.waitForTimeout(200)
+}
+
 // Establish the demonstration data source: historical stats for a completed season, so shots stay
 // identical over time (live projections drift as the season updates). The H-scoring / draft page uses
 // 2024-25 — where Giannis, the docs' punt exemplar, ranks top-6 by H-score; auction/season use 2025-26
@@ -163,6 +179,7 @@ async function selectHistoricalSeason(page, season) {
     await waitEval(page)
     await setSelect(page, 'ps-season', season)
     await waitEval(page)
+    await waitCandidateRows(page)
     // setSelect opened the Player Stats <details> to reach the trigger — collapse it so `main` (and
     // the other early shots) show the default, un-expanded sidebar.
     await page.evaluate(() => document.querySelectorAll('details.sidebar-section').forEach(d => {
@@ -174,11 +191,12 @@ const STATES = {
     async load(page) {
         await page.goto(APP, { waitUntil: 'domcontentloaded' })   // networkidle hangs on the polling SPA
         await page.locator('#hscoretable .playerheaderdiv').first().waitFor({ timeout: 120000 })   // first eval pulls from Snowflake
+        await waitCandidateRows(page)
         await page.waitForTimeout(300)
     },
-    async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Each Category') },
-    async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Most Categories') },
-    async 'draft-Roto'(page) { await setMode(page, 'Draft Mode'); await setFmt(page, 'Rotisserie') },
+    async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Each Category');  await waitCandidateRows(page) },
+    async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Most Categories'); await waitCandidateRows(page) },
+    async 'draft-Roto'(page) { await setMode(page, 'Draft Mode'); await setFmt(page, 'Rotisserie');      await waitCandidateRows(page) },
 
     async 'position'(page)     { await ensure(page, 'draft-EC'); await expandSection(page, /Position/i) },
     // Player Stats section open; the base data source (historical, set once after load) is unchanged.
