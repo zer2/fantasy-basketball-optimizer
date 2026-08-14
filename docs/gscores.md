@@ -26,6 +26,20 @@ One of the inputs needed for the scoring process is a player pool. Using the ent
 
 Based on the proxy for the real pool of players and forecasts for their performances, it is easy to calculate player-to-player variance. Week-to-week variance cannot be inferred from forecasts, and instead has to be calculated historically. The website uses historical conversion factors from player-to-player variance to week-to-week variance. 
 
+## Percentage-stat adjustment
+
+The website applies one refinement to percentage statistics that goes beyond the published paper. 
+
+For percentage stats like FG% and FT%, what matters is not a player's raw percentage but how much they move their team's overall percentage, which depends on their attempt volume. The paper handles this by weighting each player's percentage deviation by their share of attempts, using an approximation (equation 4) that treats a team's total attempts as fixed: the number of players per team, times the average attempts per player. That approximation is convenient, but it ignores that the player being evaluated contributes their own attempts to the team total. A team fielding a high-volume shooter takes more shots than an average team, which dilutes each attempt's influence on the team's percentage; a team fielding a low-volume shooter takes fewer, concentrating it.
+
+The website's calculation does not invoke the approximation. Evaluating a player against an otherwise-average team of N players, the team's attempts are (N - 1) times the average attempts per player, plus the player's own attempts — so relative to the paper's formulation, each percentage-stat score is multiplied by 
+
+```
+N x average_attempts / ((N - 1) x average_attempts + this_player_attempts)
+```
+
+where N is the number of starters per team. The factor is exactly 1 for a player with average volume, slightly below 1 for high-volume players, and slightly above 1 for low-volume players. In practice it moderates the percentage-stat impact — positive or negative — of extreme-volume players: for example, a large share of the FT% burden of a poor high-volume free-throw shooter is self-diluted by the extra attempts they bring, and their FT% penalty shrinks accordingly.
+
 ## Limitations 
 
 G-scores are fundamentally limited because they do not adapt to drafting circumstances. Drafting based purely on total G-score, or any static metric, is a flawed approach. 

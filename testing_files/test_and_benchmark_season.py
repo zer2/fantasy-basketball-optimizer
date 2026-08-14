@@ -241,10 +241,10 @@ def test_season_mode_waiver():
     assert h_scores == sorted(h_scores, reverse=True), 'Waiver candidates not sorted by H-score'
 
     expected_waiver_top = [
-        ('Guerschon Yabusele',         52.6),
-        ('Mark Williams',              52.5),
-        ('Keyonte George',             52.5),
-        ('Gary Trent',                 52.5),
+        ('Guerschon Yabusele',         52.5),
+        ('Mark Williams',              52.4),
+        ('Keyonte George',             52.3),
+        ('Gary Trent',                 52.3),
     ]
     candidates_by_name = name_candidates(session, candidates)
     for expected_name, expected_score in expected_waiver_top:

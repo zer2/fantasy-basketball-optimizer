@@ -46,14 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# Regenerated 2026-08-13 for identity-refactor Stage B: the payload is id-keyed
-# (Candidate.player_id, RosterAssignment.player_id) — same scores, verified by the exact
-# value-identity probe before this regen.
+# Regenerated 2026-08-14 for the team-denominator correction to percentage-stat G-scores
+# (calculate_scores_from_coefficients: the unpublished-paper factor
+# n_starters*V-bar / ((n_starters-1)*V-bar + V_p)) — scores deliberately move.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '185b9617336ef7d141134d523ecfef9f848171d7b0aac5535f34ce4abfbd980d',
-    ('Head to Head: Each Category',  'mid'):   '8ea761cd11fb9e76d67abd9440c74bf2d4dfcd6148c19cb83228d74105e86dc9',
-    ('Head to Head: Most Categories','empty'): '8f7fe3fb4d6deadaeb363b550501a616e3048c17e027dd6059b25bb0cf86ec6b',
-    ('Head to Head: Most Categories','mid'):   'c95cdeff60c75ee3c43da32212126034b2d3cc013c6789b391a5986fd0ef560e',
+    ('Head to Head: Each Category',  'empty'): '758e4078ed1e8250c8d4125f5cb4eec025d21ca990bf288b5af8ce0918910e5a',
+    ('Head to Head: Each Category',  'mid'):   '83b7fa08a95147bbe5a0329693bc2e912c35449a919f4d7b41d044adb7ad04af',
+    ('Head to Head: Most Categories','empty'): '8ecf63b1f2387aae5d826814d073d10eaa638503b3c76bb7a16c408de9cf5af8',
+    ('Head to Head: Most Categories','mid'):   '25fd72f5dcae9621b6842167a346c02f68e22393f7d33abed8db9491c5c440f1',
 }
 
 

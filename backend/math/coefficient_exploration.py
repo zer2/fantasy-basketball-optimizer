@@ -89,6 +89,7 @@ def compute_season_coefficients(
         , counting_stats = all_counting_stats
         , ratio_stats    = all_ratio_stats
         , categories     = all_categories
+        , n_starters     = n_starters
     )
     n_players = n_drafters * n_starters
     representative_player_set = (

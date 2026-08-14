@@ -36,49 +36,50 @@ _COMBO_THRESHOLD = 2.0
 _SCORE_TOL = 0.0001   # allowed absolute deviation on H-score diffs (0–1 scale)
 
 # Top expected suggestions per combo size.
-# Regenerated 2026-07-19 for the punt-seed init (multi-start / weakest-category, replacing the old
-# heuristic) in algorithm_agents -- the H-score shifts reshuffle the 2v2/3v3 top trades (1v1 unchanged).
+# Regenerated 2026-08-14 for the team-denominator correction to percentage-stat G-scores
+# (the unpublished-paper factor in calculate_scores_from_coefficients) -- the score
+# shifts reshuffle the 2v2/3v3 top trades; the 1v1 pairs are unchanged.
 # send / receive are sorted lists so order within the group does not matter.
 _EXPECTED = {
     '1v1': [
         {
-            'send':    ['Isaiah Hartenstein (C)'],
-            'receive': ['Malik Monk (PG,SG,SF)'],
-            'your_score':  0.0019,
-            'their_score': 0.0007,
+            'send':    ['Isaiah Hartenstein'],
+            'receive': ['Malik Monk'],
+            'your_score':  0.0021,
+            'their_score': 0.0006,
         },
         {
-            'send':    ['Daniel Gafford (C,PF)'],
-            'receive': ['Andrew Wiggins (SF,PF)'],
-            'your_score':  0.0018,
-            'their_score': 0.0010,
+            'send':    ['Daniel Gafford'],
+            'receive': ['Andrew Wiggins'],
+            'your_score':  0.0015,
+            'their_score': 0.0013,
         },
     ],
     '2v2': [
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Rudy Gobert (C)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Tyrese Maxey (PG,SG)'],
-            'your_score':  0.0045,
-            'their_score': 0.0003,
+            'send':    ['Andrew Nembhard', 'Rudy Gobert'],
+            'receive': ['Andrew Wiggins', 'Tyrese Maxey'],
+            'your_score':  0.0044,
+            'their_score': 0.0005,
         },
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Daniel Gafford (C,PF)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Derrick Jones Jr. (SF,PF)'],
-            'your_score':  0.0042,
-            'their_score': 0.0007,
+            'send':    ['Andrew Nembhard', 'Isaiah Hartenstein'],
+            'receive': ['Derrick Jones Jr.', 'Malik Monk'],
+            'your_score':  0.0039,
+            'their_score': 0.0005,
         },
     ],
     '3v3': [
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Isaiah Hartenstein (C)', 'Rudy Gobert (C)'],
-            'receive': ['Kyshawn George (SG,SF)', 'Pascal Siakam (C,SF,PF)', 'Ty Jerome (PG,SG)'],
-            'your_score':  0.0059,
-            'their_score': 0.0011,
+            'send':    ['Andrew Nembhard', 'Daniel Gafford', 'Rudy Gobert'],
+            'receive': ['Derrick Jones Jr.', 'Kyshawn George', 'Pascal Siakam'],
+            'your_score':  0.0063,
+            'their_score': 0.0004,
         },
         {
-            'send':    ['Daniel Gafford (C,PF)', 'Isaiah Hartenstein (C)', 'Mike Conley (PG)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Malik Monk (PG,SG,SF)', 'Ty Jerome (PG,SG)'],
-            'your_score':  0.0057,
+            'send':    ['Daniel Gafford', 'Isaiah Hartenstein', 'Mike Conley'],
+            'receive': ['Andrew Wiggins', 'Malik Monk', 'Ty Jerome'],
+            'your_score':  0.0059,
             'their_score': 0.0001,
         },
     ],
