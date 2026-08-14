@@ -453,12 +453,20 @@ def test_roto_minimal_punting(sessions, auction):
                     [season, mode, hard_count, soft_count, weakest_cat,
                      f'{100 * float(np.min(weakest_rates)):.0f}%',
                      session.player_registry[weakest_player].name])
-        assert hard_count == 0, f'{season}: {hard_count} HARD punt(s) in Rotisserie'
+        # Hard punts are allowed but must stay RARE: an extreme-profile star can rationally
+        # commit to one (Giannis's FT% after the team-denominator correction to percentage
+        # G-scores — accepted 2026-08-14), but more than a couple among the top anchors
+        # would mean full H2H-style punting has leaked into Rotisserie.
+        hard_ceiling = 2
+        assert hard_count <= hard_ceiling, (
+            f'{season}: {hard_count} hard Roto punt(s) among the top anchors '
+            f'(> {hard_ceiling}) — hard punting should be a rare outlier, not common'
+        )
         # Soft counts measure roster SHAPE as much as strategy: an auction anchor's expected team is a
         # star plus budget-priced fill, which mechanically spreads category win rates wider than a
         # snake-draft expectation and parks more of them in the 20-40% band without any punt intent.
-        # The hard==0 floor above is the real Roto property; the soft ceilings only catch egregious
-        # drift (draft measured <=21/season; auction measured ~47 on the widest season, 2020-21).
+        # The near-zero hard floor above is the real Roto property; the soft ceilings only catch
+        # egregious drift (draft measured <=21/season; auction measured ~47 on the widest season, 2020-21).
         soft_ceiling = (5 if auction else 2) * len(rows)
         assert soft_count <= soft_ceiling, f'{season}: Roto soft-punting excessively ({soft_count})'
 
