@@ -180,20 +180,21 @@ test('projection blend weights', async t => {
                       'a zero-weight upload must leave the blend fully working')
             expectCleanSession(app, 'upload weight back to zero')
 
-            // The whole custom structure resets on reload: uploads cannot survive one, so
-            // the restored page starts back at a single locked, untitled slot.
+            // Uploads survive a reload: the file is kept server-side on a day-long clock that
+            // resets whenever a session uses it, and the slot it fills (id, title, weight,
+            // status line) is remembered in preferences.
             await loadApp(app)
+            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'My projections',
+                         'the retitled source should come back under its own name')
+            assert.ok(!(await page.locator('#ps-w-custom-1').isDisabled()),
+                      'a restored upload keeps its weight unlocked — the file is still there')
             assert.equal(await page.locator('#ps-w-custom-1').inputValue(), '0',
-                         "an uploaded source's weight must reset to zero on reload")
-            assert.ok(await page.locator('#ps-w-custom-1').isDisabled(),
-                      "an uploaded source's weight must be locked again on reload")
-            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
-                         'titles reset with the structure')
-            assert.equal(await page.locator('#ps-w-custom-2').count(), 0,
-                         'the added slot disappears on reload')
+                         'the restored weight is the one last set, not a default')
+            assert.equal(await page.locator('#ps-w-custom-2').count(), 1,
+                         'the empty next slot is still open after the restore')
             assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
-                      'the reloaded page should evaluate cleanly without the upload')
-            expectCleanSession(app, 'reload without the upload')
+                      'the reloaded page should evaluate cleanly with the restored upload')
+            expectCleanSession(app, 'reload with the restored upload')
         })
     } finally {
         await app.close()

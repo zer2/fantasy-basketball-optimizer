@@ -10,8 +10,7 @@ import { pref, savePref } from '../preferences.js'
 
 // One row per custom projection slot. The upload's data_id is its identity everywhere
 // (blend-weight key, session requests); the title is presentation-only, like team labels
-// on the draft board. Deliberately not persisted: uploads cannot survive a reload (they
-// live in the backend's memory), so the whole structure resets with the page.
+// on the draft board.
 interface CustomUploadRow {
     dataId: string | null
     titleInput: HTMLInputElement
@@ -21,8 +20,43 @@ interface CustomUploadRow {
     uploadInput: HTMLInputElement
 }
 
+// What is remembered across reloads for a filled slot. Only the id is load-bearing — the
+// file itself lives server-side, kept for a day on a clock that resets whenever a session
+// uses it, so a remembered id normally still resolves. When it does not (a longer gap, a
+// wiped cache), the patch that carries it fails and markUploadedSourcesExpired clears the
+// slot with a visible message, which is the same recovery a mid-session expiry gets.
+interface StoredCustomUpload {
+    dataId: string
+    title: string
+    weight: number
+    statusText: string
+}
+
+const CUSTOM_UPLOADS_PREF = 'custom_uploads'
 const MAX_CUSTOM_UPLOADS = 5
 let customUploadRows: CustomUploadRow[] = []
+
+/** Persists every filled slot (id, title, weight, status line) so uploads survive a reload. */
+function saveCustomUploads(): void {
+    savePref(CUSTOM_UPLOADS_PREF, customUploadRows
+        .filter(row => row.dataId !== null)
+        .map(row => ({
+            dataId:     row.dataId as string,
+            title:      row.titleInput.value,
+            weight:     parseFloat(row.slider.value),
+            statusText: row.statusSpan.textContent ?? '',
+        })))
+}
+
+/** The remembered slots, ignoring anything malformed (hand-edited or older storage). */
+function readStoredCustomUploads(): StoredCustomUpload[] {
+    const stored = pref<unknown>(CUSTOM_UPLOADS_PREF, [])
+    if (!Array.isArray(stored)) return []
+    return stored.filter((entry): entry is StoredCustomUpload =>
+        entry !== null && typeof entry === 'object'
+        && typeof (entry as StoredCustomUpload).dataId === 'string'
+        && typeof (entry as StoredCustomUpload).weight === 'number')
+}
 
 /**
  * Marks every uploaded source as expired: clears its data_id, locks its weight back to
@@ -43,6 +77,8 @@ export function markUploadedSourcesExpired(): boolean {
         // Clear the input so re-selecting the same file fires a fresh change event.
         row.uploadInput.value = ''
     }
+    // Forget the dead ids too, so a reload does not restore them and fail all over again.
+    if (clearedAny) saveCustomUploads()
     return clearedAny
 }
 
@@ -201,17 +237,22 @@ function renderBlendWeights(container: HTMLElement): void {
     const customCaption = document.createElement('div')
     customCaption.className = 'sidebar-caption'
     customCaption.textContent =
-        'Upload projection CSVs (Hashtag Basketball, Basketball Monster, or any file with ' +
-        'standard stat columns — the format is detected automatically). Uploads last for ' +
-        'this page visit only.'
+        'Upload projection CSVs from any source — each column is read on its own, so most ' +
+        'exports work as downloaded, and stats a file leaves out are taken from the other ' +
+        'sources. Uploads are kept for a day and survive a reload.'
     container.append(customCaption)
 
     const customRowsContainer = document.createElement('div')
     customRowsContainer.id = 'ps-custom-uploads'
     container.append(customRowsContainer)
 
+    // Restore the slots filled before the last reload, then leave one empty slot open.
     customUploadRows = []
-    appendCustomUploadRow(customRowsContainer)
+    for (const storedUpload of readStoredCustomUploads()) {
+        if (customUploadRows.length >= MAX_CUSTOM_UPLOADS) break
+        appendCustomUploadRow(customRowsContainer, storedUpload)
+    }
+    if (customUploadRows.length < MAX_CUSTOM_UPLOADS) appendCustomUploadRow(customRowsContainer)
 }
 
 /** Builds a weight slider + its value display (shared by Snowflake and custom sources). */
@@ -238,8 +279,12 @@ function makeWeightSlider(
 }
 
 /** Appends one custom-projection row: [editable title | weight slider] + [file chooser | status].
- *  The slider stays locked at zero until this row's upload succeeds. */
-function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
+ *  The slider stays locked at zero until this row's upload succeeds. `storedUpload` restores a
+ *  slot remembered from a previous visit, already filled and unlocked. */
+function appendCustomUploadRow(
+    customRowsContainer: HTMLElement
+    , storedUpload?: StoredCustomUpload
+): void {
     const rowNumber = customUploadRows.length + 1
 
     const sliderRow = document.createElement('div')
@@ -252,14 +297,15 @@ function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
     titleInput.type = 'text'
     titleInput.id = `ps-custom-title-${rowNumber}`
     titleInput.className = 'sidebar-input custom-projection-title'
-    titleInput.value = `Data ${rowNumber}`
-    titleInput.addEventListener('input', event => event.stopPropagation())
+    titleInput.value = storedUpload?.title ?? `Data ${rowNumber}`
+    titleInput.addEventListener('input', event => { event.stopPropagation(); saveCustomUploads() })
     titleInput.addEventListener('change', event => event.stopPropagation())
     sliderRow.append(titleInput)
 
-    const { slider, valueDisplay } = makeWeightSlider(`ps-w-custom-${rowNumber}`, 0)
+    const { slider, valueDisplay } = makeWeightSlider(`ps-w-custom-${rowNumber}`, storedUpload?.weight ?? 0)
     // A weight for a source with no file behind it is meaningless — locked until upload succeeds.
-    slider.disabled = true
+    slider.disabled = storedUpload === undefined
+    slider.addEventListener('input', saveCustomUploads)
     sliderRow.append(slider, valueDisplay)
     customRowsContainer.append(sliderRow)
 
@@ -275,10 +321,14 @@ function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
 
     const statusSpan = document.createElement('span')
     statusSpan.className = 'sidebar-caption'
+    statusSpan.textContent = storedUpload?.statusText ?? ''
     uploadRow.append(statusSpan)
     customRowsContainer.append(uploadRow)
 
-    const row: CustomUploadRow = { dataId: null, titleInput, slider, valueDisplay, statusSpan, uploadInput }
+    const row: CustomUploadRow = {
+        dataId: storedUpload?.dataId ?? null,
+        titleInput, slider, valueDisplay, statusSpan, uploadInput,
+    }
     customUploadRows.push(row)
 
     uploadInput.addEventListener('change', async () => {
@@ -296,6 +346,7 @@ function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
                 ? ` (no ${resp.missing_stats.join('/')})` : ''
             statusSpan.textContent = `✓ ${resp.n_players} players loaded${missingNote}`
             slider.disabled = false
+            saveCustomUploads()
             // Open the next slot once this one is filled (first upload into this row only).
             if (!hadUploadAlready && customUploadRows.length < MAX_CUSTOM_UPLOADS) {
                 appendCustomUploadRow(customRowsContainer)
@@ -308,6 +359,7 @@ function appendCustomUploadRow(customRowsContainer: HTMLElement): void {
             slider.disabled = true
             slider.value = '0'
             valueDisplay.textContent = '0.00'
+            saveCustomUploads()
             // Browsers don't fire change when the same file is re-selected while the
             // input still holds it — and retrying the same file is the normal recovery
             // from a failure. Clear the input so the retry fires. On success the input
