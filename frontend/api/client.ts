@@ -128,10 +128,12 @@ export async function fetchConfig(sport: string): Promise<SportConfig> {
 
 // ── POST /data/upload ─────────────────────────────────────────────────────────
 
-/** Uploads a projection CSV (export format auto-detected server-side) and returns its data_id. */
+/** Uploads a projection CSV (export format auto-detected server-side) and returns its data_id.
+ *  missing_stats lists standard stat columns the file does not carry — league-paired exports
+ *  (e.g. Basketball Monster) only include a league's active categories. */
 export async function uploadCsv(
     file: File
-): Promise<{ data_id: string; detected_format: string; n_players: number; expires_at: string }> {
+): Promise<{ data_id: string; detected_format: string; n_players: number; expires_at: string; missing_stats: string[] }> {
     const form = new FormData()
     form.append('file', file)
     return jsonRequest(`${BASE_URL}/data/upload`, 'Upload', { method: 'POST', body: form })

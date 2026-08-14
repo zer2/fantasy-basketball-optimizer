@@ -205,10 +205,15 @@ def run_step1(
     session.v0_clean = v0_with_names.drop(columns=['Player'])
 
 
-# The per-game stats every projection export must map to. A format-drifted file (e.g. an
-# older export with renamed headers) would otherwise sail through parsing and only fail
-# much later, deep in the blend, as a baffling "0 players available" error.
+# The per-game stats a projection export CAN map to. League-paired exports (Basketball
+# Monster pairs each projection set with a league and emits only that league's active
+# categories) may legitimately lack several — so recognition requires Player, Position,
+# and only _MIN_MATCHED_CORE_COLUMNS of these. That is still unmistakably a projection
+# file, while a format-drifted export (renamed headers) maps ~none and is rejected with
+# a clear message instead of failing much later, deep in the blend, as a baffling
+# "0 players available" error.
 _CORE_PROJECTION_COLUMNS = ('Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers', 'Threes')
+_MIN_MATCHED_CORE_COLUMNS = 3
 
 # Known export formats, in detection order. A file already using canonical column names
 # passes under the first mapping (renaming is a no-op), so "any common projection file"
@@ -226,22 +231,32 @@ def parse_projection_csv(csv_bytes: bytes, params: dict) -> tuple[pd.DataFrame, 
     df_raw = pd.read_csv(io.BytesIO(csv_bytes))
 
     failures: list[str] = []
-    best_format = None
-    best_missing_count = None
     for format_name, renamer_key in _PROJECTION_FORMATS:
         renamer = params.get(renamer_key, {})
         renamed_columns = set(df_raw.rename(columns=renamer).columns)
-        missing = [column for column in _CORE_PROJECTION_COLUMNS if column not in renamed_columns]
-        if not missing and 'Position' in renamed_columns:
+        missing_identity = [column for column in ('Player', 'Position')
+                            if column not in renamed_columns]
+        matched_cores = [column for column in _CORE_PROJECTION_COLUMNS
+                         if column in renamed_columns]
+        if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
             return _parse_with_renamer(df_raw, renamer), format_name
-        problem = f"missing {', '.join(missing)}" if missing else 'missing Position'
+        missing_cores = [column for column in _CORE_PROJECTION_COLUMNS
+                         if column not in renamed_columns]
+        problem = (
+            f"missing {', '.join(missing_identity)}" if missing_identity
+            else f'recognized only {len(matched_cores)} of {len(_CORE_PROJECTION_COLUMNS)} '
+                 f"core stats (missing {', '.join(missing_cores)})"
+        )
         failures.append(f'{format_name}: {problem}')
-        if best_missing_count is None or len(missing) < best_missing_count:
-            best_missing_count = len(missing)
-            best_format = (format_name, renamer)
 
-    unmapped = [column for column in df_raw.columns
-                if best_format is None or column not in best_format[1]]
+    def count_matched_cores(renamer: dict) -> int:
+        return len(set(df_raw.rename(columns=renamer).columns) & set(_CORE_PROJECTION_COLUMNS))
+
+    best_renamer = max(
+        (params.get(renamer_key, {}) for _, renamer_key in _PROJECTION_FORMATS),
+        key=count_matched_cores,
+    )
+    unmapped = [column for column in df_raw.columns if column not in best_renamer]
     raise ValueError(
         f"File does not match any known projection format ({'; '.join(failures)}). "
         f"Headers in the file that were not recognized: {', '.join(map(str, unmapped))}."

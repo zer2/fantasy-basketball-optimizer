@@ -305,6 +305,83 @@ def test_parse_projection_csv_validates_stat_columns():
     assert 'pts' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_parse_projection_csv_tolerates_league_paired_exports():
+    """Basketball Monster pairs each projection set with a league and exports only that
+    league's active categories — a file without e.g. Turnovers or the free-throw columns
+    must still be detected and parsed as BBM. The absent stats simply stay absent: the
+    blend covers them from other active sources, and step 4 narrows the category list
+    when nothing carries them. The upload endpoint reports the absences so the caption
+    can show them."""
+    from backend.services.build_agent import parse_projection_csv
+    params = _load_params()['NBA']
+
+    league_paired_csv = (
+        'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,3/g,fg%,fga/g\n'
+        '1,Test Player,C,12.3,70,25.0,10.0,5.0,1.0,1.0,2.0,0.55,18.0\n'
+    ).encode()
+    parsed, detected_format = parse_projection_csv(league_paired_csv, params)
+    assert detected_format == 'BBM', 'a league-paired partial export should still detect as BBM'
+    assert parsed.loc['Test Player', 'Points'] == 25.0
+    assert parsed.loc['Test Player', 'Field Goal %'] == 0.55
+    for absent_column in ('Turnovers', 'Free Throw %', 'Free Throw Attempts'):
+        assert absent_column not in parsed.columns, \
+            f'{absent_column} is not in the file and must not be invented'
+
+    upload_response = client.post('/data/upload', files={
+        'file': ('bbm-league.csv', league_paired_csv, 'text/csv'),
+    })
+    assert upload_response.status_code == 200, upload_response.text
+    assert upload_response.json()['missing_stats'] == ['Turnovers', 'Free Throw %'], \
+        'the upload response should name the standard stats the file lacks'
+
+    # A file with too few recognizable stat columns is still rejected — tolerance for
+    # missing categories must not admit arbitrary CSVs that happen to have Name/Pos.
+    too_sparse_csv = (
+        'Name,Pos,g,p/g,junk\n'
+        'Test Player,C,70,25.0,1\n'
+    ).encode()
+    with pytest.raises(ValueError):
+        parse_projection_csv(too_sparse_csv, params)
+
+
+def test_partial_upload_as_sole_source_narrows_categories_and_builds():
+    """The user's league-paired-export scenario end to end: a BBM file without Turnovers
+    or free-throw data as the ONLY active projection source. The session must build, and
+    the categories the pool cannot score must be narrowed out of the response's category
+    list (the frontend syncs its checkboxes from it) instead of crashing the pipeline."""
+    positions = ('PG', 'SG', 'SF', 'PF', 'C')
+    rows = ['Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,3/g,fg%,fga/g']
+    for player_index in range(60):
+        rows.append(
+            f'{player_index + 1},Fake Player {player_index:03d},{positions[player_index % 5]},'
+            f'9.9,70,{20 - player_index * 0.2:.1f},8.0,4.0,1.0,1.0,2.0,0.5,15.0'
+        )
+    csv_bytes = '\n'.join(rows).encode()
+
+    upload_response = client.post('/data/upload', files={'file': ('bbm.csv', csv_bytes, 'text/csv')})
+    assert upload_response.status_code == 200, upload_response.text
+    data_id = upload_response.json()['data_id']
+
+    session_request = _build_default_session_request()
+    session_request['league']['n_drafters'] = 2   # 26 players needed; the pool has 60
+    session_request['data_source'] = {
+        'type': 'projections',
+        'blend_weights': {'DARKO': 0.0, 'ESPN': 0.0, data_id: 1.0},
+        'custom_data_ids': [data_id],
+    }
+    create_response = client.post('/sessions', json=session_request)
+    assert create_response.status_code == 201, create_response.text
+    body = create_response.json()
+    assert body['n_players_loaded'] == 60
+
+    categories = body['categories']
+    for absent_category in ('Turnovers', 'Free Throw %'):
+        assert absent_category not in categories, \
+            f'{absent_category} has no data in the pool and must be narrowed out'
+    for present_category in ('Points', 'Rebounds', 'Field Goal %'):
+        assert present_category in categories
+
+
 def test_parse_projection_csv_filters_non_numeric_rows():
     """hashtagbasketball.com exports repeat the header row inside the table body (every
     stat cell a string) and format ratio stats as '0.583 (10.2/17.5)'. The parser must
