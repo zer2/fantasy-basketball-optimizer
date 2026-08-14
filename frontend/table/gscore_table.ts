@@ -2,7 +2,8 @@
 // Renders a G-score breakdown table for a list of players.
 // Used by Auction Mode's "My Team" tab and potentially by Season Mode roster inspection.
 
-import { getGScoreByName, getShortCategoryNames } from '../app_state.js'
+import { getGScoreById, getShortCategoryNames } from '../app_state.js'
+import { makeFullPlayerDisplay } from '../player_display.js'
 import { getSelectedCategories, getScoringFormat } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../styles/styler_functions.js'
@@ -15,21 +16,21 @@ import { makeSpacerTh } from './table_helpers.js'
  * Clears and replaces `container` contents on each call.
  */
 export function renderTeamGScoreTable(
-    playerNames: string[]
+    playerIds: number[]
   , container: HTMLElement
   , fullTeamResult?: { h_score: number; win_rates: number[] } | null
 ): void {
     container.innerHTML = ''
     const categories = getSelectedCategories()
-    const gScoreMap  = getGScoreByName()
+    const gScoreMap  = getGScoreById()
     // Collect G-scores for each player
-    const rows: { name: string; values: number[]; total: number }[] = []
-    if (playerNames.length === 0) return
+    const rows: { playerId: number; values: number[]; total: number }[] = []
+    if (playerIds.length === 0) return
 
-    for (const name of playerNames) {
-        const gs = gScoreMap.get(name)
-        if (!gs) throw new Error(`G-score not found for player: ${name}`)
-        rows.push({ name: gs.name, values: gs.values, total: gs.total })
+    for (const playerId of playerIds) {
+        const gs = gScoreMap.get(playerId)
+        if (!gs) throw new Error(`G-score not found for player id: ${playerId}`)
+        rows.push({ playerId, values: gs.values, total: gs.total })
     }
 
     // ── Build table ──────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ export function renderTeamGScoreTable(
 
         const labelCell = document.createElement('th')
         labelCell.className = 'panel-rowlabel'
-        labelCell.textContent = row.name
+        labelCell.append(makeFullPlayerDisplay(row.playerId))
         tr.appendChild(labelCell)
 
         const totalCell = tr.insertCell(-1)

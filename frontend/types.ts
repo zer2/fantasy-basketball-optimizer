@@ -22,7 +22,7 @@ export interface SportConfig {
 // ─── Player G-scores (from session creation, pipeline step 4) ────────────────
 
 export interface PlayerGScore {
-    name: string;
+    player_id: number;
     total: number;
     values: number[];   // per-category G-scores, same order as categories
 }
@@ -52,8 +52,7 @@ export interface FlexAllocations {
 // ─── Roster grid ──────────────────────────────────────────────────────────────
 
 export interface RosterAssignment {
-    name: string;           // short display name (last name)
-    full_name: string;      // full canonical name, for display-layer lookups (e.g. headshots)
+    player_id: number;      // display resolution (name, headshot) via the player registry
     isCandidate: boolean;   // true = the player being evaluated; false = already rostered
 }
 
@@ -123,7 +122,7 @@ export interface AuctionValues {
 }
 
 export interface PlayerResult {
-    name: string;
+    player_id: number;          // display resolution (name, positions, headshot) via the player registry
     h_score: number;            // overall H-score win rate (0–100 scale)
     h_rank: number;             // rank by H-score among available players
     g_rank: number;             // rank by G-score

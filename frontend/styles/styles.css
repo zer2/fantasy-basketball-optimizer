@@ -1004,6 +1004,45 @@ tr {
     white-space: nowrap;
 }
 
+/* Positions suffix inside the full player display — lighter than the name so the
+   name stays the visual anchor. */
+.player-positions {
+    color: light-dark(#999999, #8d8d9e);
+    font-size: 0.85em;
+}
+
+/* Full player display (DOM variant): headshot beside name + positions. Used for
+   G-score table row labels and team views. */
+.player-full-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Minimal inline player display (string variant): headshot beside last name. Used in
+   trade-suggestion cells, where several players share one cell on a single line. */
+.player-minimal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 10px;
+    white-space: nowrap;
+}
+
+/* Trade-suggestion send/receive cells hold a row of minimal displays; let the row wrap
+   rather than stretching the table on multi-player trades. */
+.trade-suggestion-players {
+    white-space: normal;
+}
+
+/* Season roster paste feedback: pasted names the registry doesn't recognize. */
+.paste-warning {
+    color: #e06c6c;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
 .celltypea {
     background-color: light-dark(#e8e8e8, #3a3a4a);
     color: light-dark(black, white);

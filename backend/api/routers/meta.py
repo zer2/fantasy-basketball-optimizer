@@ -1,5 +1,5 @@
 """Read-only reference endpoints: sport config, available historical seasons, and
-player-asset lookups (NBA ids + proxied headshot images)."""
+proxied player headshot images."""
 
 from __future__ import annotations
 
@@ -61,35 +61,6 @@ def get_seasons_route():
         return {'seasons': get_available_seasons()}
     except Exception:
         raise fail(500, 'Could not load available seasons.')
-
-
-# Every name column that can appear as a display name. The app's serving names are not
-# uniformly MASTER_PLAYER_NAME — historical/projection sources carry their own spellings
-# (BBM says "O.G. Anunoby" and "Bub Carrington", ESPN says "Alex Sarr", the master rows say
-# "OG Anunoby" / "Carlton Carrington" / "Alexandre Sarr") — so the id map is keyed by every
-# variant. MASTER_PLAYER_NAME is applied last so the canonical spelling wins any collision.
-_PLAYER_NAME_COLUMNS = ['DARKO_NAME', 'ESPN_NAME', 'ROTOWIRE_NAME', 'HTB_NAME', 'BBM_NAME',
-                        'MASTER_PLAYER_NAME']
-
-
-@router.get('/players/nba-ids')
-def get_nba_player_ids_route():
-    """Map of player name (every known spelling) -> NBA player id, for NBA-keyed assets such
-    as headshots. Built from the cached UNIFIED_PLAYER_TABLE read, so this costs one dict
-    build per request, no extra query."""
-    try:
-        from backend.data_retrieval import get_unified_player_table
-        players = get_unified_player_table().dropna(subset=['NBA_PLAYER_ID'])
-        nba_player_ids: dict[str, int] = {}
-        for name_column in _PLAYER_NAME_COLUMNS:
-            named = players.dropna(subset=[name_column])
-            nba_player_ids.update({
-                name: int(nba_player_id)
-                for name, nba_player_id in zip(named[name_column], named['NBA_PLAYER_ID'])
-            })
-        return {'nba_player_ids': nba_player_ids}
-    except Exception:
-        raise fail(500, 'Could not load NBA player ids.')
 
 
 _NBA_HEADSHOT_URL_TEMPLATE = 'https://cdn.nba.com/headshots/nba/latest/260x190/{nba_player_id}.png'

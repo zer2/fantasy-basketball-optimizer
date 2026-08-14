@@ -1,7 +1,12 @@
 # testing_files/benchmark_helpers.py
 # Shared constants, client, and session-request builder used across all benchmark files.
 
+import datetime
+import json
 import os
+import subprocess
+from pathlib import Path
+
 import yaml
 from fastapi.testclient import TestClient
 
@@ -10,6 +15,35 @@ from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
 client = TestClient(app)
+
+# Append-only local benchmark history (gitignored): every [benchmark] measurement lands here
+# with its commit, so "did this get faster or slower?" is answerable from data instead of
+# memory. One JSON object per line: {timestamp, commit, label, seconds}.
+_BENCHMARK_HISTORY_PATH = Path(__file__).parent / 'benchmark_history.jsonl'
+_current_commit_cache: str | None = None
+
+
+def _current_commit() -> str:
+    global _current_commit_cache
+    if _current_commit_cache is None:
+        _current_commit_cache = subprocess.run(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            capture_output=True, text=True, cwd=Path(__file__).parent,
+        ).stdout.strip() or 'unknown'
+    return _current_commit_cache
+
+
+def record_benchmark(label: str, seconds: float) -> None:
+    """Print a [benchmark] line AND append it to the local benchmark history."""
+    print(f'\n[benchmark] {label}: {seconds:.2f}s')
+    entry = {
+        'timestamp': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'commit':    _current_commit(),
+        'label':     label,
+        'seconds':   round(seconds, 3),
+    }
+    with open(_BENCHMARK_HISTORY_PATH, 'a', encoding='utf-8') as history_file:
+        history_file.write(json.dumps(entry) + '\n')
 
 _PARAMS_PATH = 'parameters.yaml'
 _SEASON      = '2024-25'

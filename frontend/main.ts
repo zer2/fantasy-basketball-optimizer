@@ -17,7 +17,6 @@ import { resetAuctionEntry } from './data_entry/auction_entry.js'
 import { makeCustomSelect } from './custom_select.js'
 import { pref, savePref } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
-import { loadNbaPlayerIds } from './player_headshots.js'
 
 import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
@@ -53,10 +52,6 @@ if (!currentUser) {
 // Fetch sport config before rendering sidebar so defaults come from parameters.yaml
 const config = await fetchConfig('NBA')
 setSportConfig(config)
-
-// Headshot id map: fire and forget — it resolves long before the first evaluate's rows
-// render, and every display degrades gracefully if it never does.
-loadNbaPlayerIds()
 
 const sidebar = document.getElementById('sidebar') as HTMLElement
 const sidebarSections = document.getElementById('sidebar-sections')!

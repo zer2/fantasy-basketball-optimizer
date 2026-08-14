@@ -21,6 +21,7 @@ import pytest
 
 from benchmark_helpers import (
     client, _build_session_request, resolve_player_assignments, resolve_player_ids,
+    record_benchmark,
 )
 from backend.state.session import get_session
 from backend.services.trading import run_trade_suggest
@@ -127,7 +128,7 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
     elapsed = time.perf_counter() - start
 
     suggestions = result.suggestions
-    print(f'\n[benchmark] Trade suggest — {label}: {elapsed:.2f}s  ({len(suggestions)} suggestions)')
+    record_benchmark(f'Trade suggest snapshot — {label} ({len(suggestions)} suggestions)', elapsed)
     expected    = _EXPECTED[label]
 
     if os.environ.get('REGEN_GOLDENS'):

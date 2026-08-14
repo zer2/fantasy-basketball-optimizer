@@ -16,11 +16,11 @@ export function getSessionPhase(): SessionPhase { return sessionPhase }
 
 // ── Player data ───────────────────────────────────────────────────────────────
 
-let allPlayerResults:        PlayerResult[] | null = null   // full dataset — only grows, never shrinks
-let candidates:              PlayerResult[] | null = null   // current evaluate output (may be a subset, e.g. waiver free agents)
-let playerResultsByName:     Map<string, PlayerResult> | null = null
-let gScoreByName:        Map<string, PlayerGScore> | null = null
-let playerNamesByGScore: string[] | null = null   // player names sorted descending by G-score total
+let allPlayerResults:      PlayerResult[] | null = null   // full dataset — only grows, never shrinks
+let candidates:            PlayerResult[] | null = null   // current evaluate output (may be a subset, e.g. waiver free agents)
+let playerResultsById:     Map<number, PlayerResult> | null = null
+let gScoreById:        Map<number, PlayerGScore> | null = null
+let playerIdsByGScore: number[] | null = null   // player ids sorted descending by G-score total
 
 /** Returns every player in the loaded dataset, or null if no evaluate has run yet. */
 export function getPlayerResults(): PlayerResult[] | null { return allPlayerResults }
@@ -28,10 +28,10 @@ export function getPlayerResults(): PlayerResult[] | null { return allPlayerResu
 /** Returns the current candidate player list, or null if no evaluate has run yet. */
 export function getCandidatePlayerResults(): PlayerResult[] | null { return candidates }
 
-/** Returns a name → Player map for every player in the full dataset. */
-export function getPlayerResultsByName(): Map<string, PlayerResult> {
-    if (playerResultsByName === null) throw new Error('getPlayerResultsByName called before player data was loaded')
-    else return playerResultsByName
+/** Returns a player id → Player map for every player in the full dataset. */
+export function getPlayerResultsById(): Map<number, PlayerResult> {
+    if (playerResultsById === null) throw new Error('getPlayerResultsById called before player data was loaded')
+    else return playerResultsById
 }
 
 /** Replaces the full player dataset. Call after a full evaluate (draft/auction/season).
@@ -41,11 +41,11 @@ export function setAllPlayerResults(p: PlayerResult[]): void {
     setCandidatePlayerResults(p)
 }
 
-/** Replaces only the base player list (allPlayerResults + name map) without touching candidates.
+/** Replaces only the base player list (allPlayerResults + id map) without touching candidates.
  *  Call with the empty-board evaluate result so the draft dropdown always shows base H-score ordering. */
 export function setBasePlayerResults(p: PlayerResult[]): void {
-    allPlayerResults    = p
-    playerResultsByName = new Map(p.map(pl => [pl.name, pl]))
+    allPlayerResults  = p
+    playerResultsById = new Map(p.map(pl => [pl.player_id, pl]))
 }
 
 /** Replaces only the candidate list. Call after a partial evaluate (e.g. waiver wire)
@@ -55,36 +55,36 @@ export function setCandidatePlayerResults(p: PlayerResult[]): void {
     sessionPhase = 'evaluated'
 }
 
-/** Returns the name → PlayerGScore map (raw G-scores from the pipeline). */
-export function getGScoreByName(): Map<string, PlayerGScore> {
-    if (gScoreByName === null) throw new Error('getGScoreByName called before G-scores were loaded')
-    else return gScoreByName
+/** Returns the player id → PlayerGScore map (raw G-scores from the pipeline). */
+export function getGScoreById(): Map<number, PlayerGScore> {
+    if (gScoreById === null) throw new Error('getGScoreById called before G-scores were loaded')
+    else return gScoreById
 }
 
-/** Returns player names sorted descending by G-score total (pre-computed at session creation). */
-export function getPlayerNamesByGScore(): string[] {
-    if (playerNamesByGScore === null) throw new Error('getPlayerNamesByGScore called before G-scores were loaded')
-    else return playerNamesByGScore
+/** Returns player ids sorted descending by G-score total (pre-computed at session creation). */
+export function getPlayerIdsByGScore(): number[] {
+    if (playerIdsByGScore === null) throw new Error('getPlayerIdsByGScore called before G-scores were loaded')
+    else return playerIdsByGScore
 }
 
 /** Replaces the G-score map. Called by session.ts after session creation.
  *  `scores` arrives from the backend already sorted by total descending. */
 export function setGScores(scores: PlayerGScore[]): void {
-    gScoreByName        = new Map(scores.map(s => [s.name, s]))
-    playerNamesByGScore = scores.map(s => s.name)
+    gScoreById        = new Map(scores.map(s => [s.player_id, s]))
+    playerIdsByGScore = scores.map(s => s.player_id)
     if (sessionPhase === 'uninitialized') sessionPhase = 'session-created'
 }
 
 /**
  * Populates the player list from G-scores alone, for use in Season Mode before
- * any evaluate has run. The resulting PlayerResult objects contain only name and
- * g_rank — all other fields are zeroed/empty. H-score fields are meaningless in
- * this context; Season Mode roster dropdowns only use name and g_rank.
+ * any evaluate has run. The resulting PlayerResult objects contain only player_id
+ * and g_rank — all other fields are zeroed/empty. H-score fields are meaningless in
+ * this context; Season Mode roster dropdowns only use player_id and g_rank.
  */
 export function setPlayerResultsFromGScores(): void {
-    const scores  = [...getGScoreByName().values()].sort((a, b) => b.total - a.total)
+    const scores  = [...getGScoreById().values()].sort((a, b) => b.total - a.total)
     const players = scores.map((gs, i) => ({
-        name: gs.name,
+        player_id: gs.player_id,
         h_score: 0,
         h_rank: 0,
         g_rank: i + 1,

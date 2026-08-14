@@ -26,6 +26,7 @@ from benchmark_helpers import (
     , _SEASON
     , _build_session_request
     , resolve_player_assignments
+    , record_benchmark
 )
 from backend.state.session import get_session
 from backend.services.trading import run_trade_suggest
@@ -260,7 +261,7 @@ def trading_session():
     session_id = response.json()['session_id']
 
     n_drafters = session_request['league']['n_drafters']
-    print(f'\n[benchmark] Session creation — EC ({_SEASON}, {n_drafters} teams): {session_creation_seconds:.2f}s')
+    record_benchmark(f'Session creation — EC ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
 
     return session_id
 
@@ -298,7 +299,7 @@ def test_trade_suggest_speed(trading_session, config):
     elapsed = time.perf_counter() - start
 
     n_suggestions = len(result.suggestions)
-    print(f'\n[benchmark] Trade suggest — {label}: {elapsed:.2f}s  ({n_suggestions} suggestions)')
+    record_benchmark(f'Trade suggest — {label} ({n_suggestions} suggestions)', elapsed)
     _print_profile(profiler, f'trade suggest — {label}')
 
     # Sanity: result must be a valid response (not an exception)

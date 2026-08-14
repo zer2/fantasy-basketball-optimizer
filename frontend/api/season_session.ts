@@ -16,11 +16,11 @@ import type { TradeAnalyzeResponse, TradeSuggestResponse } from './client.js'
 // prefill source; the caller re-renders (applyLayout) once they arrive. Living here
 // (not in season_rosters) keeps the import one-way: season_rosters → season_session.
 
-let livePlatformRosters: Record<string, string[]> | null = null
+let livePlatformRosters: Record<string, number[]> | null = null
 
-/** Platform-provided season rosters ({team: [players]}), or null when not loaded
+/** Platform-provided season rosters ({team: [player ids]}), or null when not loaded
  *  (own data, or before the first platform refresh). */
-export function getLivePlatformRosters(): Record<string, string[]> | null {
+export function getLivePlatformRosters(): Record<string, number[]> | null {
     return livePlatformRosters
 }
 
@@ -44,7 +44,7 @@ export async function refreshSeasonRostersFromPlatform(): Promise<void> {
  * Returns h_score and per-category win rates, or null if the backend returns no candidates.
  */
 export async function evaluateTeamHScore(
-    playerAssignments: Record<string, string[]>
+    playerAssignments: Record<string, number[]>
   , teamId: string
 ): Promise<{ h_score: number; win_rates: number[] } | null> {
     await ensureSession()
@@ -75,11 +75,11 @@ export async function runSeasonInit(): Promise<void> {
  * Ensures a session exists before calling the backend.
  */
 export async function runTradeAnalyze(
-    playerAssignments: Record<string, string[]>
+    playerAssignments: Record<string, number[]>
   , myTeam: string
   , theirTeam: string
-  , myTrade: string[]
-  , theirTrade: string[]
+  , myTrade: number[]
+  , theirTrade: number[]
   , ignorePositionCheck?: boolean
 ): Promise<TradeAnalyzeResponse> {
     return await withSessionRetry(() => analyzeTrade(getSessionId()!, {
@@ -101,7 +101,7 @@ export async function runTradeAnalyze(
  * Hiding the indicator when all fetches complete is the caller's responsibility.
  */
 export async function runTradeSuggest(
-    playerAssignments: Record<string, string[]>
+    playerAssignments: Record<string, number[]>
   , myTeam: string
   , theirTeam: string
   , comboParams: { n_traded: number; n_received: number; threshold: number }[]
@@ -134,7 +134,7 @@ export async function runTradeSuggest(
  * (with the dropped player removed from their team) so they appear as a free-agent candidate.
  */
 export async function runWaiverEvaluate(
-    playerAssignments: Record<string, string[]>
+    playerAssignments: Record<string, number[]>
   , myTeamId: string
 ): Promise<void> {
     setIndicatorState('evaluating')

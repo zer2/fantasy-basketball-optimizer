@@ -16,7 +16,7 @@ export interface DraftConfig {
 
 let pickRow     = 0
 let pickDrafter = 0
-let drafted: (string | null)[][] = []   // [row][drafter], null = not yet picked
+let drafted: (number | null)[][] = []   // [row][drafter] player id, null = not yet picked
 let teamNames:          string[]
 let nDrafters:          number
 let nPicks:             number
@@ -27,7 +27,7 @@ let configKey = ''   // detects sidebar changes that require a reset
 
 export function getPickRow():     number              { return pickRow     }
 export function getPickDrafter(): number              { return pickDrafter }
-export function getDrafted():     (string | null)[][] { return drafted     }
+export function getDrafted():     (number | null)[][] { return drafted     }
 export function getTeamNames():   string[]            { return teamNames   }
 export function getNDrafters(): number { return nDrafters }
 export function getNPicks():    number { return nPicks    }
@@ -57,8 +57,8 @@ export function applyDraftConfig(cfg: DraftConfig): void {
 
 // ─── Pick mutations ───────────────────────────────────────────────────────────
 
-export function recordDraftPick(row: number, drafter: number, player: string): void {
-    drafted[row][drafter] = player
+export function recordDraftPick(row: number, drafter: number, playerId: number): void {
+    drafted[row][drafter] = playerId
 }
 
 export function clearDraftPick(row: number, drafter: number): void {
@@ -140,11 +140,13 @@ export function goBackDraftPick(): void {
 // ─── Derived state ────────────────────────────────────────────────────────────
 
 /** Returns the current draft state shaped for /evaluate requests. */
-export function getDraftState(): { player_assignments: Record<string, string[]> } {
-    const player_assignments: Record<string, string[]> = {}
+export function getDraftState(): { player_assignments: Record<string, number[]> } {
+    const player_assignments: Record<string, number[]> = {}
     for (let d = 0; d < nDrafters; d++) {
         const name = teamNames[d] ?? `Team ${d + 1}`
-        player_assignments[name] = drafted.map(row => row[d]).filter(Boolean) as string[]
+        player_assignments[name] = drafted
+            .map(row => row[d])
+            .filter(playerId => playerId !== null) as number[]
     }
     return { player_assignments }
 }

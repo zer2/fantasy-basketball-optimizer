@@ -33,6 +33,12 @@ export interface CustomSelectOption {
     label: string
 }
 
+/** Lowercases and strips diacritics so filter text typed without accents still matches
+ *  accented labels (e.g. "jakuc" matches "Jakučionis"). */
+function foldTextForFilter(text: string): string {
+    return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+}
+
 export interface CustomSelect {
     element:    HTMLElement
     getValue:   () => string
@@ -146,11 +152,11 @@ export function makeCustomSelect(
         if (!silent) wrapper.dispatchEvent(new Event('change', { bubbles: true }))
     }
 
-    /** Returns the options that match the current search text (case-insensitive). */
+    /** Returns the options that match the current search text (case- and accent-insensitive). */
     function filteredOptions(): CustomSelectOption[] {
-        const filter = searchInput.value.toLowerCase()
-        if (!filter || filter === getLabelFor(currentValue).toLowerCase()) return currentOptions
-        return currentOptions.filter(o => o.label.toLowerCase().includes(filter))
+        const filter = foldTextForFilter(searchInput.value)
+        if (!filter || filter === foldTextForFilter(getLabelFor(currentValue))) return currentOptions
+        return currentOptions.filter(o => foldTextForFilter(o.label).includes(filter))
     }
 
     function renderDropdown(): void {

@@ -5,6 +5,8 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { readRequiredIntInput } from '../helper_functions.js'
 import { getPlayerResults } from '../app_state.js'
+import { getRegistryEntry } from '../player_registry.js'
+import { makeMinimalPlayerDisplay } from '../player_display.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
@@ -33,7 +35,7 @@ const TEAM_W  = 60
 
 /**
  * Clears the auction board state. Call when the player pool changes (e.g. data source switch)
- * so picks referencing old player names are not sent to the backend.
+ * so picks referencing old player ids are not sent to the backend.
  * The next renderAuctionEntry call will reinitialise from current sidebar values.
  */
 export function resetAuctionEntry(): void {
@@ -76,11 +78,14 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     // list already excludes picked players, so after an undo it is stale and would leave the
     // undone player missing from the dropdown until some later re-render.
     const currentPicks = getPicks()
-    const pickedSet = new Set(currentPicks.flat().filter(Boolean).map(p => p!.player))
-    const available = getPlayerResults()?.map(p => p.name).filter(n => !pickedSet.has(n)) ?? []
+    const pickedSet = new Set(currentPicks.flat().filter(Boolean).map(p => p!.playerId))
+    const available = getPlayerResults()?.map(p => p.player_id).filter(playerId => !pickedSet.has(playerId)) ?? []
     const playerSel = makeCustomSelect(
         'auction-pick-player',
-        [{ value: '', label: '' }, ...available.map(n => ({ value: n, label: n }))],
+        [
+            { value: '', label: '' },
+            ...available.map(playerId => ({ value: String(playerId), label: getRegistryEntry(playerId).name })),
+        ],
         undefined,
         undefined,
         auctionListenerController?.signal,
@@ -145,8 +150,10 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     lockBtn.className   = 'pick-btn'
     lockBtn.textContent = 'Lock in selection'
     lockBtn.addEventListener('click', () => {
-        const player = playerSel.getValue()
-        if (!player) return
+        const chosen = playerSel.getValue()
+        if (!chosen) return
+        const chosenPlayerId = Number(chosen)
+        if (Number.isNaN(chosenPlayerId)) throw new Error(`Auction pick select carried a non-numeric value: "${chosen}"`)
         const team = teamSel.getValue()
         if (!team) return
         const drafterIndex = getTeamNames().indexOf(team)
@@ -154,7 +161,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         if (isNaN(cost) || cost <= 0) return
         const spent = getPicks().reduce((sum, pickRow) => sum + (pickRow[drafterIndex]?.cost ?? 0), 0)
         if (cost > getCashPerTeam() - spent) return
-        const succeeded    = recordAuctionPick(player, cost, drafterIndex)
+        const succeeded    = recordAuctionPick(chosenPlayerId, cost, drafterIndex)
         if (succeeded) {
             renderAuctionEntry(container)
             _auctionDebouncer?.fire()
@@ -238,15 +245,11 @@ function buildAuctionBoard(): HTMLElement {
             const cell = row.insertCell()
             const pick = picks[r][d]
             if (pick) {
-                const nameEl = document.createElement('div')
-                nameEl.className   = 'auction-cell-name'
-                nameEl.textContent = pick.player
-
                 const costEl = document.createElement('div')
                 costEl.className   = 'auction-cell-cost'
                 costEl.textContent = `$${pick.cost}`
 
-                cell.append(nameEl, costEl)
+                cell.append(makeMinimalPlayerDisplay(pick.playerId), costEl)
                 cell.classList.add('drafted')
             }
         }

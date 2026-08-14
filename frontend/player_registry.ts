@@ -1,12 +1,9 @@
 // player_registry.ts
 // The session's player identities: {player_id -> name, last name, positions, headshot
 // availability}, delivered inside SessionResponse/GScoresResponse whenever the pool
-// changes. The single frontend source of player names.
-//
-// Stage B of the identity refactor: only the api/ translation layer reads this, keeping
-// the rest of the frontend name-keyed until Stage C makes it id-native. The legacy-label
-// helpers below reconstruct the string-identity era's 'Name (POS)' keys for that interior
-// and are deleted with it.
+// changes. The single frontend source of player names: the interior is keyed by
+// player id everywhere, and names are resolved here only at display time (or, for
+// human-text inputs like clipboard pastes, resolved back to ids by name).
 
 export interface PlayerRegistryEntry {
     player_id: number
@@ -19,16 +16,12 @@ export interface PlayerRegistryEntry {
 export const RP_PLAYER_ID = -1
 
 let entriesById: Map<number, PlayerRegistryEntry> | null = null
-let playerIdByLabel: Map<string, number> | null = null
+let playerIdByName: Map<string, number> | null = null
 
 /** Installs a session's registry (called by the api layer whenever a payload carries one). */
 export function setPlayerRegistry(entries: PlayerRegistryEntry[]): void {
     entriesById = new Map(entries.map(entry => [entry.player_id, entry]))
-    playerIdByLabel = new Map()
-    for (const entry of entries) {
-        playerIdByLabel.set(buildLegacyLabelFromEntry(entry), entry.player_id)
-        playerIdByLabel.set(entry.name, entry.player_id)
-    }
+    playerIdByName = new Map(entries.map(entry => [entry.name, entry.player_id]))
 }
 
 /** The registry entry for a player id. Throws on an unknown id — a payload referencing a
@@ -39,21 +32,16 @@ export function getRegistryEntry(playerId: number): PlayerRegistryEntry {
     return entry
 }
 
-function buildLegacyLabelFromEntry(entry: PlayerRegistryEntry): string {
-    if (entry.player_id === RP_PLAYER_ID) return 'RP'
-    const positionDisplay = entry.positions.length > 0 ? entry.positions.join(',') : 'NP'
-    return `${entry.name} (${positionDisplay})`
+/** Resolves a bare display name to a player id (case-sensitive exact match), or null when
+ *  the name is not in the session registry. For human-text inputs — clipboard pastes and
+ *  the name-keyed DEFAULT_SEASON_ROSTERS prefill — where an unknown name is a legitimate
+ *  outcome the caller must handle visibly, not a contract violation. */
+export function findPlayerIdByName(name: string): number | null {
+    return playerIdByName?.get(name) ?? null
 }
 
-/** The string-identity era's 'Name (POS)' key for a player id (Stage-B interior only). */
-export function buildLegacyLabel(playerId: number): string {
-    return buildLegacyLabelFromEntry(getRegistryEntry(playerId))
-}
-
-/** Resolves a legacy label (or bare name) back to a player id. Throws on an unknown
- *  label — silently dropping a player from a payload would corrupt the board. */
-export function findPlayerIdByLegacyLabel(label: string): number {
-    const playerId = playerIdByLabel?.get(label)
-    if (playerId === undefined) throw new Error(`Player ${label!} is not in the session registry`)
-    return playerId
+/** Every identity in the session registry (registry order, RP included). */
+export function getAllPlayerIdentities(): PlayerRegistryEntry[] {
+    if (entriesById === null) throw new Error('getAllPlayerIdentities called before the registry was installed')
+    return [...entriesById.values()]
 }

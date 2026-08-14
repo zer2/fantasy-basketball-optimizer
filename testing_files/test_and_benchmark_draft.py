@@ -25,6 +25,7 @@ from benchmark_helpers import (
     , _build_session_request
     , check_top_scores
     , resolve_player_ids
+    , record_benchmark
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -186,7 +187,7 @@ def session_for_format(request):
     session_creation_seconds = time.perf_counter() - start
 
     assert response.status_code == 201, f'Session creation failed ({scoring_format}): {response.text}'
-    print(f'\n[benchmark] Session creation — {scoring_format} ({_SEASON}, {n_drafters} teams): {session_creation_seconds:.2f}s')
+    record_benchmark(f'Session creation — {scoring_format} ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
 
     return response.json()['session_id'], scoring_format, expected_top_scores
 
@@ -224,7 +225,7 @@ def test_evaluate_empty_board(session_for_format):
     )
     evaluate_seconds = time.perf_counter() - start
 
-    print(f'\n[benchmark] Evaluate — {scoring_format} ({n_iterations} iterations, empty board): {evaluate_seconds:.2f}s')
+    record_benchmark(f'Evaluate — {scoring_format} ({n_iterations} iterations, empty board)', evaluate_seconds)
     _print_profile(profiler, scoring_format, 'empty board')
 
     candidates      = result.candidates
@@ -283,7 +284,7 @@ def test_evaluate_mid_draft(session_for_format):
     )
     evaluate_seconds = time.perf_counter() - start
 
-    print(f'\n[benchmark] Evaluate — {scoring_format} ({n_iterations} iterations, mid-draft): {evaluate_seconds:.2f}s')
+    record_benchmark(f'Evaluate — {scoring_format} ({n_iterations} iterations, mid-draft)', evaluate_seconds)
 
     candidates = result.candidates
     assert len(candidates) > 0
@@ -306,7 +307,7 @@ def session_for_first_round(request):
     session_creation_seconds = time.perf_counter() - start
 
     assert response.status_code == 201, f'Session creation failed ({scoring_format}): {response.text}'
-    print(f'\n[benchmark] Session creation — {scoring_format} ({_SEASON}, {n_drafters} teams): {session_creation_seconds:.2f}s')
+    record_benchmark(f'Session creation — {scoring_format} ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
 
     return response.json()['session_id'], scoring_format, expected_top_scores
 
@@ -336,7 +337,7 @@ def test_evaluate_first_round(session_for_first_round):
     )
     evaluate_seconds = time.perf_counter() - start
 
-    print(f'\n[benchmark] Evaluate — {scoring_format} ({n_iterations} iterations, first round, Team 5): {evaluate_seconds:.2f}s')
+    record_benchmark(f'Evaluate — {scoring_format} ({n_iterations} iterations, first round, Team 5)', evaluate_seconds)
 
     candidates = result.candidates
     assert len(candidates) > 0

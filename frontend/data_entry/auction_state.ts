@@ -4,7 +4,7 @@
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface AuctionPick { player: string; cost: number }
+export interface AuctionPick { playerId: number; cost: number }
 
 export interface AuctionConfig {
     nDrafters:   number
@@ -60,10 +60,10 @@ export function applyAuctionConfig(cfg: AuctionConfig): void {
  * Records a pick for the given drafter in the first empty row.
  * Returns true if successful, false if the team is already full.
  */
-export function recordAuctionPick(player: string, cost: number, drafterIndex: number): boolean {
+export function recordAuctionPick(playerId: number, cost: number, drafterIndex: number): boolean {
     const emptyRow = picks.findIndex(r => r[drafterIndex] === null)
     if (emptyRow === -1) return false
-    picks[emptyRow][drafterIndex] = { player, cost }
+    picks[emptyRow][drafterIndex] = { playerId, cost }
     history.push([emptyRow, drafterIndex])
     return true
 }
@@ -90,15 +90,15 @@ export function clearAllAuctionPicks(): boolean {
 
 /** Returns the current auction state shaped for /evaluate requests. */
 export function getAuctionState(): {
-    player_assignments: Record<string, string[]>
+    player_assignments: Record<string, number[]>
     remaining_cash:     Record<string, number>
 } {
-    const player_assignments: Record<string, string[]> = {}
+    const player_assignments: Record<string, number[]> = {}
     const remaining_cash:     Record<string, number>   = {}
     for (let d = 0; d < nDrafters; d++) {
         const name      = teamNames[d] ?? `Team ${d + 1}`
         const teamPicks = picks.map(row => row[d]).filter(Boolean) as AuctionPick[]
-        player_assignments[name] = teamPicks.map(p => p.player)
+        player_assignments[name] = teamPicks.map(p => p.playerId)
         const spent              = teamPicks.reduce((sum, p) => sum + p.cost, 0)
         remaining_cash[name]     = cashPerTeam - spent
     }

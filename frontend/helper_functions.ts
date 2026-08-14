@@ -108,12 +108,20 @@ export function makeSidebarToggle(id: string, rightText: string, leftText?: stri
     return row
 }
 
+/** One selectable entry of a multiselect: `value` is what getSelected returns and what
+ *  setSelected takes; `label` is what the chip and dropdown show (e.g. a player id value
+ *  with a registry-name label). */
+export interface MultiSelectOption {
+    value: string
+    label: string
+}
+
 /**
  * Renders a chip-style multiselect widget (mirrors Streamlit's `st.multiselect`).
  * Selected items are shown as removable chips; clicking the input area opens a
  * filtered dropdown of remaining options.
  *
- * Returns the **live** selected-items array that the widget mutates in place.
+ * Returns the **live** selected-values array that the widget mutates in place.
  * Callers should store this reference so their getter always sees the current state:
  * ```ts
  * let _selected = renderMultiselect(container, ALL, DEFAULT)
@@ -122,11 +130,17 @@ export function makeSidebarToggle(id: string, rightText: string, leftText?: stri
  */
 export function renderMultiselect(
     container:       HTMLElement
-    , allOptions:      string[]
+    , allOptions:      MultiSelectOption[]
     , defaultSelected: string[]
 ): string[] {
 
     const selected: string[] = [...defaultSelected]
+
+    function getLabelFor(value: string): string {
+        const option = allOptions.find(o => o.value === value)
+        if (!option) throw new Error(`Multiselect value "${value}" is not among its options`)
+        return option.label
+    }
 
     const wrapper = document.createElement('div')
     wrapper.className = 'ms-container'
@@ -149,12 +163,12 @@ export function renderMultiselect(
         Array.from(inputArea.children).forEach(child => {
             if (child !== textInput) child.remove()
         })
-        for (const cat of selected) {
+        for (const value of selected) {
             const chip = document.createElement('span')
             chip.className = 'ms-chip'
 
             const chipText = document.createElement('span')
-            chipText.textContent = cat
+            chipText.textContent = getLabelFor(value)
             chip.append(chipText)
 
             const removeBtn = document.createElement('button')
@@ -163,7 +177,7 @@ export function renderMultiselect(
             removeBtn.textContent = '×'
             removeBtn.addEventListener('mousedown', e => {
                 e.preventDefault()
-                selected.splice(selected.indexOf(cat), 1)
+                selected.splice(selected.indexOf(value), 1)
                 renderChips()
                 renderDropdown()
             })
@@ -176,22 +190,22 @@ export function renderMultiselect(
         dropdown.replaceChildren()
         const filter = textInput.value.toLowerCase()
         const available = allOptions.filter(
-            opt => !selected.includes(opt) && opt.toLowerCase().includes(filter)
+            opt => !selected.includes(opt.value) && opt.label.toLowerCase().includes(filter)
         )
         if (available.length === 0) {
             const empty = document.createElement('div')
             empty.className = 'ms-empty'
-            empty.textContent = filter ? 'No matches' : 'All categories selected'
+            empty.textContent = filter ? 'No matches' : 'All options selected'
             dropdown.append(empty)
             return
         }
         for (const opt of available) {
             const item = document.createElement('div')
             item.className = 'ms-option'
-            item.textContent = opt
+            item.textContent = opt.label
             item.addEventListener('mousedown', e => {
                 e.preventDefault()
-                selected.push(opt)
+                selected.push(opt.value)
                 textInput.value = ''
                 renderChips()
                 renderDropdown()
@@ -239,7 +253,7 @@ export interface MultiSelectWidget {
  */
 export function makeMultiSelectWidget(
     label:   string
-    , options: string[]
+    , options: MultiSelectOption[]
     , wrapperClass = 'ms-widget'
 ): MultiSelectWidget {
     const wrap = document.createElement('div')

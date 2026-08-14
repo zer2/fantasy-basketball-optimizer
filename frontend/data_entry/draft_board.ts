@@ -5,6 +5,8 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { isMobileViewport, readRequiredIntInput } from '../helper_functions.js'
 import { getPlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
+import { getRegistryEntry } from '../player_registry.js'
+import { makeMinimalPlayerDisplay } from '../player_display.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
@@ -56,7 +58,7 @@ const ROUNDCOL_W = 64   // px — per-round column (transposed mobile)
 
 /**
  * Clears the draft board state. Call when the player pool changes (e.g. data source switch)
- * so drafted names from the old dataset are not sent to the backend.
+ * so drafted player ids from the old dataset are not sent to the backend.
  * The next renderDraftBoard call will reinitialise from current sidebar values.
  */
 export function resetDraftBoard(): void {
@@ -162,10 +164,10 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
             // Autopilot only needs the top pick: score just the first batch and render nothing. Use the
             // value this evaluate returns — not a shared global — so a competing evaluate that aborts
             // this one yields null (stop cleanly) instead of a stale pick from a previous drafter.
-            const player = await runEvaluate({ forAutopilot: true })
+            const topPlayerId = await runEvaluate({ forAutopilot: true })
 
-            if (!player) break
-            recordDraftPick(getPickRow(), getPickDrafter(), player)
+            if (topPlayerId === null) break
+            recordDraftPick(getPickRow(), getPickDrafter(), topPlayerId)
             advanceDraftPick(readDraftConfig().thirdRoundReversal)
             renderDraftBoard(container)
         }
@@ -221,8 +223,8 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         return wrap
     }
 
-    const draftedSet = new Set(getDrafted().flat().filter(Boolean) as string[])
-    const available  = getPlayerResults()?.map(p => p.name).filter(n => !draftedSet.has(n)) ?? []
+    const draftedSet = new Set(getDrafted().flat().filter(playerId => playerId !== null) as number[])
+    const available  = getPlayerResults()?.map(p => p.player_id).filter(playerId => !draftedSet.has(playerId)) ?? []
 
     const btns = document.createElement('div')
     btns.className = 'pick-control-buttons'
@@ -230,7 +232,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     if (!isDone && !isAutopilot) {
         const sel = makeCustomSelect(
             'draft-pick-select',
-            available.map(n => ({ value: n, label: n })),
+            available.map(playerId => ({ value: String(playerId), label: getRegistryEntry(playerId).name })),
             undefined,
             undefined,
             pickListenerController?.signal,
@@ -245,7 +247,9 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         lockBtn.addEventListener('click', () => {
             const chosen = sel.getValue()
             if (!chosen || getPickRow() >= getNPicks()) return
-            recordDraftPick(getPickRow(), getPickDrafter(), chosen)
+            const chosenPlayerId = Number(chosen)
+            if (Number.isNaN(chosenPlayerId)) throw new Error(`Draft pick select carried a non-numeric value: "${chosen}"`)
+            recordDraftPick(getPickRow(), getPickDrafter(), chosenPlayerId)
             // Read the reversal setting fresh from the sidebar: the stepping consumes it at the
             // round-2/3 boundary, so a toggle made any time before then must take effect.
             advanceDraftPick(readDraftConfig().thirdRoundReversal)
@@ -404,10 +408,10 @@ function rebuildStandardBody(table: HTMLTableElement): void {
         roundCell.textContent = String(r + 1)
 
         for (let d = 0; d < nDrafters; d++) {
-            const cell   = row.insertCell()
-            const player = drafted[r][d]
-            if (player) {
-                cell.textContent = player
+            const cell     = row.insertCell()
+            const playerId = drafted[r][d]
+            if (playerId !== null) {
+                cell.append(makeMinimalPlayerDisplay(playerId))
                 cell.classList.add('drafted')
             } else if (r === pickRow && d === pickDrafter) {
                 cell.classList.add('current-pick')
@@ -435,10 +439,10 @@ function rebuildTransposedBody(table: HTMLTableElement): void {
         const row = tbody.rows[d]
         while (row.cells.length > 1) row.deleteCell(-1)   // keep the sticky team header (cell 0)
         for (let r = 0; r < nPicks; r++) {
-            const cell   = row.insertCell()
-            const player = drafted[r][d]
-            if (player) {
-                cell.textContent = player
+            const cell     = row.insertCell()
+            const playerId = drafted[r][d]
+            if (playerId !== null) {
+                cell.append(makeMinimalPlayerDisplay(playerId))
                 cell.classList.add('drafted')
             } else if (r === pickRow && d === pickDrafter) {
                 cell.classList.add('current-pick')
