@@ -15,7 +15,12 @@ from backend.models import (
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
+from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID
 from backend.infra.server_timing import record_phase
+
+# The engine's internal index for the one result row of a full-roster evaluate
+# (algorithm_agents.get_h_scores, n_players_selected == n_picks branch).
+_FULL_ROSTER_RESULT_INDEX = ''
 
 
 class UnknownRosterPlayersError(ValueError):
@@ -180,6 +185,20 @@ def _build_candidates(
     # NOT reindexed — they are used to look up already-drafted players and for
     # auction value calculations across the entire player pool.
     scores_series            = h_score_result['Scores']
+
+    # A full roster has nothing to rank: the engine scores the finished team once, under
+    # its internal sentinel index. Surface that as a single team-score row — it is not a
+    # player (no registry entry), and clients read only its h_score / win_rates.
+    if list(scores_series.index) == [_FULL_ROSTER_RESULT_INDEX]:
+        team_win_rates = h_score_result['Rates'].iloc[0]
+        return [Candidate(
+            player_id    = FULL_ROSTER_SCORE_PLAYER_ID,
+            h_score      = round(float(scores_series.iloc[0]) * 100, 2),
+            h_rank       = 1,
+            win_rates    = [round(float(rate) * 100, 2) for rate in team_win_rates.values],
+            g_score_rows = [],
+        )]
+
     h_scores_sorted          = scores_series.sort_values(ascending=False)
     sorted_index             = h_scores_sorted.index
     # Every frame in h_score_result carries the same candidate index in the same order, so resolve the

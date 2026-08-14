@@ -11,7 +11,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
-    setSelect, setLeagueDrafterCount, readDropdownOptionLabels,
+    setSelect, setLeagueDrafterCount, readDropdownPlayerNames,
 } from './helpers.mjs'
 
 const TEAM_COUNT = 2
@@ -30,12 +30,14 @@ test('season tools on a self-built roster dataset', async t => {
         await waitAppSettled(app)
     }
 
-    /** The inspector's G-score table rows (player labels only, totals row excluded). */
+    /** The inspector's G-score table rows (bare player names only — the rich row label's
+     *  .playername leading text node, positions span excluded; totals row drops out
+     *  because its plain-text th has no .playername). */
     function readInspectorPlayers() {
         return page.evaluate(() =>
             [...document.querySelectorAll('[data-testid="roster-inspection-gscore"] tbody tr')]
-                .map(row => row.querySelector('th')?.textContent ?? '')
-                .filter(label => label !== 'Team Total'))
+                .map(row => row.querySelector('th .playername')?.childNodes[0]?.textContent?.trim() ?? '')
+                .filter(name => name !== ''))
     }
 
     try {
@@ -44,7 +46,8 @@ test('season tools on a self-built roster dataset', async t => {
         await setLeagueDrafterCount(app, TEAM_COUNT)
 
         // Build the dataset from the live pool: the draft pick dropdown lists every player.
-        const playerPool = await readDropdownOptionLabels(page, 'draft-pick-select-wrapper')
+        // Bare names — the paste path resolves registry names, and the inspector shows them.
+        const playerPool = await readDropdownPlayerNames(page, 'draft-pick-select-wrapper')
         assert.ok(playerPool.length > TEAM_COUNT * PICKS_PER_TEAM, 'player pool should cover the rosters')
         teamRosters = Array.from({ length: TEAM_COUNT }, (_, teamIndex) =>
             playerPool.slice(teamIndex * PICKS_PER_TEAM, (teamIndex + 1) * PICKS_PER_TEAM))

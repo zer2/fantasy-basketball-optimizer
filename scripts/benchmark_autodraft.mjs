@@ -1,15 +1,26 @@
-// One-off (temporary; delete with the Stage-D cleanup): drive a full 12-seat EC autodraft
-// through the real browser and time it wall-clock — the end-to-end number the server-side
-// probe (11s of evaluates) can't capture.
+// scripts/benchmark_autodraft.mjs
+// Times a full 12-seat autodraft through the real browser and records it in the
+// benchmark history — the end-to-end number the server-side evaluate probes can't
+// capture (HTTP round-trips, board repaints, pick bookkeeping).
+//
+// Setup: the app must be running at http://127.0.0.1:8000 (or set APP_URL), and the
+// machine should be otherwise quiet — concurrent test suites or builds inflate the
+// number and defeat the comparison.
+// Run:   node scripts/benchmark_autodraft.mjs
+
+import { appendFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { mintSessionCookie, waitEval } from './browser_helpers.mjs'
 
-const REPO = 'C:/Users/zacha/Projects/FBBO/fantasy-basketball-optimizer'
-const OUT  = 'C:/Users/zacha/AppData/Local/Temp/claude/c--Users-zacha-Projects-FBBO-fantasy-basketball-optimizer/3589b6b2-a765-4b7d-a32b-559c673bb2f5/scratchpad'
-const APP  = 'http://127.0.0.1:8000'
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const APP  = process.env.APP_URL ?? 'http://127.0.0.1:8000'
+const HISTORY_PATH = path.join(REPO, 'testing_files', 'benchmark_history.jsonl')
 
 const browser = await chromium.launch()
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' })
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 await context.addCookies([{ ...mintSessionCookie(REPO), url: APP }])
 const page = await context.newPage()
 
@@ -18,13 +29,6 @@ await page.waitForFunction(() => {
     const table = document.getElementById('hscoretable')
     return table && table.querySelectorAll('.playerheaderdiv').length >= 8
 }, { timeout: 120000 })
-
-// Visual smoke of the Stage-C displays before the draft starts.
-const tableBox = await page.locator('#hscoretable').boundingBox()
-await page.screenshot({
-    path: `${OUT}/stage_c_table.png`,
-    clip: { x: tableBox.x, y: tableBox.y, width: tableBox.width, height: 520 },
-})
 
 // All seats -> autodraft (seat 0 last: toggling the on-clock seat starts autopilot).
 async function setSeatAutodraft(index, on) {
@@ -44,11 +48,18 @@ await page.waitForFunction(
 ).catch(() => {})
 await page.waitForFunction(
     () => getComputedStyle(document.getElementById('seat-selector-container')).visibility !== 'hidden',
-    { timeout: 300000 },
+    { timeout: 600000 },
 )
 await waitEval(page)
 const elapsedSeconds = (Date.now() - started) / 1000
-console.log(`full autodraft wall-clock: ${elapsedSeconds.toFixed(1)}s (${seatCount} seats)`)
-
-await page.screenshot({ path: `${OUT}/stage_c_board.png`, fullPage: false })
 await browser.close()
+
+const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim()
+const label = `Full autodraft wall-clock (${seatCount} seats, browser)`
+console.log(`[benchmark] ${label}: ${elapsedSeconds.toFixed(1)}s`)
+appendFileSync(HISTORY_PATH, JSON.stringify({
+    timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    commit,
+    label,
+    seconds: Math.round(elapsedSeconds * 1000) / 1000,
+}) + '\n')

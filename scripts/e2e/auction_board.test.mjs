@@ -7,13 +7,13 @@ import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
     setSelect, readDropdownOptionLabels, pickControlButton, lockInAuctionPick,
+    countBoardCellsWithPlayer, countBoardPlayers,
 } from './helpers.mjs'
 
 test('auction board entry controls', async t => {
     const app = await launchAppPage()
     const { page } = app
     const remainingRow = () => page.locator('.entry-table tr', { hasText: 'Remaining' }).first()
-    const boardCellsWith = (text) => page.locator('.entry-table td', { hasText: text }).count()
     try {
         await loadApp(app)
         await setSelect(page, 'ls-mode', 'Auction Mode')
@@ -24,7 +24,8 @@ test('auction board entry controls', async t => {
         await t.test('lock in fills the board and reduces the remaining budget', async () => {
             await lockInAuctionPick(app, 'Nikola Jokic', 'Team 1', 70)
 
-            assert.equal(await boardCellsWith('Nikola Jokic'), 1, 'locked player should appear on the board')
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 1,
+                         'locked player should appear on the board')
             const remainingText = await remainingRow().textContent()
             assert.ok(remainingText.includes('$130'), `Team 1's remaining budget should drop to $130 — got: ${remainingText}`)
 
@@ -44,7 +45,7 @@ test('auction board entry controls', async t => {
 
             await pickControlButton(page, 'Lock in selection').click()
             await waitAppSettled(app)
-            assert.equal(await boardCellsWith('Shai Gilgeous-Alexander'), 0,
+            assert.equal(await countBoardCellsWithPlayer(page, 'Shai Gilgeous-Alexander'), 0,
                          'an over-budget pick must not land on the board')
             expectCleanSession(app, 'over-budget lock attempt')
         })
@@ -53,7 +54,8 @@ test('auction board entry controls', async t => {
             await pickControlButton(page, 'Undo previous selection').click()
             await waitAppSettled(app)
 
-            assert.equal(await boardCellsWith('Nikola Jokic'), 0, 'undone player should leave the board')
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 0,
+                         'undone player should leave the board')
             const remainingText = await remainingRow().textContent()
             assert.ok(!remainingText.includes('$130'), 'the $130 budget entry should be gone after undo')
 
@@ -68,7 +70,7 @@ test('auction board entry controls', async t => {
             await pickControlButton(page, 'Clear auction board').click()
             await waitAppSettled(app)
 
-            assert.equal(await boardCellsWith('('), 0, 'clear should empty every board cell')
+            assert.equal(await countBoardPlayers(page), 0, 'clear should empty every board cell')
             const remainingText = await remainingRow().textContent()
             assert.ok(!remainingText.includes('$130'), 'every budget should reset after clear')
             expectCleanSession(app, 'clear board')

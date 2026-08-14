@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, expectCleanSession, drainSessionFailures, waitAppSettled,
-    setSelect, lockInDraftPick, pickControlButton,
+    setSelect, lockInDraftPick, pickControlButton, countBoardCellsWithPlayer,
 } from './helpers.mjs'
 
 test('projection blend weights', async t => {
@@ -42,11 +42,11 @@ test('projection blend weights', async t => {
         await t.test('a blend-weight change keeps the draft board intact', async () => {
             await lockInDraftPick(page, 'Nikola Jokic')
             await waitAppSettled(app)
-            assert.equal(await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count(), 1)
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 1)
 
             await setBlendWeight('ps-w-darko', 0.9)
 
-            assert.equal(await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count(), 1,
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 1,
                          'the locked pick must survive a blend-weight change')
             assert.match(await page.locator('.pick-control-row .pick-control-label').first().textContent(),
                          /Select Pick 1 for Team 2/, 'the pick position must survive too')
@@ -123,17 +123,20 @@ test('projection blend weights', async t => {
         await t.test('a well-formed upload is auto-detected, retitleable, and changes results', async () => {
             // Build a valid BBM-format CSV from real pool players with uniform stat lines —
             // blended in at full weight, it must visibly move the results.
+            // Candidate rows render the rich display: the bare name is the .playername
+            // span's leading text node; positions ride in the nested .player-positions span.
             const pooledPlayers = await page.evaluate(() =>
                 [...document.querySelectorAll('#hscoretable .playername')].slice(0, 30)
-                    .map(span => span.textContent))
+                    .map(span => ({
+                        name:     span.childNodes[0].textContent.trim(),
+                        position: span.querySelector('.player-positions')?.textContent ?? '',
+                    })))
             // Includes unmapped junk columns (Rank, Value) like real exports carry — the
             // parser must drop them; historically one junk column in an upload silently
             // wiped the entire pool ("0 players available") at ANY weight.
-            const csvRows = pooledPlayers.map((fullName, playerIndex) => {
-                const [, name, position] = fullName.match(/^(.*) \(([^)]+)\)$/)
+            const csvRows = pooledPlayers.map(({ name, position }, playerIndex) =>
                 // Multi-position values contain commas (e.g. "C,PF") — quote them, as real exports do.
-                return `${playerIndex + 1},${name},"${position}",9.9,70,20.0,8.0,4.0,1.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0`
-            })
+                `${playerIndex + 1},${name},"${position}",9.9,70,20.0,8.0,4.0,1.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0`)
             const csvText = 'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n' + csvRows.join('\n')
 
             const beforeUploadSnapshot = await readCandidateSnapshot()

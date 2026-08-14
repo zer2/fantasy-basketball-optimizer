@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
     setSelect, readDropdownOptionLabels, pickControlButton, lockInAuctionPick,
+    countBoardCellsWithPlayer,
 } from './helpers.mjs'
 
 test('auction-league session regressions', async t => {
@@ -46,8 +47,8 @@ test('auction-league session regressions', async t => {
             const optionLabels = await readDropdownOptionLabels(page, 'auction-pick-player-wrapper')
             assert.ok(optionLabels.some(label => label.includes('Nikola Jokic')),
                       'undone player should reappear in the Player dropdown')
-            const boardCellsWithJokic = await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count()
-            assert.equal(boardCellsWithJokic, 0, 'undone player should be removed from the board')
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 0,
+                         'undone player should be removed from the board')
             expectCleanSession(app, 'undo in auction mode')
         })
 

@@ -13,11 +13,13 @@ Name→id conversion therefore happens ONLY at the edges where names enter the s
     spelling wins collisions;
   - human text inputs (the injured-players list, season-roster clipboard paste).
 
-Two reserved id ranges:
+Reserved ids:
   - RP_PLAYER_ID (-1): the replacement-player sentinel the pipeline injects.
   - synthetic ids (-2, -3, ...): user-uploaded rows whose names resolve to nothing.
     The player is KEPT — dropping or failing would change the player pool — and the
     state is modeled: no headshot, source-native display name.
+  - FULL_ROSTER_SCORE_PLAYER_ID (0): the single team-score row a full-roster evaluate
+    returns. Not a player and has no registry entry — clients read only its scores.
 """
 
 from __future__ import annotations
@@ -27,6 +29,11 @@ from typing import Iterable
 
 RP_PLAYER_ID = -1
 _FIRST_SYNTHETIC_PLAYER_ID = -2
+
+# The one evaluate with nothing to rank: a full roster's single team-score row (see
+# _build_candidates). Id 0 can never collide — NBA ids are positive, RP is -1, and
+# synthetic ids descend from -2.
+FULL_ROSTER_SCORE_PLAYER_ID = 0
 
 # Every name column of UNIFIED_PLAYER_TABLE that a source or user might spell a player
 # with. MASTER_PLAYER_NAME is applied last so the canonical spelling wins collisions.
