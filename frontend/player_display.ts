@@ -11,7 +11,7 @@
 // whose image still 404s hide their <img> via the error handler, so a missing headshot
 // costs nothing visually.
 
-import { BASE_URL } from './api/client.js'
+import { BASE_URL, countInFlightSessionRequests } from './api/client.js'
 import { getRegistryEntry, getAllPlayerIdentities } from './player_registry.js'
 
 const HEADSHOT_BASE_URL = `${BASE_URL}/players/headshots/`
@@ -23,9 +23,13 @@ const HEADSHOT_BASE_URL = `${BASE_URL}/players/headshots/`
 // "staggering" effect. Warmed once, every later render (rebuilds, scrolling, board
 // fills) paints from cache in the same frame.
 //
-// Concurrency stays low: the app and these fetches share the browser's per-origin
-// connection pool, and evaluate batches must never queue behind image requests.
-const PRELOAD_CONCURRENCY = 3
+// The sweep runs only while the backend is quiet: each fetch slot checks for in-flight
+// session traffic before launching and backs off while any exists, so evaluates keep the
+// browser's per-origin connection pool and the server's attention to themselves. Because
+// the sweep owns its idle window, it can afford real concurrency (still one connection
+// short of the browser's per-origin limit, so a user action is never blocked).
+const PRELOAD_CONCURRENCY = 5
+const PRELOAD_BACKOFF_MILLISECONDS = 400
 
 const warmedHeadshotIds = new Set<number>()
 let preloadGeneration = 0
@@ -39,9 +43,14 @@ function preloadAllHeadshots(): void {
     let cursor = 0
     function fetchNext(): void {
         if (generation !== preloadGeneration) return   // a newer registry superseded this run
+        if (cursor >= pendingPlayerIds.length) return
+        if (countInFlightSessionRequests() > 0) {
+            // An evaluate (or other session call) is running — yield and try again shortly.
+            setTimeout(fetchNext, PRELOAD_BACKOFF_MILLISECONDS)
+            return
+        }
         const playerId = pendingPlayerIds[cursor]
         cursor += 1
-        if (playerId === undefined) return
         const image = new Image()
         // 404s (CDN has no image for the id) count as warmed too: the browser caches the
         // miss and the display's onerror hides the element — no point refetching.

@@ -28,6 +28,17 @@ export class HTTPError extends Error {
     }
 }
 
+// In-flight backend work, visible to background consumers: the headshot preloader
+// yields to session traffic (evaluates, patches) and sweeps only while this is zero,
+// so image fetches never compete with real work for the browser's connection pool
+// or the server's attention.
+let inFlightSessionRequests = 0
+
+/** Number of /sessions requests currently in flight (0 = the backend is quiet). */
+export function countInFlightSessionRequests(): number {
+    return inFlightSessionRequests
+}
+
 /** Issues `fetch(url, init)` and parses the JSON response, throwing HTTPError on
  *  non-2xx. The `label` prefixes error messages so callers don't each repeat the
  *  "X failed (status): body" boilerplate. */
@@ -36,13 +47,19 @@ async function jsonRequest<T>(
     , label: string
     , init?: RequestInit
 ): Promise<T> {
-    const res = await fetch(url, init)
-    if (!res.ok) {
-        const body = await res.text()
-        throw new HTTPError(res.status, body, label)
+    const isSessionRequest = url.includes('/sessions')
+    if (isSessionRequest) inFlightSessionRequests += 1
+    try {
+        const res = await fetch(url, init)
+        if (!res.ok) {
+            const body = await res.text()
+            throw new HTTPError(res.status, body, label)
+        }
+        if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
+        return await (res.json() as Promise<T>)
+    } finally {
+        if (isSessionRequest) inFlightSessionRequests -= 1
     }
-    if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
-    return res.json() as Promise<T>
 }
 
 
