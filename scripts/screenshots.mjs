@@ -438,7 +438,8 @@ const STATES = {
 //
 const SHOTS = [
     // Draft / H-scoring
-    { name: 'main',        state: 'load',        selector: '#app-layout', viewport: true },
+    // About half the viewport: the board plus the first few candidates, cut at a row edge.
+    { name: 'main',        state: 'load',        selector: '#app-layout', viewport: true, throughRows: 3 },
     { name: 'hec',         state: 'draft-EC',    selector: '#hscoretable', rows: 12 },
     { name: 'hmc',         state: 'draft-MC',    selector: '#hscoretable', rows: 12 },
     { name: 'rototop',     state: 'draft-Roto',  selector: '#hscoretable', rows: 12 },
@@ -546,7 +547,7 @@ page.setDefaultTimeout(20000)   // fail a stuck locator fast instead of hanging
 async function captureShot(page, s) {
     try {
         await ensure(page, s.state)
-        if (s.viewport) await shootViewport(page, s.name)
+        if (s.viewport) await shootViewport(page, s.name, s.throughRows ?? 0)
         else if (s.union) await shootUnion(page, s)
         else if (s.rows) await shootRows(page, s.name, s.selector, s.rows)
         else await shoot(page, s.name, s.selector)
@@ -599,10 +600,25 @@ async function shoot(page, name, selector) {
 }
 
 // Whole-window shot (e.g. `main`) — the app-layout element is very tall, so capture the viewport.
-async function shootViewport(page, name) {
+// `throughRows` keeps only the top of it, down to the bottom edge of that many candidate rows:
+// the full 1440x900 frame is scaled down to the docs' text width, which leaves every label too
+// small to read, and cropping instead of shrinking keeps the part that carries the point legible.
+// Measured from the row rather than set as a fixed fraction so the cut always lands on a row
+// boundary instead of slicing one in half whenever the layout shifts.
+async function shootViewport(page, name, throughRows = 0) {
     await page.waitForTimeout(150)
-    await page.screenshot({ path: path.join(IMG, `${name}.png`) })
-    console.log('✓', name, '(viewport)')
+    const { width, height } = CONTEXT.viewport
+    let clipHeight = height
+    if (throughRows > 0) {
+        const rowBox = await page.locator('#hscoretable .playerheaderdiv').nth(throughRows - 1)
+            .boundingBox().catch(() => null)
+        if (rowBox) clipHeight = Math.min(height, Math.ceil(rowBox.y + rowBox.height))
+    }
+    await page.screenshot({
+        path: path.join(IMG, `${name}.png`),
+        clip: { x: 0, y: 0, width, height: clipHeight },
+    })
+    console.log('✓', name, throughRows > 0 ? `(viewport, through row ${throughRows})` : '(viewport)')
 }
 
 // Union capture: some doc regions span sibling elements with no shared wrapper (e.g. the
