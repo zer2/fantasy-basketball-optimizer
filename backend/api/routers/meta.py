@@ -72,9 +72,13 @@ _NBA_HEADSHOT_URL_TEMPLATE = 'https://cdn.nba.com/headshots/nba/latest/260x190/{
 # warm set survive process restarts — dev auto-reloads and Cloud Run cold starts otherwise
 # wipe it and the next render trickles in hundreds of CDN round-trips in arrival order.
 _headshot_cache: dict[int, bytes | None] = {}
+# Unlike the Snowflake view cache (data freshness concerns make persistence opt-in via
+# DISK_CACHE_DIR), headshots are immutable public images — so without the env override
+# the cache still persists, in a gitignored local directory. A dev server otherwise
+# re-fetches hundreds of CDN images after every auto-reload.
 _HEADSHOT_DISK_CACHE_DIR = (
     Path(os.environ['DISK_CACHE_DIR']) / 'headshots'
-    if 'DISK_CACHE_DIR' in os.environ else None
+    if 'DISK_CACHE_DIR' in os.environ else Path('.cache') / 'headshots'
 )
 
 
@@ -120,10 +124,15 @@ def get_player_headshot_route(nba_player_id: int):
 
     image_bytes = _headshot_cache[nba_player_id]
     if image_bytes is None:
-        raise HTTPException(status_code=404, detail='No headshot for this player.')
+        # Cacheable like the hit: a no-image id stays that way, and an uncached 404 would
+        # make every rebuilt <img> for the player refetch it.
+        raise HTTPException(status_code=404, detail='No headshot for this player.',
+                            headers={'Cache-Control': 'public, max-age=604800'})
     return Response(
         content=image_bytes,
         media_type='image/png',
-        # The bytes are immutable per id for a season; let the browser cache them for a day.
-        headers={'Cache-Control': 'public, max-age=86400'},
+        # The bytes are effectively immutable per id (a player's photo changes at most
+        # yearly): a week keeps the browser cache warm across sessions, so the preloader
+        # only ever pays the fetch cost for genuinely new players.
+        headers={'Cache-Control': 'public, max-age=604800'},
     )

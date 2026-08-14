@@ -12,9 +12,47 @@
 // costs nothing visually.
 
 import { BASE_URL } from './api/client.js'
-import { getRegistryEntry } from './player_registry.js'
+import { getRegistryEntry, getAllPlayerIdentities } from './player_registry.js'
 
 const HEADSHOT_BASE_URL = `${BASE_URL}/players/headshots/`
+
+// ── Headshot preloading ──────────────────────────────────────────────────────
+// Whenever a session registry arrives, warm every pool headshot into the browser's HTTP
+// cache in the background. Without this, headshots load one <img> fetch at a time as
+// rows scroll into view, popping in over the table in network-completion order — the
+// "staggering" effect. Warmed once, every later render (rebuilds, scrolling, board
+// fills) paints from cache in the same frame.
+//
+// Concurrency stays low: the app and these fetches share the browser's per-origin
+// connection pool, and evaluate batches must never queue behind image requests.
+const PRELOAD_CONCURRENCY = 3
+
+const warmedHeadshotIds = new Set<number>()
+let preloadGeneration = 0
+
+function preloadAllHeadshots(): void {
+    preloadGeneration += 1
+    const generation = preloadGeneration
+    const pendingPlayerIds = getAllPlayerIdentities()
+        .filter(entry => entry.has_headshot && !warmedHeadshotIds.has(entry.player_id))
+        .map(entry => entry.player_id)
+    let cursor = 0
+    function fetchNext(): void {
+        if (generation !== preloadGeneration) return   // a newer registry superseded this run
+        const playerId = pendingPlayerIds[cursor]
+        cursor += 1
+        if (playerId === undefined) return
+        const image = new Image()
+        // 404s (CDN has no image for the id) count as warmed too: the browser caches the
+        // miss and the display's onerror hides the element — no point refetching.
+        image.onload  = () => { warmedHeadshotIds.add(playerId); fetchNext() }
+        image.onerror = () => { warmedHeadshotIds.add(playerId); fetchNext() }
+        image.src = `${HEADSHOT_BASE_URL}${playerId}.png`
+    }
+    for (let slot = 0; slot < PRELOAD_CONCURRENCY; slot++) fetchNext()
+}
+
+document.addEventListener('player-registry-updated', preloadAllHeadshots)
 
 /** The proxied headshot URL for a player id, or null when the player has no headshot. */
 export function getHeadshotUrl(playerId: number): string | null {
@@ -34,7 +72,10 @@ export function getHeadshotUrl(playerId: number): string | null {
 function buildHeadshotImageHtml(playerId: number, className: string): string {
     const url = getHeadshotUrl(playerId)
     if (url === null) return ''
-    return `<img class='${className}' src='${url}' loading='lazy' alt='' onerror="this.style.display='none'">`
+    // headshot-loaded drives the fade-in (styles.css): late arrivals ease in instead of
+    // popping. Cache hits fire load within a frame, so warmed images read as instant.
+    return `<img class='${className}' src='${url}' loading='lazy' alt='' `
+        + `onload="this.classList.add('headshot-loaded')" onerror="this.style.display='none'">`
 }
 
 /** Headshot <img> element for DOM-built displays. These attach to the live DOM
@@ -46,6 +87,7 @@ function makeHeadshotImage(playerId: number, className: string): HTMLImageElemen
     image.className = className
     image.src = url
     image.alt = ''
+    image.addEventListener('load', () => image.classList.add('headshot-loaded'))
     image.addEventListener('error', () => { image.style.display = 'none' })
     return image
 }

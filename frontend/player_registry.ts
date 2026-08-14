@@ -18,10 +18,14 @@ export const RP_PLAYER_ID = -1
 let entriesById: Map<number, PlayerRegistryEntry> | null = null
 let playerIdByName: Map<string, number> | null = null
 
-/** Installs a session's registry (called by the api layer whenever a payload carries one). */
+/** Installs a session's registry (called by the api layer whenever a payload carries one).
+ *  Announces the install as a document event rather than calling listeners directly, so
+ *  reactions that need the api layer (the headshot preloader in player_display.ts) don't
+ *  create an import cycle through this module. */
 export function setPlayerRegistry(entries: PlayerRegistryEntry[]): void {
     entriesById = new Map(entries.map(entry => [entry.player_id, entry]))
     playerIdByName = new Map(entries.map(entry => [entry.name, entry.player_id]))
+    document.dispatchEvent(new Event('player-registry-updated'))
 }
 
 /** The registry entry for a player id. Throws on an unknown id — a payload referencing a
