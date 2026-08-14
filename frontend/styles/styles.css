@@ -641,6 +641,12 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     pointer-events: none;
 }
 
+/* The display: flex above outranks the UA's [hidden] { display: none }, so the hidden
+   attribute custom_select.ts sets while the dropdown is open needs its own rule. */
+.cs-value-display[hidden] {
+    display: none;
+}
+
 .cs-rich-value:not(.cs-open) .cs-search-input {
     color: transparent;
 }
@@ -1021,6 +1027,20 @@ tr {
     flex-shrink: 0;
 }
 
+/* Headshots ease in on load instead of popping (player_display.ts adds headshot-loaded
+   from each img's load event). Cache-warmed images complete within a frame, so after the
+   registry preloader has run this reads as instant. */
+.player-avatar,
+.roster-headshot {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.player-avatar.headshot-loaded,
+.roster-headshot.headshot-loaded {
+    opacity: 1;
+}
+
 
 .playername {
     flex: 1;
@@ -1142,12 +1162,21 @@ tr {
 }
 
 /* Long last names in narrow board cells clip with an ellipsis; the stack's title
-   tooltip carries the full name. */
+   tooltip carries the full name. The tightened line-height trims the inherited line
+   box's slack, which otherwise all reads as extra space under the name. */
 .roster-player-name {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.15;
+}
+
+/* Roster-grid cells holding a player stack drop panel-datacell's vertical padding so
+   their height matches the draft/auction board cells (which pad 0). */
+.panel-datacell.roster-player-cell {
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 /* ─── Board collapse toggle (draft/auction grids) ─────────────────────────── */
