@@ -11,41 +11,49 @@
 // whose image still 404s hide their <img> via the error handler, so a missing headshot
 // costs nothing visually.
 
-import { BASE_URL, countInFlightSessionRequests } from './api/client.js'
+import { BASE_URL, countInFlightSessionRequests, fetchPoolPlayerIds } from './api/client.js'
 import { getRegistryEntry, getAllPlayerIdentities } from './player_registry.js'
 
 const HEADSHOT_BASE_URL = `${BASE_URL}/players/headshots/`
 
 // ── Headshot preloading ──────────────────────────────────────────────────────
-// Whenever a session registry arrives, warm every pool headshot into the browser's HTTP
-// cache in the background. Without this, headshots load one <img> fetch at a time as
-// rows scroll into view, popping in over the table in network-completion order — the
-// "staggering" effect. Warmed once, every later render (rebuilds, scrolling, board
-// fills) paints from cache in the same frame.
+// Warm the pool's headshots into the browser's HTTP cache in the background. Without
+// this, headshots load one <img> fetch at a time as rows scroll into view, popping in
+// over the table in network-completion order — the "staggering" effect. Warmed once,
+// every later render (rebuilds, scrolling, board fills) paints from cache in the same
+// frame.
 //
-// The sweep runs only while the backend is quiet: each fetch slot checks for in-flight
-// session traffic before launching and backs off while any exists, so evaluates keep the
-// browser's per-origin connection pool and the server's attention to themselves. Because
-// the sweep owns its idle window, it can afford real concurrency (still one connection
-// short of the browser's per-origin limit, so a user action is never blocked).
-const PRELOAD_CONCURRENCY = 5
+// Two triggers, same sweep:
+//   - prefetchHeadshotsForDataSource: fired when a session build STARTS. The pool's ids
+//     come from the best-effort /players/pool-ids endpoint, so the sweep runs in
+//     parallel with the build — H-score setup is CPU-bound on the server while image
+//     serving is pure I/O, so the build window is free time.
+//   - the player-registry-updated document event when a build completes: sweeps the
+//     definitive pool, covering anything the prefetch didn't know about. (The event
+//     also keeps this module free of an import cycle with the api layer.)
+//
+// The sweep yields to real work: each fetch slot checks for in-flight bursty session
+// traffic (evaluate batches — builds and rebuild patches are excluded, see the api
+// client) and backs off while any exists, so evaluates keep the browser's per-origin
+// connection pool and the server's attention to themselves. Concurrency 4 leaves two
+// of the browser's six per-origin connections free — enough for an in-flight build
+// plus a fresh user action even mid-sweep.
+const PRELOAD_CONCURRENCY = 4
 const PRELOAD_BACKOFF_MILLISECONDS = 400
 
 const warmedHeadshotIds = new Set<number>()
 let preloadGeneration = 0
 
-function preloadAllHeadshots(): void {
+function sweepHeadshots(playerIds: number[]): void {
     preloadGeneration += 1
     const generation = preloadGeneration
-    const pendingPlayerIds = getAllPlayerIdentities()
-        .filter(entry => entry.has_headshot && !warmedHeadshotIds.has(entry.player_id))
-        .map(entry => entry.player_id)
+    const pendingPlayerIds = playerIds.filter(playerId => !warmedHeadshotIds.has(playerId))
     let cursor = 0
     function fetchNext(): void {
-        if (generation !== preloadGeneration) return   // a newer registry superseded this run
+        if (generation !== preloadGeneration) return   // a newer sweep superseded this one
         if (cursor >= pendingPlayerIds.length) return
         if (countInFlightSessionRequests() > 0) {
-            // An evaluate (or other session call) is running — yield and try again shortly.
+            // An evaluate (or other session-scoped call) is running — yield, retry shortly.
             setTimeout(fetchNext, PRELOAD_BACKOFF_MILLISECONDS)
             return
         }
@@ -59,6 +67,22 @@ function preloadAllHeadshots(): void {
         image.src = `${HEADSHOT_BASE_URL}${playerId}.png`
     }
     for (let slot = 0; slot < PRELOAD_CONCURRENCY; slot++) fetchNext()
+}
+
+/** Starts warming a pool's headshots as soon as its identity is known — call when a
+ *  session build begins, with the build's data source. Strictly an optimization: any
+ *  failure (or a cold backend cache answering with no ids) is logged and absorbed,
+ *  because the registry sweep after the build always covers the full pool. */
+export function prefetchHeadshotsForDataSource(dataSourceType: string, season?: string | null): void {
+    fetchPoolPlayerIds(dataSourceType, season)
+        .then(playerIds => { if (playerIds.length > 0) sweepHeadshots(playerIds) })
+        .catch(error => console.warn('Headshot prefetch skipped:', error))
+}
+
+function preloadAllHeadshots(): void {
+    sweepHeadshots(getAllPlayerIdentities()
+        .filter(entry => entry.has_headshot)
+        .map(entry => entry.player_id))
 }
 
 document.addEventListener('player-registry-updated', preloadAllHeadshots)

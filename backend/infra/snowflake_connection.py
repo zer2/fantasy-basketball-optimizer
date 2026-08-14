@@ -111,6 +111,20 @@ def query(view_name: str) -> pd.DataFrame:
     return df.copy()
 
 
+def peek(view_name: str) -> pd.DataFrame | None:
+    """The cached frame for view_name if present and unexpired, else None — NEVER loads.
+
+    For best-effort consumers (the headshot-prefetch id listing) that must not trigger
+    a Snowflake query or race a load already in progress elsewhere. Returns the live
+    cached object to avoid copying a full view per call — callers must only read it.
+    """
+    with _cache_lock:
+        entry = _cache.get(view_name)
+        if entry is not None and time.time() - entry[0] < _CACHE_TTL:
+            return entry[1]
+    return None
+
+
 def view_cache_timestamp(view_name: str) -> float | None:
     """Load-time of the cached entry for view_name if present and unexpired, else None.
 

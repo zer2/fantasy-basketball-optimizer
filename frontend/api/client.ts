@@ -29,12 +29,15 @@ export class HTTPError extends Error {
 }
 
 // In-flight backend work, visible to background consumers: the headshot preloader
-// yields to session traffic (evaluates, patches) and sweeps only while this is zero,
-// so image fetches never compete with real work for the browser's connection pool
-// or the server's attention.
+// yields to bursty session traffic (evaluate batches and their follow-ups) and sweeps
+// only while this is zero. Session BUILDS — the bare POST /sessions and the PATCH
+// /sessions/{id} rebuild — are deliberately not counted: each is one long CPU-bound
+// call on the server while image serving is pure I/O, so the build window is free
+// time the sweep should use.
 let inFlightSessionRequests = 0
 
-/** Number of /sessions requests currently in flight (0 = the backend is quiet). */
+/** Number of counted session requests in flight (0 = the backend is quiet apart from,
+ *  at most, a session build/rebuild). */
 export function countInFlightSessionRequests(): number {
     return inFlightSessionRequests
 }
@@ -47,7 +50,8 @@ async function jsonRequest<T>(
     , label: string
     , init?: RequestInit
 ): Promise<T> {
-    const isSessionRequest = url.includes('/sessions')
+    const isSessionRequest = url.includes('/sessions/')
+        && (init?.method ?? 'GET').toUpperCase() !== 'PATCH'
     if (isSessionRequest) inFlightSessionRequests += 1
     try {
         const res = await fetch(url, init)
@@ -139,6 +143,23 @@ export async function uploadCsv(
 export async function getSeasons(): Promise<string[]> {
     const data = await jsonRequest<{ seasons: string[] }>(`${BASE_URL}/seasons`, 'Get seasons')
     return data.seasons
+}
+
+// ── GET /players/pool-ids ─────────────────────────────────────────────────────
+
+/** Best-effort NBA id list for a data source's pool, for prefetching headshots while
+ *  the session builds. The backend answers only from already-cached frames — an empty
+ *  list means "not cheaply known yet" and the post-build registry sweep covers it. */
+export async function fetchPoolPlayerIds(
+    dataType: string
+    , season?: string | null
+): Promise<number[]> {
+    const seasonParam = season ? `&season=${encodeURIComponent(season)}` : ''
+    const data = await jsonRequest<{ player_ids: number[] }>(
+        `${BASE_URL}/players/pool-ids?data_type=${encodeURIComponent(dataType)}${seasonParam}`,
+        'Pool ids fetch',
+    )
+    return data.player_ids
 }
 
 // ── POST /sessions ─────────────────────────────────────────────────────────────

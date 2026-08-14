@@ -63,6 +63,38 @@ def get_seasons_route():
         raise fail(500, 'Could not load available seasons.')
 
 
+@router.get('/players/pool-ids')
+def get_pool_player_ids_route(data_type: str, season: str | None = None):
+    """Best-effort NBA id list for a data source's player pool, so the frontend can
+    prefetch headshots in parallel with a session build (image serving is pure I/O and
+    never competes with the CPU-bound pipeline).
+
+    Reads ONLY frames already in the view cache — a cold cache returns an empty list
+    instead of triggering a Snowflake load that would race the session build's own.
+    The registry-driven sweep after the build covers whatever this misses, so empty is
+    always safe here (and only here — this endpoint is explicitly an optimization)."""
+    from backend.infra.snowflake_connection import peek
+
+    if data_type == 'historical':
+        if season is None:
+            raise HTTPException(status_code=400, detail='season is required for historical pools.')
+        historical_view = peek('HISTORICAL_SEASONAL_AVERAGES_VIEW')
+        if historical_view is None:
+            return {'player_ids': []}
+        season_rows = historical_view[historical_view['SEASON'].astype(str) == season]
+        return {'player_ids': sorted(int(i) for i in season_rows['NBA_PLAYER_ID'].dropna().unique())}
+
+    if data_type in ('projections', 'csv'):
+        # These pools resolve players through the unified table, so its current players
+        # are a superset — fine to warm (a few extra ids, all cacheable).
+        unified_players = peek('UNIFIED_PLAYER_TABLE')
+        if unified_players is None:
+            return {'player_ids': []}
+        return {'player_ids': sorted(int(i) for i in unified_players['NBA_PLAYER_ID'].dropna().unique())}
+
+    raise HTTPException(status_code=400, detail=f'Unknown pool data_type: {data_type!r}')
+
+
 _NBA_HEADSHOT_URL_TEMPLATE = 'https://cdn.nba.com/headshots/nba/latest/260x190/{nba_player_id}.png'
 
 # nba_player_id -> PNG bytes, or None for a confirmed no-image id (the CDN 404s some

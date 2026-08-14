@@ -14,6 +14,7 @@ import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, c
 // bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
 const CANDIDATE_BATCH_SIZE = 100
 import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
+import { prefetchHeadshotsForDataSource } from '../player_display.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
 
 // ─── Draft/auction state ─────────────────────────────────────────────────────
@@ -70,6 +71,10 @@ export async function createOrPatchSession(
   , signal?: AbortSignal
 ): Promise<void> {
     setIndicatorState('fetching')
+    // A data-source change means a new player pool: start warming its headshots now, in
+    // parallel with the rebuild (startFreshSession does the same for brand-new sessions).
+    const patchDataSource = patchBody.data_source as { type: string; season?: string | null } | undefined
+    if (patchDataSource) prefetchHeadshotsForDataSource(patchDataSource.type, patchDataSource.season)
     try {
         if (!getSessionId()) {
             await startFreshSession(signal)
