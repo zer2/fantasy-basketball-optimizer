@@ -264,7 +264,7 @@ def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
         # Every name the aliases can produce, so a file already written in canonical names
         # keeps those columns even though they never went through the mapping.
         canonical_columns = set(params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
-        return _parse_with_renamer(df_raw, column_mapping, canonical_columns)
+        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, params)
 
     if missing_identity:
         problem = f"no column for {' or '.join(missing_identity)}"
@@ -281,10 +281,43 @@ def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
     )
 
 
+# Attempts hiding inside a ratio cell: sources that print a percentage with its makes and
+# attempts behind it — "0.583 (10.2/17.5)" — and ship no attempts column of their own.
+# Captures the second number, the attempts.
+_ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
+
+
+def _recover_volumes_from_ratio_cells(df: pd.DataFrame, params: dict) -> pd.DataFrame:
+    """Fill in a missing attempts column from the text of its percentage column.
+
+    Attempt volume is load-bearing: a ratio G-score weights the percentage deviation by it,
+    so a percentage without its volume cannot be scored at all. When a source carries that
+    volume only inside the percentage cell, take it from there rather than discard it with
+    the rest of the text. A file's own attempts column always wins — this fires only when
+    there is none. Only the attempts are recovered, never the makes: the projection path
+    does not use them, and emitting a column no other source carries would make the blend
+    drop every player that source lacks.
+    """
+    for ratio_stat, ratio_info in params.get('ratio-statistics', {}).items():
+        volume_statistic = ratio_info['volume-statistic']
+        if (ratio_stat not in df.columns
+                or volume_statistic in df.columns
+                or df[ratio_stat].dtype != object):
+            continue
+        attempts = pd.to_numeric(
+            df[ratio_stat].astype(str).str.extract(_ATTEMPTS_IN_RATIO_CELL_PATTERN, expand=False),
+            errors='coerce',
+        )
+        if attempts.notna().any():
+            df[volume_statistic] = attempts
+    return df
+
+
 def _parse_with_renamer(
     df_raw: pd.DataFrame
     , column_mapping: dict
     , canonical_columns: set
+    , params: dict
 ) -> pd.DataFrame:
     """Rename this file's columns to canonical names, drop junk, coerce stats."""
     df = df_raw.rename(columns=column_mapping)
@@ -293,7 +326,11 @@ def _parse_with_renamer(
     # would otherwise join the blend's column union, where every player from the OTHER
     # sources is "missing" them — and the blend drops any player missing any column
     # across all sources, so a single junk column can wipe out the entire pool.
-    df = df[[column for column in df.columns if column in canonical_columns]]
+    df = df[[column for column in df.columns if column in canonical_columns]].copy()
+
+    # Before the ratio cells are reduced to their leading number below, mine them for any
+    # attempts column the file does not carry separately.
+    df = _recover_volumes_from_ratio_cells(df, params)
 
     # Sources carry non-numeric stat values: some repeat the header row inside the table
     # body (every stat cell a string), and some format ratio stats as
@@ -386,8 +423,17 @@ def run_step4(session: Session) -> None:
             f'({n_drafters} teams x {n_picks} roster spots) to fill every roster.'
         )
 
+    # A category needs its own column, and a ratio category also needs the volume column
+    # that weights it (a percentage cannot be scored without the attempts behind it) —
+    # without this second check the coefficient pass fails on the missing volume column
+    # instead of the category simply dropping out.
     available_columns = set(session.v2.columns)
-    categories = [c for c in cp['categories'] if c in available_columns]
+    ratio_statistics  = params.get('ratio-statistics', {})
+    categories = [
+        category for category in cp['categories']
+        if category in available_columns
+        and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
+    ]
     cp['categories'] = categories
 
     info, _ = process_player_data(

@@ -314,6 +314,78 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_ratio_cells_supply_missing_attempt_columns():
+    """Some sources print a ratio stat as its percentage followed by the makes and attempts
+    behind it — '0.583 (10.2/17.5)' — and ship no attempts column at all. Attempt volume
+    weights the percentage deviation in a ratio G-score, so it must be recovered from the
+    cell rather than discarded with the rest of the text. A file's own attempts column
+    always wins, and a percentage with no attempts anywhere is reported as missing."""
+    from backend.services.build_agent import parse_projection_csv
+    params = _load_params()['NBA']
+
+    volumes_inside_the_cell = (
+        'PLAYER,POS,GP,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO\n'
+        'Test Player,C,70,"0.583 (10.2/17.5)","0.821 (6.0/7.3)",1.1,26.5,12.5,9.0,1.3,0.9,3.0\n'
+    ).encode()
+    recovered = parse_projection_csv(volumes_inside_the_cell, params)
+    assert recovered.loc['Test Player', 'Field Goal %'] == 0.583, 'the percentage still parses'
+    assert recovered.loc['Test Player', 'Field Goal Attempts'] == 17.5, 'attempts read from the cell'
+    assert recovered.loc['Test Player', 'Free Throw Attempts'] == 7.3
+
+    own_attempts_columns = (
+        'PLAYER,POS,GP,FG%,FGA,FT%,FTA,3PM,PTS,TREB,AST,STL,BLK,TO\n'
+        'Test Player,C,70,"0.583 (10.2/17.5)",21.0,"0.821 (6.0/7.3)",8.5,1.1,26.5,12.5,9.0,1.3,0.9,3.0\n'
+    ).encode()
+    explicit = parse_projection_csv(own_attempts_columns, params)
+    assert explicit.loc['Test Player', 'Field Goal Attempts'] == 21.0, "the file's own column wins"
+    assert explicit.loc['Test Player', 'Free Throw Attempts'] == 8.5
+
+    percentages_only = (
+        'PLAYER,POS,GP,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO\n'
+        'Test Player,C,70,0.583,0.821,1.1,26.5,12.5,9.0,1.3,0.9,3.0\n'
+    ).encode()
+    response = client.post('/data/upload',
+                           files={'file': ('percentages-only.csv', percentages_only, 'text/csv')})
+    assert response.status_code == 200, response.text
+    missing = response.json()['missing_stats']
+    assert 'Field Goal Attempts' in missing and 'Free Throw Attempts' in missing, \
+        'a percentage that cannot be weighted must be reported, not silently dropped later'
+
+
+def test_percentage_without_attempts_narrows_out_instead_of_failing():
+    """A percentage whose attempt volume is nowhere to be found cannot be scored, because the
+    coefficient pass reads the volume column directly. The category must drop out of the
+    session the same way an absent category does, rather than failing the whole build."""
+    rows = ['PLAYER,POS,GP,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO']
+    for player_index in range(60):
+        # Eligible everywhere, so the position-means slice always covers each base position
+        # regardless of how this small synthetic pool happens to rank.
+        rows.append(f'Fake Player {player_index:03d},"PG,SG,SF,PF,C",70,0.500,0.800,'
+                    f'1.1,{20 - player_index * 0.2:.1f},8.0,4.0,1.0,1.0,3.0')
+    csv_bytes = '\n'.join(rows).encode()
+
+    upload_response = client.post('/data/upload',
+                                  files={'file': ('percentages-only.csv', csv_bytes, 'text/csv')})
+    assert upload_response.status_code == 200, upload_response.text
+    data_id = upload_response.json()['data_id']
+
+    session_request = _build_default_session_request()
+    session_request['league']['n_drafters'] = 2
+    session_request['data_source'] = {
+        'type': 'projections',
+        'blend_weights': {'DARKO': 0.0, 'ESPN': 0.0, data_id: 1.0},
+        'custom_data_ids': [data_id],
+    }
+    create_response = client.post('/sessions', json=session_request)
+    assert create_response.status_code == 201, create_response.text
+
+    categories = create_response.json()['categories']
+    for unweightable in ('Field Goal %', 'Free Throw %'):
+        assert unweightable not in categories, \
+            f'{unweightable} has no attempt volume in this pool and cannot be scored'
+    assert 'Points' in categories, 'the countable categories are unaffected'
+
+
 def test_parse_projection_csv_tolerates_files_missing_categories():
     """A source that pairs each projection set with a league exports only that league's
     active categories, so a file may legitimately lack e.g. Turnovers or the free-throw
