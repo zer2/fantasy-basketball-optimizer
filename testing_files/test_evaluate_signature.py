@@ -46,14 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# Regenerated 2026-08-14 for the team-denominator correction to percentage-stat G-scores
-# (calculate_scores_from_coefficients: the unpublished-paper factor
-# n_starters*V-bar / ((n_starters-1)*V-bar + V_p)) — scores deliberately move.
+# Regenerated 2026-08-14 for the expand-view diff reattribution: the displayed Future
+# diff nets out the opponents' expected future tilts (res['Opponent-Future-Tilt']), so
+# Current diff is the board as it stands. Display-only — H-scores verified identical.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): '758e4078ed1e8250c8d4125f5cb4eec025d21ca990bf288b5af8ce0918910e5a',
-    ('Head to Head: Each Category',  'mid'):   '83b7fa08a95147bbe5a0329693bc2e912c35449a919f4d7b41d044adb7ad04af',
-    ('Head to Head: Most Categories','empty'): '8ecf63b1f2387aae5d826814d073d10eaa638503b3c76bb7a16c408de9cf5af8',
-    ('Head to Head: Most Categories','mid'):   '25fd72f5dcae9621b6842167a346c02f68e22393f7d33abed8db9491c5c440f1',
+    ('Head to Head: Each Category',  'empty'): 'c41fb2be835637d9b2199a60051aca4a4a4a2f155e7e4fbf0b17076036757ba3',
+    ('Head to Head: Each Category',  'mid'):   '2d425db8b085e0154a3ce7ad10108f5a4be014ea2ece4b1031d9f73b89f0627d',
+    ('Head to Head: Most Categories','empty'): 'c31299bf88fc88d67c7b30062a77ec9b27a86acd40e1db4da607e396c1c590eb',
+    ('Head to Head: Most Categories','mid'):   '9d4ddcc95b746b852a3924a5ff36a63a5026b02baccf5b3fdb9520c42d5dedb9',
 }
 
 

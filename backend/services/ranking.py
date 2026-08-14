@@ -210,6 +210,8 @@ def _build_candidates(
     win_rate_cdfs            = h_score_result['Rates'].iloc[order]
     team_diff_df             = h_score_result['Diff'].iloc[order] if h_score_result['Diff'] is not None else None
     future_diff_df           = h_score_result['Future-Diff'].iloc[order] if h_score_result['Future-Diff'] is not None else None
+    opponent_tilt_df         = (h_score_result.get('Opponent-Future-Tilt').iloc[order]
+                                if h_score_result.get('Opponent-Future-Tilt') is not None else None)
     player_g_scores          = info['G-scores']            # full-population: used for auction dollar values
 
     # res['Rosters'] column 0 encodes whether a valid slot assignment was found.
@@ -355,6 +357,13 @@ def _build_candidates(
         if future_diff_df is not None
         else None
     )
+    # The opponents' expected future tilts (x-score space), subtracted from the future row at
+    # display time — res['Future-Diff'] itself stays raw because the opponent model feeds on it.
+    opponent_tilt_matrix = (
+        opponent_tilt_df[categories].values
+        if opponent_tilt_df is not None and future_diff_matrix is not None
+        else None
+    )
     rosters_rows = rosters_sorted.values
 
     # Candidate last names, read once for the whole pool from the registry (they label each
@@ -383,6 +392,7 @@ def _build_candidates(
         , team_diff_matrix
         , future_diff_matrix
         , original_v
+        , opponent_tilt_matrix
     )
     # How many of each flex type's slots are still open for future picks, per candidate. The shares
     # describe how those *remaining* slots would be filled, so the display multiplies by this — not by
@@ -452,6 +462,7 @@ def _build_g_score_rows(
     , team_diff_matrix: np.ndarray | None
     , future_diff_matrix: np.ndarray | None
     , original_v: np.ndarray
+    , opponent_tilt_matrix: np.ndarray | None = None
 ) -> list[list[GScoreRow]]:
     """Build the G-score breakdown table rows for every candidate at once.
 
@@ -474,18 +485,25 @@ def _build_g_score_rows(
     expected_future_diff is the algorithm's projection for the picks
     remaining, which varies per candidate.
 
-    Therefore:
-        current_diff = res['Diff'] - res['Future-Diff']
-                     = (future_diff + diff_means) - future_diff
-                     = diff_means
+    res['Future-Diff'] is the drafter's own RAW projected future tilt — the
+    opponent model feeds on it, so it is not netted at the source. The
+    opponents' expected future tilts arrive separately (opponent_tilt_matrix,
+    from res['Opponent-Future-Tilt']; diff_means carries them with opposite
+    sign) and are subtracted HERE to form the displayed Future row:
 
-    With the opponent model OFF, diff_means depends only on the players
-    already drafted, so Current diff is identical for every candidate. With
-    the model ON it is candidate-dependent for the predicted-anchor
-    candidates: self-exclusion swaps the candidate's own predicted team out
-    of its field for the spare anchor's team (you never play against your own
-    team), so a stronger anchor shows a less negative Current diff, while
-    every non-anchor candidate shares one identical field.
+        Future diff  = future_diff - opponent tilt   (net future differential)
+        Current diff = Total diff  - Future diff
+                     = diff_means + mean opponent future tilt
+    i.e. the board as it stands, with every seat's expected FUTURE behaviour
+    — the drafter's and the opponents' alike — attributed to the Future row.
+
+    With the opponent model OFF the tilts are zero and diff_means depends
+    only on the players already drafted, so Current diff is identical for
+    every candidate. With the model ON it is candidate-dependent for the
+    predicted-anchor candidates: self-exclusion swaps the candidate's own
+    predicted team out of its field for the spare anchor's team (you never
+    play against your own team), so a stronger anchor shows a less negative
+    Current diff, while every non-anchor candidate shares one identical field.
 
     Both diff DataFrames store values in x-score space (divided by v during
     computation).  Multiplying by original_v converts them back to G-score
@@ -560,8 +578,13 @@ def _build_g_score_rows(
     # 4-row layout: separate out the future component so the user can see how much of
     # the expected advantage is 'already there' vs. 'expected from future picks given
     # this player is on the team'.
-    future_diff  = future_diff_matrix.astype(float) * original_v
-    current_diff = total_diff - future_diff  # = diff_means * original_v; same for all candidates
+    future_diff = future_diff_matrix.astype(float) * original_v
+    if opponent_tilt_matrix is not None:
+        # Net out the opponents' expected future tilts (see the docstring): the future row
+        # becomes the net future differential, and Current diff below correspondingly sheds
+        # behaviour that hasn't happened yet. Total diff is unaffected.
+        future_diff = future_diff - opponent_tilt_matrix.astype(float) * original_v
+    current_diff = total_diff - future_diff  # the board as it stands (all future tilts in Future diff)
     current_values = np.round(current_diff, 2).tolist()
     current_totals = np.round(current_diff.sum(axis=1), 2).tolist()
     future_values  = np.round(future_diff, 2).tolist()
