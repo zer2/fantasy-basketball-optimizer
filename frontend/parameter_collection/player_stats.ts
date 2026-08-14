@@ -46,18 +46,18 @@ export function markUploadedSourcesExpired(): boolean {
     return clearedAny
 }
 
-// Resolves when the initial historical-seasons fetch (kicked off inside
-// renderPlayerStats when the default data source is 'historical') has finished
-// populating the ps-season dropdown. Resolves immediately when the default data
-// source is not 'historical', since no fetch is needed.
-let _initialSeasonsPromise: Promise<void> = Promise.resolve()
+// Resolves when the in-flight historical-seasons fetch has finished populating the
+// ps-season dropdown; already resolved when none is running. Covers BOTH the fetch
+// kicked off at render (when the restored data source is 'historical') and the one
+// kicked off by switching the data source to Historical later.
+let _seasonsPromise: Promise<void> = Promise.resolve()
 
-/** Returns a promise that resolves once the initial seasons dropdown is ready
- *  (or immediately if no historical fetch was needed). The bootstrap must await
- *  this before creating the first session — otherwise getPlayerStatsParams()
- *  reads `ps-season` before the dropdown exists and sends season=null. */
-export function waitForInitialSeasons(): Promise<void> {
-    return _initialSeasonsPromise
+/** Returns a promise that resolves once the seasons dropdown is ready (immediately when
+ *  no fetch is needed or one has already completed). Anything that reads the data source
+ *  must await this first: until the fetch lands there is no `ps-season` element, and
+ *  getPlayerStatsParams() refuses to report a historical source without a season. */
+export function waitForSeasons(): Promise<void> {
+    return _seasonsPromise
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -134,12 +134,15 @@ export function renderPlayerStats(container: HTMLElement): void {
         const type = typeSelect.getValue()
         projSection.style.display = type === 'projections'    ? '' : 'none'
         histSection.style.display = type === 'historical' ? '' : 'none'
-        if (type === 'historical') loadSeasons()
+        // Published so the change handlers that react to this same event can await the
+        // fetch; without it they read ps-season before the dropdown exists. Cheap to
+        // re-assign — loadSeasons returns immediately once the seasons are in.
+        if (type === 'historical') _seasonsPromise = loadSeasons()
     })
 
     // Load seasons immediately if restored type is 'historical'
     if (typeSelect.getValue() === 'historical') {
-        _initialSeasonsPromise = loadSeasons()
+        _seasonsPromise = loadSeasons()
     }
 
     // Injured players
