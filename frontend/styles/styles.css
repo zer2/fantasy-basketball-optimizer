@@ -669,6 +669,11 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     cursor: pointer;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
+    /* Rich player options carry an inline headshot before the name (the candidate-row
+       treatment); flex keeps text-only options rendering identically. */
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .cs-option:hover {
@@ -1111,11 +1116,53 @@ tr {
     flex-direction: column;
     align-items: center;
     gap: 1px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* Long last names in narrow board cells clip with an ellipsis; the stack's title
+   tooltip carries the full name. */
+.roster-player-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ─── Board collapse toggle (draft/auction grids) ─────────────────────────── */
+/* The corner header cell ('Round') doubles as the collapse toggle — the familiar
+   rotating arrow without spending a row on it. Collapsing hides the pick rows
+   (tbody/tfoot); the team header row stays visible so team names and autodraft
+   toggles remain usable. */
+
+.board-toggle-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.board-toggle-arrow {
+    display: inline-block;
+    font-size: 0.55rem;
+    margin-right: 4px;
+    transition: transform 0.15s;
+    color: light-dark(#999999, #666688);
+}
+
+.entry-table:not(.board-collapsed) .board-toggle-arrow {
+    transform: rotate(90deg);
+}
+
+.entry-table.board-collapsed > tbody,
+.entry-table.board-collapsed > tfoot {
+    display: none;
 }
 
 .roster-headshot {
-    width: 44px;
-    height: 32px;
+    /* Between the candidate-row avatar (30x22) and the original stacked size (44x32):
+       compact enough for a full board, big enough that faces still read. Keeps the
+       CDN's 260x190 aspect. */
+    width: 37px;
+    height: 27px;
     object-fit: cover;
 }
 
@@ -1398,13 +1445,15 @@ tr {
     color: light-dark(#555555, #aaaaaa);
 }
 
-/* Remove inner border/padding from custom selects inside entry table cells */
+/* Remove inner border/padding from custom selects inside entry table cells.
+   Text size matches the candidate-table rows (0.8rem) so player names read the same
+   everywhere they appear. */
 .entry-table td .cs-trigger {
     border: none;
     border-radius: 0;
     min-height: 24px;
     padding: 2px 4px;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
 }
 
 .entry-table td .cs-trigger:focus,

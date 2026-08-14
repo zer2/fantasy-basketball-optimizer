@@ -2,6 +2,8 @@
 // Shared UI building blocks used across sidebar and parameter_collection modules.
 // Table-specific helpers (ExpandView and friends) live in table/expand_view.ts.
 
+import { pref, savePref } from './preferences.js'
+
 // ─── Viewport breakpoint ──────────────────────────────────────────────────────
 // Mirrors the 768px breakpoint used by the @media (max-width: 768px) blocks in
 // styles.css. CSS handles layout-level switches; this is for the few cases
@@ -110,10 +112,12 @@ export function makeSidebarToggle(id: string, rightText: string, leftText?: stri
 
 /** One selectable entry of a multiselect: `value` is what getSelected returns and what
  *  setSelected takes; `label` is what the chip and dropdown show (e.g. a player id value
- *  with a registry-name label). */
+ *  with a registry-name label). `html` optionally enriches the DROPDOWN row only (e.g. a
+ *  player headshot via the display builders — keep imgs lazy); chips stay label text. */
 export interface MultiSelectOption {
     value: string
     label: string
+    html?: string
 }
 
 /**
@@ -202,7 +206,8 @@ export function renderMultiselect(
         for (const opt of available) {
             const item = document.createElement('div')
             item.className = 'ms-option'
-            item.textContent = opt.label
+            if (opt.html !== undefined) item.innerHTML = opt.html
+            else item.textContent = opt.label
             item.addEventListener('mousedown', e => {
                 e.preventDefault()
                 selected.push(opt.value)
@@ -327,6 +332,34 @@ export function createSection(parent: HTMLElement, title: string): HTMLElement {
     details.append(content)
     parent.append(details)
     return content
+}
+
+/** Builds a board table's corner header cell (the 'Round' cell) as the collapse toggle:
+ *  the familiar rotating arrow rides beside the label, and clicking the cell hides the
+ *  table's pick rows (tbody/tfoot via the 'board-collapsed' class) without giving the
+ *  collapse a row of its own. The team header row stays visible, so team names and
+ *  autodraft toggles remain usable while collapsed. The state persists under the given
+ *  preference key. */
+export function makeBoardToggleHeaderCell(
+    table: HTMLTableElement
+    , preferenceKey: string
+    , labelText: string
+): HTMLTableCellElement {
+    const cornerHeader = document.createElement('th')
+    cornerHeader.className = 'board-toggle-header'
+    cornerHeader.title = 'Collapse or expand the board'
+
+    const arrow = document.createElement('span')
+    arrow.className = 'board-toggle-arrow'
+    arrow.textContent = '▶'
+    cornerHeader.append(arrow, labelText)
+
+    table.classList.toggle('board-collapsed', !pref(preferenceKey, 1))
+    cornerHeader.addEventListener('click', () => {
+        const collapsed = table.classList.toggle('board-collapsed')
+        savePref(preferenceKey, collapsed ? 0 : 1)
+    })
+    return cornerHeader
 }
 
 /**

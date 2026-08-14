@@ -3,10 +3,10 @@
 // Mirrors the draft board structure: pick control on top, grid below.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { readRequiredIntInput } from '../helper_functions.js'
+import { readRequiredIntInput, makeBoardToggleHeaderCell } from '../helper_functions.js'
 import { getPlayerResults } from '../app_state.js'
 import { getRegistryEntry } from '../player_registry.js'
-import { makeMinimalPlayerDisplay } from '../player_display.js'
+import { makeMinimalPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../player_display.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
@@ -28,7 +28,7 @@ const _auctionDebouncer = makeDebouncer(() => { runEvaluate().catch(err => conso
 // nodes. The closures keep the old wrapper DOM alive until the cycle is broken.
 let auctionListenerController: AbortController | null = null
 
-const ROUND_W = 32
+const ROUND_W = 46   // fits the collapse arrow beside 'Round'
 const TEAM_W  = 60
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -84,7 +84,11 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         'auction-pick-player',
         [
             { value: '', label: '' },
-            ...available.map(playerId => ({ value: String(playerId), label: getRegistryEntry(playerId).name })),
+            ...available.map(playerId => ({
+                value: String(playerId),
+                label: buildPlayerOptionLabel(playerId),
+                html:  buildFullPlayerDisplayHtml(playerId),
+            })),
         ],
         undefined,
         undefined,
@@ -215,11 +219,11 @@ function buildAuctionBoard(): HTMLElement {
     table.style.width    = '100%'
     table.style.minWidth = (ROUND_W + nDrafters * TEAM_W) + 'px'
 
-    // Header: Round | Team1 | Team2 | …
+    // Header: Round | Team1 | Team2 | … The corner cell doubles as the board collapse
+    // toggle (see makeBoardToggleHeaderCell) — the filled grid of headshots is tall.
     const thead = table.createTHead()
     const hrow  = thead.insertRow()
-    const roundTh = document.createElement('th')
-    roundTh.textContent = 'Round'
+    const roundTh = makeBoardToggleHeaderCell(table, 'auction_board_open', 'Round')
     roundTh.style.width = ROUND_W + 'px'
     hrow.append(roundTh)
     teamNames.forEach((_, d) => {

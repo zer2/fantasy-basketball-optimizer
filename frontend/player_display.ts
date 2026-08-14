@@ -56,6 +56,15 @@ function buildPositionsHtml(positions: string[]): string {
     return ` <span class='player-positions'>${positions.join(',')}</span>`
 }
 
+/** Plain-text "Name (POS)" label for select options: the closed trigger and multiselect
+ *  chips are text-only, and the label also drives filtering — so positions ride in it
+ *  (typing "PG" matches point guards). The rich dropdown row comes from the html field. */
+export function buildPlayerOptionLabel(playerId: number): string {
+    const entry = getRegistryEntry(playerId)
+    if (entry.positions.length === 0) return entry.name
+    return `${entry.name} (${entry.positions.join(',')})`
+}
+
 /** Full display (headshot + full name + positions) as an HTML string, for string-built
  *  contexts: virtualized candidate rows, trade-suggestion cells. */
 export function buildFullPlayerDisplayHtml(playerId: number): string {
@@ -94,14 +103,17 @@ export function makeFullPlayerDisplay(playerId: number): HTMLElement {
 }
 
 /** Minimal display (headshot stacked above last name) as a DOM element, for the
- *  expanded-view roster grid and draft/auction board cells. */
+ *  expanded-view roster grid and draft/auction board cells. The full name rides in the
+ *  tooltip — narrow board cells ellipsize long last names. */
 export function makeMinimalPlayerDisplay(playerId: number): HTMLElement {
     const entry = getRegistryEntry(playerId)
     const stack = document.createElement('div')
     stack.className = 'roster-player-stack'
+    stack.title = entry.name
     const headshot = makeHeadshotImage(playerId, 'roster-headshot')
     if (headshot) stack.appendChild(headshot)
     const nameLabel = document.createElement('span')
+    nameLabel.className = 'roster-player-name'
     nameLabel.textContent = entry.last_name
     stack.appendChild(nameLabel)
     return stack

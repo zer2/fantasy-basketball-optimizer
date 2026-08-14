@@ -31,6 +31,11 @@
 export interface CustomSelectOption {
     value: string
     label: string
+    // Rich option rendering (e.g. player headshot + name via player_display builders).
+    // The label still drives filtering, the committed trigger text, and e2e text-based
+    // interactions; html only changes how the OPEN dropdown paints its rows. Keep any
+    // imgs lazy — a long filtered list renders in one pass.
+    html?: string
 }
 
 /** Lowercases and strips diacritics so filter text typed without accents still matches
@@ -173,7 +178,8 @@ export function makeCustomSelect(
             const item = document.createElement('div')
             item.className = 'cs-option'
             if (opt.value === currentValue) item.classList.add('cs-option-selected')
-            item.textContent = opt.label
+            if (opt.html !== undefined) item.innerHTML = opt.html
+            else item.textContent = opt.label
             item.addEventListener('mousedown', e => {
                 e.preventDefault()   // prevent blur from firing before click
                 close()

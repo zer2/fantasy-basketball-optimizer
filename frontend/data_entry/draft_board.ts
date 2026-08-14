@@ -3,10 +3,10 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { isMobileViewport, readRequiredIntInput } from '../helper_functions.js'
+import { isMobileViewport, readRequiredIntInput, makeBoardToggleHeaderCell } from '../helper_functions.js'
 import { getPlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { getRegistryEntry } from '../player_registry.js'
-import { makeMinimalPlayerDisplay } from '../player_display.js'
+import { makeMinimalPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../player_display.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
@@ -49,7 +49,7 @@ let _suppressAutostart = false
 let transposed        = false
 let lastScrolledRound = -1   // mobile auto-scroll: only nudge when the current round changes
 
-const ROUND_W    = 32   // px — Round label column (desktop)
+const ROUND_W    = 46   // px — Round label column incl. the collapse arrow (desktop)
 const TEAM_W     = 50   // px — per-drafter column, desktop (min-width floor; table fills width)
 const TEAMCOL_W  = 90   // px — frozen team-name column (transposed mobile; fits name + method dropdown on one row)
 const ROUNDCOL_W = 64   // px — per-round column (transposed mobile)
@@ -232,7 +232,11 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     if (!isDone && !isAutopilot) {
         const sel = makeCustomSelect(
             'draft-pick-select',
-            available.map(playerId => ({ value: String(playerId), label: getRegistryEntry(playerId).name })),
+            available.map(playerId => ({
+                value: String(playerId),
+                label: buildPlayerOptionLabel(playerId),
+                html:  buildFullPlayerDisplayHtml(playerId),
+            })),
             undefined,
             undefined,
             pickListenerController?.signal,
@@ -314,8 +318,9 @@ function buildStandardTable(container: HTMLElement): HTMLTableElement {
 
     const thead = table.createTHead()
     const hrow  = thead.insertRow()
-    const roundTh = document.createElement('th')
-    roundTh.textContent = 'Round'
+    // The corner cell doubles as the board collapse toggle (arrow + 'Round'): the grid
+    // gets very tall once filled with headshots, and the toggle costs no extra row.
+    const roundTh = makeBoardToggleHeaderCell(table, 'draft_board_open', 'Round')
     roundTh.style.width = ROUND_W + 'px'
     hrow.append(roundTh)
     for (let d = 0; d < nDrafters; d++) {
@@ -344,7 +349,7 @@ function buildTransposedTable(container: HTMLElement): HTMLTableElement {
     // Header: [corner] | 1 | 2 | … | nPicks
     const thead = table.createTHead()
     const hrow  = thead.insertRow()
-    const corner = document.createElement('th')
+    const corner = makeBoardToggleHeaderCell(table, 'draft_board_open', '')
     corner.style.width = TEAMCOL_W + 'px'
     hrow.append(corner)
     for (let r = 0; r < nPicks; r++) {

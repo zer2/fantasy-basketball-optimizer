@@ -5,7 +5,7 @@
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { getPlayerResults, getGScoreById, getShortCategoryNames } from '../../app_state.js'
 import { getRegistryEntry, findPlayerIdByName } from '../../player_registry.js'
-import { makeFullPlayerDisplay } from '../../player_display.js'
+import { makeFullPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
@@ -42,7 +42,8 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     // best players first; labels come from the registry.
     const playerOptions = playerResults.map(p => ({
         value: String(p.player_id)
-      , label: getRegistryEntry(p.player_id).name
+      , label: buildPlayerOptionLabel(p.player_id)
+      , html:  buildFullPlayerDisplayHtml(p.player_id)
     }))
 
     // Live platform → prefill the grid from the platform's rosters (blank until the

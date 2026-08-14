@@ -10,7 +10,7 @@ import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarT
 import { readTeamNames, readRosterAssignments } from './season_helpers.js'
 import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
-import { buildMinimalPlayerDisplayHtml } from '../../player_display.js'
+import { buildMinimalPlayerDisplayHtml, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
@@ -23,7 +23,11 @@ import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 /** Multiselect options for a roster: player ids as values, registry names as labels. */
 function buildPlayerOptions(playerIds: number[]): { value: string; label: string }[] {
-    return playerIds.map(playerId => ({ value: String(playerId), label: getRegistryEntry(playerId).name }))
+    return playerIds.map(playerId => ({
+        value: String(playerId),
+        label: buildPlayerOptionLabel(playerId),
+        html:  buildFullPlayerDisplayHtml(playerId),
+    }))
 }
 
 /** Parses multiselect values back to player ids. Throws on a non-numeric value — the
