@@ -344,6 +344,44 @@ def test_parse_projection_csv_tolerates_league_paired_exports():
         parse_projection_csv(too_sparse_csv, params)
 
 
+def test_uploads_survive_restarts_and_stay_alive_while_in_use():
+    """An upload must outlive every session that references it: a session whose upload has
+    vanished cannot be rebuilt (creation 404s), which strands the app mid-draft. Two ways
+    that used to happen — the store was memory-only (a dev auto-reload or a cold start wiped
+    it) and the 2h TTL ran from upload time regardless of use (so it died under any draft
+    longer than that, while the session it fed lived on a sliding 4h clock)."""
+    import time as time_module
+    from backend.state import upload_store
+
+    csv_bytes = (
+        'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
+        '1,Test Player,C,12.3,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
+    ).encode()
+    response = client.post('/data/upload', files={'file': ('bbm.csv', csv_bytes, 'text/csv')})
+    assert response.status_code == 200, response.text
+    data_id = response.json()['data_id']
+
+    # A restart keeps only what reached disk: drop the in-memory entry and re-resolve.
+    upload_store._upload_store.clear()
+    rehydrated = upload_store.get_upload(data_id)
+    assert rehydrated is not None, 'an upload must survive a process restart'
+    assert rehydrated['bytes'] == csv_bytes, 'the rehydrated file must be byte-identical'
+    assert rehydrated['file_type'] == 'BBM', 'the detected format must survive too'
+
+    # The TTL is idle time, not age: an upload still in use never expires. Backdate the
+    # entry to just inside the window, read it, and confirm the clock restarted.
+    upload_store._upload_store[data_id]['last_accessed'] = time_module.time() - (upload_store.UPLOAD_TTL - 60)
+    assert upload_store.get_upload(data_id) is not None, 'an in-window upload must resolve'
+    assert (time_module.time() - upload_store._upload_store[data_id]['last_accessed']) < 5, \
+        'reading an upload must refresh its clock (sliding window)'
+
+    # Past the idle window it is dropped from memory AND disk, and stays gone.
+    upload_store._upload_store[data_id]['last_accessed'] = time_module.time() - (upload_store.UPLOAD_TTL + 60)
+    upload_store._touch_upload_on_disk(data_id, time_module.time() - (upload_store.UPLOAD_TTL + 60))
+    assert upload_store.get_upload(data_id) is None, 'an idle upload must expire'
+    assert upload_store.get_upload(data_id) is None, 'an expired upload must not rehydrate from disk'
+
+
 def test_partial_upload_as_sole_source_narrows_categories_and_builds():
     """The user's league-paired-export scenario end to end: a BBM file without Turnovers
     or free-throw data as the ONLY active projection source. The session must build, and
