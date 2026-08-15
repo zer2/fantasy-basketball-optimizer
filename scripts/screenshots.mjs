@@ -30,7 +30,13 @@ const IMG  = process.env.SHOT_OUT ?? path.resolve(path.dirname(fileURLToPath(imp
 const only = new Set(process.argv.slice(2))
 
 const CONTEXT = {
-    viewport:          { width: 1440, height: 900 },
+    // 1280 rather than a roomier desktop width: the docs render every image at the text
+    // column (~760px), so the wider the app lays out, the more each shot is shrunk and the
+    // smaller the app's own labels end up — that shrink, not the PNG's pixel count, is what
+    // reads as blur. The app's tables scale to the window, so a narrower capture yields the
+    // same content in fewer CSS pixels and lands much closer to 1:1 on the page. 1280 is the
+    // floor: at ~1100 the candidate table starts clipping its category headers.
+    viewport:          { width: 1280, height: 900 },
     deviceScaleFactor: 2,        // retina-crisp PNGs
     colorScheme:       'light',  // one theme for every screenshot
 }
@@ -160,12 +166,21 @@ async function setFmt(page, fmt)   { await setSelect(page, 'fc-scoring-format', 
  *  previous evaluate when waitEval looks at it, and it returns while the table sits emptied by
  *  buildTableHeader and not yet refilled. That window is wide enough to photograph — it is how
  *  `main` was captured showing a header row and nothing under it. */
+//  Not every state HAS a candidate list: Season Mode shows none until a waiver evaluation
+//  runs, and selectHistoricalSeason is called on the way into season and auction states too.
+//  So a hidden or absent table counts as "nothing to wait for", and the wait is advisory —
+//  it times out quietly rather than failing the shot, since its job is to avoid photographing
+//  a half-drawn table, not to assert that one exists.
 async function waitCandidateRows(page, minimum = 8) {
     await page.waitForFunction(
-        min => document.querySelectorAll('#hscoretable .playerheaderdiv').length >= min,
+        min => {
+            const table = document.getElementById('hscoretable')
+            if (!table || table.offsetParent === null) return true   // not on screen in this state
+            return table.querySelectorAll('.playerheaderdiv').length >= min
+        },
         minimum,
-        { timeout: 120000 },
-    )
+        { timeout: 30000 },
+    ).catch(() => {})
     await page.waitForTimeout(200)
 }
 
