@@ -9,9 +9,11 @@ backend.infra.*.
 from __future__ import annotations
 
 import os
+import socket
 import time
 import logging
 
+import urllib3.util.connection
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -31,6 +33,22 @@ _fbbo_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s
 _fbbo_logger.addHandler(_fbbo_handler)
 _fbbo_logger.propagate = False   # this logger owns its handler; don't also emit via the root logger
 logging.getLogger('fbbo.api')    # instantiate now (clean), before the hijack fires below
+
+# Outbound HTTP resolves IPv4 only.
+#
+# Cloud Run's Direct VPC egress is IPv4-only unless the subnet is dual-stack, and cdn.nba.com
+# publishes AAAA records alongside its single A record. When a lookup steers a connection to
+# an AAAA address the kernel has no route for it and the request dies immediately with
+# OSError [Errno 101] "Network is unreachable" — which is what made headshot fetches fail
+# intermittently in production while the very same URL served fine from anywhere with IPv6.
+# Nothing distinguished a good request from a bad one but which address family came back.
+#
+# Every host this app talks to — the NBA CDN, Snowflake, ESPN/Yahoo/Fantrax — is reachable
+# over IPv4, so restricting the family costs nothing and removes the failure mode outright.
+# This is a property of where the app runs, not of the app, so it belongs here at the
+# composition root rather than at any one call site. Remove it if the deployment ever gains
+# real IPv6 egress. (urllib3 consults this on every connection, so it covers requests too.)
+urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
 
 from backend.infra.auth import session_secret_key, session_https_only
 from backend.api.routers import auth, meta, data, sessions, ranking, trade, platforms
