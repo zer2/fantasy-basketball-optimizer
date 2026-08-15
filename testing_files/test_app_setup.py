@@ -314,6 +314,30 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_headshot_is_served_even_when_the_cache_cannot_be_written(monkeypatch):
+    """The headshot disk cache is a mounted bucket in production, which can be read-only or
+    briefly unavailable. A cache write is an optimisation — failing it must not fail a request
+    whose image has already been fetched, which it would if the write raised through the
+    handler."""
+    from pathlib import Path
+    from unittest import mock
+    from backend.api.routers import meta
+
+    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+    monkeypatch.setattr(meta, '_read_headshot_from_disk', lambda _id: None)
+    monkeypatch.setattr(meta.requests, 'get',
+                        lambda *args, **kwargs: mock.Mock(status_code=200, content=b'PNG-BYTES'))
+    monkeypatch.setattr(Path, 'write_bytes',
+                        lambda *args, **kwargs: (_ for _ in ()).throw(OSError('read-only file system')))
+
+    response = meta.get_player_headshot_route(_UNWRITABLE_CACHE_TEST_ID)
+    assert response.body == b'PNG-BYTES', 'the fetched image must still be served'
+    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+
+
+_UNWRITABLE_CACHE_TEST_ID = 987654321
+
+
 def test_outbound_http_resolves_ipv4_only():
     """Cloud Run's Direct VPC egress is IPv4-only while cdn.nba.com is dual-stack, so a
     connection that picks an AAAA address dies instantly with ENETUNREACH and the headshot
