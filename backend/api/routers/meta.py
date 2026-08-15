@@ -131,6 +131,46 @@ def _write_headshot_to_disk(nba_player_id: int, image_bytes: bytes) -> None:
     (_HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png').write_bytes(image_bytes)
 
 
+@router.get('/health/disk-cache')
+def get_disk_cache_health_route():
+    """What the running container actually sees of its disk cache.
+
+    Deployment settings are easy to misread from outside — a mount path and the env var
+    naming it can disagree, a revision's YAML can describe a revision that is not the one
+    serving, and a bucket listing says nothing about where it is mounted. This reports the
+    paths the process resolved and what is behind them, so the question is settled by the
+    process rather than inferred. Paths and counts only; no secrets, no file contents."""
+    def describe(path: Path | None) -> dict:
+        if path is None:
+            return {'configured': False}
+        try:
+            entries = sorted(child.name for child in path.iterdir())
+        except OSError as exc:
+            return {'configured': True, 'path': str(path), 'exists': path.exists(),
+                    'readable': False, 'error': f'{type(exc).__name__}: {exc}'}
+        return {
+            'configured': True,
+            'path':       str(path),
+            'exists':     True,
+            'readable':   True,
+            'entries':    len(entries),
+            'sample':     entries[:8],
+        }
+
+    disk_cache_dir = os.environ.get('DISK_CACHE_DIR')
+    return {
+        'DISK_CACHE_DIR_env':  disk_cache_dir,
+        'disk_cache_root':     describe(Path(disk_cache_dir) if disk_cache_dir else None),
+        'headshot_dir':        describe(_HEADSHOT_DISK_CACHE_DIR),
+        'headshots_in_memory': len(_headshot_cache),
+        # Checked explicitly because a mount can live somewhere other than the env var says.
+        'other_mount_candidates': {
+            candidate: describe(Path(candidate))
+            for candidate in ('/cache', '/data-cache')
+        },
+    }
+
+
 @router.get('/players/headshots/{nba_player_id}.png')
 def get_player_headshot_route(nba_player_id: int):
     """The NBA CDN headshot for a player, proxied and cached server-side (memory + disk).

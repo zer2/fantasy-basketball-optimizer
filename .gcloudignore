@@ -1,0 +1,54 @@
+# What NOT to upload as build context (`gcloud run deploy --source`, `gcloud builds submit`).
+# Same syntax as .gitignore.
+#
+# Without this file the whole working tree is uploaded — around 2.7 GB, nearly all of it
+# test artefacts — to build an image that needs a couple of megabytes. The Dockerfile copies
+# only: requirements.txt, backend/, __init__.py, parameters.yaml,
+# coefficient_exploration_output/, and the frontend build inputs (package*.json,
+# tsconfig.json, frontend/). Everything listed below is large, regenerable, machine-local,
+# or secret — and none of it reaches the image.
+#
+# NOTE: adding this file REPLACES gcloud's default behaviour of deriving exclusions from
+# .gitignore, so anything sensitive that .gitignore was covering must be named here too —
+# see the credentials section.
+
+.gcloudignore
+.git
+.gitignore
+
+# ── Credentials — never upload ────────────────────────────────────────────────
+# These are gitignored, which used to keep them out of the context by inheritance.
+# With this file present that inheritance is gone, so they are excluded explicitly.
+.streamlit/
+.platform_credentials/
+.env
+.env.*
+*.pem
+
+# ── Caches and build output (regenerated inside the image, or machine-local) ──
+.cache/
+node_modules/
+frontend/dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.ipynb_checkpoints/
+
+# ── Tests and experiment artefacts — by far the largest thing in the tree ─────
+testing_files/
+
+# ── Developer tooling, editor state, CI config — not part of the service ──────
+scripts/
+screenshot_review/
+.claude/
+.vscode/
+.devcontainer/
+.github/
+
+# ── Documentation: source, built site, and specs. Published to GitHub Pages ───
+# by mkdocs, never served by this container.
+docs/
+site/
+mkdocs.yml
+*.md
