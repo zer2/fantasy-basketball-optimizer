@@ -8,14 +8,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
-    lockInDraftPick, readDropdownOptionLabels, pickControlButton,
+    lockInDraftPick, readDropdownPlayerNames, readBoardPlayerNames, pickControlButton,
 } from './helpers.mjs'
 
 test('autodraft seats', async t => {
     const app = await launchAppPage()
     const { page } = app
     const pickLabel = () => page.locator('.pick-control-row .pick-control-label').first().textContent()
-    const draftedCellTexts = () => page.locator('.entry-table td.drafted').allTextContents()
     const seatToggle = (index) => page.locator('.entry-table thead .method-dd-trigger').nth(index)
 
     let topCandidates = []
@@ -26,7 +25,7 @@ test('autodraft seats', async t => {
 
         await t.test('toggling a seat marks it as an autodrafter without starting a draft', async () => {
             // The board's base ordering — used later to judge the autopick's sanity.
-            topCandidates = (await readDropdownOptionLabels(page, 'draft-pick-select-wrapper')).slice(0, 15)
+            topCandidates = (await readDropdownPlayerNames(page, 'draft-pick-select-wrapper')).slice(0, 15)
             assert.ok(topCandidates.length === 15, 'pick dropdown should list the player pool')
 
             await seatToggle(1).click()
@@ -44,9 +43,9 @@ test('autodraft seats', async t => {
             assert.match(await pickLabel(), /Select Pick 1 for Team 3/,
                          'after the autopilot pick, the next manual seat should be on the clock')
 
-            const drafted = await draftedCellTexts()
+            const drafted = await readBoardPlayerNames(page)
             assert.equal(drafted.length, 2, 'the board should hold the manual pick plus the autopilot pick')
-            const autoPick = drafted.find(name => !name.includes('Nikola Jokic'))
+            const autoPick = drafted.find(name => name !== 'Nikola Jokic')
             assert.ok(autoPick, 'the autopilot pick should not duplicate the manual pick')
             assert.ok(topCandidates.some(candidate => candidate === autoPick),
                       `autopilot's round-1 pick should come from the top of the pool — got: ${autoPick}`)
@@ -61,7 +60,7 @@ test('autodraft seats', async t => {
             await pickControlButton(page, 'Undo previous selection').click()
             await waitAppSettled(app)
 
-            assert.equal((await draftedCellTexts()).length, 0,
+            assert.equal((await readBoardPlayerNames(page)).length, 0,
                          'undo should clear the autodrafted pick and the manual pick behind it')
             assert.match(await pickLabel(), /Select Pick 1 for Team 1/,
                          'the draft should rewind to the manual drafter, not stop on the autodrafter')

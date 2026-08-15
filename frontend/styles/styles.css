@@ -589,6 +589,7 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 .cs-trigger {
+    position: relative;   /* positioning context for .cs-value-display */
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -622,6 +623,38 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     min-width: 0;
     cursor: pointer;
     text-overflow: ellipsis;
+}
+
+/* Closed-state rich value: paints the selected player (headshot + name + positions) over
+   the search input while the select is closed. Clicks pass through to the input; opening
+   the dropdown hides the overlay (see custom_select.ts). The input's own text is made
+   transparent underneath so the two never double-render. */
+.cs-value-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 24px 0 8px;   /* clear of the ▾ arrow on the right */
+    overflow: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* The display: flex above outranks the UA's [hidden] { display: none }, so the hidden
+   attribute custom_select.ts sets while typed filter text owns the box needs its own rule. */
+.cs-value-display[hidden] {
+    display: none;
+}
+
+/* While the dropdown is open the overlay plays the placeholder's role — the current
+   selection, dimmed to read as replaceable — until typing hides it. */
+.cs-open .cs-value-display {
+    opacity: 0.55;
+}
+
+.cs-rich-value:not(.cs-open) .cs-search-input {
+    color: transparent;
 }
 
 .cs-search-input::placeholder {
@@ -669,6 +702,11 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     cursor: pointer;
     font-size: 0.8rem;
     font-family: "Source Sans 3";
+    /* Rich player options carry an inline headshot before the name (the candidate-row
+       treatment); flex keeps text-only options rendering identically. */
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .cs-option:hover {
@@ -985,12 +1023,73 @@ tr {
     cursor: pointer;
 }
 
+/* NBA headshot avatar in candidate rows. The CDN images are 260x190 transparent-background
+   PNGs, so no background is set here — the player blends onto whatever surface is behind
+   the row in either theme. */
+.player-avatar {
+    width: 30px;
+    height: 22px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* The name column is far narrower on a phone, and the avatar (plus the expand arrow beside
+   it) is fixed width — so every pixel it takes comes straight out of the name, which then
+   ellipsizes. Shrink the avatar there; it still reads as a face at this size, and the names
+   fit. Keeps the CDN's 260x190 aspect. */
+@media (max-width: 768px) {
+    .player-avatar {
+        width: 22px;
+        height: 16px;
+    }
+}
+
+
 .playername {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Positions suffix inside the full player display — lighter than the name so the
+   name stays the visual anchor. */
+.player-positions {
+    color: light-dark(#999999, #8d8d9e);
+    font-size: 0.85em;
+}
+
+/* Full player display (DOM variant): headshot beside name + positions. Used for
+   G-score table row labels and team views. */
+.player-full-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Minimal inline player display (string variant): headshot beside last name. Used in
+   trade-suggestion cells, where several players share one cell on a single line. */
+.player-minimal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 10px;
+    white-space: nowrap;
+}
+
+/* Trade-suggestion send/receive cells hold a row of minimal displays; let the row wrap
+   rather than stretching the table on multi-player trades. */
+.trade-suggestion-players {
+    white-space: normal;
+}
+
+/* Season roster paste feedback: pasted names the registry doesn't recognize. */
+.paste-warning {
+    color: #e06c6c;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    margin-top: 4px;
 }
 
 .celltypea {
@@ -1052,6 +1151,82 @@ tr {
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 0;
+}
+
+/* Occupied roster cells stack a headshot above the player's last name. The headshot is a
+   transparent-background PNG, so it blends onto the cell's own team/candidate color. */
+.roster-player-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* Long last names in narrow board cells clip with an ellipsis; the stack's title
+   tooltip carries the full name. The tightened line-height trims the inherited line
+   box's slack, which otherwise all reads as extra space under the name. */
+.roster-player-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.15;
+}
+
+/* Roster-grid cells holding a player stack drop panel-datacell's vertical padding so
+   their height matches the draft/auction board cells (which pad 0). */
+.panel-datacell.roster-player-cell {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* ─── Board collapse toggle (draft/auction grids) ─────────────────────────── */
+/* The corner header cell ('Round') doubles as the collapse toggle — the familiar
+   rotating arrow without spending a row on it. Collapsing hides the pick rows
+   (tbody/tfoot); the team header row stays visible so team names and autodraft
+   toggles remain usable. */
+
+.board-toggle-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.board-toggle-arrow {
+    display: inline-block;
+    font-size: 0.55rem;
+    margin-right: 4px;
+    transition: transform 0.15s;
+    color: light-dark(#999999, #666688);
+}
+
+.entry-table:not(.board-collapsed) .board-toggle-arrow {
+    transform: rotate(90deg);
+}
+
+.entry-table.board-collapsed > tbody,
+.entry-table.board-collapsed > tfoot {
+    display: none;
+}
+
+.roster-headshot {
+    /* Between the candidate-row avatar (30x22) and the original stacked size (44x32):
+       compact enough for a full board, big enough that faces still read. Keeps the
+       CDN's 260x190 aspect. */
+    width: 37px;
+    height: 27px;
+    object-fit: cover;
+}
+
+/* Board cells are only 64px wide on a phone, where a 37px face crowds out the last name
+   under it. Must sit AFTER the rule above: a media query adds no specificity, so an
+   override placed earlier in the file would simply lose to it. */
+@media (max-width: 768px) {
+    .roster-headshot {
+        width: 26px;
+        height: 19px;
+    }
 }
 
 .rosteronteam {
@@ -1333,13 +1508,15 @@ tr {
     color: light-dark(#555555, #aaaaaa);
 }
 
-/* Remove inner border/padding from custom selects inside entry table cells */
+/* Remove inner border/padding from custom selects inside entry table cells.
+   Text size matches the candidate-table rows (0.8rem) so player names read the same
+   everywhere they appear. */
 .entry-table td .cs-trigger {
     border: none;
     border-radius: 0;
     min-height: 24px;
     padding: 2px 4px;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
 }
 
 .entry-table td .cs-trigger:focus,

@@ -11,6 +11,8 @@ from benchmark_helpers import (
     client
     , _SCORE_TOL
     , _build_session_request
+    , resolve_player_ids
+    , name_candidates
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -34,8 +36,8 @@ def test_evaluate_auction():
     # The neutral (full-cash) baseline that anchors the dollar values is built once at session
     # creation (agent.populate_default_h_scores), so we go straight to the real assignments.
     player_assignments = {name: [] for name in team_names}
-    player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
-    player_assignments['Drafter 2'] = ['Nikola Jokic (C)']
+    player_assignments['Drafter 1'] = resolve_player_ids(session, ['Giannis Antetokounmpo'])
+    player_assignments['Drafter 2'] = resolve_player_ids(session, ['Nikola Jokic'])
 
     remaining_cash = {name: 200.0 for name in team_names}
     remaining_cash['Drafter 1'] = 150.0
@@ -45,7 +47,7 @@ def test_evaluate_auction():
         session            = session
         , player_assignments = player_assignments
         , my_team_id         = 'Drafter 1'
-        , exclusion_list     = ['Giannis Antetokounmpo (C,PF)']
+        , exclusion_list     = resolve_player_ids(session, ['Giannis Antetokounmpo'])
         , remaining_cash     = remaining_cash
     )
 
@@ -57,12 +59,12 @@ def test_evaluate_auction():
 
     # (expected_name, diff, your_dollar, gnrc_dollar, orig_dollar)
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',   -8.7,  88.3,  97.0,  95.7),
-        ('Tyrese Haliburton',           7.5,  62.5,  54.9,  54.1),
-        ('Dyson Daniels',             14.9,  54.6,  39.8,  39.2),
-        ('Jayson Tatum',                7.2,  48.3,  41.1,  40.5),
+        ('Shai Gilgeous-Alexander',   -2.5,  88.1,  90.6,  89.4),
+        ('Tyrese Haliburton',           2.5,  57.6,  55.1,  54.4),
+        ('Dyson Daniels',             13.8,  54.5,  40.7,  40.2),
+        ('Jayson Tatum',                4.4,  44.5,  40.0,  39.5),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
+    candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):
         rows = []
         for expected_name, *_ in expected_auction_values:

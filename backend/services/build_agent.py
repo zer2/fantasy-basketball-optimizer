@@ -75,7 +75,7 @@ def _v0_cache_key(cp: dict) -> tuple | None:
 
     A projections blend is fully described by every source weight plus the ids of any
     uploaded tables feeding it: uploads are stored immutably under their data_id, so the
-    id doubles as a content key. (Leaving the HTB/BBM weights or the upload ids out of
+    id doubles as a content key. (Leaving the uploaded-source weights or the upload ids out of
     the key — as an earlier version did — served stale blends when an upload's weight
     changed, and could leak an uploaded blend into sessions that never uploaded anything.)
     Returns None only for single-CSV mode, whose bytes arrive outside current_params.
@@ -93,129 +93,247 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     return None
 
 
+def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
+    """Bring a single uploaded CSV (name-indexed by parse_projection_csv) to the id-keyed
+    contract: resolve names via the unified table, keep unresolved rows under synthetic
+    ids, and return an id-indexed frame with the display 'Player' column retained."""
+    from backend.data_retrieval import attach_player_ids_by_name
+    from backend.player_identity import allocate_synthetic_player_ids
+
+    frame = attach_player_ids_by_name(parsed_csv.reset_index())
+    synthetic_ids = allocate_synthetic_player_ids(
+        frame.loc[frame['player_id'].isna(), 'Player'])
+    resolved = frame['player_id'].astype('object').fillna(frame['Player'].map(synthetic_ids))
+    frame = frame.drop(columns=['player_id'])
+    frame.index = pd.Index(resolved.astype(int), name='Player')
+    if frame.index.has_duplicates:
+        duplicated = frame.index[frame.index.duplicated()].tolist()
+        raise ValueError(f'Uploaded CSV: multiple rows resolve to the same player id(s): {duplicated}')
+    return frame
+
+
+def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
+    """One PlayerIdentity per pool row (from the id index + 'Player'/'Position' columns),
+    plus the replacement-player sentinel."""
+    from backend.player_identity import (
+        RP_PLAYER_ID, make_player_identity, make_replacement_player_identity,
+    )
+
+    registry = {
+        int(player_id): make_player_identity(int(player_id), str(name), position_value)
+        for player_id, name, position_value in zip(
+            v0_with_names.index, v0_with_names['Player'], v0_with_names['Position'])
+    }
+    registry[RP_PLAYER_ID] = make_replacement_player_identity()
+    return registry
+
+
 def run_step1(
     session: Session,
     csv_bytes: bytes | None = None,
     uploaded_dfs: dict | None = None,
 ) -> None:
-    """Load player_stats_v0 into session.v0_clean.
+    """Load player_stats_v0 into session.v0_clean and build session.player_registry.
 
     Branches on current_params['data_source_type']:
       'csv'        — single uploaded CSV (csv_bytes required; format auto-detected)
       'historical' — Snowflake historical stats for current_params['season']
       'projections' — weighted blend of Snowflake sources + any uploaded_dfs
 
-    Results for Snowflake-backed sources are cached at the module level for
-    24 hours so repeated session creations with the same data source skip the
-    Snowflake round-trip entirely.
+    Every branch produces a frame INDEXED BY PLAYER ID with the display name in a
+    'Player' column; the name is popped into the registry so v0_clean carries exactly
+    the stats + Position columns the pipeline has always seen. Results for
+    Snowflake-backed sources are cached (with names) at the module level for 24 hours
+    so repeated session creations with the same data source skip the round-trip and
+    rebuild an identical registry.
     """
     _, params, _ = _sport_params(session)
     cp = session.current_params
     source_type = cp['data_source_type']
     cache_key = _v0_cache_key(cp)
 
+    v0_with_names = None
     if cache_key is not None:
         with _v0_cache_lock:
             entry = _v0_cache.get(cache_key)
             if entry is not None and time.time() - entry[0] < _V0_CACHE_TTL:
-                session.v0_clean = entry[1].copy()
-                return
+                v0_with_names = entry[1].copy()
 
-    if source_type == 'csv':
-        v0, _detected_format = parse_projection_csv(csv_bytes, params)
+    if v0_with_names is None:
+        if source_type == 'csv':
+            v0_with_names = _resolve_single_csv_player_ids(parse_projection_csv(csv_bytes, params))
 
-    elif source_type == 'historical':
-        from backend.data_retrieval import get_specified_historical_stats
+        elif source_type == 'historical':
+            from backend.data_retrieval import get_specified_historical_stats
 
-        season = cp['season']
-        if not season:
-            raise ValueError(
-                "data_source.season is required when data_source.type == 'historical'"
+            season = cp['season']
+            if not season:
+                raise ValueError(
+                    "data_source.season is required when data_source.type == 'historical'"
+                )
+            v0_with_names = get_specified_historical_stats(season, params)
+
+        elif source_type == 'projections':
+            from backend.data_retrieval import combine_projections
+
+            blend_weights = cp.get('blend_weights', {})
+            # All-zero weights would blend nothing and crash deep in the pipeline with an
+            # opaque 500 — reject it up front with an actionable message instead.
+            if not any(weight > 0 for weight in blend_weights.values()):
+                raise InsufficientPlayerPoolError(
+                    'All projection blend weights are zero. Set at least one source weight above zero.'
+                )
+            v0_with_names = combine_projections(
+                blend_weights = blend_weights,
+                params        = params,
+                uploaded_dfs  = uploaded_dfs,
             )
-        v0 = get_specified_historical_stats(season, params)
 
-    elif source_type == 'projections':
-        from backend.data_retrieval import combine_projections
+        else:
+            raise ValueError(f"Unknown data_source_type: {source_type!r}")
 
-        blend_weights = cp.get('blend_weights', {})
-        # All-zero weights would blend nothing and crash deep in the pipeline with an
-        # opaque 500 — reject it up front with an actionable message instead.
-        if not any(weight > 0 for weight in blend_weights.values()):
-            raise InsufficientPlayerPoolError(
-                'All projection blend weights are zero. Set at least one source weight above zero.'
-            )
-        v0 = combine_projections(
-            blend_weights = blend_weights,
-            params        = params,
-            uploaded_dfs  = uploaded_dfs,
-        )
+        if not v0_with_names.index.is_unique:
+            duplicated = v0_with_names.index[v0_with_names.index.duplicated()].tolist()
+            raise ValueError(f'Player pool has duplicate player id(s): {duplicated}')
 
-    else:
-        raise ValueError(f"Unknown data_source_type: {source_type!r}")
+        if cache_key is not None:
+            with _v0_cache_lock:
+                _v0_cache[cache_key] = (time.time(), v0_with_names.copy())
 
-    if cache_key is not None:
-        with _v0_cache_lock:
-            _v0_cache[cache_key] = (time.time(), v0.copy())
-
-    session.v0_clean = v0.copy()
+    session.player_registry = _build_player_registry(v0_with_names)
+    session.v0_clean = v0_with_names.drop(columns=['Player'])
 
 
-# The per-game stats every projection export must map to. A format-drifted file (e.g. an
-# older export with renamed headers) would otherwise sail through parsing and only fail
-# much later, deep in the blend, as a baffling "0 players available" error.
+# The per-game stats a projection file CAN carry. A file need not carry all of them:
+# sources that pair a projection set with a league export only that league's active
+# categories, so several may legitimately be absent. Recognition therefore asks only for
+# Player, Position, and _MIN_MATCHED_CORE_COLUMNS of these — still unmistakably a
+# projection file, while a spreadsheet of something else entirely maps ~nothing and is
+# rejected with a clear message instead of failing much later, deep in the blend, as a
+# baffling "0 players available" error.
 _CORE_PROJECTION_COLUMNS = ('Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers', 'Threes')
+_MIN_MATCHED_CORE_COLUMNS = 3
 
-# Known export formats, in detection order. A file already using canonical column names
-# passes under the first mapping (renaming is a no-op), so "any common projection file"
-# includes plain canonical CSVs for free.
-_PROJECTION_FORMATS = (
-    ('HTB', 'htb-renamer'),
-    ('BBM', 'bbm-renamer'),
-)
+_COLUMN_ALIASES_KEY = 'projection-column-aliases'
 
 
-def parse_projection_csv(csv_bytes: bytes, params: dict) -> tuple[pd.DataFrame, str]:
-    """Parse an uploaded projection CSV into the canonical column set, auto-detecting the
-    export format. Returns (parsed frame, detected format name). Raises ValueError with an
-    aggregated, per-format diagnosis when no known format fits."""
+def _normalize_projection_header(header) -> str:
+    """Header spellings differ only by case and padding far more often than by wording, so
+    both sides of an alias lookup are folded to one form."""
+    return str(header).strip().lower()
+
+
+def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
+    """{column in the file: canonical name} for every column the aliases recognize.
+
+    Columns that match nothing are left out (the parse drops them). A canonical name that
+    two of the file's columns both claim is taken by the first, so a file carrying e.g.
+    both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
+    """
+    aliases = {_normalize_projection_header(alias): canonical
+               for alias, canonical in params.get(_COLUMN_ALIASES_KEY, {}).items()}
+    mapping, claimed = {}, set()
+    for column in df_raw.columns:
+        canonical = aliases.get(_normalize_projection_header(column))
+        if canonical is not None and canonical not in claimed:
+            mapping[column] = canonical
+            claimed.add(canonical)
+    return mapping
+
+
+def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
+    """Parse an uploaded projection CSV into the canonical column set.
+
+    There is no format detection: each column is interpreted on its own through the alias
+    table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
+    as long as its header spellings are known, and a file already written in canonical
+    names needs no aliases at all. Raises ValueError naming what could not be found when
+    the file does not read as a projection set.
+    """
     df_raw = pd.read_csv(io.BytesIO(csv_bytes))
+    column_mapping  = _map_columns_to_canonical(df_raw, params)
+    # Unrecognized columns keep their own names, so a file already using canonical names
+    # is understood without any alias matching at all.
+    renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
 
-    failures: list[str] = []
-    best_format = None
-    best_missing_count = None
-    for format_name, renamer_key in _PROJECTION_FORMATS:
-        renamer = params.get(renamer_key, {})
-        renamed_columns = set(df_raw.rename(columns=renamer).columns)
-        missing = [column for column in _CORE_PROJECTION_COLUMNS if column not in renamed_columns]
-        if not missing and 'Position' in renamed_columns:
-            return _parse_with_renamer(df_raw, renamer), format_name
-        problem = f"missing {', '.join(missing)}" if missing else 'missing Position'
-        failures.append(f'{format_name}: {problem}')
-        if best_missing_count is None or len(missing) < best_missing_count:
-            best_missing_count = len(missing)
-            best_format = (format_name, renamer)
+    missing_identity = [column for column in ('Player', 'Position')
+                        if column not in renamed_columns]
+    matched_cores    = [column for column in _CORE_PROJECTION_COLUMNS
+                        if column in renamed_columns]
+    if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
+        # Every name the aliases can produce, so a file already written in canonical names
+        # keeps those columns even though they never went through the mapping.
+        canonical_columns = set(params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
+        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, params)
 
-    unmapped = [column for column in df_raw.columns
-                if best_format is None or column not in best_format[1]]
+    if missing_identity:
+        problem = f"no column for {' or '.join(missing_identity)}"
+    else:
+        missing_cores = [column for column in _CORE_PROJECTION_COLUMNS
+                         if column not in renamed_columns]
+        problem = (f'only {len(matched_cores)} of {len(_CORE_PROJECTION_COLUMNS)} core stats '
+                   f"were recognized (no {', '.join(missing_cores)})")
+    unrecognized = [column for column in df_raw.columns if column not in column_mapping]
     raise ValueError(
-        f"File does not match any known projection format ({'; '.join(failures)}). "
-        f"Headers in the file that were not recognized: {', '.join(map(str, unmapped))}."
+        f'File does not read as a projection set: {problem}. Headers that were not '
+        f"recognized: {', '.join(map(str, unrecognized))}. Add their spellings to "
+        f'{_COLUMN_ALIASES_KEY} to teach the parser this source.'
     )
 
 
-def _parse_with_renamer(df_raw: pd.DataFrame, renamer: dict) -> pd.DataFrame:
-    """The format-specific parse: rename to canonical columns, drop junk, coerce stats."""
-    df = df_raw.rename(columns=renamer)
+# Attempts hiding inside a ratio cell: sources that print a percentage with its makes and
+# attempts behind it — "0.583 (10.2/17.5)" — and ship no attempts column of their own.
+# Captures the second number, the attempts.
+_ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
+
+
+def _recover_volumes_from_ratio_cells(df: pd.DataFrame, params: dict) -> pd.DataFrame:
+    """Fill in a missing attempts column from the text of its percentage column.
+
+    Attempt volume is load-bearing: a ratio G-score weights the percentage deviation by it,
+    so a percentage without its volume cannot be scored at all. When a source carries that
+    volume only inside the percentage cell, take it from there rather than discard it with
+    the rest of the text. A file's own attempts column always wins — this fires only when
+    there is none. Only the attempts are recovered, never the makes: the projection path
+    does not use them, and emitting a column no other source carries would make the blend
+    drop every player that source lacks.
+    """
+    for ratio_stat, ratio_info in params.get('ratio-statistics', {}).items():
+        volume_statistic = ratio_info['volume-statistic']
+        if (ratio_stat not in df.columns
+                or volume_statistic in df.columns
+                or df[ratio_stat].dtype != object):
+            continue
+        attempts = pd.to_numeric(
+            df[ratio_stat].astype(str).str.extract(_ATTEMPTS_IN_RATIO_CELL_PATTERN, expand=False),
+            errors='coerce',
+        )
+        if attempts.notna().any():
+            df[volume_statistic] = attempts
+    return df
+
+
+def _parse_with_renamer(
+    df_raw: pd.DataFrame
+    , column_mapping: dict
+    , canonical_columns: set
+    , params: dict
+) -> pd.DataFrame:
+    """Rename this file's columns to canonical names, drop junk, coerce stats."""
+    df = df_raw.rename(columns=column_mapping)
 
     # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
     # would otherwise join the blend's column union, where every player from the OTHER
     # sources is "missing" them — and the blend drops any player missing any column
     # across all sources, so a single junk column can wipe out the entire pool.
-    canonical_columns = set(renamer.values()) | {'Games Played %'}
-    df = df[[column for column in df.columns if column in canonical_columns]]
+    df = df[[column for column in df.columns if column in canonical_columns]].copy()
 
-    # Exports carry non-numeric stat values: hashtagbasketball.com repeats its header row
-    # inside the table body (every stat cell a string), and formats ratio stats as
+    # Before the ratio cells are reduced to their leading number below, mine them for any
+    # attempts column the file does not carry separately.
+    df = _recover_volumes_from_ratio_cells(df, params)
+
+    # Sources carry non-numeric stat values: some repeat the header row inside the table
+    # body (every stat cell a string), and some format ratio stats as
     # "0.474 (5.2/11.0)". Extract the leading number where a stat column holds strings,
     # then drop rows with no numeric stats at all — those are the embedded header/junk rows.
     def coerce_stat_column(column: pd.Series) -> pd.Series:
@@ -256,11 +374,13 @@ def _parse_with_renamer(df_raw: pd.DataFrame, renamer: dict) -> pd.DataFrame:
 # ── Step 2: drop injured players ──────────────────────────────────────────────
 
 def run_step2(session: Session) -> None:
-    """Run drop_injured_players and store in session.v1_clean."""
+    """Resolve the free-typed injured list to player ids and drop them into v1_clean."""
     from backend.math.process_player_data import drop_injured_players
+    from backend.player_identity import resolve_typed_player_names
 
-    injured = session.current_params.get('injured_players', [])
-    v1, _ = drop_injured_players(session.v0_clean, tuple(injured))
+    injured_names = session.current_params.get('injured_players', [])
+    injured_player_ids = resolve_typed_player_names(session.player_registry, injured_names)
+    v1, _ = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
 
 
@@ -303,8 +423,17 @@ def run_step4(session: Session) -> None:
             f'({n_drafters} teams x {n_picks} roster spots) to fill every roster.'
         )
 
+    # A category needs its own column, and a ratio category also needs the volume column
+    # that weights it (a percentage cannot be scored without the attempts behind it) —
+    # without this second check the coefficient pass fails on the missing volume column
+    # instead of the category simply dropping out.
     available_columns = set(session.v2.columns)
-    categories = [c for c in cp['categories'] if c in available_columns]
+    ratio_statistics  = params.get('ratio-statistics', {})
+    categories = [
+        category for category in cp['categories']
+        if category in available_columns
+        and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
+    ]
     cp['categories'] = categories
 
     info, _ = process_player_data(

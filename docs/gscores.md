@@ -26,6 +26,18 @@ One of the inputs needed for the scoring process is a player pool. Using the ent
 
 Based on the proxy for the real pool of players and forecasts for their performances, it is easy to calculate player-to-player variance. Week-to-week variance cannot be inferred from forecasts, and instead has to be calculated historically. The website uses historical conversion factors from player-to-player variance to week-to-week variance. 
 
+## Percentage-stat adjustment
+
+The website applies one refinement to percentage statistics that goes beyond the paper. 
+
+The paper approximates (via equation 4) that the number of attempts for a team is fixed, and does not vary depending on the chosen player. That approximation is needed to make the only difference between G-scores and Z-scores the inclusion of the period-to-period variance term. The website does away with the approximation, instead leaving G-scores as what they would be without applying equation 4. That leads to an extra term of 
+
+```
+N x average_attempts / ((N - 1) x average_attempts + this_player_attempts)
+```
+
+where N is the number of starters per team. The factor is one for a player with average volume, slightly below one for high-volume players, and slightly above one for low-volume players. It moderates the percentage-stat impact of extreme-volume players, accounting for the fact that as a player's volume increases, the influence of their success rate is diluted by the increasing number of attempts rather than scaling linearly. It also subtly increases the influence of low-volume players' success rate, because each attempt matters more when a team is expected to have fewer of them. 
+
 ## Limitations 
 
 G-scores are fundamentally limited because they do not adapt to drafting circumstances. Drafting based purely on total G-score, or any static metric, is a flawed approach. 

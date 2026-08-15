@@ -24,6 +24,7 @@ import { getScoringFormat, getSelectedCategories } from '../parameter_collection
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
 import { getShortCategoryNames } from '../app_state.js'
 import { isMobileViewport } from '../helper_functions.js'
+import { buildFullPlayerDisplayHtml } from '../player_display.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
 
@@ -75,9 +76,9 @@ let bottomSpacer: HTMLTableRowElement | null = null
 // data rows define makes the browser lay the table out with that many columns under table-layout:fixed,
 // squishing the real columns. Set from renderCtx (player col + score col(s) + one per category).
 let columnCount = 1
-// Name of a candidate to visually mark (the waiver drop-player highlight), or null. Applied by
+// Id of a candidate to visually mark (the waiver drop-player highlight), or null. Applied by
 // renderWindow to whichever windowed row matches, so it survives scrolling under virtualization.
-let highlightedName: string | null = null
+let highlightedPlayerId: number | null = null
 
 // Per-render context, captured once in resetTable so every addBatch renders rows consistently.
 interface RenderContext {
@@ -100,7 +101,7 @@ function resetVirtualState(): void {
     windowDirty     = false
     topSpacer       = null
     bottomSpacer    = null
-    highlightedName = null
+    highlightedPlayerId = null
 }
 
 /** Clears the candidate table and shows a single centred message row. */
@@ -193,8 +194,8 @@ export function buildTableHeader(): void {
 function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
     let html = `<tr>`
 
-    // Player name cell with expand button
-    html += `<th class='playerheader'><div class='playerheaderdiv'><span class='playername'>${player.name}</span><button class='playerpopup'>▶</button></div></th>`
+    // Player display cell (headshot + name + positions) with expand button
+    html += `<th class='playerheader'><div class='playerheaderdiv'>${buildFullPlayerDisplayHtml(player.player_id)}<button class='playerpopup'>▶</button></div></th>`
 
     // Score column(s)
     if (ctx.isAuction) {
@@ -373,7 +374,7 @@ function renderWindow(): void {
         const candidate = candidateRows[i]
         const headerCell = candidate.displayRow.firstElementChild as HTMLElement | null
         headerCell?.classList.toggle('waiver-drop-highlight',
-                                     highlightedName !== null && candidate.player.name === highlightedName)
+                                     highlightedPlayerId !== null && candidate.player.player_id === highlightedPlayerId)
         tbodyEl.appendChild(candidate.displayRow)
         if (candidate.expanded) tbodyEl.appendChild(candidate.expandRow)
     }
@@ -394,13 +395,13 @@ function scrollCandidateIntoView(idx: number): void {
     window.scrollTo({ top: Math.max(0, bodyTopDoc + off - window.innerHeight * 0.3), behavior: 'auto' })
 }
 
-/** Marks one candidate (by player name) with the waiver-drop highlight, or clears it when null. The mark
+/** Marks one candidate (by player id) with the waiver-drop highlight, or clears it when null. The mark
  *  is stored, not written to a fixed DOM row, so it follows the row as the window scrolls. If found, the
- *  candidate is scrolled into view. Safe when the name is absent — nothing is highlighted. */
-export function highlightCandidate(playerName: string | null): void {
-    highlightedName = playerName
-    if (playerName !== null) {
-        const idx = candidateRows.findIndex(candidate => candidate.player.name === playerName)
+ *  candidate is scrolled into view. Safe when the id is absent — nothing is highlighted. */
+export function highlightCandidate(playerId: number | null): void {
+    highlightedPlayerId = playerId
+    if (playerId !== null) {
+        const idx = candidateRows.findIndex(candidate => candidate.player.player_id === playerId)
         if (idx >= 0) scrollCandidateIntoView(idx)
     }
     windowDirty = true

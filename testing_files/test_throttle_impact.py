@@ -5,7 +5,7 @@
 # against the un-throttled ('exact') result and bound how far the approximation may move things.
 # Higher, deliberately looser tolerances; the point is "close enough", not "identical".
 
-from benchmark_helpers import client, _build_session_request
+from benchmark_helpers import client, _build_session_request, resolve_player_ids
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
@@ -20,7 +20,8 @@ _TOP_N      = 30
 
 
 def _evaluate(session, mode, **kwargs):
-    """Run an evaluate forcing a specific throttle schedule; return {name: candidate}, [name order]."""
+    """Run an evaluate forcing a specific throttle schedule; return {player_id: candidate},
+    [player_id order]."""
     session.agent._position_mode_override = mode
     # Control the warm-start hysteresis confound: an evaluate stores the drafter's converged build and
     # the NEXT evaluate warm-starts from it (by design, in the app). Here the two arms must differ ONLY
@@ -28,7 +29,7 @@ def _evaluate(session, mode, **kwargs):
     # identically (from the frozen per-player table).
     session.agent.reset_draft_state()
     res = rank_candidates(session=session, **kwargs)
-    return {c.name: c for c in res.candidates}, [c.name for c in res.candidates]
+    return {c.player_id: c for c in res.candidates}, [c.player_id for c in res.candidates]
 
 
 def test_throttle_draft_close_to_exact():
@@ -61,15 +62,15 @@ def test_throttle_auction_close_to_exact():
     teams = [f'Drafter {i + 1}' for i in range(session.current_params['n_drafters'])]
 
     player_assignments = {t: [] for t in teams}
-    player_assignments['Drafter 1'] = ['Giannis Antetokounmpo (C,PF)']
-    player_assignments['Drafter 2'] = ['Nikola Jokic (C)']
+    player_assignments['Drafter 1'] = resolve_player_ids(session, ['Giannis Antetokounmpo'])
+    player_assignments['Drafter 2'] = resolve_player_ids(session, ['Nikola Jokic'])
     remaining_cash = {t: 200.0 for t in teams}
     remaining_cash['Drafter 1'] = 150.0
     remaining_cash['Drafter 2'] = 150.0
 
     def run(mode):
         return _evaluate(session, mode, player_assignments=player_assignments, my_team_id='Drafter 1',
-                         exclusion_list=['Giannis Antetokounmpo (C,PF)'], remaining_cash=remaining_cash)
+                         exclusion_list=player_assignments['Drafter 1'], remaining_cash=remaining_cash)
 
     exact_by, exact_order = run('exact')
     thr_by,   thr_order   = run('light')

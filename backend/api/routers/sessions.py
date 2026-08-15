@@ -19,7 +19,7 @@ from backend.services.build_agent import clear_v0_cache, parse_projection_csv, I
 from backend.state.upload_store import get_upload
 from backend.api.platform_helpers import resolve_platform_config
 from backend.api.schemas import (
-    SessionRequest, SessionResponse, PlayerGScore,
+    SessionRequest, SessionResponse, PlayerGScore, PlayerRegistryEntry,
     PatchRequest, PatchResponse, GScoresResponse,
 )
 from backend.api.errors import fail
@@ -113,8 +113,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) ->
         entry = get_upload(data_id)
         if entry is None:
             raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        parsed, _detected_format = parse_projection_csv(entry['bytes'], params)
-        result[data_id] = parsed
+        result[data_id] = parse_projection_csv(entry['bytes'], params)
     return result
 
 
@@ -124,11 +123,25 @@ def _serialize_g_scores(session) -> list[PlayerGScore]:
     g_scores_df = session.agent.info['G-scores']
     return [
         PlayerGScore(
-            name=str(name),
+            player_id=int(player_id),
             total=round(float(row['Total']), 2),
             values=[round(float(row[cat]), 2) for cat in categories],
         )
-        for name, row in g_scores_df.iterrows()
+        for player_id, row in g_scores_df.iterrows()
+    ]
+
+
+def _serialize_player_registry(session) -> list[PlayerRegistryEntry]:
+    """The session's player identities, for the frontend registry (see PlayerRegistryEntry)."""
+    return [
+        PlayerRegistryEntry(
+            player_id    = identity.player_id,
+            name         = identity.name,
+            last_name    = identity.last_name,
+            positions    = identity.positions,
+            has_headshot = identity.has_headshot,
+        )
+        for identity in session.player_registry.values()
     ]
 
 
@@ -171,6 +184,7 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
         session_id=session.id,
         n_players_loaded=len(session.v0_clean),
         categories=list(session.current_params['categories']),
+        players=_serialize_player_registry(session),
         g_scores=_serialize_g_scores(session),
         expires_at=(datetime.now(timezone.utc) + timedelta(seconds=4 * 3600)).strftime('%Y-%m-%dT%H:%M:%SZ'),
     )
@@ -222,7 +236,10 @@ def get_g_scores_route(session_id: str):
     # Reads agent/info state that a concurrent PATCH rebuilds in place — hold the lock so it never
     # observes a half-rebuilt pipeline.
     with session.lock:
-        return GScoresResponse(g_scores=_serialize_g_scores(session))
+        return GScoresResponse(
+            players=_serialize_player_registry(session),
+            g_scores=_serialize_g_scores(session),
+        )
 
 
 @router.post('/cache/clear', status_code=status.HTTP_204_NO_CONTENT)

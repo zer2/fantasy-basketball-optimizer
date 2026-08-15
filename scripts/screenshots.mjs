@@ -30,7 +30,13 @@ const IMG  = process.env.SHOT_OUT ?? path.resolve(path.dirname(fileURLToPath(imp
 const only = new Set(process.argv.slice(2))
 
 const CONTEXT = {
-    viewport:          { width: 1440, height: 900 },
+    // 1280 rather than a roomier desktop width: the docs render every image at the text
+    // column (~760px), so the wider the app lays out, the more each shot is shrunk and the
+    // smaller the app's own labels end up — that shrink, not the PNG's pixel count, is what
+    // reads as blur. The app's tables scale to the window, so a narrower capture yields the
+    // same content in fewer CSS pixels and lands much closer to 1:1 on the page. 1280 is the
+    // floor: at ~1100 the candidate table starts clipping its category headers.
+    viewport:          { width: 1280, height: 900 },
     deviceScaleFactor: 2,        // retina-crisp PNGs
     colorScheme:       'light',  // one theme for every screenshot
 }
@@ -153,6 +159,31 @@ async function ensure(page, state) {
 async function setMode(page, mode) { await setSelect(page, 'ls-mode', mode);          await waitEval(page) }
 async function setFmt(page, fmt)   { await setSelect(page, 'fc-scoring-format', fmt); await waitEval(page) }
 
+/** Waits until the candidate table actually holds player rows.
+ *
+ *  waitEval only watches the eval indicator, which is NOT sufficient after a sidebar change:
+ *  the Player Stats section debounces for 800ms, so the indicator still reads 'idle' from the
+ *  previous evaluate when waitEval looks at it, and it returns while the table sits emptied by
+ *  buildTableHeader and not yet refilled. That window is wide enough to photograph — it is how
+ *  `main` was captured showing a header row and nothing under it. */
+//  Not every state HAS a candidate list: Season Mode shows none until a waiver evaluation
+//  runs, and selectHistoricalSeason is called on the way into season and auction states too.
+//  So a hidden or absent table counts as "nothing to wait for", and the wait is advisory —
+//  it times out quietly rather than failing the shot, since its job is to avoid photographing
+//  a half-drawn table, not to assert that one exists.
+async function waitCandidateRows(page, minimum = 8) {
+    await page.waitForFunction(
+        min => {
+            const table = document.getElementById('hscoretable')
+            if (!table || table.offsetParent === null) return true   // not on screen in this state
+            return table.querySelectorAll('.playerheaderdiv').length >= min
+        },
+        minimum,
+        { timeout: 30000 },
+    ).catch(() => {})
+    await page.waitForTimeout(200)
+}
+
 // Establish the demonstration data source: historical stats for a completed season, so shots stay
 // identical over time (live projections drift as the season updates). The H-scoring / draft page uses
 // 2024-25 — where Giannis, the docs' punt exemplar, ranks top-6 by H-score; auction/season use 2025-26
@@ -163,6 +194,7 @@ async function selectHistoricalSeason(page, season) {
     await waitEval(page)
     await setSelect(page, 'ps-season', season)
     await waitEval(page)
+    await waitCandidateRows(page)
     // setSelect opened the Player Stats <details> to reach the trigger — collapse it so `main` (and
     // the other early shots) show the default, un-expanded sidebar.
     await page.evaluate(() => document.querySelectorAll('details.sidebar-section').forEach(d => {
@@ -174,11 +206,12 @@ const STATES = {
     async load(page) {
         await page.goto(APP, { waitUntil: 'domcontentloaded' })   // networkidle hangs on the polling SPA
         await page.locator('#hscoretable .playerheaderdiv').first().waitFor({ timeout: 120000 })   // first eval pulls from Snowflake
+        await waitCandidateRows(page)
         await page.waitForTimeout(300)
     },
-    async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Each Category') },
-    async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Most Categories') },
-    async 'draft-Roto'(page) { await setMode(page, 'Draft Mode'); await setFmt(page, 'Rotisserie') },
+    async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Each Category');  await waitCandidateRows(page) },
+    async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Most Categories'); await waitCandidateRows(page) },
+    async 'draft-Roto'(page) { await setMode(page, 'Draft Mode'); await setFmt(page, 'Rotisserie');      await waitCandidateRows(page) },
 
     async 'position'(page)     { await ensure(page, 'draft-EC'); await expandSection(page, /Position/i) },
     // Player Stats section open; the base data source (historical, set once after load) is unchanged.
@@ -420,7 +453,8 @@ const STATES = {
 //
 const SHOTS = [
     // Draft / H-scoring
-    { name: 'main',        state: 'load',        selector: '#app-layout', viewport: true },
+    // About half the viewport: the board plus the first few candidates, cut at a row edge.
+    { name: 'main',        state: 'load',        selector: '#app-layout', viewport: true, throughRows: 3 },
     { name: 'hec',         state: 'draft-EC',    selector: '#hscoretable', rows: 12 },
     { name: 'hmc',         state: 'draft-MC',    selector: '#hscoretable', rows: 12 },
     { name: 'rototop',     state: 'draft-Roto',  selector: '#hscoretable', rows: 12 },
@@ -528,7 +562,7 @@ page.setDefaultTimeout(20000)   // fail a stuck locator fast instead of hanging
 async function captureShot(page, s) {
     try {
         await ensure(page, s.state)
-        if (s.viewport) await shootViewport(page, s.name)
+        if (s.viewport) await shootViewport(page, s.name, s.throughRows ?? 0)
         else if (s.union) await shootUnion(page, s)
         else if (s.rows) await shootRows(page, s.name, s.selector, s.rows)
         else await shoot(page, s.name, s.selector)
@@ -581,10 +615,25 @@ async function shoot(page, name, selector) {
 }
 
 // Whole-window shot (e.g. `main`) — the app-layout element is very tall, so capture the viewport.
-async function shootViewport(page, name) {
+// `throughRows` keeps only the top of it, down to the bottom edge of that many candidate rows:
+// the full 1440x900 frame is scaled down to the docs' text width, which leaves every label too
+// small to read, and cropping instead of shrinking keeps the part that carries the point legible.
+// Measured from the row rather than set as a fixed fraction so the cut always lands on a row
+// boundary instead of slicing one in half whenever the layout shifts.
+async function shootViewport(page, name, throughRows = 0) {
     await page.waitForTimeout(150)
-    await page.screenshot({ path: path.join(IMG, `${name}.png`) })
-    console.log('✓', name, '(viewport)')
+    const { width, height } = CONTEXT.viewport
+    let clipHeight = height
+    if (throughRows > 0) {
+        const rowBox = await page.locator('#hscoretable .playerheaderdiv').nth(throughRows - 1)
+            .boundingBox().catch(() => null)
+        if (rowBox) clipHeight = Math.min(height, Math.ceil(rowBox.y + rowBox.height))
+    }
+    await page.screenshot({
+        path: path.join(IMG, `${name}.png`),
+        clip: { x: 0, y: 0, width, height: clipHeight },
+    })
+    console.log('✓', name, throughRows > 0 ? `(viewport, through row ${throughRows})` : '(viewport)')
 }
 
 // Union capture: some doc regions span sibling elements with no shared wrapper (e.g. the

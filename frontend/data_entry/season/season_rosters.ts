@@ -3,7 +3,9 @@
 // inspector table (right).  Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
-import { getPlayerResults, getGScoreByName, getShortCategoryNames } from '../../app_state.js'
+import { getPlayerResults, getGScoreById, getShortCategoryNames } from '../../app_state.js'
+import { getRegistryEntry, findPlayerIdByName } from '../../player_registry.js'
+import { makeFullPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
@@ -36,7 +38,13 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     const nPicks    = readRequiredIntInput('ls-n-picks')
     const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
-    const playerNames = playerResults.map(p => p.name)
+    // Option order follows playerResults (G-rank descending), so the dropdowns list the
+    // best players first; labels come from the registry.
+    const playerOptions = playerResults.map(p => ({
+        value: String(p.player_id)
+      , label: buildPlayerOptionLabel(p.player_id)
+      , html:  buildFullPlayerDisplayHtml(p.player_id)
+    }))
 
     // Live platform → prefill the grid from the platform's rosters (blank until the
     // async poll populates the cache); own data → the hardcoded defaults.
@@ -94,15 +102,24 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
             const cell = row.insertCell()
             const sel  = makeCustomSelect(
                 `sr-player-${r}-${d}`
-              , [...blankOption, ...playerNames.map(n => ({ value: n, label: n }))]
+              , [...blankOption, ...playerOptions]
               , undefined
               , true
               , rosterListenerController.signal
             )
-            const prefill = isLivePlatform
-                ? platformRosters?.[teamNames[d]]?.[r]
-                : DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
-            if (prefill) sel.setValue(prefill)
+            // Live platform rosters arrive as player ids; DEFAULT_SEASON_ROSTERS stays a
+            // name-keyed file and is resolved through the registry at render time. A default
+            // name missing from the current pool simply leaves the cell blank.
+            if (isLivePlatform) {
+                const prefillPlayerId = platformRosters?.[teamNames[d]]?.[r]
+                if (prefillPlayerId !== undefined) sel.setValue(String(prefillPlayerId))
+            } else {
+                const defaultName = DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
+                if (defaultName) {
+                    const prefillPlayerId = resolveRosterEntryName(defaultName)
+                    if (prefillPlayerId !== null) sel.setValue(String(prefillPlayerId))
+                }
+            }
             cell.append(sel.element)
             rowSelects.push(sel)
         }
@@ -199,13 +216,16 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
         }
 
         if (e.key === 'c') {
+            // Copy writes registry names (tab-separated), so the clipboard stays human-readable
+            // and round-trips through the name-resolving paste below.
             e.preventDefault()
             const { r1, r2, c1, c2 } = selectionBounds()
             const lines: string[] = []
             for (let r = r1; r <= r2; r++) {
                 const cols: string[] = []
                 for (let c = c1; c <= c2; c++) {
-                    cols.push(selects[r]?.[c]?.getValue() ?? '')
+                    const value = selects[r]?.[c]?.getValue() ?? ''
+                    cols.push(value ? getRegistryEntry(Number(value)).name : '')
                 }
                 lines.push(cols.join('\t'))
             }
@@ -220,6 +240,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
                 const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd().split('\n')
 
                 let changed = false
+                const unmatchedNames: string[] = []
                 for (let dr = 0; dr < lines.length; dr++) {
                     const r = r1 + dr
                     if (r >= nPicks) break
@@ -227,14 +248,21 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
                     for (let dc = 0; dc < values.length; dc++) {
                         const d = c1 + dc
                         if (d >= nDrafters) break
-                        const val = values[dc].trim()
-                        if (selects[r]?.[d]) {
-                            selects[r][d].setValue(val)
-                            changed = true
-                        }
+                        if (!selects[r]?.[d]) continue
+                        const pastedName = values[dc].trim()
+                        const pastedPlayerId = pastedName ? resolveRosterEntryName(pastedName) : null
+                        // A name the registry doesn't know leaves the cell blank and is
+                        // reported below — never silently kept or guessed at.
+                        if (pastedName && pastedPlayerId === null) unmatchedNames.push(pastedName)
+                        selects[r][d].setValue(pastedPlayerId === null ? '' : String(pastedPlayerId))
+                        changed = true
                     }
                 }
 
+                pasteWarning.hidden = unmatchedNames.length === 0
+                pasteWarning.textContent = unmatchedNames.length > 0
+                    ? `Not recognized (left blank): ${unmatchedNames.join(', ')}`
+                    : ''
                 if (changed) rebuildInspector()
             })
         }
@@ -242,6 +270,13 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
     scroll.append(table)
     leftEl.append(scroll)
+
+    // Paste feedback: names the registry doesn't recognize are listed here so a partial
+    // paste can't silently masquerade as a complete one.
+    const pasteWarning = document.createElement('div')
+    pasteWarning.className = 'paste-warning'
+    pasteWarning.hidden = true
+    leftEl.append(pasteWarning)
 
     // ── Right: team selector + G-score table ─────────────────────────────────
 
@@ -304,16 +339,16 @@ async function buildTeamGScoreTable(
 ): Promise<void> {
     container.innerHTML = ''
     const categories = getSelectedCategories()
-    const gScoreMap  = getGScoreByName()
+    const gScoreMap  = getGScoreById()
 
     // Collect G-scores for players on this team
-    const rows: { name: string; values: number[]; total: number }[] = []
+    const rows: { playerId: number; values: number[]; total: number }[] = []
     for (let r = 0; r < nPicks; r++) {
-        const name = selects[r][teamIdx].getValue()
-        if (!name) continue
-        const gs = gScoreMap.get(name)
-        if (!gs) continue
-        rows.push({ name: gs.name, values: gs.values, total: gs.total })
+        const playerId = readSelectedPlayerId(selects[r][teamIdx])
+        if (playerId === null) continue
+        const gs = gScoreMap.get(playerId)
+        if (!gs) throw new Error(`G-score not found for player id ${playerId}`)
+        rows.push({ playerId, values: gs.values, total: gs.total })
     }
 
     if (rows.length === 0) return
@@ -361,7 +396,7 @@ async function buildTeamGScoreTable(
 
         const labelCell = document.createElement('th')
         labelCell.className = 'panel-rowlabel'
-        labelCell.textContent = row.name
+        labelCell.append(makeFullPlayerDisplay(row.playerId))
         tr.appendChild(labelCell)
 
         const totalCell = tr.insertCell(-1)
@@ -403,13 +438,13 @@ async function buildTeamGScoreTable(
     if (rows.length < nPicks) return
 
     const nDrafters = teamNames.length
-    const playerAssignments: Record<string, string[]> = {}
+    const playerAssignments: Record<string, number[]> = {}
     for (let d = 0; d < nDrafters; d++) {
         const team = teamNames[d]
-        const players: string[] = []
+        const players: number[] = []
         for (let r = 0; r < nPicks; r++) {
-            const name = selects[r][d].getValue()
-            if (name) players.push(name)
+            const playerId = readSelectedPlayerId(selects[r][d])
+            if (playerId !== null) players.push(playerId)
         }
         playerAssignments[team] = players
     }
@@ -472,4 +507,22 @@ function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
     const th = document.createElement('th')
     th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
     return th
+}
+
+/** Resolves a human-entered roster name to a player id, or null when the registry doesn't
+ *  know it. Accepts both bare names and the pre-refactor "Name (POS)" form, which
+ *  DEFAULT_SEASON_ROSTERS (and old clipboard copies) still carry. */
+function resolveRosterEntryName(entryName: string): number | null {
+    const bareName = entryName.replace(/\s*\([A-Z,\-]+\)\s*$/, '')
+    return findPlayerIdByName(bareName)
+}
+
+/** The player id a roster select holds, or null when the cell is blank. Throws on a
+ *  non-numeric value — the selects only ever carry stringified ids. */
+function readSelectedPlayerId(select: CustomSelect): number | null {
+    const value = select.getValue()
+    if (!value) return null
+    const playerId = Number(value)
+    if (Number.isNaN(playerId)) throw new Error(`Roster select carried a non-numeric value: "${value}"`)
+    return playerId
 }

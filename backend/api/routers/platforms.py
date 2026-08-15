@@ -100,11 +100,11 @@ def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(cu
     # connected session always has it here; no defensive rebuild (its absence would be an upstream bug).
     try:
         if mode == 'Auction Mode':
-            selections = integration.get_auction_results(config, mode, session.platform_name_lookup)
+            selections = integration.get_auction_results(config, mode, session.platform_player_id_lookup)
             if selections is None:
                 raise HTTPException(status_code=400, detail=f'{config.platform} does not support auctions.')
         else:
-            selections = integration.get_draft_results(config, mode, session.platform_name_lookup)
+            selections = integration.get_draft_results(config, mode, session.platform_player_id_lookup)
     except HTTPException:
         raise
     except Exception:

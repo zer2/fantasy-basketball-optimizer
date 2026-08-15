@@ -135,7 +135,8 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
                                         , beta_weight: float
                                         , counting_stats: list[str]
                                         , ratio_stats: list[str]
-                                        , categories: list[str]) -> pd.DataFrame:
+                                        , categories: list[str]
+                                        , n_starters: int) -> pd.DataFrame:
 
     counting_mean    = coefficients.loc[counting_stats, 'Mean of Means']
     counting_var_m   = coefficients.loc[counting_stats, 'Variance of Means']
@@ -153,10 +154,23 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
                 coefficients.loc[ratio_stat, 'Variance of Means'] * alpha_weight
                 + coefficients.loc[ratio_stat, 'Mean of Variances'] * beta_weight
             ) ** 0.5
+            volume_average = coefficients.loc[volume_statistic, 'Mean of Means']
+            player_volume  = player_means.loc[:, volume_statistic]
+            # Team-denominator correction (the unpublished revision of the G-score paper):
+            # the paper's equation 4 approximates a team's attempt volume as
+            # n_starters * V-bar regardless of who the player is. Without that
+            # approximation, a team fielding player p attempts
+            # (n_starters - 1) * V-bar + V_p, so p's percentage impact is the original
+            # numerator times n_starters * V-bar / ((n_starters - 1) * V-bar + V_p) --
+            # a player's own volume slightly dampens their own percentage impact.
+            team_volume_correction = (
+                n_starters * volume_average
+                / ((n_starters - 1) * volume_average + player_volume)
+            )
             num_r = (
-                player_means.loc[:, volume_statistic]
-                / coefficients.loc[volume_statistic, 'Mean of Means']
+                player_volume / volume_average
                 * (player_means[ratio_stat] - coefficients.loc[ratio_stat, 'Mean of Means'])
+                * team_volume_correction
             )
             ratio_scores[ratio_stat] = num_r.divide(denom_r)
 
@@ -251,7 +265,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
     coeff_first['Mean of Variances'] = coeff_first['Mean of Variances'] * chi_factor
 
     g_first = calculate_scores_from_coefficients(player_means, coeff_first, params, 1, 1,
-                                                  counting_stats, ratio_stats, categories)
+                                                  counting_stats, ratio_stats, categories,
+                                                  n_starters)
     representative_player_set = (
         g_first.sum(axis=1).sort_values(ascending=False).index[:n_starters * n_drafters]
     )
@@ -272,9 +287,11 @@ def process_player_data(player_stats_v2: pd.DataFrame
     w = vom / mov
 
     g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1, 1,
-                                                   counting_stats, ratio_stats, categories)
+                                                   counting_stats, ratio_stats, categories,
+                                                   n_starters)
     x_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 0, 1,
-                                                   counting_stats, ratio_stats, categories)
+                                                   counting_stats, ratio_stats, categories,
+                                                   n_starters)
 
     replacement_games_rate = (1 - player_means['Games Played %'] / 100) * psi
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
@@ -282,8 +299,9 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
                                         params, categories, v=v)
 
-    x_scores.loc['RP', :] = -1
-    g_scores.loc['RP', :] = -1
+    from backend.player_identity import RP_PLAYER_ID
+    x_scores.loc[RP_PLAYER_ID, :] = -1
+    g_scores.loc[RP_PLAYER_ID, :] = -1
 
     g_scores.insert(loc=0, column='Total', value=g_scores.sum(axis=1))
     g_scores.sort_values('Total', ascending=False, inplace=True)

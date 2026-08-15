@@ -24,15 +24,20 @@ let currentDraftTab   = 'candidates'
 
 // Refresh the active "my team" panel when session.ts signals that the full-team
 // H-score result has arrived (dispatched after the evaluate await resolves).
+// Guarded by the CURRENT mode: each mode's tab state persists while the other mode is
+// active, so an unguarded refresh would repaint the inactive mode's (hidden, stale)
+// panel with the wrong board's rosters.
 document.addEventListener('full-team-result-updated', () => {
-    if (currentDraftTab   === 'my-team') refreshDraftGScore()
-    if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+    const { mode } = getLeagueSettings()
+    if (mode === 'Draft Mode'   && currentDraftTab   === 'my-team') refreshDraftGScore()
+    if (mode === 'Auction Mode' && currentAuctionTab === 'my-team') refreshAuctionGScore()
 })
 
 // Refresh the active "my team" panel whenever the seat changes (including during autopilot).
 document.addEventListener('seat-changed', () => {
-    if (currentDraftTab   === 'my-team') refreshDraftGScore()
-    if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+    const { mode } = getLeagueSettings()
+    if (mode === 'Draft Mode'   && currentDraftTab   === 'my-team') refreshDraftGScore()
+    if (mode === 'Auction Mode' && currentAuctionTab === 'my-team') refreshAuctionGScore()
 })
 
 export function getCurrentAuctionTab(): string { return currentAuctionTab }
@@ -83,6 +88,9 @@ function showOwnDataLayout(mode: string): void {
 
     if (mode === 'Auction Mode') {
         renderAuctionEntry(rightHeader)
+        // The other mode's team panel would otherwise stay visible (and stale) under this
+        // layout — each branch must hide its counterpart's container.
+        hide('draft-gscore')
         buildModeTabBar(rightSubHeader, 'auction-tab-bar', currentAuctionTab, activateAuctionTab)
         activateAuctionTab(currentAuctionTab)
 

@@ -43,7 +43,7 @@ class FlexAllocations:
 
 @dataclass
 class RosterAssignment:
-    name: str
+    player_id: int   # display resolution (names, headshots) happens client-side via the registry
     is_candidate: bool
 
 
@@ -62,8 +62,7 @@ class AuctionValues(BaseModel):
 
 
 class Candidate(BaseModel):
-    name: str
-    position: str
+    player_id: int   # display resolution (name, positions, headshot) via the session registry
     h_score: float
     h_rank: int
     win_rates: list[float]
@@ -108,8 +107,8 @@ class ComboParam(BaseModel):
 
 
 class TradeSuggestion(BaseModel):
-    send: list[str]
-    receive: list[str]
+    send: list[int]
+    receive: list[int]
     your_score: float
     their_score: float
 

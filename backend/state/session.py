@@ -31,10 +31,17 @@ class Session:
     # Snapshot of current parameters — used to diff PATCH requests
     current_params: dict = field(default_factory=dict)
 
-    # Pipeline intermediate DataFrames (kept for resumable PATCH re-runs from a step)
+    # Pipeline intermediate DataFrames (kept for resumable PATCH re-runs from a step).
+    # All three are indexed by player id; display names live only in player_registry.
     v0_clean: Optional[pd.DataFrame] = None   # raw player stats
     v1_clean: Optional[pd.DataFrame] = None   # after drop_injured
     v2:       Optional[pd.DataFrame] = None   # after upsilon adjustment
+
+    # The session's player identities: {player_id -> PlayerIdentity (name, last name,
+    # positions, headshot availability)}. Built by run_step1 alongside v0_clean — the two
+    # travel together through every cache — and includes the RP sentinel. The ONLY place
+    # names live server-side; everything else keys by id.
+    player_registry: Optional[dict] = None
 
     # Step-4 processed player data (G-scores, positions, covariance, ...). A pipeline intermediate
     # kept for from_step==5 patches; consumers read it via session.agent.info.
@@ -56,10 +63,10 @@ class Session:
     # creation when a live platform is selected; used by the draft-state poll.
     platform_config: Optional[PlatformConfig] = None
 
-    # {platform player name -> canonical 'Name (POS)'} lookup, rebuilt from agent.info
-    # whenever the data changes (see refresh_platform_name_lookup). None until a
+    # {platform player id/name -> session player id} lookup, rebuilt from the registry
+    # whenever the data changes (see refresh_platform_player_id_lookup). None until a
     # live platform is connected.
-    platform_name_lookup: Optional[dict[str, str]] = None
+    platform_player_id_lookup: Optional[dict[str, int]] = None
 
     # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
     # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping

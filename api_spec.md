@@ -114,13 +114,16 @@ Returns a list of season strings that can be used as `data_source.season` when c
 
 ## `POST /data/upload` — Upload projection file
 
-Accepts a user-supplied CSV projection file and stores it server-side. Returns a short-lived
+Accepts a user-supplied CSV projection file and stores it server-side. Returns a
 `data_id` to reference it when creating or patching a session — the `data_id` is the upload's
-identity everywhere (including as its blend-weight key). The export format is auto-detected
-from the file's headers; known formats are HTB (Hashtag Basketball), BBM (Basketball Monster),
-and any CSV already using the canonical stat column names.
+identity everywhere (including as its blend-weight key). No particular export format is
+assumed: each column is interpreted through the header-alias table in `parameters.yaml`
+(`projection-column-aliases`), so any source is readable as long as its spellings are known,
+and a CSV already using the canonical stat column names needs no aliases at all. Stats the
+file does not carry are reported in `missing_stats` and simply stay absent.
 
-Files expire after 2 hours if not referenced by a session.
+Files expire after 24 hours of not being referenced (the clock resets on every use, so a
+file backing an active session does not expire).
 
 **Request:** `multipart/form-data`
 
@@ -132,14 +135,15 @@ Files expire after 2 hours if not referenced by a session.
 ```json
 {
   "data_id": "f3a9c2",
-  "detected_format": "HTB",
   "n_players": 312,
-  "expires_at": "2025-03-01T15:30:00Z"
+  "expires_at": "2025-03-01T15:30:00Z",
+  "missing_stats": ["Turnovers", "Free Throw %"]
 }
 ```
 
 **Errors:**
-- `400` — unrecognized file format or missing required columns
+- `400` — the file does not read as a projection set (no Player/Position column, or too few
+  recognizable stat columns)
 - `413` — file too large (limit: 10 MB)
 
 ---

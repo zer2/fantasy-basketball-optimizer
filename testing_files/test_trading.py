@@ -19,7 +19,10 @@ import time
 
 import pytest
 
-from benchmark_helpers import client, _build_session_request
+from benchmark_helpers import (
+    client, _build_session_request, resolve_player_assignments, resolve_player_ids,
+    record_benchmark,
+)
 from backend.state.session import get_session
 from backend.services.trading import run_trade_suggest
 from backend.models import ComboParam
@@ -33,49 +36,50 @@ _COMBO_THRESHOLD = 2.0
 _SCORE_TOL = 0.0001   # allowed absolute deviation on H-score diffs (0–1 scale)
 
 # Top expected suggestions per combo size.
-# Regenerated 2026-07-19 for the punt-seed init (multi-start / weakest-category, replacing the old
-# heuristic) in algorithm_agents -- the H-score shifts reshuffle the 2v2/3v3 top trades (1v1 unchanged).
+# Regenerated 2026-08-14 for the team-denominator correction to percentage-stat G-scores
+# (the unpublished-paper factor in calculate_scores_from_coefficients) -- the score
+# shifts reshuffle the 2v2/3v3 top trades; the 1v1 pairs are unchanged.
 # send / receive are sorted lists so order within the group does not matter.
 _EXPECTED = {
     '1v1': [
         {
-            'send':    ['Isaiah Hartenstein (C)'],
-            'receive': ['Malik Monk (PG,SG,SF)'],
-            'your_score':  0.0019,
-            'their_score': 0.0007,
+            'send':    ['Isaiah Hartenstein'],
+            'receive': ['Malik Monk'],
+            'your_score':  0.0021,
+            'their_score': 0.0006,
         },
         {
-            'send':    ['Daniel Gafford (C,PF)'],
-            'receive': ['Andrew Wiggins (SF,PF)'],
-            'your_score':  0.0018,
-            'their_score': 0.0010,
+            'send':    ['Daniel Gafford'],
+            'receive': ['Andrew Wiggins'],
+            'your_score':  0.0015,
+            'their_score': 0.0013,
         },
     ],
     '2v2': [
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Rudy Gobert (C)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Tyrese Maxey (PG,SG)'],
-            'your_score':  0.0045,
-            'their_score': 0.0003,
+            'send':    ['Andrew Nembhard', 'Rudy Gobert'],
+            'receive': ['Andrew Wiggins', 'Tyrese Maxey'],
+            'your_score':  0.0044,
+            'their_score': 0.0005,
         },
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Daniel Gafford (C,PF)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Derrick Jones Jr. (SF,PF)'],
-            'your_score':  0.0042,
-            'their_score': 0.0007,
+            'send':    ['Andrew Nembhard', 'Isaiah Hartenstein'],
+            'receive': ['Derrick Jones Jr.', 'Malik Monk'],
+            'your_score':  0.0039,
+            'their_score': 0.0005,
         },
     ],
     '3v3': [
         {
-            'send':    ['Andrew Nembhard (PG,SG)', 'Isaiah Hartenstein (C)', 'Rudy Gobert (C)'],
-            'receive': ['Kyshawn George (SG,SF)', 'Pascal Siakam (C,SF,PF)', 'Ty Jerome (PG,SG)'],
-            'your_score':  0.0059,
-            'their_score': 0.0011,
+            'send':    ['Andrew Nembhard', 'Daniel Gafford', 'Rudy Gobert'],
+            'receive': ['Derrick Jones Jr.', 'Kyshawn George', 'Pascal Siakam'],
+            'your_score':  0.0063,
+            'their_score': 0.0004,
         },
         {
-            'send':    ['Daniel Gafford (C,PF)', 'Isaiah Hartenstein (C)', 'Mike Conley (PG)'],
-            'receive': ['Andrew Wiggins (SF,PF)', 'Malik Monk (PG,SG,SF)', 'Ty Jerome (PG,SG)'],
-            'your_score':  0.0057,
+            'send':    ['Daniel Gafford', 'Isaiah Hartenstein', 'Mike Conley'],
+            'receive': ['Andrew Wiggins', 'Malik Monk', 'Ty Jerome'],
+            'your_score':  0.0059,
             'their_score': 0.0001,
         },
     ],
@@ -114,7 +118,7 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
     start  = time.perf_counter()
     result = run_trade_suggest(
         session              = session
-        , player_assignments = _DEFAULT_SEASON_ROSTERS
+        , player_assignments = resolve_player_assignments(session, _DEFAULT_SEASON_ROSTERS)
         , my_team            = 'Drafter 1'
         , their_team         = 'Drafter 2'
         , combo_params       = combo_params
@@ -125,14 +129,14 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
     elapsed = time.perf_counter() - start
 
     suggestions = result.suggestions
-    print(f'\n[benchmark] Trade suggest — {label}: {elapsed:.2f}s  ({len(suggestions)} suggestions)')
+    record_benchmark(f'Trade suggest snapshot — {label} ({len(suggestions)} suggestions)', elapsed)
     expected    = _EXPECTED[label]
 
     if os.environ.get('REGEN_GOLDENS'):
         rows = [
             "        {\n"
-            f"            'send':    {sorted(s.send)},\n"
-            f"            'receive': {sorted(s.receive)},\n"
+            f"            'send':    {sorted(session.player_registry[i].name for i in s.send)},\n"
+            f"            'receive': {sorted(session.player_registry[i].name for i in s.receive)},\n"
             f"            'your_score':  {round(s.your_score, 4)},\n"
             f"            'their_score': {round(s.their_score, 4)},\n"
             "        }"
@@ -147,9 +151,11 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
 
     for rank, exp in enumerate(expected):
         actual = suggestions[rank]
+        expected_send_ids    = resolve_player_ids(session, exp['send'])
+        expected_receive_ids = resolve_player_ids(session, exp['receive'])
 
-        assert sorted(actual.send)    == sorted(exp['send']),    f'{label} rank {rank+1}: send mismatch'
-        assert sorted(actual.receive) == sorted(exp['receive']), f'{label} rank {rank+1}: receive mismatch'
+        assert sorted(actual.send)    == sorted(expected_send_ids),    f'{label} rank {rank+1}: send mismatch'
+        assert sorted(actual.receive) == sorted(expected_receive_ids), f'{label} rank {rank+1}: receive mismatch'
 
         assert abs(actual.your_score  - exp['your_score'])  <= _SCORE_TOL, (
             f'{label} rank {rank+1}: your_score {actual.your_score} != {exp["your_score"]}'

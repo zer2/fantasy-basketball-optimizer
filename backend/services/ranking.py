@@ -15,7 +15,12 @@ from backend.models import (
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
+from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID
 from backend.infra.server_timing import record_phase
+
+# The engine's internal index for the one result row of a full-roster evaluate
+# (algorithm_agents.get_h_scores, n_players_selected == n_picks branch).
+_FULL_ROSTER_RESULT_INDEX = ''
 
 
 class UnknownRosterPlayersError(ValueError):
@@ -27,22 +32,13 @@ class UnknownRosterPlayersError(ValueError):
     """
 
 
-def extract_last_name(player_full_name: str) -> str:
-    """Return the player's last name, stripping any trailing position suffix.
-
-    For example: "Nikola Jokic (C, PF)" → "Jokic", "LeBron James (PF, SF)" → "James",
-    "Nikola Jokic" → "Jokic".
-    """
-    return ' '.join(player_full_name.split(' (')[0].split(' ')[1:])
-
-
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
     session: Session,
-    player_assignments: dict[str, list[str]],
+    player_assignments: dict[str, list[int]],
     my_team_id: str,
-    exclusion_list: list[str],
+    exclusion_list: list[int],
     remaining_cash: Optional[dict[str, float]],
     candidate_offset: int = 0,
     candidate_limit: Optional[int] = None,
@@ -56,10 +52,10 @@ def rank_candidates(
     Args:
         session:            The active session (fetched by the caller). n_iterations
                             is read from its current_params.
-        player_assignments: Maps each team name to the list of players already
+        player_assignments: Maps each team name to the list of player ids already
                             drafted/won by that team.
         my_team_id:         The team name whose perspective the evaluation is from.
-        exclusion_list:     Players to exclude from the candidate rankings
+        exclusion_list:     Player ids to exclude from the candidate rankings
                             (e.g. already drafted by the user, injured).
         remaining_cash:     Per-team auction budget remaining; None for draft mode.
 
@@ -71,19 +67,25 @@ def rank_candidates(
     current_params = session.current_params
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
+    player_registry = session.player_registry
 
     # Every rostered player must exist in the pool under exactly the identity the board
     # holds. A stale board (identities changed by a data-source switch) would otherwise
-    # crash on a KeyError deep inside the H-score math.
+    # crash on a KeyError deep inside the H-score math. Unknown ids resolve to names via
+    # the registry where possible, so the message stays actionable.
     rostered_players = [
-        player for team_players in player_assignments.values()
-        for player in team_players if isinstance(player, str)
+        player_id for team_players in player_assignments.values()
+        for player_id in team_players
     ]
     missing_players = sorted({p for p in rostered_players if p not in H.x_scores.index})
     if missing_players:
+        missing_display = [
+            player_registry[p].name if p in player_registry else str(p)
+            for p in missing_players
+        ]
         raise UnknownRosterPlayersError(
             'These rostered players are not in the current player pool: '
-            + ', '.join(missing_players)
+            + ', '.join(missing_display)
             + '. The data-source change altered the pool; clear the board or restore the previous sources.'
         )
 
@@ -93,7 +95,7 @@ def rank_candidates(
     # on the full-distribution replacement level.
     is_auction = remaining_cash is not None
     if candidate_limit is not None and not is_auction:
-        unavailable = {p for team in player_assignments.values() for p in team if isinstance(p, str)}
+        unavailable = {p for team in player_assignments.values() for p in team}
         unavailable |= set(exclusion_list)
         available_ranked = [p for p in session.agent.default_h_scores.index if p not in unavailable]
         candidate_subset = available_ranked[candidate_offset : candidate_offset + candidate_limit]
@@ -128,6 +130,7 @@ def rank_candidates(
     with record_phase('build_candidates'):
         candidates = _build_candidates(
             h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
+            player_registry,
             remaining_cash,
             generic_h_scores=session.agent.default_h_scores,
         )
@@ -147,9 +150,10 @@ def _build_candidates(
     info: dict,
     H,
     categories: list[str],
-    player_assignments: dict[str, list[str]],
+    player_assignments: dict[str, list[int]],
     my_team_id: str,
     current_params: dict,
+    player_registry: dict,
     remaining_cash: Optional[dict[str, float]] = None,
     generic_h_scores: Optional[pd.Series] = None,
 ) -> list[Candidate]:
@@ -181,6 +185,20 @@ def _build_candidates(
     # NOT reindexed — they are used to look up already-drafted players and for
     # auction value calculations across the entire player pool.
     scores_series            = h_score_result['Scores']
+
+    # A full roster has nothing to rank: the engine scores the finished team once, under
+    # its internal sentinel index. Surface that as a single team-score row — it is not a
+    # player (no registry entry), and clients read only its h_score / win_rates.
+    if list(scores_series.index) == [_FULL_ROSTER_RESULT_INDEX]:
+        team_win_rates = h_score_result['Rates'].iloc[0]
+        return [Candidate(
+            player_id    = FULL_ROSTER_SCORE_PLAYER_ID,
+            h_score      = round(float(scores_series.iloc[0]) * 100, 2),
+            h_rank       = 1,
+            win_rates    = [round(float(rate) * 100, 2) for rate in team_win_rates.values],
+            g_score_rows = [],
+        )]
+
     h_scores_sorted          = scores_series.sort_values(ascending=False)
     sorted_index             = h_scores_sorted.index
     # Every frame in h_score_result carries the same candidate index in the same order, so resolve the
@@ -192,7 +210,8 @@ def _build_candidates(
     win_rate_cdfs            = h_score_result['Rates'].iloc[order]
     team_diff_df             = h_score_result['Diff'].iloc[order] if h_score_result['Diff'] is not None else None
     future_diff_df           = h_score_result['Future-Diff'].iloc[order] if h_score_result['Future-Diff'] is not None else None
-    player_position_map      = info['Positions']           # full-population: used by _build_roster for my_players
+    opponent_tilt_df         = (h_score_result.get('Opponent-Future-Tilt').iloc[order]
+                                if h_score_result.get('Opponent-Future-Tilt') is not None else None)
     player_g_scores          = info['G-scores']            # full-population: used for auction dollar values
 
     # res['Rosters'] column 0 encodes whether a valid slot assignment was found.
@@ -232,7 +251,7 @@ def _build_candidates(
         None if category_weights_normalized is None else np.round(category_weights_normalized, 1)
     )
 
-    my_players         = [p for p in player_assignments.get(my_team_id, []) if isinstance(p, str)]
+    my_players         = list(player_assignments.get(my_team_id, []))
     position_structure = H.position_structure
     base_list          = position_structure['base_list']
     slot_counts        = current_params.get('slot_counts', {})
@@ -260,14 +279,16 @@ def _build_candidates(
         # The evaluate route enforces that remaining_cash and cash_per_team are set together, so an
         # auction evaluate always has cash_per_team here (no defensive fallback needed).
         cash_per_team   = current_params['cash_per_team']
-        streaming_noise = float(current_params.get('streaming_noise', 10.0))
+        streaming_noise = float(current_params.get('streaming_noise', 10.0)) #ZR: What is this dumb fallback? What does claude.md say about this?
         total_picks     = H.n_drafters * H.n_picks
 
         all_players_chosen = [
             p for team_players in player_assignments.values()
-            for p in team_players if isinstance(p, str)
+            for p in team_players
         ]
         n_remaining          = total_picks - len(all_players_chosen)
+
+        #ZR: Why are these float calls needed? How would these be anything but floats or ints, which would also be fine I think?
         total_cash_remaining = float(sum(remaining_cash.values()))
 
         if n_remaining > 0:
@@ -336,11 +357,18 @@ def _build_candidates(
         if future_diff_df is not None
         else None
     )
+    # The opponents' expected future tilts (x-score space), subtracted from the future row at
+    # display time — res['Future-Diff'] itself stays raw because the opponent model feeds on it.
+    opponent_tilt_matrix = (
+        opponent_tilt_df[categories].values
+        if opponent_tilt_df is not None and future_diff_matrix is not None
+        else None
+    )
     rosters_rows = rosters_sorted.values
 
-    # Candidate last names, computed once for the whole pool (previously recomputed per
-    # candidate inside both _build_g_score_rows and the roster builder).
-    candidate_last_names = [extract_last_name(player) for player in sorted_index]
+    # Candidate last names, read once for the whole pool from the registry (they label each
+    # candidate's own G-score row).
+    candidate_last_names = [player_registry[p].last_name for p in sorted_index]
 
     # Pre-extract position share arrays for each flex type, aligned to sorted_index.
     # Each entry is (numpy_array, base_to_col) where base_to_col maps base position
@@ -364,6 +392,7 @@ def _build_candidates(
         , team_diff_matrix
         , future_diff_matrix
         , original_v
+        , opponent_tilt_matrix
     )
     # How many of each flex type's slots are still open for future picks, per candidate. The shares
     # describe how those *remaining* slots would be filled, so the display multiplies by this — not by
@@ -387,7 +416,7 @@ def _build_candidates(
     roster_by_rank = (
         None if no_position_data
         else _build_roster_assignments(
-            candidate_last_names
+            list(sorted_index)
             , my_players
             , rosters_rows
             , slot_names
@@ -401,10 +430,6 @@ def _build_candidates(
     h_scores_list          = h_scores_scaled.tolist()
     win_rates_lists        = win_rates_scaled.tolist()
     category_weights_lists = None if category_weights_scaled is None else category_weights_scaled.tolist()
-    position_displays      = [
-        ','.join(raw) if isinstance(raw, list) else str(raw)
-        for raw in (player_position_map.get(p, ['?']) for p in sorted_index)
-    ]
 
     # The remaining loop constructs one Candidate per fitting player, indexing into the
     # pre-built tables — no arithmetic left. rank_idx counts every sorted player (including
@@ -415,8 +440,7 @@ def _build_candidates(
             continue  # skip players for whom no valid roster slot exists
 
         candidates.append(Candidate(
-            name             = player,
-            position         = position_displays[rank_idx],
+            player_id        = int(player),
             h_score          = h_scores_list[rank_idx],   # already × 100 and rounded to 2 dp
             h_rank           = rank_idx + 1,
             win_rates        = win_rates_lists[rank_idx],   # already × 100 and rounded to 2 dp
@@ -438,6 +462,7 @@ def _build_g_score_rows(
     , team_diff_matrix: np.ndarray | None
     , future_diff_matrix: np.ndarray | None
     , original_v: np.ndarray
+    , opponent_tilt_matrix: np.ndarray | None = None
 ) -> list[list[GScoreRow]]:
     """Build the G-score breakdown table rows for every candidate at once.
 
@@ -460,18 +485,25 @@ def _build_g_score_rows(
     expected_future_diff is the algorithm's projection for the picks
     remaining, which varies per candidate.
 
-    Therefore:
-        current_diff = res['Diff'] - res['Future-Diff']
-                     = (future_diff + diff_means) - future_diff
-                     = diff_means
+    res['Future-Diff'] is the drafter's own RAW projected future tilt — the
+    opponent model feeds on it, so it is not netted at the source. The
+    opponents' expected future tilts arrive separately (opponent_tilt_matrix,
+    from res['Opponent-Future-Tilt']; diff_means carries them with opposite
+    sign) and are subtracted HERE to form the displayed Future row:
 
-    With the opponent model OFF, diff_means depends only on the players
-    already drafted, so Current diff is identical for every candidate. With
-    the model ON it is candidate-dependent for the predicted-anchor
-    candidates: self-exclusion swaps the candidate's own predicted team out
-    of its field for the spare anchor's team (you never play against your own
-    team), so a stronger anchor shows a less negative Current diff, while
-    every non-anchor candidate shares one identical field.
+        Future diff  = future_diff - opponent tilt   (net future differential)
+        Current diff = Total diff  - Future diff
+                     = diff_means + mean opponent future tilt
+    i.e. the board as it stands, with every seat's expected FUTURE behaviour
+    — the drafter's and the opponents' alike — attributed to the Future row.
+
+    With the opponent model OFF the tilts are zero and diff_means depends
+    only on the players already drafted, so Current diff is identical for
+    every candidate. With the model ON it is candidate-dependent for the
+    predicted-anchor candidates: self-exclusion swaps the candidate's own
+    predicted team out of its field for the spare anchor's team (you never
+    play against your own team), so a stronger anchor shows a less negative
+    Current diff, while every non-anchor candidate shares one identical field.
 
     Both diff DataFrames store values in x-score space (divided by v during
     computation).  Multiplying by original_v converts them back to G-score
@@ -546,8 +578,13 @@ def _build_g_score_rows(
     # 4-row layout: separate out the future component so the user can see how much of
     # the expected advantage is 'already there' vs. 'expected from future picks given
     # this player is on the team'.
-    future_diff  = future_diff_matrix.astype(float) * original_v
-    current_diff = total_diff - future_diff  # = diff_means * original_v; same for all candidates
+    future_diff = future_diff_matrix.astype(float) * original_v
+    if opponent_tilt_matrix is not None:
+        # Net out the opponents' expected future tilts (see the docstring): the future row
+        # becomes the net future differential, and Current diff below correspondingly sheds
+        # behaviour that hasn't happened yet. Total diff is unaffected.
+        future_diff = future_diff - opponent_tilt_matrix.astype(float) * original_v
+    current_diff = total_diff - future_diff  # the board as it stands (all future tilts in Future diff)
     current_values = np.round(current_diff, 2).tolist()
     current_totals = np.round(current_diff.sum(axis=1), 2).tolist()
     future_values  = np.round(future_diff, 2).tolist()
@@ -708,8 +745,8 @@ def _build_flex_allocations(
 # ── Roster assignment ─────────────────────────────────────────────────────────
 
 def _build_roster_assignments(
-    candidate_last_names: list[str]
-    , my_players: list[str]
+    candidate_player_ids: list[int]
+    , my_players: list[int]
     , rosters_rows: np.ndarray
     , slot_names: list[str]
 ) -> list[Roster]:
@@ -719,15 +756,15 @@ def _build_roster_assignments(
     [team_so_far[0], ..., team_so_far[-1], candidate, future_player[0], ...].
     Columns beyond len(my_players) + 1 are future hypothetical players and are ignored.
 
-    The already-drafted players' RosterAssignment objects depend only on their name and
-    are identical across candidates, so they are built once and shared; the slot each one
-    lands in still varies per candidate (the optimiser may repack the roster around the
-    candidate) and is read straight from rosters_rows. Only the candidate's own assignment
-    is unique per rank. Slot indices are converted to Python ints in one array pass.
+    The already-drafted players' RosterAssignment objects depend only on their identity
+    and are identical across candidates, so they are built once and shared; the slot each
+    one lands in still varies per candidate (the optimiser may repack the roster around
+    the candidate) and is read straight from rosters_rows. Only the candidate's own
+    assignment is unique per rank. Slot indices are converted to Python ints in one pass.
 
     Args:
-        candidate_last_names: Per-rank candidate last name for the candidate's own slot.
-        my_players:           Players already on the user's team, in roster-column order.
+        candidate_player_ids: Per-rank candidate player id for the candidate's own slot.
+        my_players:           Player ids already on the user's team, in roster-column order.
         rosters_rows:         Slot-index matrix, shape (n_players, n_columns).
         slot_names:           Ordered slot IDs (e.g. ['PG1', 'PG2', 'UTIL1']).
 
@@ -738,10 +775,10 @@ def _build_roster_assignments(
     n_team_so_far = len(my_players)
     n_columns     = rosters_rows.shape[1]
 
-    # Shared, name-only assignments for the already-drafted players (built once).
+    # Shared assignments for the already-drafted players (built once).
     drafted_assignments = [
-        RosterAssignment(name=extract_last_name(player_name), is_candidate=False)
-        for player_name in my_players
+        RosterAssignment(player_id=int(player_id), is_candidate=False)
+        for player_id in my_players
     ]
     # Cross the numpy→Python boundary once for all slot indices.
     rosters_int = rosters_rows.astype(int).tolist()
@@ -758,7 +795,7 @@ def _build_roster_assignments(
             candidate_slot_idx = roster_row[n_team_so_far]
             if 0 <= candidate_slot_idx < n_slots:
                 assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
-                    name=candidate_last_names[rank_idx],
+                    player_id=int(candidate_player_ids[rank_idx]),
                     is_candidate=True,
                 )
 

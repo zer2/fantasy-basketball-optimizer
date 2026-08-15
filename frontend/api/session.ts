@@ -10,6 +10,7 @@ import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { createSession, HTTPError } from './client.js'
+import { prefetchHeadshotsForDataSource } from '../player_display.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -91,6 +92,9 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
     }
     const platformConfig = getPlatformConfig()
     if (platformConfig) req.platform_config = platformConfig
+    // Warm the pool's headshots in parallel with the build: H-score setup is CPU-bound
+    // server-side while image serving is pure I/O, so the build window is free time.
+    prefetchHeadshotsForDataSource(data_source.type, data_source.season)
     const resp = await createSession(req, signal)
     sessionId = resp.session_id
     syncCategoriesFromBackend(resp.categories)

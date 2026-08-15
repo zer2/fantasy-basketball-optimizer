@@ -451,13 +451,22 @@ def test_roto_minimal_punting(sessions, auction):
         _record_row('Rotisserie punting (hard <20% / soft 20-40% expected win rate)',
                     ['Season', 'Mode', 'Hard', 'Soft', 'Weakest category', 'Weakest rate', 'Player'],
                     [season, mode, hard_count, soft_count, weakest_cat,
-                     f'{100 * float(np.min(weakest_rates)):.0f}%', weakest_player.split(' (')[0]])
-        assert hard_count == 0, f'{season}: {hard_count} HARD punt(s) in Rotisserie'
+                     f'{100 * float(np.min(weakest_rates)):.0f}%',
+                     session.player_registry[weakest_player].name])
+        # Hard punts are allowed but must stay RARE: an extreme-profile star can rationally
+        # commit to one (Giannis's FT% after the team-denominator correction to percentage
+        # G-scores — accepted 2026-08-14), but more than a couple among the top anchors
+        # would mean full H2H-style punting has leaked into Rotisserie.
+        hard_ceiling = 2
+        assert hard_count <= hard_ceiling, (
+            f'{season}: {hard_count} hard Roto punt(s) among the top anchors '
+            f'(> {hard_ceiling}) — hard punting should be a rare outlier, not common'
+        )
         # Soft counts measure roster SHAPE as much as strategy: an auction anchor's expected team is a
         # star plus budget-priced fill, which mechanically spreads category win rates wider than a
         # snake-draft expectation and parks more of them in the 20-40% band without any punt intent.
-        # The hard==0 floor above is the real Roto property; the soft ceilings only catch egregious
-        # drift (draft measured <=21/season; auction measured ~47 on the widest season, 2020-21).
+        # The near-zero hard floor above is the real Roto property; the soft ceilings only catch
+        # egregious drift (draft measured <=21/season; auction measured ~47 on the widest season, 2020-21).
         soft_ceiling = (5 if auction else 2) * len(rows)
         assert soft_count <= soft_ceiling, f'{season}: Roto soft-punting excessively ({soft_count})'
 
@@ -466,8 +475,8 @@ def test_roto_minimal_punting(sessions, auction):
 
 def _snapshot_candidates(result, top_n=15):
     return {
-        c.name: (c.h_score, np.asarray(c.category_weights, dtype=float),
-                 np.asarray(c.win_rates, dtype=float))
+        c.player_id: (c.h_score, np.asarray(c.category_weights, dtype=float),
+                      np.asarray(c.win_rates, dtype=float))
         for c in result.candidates[:top_n]
     }
 
@@ -516,18 +525,18 @@ def test_early_pick_stability(sessions, auction):
             if crossed:
                 punt_flips[name] = crossed
         if punt_flips:
-            flip_name, flip_cats = max(punt_flips.items(), key=lambda kv: max(abs(a - b) for _, b, a in kv[1]))
+            flip_id, flip_cats = max(punt_flips.items(), key=lambda kv: max(abs(a - b) for _, b, a in kv[1]))
             categories = session.current_params['categories']
             worst_flip = ', '.join(f'{_SHORT_CATEGORY.get(categories[i], categories[i])} {b:.0f}->{a:.0f}'
                                    for i, b, a in flip_cats)
-            flip_text = f'{flip_name.split(" (")[0]}: {worst_flip}'
+            flip_text = f'{session.player_registry[flip_id].name}: {worst_flip}'
         else:
             flip_text = '(none)'
         _record_row('Predicted-pick stability (EC; opponent takes its predicted player)',
                     ['Season', 'Mode', 'Shared shift (whole board)', 'Max relative move',
                      'Biggest mover', 'Max dweight', 'Punt flips', 'Worst punt flip', 'Players compared'],
                     [season, mode, f'{level_shift:+.2f}', f'{max(h_deltas.values()):.2f}',
-                     worst_h_name.split(' (')[0], f'{max(w_deltas.values()):.1f}',
+                     session.player_registry[worst_h_name].name, f'{max(w_deltas.values()):.1f}',
                      len(punt_flips), flip_text, len(common)])
         # 1e-6: the deltas come from 2-decimal display scores, so a mover sitting exactly ON the floor
         # (0.60) must not fail on float dust.

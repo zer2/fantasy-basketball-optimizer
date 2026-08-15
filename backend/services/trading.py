@@ -428,8 +428,8 @@ def run_trade_suggest(
 
     suggestions = [
         TradeSuggestion(
-            send=row['Send'],
-            receive=row['Receive'],
+            send=[int(player_id) for player_id in row['Send']],
+            receive=[int(player_id) for player_id in row['Receive']],
             your_score=round(float(row['Your Score']), 4),
             their_score=round(float(row['Their Score']), 4),
         )

@@ -21,7 +21,7 @@ import { setTheme } from './styles/styler_functions.js'
 import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsParams, waitForInitialSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
+import { renderPlayerStats, getPlayerStatsParams, waitForSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
 
@@ -247,7 +247,12 @@ document.addEventListener(TEAM_LABELS_CHANGED, () => {
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
 
-const applyPlayerStats = (signal?: AbortSignal, keepsPlayerPool = false) => {
+const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) => {
+    // Switching the data source to Historical starts an async seasons fetch and fires this
+    // change handler in the same breath, so the ps-season dropdown may not exist yet. Wait
+    // for it (already resolved in every other case) rather than read a season that is not
+    // there — getPlayerStatsParams rightly refuses a historical source without one.
+    await waitForSeasons()
     const { data_source, injured_players } = getPlayerStatsParams()
     // The boards reset when the player pool's identity changes (data source, season,
     // uploads, injured list) so stale names are never sent to the backend. A blend-weight
@@ -383,16 +388,24 @@ identity.className = 'account-identity'
 
 const avatar = document.createElement('span')
 avatar.className = 'account-avatar'
+
+/** Default person icon — shown when no Google picture is available, and swapped in when a
+ *  stored picture URL stops resolving (Google's profile-photo URLs are tokenized and expire;
+ *  the session stores the URL from login, so a long-lived login eventually holds a dead link). */
+function showDefaultAccountIcon(): void {
+    avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+        + '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>'
+}
+
 if (currentUser.picture) {
     const avatarImg = document.createElement('img')
     avatarImg.src = currentUser.picture
     avatarImg.alt = ''
     avatarImg.referrerPolicy = 'no-referrer'   // Google pic URLs 403 without this
+    avatarImg.addEventListener('error', showDefaultAccountIcon)
     avatar.append(avatarImg)
 } else {
-    // Default person icon when no Google picture is available.
-    avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
-        + '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>'
+    showDefaultAccountIcon()
 }
 
 const accountName = document.createElement('span')
@@ -421,7 +434,7 @@ sidebar.style.visibility = ''
 
 applyLayout()
 buildTableHeader()
-waitForInitialSeasons()
+waitForSeasons()
     .then(() => runModeEval())
     .then(() => applyLayout())
     .catch(err => console.error('Initial load failed:', err))

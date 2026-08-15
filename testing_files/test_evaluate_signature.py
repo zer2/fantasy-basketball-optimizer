@@ -25,7 +25,7 @@ import os
 
 import pytest
 
-from benchmark_helpers import client, _build_session_request
+from benchmark_helpers import client, _build_session_request, resolve_player_ids
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
@@ -46,14 +46,14 @@ _TEAM_2 = [
 
 # sha256 of json.dumps(EvaluateResponse.model_dump(mode='json'), sort_keys=True), keyed by
 # (scoring_format, board). Regenerate with UPDATE_EVALUATE_SIGNATURE=1 (see module docstring).
-# Regenerated 2026-08-12 for the populate perf batch: the full-pool serve now runs its normal
-# position-optimiser throttle schedule, and the self-play bootstrap defaults to 8 passes (the
-# measured convergence knee) instead of 15.
+# Regenerated 2026-08-14 for the expand-view diff reattribution: the displayed Future
+# diff nets out the opponents' expected future tilts (res['Opponent-Future-Tilt']), so
+# Current diff is the board as it stands. Display-only — H-scores verified identical.
 _GOLDEN = {
-    ('Head to Head: Each Category',  'empty'): 'f2dc359f05760ffdb7cbf06f78f42e883cf51bbe963ac7d2862bdc5ad04deadd',
-    ('Head to Head: Each Category',  'mid'):   'd4495335aad489f551365b94ae30abce7837b9f74249c3736bfefb0e4a3154fd',
-    ('Head to Head: Most Categories','empty'): '6ac5e1cf5bf668c579f830c92c316f389c27ae2a83027708e89af7ddc5eeabcb',
-    ('Head to Head: Most Categories','mid'):   '21c74d34023a7b080d367f5e6338cf1dd86ebd1c755ce9685254232f7a6239ac',
+    ('Head to Head: Each Category',  'empty'): 'c41fb2be835637d9b2199a60051aca4a4a4a2f155e7e4fbf0b17076036757ba3',
+    ('Head to Head: Each Category',  'mid'):   '2d425db8b085e0154a3ce7ad10108f5a4be014ea2ece4b1031d9f73b89f0627d',
+    ('Head to Head: Most Categories','empty'): 'c31299bf88fc88d67c7b30062a77ec9b27a86acd40e1db4da607e396c1c590eb',
+    ('Head to Head: Most Categories','mid'):   '9d4ddcc95b746b852a3924a5ff36a63a5026b02baccf5b3fdb9520c42d5dedb9',
 }
 
 
@@ -85,9 +85,9 @@ def test_evaluate_signature(warmed_session, board):
 
     assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     if board == 'mid':
-        assignments['Team 1'] = _TEAM_1
-        assignments['Team 2'] = _TEAM_2
-        exclusion_list        = _TEAM_1
+        assignments['Team 1'] = resolve_player_ids(session, _TEAM_1)
+        assignments['Team 2'] = resolve_player_ids(session, _TEAM_2)
+        exclusion_list        = assignments['Team 1']
     else:
         exclusion_list = []
 

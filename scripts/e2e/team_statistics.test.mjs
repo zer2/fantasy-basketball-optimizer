@@ -22,20 +22,23 @@ test('draft team statistics track the roster', async t => {
         await page.locator('[data-testid="team-gscore"]').waitFor({ timeout: 30000 })
     }
 
-    /** Team 1's players as shown on the board (column 1 of the entry grid). */
+    /** Team 1's players as shown on the board (column 1 of the entry grid). Cells render
+     *  the minimal display; the stack's title tooltip carries the full name. */
     function readTeamOneBoardPlayers() {
         return page.evaluate(() =>
             [...document.querySelectorAll('.entry-table tbody tr')]
-                .map(row => row.cells[1]?.textContent ?? '')
+                .map(row => row.cells[1]?.querySelector('.roster-player-stack')?.title ?? '')
                 .filter(text => text !== ''))
     }
 
-    /** The team table's rows as { label, total } (the totals row included). Each row is a
-     *  th label followed by the Total cell — row.cells counts the th, so Total is cells[1]. */
+    /** The team table's rows as { label, total } (the totals row included). Player rows
+     *  label with the rich display (bare name = the .playername leading text node); the
+     *  totals row's th is plain text. Total is cells[1] — row.cells counts the th. */
     function readTeamTableRows() {
         return page.evaluate(() =>
             [...document.querySelectorAll('[data-testid="team-gscore"] tbody tr')].map(row => ({
-                label: row.querySelector('th')?.textContent ?? '',
+                label: row.querySelector('th .playername')?.childNodes[0]?.textContent?.trim()
+                    ?? row.querySelector('th')?.textContent ?? '',
                 total: parseFloat(row.cells[1]?.textContent ?? ''),
             })))
     }

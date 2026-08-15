@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, expectCleanSession, drainSessionFailures, waitAppSettled,
-    setSelect, lockInDraftPick, pickControlButton,
+    setSelect, lockInDraftPick, pickControlButton, countBoardCellsWithPlayer,
 } from './helpers.mjs'
 
 test('projection blend weights', async t => {
@@ -42,11 +42,11 @@ test('projection blend weights', async t => {
         await t.test('a blend-weight change keeps the draft board intact', async () => {
             await lockInDraftPick(page, 'Nikola Jokic')
             await waitAppSettled(app)
-            assert.equal(await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count(), 1)
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 1)
 
             await setBlendWeight('ps-w-darko', 0.9)
 
-            assert.equal(await page.locator('.entry-table td', { hasText: 'Nikola Jokic' }).count(), 1,
+            assert.equal(await countBoardCellsWithPlayer(page, 'Nikola Jokic'), 1,
                          'the locked pick must survive a blend-weight change')
             assert.match(await page.locator('.pick-control-row .pick-control-label').first().textContent(),
                          /Select Pick 1 for Team 2/, 'the pick position must survive too')
@@ -91,7 +91,7 @@ test('projection blend weights', async t => {
             expectCleanSession(app, 'recovered from empty blend')
         })
 
-        await t.test('a format-mismatched upload is rejected at upload time, visibly', async () => {
+        await t.test('an unreadable upload is rejected at upload time, visibly', async () => {
             const firstSlider = page.locator('#ps-w-custom-1')
             assert.ok(await firstSlider.isDisabled(), 'a custom weight starts locked at zero')
             assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
@@ -99,15 +99,17 @@ test('projection blend weights', async t => {
 
             const uploadInput = page.locator('#ps-upload-custom-1')
             await uploadInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+            // Headers the alias table cannot interpret at all. (A file with only a few
+            // recognizable stats is NOT rejected — sparse projection sets are legitimate.)
             await uploadInput.setInputFiles({
-                name: 'unknown-format.csv',
+                name: 'not-projections.csv',
                 mimeType: 'text/csv',
-                buffer: Buffer.from('Name,Pos,g,pts,reb,ast\nSome Player,C,70,25,10,5\n'),
+                buffer: Buffer.from('Ticker,Sector,Close,Volume\nABC,Tech,101.5,20000\n'),
             })
 
             const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
             await uploadStatus.filter({ hasText: 'Upload failed' }).waitFor({ timeout: 15000 })
-            assert.match(await uploadStatus.textContent(), /does not match any known projection format/,
+            assert.match(await uploadStatus.textContent(), /does not read as a projection set/,
                          'the status should say WHY the file was rejected')
             await waitAppSettled(app)
             assert.ok(await firstSlider.isDisabled(), 'a rejected upload must leave the weight locked')
@@ -121,19 +123,22 @@ test('projection blend weights', async t => {
         })
 
         await t.test('a well-formed upload is auto-detected, retitleable, and changes results', async () => {
-            // Build a valid BBM-format CSV from real pool players with uniform stat lines —
+            // Build a valid projection CSV from real pool players with uniform stat lines —
             // blended in at full weight, it must visibly move the results.
+            // Candidate rows render the rich display: the bare name is the .playername
+            // span's leading text node; positions ride in the nested .player-positions span.
             const pooledPlayers = await page.evaluate(() =>
                 [...document.querySelectorAll('#hscoretable .playername')].slice(0, 30)
-                    .map(span => span.textContent))
+                    .map(span => ({
+                        name:     span.childNodes[0].textContent.trim(),
+                        position: span.querySelector('.player-positions')?.textContent ?? '',
+                    })))
             // Includes unmapped junk columns (Rank, Value) like real exports carry — the
             // parser must drop them; historically one junk column in an upload silently
             // wiped the entire pool ("0 players available") at ANY weight.
-            const csvRows = pooledPlayers.map((fullName, playerIndex) => {
-                const [, name, position] = fullName.match(/^(.*) \(([^)]+)\)$/)
+            const csvRows = pooledPlayers.map(({ name, position }, playerIndex) =>
                 // Multi-position values contain commas (e.g. "C,PF") — quote them, as real exports do.
-                return `${playerIndex + 1},${name},"${position}",9.9,70,20.0,8.0,4.0,1.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0`
-            })
+                `${playerIndex + 1},${name},"${position}",9.9,70,20.0,8.0,4.0,1.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0`)
             const csvText = 'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n' + csvRows.join('\n')
 
             const beforeUploadSnapshot = await readCandidateSnapshot()
@@ -143,8 +148,8 @@ test('projection blend weights', async t => {
             const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
             await uploadStatus.filter({ hasText: 'players loaded' }).waitFor({ timeout: 15000 })
             await waitAppSettled(app)
-            assert.match(await uploadStatus.textContent(), /BBM format/,
-                         'the status should report the auto-detected format')
+            assert.match(await uploadStatus.textContent(), /\d+ players loaded/,
+                         'the status should report how many players were read')
             assert.ok(!(await page.locator('#ps-w-custom-1').isDisabled()),
                       'a successful upload should unlock the weight')
             assert.equal(await page.locator('#ps-w-custom-2').count(), 1,
@@ -175,20 +180,21 @@ test('projection blend weights', async t => {
                       'a zero-weight upload must leave the blend fully working')
             expectCleanSession(app, 'upload weight back to zero')
 
-            // The whole custom structure resets on reload: uploads cannot survive one, so
-            // the restored page starts back at a single locked, untitled slot.
+            // Uploads survive a reload: the file is kept server-side on a day-long clock that
+            // resets whenever a session uses it, and the slot it fills (id, title, weight,
+            // status line) is remembered in preferences.
             await loadApp(app)
+            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'My projections',
+                         'the retitled source should come back under its own name')
+            assert.ok(!(await page.locator('#ps-w-custom-1').isDisabled()),
+                      'a restored upload keeps its weight unlocked — the file is still there')
             assert.equal(await page.locator('#ps-w-custom-1').inputValue(), '0',
-                         "an uploaded source's weight must reset to zero on reload")
-            assert.ok(await page.locator('#ps-w-custom-1').isDisabled(),
-                      "an uploaded source's weight must be locked again on reload")
-            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
-                         'titles reset with the structure')
-            assert.equal(await page.locator('#ps-w-custom-2').count(), 0,
-                         'the added slot disappears on reload')
+                         'the restored weight is the one last set, not a default')
+            assert.equal(await page.locator('#ps-w-custom-2').count(), 1,
+                         'the empty next slot is still open after the restore')
             assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
-                      'the reloaded page should evaluate cleanly without the upload')
-            expectCleanSession(app, 'reload without the upload')
+                      'the reloaded page should evaluate cleanly with the restored upload')
+            expectCleanSession(app, 'reload with the restored upload')
         })
     } finally {
         await app.close()

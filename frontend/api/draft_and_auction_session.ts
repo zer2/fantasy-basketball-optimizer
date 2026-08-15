@@ -14,6 +14,7 @@ import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, c
 // bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
 const CANDIDATE_BATCH_SIZE = 100
 import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
+import { prefetchHeadshotsForDataSource } from '../player_display.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
 
 // ─── Draft/auction state ─────────────────────────────────────────────────────
@@ -26,11 +27,11 @@ let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
 // Player assignments pulled from a live platform (Refresh Analysis). When set,
 // evaluateSeat uses these instead of reading the manual draft/auction board,
 // which does not exist in the live-platform layout.
-let livePlayerAssignments: Record<string, string[]> | null = null
+let livePlayerAssignments: Record<string, number[]> | null = null
 let liveRemainingCash: Record<string, number> | null = null
 
 export function setLivePlayerAssignments(
-    assignments: Record<string, string[]>
+    assignments: Record<string, number[]>
     , remainingCash?: Record<string, number>
 ): void {
     livePlayerAssignments = assignments
@@ -70,6 +71,10 @@ export async function createOrPatchSession(
   , signal?: AbortSignal
 ): Promise<void> {
     setIndicatorState('fetching')
+    // A data-source change means a new player pool: start warming its headshots now, in
+    // parallel with the rebuild (startFreshSession does the same for brand-new sessions).
+    const patchDataSource = patchBody.data_source as { type: string; season?: string | null } | undefined
+    if (patchDataSource) prefetchHeadshotsForDataSource(patchDataSource.type, patchDataSource.season)
     try {
         if (!getSessionId()) {
             await startFreshSession(signal)
@@ -119,7 +124,7 @@ document.addEventListener('platform-connected', () => {
  * base players cache, and full-team result.
  * Retries once if the session has expired (404).
  */
-async function evaluateSeat(seat: string, forAutopilot = false): Promise<string | null> {
+async function evaluateSeat(seat: string, forAutopilot = false): Promise<number | null> {
     if (evaluateController) evaluateController.abort()
     evaluateController = new AbortController()
     const { signal } = evaluateController
@@ -155,7 +160,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<string 
             if (!forAutopilot && !basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
                 const { n_drafters } = getLeagueSettings()
                 const genericTeams   = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
-                const emptyAssignments: Record<string, string[]> = Object.fromEntries(
+                const emptyAssignments: Record<string, number[]> = Object.fromEntries(
                     genericTeams.map(name => [name, []])
                 )
                 // An auction session requires remaining_cash on every evaluate; the empty board
@@ -223,7 +228,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<string 
                 // rather than a shared global, so a later evaluate that aborts this one can't leave a
                 // stale pick behind. Don't cache this partial first-batch-only list as the base players.
                 setCandidatePlayerResults(players)
-                return players[0]?.name ?? null
+                return players[0]?.player_id ?? null
             }
 
             if (!basePlayersBySession.has(getSessionId()!)) {
@@ -245,7 +250,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<string 
 /** Evaluates the current draft/auction state for the current seat and rebuilds the candidate table.
  *  With `forAutopilot`, it scores only the first batch and renders nothing — the caller only needs the
  *  top candidate for an autopilot pick. */
-export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Promise<string | null> {
+export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Promise<number | null> {
     const forAutopilot = options.forAutopilot ?? false
     // No explicit seat selected falls back to the first team; an empty league is a bug, not a default.
     const seat = getCurrentSeat() ?? getLeagueSettings().team_names[0]
@@ -284,7 +289,7 @@ export async function showDefaultRankings(): Promise<void> {
         await withSessionRetry(async () => {
             const { n_drafters, mode } = getLeagueSettings()
             const genericTeams = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
-            const emptyAssignments: Record<string, string[]> = Object.fromEntries(
+            const emptyAssignments: Record<string, number[]> = Object.fromEntries(
                 genericTeams.map(name => [name, []])
             )
             // An auction session requires remaining_cash on every evaluate; with no picks made,

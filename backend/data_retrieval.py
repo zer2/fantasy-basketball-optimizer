@@ -13,6 +13,7 @@ Equivalent to src/data_retrieval/get_data.py but:
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 import numpy as np
@@ -100,7 +101,9 @@ def get_available_seasons() -> list[str]:
 def get_historical_data(params: dict) -> pd.DataFrame:
     """Fetch full historical player data from Snowflake.
 
-    Returns a DataFrame indexed by (Season, Player).
+    Returns a DataFrame indexed by (Season, player id), with the season row's native
+    display name kept as the 'Player' column — the view carries NBA_PLAYER_ID for every
+    row back to 1984-85, so historical identity never depends on the unified table.
     """
     df = query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
     df = df.rename(columns=params['stat-df-renamer'])
@@ -112,50 +115,74 @@ def get_historical_data(params: dict) -> pd.DataFrame:
     df['Assist to TO']  = df['Assists'] / df['Turnovers']
     df['Position']      = df['Position'].fillna('NP')
 
-    return df.set_index(['Season', 'Player']).sort_index().fillna(0)
+    df['NBA_PLAYER_ID'] = df['NBA_PLAYER_ID'].astype(int)
+    # ROW ORDER IS LOAD-BEARING: the pool has always been name-sorted, and stable sorts
+    # downstream (G-score ties, anchor ordering, top-N selections) inherit it — id-sorting
+    # here would change served H-scores. Sort by name, then key by id.
+    # The id index level keeps the legacy 'Player' name through Stage A of the identity
+    # refactor (pipeline internals reference the level name); renamed in the cleanup stage.
+    df = df.sort_values(['Season', 'Player']).fillna(0)
+    df = df.set_index(['Season', 'NBA_PLAYER_ID'])
+    df.index = df.index.set_names(['Season', 'Player'])
+    return df
 
 
 def get_specified_historical_stats(season: str, params: dict) -> pd.DataFrame:
-    """Return player stats for a specific season.
+    """Return player stats for a specific season, indexed by player id.
 
-    Returns a DataFrame indexed by 'Player (Position)' — the canonical format
-    for player_stats_v0 (same as what process_player_data expects).
+    The 'Player' column carries the season row's native display name (registry material
+    popped off by run_step1); stats and 'Position' are the pipeline's v0 columns.
     """
-    df = get_historical_data(params).loc[season].copy()
-    df.index = df.index + ' (' + df['Position'] + ')'
-    df.index.name = 'Player'
-    return df
+    return get_historical_data(params).loc[season].copy()
 
 
 # ── Projection data ───────────────────────────────────────────────────────────
 
+def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
+    """Resolve df['Player'] (a source's own spellings) to NBA player ids in a nullable
+    'player_id' column — the ingestion edge for name-keyed sources. Unresolved rows keep
+    a null id; the caller decides between synthetic allocation (uploads) and loud
+    warnings (curated sources)."""
+    from backend.player_identity import build_name_to_player_id_resolver
+
+    resolver = build_name_to_player_id_resolver()
+    df = df.copy()
+    df['player_id'] = df['Player'].map(resolver).astype('Int64')
+    return df
+
+
 def get_espn_projections(params: dict) -> pd.DataFrame:
-    """Fetch ESPN projections from Snowflake."""
+    """Fetch ESPN projections from Snowflake, with 'player_id' resolved from ESPN names."""
     n_games = params['n_games']
     df = query('ESPN_PROJECTION_VIEW')
     df = df.rename(columns=params['espn-renamer'])
-    df = _map_player_names(df, 'ESPN_NAME')
+    df = attach_player_ids_by_name(df)      # resolve the raw ESPN spellings
+    df = _map_player_names(df, 'ESPN_NAME')  # display names stay master-mapped as today
     df['Games Played %'] = df['Games Played'] / n_games
-    return df.set_index('Player')
+    return df
 
 
 def get_darko_data(params: dict) -> pd.DataFrame:
-    """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game."""
+    """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game.
+    DARKO carries NBA_PLAYER_ID natively; position/minutes ride in from the ESPN table
+    joined by id (its names resolved through the unified table)."""
     n_games = params['n_games']
 
     df = query('DARKO_VIEW')
     df = df.rename(columns=params['darko-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
     df = _map_player_names(df, 'DARKO_NAME')
-    df = df.set_index('Player').sort_index().fillna(0)
+    df['player_id'] = df['NBA_PLAYER_ID'].astype('Int64')
+    df = df.drop(columns=['NBA_PLAYER_ID']).sort_values('Player').fillna(0)
 
-    # Fetch position / minutes / games from ESPN table
+    # Fetch position / minutes / games from ESPN table, joined by resolved id
     extra = query('ESPN_PROJECTION_TABLE')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
     extra.columns = ['Player', 'Minutes', 'Games Played %', 'Position']
     extra['Games Played %'] = extra['Games Played %'].astype(float) / n_games
-    extra = _map_player_names(extra, 'ESPN_NAME').set_index('Player')
+    extra = attach_player_ids_by_name(extra).dropna(subset=['player_id'])
+    extra = extra.drop(columns=['Player'])
 
-    df = df.merge(extra, left_index=True, right_index=True)
+    df = df.merge(extra, on='player_id')
     possessions_per_game = df['Pace'] / 100 * df['Minutes'] / 48
 
     per_100_cols = {
@@ -183,6 +210,7 @@ def get_darko_data(params: dict) -> pd.DataFrame:
         + list(params['ratio-statistics'].keys())
         + [info['volume-statistic'] for info in params['ratio-statistics'].values()]
         + params['other-columns']
+        + ['Player', 'player_id']
     )
     required = [c for c in required if c in df.columns]
     return df[list(set(required))]
@@ -196,11 +224,12 @@ def get_canonical_position_eligibility(params: dict) -> pd.Series:
     Positions are never blended across projection sources: every source contributes
     stats only, and eligibility comes from the latest season in
     YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE. Composite slots (Util/G/F) are dropped
-    and base positions are emitted in base_list order, so a player's
-    'Player (Position)' identity cannot depend on which sources are active, on a
-    file's comma spacing, or on the order a file lists positions in.
+    and base positions are emitted in base_list order, so a player's position identity
+    cannot depend on which sources are active, on a file's comma spacing, or on the
+    order a file lists positions in.
 
-    Returns a Series indexed by MASTER_PLAYER_NAME with 'PG,SG'-style values.
+    Returns a Series indexed by NBA player id with 'PG,SG'-style values — the join
+    path is pool id -> (unified table) -> YAHOO_PLAYER_ID -> eligibility rows.
     """
     base_order = {
         position: rank
@@ -213,13 +242,13 @@ def get_canonical_position_eligibility(params: dict) -> pd.Series:
     ]
     eligibility = eligibility[eligibility['SEASON_ID'] == eligibility['SEASON_ID'].max()]
 
-    unified = get_unified_player_table()[['YAHOO_PLAYER_ID', 'MASTER_PLAYER_NAME']].dropna()
-    unified = unified.astype({'YAHOO_PLAYER_ID': 'int64'})
+    unified = get_unified_player_table()[['YAHOO_PLAYER_ID', 'NBA_PLAYER_ID']].dropna()
+    unified = unified.astype({'YAHOO_PLAYER_ID': 'int64', 'NBA_PLAYER_ID': 'int64'})
     merged = eligibility.astype({'YAHOO_PLAYER_ID': 'int64'}).merge(unified, on='YAHOO_PLAYER_ID')
 
     return (
         merged.sort_values('POSITION', key=lambda column: column.map(base_order))
-              .groupby('MASTER_PLAYER_NAME')['POSITION']
+              .groupby('NBA_PLAYER_ID')['POSITION']
               .agg(','.join)
     )
 
@@ -238,6 +267,8 @@ def combine_projections(
     uploaded_dfs maps those same ids to their pre-parsed DataFrames. Snowflake
     sources (DARKO, ESPN) are fetched automatically if weight > 0.
     """
+    from backend.player_identity import allocate_synthetic_player_ids
+
     uploaded = uploaded_dfs or {}
 
     # Every source is gated on its weight — an uploaded file at weight zero must not
@@ -254,6 +285,48 @@ def combine_projections(
 
     weights = [blend_weights.get(k, 0.0) for k in source_keys]
 
+    # Uploaded frames arrive name-indexed from parse_projection_csv; bring them to the
+    # id-column contract the Snowflake loaders already follow.
+    for key in source_keys:
+        source_frame = sources[key]
+        if source_frame is not None and 'player_id' not in source_frame.columns:
+            source_frame = source_frame.reset_index()
+            sources[key] = attach_player_ids_by_name(source_frame)
+
+    # Synthetic ids are allocated ONCE over the union of unresolved names across every
+    # active source, so the same unknown spelling merges across sources and rebuilds of
+    # the same data produce the same ids. The player is kept, never dropped — a changed
+    # pool would silently change every downstream number.
+    unresolved_names = sorted({
+        name
+        for key in source_keys
+        if sources[key] is not None
+        for name in sources[key].loc[sources[key]['player_id'].isna(), 'Player']
+    })
+    if unresolved_names:
+        logging.getLogger('fbbo').warning(
+            'combine_projections: %d source name(s) resolve to no NBA id; keeping them '
+            'under synthetic ids: %s', len(unresolved_names), ', '.join(unresolved_names[:10]))
+    synthetic_ids = allocate_synthetic_player_ids(unresolved_names)
+
+    for key in source_keys:
+        source_frame = sources[key]
+        if source_frame is None:
+            continue
+        resolved = source_frame['player_id'].astype('object')
+        resolved = resolved.fillna(source_frame['Player'].map(synthetic_ids))
+        source_frame = source_frame.drop(columns=['player_id'])
+        # The display name travels as '_display_name' through the blend so the id index
+        # can keep the legacy 'Player' level name without an index/column name collision.
+        source_frame = source_frame.rename(columns={'Player': '_display_name'})
+        source_frame.index = pd.Index(resolved.astype(int), name='Player')
+        # Two source rows landing on one id (e.g. a file listing a player twice) would
+        # silently double-count in the blend — refuse instead.
+        if source_frame.index.has_duplicates:
+            duplicated = source_frame.index[source_frame.index.duplicated()].tolist()
+            raise ValueError(f'{key}: multiple rows resolve to the same player id(s): {duplicated}')
+        sources[key] = source_frame
+
     all_players = {
         p
         for k in source_keys
@@ -267,8 +340,11 @@ def combine_projections(
     )
     df = df.reindex(new_index)
 
-    # Drop players missing a column from every source
-    ineligible = (df.isna().groupby('Player').sum() == len(source_keys)).sum(axis=1) > 0
+    # Drop players missing a column from every source. '_display_name' is exempt: it is
+    # registry material, not a blended stat, and a source that carries a player always
+    # names them.
+    blend_columns = [c for c in df.columns if c != '_display_name']
+    ineligible = (df[blend_columns].isna().groupby('Player').sum() == len(source_keys)).sum(axis=1) > 0
     df = df[~df.index.get_level_values('Player').isin(ineligible.index[ineligible])]
 
     df = df.groupby('Player').agg(
@@ -291,8 +367,11 @@ def combine_projections(
     df['Position'] = mapped_positions.fillna(df['Position'])
 
     df['Position'] = df['Position'].fillna('NP')
-    df = df.fillna(0)
-
-    df.index = df.index + ' (' + df['Position'] + ')'
-    df.index.name = 'Player'
-    return df
+    stat_columns = [c for c in df.columns if c != '_display_name']
+    df[stat_columns] = df[stat_columns].fillna(0)
+    # ROW ORDER IS LOAD-BEARING (see get_historical_data): the blend has always emitted a
+    # name-sorted pool; groupby ordered it by id above, so restore name order here — while
+    # the display column still has its collision-free blend name (renaming first would make
+    # sort_values('Player') ambiguous against the id level of the same name).
+    df = df.sort_values('_display_name')
+    return df.rename(columns={'_display_name': 'Player'})

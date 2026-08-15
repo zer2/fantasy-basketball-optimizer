@@ -3,6 +3,7 @@
 // All fetch calls go through this module; callers receive typed results.
 
 import { PlayerResult, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
+import { setPlayerRegistry } from '../player_registry.js'
 
 
 // Empty string = same-origin deployment (frontend and backend served from the same host).
@@ -27,6 +28,20 @@ export class HTTPError extends Error {
     }
 }
 
+// In-flight backend work, visible to background consumers: the headshot preloader
+// yields to bursty session traffic (evaluate batches and their follow-ups) and sweeps
+// only while this is zero. Session BUILDS — the bare POST /sessions and the PATCH
+// /sessions/{id} rebuild — are deliberately not counted: each is one long CPU-bound
+// call on the server while image serving is pure I/O, so the build window is free
+// time the sweep should use.
+let inFlightSessionRequests = 0
+
+/** Number of counted session requests in flight (0 = the backend is quiet apart from,
+ *  at most, a session build/rebuild). */
+export function countInFlightSessionRequests(): number {
+    return inFlightSessionRequests
+}
+
 /** Issues `fetch(url, init)` and parses the JSON response, throwing HTTPError on
  *  non-2xx. The `label` prefixes error messages so callers don't each repeat the
  *  "X failed (status): body" boilerplate. */
@@ -35,13 +50,20 @@ async function jsonRequest<T>(
     , label: string
     , init?: RequestInit
 ): Promise<T> {
-    const res = await fetch(url, init)
-    if (!res.ok) {
-        const body = await res.text()
-        throw new HTTPError(res.status, body, label)
+    const isSessionRequest = url.includes('/sessions/')
+        && (init?.method ?? 'GET').toUpperCase() !== 'PATCH'
+    if (isSessionRequest) inFlightSessionRequests += 1
+    try {
+        const res = await fetch(url, init)
+        if (!res.ok) {
+            const body = await res.text()
+            throw new HTTPError(res.status, body, label)
+        }
+        if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
+        return await (res.json() as Promise<T>)
+    } finally {
+        if (isSessionRequest) inFlightSessionRequests -= 1
     }
-    if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
-    return res.json() as Promise<T>
 }
 
 
@@ -49,11 +71,13 @@ async function jsonRequest<T>(
 
 
 // Adapter between backend snake_case Candidate objects and frontend PlayerResult objects.
-// The backend follows Python naming conventions; this is the single place where that translation happens.
+// The backend follows Python naming conventions; this is the single place where that translation
+// happens. Players are keyed by player id end to end; display resolution happens in the
+// rendering layer via the session registry.
 /** Converts raw backend Candidate objects to frontend PlayerResult objects, remapping snake_case keys to camelCase. */
 export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
     return candidates.filter(c => c.h_score != null).map((c, i) => ({
-        name:             c.name,
+        player_id:        c.player_id,
         h_score:          c.h_score,
         h_rank:           c.h_rank,
         g_rank:           i + 1,
@@ -78,7 +102,10 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
             assignments: Object.fromEntries(
                 Object.entries(c.roster.assignments).map(([slot, a]: [string, any]) => [
                     slot,
-                    a ? { name: a.name, isCandidate: a.is_candidate } : null,
+                    a ? {
+                        player_id:   a.player_id,
+                        isCandidate: a.is_candidate,
+                    } : null,
                 ]),
             ),
         } : undefined,
@@ -101,10 +128,12 @@ export async function fetchConfig(sport: string): Promise<SportConfig> {
 
 // ── POST /data/upload ─────────────────────────────────────────────────────────
 
-/** Uploads a projection CSV (export format auto-detected server-side) and returns its data_id. */
+/** Uploads a projection CSV (headers interpreted server-side) and returns its data_id.
+ *  missing_stats lists standard stat columns the file does not carry — a source that pairs
+ *  projections with a league only includes that league's active categories. */
 export async function uploadCsv(
     file: File
-): Promise<{ data_id: string; detected_format: string; n_players: number; expires_at: string }> {
+): Promise<{ data_id: string; n_players: number; expires_at: string; missing_stats: string[] }> {
     const form = new FormData()
     form.append('file', file)
     return jsonRequest(`${BASE_URL}/data/upload`, 'Upload', { method: 'POST', body: form })
@@ -118,19 +147,47 @@ export async function getSeasons(): Promise<string[]> {
     return data.seasons
 }
 
+// ── GET /players/pool-ids ─────────────────────────────────────────────────────
+
+/** Best-effort NBA id list for a data source's pool, for prefetching headshots while
+ *  the session builds. The backend answers only from already-cached frames — an empty
+ *  list means "not cheaply known yet" and the post-build registry sweep covers it. */
+export async function fetchPoolPlayerIds(
+    dataType: string
+    , season?: string | null
+): Promise<number[]> {
+    const seasonParam = season ? `&season=${encodeURIComponent(season)}` : ''
+    const data = await jsonRequest<{ player_ids: number[] }>(
+        `${BASE_URL}/players/pool-ids?data_type=${encodeURIComponent(dataType)}${seasonParam}`,
+        'Pool ids fetch',
+    )
+    return data.player_ids
+}
+
 // ── POST /sessions ─────────────────────────────────────────────────────────────
+
+/** Installs the payload's registry, then returns its id-keyed G-score rows. */
+function adoptRegistryAndGScores(body: any): PlayerGScore[] {
+    setPlayerRegistry(body.players)
+    return body.g_scores.map((entry: any) => ({
+        player_id: entry.player_id,
+        total:     entry.total,
+        values:    entry.values,
+    }))
+}
 
 /** Creates a new backend session, running the full 5-step pipeline. Returns session_id and resolved categories. */
 export async function createSession(
     req: SessionRequest
     , signal?: AbortSignal
 ): Promise<{ session_id: string; categories: string[]; g_scores: PlayerGScore[]; n_players_loaded: number; expires_at: string }> {
-    return jsonRequest(`${BASE_URL}/sessions`, 'Create session', {
+    const body: any = await jsonRequest(`${BASE_URL}/sessions`, 'Create session', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
         signal,
     })
+    return { ...body, g_scores: adoptRegistryAndGScores(body) }
 }
 
 // ── PATCH /sessions/{id} ──────────────────────────────────────────────────────
@@ -153,8 +210,8 @@ export async function patchSession(
 
 /** Fetches the current G-scores for a session directly from session state. */
 export async function fetchGScores(sessionId: string): Promise<PlayerGScore[]> {
-    const data = await jsonRequest<{ g_scores: PlayerGScore[] }>(`${BASE_URL}/sessions/${sessionId}/g-scores`, 'Fetch G-scores')
-    return data.g_scores
+    const data: any = await jsonRequest(`${BASE_URL}/sessions/${sessionId}/g-scores`, 'Fetch G-scores')
+    return adoptRegistryAndGScores(data)
 }
 
 // ── POST /sessions/{id}/evaluate ──────────────────────────────────────────────
@@ -163,9 +220,9 @@ export async function fetchGScores(sessionId: string): Promise<PlayerGScore[]> {
 export async function evaluate(
     sessionId: string
     , req: {
-        player_assignments: Record<string, string[]>
+        player_assignments: Record<string, number[]>
         my_team_id: string
-        exclusion_list?: string[]
+        exclusion_list?: number[]
         remaining_cash?: Record<string, number>
         candidate_offset?: number   // draft/waiver batching: slice start
         candidate_limit?: number    // draft/waiver batching: slice size (omit = whole pool)
@@ -202,11 +259,11 @@ export interface TradeAnalyzeResponse {
 export async function analyzeTrade(
     sessionId: string
     , req: {
-        player_assignments: Record<string, string[]>
+        player_assignments: Record<string, number[]>
         my_team: string
         their_team: string
-        my_trade: string[]
-        their_trade: string[]
+        my_trade: number[]
+        their_trade: number[]
         ignore_position_check?: boolean
     }
 ): Promise<TradeAnalyzeResponse> {
@@ -220,8 +277,8 @@ export async function analyzeTrade(
 // ── POST /sessions/{id}/trade/suggest ────────────────────────────────────────
 
 export interface TradeSuggestion {
-    send: string[]
-    receive: string[]
+    send: number[]
+    receive: number[]
     your_score: number
     their_score: number
 }
@@ -234,7 +291,7 @@ export interface TradeSuggestResponse {
 export async function suggestTrades(
     sessionId: string
     , req: {
-        player_assignments: Record<string, string[]>
+        player_assignments: Record<string, number[]>
         my_team: string
         their_team: string
         combo_params: { n_traded: number; n_received: number; threshold: number }[]
@@ -266,8 +323,8 @@ export interface PlatformConnectResponse {
 }
 
 export interface DraftStateResponse {
-    player_assignments: Record<string, string[]>
-    injured_players: string[]
+    player_assignments: Record<string, number[]>
+    injured_players: number[]
     status: string
     remaining_cash?: Record<string, number>   // Auction Mode only
 }

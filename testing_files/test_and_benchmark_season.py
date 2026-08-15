@@ -11,6 +11,8 @@ from benchmark_helpers import (
     client
     , _SCORE_TOL
     , _build_session_request
+    , resolve_player_assignments
+    , name_candidates
 )
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -226,7 +228,7 @@ def test_season_mode_waiver():
 
     waiver_result = rank_candidates(
         session            = session
-        , player_assignments = waiver_assignments
+        , player_assignments = resolve_player_assignments(session, waiver_assignments)
         , my_team_id         = 'Drafter 1'
         , exclusion_list     = []
         , remaining_cash     = None
@@ -239,12 +241,12 @@ def test_season_mode_waiver():
     assert h_scores == sorted(h_scores, reverse=True), 'Waiver candidates not sorted by H-score'
 
     expected_waiver_top = [
-        ('Guerschon Yabusele',         52.6),
-        ('Mark Williams',              52.5),
-        ('Keyonte George',             52.5),
-        ('Gary Trent',                 52.5),
+        ('Guerschon Yabusele',         52.5),
+        ('Mark Williams',              52.4),
+        ('Keyonte George',             52.3),
+        ('Gary Trent',                 52.3),
     ]
-    candidates_by_name = {c.name: c for c in candidates}
+    candidates_by_name = name_candidates(session, candidates)
     for expected_name, expected_score in expected_waiver_top:
         match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
         assert match is not None, f'{expected_name} not found in waiver candidates'

@@ -31,6 +31,17 @@
 export interface CustomSelectOption {
     value: string
     label: string
+    // Rich option rendering (e.g. player headshot + name via player_display builders).
+    // The label still drives filtering, the committed trigger text, and e2e text-based
+    // interactions; html only changes how the OPEN dropdown paints its rows. Keep any
+    // imgs lazy — a long filtered list renders in one pass.
+    html?: string
+}
+
+/** Lowercases and strips diacritics so filter text typed without accents still matches
+ *  accented labels (e.g. "jakuc" matches "Jakučionis"). */
+function foldTextForFilter(text: string): string {
+    return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 }
 
 export interface CustomSelect {
@@ -124,7 +135,15 @@ export function makeCustomSelect(
     arrow.className   = 'cs-arrow'
     arrow.textContent = '▾'
 
-    trigger.append(searchInput, arrow)
+    // Rich closed-state display: an <input> can only show text, so options that carry
+    // html (player headshot + styled positions) paint here, overlaid on the search
+    // input while the select is closed. pointer-events pass through to the input, the
+    // input's value still holds the label (DOM readers, copy, e2e), and opening the
+    // dropdown hides the overlay so typing behaves exactly as before.
+    const valueDisplay = document.createElement('div')
+    valueDisplay.className = 'cs-value-display'
+
+    trigger.append(searchInput, valueDisplay, arrow)
 
     // Dropdown panel
     const dropdown = document.createElement('div')
@@ -139,18 +158,39 @@ export function makeCustomSelect(
         return currentOptions.find(o => o.value === value)?.label ?? value
     }
 
+    /** Paints the rich value overlay: shown when the selected option carries html and
+     *  the input isn't holding typed filter text — so the closed trigger always mirrors
+     *  the selection, and the OPEN trigger keeps mirroring it (dimmed, placeholder-like,
+     *  see styles.css) until the user starts typing. Options without html fall back to
+     *  the plain input text as always. */
+    function refreshValueDisplay(): void {
+        const selectedOption = currentOptions.find(o => o.value === currentValue)
+        const showRichValue = selectedOption?.html !== undefined
+            && (dropdown.hidden || searchInput.value === '')
+        if (showRichValue) {
+            valueDisplay.innerHTML = selectedOption!.html!
+            valueDisplay.hidden = false
+            wrapper.classList.add('cs-rich-value')
+        } else {
+            valueDisplay.innerHTML = ''
+            valueDisplay.hidden = true
+            if (selectedOption?.html === undefined) wrapper.classList.remove('cs-rich-value')
+        }
+    }
+
     function commit(value: string, silent = false): void {
         currentValue       = value
         hiddenValueInput.value = value
         searchInput.value  = getLabelFor(value)
+        refreshValueDisplay()
         if (!silent) wrapper.dispatchEvent(new Event('change', { bubbles: true }))
     }
 
-    /** Returns the options that match the current search text (case-insensitive). */
+    /** Returns the options that match the current search text (case- and accent-insensitive). */
     function filteredOptions(): CustomSelectOption[] {
-        const filter = searchInput.value.toLowerCase()
-        if (!filter || filter === getLabelFor(currentValue).toLowerCase()) return currentOptions
-        return currentOptions.filter(o => o.label.toLowerCase().includes(filter))
+        const filter = foldTextForFilter(searchInput.value)
+        if (!filter || filter === foldTextForFilter(getLabelFor(currentValue))) return currentOptions
+        return currentOptions.filter(o => foldTextForFilter(o.label).includes(filter))
     }
 
     function renderDropdown(): void {
@@ -167,7 +207,8 @@ export function makeCustomSelect(
             const item = document.createElement('div')
             item.className = 'cs-option'
             if (opt.value === currentValue) item.classList.add('cs-option-selected')
-            item.textContent = opt.label
+            if (opt.html !== undefined) item.innerHTML = opt.html
+            else item.textContent = opt.label
             item.addEventListener('mousedown', e => {
                 e.preventDefault()   // prevent blur from firing before click
                 close()
@@ -179,10 +220,14 @@ export function makeCustomSelect(
 
     function open(): void {
         searchInput.value = ''
-        searchInput.placeholder = getLabelFor(currentValue)
+        // Rich selections keep their overlay as the "placeholder" while open (typing
+        // replaces it, see the input listener); plain ones use the text placeholder.
+        const selectedOption = currentOptions.find(o => o.value === currentValue)
+        searchInput.placeholder = selectedOption?.html !== undefined ? '' : getLabelFor(currentValue)
         renderDropdown()
         dropdown.hidden = false
         wrapper.classList.add('cs-open')
+        refreshValueDisplay()
     }
 
     function close(): void {
@@ -190,6 +235,7 @@ export function makeCustomSelect(
         wrapper.classList.remove('cs-open')
         searchInput.value       = getLabelFor(currentValue)
         searchInput.placeholder = ''
+        refreshValueDisplay()
         if (doubleClickToOpen) searchInput.readOnly = true
     }
 
@@ -223,6 +269,7 @@ export function makeCustomSelect(
 
     searchInput.addEventListener('input', () => {
         if (dropdown.hidden) open()
+        refreshValueDisplay()   // typed text replaces the rich overlay; clearing restores it
         renderDropdown()
     }, listenerOpts)
 

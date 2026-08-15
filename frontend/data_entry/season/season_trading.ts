@@ -8,7 +8,9 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../../helper_functions.js'
 import { readTeamNames, readRosterAssignments } from './season_helpers.js'
-import { getGScoreByName } from '../../app_state.js'
+import { getGScoreById } from '../../app_state.js'
+import { getRegistryEntry } from '../../player_registry.js'
+import { buildMinimalPlayerDisplayHtml, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
@@ -17,32 +19,53 @@ import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
 import { applyIndicatorState } from '../../api/session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
+// ─── Player id <-> multiselect value helpers ─────────────────────────────────
+
+/** Multiselect options for a roster: player ids as values, registry names as labels. */
+function buildPlayerOptions(playerIds: number[]): { value: string; label: string }[] {
+    return playerIds.map(playerId => ({
+        value: String(playerId),
+        label: buildPlayerOptionLabel(playerId),
+        html:  buildFullPlayerDisplayHtml(playerId),
+    }))
+}
+
+/** Parses multiselect values back to player ids. Throws on a non-numeric value — the
+ *  send/receive selectors only ever carry stringified ids. */
+function parseSelectedPlayerIds(values: string[]): number[] {
+    return values.map(value => {
+        const playerId = Number(value)
+        if (Number.isNaN(playerId)) throw new Error(`Trade multiselect carried a non-numeric value: "${value}"`)
+        return playerId
+    })
+}
+
 // ─── G-score comparison table ────────────────────────────────────────────────
 
 /** Builds a G-score comparison table for the selected send/receive players. */
-function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
+function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
     const container = document.createElement('div')
     container.className = 'trade-gscore-section'
 
-    const gScoreMap = getGScoreByName()
+    const gScoreMap = getGScoreById()
     const categories = getSelectedCategories()
 
     type Row = { label: string; total: number; values: number[] }
 
-    function getPlayerGRow(name: string): Row | null {
-        const gs = gScoreMap.get(name)
+    function getPlayerGRow(playerId: number): Row | null {
+        const gs = gScoreMap.get(playerId)
         if (!gs) return null
-        return { label: gs.name, total: gs.total, values: gs.values }
+        return { label: getRegistryEntry(playerId).name, total: gs.total, values: gs.values }
     }
 
     const sentRows:     Row[] = []
     const receivedRows: Row[] = []
-    for (const name of sent) {
-        const r = getPlayerGRow(name)
+    for (const playerId of sent) {
+        const r = getPlayerGRow(playerId)
         if (r) sentRows.push(r)
     }
-    for (const name of received) {
-        const r = getPlayerGRow(name)
+    for (const playerId of received) {
+        const r = getPlayerGRow(playerId)
         if (r) receivedRows.push(r)
     }
 
@@ -101,13 +124,13 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
         }
     }
 
-    for (let i = 0; i < sent.length; i++) {
-        if (sentRows[i]) addRow(sent[i], sentRows[i], 'trade-row-sent', true)
+    for (const row of sentRows) {
+        addRow(row.label, row, 'trade-row-sent', true)
     }
     addRow('Total Sent', sentTotal, 'trade-row-subtotal', false)
 
-    for (let i = 0; i < received.length; i++) {
-        if (receivedRows[i]) addRow(received[i], receivedRows[i], 'trade-row-received', true)
+    for (const row of receivedRows) {
+        addRow(row.label, row, 'trade-row-received', true)
     }
     addRow('Total Received', recvTotal, 'trade-row-subtotal', false)
 
@@ -122,11 +145,11 @@ function buildGScoreTable(sent: string[], received: string[]): HTMLElement {
 /** Builds the H-score trade result display with pre/post comparison for both teams. */
 function buildHScoreResult(
     pane: HTMLElement
-    , assignments: Record<string, string[]>
+    , assignments: Record<string, number[]>
     , yourTeam: string
     , theirTeam: string
-    , sent: string[]
-    , received: string[]
+    , sent: number[]
+    , received: number[]
 ): void {
     pane.innerHTML = ''
 
@@ -294,7 +317,7 @@ function refreshSuggestionDisplay(
 function fetchMissingCombos(
     resultsArea: HTMLElement
     , comboSel: MultiSelectWidget
-    , assignments: Record<string, string[]>
+    , assignments: Record<string, number[]>
     , yourTeam: string
     , theirTeam: string
     , pendingFetches: Set<string>
@@ -365,11 +388,13 @@ function buildSuggestionTable(
         tr.style.cursor = 'pointer'
 
         const sendCell = tr.insertCell()
-        sendCell.textContent = sug.send.join(', ')
+        sendCell.className = 'trade-suggestion-players'
+        sendCell.innerHTML = sug.send.map(buildMinimalPlayerDisplayHtml).join('')
         sendCell.style.textAlign = 'left'
 
         const recvCell = tr.insertCell()
-        recvCell.textContent = sug.receive.join(', ')
+        recvCell.className = 'trade-suggestion-players'
+        recvCell.innerHTML = sug.receive.map(buildMinimalPlayerDisplayHtml).join('')
         recvCell.style.textAlign = 'left'
 
         const yourCell = tr.insertCell()
@@ -384,8 +409,8 @@ function buildSuggestionTable(
         // Both are set silently to avoid two separate updateResults() calls
         // (which would fire a stale API request on the first onChange).
         tr.addEventListener('click', () => {
-            sendSel.setSelectedSilently(sug.send)
-            receiveSel.setSelectedSilently(sug.receive)
+            sendSel.setSelectedSilently(sug.send.map(String))
+            receiveSel.setSelectedSilently(sug.receive.map(String))
             onTradeSelected()
         })
     }
@@ -505,7 +530,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
     comboSizeLabel.textContent = 'Trade sizes'
 
     const comboOptions = DEFAULT_COMBOS.map(cp => `${cp.n_traded} for ${cp.n_received}`)
-    const comboSel = makeMultiSelectWidget('', comboOptions)
+    const comboSel = makeMultiSelectWidget('', comboOptions.map(combo => ({ value: combo, label: combo })))
     comboSel.element.classList.add('trade-combo-select')
     comboSel.setSelected([comboOptions[0]])
 
@@ -604,8 +629,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
         const leftCol = document.createElement('div')
         leftCol.className = 'trade-left-col'
 
-        const sendSel    = makeMultiSelectWidget('Which players are you trading?',   yourPlayers)
-        const receiveSel = makeMultiSelectWidget('Which players are you receiving?', theirPlayers)
+        const sendSel    = makeMultiSelectWidget('Which players are you trading?',   buildPlayerOptions(yourPlayers))
+        const receiveSel = makeMultiSelectWidget('Which players are you receiving?', buildPlayerOptions(theirPlayers))
         currentSendSel = sendSel
         currentReceiveSel = receiveSel
 
@@ -655,8 +680,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
             hPane.innerHTML = ''
             gPane.innerHTML = ''
 
-            const sent     = sendSel.getSelected()
-            const received = receiveSel.getSelected()
+            const sent     = parseSelectedPlayerIds(sendSel.getSelected())
+            const received = parseSelectedPlayerIds(receiveSel.getSelected())
 
             if (sent.length === 0 || received.length === 0) {
                 const msg = document.createElement('p')

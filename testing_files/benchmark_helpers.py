@@ -1,7 +1,12 @@
 # testing_files/benchmark_helpers.py
 # Shared constants, client, and session-request builder used across all benchmark files.
 
+import datetime
+import json
 import os
+import subprocess
+from pathlib import Path
+
 import yaml
 from fastapi.testclient import TestClient
 
@@ -10,6 +15,35 @@ from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
 client = TestClient(app)
+
+# Append-only local benchmark history (gitignored): every [benchmark] measurement lands here
+# with its commit, so "did this get faster or slower?" is answerable from data instead of
+# memory. One JSON object per line: {timestamp, commit, label, seconds}.
+_BENCHMARK_HISTORY_PATH = Path(__file__).parent / 'benchmark_history.jsonl'
+_current_commit_cache: str | None = None
+
+
+def _current_commit() -> str:
+    global _current_commit_cache
+    if _current_commit_cache is None:
+        _current_commit_cache = subprocess.run(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            capture_output=True, text=True, cwd=Path(__file__).parent,
+        ).stdout.strip() or 'unknown'
+    return _current_commit_cache
+
+
+def record_benchmark(label: str, seconds: float) -> None:
+    """Print a [benchmark] line AND append it to the local benchmark history."""
+    print(f'\n[benchmark] {label}: {seconds:.2f}s')
+    entry = {
+        'timestamp': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'commit':    _current_commit(),
+        'label':     label,
+        'seconds':   round(seconds, 3),
+    }
+    with open(_BENCHMARK_HISTORY_PATH, 'a', encoding='utf-8') as history_file:
+        history_file.write(json.dumps(entry) + '\n')
 
 _PARAMS_PATH = 'parameters.yaml'
 _SEASON      = '2024-25'
@@ -87,10 +121,49 @@ def _build_session_request(
     }
 
 
-def check_top_scores(label, expected_top_scores, candidates):
+def resolve_player_ids(session, player_names):
+    """Resolve human-readable test-fixture names to the session's player ids.
+
+    Accepts bare names, 'Name (POS)' labels, or prefixes (mirroring check_top_scores'
+    startswith semantics). Raises on no match or ambiguity — a fixture that silently
+    resolved to the wrong player would corrupt the test, so fail loudly instead.
+    """
+    registry = session.player_registry
+    resolved = []
+    for player_name in player_names:
+        bare_name = player_name.split(' (')[0]
+        matches = [identity.player_id for identity in registry.values()
+                   if identity.name == bare_name]
+        if not matches:
+            matches = [identity.player_id for identity in registry.values()
+                       if identity.name.startswith(bare_name)]
+        if len(matches) != 1:
+            raise ValueError(
+                f'{player_name!r} resolved to {len(matches)} registry entries: {matches}')
+        resolved.append(matches[0])
+    return resolved
+
+
+def resolve_player_assignments(session, player_assignments_by_name):
+    """resolve_player_ids over a whole {team: [name, ...]} board."""
+    return {
+        team: resolve_player_ids(session, names)
+        for team, names in player_assignments_by_name.items()
+    }
+
+
+def name_candidates(session, candidates):
+    """{registry display name: candidate} over an evaluate result — the human-readable view
+    of the id-keyed candidate payload for fixture matching."""
+    registry = session.player_registry
+    return {registry[c.player_id].name: c for c in candidates}
+
+
+def check_top_scores(session, label, expected_top_scores, candidates):
     """Assert each expected player's H-score is within _SCORE_TOL of its golden. With REGEN_GOLDENS set,
-    print the actuals in paste-ready form and skip the assertions instead (golden regeneration)."""
-    by_name  = {c.name: c for c in candidates}
+    print the actuals in paste-ready form and skip the assertions instead (golden regeneration).
+    Expected names are prefixes of registry display names."""
+    by_name  = name_candidates(session, candidates)
     resolved = []
     for expected_name, expected_score in expected_top_scores:
         match = next((n for n in by_name if n.startswith(expected_name)), None)

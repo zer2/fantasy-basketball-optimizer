@@ -52,7 +52,7 @@ export function renderFormatAndCategories(container: HTMLElement): void {
 
     _selectedCategories = renderMultiselect(
         container,
-        allCategories,
+        allCategories.map(category => ({ value: category, label: category })),
         initialCategories,
     )
 

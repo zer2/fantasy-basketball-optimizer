@@ -168,6 +168,37 @@ export async function readDropdownOptionLabels(page, wrapperTestId) {
     return labels
 }
 
+/** Opens a player select's dropdown and reads each rich option's bare player name — the
+ *  .playername text without the trailing positions span — then closes it again. */
+export async function readDropdownPlayerNames(page, wrapperTestId) {
+    const wrap = page.locator(`[data-testid="${wrapperTestId}"]`).first()
+    await openSelectDropdown(page, wrap)
+    const names = await wrap.locator('.cs-dropdown').evaluate(dropdown =>
+        [...dropdown.querySelectorAll('.cs-option .playername')]
+            .map(span => span.childNodes[0].textContent.trim()))
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(150)
+    return names
+}
+
+/** Full names of the players on the draft/auction board. Board cells render the minimal
+ *  display (headshot + last name); the stack's title tooltip carries the full name. */
+export function readBoardPlayerNames(page) {
+    return page.evaluate(() =>
+        [...document.querySelectorAll('.entry-table td .roster-player-stack')]
+            .map(stack => stack.title))
+}
+
+/** Count of board cells holding the given player, matched on the stack's full-name tooltip. */
+export function countBoardCellsWithPlayer(page, fullName) {
+    return page.locator(`.entry-table td .roster-player-stack[title="${fullName}"]`).count()
+}
+
+/** Total players on the board (occupied cells across all teams). */
+export function countBoardPlayers(page) {
+    return page.locator('.entry-table td .roster-player-stack').count()
+}
+
 /** The draft/auction pick-control button with the given label ("Lock in selection", etc.). */
 export function pickControlButton(page, label) {
     return page.locator('.pick-control-row .pick-btn', { hasText: label })

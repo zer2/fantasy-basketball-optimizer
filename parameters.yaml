@@ -126,47 +126,77 @@ NBA:
     C : C
     G : PG,SG
     F : PF,SF
-  bbm-renamer:
-    Name : Player
+  # Header aliases for uploaded projection files: every spelling a source might use for a
+  # stat, mapped to this codebase's canonical name. There is no notion of a "supported
+  # export format" — a file is interpreted column by column, so any export is readable as
+  # long as its headers appear below. Matching ignores case and surrounding whitespace, so
+  # one entry covers PTS / pts / Pts. Canonical names (the right-hand side) are always
+  # understood, so a file already written in them needs no aliases at all. Unrecognized
+  # columns are dropped, and stats a file simply lacks stay absent (sources that pair
+  # projections with a league export only that league's categories). To teach the parser a
+  # new source, add its spellings here — nothing else needs to change.
+  projection-column-aliases:
+    # ── Identity ──
+    name : Player
+    player : Player
+    player name : Player
+    pos : Position
+    position : Position
+    # ── Games ──
     g : Games Played
+    gp : Games Played
     games : Games Played
+    games played : Games Played
+    # ── Counting stats ──
     p/g : Points
+    pts : Points
+    ppg : Points
+    points : Points
     r/g : Rebounds
+    reb : Rebounds
+    treb : Rebounds
+    trb : Rebounds
+    rpg : Rebounds
+    rebounds : Rebounds
     dr/g : Def Rebounds
+    dreb : Def Rebounds
     or/g : Off Rebounds
+    oreb : Off Rebounds
     a/g : Assists
+    ast : Assists
+    apg : Assists
+    assists : Assists
     s/g : Steals
-    3/g : Threes
+    stl : Steals
+    spg : Steals
+    steals : Steals
     b/g : Blocks
+    blk : Blocks
+    bpg : Blocks
+    blocks : Blocks
     to/g : Turnovers
-    fta/g: Free Throw Attempts
-    ft% : Free Throw %
-    fga/g: Field Goal Attempts
-    fg%: Field Goal %
-    3% : Three %
-    3a/g: Three Attempts
+    to : Turnovers
+    tov : Turnovers
+    turnovers : Turnovers
+    3/g : Threes
+    3pm : Threes
+    threes : Threes
     2d/g : Double Doubles
-    Pos : Position
-  htb-renamer:
-    PLAYER : Player
-    GP : Games Played
-    PTS : Points
-    TREB : Rebounds
-    OREB: Off Rebounds
-    DREB: Def Rebounds
-    AST : Assists
-    STL : Steals
-    3PM : Threes
-    BLK : Blocks
-    TO : Turnovers
-    FTA : Free Throw Attempts
-    FT% : Free Throw %
-    FGA : Field Goal Attempts
-    FG% : Field Goal %
-    3P% : Three %
-    3PA : Three Attempts
-    DD: Double Doubles
-    POS : Position
+    dd : Double Doubles
+    # ── Ratio stats and the volumes they are weighted by ──
+    fg% : Field Goal %
+    fg pct : Field Goal %
+    fga/g : Field Goal Attempts
+    fga : Field Goal Attempts
+    ft% : Free Throw %
+    ft pct : Free Throw %
+    fta/g : Free Throw Attempts
+    fta : Free Throw Attempts
+    3% : Three %
+    3p% : Three %
+    3pt% : Three %
+    3a/g : Three Attempts
+    3pa : Three Attempts
   espn-renamer:
     ESPN_NAME : Player
     GAMES_PLAYED : Games Played
@@ -791,7 +821,8 @@ MLB:
     PITCHING_WALKS_AND_HITS : Pitching WH
     BATTING_WALKS_AND_HITS : Batting WH 
     EFFECTIVE_AT_BATS: Effective At Bats
-  htb-renamer: 
+  # Header aliases for uploaded projection files — see the NBA block for how they are used.
+  projection-column-aliases:
     GP : Games Played
     R : Runs
     H : Hits

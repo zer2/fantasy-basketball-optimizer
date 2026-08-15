@@ -291,7 +291,8 @@ class HAgent:
             # A player's positional baseline is the average of the position means over ALL of their
             # eligible positions (e.g. a PF/C uses the mean of the PF and C means, not just PF). reindex
             # then mean(axis=0) skips any listed position absent from position_means_df.
-            rel_players = [p for p in x_scores.index if p != 'RP']
+            from backend.player_identity import RP_PLAYER_ID
+            rel_players = [p for p in x_scores.index if p != RP_PLAYER_ID]
             self.pos_avg = pd.DataFrame(
                 [position_means_df.reindex(self.positions.get(p)).mean(axis=0)
                 for p in rel_players],
@@ -567,7 +568,7 @@ class HAgent:
         # diff_means/diff_vars/sigma_2_m broadcast against the candidate batch. With opponent modelling on,
         # diff_means is candidate-DEPENDENT (N, n_cat, n_drafters-1) for candidates that are themselves a
         # seated anchor — self-exclusion swaps their own team out of the field (see get_diff_distributions).
-        diff_means, diff_vars, sigma_2_m = self.get_diff_distributions(
+        diff_means, diff_vars, sigma_2_m, opponent_future_tilts = self.get_diff_distributions(
             player_assignments, drafter, x_scores_available, cash_remaining_per_team,
             candidate_batch=list(x_scores_batch.index),
         )
@@ -781,6 +782,7 @@ class HAgent:
             n_iterations,
             candidate_priority,
             candidate_offset,
+            opponent_future_tilts=opponent_future_tilts,
         )
 
         # NOTE: evaluates deliberately write NOTHING to _team_states. The store is a pure function of
@@ -841,7 +843,10 @@ class HAgent:
             field_copies    = len(field_snapshots)
 
             def seat_diff(team, anchor_map, committed_diffs, anchor_override=None):
-                """Auction diff (1, n_cat, 1) of the drafter vs one opponent seat, punt tilt included.
+                """Auction diff of the drafter vs one opponent seat, punt tilt included. Returns
+                (column, tilt): the (1, n_cat, 1) diff and the seat's expected-future-tilt vector
+                (n_cat,), tracked separately so the display can attribute it to the future
+                differential (zeros when the seat has no modelled tilt).
                 anchor_map/committed_diffs carry one field snapshot's seat predictions and tilts;
                 anchor_override forces the spare anchor (self-exclusion's whole-seat swap)."""
                 roster = [p for p in player_assignments[team] if p == p]
@@ -878,7 +883,8 @@ class HAgent:
                     # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
                     tilt = (self.n_picks - roster_len) * self.behavior_model_confidence * mu_edge
                     base = base - tilt.reshape(1, self.n_categories, 1)
-                return base
+                    return base, np.asarray(tilt).reshape(self.n_categories)
+                return base, np.zeros(self.n_categories)
 
             # On an all-empty board every seat is the same formula over a different (anchor, tilt) row,
             # so a snapshot's whole block batches into a few array operations instead of a Python call
@@ -891,7 +897,7 @@ class HAgent:
             seat_cash_diffs = np.array([drafter_cash - cash_remaining_per_team[team]
                                         for team in opponent_teams])
 
-            field_blocks, snapshot_exclusions = [], []
+            field_blocks, tilt_blocks, snapshot_exclusions = [], [], []
             for snapshot in field_snapshots:
                 committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
                 anchor_order    = (None if snapshot is None else snapshot[1])
@@ -921,21 +927,32 @@ class HAgent:
                     tilt              = (self.n_picks - 1) * self.behavior_model_confidence * anchor_tilts
                     columns           = score_diff - player_diff_total + money_diff_total - tilt
                     field_blocks.append(columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
+                    tilt_blocks.append(tilt[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
                     spare_column = columns[len(anchors)] if batch_spare else None
+                    spare_tilt   = tilt[len(anchors)] if batch_spare else None
                 else:
-                    field_blocks.append(np.concatenate(
-                        [seat_diff(team, empty_seat_anchor, committed_diffs) for team in opponent_teams],
-                        axis=2))
+                    seat_results = [seat_diff(team, empty_seat_anchor, committed_diffs)
+                                    for team in opponent_teams]
+                    field_blocks.append(np.concatenate([column for column, _ in seat_results], axis=2))
+                    tilt_blocks.append(np.stack([seat_tilt for _, seat_tilt in seat_results], axis=1)
+                                       .reshape(1, self.n_categories, len(seat_results)))
                     spare_column = None   # computed lazily via seat_diff in the exclusion loop
-                snapshot_exclusions.append((empty_seat_anchor, spare_anchor, committed_diffs, spare_column))
+                    spare_tilt   = None
+                snapshot_exclusions.append((empty_seat_anchor, spare_anchor, committed_diffs,
+                                            spare_column, spare_tilt))
             diff_means = np.concatenate(field_blocks, axis=2)                     # (1, n_cat, n_teams*K)
+            # Each opponent column's expected-future-tilt vector, tracked in lockstep with
+            # diff_means (which carries it with opposite sign) so the display can attribute
+            # it to the future differential. Zeros with the opponent model off.
+            opponent_tilt_columns = np.concatenate(tilt_blocks, axis=2)           # (1, n_cat, n_teams*K)
 
             # Self-exclusion: a candidate that is itself an empty seat's predicted first buy is not scored
             # against a copy of itself -- rebuild that seat with the spare anchor (whole seat: stats, cost,
             # tilt). Makes the returned diff_means candidate-dependent (N, n_cat, n_opp). Applied per
             # snapshot block — each snapshot has its own seat map, spare anchor, and tilt table.
             if model_opponents and candidate_batch is not None:
-                for snapshot_index, (empty_seat_anchor, spare_anchor, committed_diffs, spare_column) \
+                for snapshot_index, (empty_seat_anchor, spare_anchor, committed_diffs,
+                                     spare_column, spare_tilt) \
                         in enumerate(snapshot_exclusions):
                     if spare_anchor is None or not empty_seat_anchor:
                         continue
@@ -947,18 +964,24 @@ class HAgent:
                         continue
                     if diff_means.shape[0] == 1:
                         diff_means = np.repeat(diff_means, len(candidate_batch), axis=0)  # (N, n_cat, n_opp)
+                        opponent_tilt_columns = np.repeat(opponent_tilt_columns, len(candidate_batch), axis=0)
                     slot_offset = snapshot_index * len(opponent_teams)
                     spare_seat_by_team = {}
                     for candidate_index, team in affected.items():
                         if team not in spare_seat_by_team:
                             # Fast path precomputed the spare column (seat-independent when every
                             # empty seat shares one cash diff); otherwise compute it per seat.
-                            spare_seat_by_team[team] = (
-                                spare_column if spare_column is not None
-                                else seat_diff(team, empty_seat_anchor, committed_diffs,
-                                               anchor_override=spare_anchor)[0, :, 0])
+                            if spare_column is not None:
+                                spare_seat_by_team[team] = (spare_column, spare_tilt)
+                            else:
+                                spare_base, spare_seat_tilt = seat_diff(
+                                    team, empty_seat_anchor, committed_diffs,
+                                    anchor_override=spare_anchor)
+                                spare_seat_by_team[team] = (spare_base[0, :, 0], spare_seat_tilt)
                         slot = anchor_to_slot[candidate_batch[candidate_index]] + slot_offset
-                        diff_means[candidate_index, :, slot] = spare_seat_by_team[team]
+                        column_values, column_tilt = spare_seat_by_team[team]
+                        diff_means[candidate_index, :, slot] = column_values
+                        opponent_tilt_columns[candidate_index, :, slot] = column_tilt
 
         else:
             # While the roster still has room a candidate is being added, so the drafter's team grows to
@@ -991,7 +1014,7 @@ class HAgent:
                 all_seats_empty = all(not any(p == p for p in player_assignments[team])
                                       for team in opponent_teams)
                 mean_extra_array = np.asarray(mean_extra)
-                field_blocks, snapshot_exclusions = [], []
+                field_blocks, tilt_blocks, snapshot_exclusions = [], [], []
                 for snapshot in field_snapshots:
                     committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
                     anchor_order    = (None if snapshot is None else snapshot[1])
@@ -1008,27 +1031,37 @@ class HAgent:
                         tilt         = ((self.n_picks - 1) * self.behavior_model_confidence) * anchor_tilts
                         totals_rows  = (anchor_stats + extra_sum) + tilt
                         field_blocks.append(totals_rows.T.reshape(1, self.n_categories, len(anchors)))
+                        tilt_blocks.append(tilt.T.reshape(1, self.n_categories, len(anchors)))
                         if spare_anchor is not None:
+                            spare_tilt  = (((self.n_picks - 1) * self.behavior_model_confidence)
+                                           * committed_diffs.loc[spare_anchor].to_numpy())
                             spare_total = ((self.x_scores.loc[[spare_anchor]].sum(axis=0).to_numpy()
                                             + extra_sum.reshape(-1))
-                                           + ((self.n_picks - 1) * self.behavior_model_confidence)
-                                           * committed_diffs.loc[spare_anchor].to_numpy()
+                                           + spare_tilt
                                            ).reshape(1, self.n_categories, 1)
                         else:
                             spare_total = None
+                            spare_tilt  = None
                     else:
-                        totals, empty_slot_player, spare_total = self.compute_opponent_totals(
-                            player_assignments, drafter, mean_extra, target_team_size, field_snapshot=snapshot
-                        )
+                        totals, seat_tilts, empty_slot_player, spare_total, spare_tilt = \
+                            self.compute_opponent_totals(
+                                player_assignments, drafter, mean_extra, target_team_size,
+                                field_snapshot=snapshot)
                         field_blocks.append(np.concatenate([totals[team] for team in opponent_teams], axis=2))
-                    snapshot_exclusions.append((empty_slot_player, spare_total))
+                        tilt_blocks.append(np.stack([seat_tilts[team] for team in opponent_teams], axis=1)
+                                           .reshape(1, self.n_categories, len(opponent_teams)))
+                    snapshot_exclusions.append((empty_slot_player, spare_total, spare_tilt))
                 other_team_sums = np.concatenate(field_blocks, axis=2)                # (1, n_cat, n_teams*K)
+                # Each opponent column's expected-future-tilt vector, in lockstep with the totals
+                # (which carry it additively, so diff_means below carries it with opposite sign).
+                opponent_tilt_columns = np.concatenate(tilt_blocks, axis=2)           # (1, n_cat, n_teams*K)
             else:
-                snapshot_exclusions = [({}, None)]
+                snapshot_exclusions = [({}, None, None)]
                 other_team_sums = np.concatenate([
                     self.get_opposing_team_means(player_assignments[team], mean_extra, target_team_size)
                     for team in opponent_teams
                 ], axis=2)                                                            # (1, n_cat, n_opp)
+                opponent_tilt_columns = np.zeros_like(other_team_sums)
             diff_means = x_self_sum.reshape(1, self.n_categories, 1) - other_team_sums  # (1, n_cat, n_opp)
 
             # Self-exclusion: when the candidate being scored is itself one of the predicted opponent teams,
@@ -1036,7 +1069,8 @@ class HAgent:
             # itself. This makes diff_means candidate-dependent (N, n_cat, n_opp) for the affected
             # candidates. Applied per snapshot block — each snapshot has its own seat map and spare.
             if candidate_batch is not None:
-                for snapshot_index, (empty_slot_player, spare_total) in enumerate(snapshot_exclusions):
+                for snapshot_index, (empty_slot_player, spare_total, spare_tilt) \
+                        in enumerate(snapshot_exclusions):
                     if spare_total is None or not empty_slot_player:
                         continue
                     slot_offset = snapshot_index * len(opponent_teams)
@@ -1050,8 +1084,10 @@ class HAgent:
                                     - spare_total.reshape(self.n_categories))
                     if diff_means.shape[0] == 1:
                         diff_means = np.repeat(diff_means, len(candidate_batch), axis=0)  # (N, n_cat, n_opp)
+                        opponent_tilt_columns = np.repeat(opponent_tilt_columns, len(candidate_batch), axis=0)
                     for candidate_index, slot in affected.items():
                         diff_means[candidate_index, :, slot] = spare_column
+                        opponent_tilt_columns[candidate_index, :, slot] = spare_tilt
 
         diff_vars = np.vstack([
             self.get_diff_var(len([p for p in player_assignments[team] if p == p]))
@@ -1071,7 +1107,13 @@ class HAgent:
             diff_vars = np.tile(diff_vars, (1, field_copies))
         diff_vars = diff_vars.reshape(1, self.n_categories, -1)
 
-        return diff_means, diff_vars, sigma_2_m
+        # Mean expected future tilt of the field, aligned to diff_means' candidate rows (self-exclusion
+        # swaps affect both identically). diff_means carries this with opposite sign, so the display's
+        # 'Current diff' (= Diff - Future-Diff) sheds it once 'Future-Diff' subtracts it — a pure
+        # reattribution between rows; the objective sums both terms and is untouched.
+        opponent_future_tilts = opponent_tilt_columns.mean(axis=2)               # (1|N, n_cat)
+
+        return diff_means, diff_vars, sigma_2_m, opponent_future_tilts
 
     def compute_h_score_from_diff_means(self
                                          , diff_means: np.ndarray
@@ -1175,8 +1217,11 @@ class HAgent:
         committed future. Pricing X's real stats in now means that when the seat actually drafts X the field
         does not move.
 
-        Returns (totals, empty_slot_player, spare_total). empty_slot_player maps each empty seat to its
-        predicted player; spare_total is the next predicted team, swapped in for self-exclusion when the
+        Returns (totals, seat_tilts, empty_slot_player, spare_total, spare_tilt). seat_tilts maps each
+        opponent to its expected-future-tilt vector (n_cat; zeros when untilted) — the tilt is inside
+        totals additively, and the display attributes it to the future differential, so it is also
+        exposed separately. empty_slot_player maps each empty seat to its predicted player;
+        spare_total/spare_tilt are the next predicted team's, swapped in for self-exclusion when the
         candidate being scored is itself one of those predicted players (so nobody drafts a copy of it).
         field_snapshot = (committed_future_diffs, anchor_player_order) reads one windowed-bootstrap
         snapshot's field instead of the agent's committed one (None outside the windowed bootstrap)."""
@@ -1190,31 +1235,33 @@ class HAgent:
         def team_total(roster, mu_edge):
             base = self.get_opposing_team_means(roster, mean_extra, target_team_size)
             if mu_edge is None:
-                return base
+                return base, np.zeros(self.n_categories)
             picks_left = self.n_picks - len([p for p in roster if p == p])
             # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
             tilt = picks_left * self.behavior_model_confidence * mu_edge
-            return base + tilt.reshape(1, self.n_categories, 1)
+            return base + tilt.reshape(1, self.n_categories, 1), np.asarray(tilt).reshape(self.n_categories)
 
-        totals = {}
+        totals, seat_tilts = {}, {}
         for team in player_assignments:
             if team == drafter:
                 continue
             roster = [p for p in player_assignments[team] if p == p]
             if len(roster) >= self.n_picks:
-                totals[team] = team_total(roster, None)
+                totals[team], seat_tilts[team] = team_total(roster, None)
             elif roster:
                 state = self._team_states.get(team)
-                totals[team] = team_total(roster, None if state is None else state['mu_edge'])
+                totals[team], seat_tilts[team] = team_total(roster, None if state is None else state['mu_edge'])
             elif team in empty_seat_anchor:
                 predicted = empty_seat_anchor[team]
-                totals[team] = team_total([predicted], committed_future_diffs.loc[predicted].to_numpy())
+                totals[team], seat_tilts[team] = team_total([predicted],
+                                                            committed_future_diffs.loc[predicted].to_numpy())
             else:
-                totals[team] = team_total(roster, None)   # no prediction left: neutral padding
+                totals[team], seat_tilts[team] = team_total(roster, None)   # no prediction left: neutral padding
 
-        spare_total = (None if spare_anchor is None
-                       else team_total([spare_anchor], committed_future_diffs.loc[spare_anchor].to_numpy()))
-        return totals, empty_seat_anchor, spare_total
+        spare_total, spare_tilt = ((None, None) if spare_anchor is None
+                                   else team_total([spare_anchor],
+                                                   committed_future_diffs.loc[spare_anchor].to_numpy()))
+        return totals, seat_tilts, empty_seat_anchor, spare_total, spare_tilt
 
     def refresh_stale_team_states(self, player_assignments, drafter, cash_remaining_per_team=None):
         """Bring EVERY seat whose stored build no longer matches its roster up to date — including the
@@ -1420,7 +1467,8 @@ class HAgent:
                            , sigma_2_m
                            , n_iterations
                            , candidate_priority=None
-                           , candidate_offset=0):
+                           , candidate_offset=0
+                           , opponent_future_tilts=None):
 
         # Stale correction terms must never leak across boards or candidate batches.
         self._correction_cache = None
@@ -1669,10 +1717,21 @@ class HAgent:
             # to one row per candidate player, matching cdf_means' leading dimension.
             expected_diff_means = np.broadcast_to(diff_means.mean(axis=2), cdf_means.shape)
 
+        # 'Future-Diff' stays the drafter's RAW projected future tilt: the opponent model
+        # feeds on it (committed per-player builds, mu_edge inference), so it must not be
+        # netted here. The opponents' expected future tilts ride along as their own entry;
+        # the DISPLAY subtracts them from the future row (see _build_g_score_rows) so the
+        # expand view's 'Current diff' sheds behaviour that hasn't happened yet.
         future_diff_df = (
             pd.DataFrame(expected_future_diff.mean(axis=2),
                          index=result_index, columns=self.x_scores.columns)
             if expected_future_diff is not None else None
+        )
+        opponent_future_tilt_df = (
+            pd.DataFrame(np.broadcast_to(opponent_future_tilts,
+                                         (len(result_index), self.n_categories)),
+                         index=result_index, columns=self.x_scores.columns)
+            if expected_future_diff is not None and opponent_future_tilts is not None else None
         )
 
         return {
@@ -1685,6 +1744,7 @@ class HAgent:
                                      columns=self.x_scores.columns)
                         if expected_diff_means is not None else None),
             'Future-Diff': future_diff_df,
+            'Opponent-Future-Tilt': opponent_future_tilt_df,
             'Rosters': pd.DataFrame(rosters, index=result_index) if rosters is not None else
                        pd.DataFrame(np.zeros((len(result_index), 1)) - 1, index=result_index),
             'Position-Shares': (

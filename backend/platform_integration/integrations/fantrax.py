@@ -8,9 +8,12 @@ Streamlit code did); see the spec for the public-method fallback if it breaks.
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from fantraxapi import FantraxAPI
+
+logger = logging.getLogger('fbbo')
 
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
@@ -116,28 +119,36 @@ class FantraxIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
-        """Read each team's current roster, mapping each player's Fantrax scorer id to
-        canonical via name_lookup ('RP' for any player missing from it). In Season Mode,
-        players flagged injured-reserve are moved to injured_players instead of the roster."""
+        """Read each team's current roster, mapping each player's Fantrax scorer id to a
+        session player id (RP_PLAYER_ID for any player missing from the lookup, counted
+        and logged — a whole-roster fallback means the mapping is broken, not the roster).
+        In Season Mode, players flagged injured-reserve are moved to injured_players
+        instead of the roster."""
+        from backend.player_identity import RP_PLAYER_ID
+
         api = self._make_api(config.league_id)
         exclude_injured = mode == 'Season Mode'
-        injured_players: list[str] = []
+        injured_players: list[int] = []
+        unmatched_count = 0
 
-        player_assignments: dict[str, list[str]] = {}
+        player_assignments: dict[str, list[int]] = {}
         for team_name, team_id in config.teams_dict.items():
-            roster: list[str] = []
+            roster: list[int] = []
             for row in self._fetch_team_roster_rows(api, team_id):
                 if 'scorer' not in row:
                     continue
-                player = name_lookup.get(row['scorer']['scorerId'], 'RP')
+                player_id = player_id_lookup.get(row['scorer']['scorerId'], RP_PLAYER_ID)
+                unmatched_count += player_id == RP_PLAYER_ID
                 if exclude_injured and row['statusId'] == _INJURED_RESERVE_STATUS_ID:
-                    injured_players.append(player)
+                    injured_players.append(player_id)
                 else:
-                    roster.append(player)
+                    roster.append(player_id)
             player_assignments[team_name] = roster
 
+        if unmatched_count:
+            logger.warning('Fantrax roster mapping: %d player(s) fell back to RP', unmatched_count)
         return PlatformSelections(
             player_assignments = player_assignments,
             status             = 'Success',
@@ -148,7 +159,7 @@ class FantraxIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , name_lookup: dict[str, str]
+        , player_id_lookup: dict[str, int]
     ) -> Optional[PlatformSelections]:
         """Fantrax has no auction support, so this always returns None (matches Streamlit)."""
         return None

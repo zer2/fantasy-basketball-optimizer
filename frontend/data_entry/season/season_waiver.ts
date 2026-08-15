@@ -7,32 +7,34 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readTeamNames, readRosterAssignments } from './season_helpers.js'
-import { getPlayerResultsByName } from '../../app_state.js'
+import { getPlayerResultsById } from '../../app_state.js'
+import { getRegistryEntry } from '../../player_registry.js'
+import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
 import { highlightCandidate } from '../../table/player_table.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Returns the name of the player with the highest g_rank (worst) among the given names.
- *  Returns null if none of the names are found in the backend player data. */
-function lowestGRankPlayer(playerNames: string[]): string | null {
-    const byName = getPlayerResultsByName()
-    let worst: string | null = null
+/** Returns the id of the player with the highest g_rank (worst) among the given ids.
+ *  Returns null if none of the ids are found in the backend player data. */
+function lowestGRankPlayer(playerIds: number[]): number | null {
+    const byId = getPlayerResultsById()
+    let worst: number | null = null
     let worstRank = -Infinity
-    for (const name of playerNames) {
-        const p = byName.get(name)
+    for (const playerId of playerIds) {
+        const p = byId.get(playerId)
         if (p && p.g_rank > worstRank) {
             worstRank = p.g_rank
-            worst = name
+            worst = playerId
         }
     }
     return worst
 }
 
 /** Marks the dropped player's row in the candidate table (virtualization-aware: the candidate may be
- *  outside the current render window, so the mark is tracked by name and applied when its row renders). */
-function highlightDropPlayer(dropPlayer: string): void {
-    highlightCandidate(dropPlayer)
+ *  outside the current render window, so the mark is tracked by id and applied when its row renders). */
+function highlightDropPlayer(dropPlayerId: number): void {
+    highlightCandidate(dropPlayerId)
 }
 
 // Tracks the listeners attached by the most recent renderWaiverControls call so
@@ -93,17 +95,22 @@ export function renderWaiverControls(container: HTMLElement): void {
     dropWrap.append(dropLabel)
 
     // teams in fullTeams are guaranteed to have entries in assignments
-    const buildDropOptions = (team: string) => assignments[team].map(n => ({ value: n, label: n }))
+    const buildDropOptions = (team: string) => assignments[team]
+        .map(playerId => ({
+            value: String(playerId),
+            label: buildPlayerOptionLabel(playerId),
+            html:  buildFullPlayerDisplayHtml(playerId),
+        }))
 
     const initialTeam    = fullTeams[0]
     const initialRoster  = assignments[initialTeam]
-    // lowestGRankPlayer returns null if roster names aren't in backend data yet
+    // lowestGRankPlayer returns null if roster ids aren't in backend data yet
     const initialDefault = lowestGRankPlayer(initialRoster) ?? initialRoster[0]
 
     const dropSel = makeCustomSelect(
         'waiver-drop-select',
         buildDropOptions(initialTeam),
-        initialDefault,
+        String(initialDefault),
         undefined,
         waiverListenerController.signal,
     )
@@ -113,23 +120,25 @@ export function renderWaiverControls(container: HTMLElement): void {
     // ── Evaluate and highlight ───────────────────────────────────────────────
 
     async function runWaiver(): Promise<void> {
-        const team       = teamSel.getValue()
-        const dropPlayer = dropSel.getValue()
-        if (!team || !dropPlayer) return
+        const team      = teamSel.getValue()
+        const dropValue = dropSel.getValue()
+        if (!team || !dropValue) return
+        const dropPlayerId = Number(dropValue)
+        if (Number.isNaN(dropPlayerId)) throw new Error(`Waiver drop select carried a non-numeric value: "${dropValue}"`)
 
         // Remove the drop player from their team; they become a free-agent candidate
         const modifiedAssignments = { ...assignments }
-        modifiedAssignments[team] = assignments[team].filter(p => p !== dropPlayer)
-        
+        modifiedAssignments[team] = assignments[team].filter(playerId => playerId !== dropPlayerId)
+
         await runWaiverEvaluate(modifiedAssignments, team)
-        highlightDropPlayer(dropPlayer)
+        highlightDropPlayer(dropPlayerId)
     }
 
     teamSel.element.addEventListener('change', () => {
         const team        = teamSel.getValue()
         const roster      = assignments[team]
         const defaultDrop = lowestGRankPlayer(roster) ?? roster[0]
-        dropSel.setOptions(buildDropOptions(team), defaultDrop)
+        dropSel.setOptions(buildDropOptions(team), String(defaultDrop))
         runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
     })
 
