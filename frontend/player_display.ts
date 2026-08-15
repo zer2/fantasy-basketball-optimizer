@@ -38,8 +38,18 @@ const HEADSHOT_BASE_URL = `${BASE_URL}/players/headshots/`
 // connection pool and the server's attention to themselves. Concurrency 4 leaves two
 // of the browser's six per-origin connections free — enough for an in-flight build
 // plus a fresh user action even mid-sweep.
+// A sweep also gives up when headshots are simply not being served — the proxy cannot reach
+// the CDN (no egress from the host, or the CDN refusing the server's addresses), so EVERY id
+// fails. Without this the sweep walks the whole pool regardless: several hundred doomed
+// requests per session, each one an outbound attempt the server makes and waits on.
+//
+// The giving-up test is "nothing has EVER loaded in this sweep", not "N in a row failed":
+// individual failures are normal and expected (the CDN has no photo for some ids, which is
+// exactly why displays hide a broken image), and a run of those must not stop a healthy
+// sweep. Only a start where nothing at all succeeds means the deployment cannot serve them.
 const PRELOAD_CONCURRENCY = 4
 const PRELOAD_BACKOFF_MILLISECONDS = 400
+const PRELOAD_FAILURES_BEFORE_GIVING_UP = 8
 
 const warmedHeadshotIds = new Set<number>()
 let preloadGeneration = 0
@@ -49,7 +59,11 @@ function sweepHeadshots(playerIds: number[]): void {
     const generation = preloadGeneration
     const pendingPlayerIds = playerIds.filter(playerId => !warmedHeadshotIds.has(playerId))
     let cursor = 0
+    let failureCount = 0
+    let anyLoaded = false
+    let abandoned = false
     function fetchNext(): void {
+        if (abandoned) return
         if (generation !== preloadGeneration) return   // a newer sweep superseded this one
         if (cursor >= pendingPlayerIds.length) return
         if (countInFlightSessionRequests() > 0) {
@@ -62,8 +76,24 @@ function sweepHeadshots(playerIds: number[]): void {
         const image = new Image()
         // 404s (CDN has no image for the id) count as warmed too: the browser caches the
         // miss and the display's onerror hides the element — no point refetching.
-        image.onload  = () => { warmedHeadshotIds.add(playerId); fetchNext() }
-        image.onerror = () => { warmedHeadshotIds.add(playerId); fetchNext() }
+        image.onload = () => {
+            warmedHeadshotIds.add(playerId)
+            anyLoaded = true
+            fetchNext()
+        }
+        image.onerror = () => {
+            warmedHeadshotIds.add(playerId)
+            failureCount += 1
+            if (!anyLoaded && failureCount >= PRELOAD_FAILURES_BEFORE_GIVING_UP) {
+                abandoned = true
+                console.warn(
+                    `Headshot preloading stopped: the first ${failureCount} requests all failed, so `
+                    + 'this deployment cannot serve headshots (check that the host can reach the NBA '
+                    + 'CDN). Players will show as names without pictures.')
+                return
+            }
+            fetchNext()
+        }
         image.src = `${HEADSHOT_BASE_URL}${playerId}.png`
     }
     for (let slot = 0; slot < PRELOAD_CONCURRENCY; slot++) fetchNext()
