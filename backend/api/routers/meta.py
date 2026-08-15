@@ -3,6 +3,7 @@ proxied player headshot images."""
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -144,8 +145,21 @@ def get_player_headshot_route(nba_player_id: int):
         try:
             cdn_response = requests.get(
                 _NBA_HEADSHOT_URL_TEMPLATE.format(nba_player_id=nba_player_id), timeout=5)
-        except requests.RequestException:
-            raise fail(502, 'Headshot fetch failed.')
+        except requests.RequestException as exc:
+            # Say WHY, in the log and in the response. The exception type is the whole
+            # diagnosis when a deployment cannot reach the CDN and every id 502s: a DNS
+            # failure, a refused connection, a routing black hole and a TLS rejection are
+            # four different infrastructure problems that are indistinguishable once the
+            # error is swallowed. Nested causes matter too — requests wraps urllib3, which
+            # wraps socket.gaierror — so the chain is unwound rather than just the surface.
+            causes, cause = [], exc
+            while cause is not None and len(causes) < 4:
+                causes.append(f'{type(cause).__name__}: {cause}')
+                cause = cause.__cause__ or cause.__context__
+            reason = ' <- '.join(causes)
+            logging.getLogger('fbbo').warning(
+                'Headshot fetch failed for %s: %s', nba_player_id, reason)
+            raise fail(502, f'Headshot fetch failed: {reason}')
         if cdn_response.status_code == 200:
             _headshot_cache[nba_player_id] = cdn_response.content
             _write_headshot_to_disk(nba_player_id, cdn_response.content)
