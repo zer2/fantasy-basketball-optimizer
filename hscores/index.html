@@ -487,17 +487,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#timing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Timing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#limitations-and-corrections" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -532,10 +521,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#gradient-descent-optimizes-locally" class="md-nav__link">
+  <a href="#no-model-of-other-managers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Gradient descent optimizes locally
+        No model of other managers
       
     </span>
   </a>
@@ -543,10 +532,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#no-model-of-other-managers" class="md-nav__link">
+  <a href="#gradient-descent-optimizes-locally" class="md-nav__link">
     <span class="md-ellipsis">
       
-        No model of other managers
+        Gradient descent optimizes locally
       
     </span>
   </a>
@@ -884,17 +873,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#timing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Timing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#limitations-and-corrections" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -929,10 +907,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#gradient-descent-optimizes-locally" class="md-nav__link">
+  <a href="#no-model-of-other-managers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Gradient descent optimizes locally
+        No model of other managers
       
     </span>
   </a>
@@ -940,10 +918,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#no-model-of-other-managers" class="md-nav__link">
+  <a href="#gradient-descent-optimizes-locally" class="md-nav__link">
     <span class="md-ellipsis">
       
-        No model of other managers
+        Gradient descent optimizes locally
       
     </span>
   </a>
@@ -1036,9 +1014,9 @@
 <p>Both gradient descent and Adam require an underlying function which has well-defined gradients. The main machinery of H-scoring is the definition of that function. </p>
 <p>Roughly, the function for H-scoring has three components: category strength expectations, category-level victory probabilities, and the outer-level objective function. The decisions made by the algorithm impact the category strength expectations, which in turn impact category-level victory probabilities, which in turn impact the outer-level objective function. The total gradient relative to an input decision is the gradient of all three steps relative to the previous, multiplied together.</p>
 </details>
-<p>One might note that Giannis Antetokounmpo ranks highly by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.</p>
+<p>One might note that Giannis Antetokounmpo ranks in the top dozen by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.</p>
 <p>The colored numbers to the right are category-level H-scores. They are <em>not direct reflections of the candidate player's characteristics</em>. Instead, they show what the algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates those expectations based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.</p>
-<p>Because other picks are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For example, Shai Gilgeous-Alexander's row as a candidate for first pick shows a very low probability of winning the Assist category, despite SGA getting a decent number himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing assists with future picks.</p>
+<p>Because other picks are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For example, Shai Gilgeous-Alexander's row as a candidate for first pick shows a very low probability of winning the Threes category, despite SGA hitting a decent number himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing threes with future picks.</p>
 <p>In later draft rounds, the importance of previously chosen players increases and the importance of the strategy for future picks decreases. Also, the strategy for future picks tends to become more stable across players, since the direction of the team is already decided. So categorical H-scores tend to become more consistent across candidate players as the draft goes on.</p>
 <figure>
 <p><img alt="Round seven H-score table" src="../img/hec2.png" /></p>
@@ -1076,7 +1054,7 @@
 <p>Top Most Categories H-scores for the first pick, 2024-25 season</p>
 </figcaption>
 </figure>
-<p>The table above is based on the same dataset as the Each Category version. The overall H-scores are different because they are based on the Most Categories objective; the associated strategies are optimized accordingly to match the format and maximize the objective for each player. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories is not helpful. This leads to players like Giannis, who benefit greatly from punting, ranking better (sixth vs. fourth in this case).</p>
+<p>The table above is based on the same dataset as the Each Category version. The overall H-scores are different because they are based on the Most Categories objective; the associated strategies are optimized accordingly to match the format and maximize the objective for each player. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories is not helpful. This leads to players like Giannis, who benefit greatly from punting, ranking better (tenth vs. eleventh in this case).</p>
 <details class="note">
 <summary>What is different about the Most Categories algorithm, and why does it take longer to compute?</summary>
 <p>The format-dependent overall H-score is the outer-level objective function that the algorithm maximizes. Different formats necessitate different structures for that function, which then drive different behavior for the formats. They also require different amounts of computational time. </p>
@@ -1093,7 +1071,7 @@
 <p>Top Rotisserie H-scores, for the 2024-25 season</p>
 </figcaption>
 </figure>
-<p>The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis falls to eleventh, which aligns with the traditional wisdom that punting is not as advantagous for that format. </p>
+<p>The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis falls out of the top twelve entirely, which aligns with the traditional wisdom that punting is not as advantageous for that format. </p>
 <p>Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head-to-Head formats. The average is around 8% instead of 50%. </p>
 <p>When the format is Rotisserie, category-level H-scores are expected fantasy point totals per category instead of the likelihood to win a single matchup. One should keep in mind that the expected fantasy point total is just a general average, not what it expects to happen in a winning scenario. While it looks like the Rotisserie algorithm is always punting turnovers, it actually wants to win the category, it is just hoping for luck to do well in it. </p>
 <details class="note">
@@ -1203,14 +1181,6 @@
 <p>The position structure used by the algorithm — also shown in the <a href="#detailed-drop-down">detailed drop-down</a> — is configurable by the user.</p>
 <p><img alt="Position structure configuration" src="../img/positions.png" /></p>
 <p>It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accomodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. </p>
-<h2 id="timing">Timing</h2>
-<p>H-scoring is not an instantaneous process. In general, the algorithm will take less than a second to complete. But it could take longer if the format is 'Most Categories', the number of iterations is high, or the number of candidate players, categories, or drafters is high. It also takes extra time upon the first page load, because data needs to be pulled in from Snowflake.</p>
-<figure>
-<p><img alt="The updating spinner" src="../img/updating.png" /></p>
-<figcaption>
-<p>The updating spinner, which indicates that the algorithm is running</p>
-</figcaption>
-</figure>
 <h2 id="limitations-and-corrections">Limitations and corrections</h2>
 <p>H-scoring as presented in the papers has numerous limitations. The website does have some procedures in place to mitigate these limitations, but they are imperfect and not comprehensive. </p>
 <h3 id="reliance-on-one-projection-set">Reliance on one projection set</h3>
@@ -1309,25 +1279,28 @@ w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]
 <p>The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, if the weight for the first pick is <span class="arithmatex">\(A\)</span>, the weight for pick <span class="arithmatex">\(n\)</span> is <span class="arithmatex">\(A\)</span> multiplied by the phi function evaluated at <span class="arithmatex">\(\frac{4n}{k}\)</span> where <span class="arithmatex">\(k\)</span> is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. </p>
 <p>The absolute values of <span class="arithmatex">\(A\)</span> for both category weightings and position weightings are hardcoded into the algorithm, and cannot be configured by the user. They were calibrated to regularize meaningfully without collapsing weights to neutral across the board. </p>
 </details>
-<h3 id="gradient-descent-optimizes-locally">Gradient descent optimizes locally</h3>
-<p>A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. </p>
-<p>For Each Category and Most Categories, the website mitigates this flaw by choosing its starting point carefully for the first few picks. It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. For picks after the first few, it is no longer necessary to prove every punt, because the team already has a defined shape. The algorithm instead starts punting the team's weakest category.  </p>
-<p>Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position. </p>
-<details class="note">
-<summary>How does the website check multiple punts?</summary>
-<p>The website checks potential punts by calculating the current objective function with one category at a time set to a 95% weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent. </p>
-<p>Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. </p>
-</details>
 <h3 id="no-model-of-other-managers">No model of other managers</h3>
-<p>The internal logic of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams, inaccurate projections of which players will be available in later rounds, and inaccurate projections of expected win rates. </p>
-<p>Ideally, the algorithm would be able to predict what other managers are trying to do and react accordingly. But predicting the choices of other fantasy managers is difficult because each one has their own habits. Some will punt aggressively, some will prioritize balance, some will chose players from their favorite teams, etc. So instead, the algorithm has a few crude ways of accounting for general behavior that it expects. </p>
-<p>One is the κ (kappa) factor, which subtly discourages the algorithm from using potentially popular punting strategies. It does an initial round of checking which punts are most beneficial to the top forty players, then adds small punishments for punting those categories, scaled by the value of κ. This is to make the cost of competing for a crowded punt explicit. The algorithm would not otherwise understand that if a punting strategy is popular, other managers are likely to take players well-suited for that strategy, leaving fewer of them for the algorithm's team. Of course, this is only necessary when other managers are expected to punt. When other managers are punting, a reasonable value for κ is <span class="arithmatex">\(0.3\)</span>. Otherwise, it should be set to zero. </p>
+<p>The internal logic of the paper's version of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams and inaccurate projections of which players will be available in later rounds.</p>
+<p>The website's version of the algorithm has a few ways of dealing with this. Predicting the choices of other fantasy managers is difficult because each one has their own habits. Some will punt aggressively, some will prioritize balance, some will chose players from their favorite teams, etc. So the algorithm doesn't try to get in every manager's head; it uses a few heuristic strategies instead. </p>
+<p>The first is a way of predicting what other teams will look like. Before running H-scoring on all candidates, the algorithm is run on a small subset of the top players, and the expected final statistics for each player's team are recorded. That process iterates, with each successive pass reacting to all previous ones. By the end, the algorithm has a rough picture of what an equilibrium might look like in terms of opposing team strategies. Then, during a draft, the algorithm continues to update its expectations by running H-scoring for opponents, and keeping track of what the algorithm expects from future picks for each opponent. </p>
+<p>For head-to-head formats, the strength of the prediction adjustment to expected team statistics is cut in half. The purpose of that softening is to prevent overconfidence about exact punting builds. The prediction adjustment is kept at full strength for Rotisserie because there is no equivalent uncertainty about punting in Rotisserie; the main strategy that other drafters are expected to adopt is shoring up reliable categories, which is consistent and stable. </p>
+<p>Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance against pure G-score drafters. The adjustment defaults to on, but can be turned off in the sidebar.  </p>
+<p>While the first fix handles the expectations of what other teams will look like, it does not account for how the field of available players changes based on what other drafters are doing. If a punt is strong and likely to be popular, other drafters will compete for players who fit that punt build well, making it more difficult to succeed with the build. The algorithm handles that with the κ (kappa) factor, which subtly discourages the algorithm from using potentially popular punting strategies. It observes which categories were popular to punt after the self-play process, then adds small punishments for punting those categories, scaled by the value of κ. This is to make the cost of competing for a crowded punt explicit. The default value of κ is <span class="arithmatex">\(0.3\)</span>.</p>
 <p>Another way to account for other other manager's behavior is modifying the H-scoring parameters. When autodrafters play against each other, the optimum values for <span class="arithmatex">\(\omega\)</span> and <span class="arithmatex">\(\gamma\)</span> are approximately <span class="arithmatex">\(0.5\)</span> and <span class="arithmatex">\(0.1\)</span>, respectively, with κ set to <span class="arithmatex">\(0.3\)</span>. This setting leads to slightly less aggressive punting than the default parameters, which are designed to do well against managers who do not punt. Punting less aggressively against strategic managers is likely appropriate because there is more competition for the best players for punt builds.  </p>
 <details class="note">
 <summary>How do we know what the optimal parameters are for H-scoring agents against other H-scoring agents?</summary>
 <p>The optimal values were found via a self-play experiment: across thousands of simulations of different seasons, a full league of identical H-scoring agents drafted against each other, slightly perturbing their parameters each time. Simulations were paired such that each one would have two drafters with a positive <span class="arithmatex">\(\omega\)</span> peturbation, two with a negative <span class="arithmatex">\(\omega\)</span> peturbation, etc. and the other simulation would have the same drafters moving in the opposite direction- Spall's method with antithetic variates. After each pair of simulations, the success of the perturbations was judged, and the parameter stepped in the direction that produced better results. This kept going until there was no clear better direction, meaning that the parameters were at a symmetric equilibrium, in which no agent could improve by unilaterally changing its own parameters.</p>
 <p>This procedure repeatedly settled near <span class="arithmatex">\(\gamma \approx 0.1\)</span> and <span class="arithmatex">\(\omega \approx 0.5\)</span>, with κ free to vary landing near <span class="arithmatex">\(0.3\)</span> — consistent with the recommendation above, since a field of H-scoring agents is itself a punting field. To confirm the result was a genuine optimum rather than a degenerate local trap, a head-to-head test of these parameters against the defaults was also run; the tuned parameters won consistently, ruling out a bad basin. </p>
 <p>These parameters specifically work well in the H-scoring vs H-scoring context. Against G-scores, a similar procedure yielded parameters close to the defaults of <span class="arithmatex">\(\omega \approx 0.7\)</span> and <span class="arithmatex">\(\gamma \approx 0.25\)</span>.</p>
+</details>
+<h3 id="gradient-descent-optimizes-locally">Gradient descent optimizes locally</h3>
+<p>A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. </p>
+<p>For Each Category and Most Categories, the website mitigates this flaw by choosing its starting point carefully for the first few picks. It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. For picks after the first few, it is no longer necessary to prove every punt, because the team already has a defined shape. The algorithm instead starts with the build it settled on for its previous pick. </p>
+<p>Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position, slightly tilted towards categories that are robust like Points and Assists. That's where the Rotisserie algorithm generally wants to go, since it thinks it can rely more on luck for the unstable categories like Steals and Turnovers. </p>
+<details class="note">
+<summary>How does the website check multiple punts?</summary>
+<p>The website checks potential punts by calculating the current objective function with one category at a time set to 90% of its neutral weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent. </p>
+<p>Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. </p>
 </details>
 <h3 id="constant-categorical-variance">Constant categorical variance</h3>
 <p>H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category</p>
@@ -1345,9 +1318,13 @@ w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]
 <p>Another reason is that predicting variance is hard, even ignoring the complicated reality of real fantasy basketball. Most likely, accounting for variance would require individual player-and-category-level forecasts of variance, which would require a massive overhaul of existing forecasting procedures. It might be possible to predict category variance as a function of expected value instead, but that would not necessarily be accurate. </p>
 </details>
 <h3 id="simplified-player-model">Simplified player model</h3>
-<p>H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles. A classic example is prime Ben Simmons, who was an all-NBA point guard with a 61% free throw rate during the 2020-21 season. Point guards with low free throw percentages are unusual, and can provide prime opportunities for builds that punt free throws. H-scoring's player model lumps all players together into one giant pile, and so is not aware of particular opportunities for punting like Simmons. </p>
+<p>H-scoring's model for what sorts of players will be available in the future is simplified, and may fail to properly account for individual players with exceptional profiles. </p>
+<p>A classic example of an exceptional profile is prime Ben Simmons, who was an All-Star point guard with a free throw rate barely above 60% between 2019 and 2021. Point guards with low free throw percentages are unusual, and can provide prime opportunities for builds that punt free throws. H-scoring's player model lumps all players together into one giant pile, and so is not aware of particular opportunities for punting like Simmons. </p>
+<p>The best fantasy managers are likely aware of these individual players and how they can be composed into a team. Their insight might help them draft better than H-scoring, especially at the beginning of a draft, before the team has settled on a build. </p>
 <h3 id="incomplete-fantasy-model">Incomplete fantasy model</h3>
-<p>The most fundamental flaw of H-scoring is that it does not take into account decisions made during the actual fantasy season streaming players, trading, etc. These all add additional strategic considerations</p>
+<p>The most fundamental flaw of H-scoring is that it does not take into account moves that can be made during an actual fantasy season: streaming players, trading, etc. These introduce considerations that are complex and difficult to incorporate into the drafting process. </p>
+<p>Beyond adding multifaceted strategic considerations to the drafting process, these options also represent important decision points in and of themselves. Expert fantasy managers can greatly improve their chances by making smart moves during the fantasy season. </p>
+<p>The website does have <a href="../season/">season mode</a> for applying H-scoring during the season, but H-scoring relies on projections, and most expert fantasy managers can move faster than projections when a player becomes poised for a breakout. They also understand schedules and streaming rules. So H-scoring by itself is missing quite a bit when it comes to managing a team throughout a season, and human expertise can outperform it easily on that axis. </p>
 
 
 
