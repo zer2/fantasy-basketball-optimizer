@@ -455,7 +455,7 @@ The best fantasy managers are likely aware of these individual players and how t
 
 ### Incomplete fantasy model
 
-The most fundamental flaw of H-scoring is that it does not take into account moves that can be made during an actual fantasy season: streaming players, trading, etc. These add a level of variance and bias to expected statistics that is difficult to model. 
+The most fundamental flaw of H-scoring is that it does not take into account moves that can be made during an actual fantasy season: streaming players, trading, etc. These introduce considerations that are complex and difficult to incorporate into the drafting process. 
 
 Beyond adding multifaceted strategic considerations to the drafting process, these options also represent important decision points in and of themselves. Expert fantasy managers can greatly improve their chances by making smart moves during the fantasy season. 
 
