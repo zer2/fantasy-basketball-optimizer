@@ -314,6 +314,18 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_outbound_http_resolves_ipv4_only():
+    """Cloud Run's Direct VPC egress is IPv4-only while cdn.nba.com is dual-stack, so a
+    connection that picks an AAAA address dies instantly with ENETUNREACH and the headshot
+    proxy 502s — intermittently, depending only on which address family the lookup returned.
+    backend.main pins the family at import; this guards that line against being tidied away."""
+    import socket
+    import urllib3.util.connection
+
+    assert urllib3.util.connection.allowed_gai_family() == socket.AF_INET, \
+        'importing the app must restrict outbound connections to IPv4'
+
+
 def test_ratio_cells_supply_missing_attempt_columns():
     """Some sources print a ratio stat as its percentage followed by the makes and attempts
     behind it — '0.583 (10.2/17.5)' — and ship no attempts column at all. Attempt volume
