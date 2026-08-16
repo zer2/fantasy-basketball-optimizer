@@ -14,15 +14,13 @@ The default for player statistics is to use forward-looking projections.
 
 The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. 
 
-**Note as of December 2025: the ESPN forecasting page currently has bugs, and for that reason the ESPN projections have not been updated since October.**
+**Note as of August 2026: the ESPN forecasting page currently has bugs, and for that reason the ESPN projections have not been updated since October. The DARKO app projections have also been down. So right now, the default forecasts are very stale**
 
-Any other set of projections can be uploaded, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded, and a file that already uses the website's own column names always works. Text files are read whatever character encoding they were saved in, so there is no need to re-save them as UTF-8. A file does not need to carry every category either — some providers pair a projection set with a league and export only that league's active categories. Whatever is missing is simply taken from the other sources in the blend, and the upload note says which statistics were absent. If a file is not recognized at all, the error names the headers it could not interpret. Uploaded projections can also be edited by hand before uploading, if you want to adjust individual forecasts.
+The weights are always re-scaled so they add up to 100%. E.g. if DARKO is set to 75% while ESPN is still at 50%, that re-scales to 60% DARKO and 40% ESPN. 
 
-Two paid products worth mentioning: Hashtag Basketball has no download option, so the projections must be copy pasted into a spreadsheet, which can then be uploaded directly; Basketball Monster's XLSX download can be uploaded as it is. 
+Any other set of projections can be uploaded and included in the blend, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded. If a file is missing a category, which is common for non-standard categories like Double Doubles, that category can still be used if at least one other projection set has the category. The category will just ignore the weight of the projection that does not have it. 
 
-Also: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. 
-
-Projections are combined between different sources by taking weighted means according to the provided weights. If the assigned weights add up to more or less than 1, they will be scaled to add to 1. 
+One note of caution: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. 
 
 ### Historical data
 

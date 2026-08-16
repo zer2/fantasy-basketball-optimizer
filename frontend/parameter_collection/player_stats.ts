@@ -250,8 +250,7 @@ function renderBlendWeights(container: HTMLElement): void {
     customCaption.className = 'sidebar-caption'
     customCaption.textContent =
         'Upload projections from any source, as CSV or Excel — each column is read on its ' +
-        'own, so most exports work as downloaded, and stats a file leaves out are taken ' +
-        'from the other sources. Uploads are kept for a day and survive a reload.'
+        'own, so most exports work as downloaded.'
     container.append(customCaption)
 
     const customRowsContainer = document.createElement('div')
