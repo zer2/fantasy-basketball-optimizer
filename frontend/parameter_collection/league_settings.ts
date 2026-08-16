@@ -9,6 +9,7 @@ import { pref, savePref } from '../preferences.js'
 import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector } from '../platforms/connector.js'
+import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -168,15 +169,31 @@ export function renderLeagueSettings(container: HTMLElement): void {
     connectButton.textContent = 'Connect'
     connectCell.append(connectButton)
     connectCell.append(connectStatus)
+
+    // Connecting a league stores that platform's credentials against a Google account, so it is
+    // the one part of the app that cannot work anonymously. Signed out, the controls are replaced
+    // by this rather than left to fail at the first request.
+    const signInPrompt = makeSignInPrompt(
+        'Connecting a live league needs an account, so your platform credentials can be stored '
+        + 'against it. Entering your own data works without signing in.')
+    signInPrompt.id = 'ls-connect-signin'
+    connectCell.append(signInPrompt)
     container.append(connectCell)
 
-    /** Show only the selected platform's connector controls. */
+    /** Show only the selected platform's connector controls — or, signed out, the sign-in
+     *  prompt in their place. */
     let lastConnectorPlatform: string | null = null
     function refreshConnectControls(): void {
         const platform = platformSelect.getValue()
+        const canConnect = isSignedIn()
+        signInPrompt.style.display  = canConnect ? 'none' : ''
+        connectButton.style.display = canConnect ? '' : 'none'
+        connectStatus.style.display = canConnect ? '' : 'none'
         for (const connector of connectors) {
-            connector.element.style.display = connector.platform === platform ? '' : 'none'
+            connector.element.style.display =
+                canConnect && connector.platform === platform ? '' : 'none'
         }
+        if (!canConnect) return
         // Fire onSelected/onDeselected only on the transition to a new platform (not on mode-only
         // re-renders), so e.g. the ESPN instructions pop-up appears when ESPN is picked and closes
         // when the user switches away.

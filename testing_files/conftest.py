@@ -5,6 +5,12 @@ import os
 # real OAuth, so a dummy value is fine — set it before any test imports backend.main.
 os.environ.setdefault('SESSION_SECRET_KEY', 'test-only-session-secret')
 
+# Rate limiting off for the suite. TestClient does not present a loopback address (its peer is
+# literally 'testclient'), so it misses the local exemption, and the suite builds far more
+# sessions in five minutes than any person would — the limits would fire on the tests rather than
+# on abuse. test_rate_limit.py turns them back on explicitly for the cases that exercise them.
+os.environ.setdefault('RATE_LIMITS_ENABLED', 'false')
+
 # Add the testing_files/ directory to sys.path so that benchmark_helpers
 # can be imported by the benchmark_* test modules without a package prefix.
 # Pytest's working directory is the project root, so this directory would

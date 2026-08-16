@@ -5,13 +5,17 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
 from backend.parameters import load_all_params
+from backend.infra.rate_limit import (
+    identify_rate_limit_client, get_rate_limiter, rate_limits_enabled, request_is_local,
+)
 from backend.api.errors import fail
 
 router = APIRouter()
@@ -178,6 +182,34 @@ def get_disk_cache_health_route():
             candidate: describe(Path(candidate))
             for candidate in ('/cache', '/data-cache')
         },
+    }
+
+
+@router.get('/health/rate-limit')
+def get_rate_limit_health_route(request: Request):
+    """What the limiter makes of the caller it is looking at right now.
+
+    The one genuinely uncertain input is X-Forwarded-For: how many proxies append to it decides
+    which entry is the real client, and trusting the wrong one either lets a script rotate fake
+    addresses past the limit or lumps every visitor into a single bucket. Rather than infer it,
+    this echoes the chain as received alongside the address that was derived from it, so
+    TRUSTED_PROXY_HOPS can be checked against reality from the deployment itself.
+
+    Reports this caller's own usage only — never a list of who else has been here."""
+    client_key = identify_rate_limit_client(request)
+    return {
+        'enabled':                rate_limits_enabled(),
+        # True only for requests off the loopback interface with no proxy in front — local
+        # development and the test suites. Should read false from anywhere on the internet.
+        'exempt_as_local':        request_is_local(request),
+        'x_forwarded_for':        request.headers.get('x-forwarded-for'),
+        'direct_peer':            request.client.host if request.client else None,
+        'trusted_proxy_hops':     int(os.environ.get('TRUSTED_PROXY_HOPS', '1')),
+        # Identity only — the account hash is truncated and one-way, and an IP bucket names
+        # the address the request already came from.
+        'counted_as':             client_key,
+        'signed_in':              client_key.startswith('user:'),
+        'usage':                  get_rate_limiter().describe_client(client_key, time.monotonic()),
     }
 
 

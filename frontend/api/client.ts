@@ -28,6 +28,18 @@ export class HTTPError extends Error {
     }
 }
 
+/** FastAPI wraps an error message as {"detail": "..."}. Returns that sentence, or the body
+ *  unchanged when it is not shaped that way — a caller showing this to a person wants the
+ *  message, not the envelope. */
+function readErrorDetail(body: string): string {
+    try {
+        const parsed = JSON.parse(body)
+        return typeof parsed?.detail === 'string' ? parsed.detail : body
+    } catch {
+        return body
+    }
+}
+
 // In-flight backend work, visible to background consumers: the headshot preloader
 // yields to bursty session traffic (evaluate batches and their follow-ups) and sweeps
 // only while this is zero. Session BUILDS — the bare POST /sessions and the PATCH
@@ -57,6 +69,10 @@ async function jsonRequest<T>(
         const res = await fetch(url, init)
         if (!res.ok) {
             const body = await res.text()
+            // A rate-limited response already carries a sentence written for a person ("try
+            // again in N seconds"). Surfacing that instead of the raw JSON body is the
+            // difference between an explanation and an opaque failure.
+            if (res.status === 429) throw new HTTPError(res.status, readErrorDetail(body), label)
             throw new HTTPError(res.status, body, label)
         }
         if (res.status === 204) return undefined as T   // no content (e.g. token exchange)

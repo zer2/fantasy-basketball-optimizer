@@ -51,7 +51,13 @@ logging.getLogger('fbbo.api')    # instantiate now (clean), before the hijack fi
 urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
 
 from backend.infra.auth import session_secret_key, session_https_only
+from backend.infra.rate_limit import configure_rate_limits
 from backend.api.routers import auth, meta, data, sessions, ranking, trade, platforms
+
+# Read the per-client request limits here, at startup: signing in is optional, so these are what
+# cap how fast one caller can ask for the expensive work, and malformed configuration should stop
+# the process rather than surface on an unlucky request.
+configure_rate_limits()
 
 # Undo yahoo_oauth's logging.setLoggerClass hijack (fired during the router imports above) so the
 # rest of the process's loggers behave normally. Our 'fbbo'* loggers were created before it.

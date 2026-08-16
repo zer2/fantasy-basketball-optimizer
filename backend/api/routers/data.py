@@ -7,8 +7,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
+from backend.infra.rate_limit import enforce_rate_limit, UPLOAD_POLICY
 from backend.parameters import load_all_params
 from backend.services.build_agent import parse_projection_upload, _CORE_PROJECTION_COLUMNS
 from backend.state.upload_store import store_upload, UPLOAD_TTL, MAX_FILE_BYTES
@@ -36,7 +37,8 @@ def _missing_reportable_stats(parsed: pd.DataFrame, params: dict) -> list[str]:
     return missing
 
 
-@router.post('/data/upload', response_model=UploadResponse)
+@router.post('/data/upload', response_model=UploadResponse,
+             dependencies=[Depends(enforce_rate_limit(UPLOAD_POLICY))])
 async def upload_projection(
     file: UploadFile = File(...),
 ):
