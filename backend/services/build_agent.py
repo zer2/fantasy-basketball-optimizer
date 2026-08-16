@@ -13,9 +13,13 @@ No session_context or _SessionState: each step reads/writes session fields direc
 
 from __future__ import annotations
 
+import codecs
 import io
+import logging
 import time
 import threading
+
+import charset_normalizer
 import pandas as pd
 from pathlib import Path
 
@@ -94,7 +98,7 @@ def _v0_cache_key(cp: dict) -> tuple | None:
 
 
 def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
-    """Bring a single uploaded CSV (name-indexed by parse_projection_csv) to the id-keyed
+    """Bring a single uploaded CSV (name-indexed by parse_projection_upload) to the id-keyed
     contract: resolve names via the unified table, keep unresolved rows under synthetic
     ids, and return an id-indexed frame with the display 'Player' column retained."""
     from backend.data_retrieval import attach_player_ids_by_name
@@ -161,7 +165,7 @@ def run_step1(
 
     if v0_with_names is None:
         if source_type == 'csv':
-            v0_with_names = _resolve_single_csv_player_ids(parse_projection_csv(csv_bytes, params))
+            v0_with_names = _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, params))
 
         elif source_type == 'historical':
             from backend.data_retrieval import get_specified_historical_stats
@@ -241,8 +245,69 @@ def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
     return mapping
 
 
-def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
-    """Parse an uploaded projection CSV into the canonical column set.
+# A .xlsx is a ZIP archive, so every one begins with this signature. The older .xls is an
+# OLE2 compound file with a different one — detected only to say so plainly, since reading it
+# would need another engine and anything that can save .xls can also save .xlsx or .csv.
+_XLSX_SIGNATURE = b'PK\x03\x04'
+_XLS_SIGNATURE  = b'\xd0\xcf\x11\xe0'
+
+
+def _read_projection_table(upload_bytes: bytes) -> pd.DataFrame:
+    """Load an upload into a frame, whether it is a spreadsheet or a text file.
+
+    People reach these tools by copying a projection table into a spreadsheet, so the file
+    that comes back is as often .xlsx as .csv — and telling someone to re-export as CSV is
+    asking them to do work the parser can do. Format is decided by the file's own signature
+    rather than its name, because a download saved with the wrong extension is common and the
+    bytes cannot lie."""
+    if upload_bytes.startswith(_XLSX_SIGNATURE):
+        try:
+            return pd.read_excel(io.BytesIO(upload_bytes), engine='openpyxl')
+        except Exception as exc:
+            raise ValueError(f'Could not read this spreadsheet: {type(exc).__name__}: {exc}')
+    if upload_bytes.startswith(_XLS_SIGNATURE):
+        raise ValueError(
+            'This is an older .xls spreadsheet, which cannot be read directly. '
+            'Save it as .xlsx or .csv and upload again.')
+    return pd.read_csv(io.StringIO(_decode_projection_text(upload_bytes)))
+
+
+def _decode_projection_text(csv_bytes: bytes) -> str:
+    """Decode an uploaded text file whatever it was saved as.
+
+    Spreadsheets export in whatever codepage the machine defaults to, so a file that opens
+    fine locally can be UTF-8, UTF-16 (Excel's "Unicode text"), or a legacy Windows codepage.
+    Assuming UTF-8 made those fail on the first non-ASCII byte — a decode error naming a byte
+    offset, which tells a user nothing except that saving it again as UTF-8 helps.
+
+    Order matters. A byte-order mark is decisive, so it is honoured first; UTF-16 in
+    particular must never be guessed at, since its text decodes as plausible-looking rubbish
+    under a single-byte codepage. UTF-8 is tried next because it is both the common case and
+    self-validating — invalid sequences raise rather than silently mis-decode. Only then do we
+    detect, which is what gets accented names right: Jokić and Dončić live in Central European
+    codepages that a blind cp1252 fallback would mangle, and a mangled name resolves to no
+    player id. latin-1 is the floor: it cannot raise, so a file always loads.
+    """
+    if csv_bytes.startswith(codecs.BOM_UTF16_LE) or csv_bytes.startswith(codecs.BOM_UTF16_BE):
+        return csv_bytes.decode('utf-16')
+    try:
+        return csv_bytes.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        pass
+
+    detected = charset_normalizer.from_bytes(csv_bytes).best()
+    if detected is not None:
+        logging.getLogger('fbbo').info(
+            'Projection upload is not UTF-8; decoded as %s', detected.encoding)
+        return str(detected)
+    logging.getLogger('fbbo').warning(
+        'Projection upload encoding could not be identified; decoding as latin-1, '
+        'so accented names may be wrong')
+    return csv_bytes.decode('latin-1')
+
+
+def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
+    """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
 
     There is no format detection: each column is interpreted on its own through the alias
     table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
@@ -250,7 +315,7 @@ def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
     names needs no aliases at all. Raises ValueError naming what could not be found when
     the file does not read as a projection set.
     """
-    df_raw = pd.read_csv(io.BytesIO(csv_bytes))
+    df_raw = _read_projection_table(upload_bytes)
     column_mapping  = _map_columns_to_canonical(df_raw, params)
     # Unrecognized columns keep their own names, so a file already using canonical names
     # is understood without any alias matching at all.

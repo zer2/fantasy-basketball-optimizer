@@ -94,8 +94,8 @@ test('projection blend weights', async t => {
         await t.test('an unreadable upload is rejected at upload time, visibly', async () => {
             const firstSlider = page.locator('#ps-w-custom-1')
             assert.ok(await firstSlider.isDisabled(), 'a custom weight starts locked at zero')
-            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'Data 1',
-                         'the first custom slot should carry its default title')
+            assert.equal(await page.locator('#ps-upload-custom-1 ~ .sidebar-file-name').textContent(),
+                         'No file chosen', 'an empty custom slot should say so where the filename goes')
 
             const uploadInput = page.locator('#ps-upload-custom-1')
             await uploadInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
@@ -122,7 +122,7 @@ test('projection blend weights', async t => {
             expectCleanSession(app, 'after rejected upload')
         })
 
-        await t.test('a well-formed upload is auto-detected, retitleable, and changes results', async () => {
+        await t.test('a well-formed upload is auto-detected, named, and changes results', async () => {
             // Build a valid projection CSV from real pool players with uniform stat lines —
             // blended in at full weight, it must visibly move the results.
             // Candidate rows render the rich display: the bare name is the .playername
@@ -158,14 +158,10 @@ test('projection blend weights', async t => {
                       'the next slot starts locked')
             expectCleanSession(app, 'valid upload accepted')
 
-            // Retitling is presentation-only: it must not touch the backend at all.
-            const requestsBeforeRetitle = app.sessionRequestLog.length
-            await page.locator('#ps-custom-title-1').fill('My projections')
-            await page.locator('#ps-custom-title-1').evaluate(el => el.blur())
-            await waitAppSettled(app)
-            assert.equal(app.sessionRequestLog.length, requestsBeforeRetitle,
-                         'renaming a custom source must not trigger any backend call')
-            expectCleanSession(app, 'retitled upload')
+            // The slot is identified by the file behind it. The browser's own file-input text
+            // cannot be read back or restored, so the app renders the name itself.
+            assert.equal(await page.locator('#ps-upload-custom-1 ~ .sidebar-file-name').textContent(),
+                         'generated-projections.csv', 'the slot should name the file it holds')
 
             await setBlendWeight('ps-w-custom-1', 1)
             const withUploadSnapshot = await readCandidateSnapshot()
@@ -181,11 +177,12 @@ test('projection blend weights', async t => {
             expectCleanSession(app, 'upload weight back to zero')
 
             // Uploads survive a reload: the file is kept server-side on a day-long clock that
-            // resets whenever a session uses it, and the slot it fills (id, title, weight,
+            // resets whenever a session uses it, and the slot it fills (id, filename, weight,
             // status line) is remembered in preferences.
             await loadApp(app)
-            assert.equal(await page.locator('#ps-custom-title-1').inputValue(), 'My projections',
-                         'the retitled source should come back under its own name')
+            assert.equal(await page.locator('#ps-upload-custom-1 ~ .sidebar-file-name').textContent(),
+                         'generated-projections.csv',
+                         'the restored source should come back under the filename it was uploaded as')
             assert.ok(!(await page.locator('#ps-w-custom-1').isDisabled()),
                       'a restored upload keeps its weight unlocked — the file is still there')
             assert.equal(await page.locator('#ps-w-custom-1').inputValue(), '0',

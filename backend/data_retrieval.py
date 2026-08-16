@@ -285,7 +285,7 @@ def combine_projections(
 
     weights = [blend_weights.get(k, 0.0) for k in source_keys]
 
-    # Uploaded frames arrive name-indexed from parse_projection_csv; bring them to the
+    # Uploaded frames arrive name-indexed from parse_projection_upload; bring them to the
     # id-column contract the Snowflake loaders already follow.
     for key in source_keys:
         source_frame = sources[key]

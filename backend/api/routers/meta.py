@@ -125,10 +125,20 @@ def _read_headshot_from_disk(nba_player_id: int) -> bytes | None:
 
 
 def _write_headshot_to_disk(nba_player_id: int, image_bytes: bytes) -> None:
+    """Best effort. In production this directory is a mounted bucket, which can be read-only,
+    out of quota, or briefly unavailable through gcsfuse — and none of that is a reason to
+    deny the caller an image we are already holding. Caching is the optimisation; serving is
+    the job. Failures are logged, since a cache that never persists turns every cold start
+    into a full re-fetch and should not do so silently."""
     if _HEADSHOT_DISK_CACHE_DIR is None:
         return
-    _HEADSHOT_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    (_HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png').write_bytes(image_bytes)
+    try:
+        _HEADSHOT_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        (_HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png').write_bytes(image_bytes)
+    except OSError as exc:
+        logging.getLogger('fbbo').warning(
+            'Could not cache headshot %s under %s: %s',
+            nba_player_id, _HEADSHOT_DISK_CACHE_DIR, exc)
 
 
 @router.get('/health/disk-cache')

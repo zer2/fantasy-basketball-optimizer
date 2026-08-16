@@ -273,11 +273,11 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
         'changing a Snowflake source weight must change the key'
 
 
-def test_parse_projection_csv_reads_any_recognized_spelling():
+def test_parse_projection_upload_reads_any_recognized_spelling():
     """Files are interpreted column by column through the alias table, not matched against
     named export formats: differently-spelled headers for the same stat all land on the
     canonical column, casing is irrelevant, and unrecognized columns are dropped."""
-    from backend.services.build_agent import parse_projection_csv
+    from backend.services.build_agent import parse_projection_upload
     params = _load_params()['NBA']
 
     # Extra unmapped columns (Rank, Value, m/g) must be dropped: they would otherwise
@@ -288,7 +288,7 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
         'Rank,Name,Pos,Value,g,m/g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
         '1,Test Player,C,12.3,70,34.0,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
     ).encode()
-    parsed = parse_projection_csv(slash_per_game_csv, params)
+    parsed = parse_projection_upload(slash_per_game_csv, params)
     assert parsed.loc['Test Player', 'Points'] == 25.0
     for junk_column in ('Rank', 'Value', 'm/g'):
         assert junk_column not in parsed.columns, f'unmapped column {junk_column} should be dropped'
@@ -298,7 +298,7 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
         'PLAYER , POS ,GP,PTS,TREB,AST,STL,BLK,TO,3PM,FG%,FGA,FT%,FTA\n'
         'Test Player,C,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.55,18.0,0.8,6.0\n'
     ).encode()
-    abbreviated = parse_projection_csv(abbreviated_csv, params)
+    abbreviated = parse_projection_upload(abbreviated_csv, params)
     assert abbreviated.loc['Test Player', 'Points'] == 25.0
     assert abbreviated.loc['Test Player', 'Rebounds'] == 10.0
     assert abbreviated.loc['Test Player', 'Free Throw %'] == 0.8
@@ -309,9 +309,101 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
         'ABC,Tech,101.5,20000\n'
     ).encode()
     with pytest.raises(ValueError) as exc_info:
-        parse_projection_csv(unrelated_csv, params)
+        parse_projection_upload(unrelated_csv, params)
     assert 'Player' in str(exc_info.value), 'the error should name what could not be found'
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
+
+
+def test_projection_upload_accepts_xlsx():
+    """People reach these tools by copying a projection table into a spreadsheet, so what comes
+    back is as often .xlsx as .csv. Format is decided by the file's own signature rather than
+    its name, since a download saved with the wrong extension is common."""
+    import io as io_module
+    import pandas as pd
+    from backend.services.build_agent import parse_projection_upload
+    params = _load_params()['NBA']
+
+    frame = pd.DataFrame([
+        {'PLAYER': 'Nikola Jokić', 'POS': 'C', 'GP': 70, 'PTS': 26.5, 'TREB': 12.5, 'AST': 9.0,
+         'STL': 1.3, 'BLK': 0.9, 'TO': 3.0, '3PM': 1.1, 'FG%': 0.583, 'FTA': 7.3},
+        {'PLAYER': 'Plain Player', 'POS': 'PG', 'GP': 70, 'PTS': 20.0, 'TREB': 5.0, 'AST': 5.0,
+         'STL': 1.0, 'BLK': 0.5, 'TO': 2.0, '3PM': 2.0, 'FG%': 0.470, 'FTA': 4.0},
+    ])
+    workbook = io_module.BytesIO()
+    frame.to_excel(workbook, index=False, engine='openpyxl')
+    spreadsheet = workbook.getvalue()
+
+    parsed = parse_projection_upload(spreadsheet, params)
+    assert len(parsed) == 2, 'both rows should parse from the spreadsheet'
+    assert parsed.loc['Nikola Jokić', 'Points'] == 26.5, 'accented names survive the spreadsheet too'
+
+    upload = client.post('/data/upload', files={
+        'file': ('projections.xlsx', spreadsheet,
+                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+    })
+    assert upload.status_code == 200, upload.text
+    assert upload.json()['n_players'] == 2
+
+    # The older .xls format needs a different engine; say so plainly instead of failing deep
+    # in a parser with something unactionable.
+    with pytest.raises(ValueError, match='.xlsx'):
+        parse_projection_upload(b'\xd0\xcf\x11\xe0legacy-excel-file', params)
+
+
+def test_projection_csv_reads_whatever_encoding_it_was_saved_in():
+    """Spreadsheets export in whatever codepage the machine defaults to, so uploads arrive as
+    UTF-8 (with or without a BOM), UTF-16 from Excel's Unicode export, or a legacy Windows
+    codepage. Assuming UTF-8 failed those on the first non-ASCII byte.
+
+    Accented names are the point, not a nicety: a mangled name matches no row in the unified
+    table, so the player silently falls through to a synthetic id with no headshot. Central
+    European codepages carry most NBA diacritics and are exactly what a blind cp1252 fallback
+    would corrupt."""
+    from backend.services.build_agent import parse_projection_upload
+    params = _load_params()['NBA']
+
+    def csv_text(player_name: str) -> str:
+        return (
+            'PLAYER,POS,GP,PTS,TREB,AST,STL,BLK,TO,3PM,FG%,FTA\n'
+            f'{player_name},C,70,26.5,12.5,9.0,1.3,0.9,3.0,1.1,0.583,7.3\n'
+            'Plain Player,PG,70,20.0,5.0,5.0,1.0,0.5,2.0,2.0,0.470,4.0\n'
+        )
+
+    for label, name, data in [
+        ('utf-8',          'Nikola Jokic',  csv_text('Nikola Jokic').encode('utf-8')),
+        ('utf-8 with BOM', 'Nikola Jokic',  csv_text('Nikola Jokic').encode('utf-8-sig')),
+        ('utf-16',         'Nikola Jokic',  csv_text('Nikola Jokic').encode('utf-16')),
+        ('cp1252',         'José Calderón', csv_text('José Calderón').encode('cp1252')),
+        ('cp1250',         'Nikola Jokić',  csv_text('Nikola Jokić').encode('cp1250')),
+    ]:
+        parsed = parse_projection_upload(data, params)
+        assert len(parsed) == 2, f'{label}: both rows should parse'
+        assert name in parsed.index, f'{label}: the name must survive decoding as {name!r}'
+        assert parsed.loc[name, 'Points'] == 26.5, f'{label}: stats should parse'
+
+
+def test_headshot_is_served_even_when_the_cache_cannot_be_written(monkeypatch):
+    """The headshot disk cache is a mounted bucket in production, which can be read-only or
+    briefly unavailable. A cache write is an optimisation — failing it must not fail a request
+    whose image has already been fetched, which it would if the write raised through the
+    handler."""
+    from pathlib import Path
+    from unittest import mock
+    from backend.api.routers import meta
+
+    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+    monkeypatch.setattr(meta, '_read_headshot_from_disk', lambda _id: None)
+    monkeypatch.setattr(meta.requests, 'get',
+                        lambda *args, **kwargs: mock.Mock(status_code=200, content=b'PNG-BYTES'))
+    monkeypatch.setattr(Path, 'write_bytes',
+                        lambda *args, **kwargs: (_ for _ in ()).throw(OSError('read-only file system')))
+
+    response = meta.get_player_headshot_route(_UNWRITABLE_CACHE_TEST_ID)
+    assert response.body == b'PNG-BYTES', 'the fetched image must still be served'
+    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+
+
+_UNWRITABLE_CACHE_TEST_ID = 987654321
 
 
 def test_outbound_http_resolves_ipv4_only():
@@ -332,14 +424,14 @@ def test_ratio_cells_supply_missing_attempt_columns():
     weights the percentage deviation in a ratio G-score, so it must be recovered from the
     cell rather than discarded with the rest of the text. A file's own attempts column
     always wins, and a percentage with no attempts anywhere is reported as missing."""
-    from backend.services.build_agent import parse_projection_csv
+    from backend.services.build_agent import parse_projection_upload
     params = _load_params()['NBA']
 
     volumes_inside_the_cell = (
         'PLAYER,POS,GP,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO\n'
         'Test Player,C,70,"0.583 (10.2/17.5)","0.821 (6.0/7.3)",1.1,26.5,12.5,9.0,1.3,0.9,3.0\n'
     ).encode()
-    recovered = parse_projection_csv(volumes_inside_the_cell, params)
+    recovered = parse_projection_upload(volumes_inside_the_cell, params)
     assert recovered.loc['Test Player', 'Field Goal %'] == 0.583, 'the percentage still parses'
     assert recovered.loc['Test Player', 'Field Goal Attempts'] == 17.5, 'attempts read from the cell'
     assert recovered.loc['Test Player', 'Free Throw Attempts'] == 7.3
@@ -348,7 +440,7 @@ def test_ratio_cells_supply_missing_attempt_columns():
         'PLAYER,POS,GP,FG%,FGA,FT%,FTA,3PM,PTS,TREB,AST,STL,BLK,TO\n'
         'Test Player,C,70,"0.583 (10.2/17.5)",21.0,"0.821 (6.0/7.3)",8.5,1.1,26.5,12.5,9.0,1.3,0.9,3.0\n'
     ).encode()
-    explicit = parse_projection_csv(own_attempts_columns, params)
+    explicit = parse_projection_upload(own_attempts_columns, params)
     assert explicit.loc['Test Player', 'Field Goal Attempts'] == 21.0, "the file's own column wins"
     assert explicit.loc['Test Player', 'Free Throw Attempts'] == 8.5
 
@@ -398,20 +490,20 @@ def test_percentage_without_attempts_narrows_out_instead_of_failing():
     assert 'Points' in categories, 'the countable categories are unaffected'
 
 
-def test_parse_projection_csv_tolerates_files_missing_categories():
+def test_parse_projection_upload_tolerates_files_missing_categories():
     """A source that pairs each projection set with a league exports only that league's
     active categories, so a file may legitimately lack e.g. Turnovers or the free-throw
     columns. It must still parse; the absent stats simply stay absent (the blend covers
     them from other active sources, and step 4 narrows the category list when nothing
     carries them). The upload endpoint reports the absences so the caption can show them."""
-    from backend.services.build_agent import parse_projection_csv
+    from backend.services.build_agent import parse_projection_upload
     params = _load_params()['NBA']
 
     partial_csv = (
         'Rank,Name,Pos,Value,g,p/g,r/g,a/g,s/g,b/g,3/g,fg%,fga/g\n'
         '1,Test Player,C,12.3,70,25.0,10.0,5.0,1.0,1.0,2.0,0.55,18.0\n'
     ).encode()
-    parsed = parse_projection_csv(partial_csv, params)
+    parsed = parse_projection_upload(partial_csv, params)
     assert parsed.loc['Test Player', 'Points'] == 25.0
     assert parsed.loc['Test Player', 'Field Goal %'] == 0.55
     for absent_column in ('Turnovers', 'Free Throw %', 'Free Throw Attempts'):
@@ -432,7 +524,7 @@ def test_parse_projection_csv_tolerates_files_missing_categories():
         'Test Player,C,70,25.0,1\n'
     ).encode()
     with pytest.raises(ValueError):
-        parse_projection_csv(too_sparse_csv, params)
+        parse_projection_upload(too_sparse_csv, params)
 
 
 def test_uploads_survive_restarts_and_stay_alive_while_in_use():
@@ -511,11 +603,11 @@ def test_partial_upload_as_sole_source_narrows_categories_and_builds():
         assert present_category in categories
 
 
-def test_parse_projection_csv_filters_non_numeric_rows():
+def test_parse_projection_upload_filters_non_numeric_rows():
     """Some sources repeat the header row inside the table body (every stat cell a string)
     and format ratio stats as '0.583 (10.2/17.5)'. The parser must extract the leading
     numbers, drop the embedded header rows, and never crash dividing a string by 82."""
-    from backend.services.build_agent import parse_projection_csv
+    from backend.services.build_agent import parse_projection_upload
     params = _load_params()['NBA']
 
     messy_csv = (
@@ -524,7 +616,7 @@ def test_parse_projection_csv_filters_non_numeric_rows():
         'R#,ADP,PLAYER,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\n'
         '2,2.1,Luka Doncic,PG,DAL,72,36.0,"0.490 (9.8/20.0)","0.786 (7.0/8.9)",3.0,32.0,9.0,9.5,1.4,0.5,4.0,14.8\n'
     ).encode()
-    parsed = parse_projection_csv(messy_csv, params)
+    parsed = parse_projection_upload(messy_csv, params)
     assert len(parsed) == 2, 'embedded header rows must be dropped'
     assert parsed.loc['Nikola Jokic', 'Points'] == 26.5
     assert parsed.loc['Nikola Jokic', 'Field Goal %'] == 0.583, 'leading number extracted from the compound cell'

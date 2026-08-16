@@ -9,15 +9,24 @@ import { pref, savePref } from '../preferences.js'
 // ─── Module state ──────────────────────────────────────────────────────────────
 
 // One row per custom projection slot. The upload's data_id is its identity everywhere
-// (blend-weight key, session requests); the title is presentation-only, like team labels
-// on the draft board.
+// (blend-weight key, session requests); the file's own name is what identifies the slot
+// to the reader.
 interface CustomUploadRow {
     dataId: string | null
-    titleInput: HTMLInputElement
+    fileName: string | null
     slider: HTMLInputElement
     valueDisplay: HTMLSpanElement
     statusSpan: HTMLSpanElement
     uploadInput: HTMLInputElement
+    fileNameLabel: HTMLSpanElement
+}
+
+/** Shows a chosen file's name, or the browser's own wording when a slot is empty. The full
+ *  name rides in the tooltip, since a long one is ellipsized in the narrow sidebar. */
+function setFileNameLabel(label: HTMLSpanElement, fileName: string | null): void {
+    label.textContent = fileName ?? 'No file chosen'
+    label.title = fileName ?? ''
+    label.classList.toggle('sidebar-file-name-empty', fileName === null)
 }
 
 // What is remembered across reloads for a filled slot. Only the id is load-bearing — the
@@ -27,24 +36,24 @@ interface CustomUploadRow {
 // slot with a visible message, which is the same recovery a mid-session expiry gets.
 interface StoredCustomUpload {
     dataId: string
-    title: string
     weight: number
     statusText: string
+    fileName: string | null
 }
 
 const CUSTOM_UPLOADS_PREF = 'custom_uploads'
 const MAX_CUSTOM_UPLOADS = 5
 let customUploadRows: CustomUploadRow[] = []
 
-/** Persists every filled slot (id, title, weight, status line) so uploads survive a reload. */
+/** Persists every filled slot (id, filename, weight, status line) so uploads survive a reload. */
 function saveCustomUploads(): void {
     savePref(CUSTOM_UPLOADS_PREF, customUploadRows
         .filter(row => row.dataId !== null)
         .map(row => ({
             dataId:     row.dataId as string,
-            title:      row.titleInput.value,
             weight:     parseFloat(row.slider.value),
             statusText: row.statusSpan.textContent ?? '',
+            fileName:   row.fileName,
         })))
 }
 
@@ -74,6 +83,9 @@ export function markUploadedSourcesExpired(): boolean {
         row.slider.value = '0'
         row.valueDisplay.textContent = '0.00'
         row.statusSpan.textContent = 'Upload expired — please re-upload the file.'
+        // The slot holds nothing now; showing the old filename would suggest otherwise.
+        row.fileName = null
+        setFileNameLabel(row.fileNameLabel, null)
         // Clear the input so re-selecting the same file fires a fresh change event.
         row.uploadInput.value = ''
     }
@@ -198,9 +210,9 @@ export function renderPlayerStats(container: HTMLElement): void {
 }
 
 /** Renders the projection source weights: ESPN and DARKO sliders, then the custom
- *  projections section — up to five uploadable sources, each with an editable title,
- *  a weight slider locked until its upload succeeds, and a file chooser. A fresh empty
- *  row appears after each successful upload. */
+ *  projections section — up to five uploadable sources, each a file chooser plus a weight
+ *  slider locked until its upload succeeds. A fresh empty row appears after each successful
+ *  upload. */
 function renderBlendWeights(container: HTMLElement): void {
 
     const weightLabel = document.createElement('div')
@@ -237,9 +249,8 @@ function renderBlendWeights(container: HTMLElement): void {
     const customCaption = document.createElement('div')
     customCaption.className = 'sidebar-caption'
     customCaption.textContent =
-        'Upload projection CSVs from any source — each column is read on its own, so most ' +
-        'exports work as downloaded, and stats a file leaves out are taken from the other ' +
-        'sources. Uploads are kept for a day and survive a reload.'
+        'Upload projections from any source, as CSV or Excel — each column is read on its ' +
+        'own, so most exports work as downloaded.'
     container.append(customCaption)
 
     const customRowsContainer = document.createElement('div')
@@ -278,29 +289,53 @@ function makeWeightSlider(
     return { slider, valueDisplay }
 }
 
-/** Appends one custom-projection row: [editable title | weight slider] + [file chooser | status].
- *  The slider stays locked at zero until this row's upload succeeds. `storedUpload` restores a
- *  slot remembered from a previous visit, already filled and unlocked. */
+/** Appends one custom-projection slot: [file chooser | filename] over [weight slider], with
+ *  the upload's status line beneath. The file's own name identifies the source, so the slider
+ *  needs no label of its own. The slider stays locked at zero until this slot's upload
+ *  succeeds. `storedUpload` restores a slot remembered from a previous visit, already filled
+ *  and unlocked. */
 function appendCustomUploadRow(
     customRowsContainer: HTMLElement
     , storedUpload?: StoredCustomUpload
 ): void {
     const rowNumber = customUploadRows.length + 1
 
-    const sliderRow = document.createElement('div')
-    sliderRow.className = 'sidebar-slider-row'
+    const uploadRow = document.createElement('div')
+    uploadRow.className = 'sidebar-upload-row'
 
-    // Editable display title, like team labels on the draft board: presentation only —
-    // the upload's identity is its data_id. Title events stay out of the section's
-    // change/input listeners so typing a name never triggers a session patch.
-    const titleInput = document.createElement('input')
-    titleInput.type = 'text'
-    titleInput.id = `ps-custom-title-${rowNumber}`
-    titleInput.className = 'sidebar-input custom-projection-title'
-    titleInput.value = storedUpload?.title ?? `Data ${rowNumber}`
-    titleInput.addEventListener('input', event => { event.stopPropagation(); saveCustomUploads() })
-    titleInput.addEventListener('change', event => event.stopPropagation())
-    sliderRow.append(titleInput)
+    const uploadInput = document.createElement('input')
+    uploadInput.type = 'file'
+    uploadInput.id = `ps-upload-custom-${rowNumber}`
+    // Spreadsheets are as common as CSVs here: people copy a projection table into Excel and
+    // upload what they saved. The backend decides format from the file's own signature, so
+    // this only widens the picker.
+    uploadInput.accept = '.csv,.xlsx'
+    uploadInput.className = 'sidebar-file-input'
+
+    // The file input's own text ("No file chosen", or the filename) is drawn by the browser
+    // and cannot be set from script — a page that could would be able to fake a chosen file.
+    // So a restored slot could never show the file behind it, however much else we remembered.
+    // The input is visually hidden (still focusable, still the thing the label opens) and the
+    // filename is rendered here instead, which makes it ours to persist like the rest.
+    const fileButton = document.createElement('label')
+    fileButton.className = 'sidebar-file-button'
+    fileButton.htmlFor = uploadInput.id
+    fileButton.textContent = 'Choose file'
+
+    const fileNameLabel = document.createElement('span')
+    fileNameLabel.className = 'sidebar-file-name'
+    setFileNameLabel(fileNameLabel, storedUpload?.fileName ?? null)
+
+    uploadRow.append(fileButton, uploadInput, fileNameLabel)
+
+    const statusSpan = document.createElement('span')
+    statusSpan.className = 'sidebar-caption'
+    statusSpan.textContent = storedUpload?.statusText ?? ''
+    uploadRow.append(statusSpan)
+    customRowsContainer.append(uploadRow)
+
+    const sliderRow = document.createElement('div')
+    sliderRow.className = 'sidebar-slider-row custom-upload-weight-row'
 
     const { slider, valueDisplay } = makeWeightSlider(`ps-w-custom-${rowNumber}`, storedUpload?.weight ?? 0)
     // A weight for a source with no file behind it is meaningless — locked until upload succeeds.
@@ -309,25 +344,10 @@ function appendCustomUploadRow(
     sliderRow.append(slider, valueDisplay)
     customRowsContainer.append(sliderRow)
 
-    const uploadRow = document.createElement('div')
-    uploadRow.className = 'sidebar-upload-row'
-
-    const uploadInput = document.createElement('input')
-    uploadInput.type = 'file'
-    uploadInput.id = `ps-upload-custom-${rowNumber}`
-    uploadInput.accept = '.csv'
-    uploadInput.className = 'sidebar-file-input'
-    uploadRow.append(uploadInput)
-
-    const statusSpan = document.createElement('span')
-    statusSpan.className = 'sidebar-caption'
-    statusSpan.textContent = storedUpload?.statusText ?? ''
-    uploadRow.append(statusSpan)
-    customRowsContainer.append(uploadRow)
-
     const row: CustomUploadRow = {
         dataId: storedUpload?.dataId ?? null,
-        titleInput, slider, valueDisplay, statusSpan, uploadInput,
+        fileName: storedUpload?.fileName ?? null,
+        slider, valueDisplay, statusSpan, uploadInput, fileNameLabel,
     }
     customUploadRows.push(row)
 
@@ -346,6 +366,8 @@ function appendCustomUploadRow(
                 ? ` (no ${resp.missing_stats.join('/')})` : ''
             statusSpan.textContent = `✓ ${resp.n_players} players loaded${missingNote}`
             slider.disabled = false
+            row.fileName = file.name
+            setFileNameLabel(fileNameLabel, file.name)
             saveCustomUploads()
             // Open the next slot once this one is filled (first upload into this row only).
             if (!hadUploadAlready && customUploadRows.length < MAX_CUSTOM_UPLOADS) {

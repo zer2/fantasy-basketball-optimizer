@@ -16,6 +16,7 @@ yfpy==15.0.3
 requests_oauthlib
 requests
 pyyaml
+openpyxl               # reads .xlsx projection uploads (pandas' engine for the format)
 numexpr
 statsmodels
 snowflake-connector-python
