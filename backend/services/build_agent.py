@@ -98,7 +98,7 @@ def _v0_cache_key(cp: dict) -> tuple | None:
 
 
 def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
-    """Bring a single uploaded CSV (name-indexed by parse_projection_csv) to the id-keyed
+    """Bring a single uploaded CSV (name-indexed by parse_projection_upload) to the id-keyed
     contract: resolve names via the unified table, keep unresolved rows under synthetic
     ids, and return an id-indexed frame with the display 'Player' column retained."""
     from backend.data_retrieval import attach_player_ids_by_name
@@ -165,7 +165,7 @@ def run_step1(
 
     if v0_with_names is None:
         if source_type == 'csv':
-            v0_with_names = _resolve_single_csv_player_ids(parse_projection_csv(csv_bytes, params))
+            v0_with_names = _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, params))
 
         elif source_type == 'historical':
             from backend.data_retrieval import get_specified_historical_stats
@@ -245,8 +245,35 @@ def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
     return mapping
 
 
-def _decode_projection_csv(csv_bytes: bytes) -> str:
-    """Decode an uploaded CSV whatever it was saved as.
+# A .xlsx is a ZIP archive, so every one begins with this signature. The older .xls is an
+# OLE2 compound file with a different one — detected only to say so plainly, since reading it
+# would need another engine and anything that can save .xls can also save .xlsx or .csv.
+_XLSX_SIGNATURE = b'PK\x03\x04'
+_XLS_SIGNATURE  = b'\xd0\xcf\x11\xe0'
+
+
+def _read_projection_table(upload_bytes: bytes) -> pd.DataFrame:
+    """Load an upload into a frame, whether it is a spreadsheet or a text file.
+
+    People reach these tools by copying a projection table into a spreadsheet, so the file
+    that comes back is as often .xlsx as .csv — and telling someone to re-export as CSV is
+    asking them to do work the parser can do. Format is decided by the file's own signature
+    rather than its name, because a download saved with the wrong extension is common and the
+    bytes cannot lie."""
+    if upload_bytes.startswith(_XLSX_SIGNATURE):
+        try:
+            return pd.read_excel(io.BytesIO(upload_bytes), engine='openpyxl')
+        except Exception as exc:
+            raise ValueError(f'Could not read this spreadsheet: {type(exc).__name__}: {exc}')
+    if upload_bytes.startswith(_XLS_SIGNATURE):
+        raise ValueError(
+            'This is an older .xls spreadsheet, which cannot be read directly. '
+            'Save it as .xlsx or .csv and upload again.')
+    return pd.read_csv(io.StringIO(_decode_projection_text(upload_bytes)))
+
+
+def _decode_projection_text(csv_bytes: bytes) -> str:
+    """Decode an uploaded text file whatever it was saved as.
 
     Spreadsheets export in whatever codepage the machine defaults to, so a file that opens
     fine locally can be UTF-8, UTF-16 (Excel's "Unicode text"), or a legacy Windows codepage.
@@ -279,8 +306,8 @@ def _decode_projection_csv(csv_bytes: bytes) -> str:
     return csv_bytes.decode('latin-1')
 
 
-def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
-    """Parse an uploaded projection CSV into the canonical column set.
+def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
+    """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
 
     There is no format detection: each column is interpreted on its own through the alias
     table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
@@ -288,7 +315,7 @@ def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
     names needs no aliases at all. Raises ValueError naming what could not be found when
     the file does not read as a projection set.
     """
-    df_raw = pd.read_csv(io.StringIO(_decode_projection_csv(csv_bytes)))
+    df_raw = _read_projection_table(upload_bytes)
     column_mapping  = _map_columns_to_canonical(df_raw, params)
     # Unrecognized columns keep their own names, so a file already using canonical names
     # is understood without any alias matching at all.

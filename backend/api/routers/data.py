@@ -1,5 +1,5 @@
 """Projection CSV upload endpoint. Headers are interpreted through the alias table, so no
-particular export format is assumed (see build_agent.parse_projection_csv)."""
+particular export format is assumed (see build_agent.parse_projection_upload)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from backend.parameters import load_all_params
-from backend.services.build_agent import parse_projection_csv, _CORE_PROJECTION_COLUMNS
+from backend.services.build_agent import parse_projection_upload, _CORE_PROJECTION_COLUMNS
 from backend.state.upload_store import store_upload, UPLOAD_TTL, MAX_FILE_BYTES
 from backend.api.schemas import UploadResponse
 
@@ -47,7 +47,7 @@ async def upload_projection(
     all_params = load_all_params()
     params = all_params.get('NBA', {})
     try:
-        df = parse_projection_csv(csv_bytes, params)
+        df = parse_projection_upload(csv_bytes, params)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f'Could not parse file: {exc}')
 

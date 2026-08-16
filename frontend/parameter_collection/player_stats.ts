@@ -237,9 +237,9 @@ function renderBlendWeights(container: HTMLElement): void {
     const customCaption = document.createElement('div')
     customCaption.className = 'sidebar-caption'
     customCaption.textContent =
-        'Upload projection CSVs from any source — each column is read on its own, so most ' +
-        'exports work as downloaded, and stats a file leaves out are taken from the other ' +
-        'sources. Uploads are kept for a day and survive a reload.'
+        'Upload projections from any source, as CSV or Excel — each column is read on its ' +
+        'own, so most exports work as downloaded, and stats a file leaves out are taken ' +
+        'from the other sources. Uploads are kept for a day and survive a reload.'
     container.append(customCaption)
 
     const customRowsContainer = document.createElement('div')
@@ -315,7 +315,10 @@ function appendCustomUploadRow(
     const uploadInput = document.createElement('input')
     uploadInput.type = 'file'
     uploadInput.id = `ps-upload-custom-${rowNumber}`
-    uploadInput.accept = '.csv'
+    // Spreadsheets are as common as CSVs here: people copy a projection table into Excel and
+    // upload what they saved. The backend decides format from the file's own signature, so
+    // this only widens the picker.
+    uploadInput.accept = '.csv,.xlsx'
     uploadInput.className = 'sidebar-file-input'
     uploadRow.append(uploadInput)
 

@@ -15,7 +15,7 @@ from backend.infra.auth import current_user_key_optional
 from backend.parameters import load_all_params
 from backend.state.session import get_session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_agent import clear_v0_cache, parse_projection_csv, InsufficientPlayerPoolError
+from backend.services.build_agent import clear_v0_cache, parse_projection_upload, InsufficientPlayerPoolError
 from backend.state.upload_store import get_upload
 from backend.api.platform_helpers import resolve_platform_config
 from backend.api.schemas import (
@@ -113,7 +113,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) ->
         entry = get_upload(data_id)
         if entry is None:
             raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        result[data_id] = parse_projection_csv(entry['bytes'], params)
+        result[data_id] = parse_projection_upload(entry['bytes'], params)
     return result
 
 
