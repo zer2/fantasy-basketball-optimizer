@@ -314,6 +314,38 @@ def test_parse_projection_csv_reads_any_recognized_spelling():
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_projection_csv_reads_whatever_encoding_it_was_saved_in():
+    """Spreadsheets export in whatever codepage the machine defaults to, so uploads arrive as
+    UTF-8 (with or without a BOM), UTF-16 from Excel's Unicode export, or a legacy Windows
+    codepage. Assuming UTF-8 failed those on the first non-ASCII byte.
+
+    Accented names are the point, not a nicety: a mangled name matches no row in the unified
+    table, so the player silently falls through to a synthetic id with no headshot. Central
+    European codepages carry most NBA diacritics and are exactly what a blind cp1252 fallback
+    would corrupt."""
+    from backend.services.build_agent import parse_projection_csv
+    params = _load_params()['NBA']
+
+    def csv_text(player_name: str) -> str:
+        return (
+            'PLAYER,POS,GP,PTS,TREB,AST,STL,BLK,TO,3PM,FG%,FTA\n'
+            f'{player_name},C,70,26.5,12.5,9.0,1.3,0.9,3.0,1.1,0.583,7.3\n'
+            'Plain Player,PG,70,20.0,5.0,5.0,1.0,0.5,2.0,2.0,0.470,4.0\n'
+        )
+
+    for label, name, data in [
+        ('utf-8',          'Nikola Jokic',  csv_text('Nikola Jokic').encode('utf-8')),
+        ('utf-8 with BOM', 'Nikola Jokic',  csv_text('Nikola Jokic').encode('utf-8-sig')),
+        ('utf-16',         'Nikola Jokic',  csv_text('Nikola Jokic').encode('utf-16')),
+        ('cp1252',         'José Calderón', csv_text('José Calderón').encode('cp1252')),
+        ('cp1250',         'Nikola Jokić',  csv_text('Nikola Jokić').encode('cp1250')),
+    ]:
+        parsed = parse_projection_csv(data, params)
+        assert len(parsed) == 2, f'{label}: both rows should parse'
+        assert name in parsed.index, f'{label}: the name must survive decoding as {name!r}'
+        assert parsed.loc[name, 'Points'] == 26.5, f'{label}: stats should parse'
+
+
 def test_headshot_is_served_even_when_the_cache_cannot_be_written(monkeypatch):
     """The headshot disk cache is a mounted bucket in production, which can be read-only or
     briefly unavailable. A cache write is an optimisation — failing it must not fail a request

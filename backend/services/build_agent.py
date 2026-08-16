@@ -13,9 +13,13 @@ No session_context or _SessionState: each step reads/writes session fields direc
 
 from __future__ import annotations
 
+import codecs
 import io
+import logging
 import time
 import threading
+
+import charset_normalizer
 import pandas as pd
 from pathlib import Path
 
@@ -241,6 +245,40 @@ def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
     return mapping
 
 
+def _decode_projection_csv(csv_bytes: bytes) -> str:
+    """Decode an uploaded CSV whatever it was saved as.
+
+    Spreadsheets export in whatever codepage the machine defaults to, so a file that opens
+    fine locally can be UTF-8, UTF-16 (Excel's "Unicode text"), or a legacy Windows codepage.
+    Assuming UTF-8 made those fail on the first non-ASCII byte — a decode error naming a byte
+    offset, which tells a user nothing except that saving it again as UTF-8 helps.
+
+    Order matters. A byte-order mark is decisive, so it is honoured first; UTF-16 in
+    particular must never be guessed at, since its text decodes as plausible-looking rubbish
+    under a single-byte codepage. UTF-8 is tried next because it is both the common case and
+    self-validating — invalid sequences raise rather than silently mis-decode. Only then do we
+    detect, which is what gets accented names right: Jokić and Dončić live in Central European
+    codepages that a blind cp1252 fallback would mangle, and a mangled name resolves to no
+    player id. latin-1 is the floor: it cannot raise, so a file always loads.
+    """
+    if csv_bytes.startswith(codecs.BOM_UTF16_LE) or csv_bytes.startswith(codecs.BOM_UTF16_BE):
+        return csv_bytes.decode('utf-16')
+    try:
+        return csv_bytes.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        pass
+
+    detected = charset_normalizer.from_bytes(csv_bytes).best()
+    if detected is not None:
+        logging.getLogger('fbbo').info(
+            'Projection upload is not UTF-8; decoded as %s', detected.encoding)
+        return str(detected)
+    logging.getLogger('fbbo').warning(
+        'Projection upload encoding could not be identified; decoding as latin-1, '
+        'so accented names may be wrong')
+    return csv_bytes.decode('latin-1')
+
+
 def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
     """Parse an uploaded projection CSV into the canonical column set.
 
@@ -250,7 +288,7 @@ def parse_projection_csv(csv_bytes: bytes, params: dict) -> pd.DataFrame:
     names needs no aliases at all. Raises ValueError naming what could not be found when
     the file does not read as a projection set.
     """
-    df_raw = pd.read_csv(io.BytesIO(csv_bytes))
+    df_raw = pd.read_csv(io.StringIO(_decode_projection_csv(csv_bytes)))
     column_mapping  = _map_columns_to_canonical(df_raw, params)
     # Unrecognized columns keep their own names, so a file already using canonical names
     # is understood without any alias matching at all.
