@@ -2251,45 +2251,33 @@ tr {
     background-color: rgba(53, 128, 187, 0.25) !important;
 }
 
-/* ─── Login screen (shown until the user signs in with Google) ────────────────── */
+/* ─── Sign-in affordances (signing in is optional; the app runs signed out) ───── */
 
-#login-overlay {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: light-dark(#f4f4f6, #15161f);
-    font-family: "Source Sans 3";
-}
-
-.login-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 40px 48px;
+/* In the sidebar account row it stands in for Sign out, so it matches that button; in a
+   sign-in prompt it is the only control, so it sits on its own line. */
+.signin-link {
+    flex-shrink: 0;
+    padding: 4px 10px;
     border: 1px solid light-dark(#e5e5e5, #3d3d55);
-    border-radius: 10px;
-    background: light-dark(white, #1d1e2a);
-}
-
-.login-logo  { font-size: 2.5rem; }
-.login-title { font-size: 1.3rem; font-weight: 700; color: light-dark(#222222, #e6e6ff); }
-.login-sub   { margin: 0 0 12px; color: light-dark(#666666, #9999bb); }
-
-.login-btn {
-    padding: 10px 22px;
-    border: 1px solid light-dark(#cccccc, #555577);
-    border-radius: 6px;
-    background: light-dark(#ffffff, #2a2a3e);
-    color: light-dark(#222222, #e6e6ff);
-    font-size: 0.95rem;
+    border-radius: 4px;
+    background: light-dark(#efefef, #2a2a3e);
+    color: light-dark(#555555, darkgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
     text-decoration: none;
     cursor: pointer;
 }
 
-.login-btn:hover { background: light-dark(#f0f0f0, #3d3d55); }
+.signin-link:hover { background: light-dark(#e5e5e5, #3d3d55); color: light-dark(black, white); }
+
+/* In the sidebar account row the link inherits that row's centring; here it should line up with
+   the explanation above it instead of floating in the middle of the cell. */
+.signin-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
 
 /* ─── ESPN auth-instructions pop-up (espn_connector.ts) ───────────────────────── */
 

@@ -23,12 +23,16 @@ export const APP = process.env.APP_URL ?? 'http://localhost:8000'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /**
- * Launches a headless browser page logged into the app, with monitors attached:
- * every failed backend call (status >= 400 on a /sessions route) and every console
- * error is recorded. Tests drain these via expectCleanSession after each step, so a
- * failure is attributed to the step that caused it.
+ * Launches a headless browser page against the app, with monitors attached: every failed
+ * backend call (status >= 400 on a /sessions route) and every console error is recorded.
+ * Tests drain these via expectCleanSession after each step, so a failure is attributed to
+ * the step that caused it.
+ *
+ * Signed in by default, since that is what most tests want to exercise. Pass
+ * `{ signedIn: false }` for the anonymous path — the app is usable without an account, and
+ * only the live-platform controls require one.
  */
-export async function launchAppPage() {
+export async function launchAppPage({ signedIn = true } = {}) {
     try {
         await fetch(APP, { method: 'HEAD' })
     } catch {
@@ -39,8 +43,10 @@ export async function launchAppPage() {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     // The season rosters grid pastes via navigator.clipboard — grant it up front.
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: APP })
-    const cookie = mintSessionCookie(repoRoot)
-    await context.addCookies([{ name: cookie.name, value: cookie.value, url: APP }])
+    if (signedIn) {
+        const cookie = mintSessionCookie(repoRoot)
+        await context.addCookies([{ name: cookie.name, value: cookie.value, url: APP }])
+    }
     const page = await context.newPage()
     page.setDefaultTimeout(20000)
 

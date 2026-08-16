@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status, Response
 
 from backend.infra.auth import current_user_key_optional
+from backend.infra.rate_limit import enforce_rate_limit, BUILD_POLICY, REBUILD_POLICY
 from backend.parameters import load_all_params
 from backend.state.session import get_session, delete_session
 from backend.services.session_management import build_session, apply_patch
@@ -147,7 +148,8 @@ def _serialize_player_registry(session) -> list[PlayerRegistryEntry]:
 
 # ── Routes ──────────────────────────────────────────────────────────────────────────────
 
-@router.post('/sessions', response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
+@router.post('/sessions', response_model=SessionResponse, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(enforce_rate_limit(BUILD_POLICY))])
 def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(current_user_key_optional)):
     all_params = load_all_params()
     if req.league.sport not in all_params:
@@ -190,7 +192,8 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     )
 
 
-@router.patch('/sessions/{session_id}', response_model=PatchResponse)
+@router.patch('/sessions/{session_id}', response_model=PatchResponse,
+              dependencies=[Depends(enforce_rate_limit(REBUILD_POLICY))])
 def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[str] = Depends(current_user_key_optional)):
     session = get_session(session_id)
     if session is None:

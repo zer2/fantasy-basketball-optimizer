@@ -4,6 +4,8 @@ The H-scoring algorithm factors in which players are selected by other teams. Us
 
 ## Fantasy provider connections
 
+Connecting a provider is the one part of the website that requires signing in with Google. The credentials for a platform are stored against that account, so there has to be an account to store them against. Everything else — entering your own data, uploading projections, drafts, auctions and season tools — works without signing in.
+
 The three platforms currently supported are: 
 
 **Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when Yahoo is selected.
