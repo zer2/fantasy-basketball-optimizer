@@ -728,20 +728,19 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     gap: 8px;
 }
 
-/* Editable display title of a custom projection source, sitting where the fixed
-   source label (ESPN / DARKO) does on the Snowflake rows. */
-.custom-projection-title {
-    width: 4.5rem;
-    box-sizing: border-box;
-    flex-shrink: 0;
-}
-
 .sidebar-slider-row label {
     color: light-dark(#555555, darkgrey);
     font-size: 0.78rem;
     font-family: "Source Sans 3";
     width: 52px;
     flex-shrink: 0;
+}
+
+/* A custom source is named by the filename on the line above rather than by a label in the
+   row, so its slider is indented by the width of that label column (52px) plus the row gap —
+   otherwise every custom track would start left of the ESPN/DARKO tracks above it. */
+.custom-upload-weight-row {
+    padding-left: 60px;
 }
 
 .sidebar-slider-row input[type="range"] {
@@ -761,12 +760,75 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     flex-shrink: 0;
 }
 
+/* The file input is driven through its <label> rather than shown directly: the browser draws
+   its own "No file chosen" text, which cannot be set from script, so a restored upload could
+   never name the file behind it. Hidden this way rather than with display:none, the input
+   stays focusable and keyboard-operable, and the label opens the picker as before. */
 .sidebar-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* A custom-projection slot leads with this row, so its top margin is what separates one
+   slot from the next. The status line wraps onto its own line (flex-basis below) — it is
+   a full sentence, and squeezing it beside the filename would ellipsize both. */
+.sidebar-upload-row {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    margin-top: 8px;
+}
+
+.sidebar-upload-row .sidebar-caption {
+    flex-basis: 100%;
+}
+
+.sidebar-file-button {
     font-size: 0.75rem;
-    color: light-dark(#555555, darkgrey);
     font-family: "Source Sans 3";
-    margin-top: 2px;
-    width: 100%;
+    color: light-dark(#333333, lightgrey);
+    background-color: light-dark(#fafafa, #181923);
+    border: 1px solid light-dark(#d5d5d5, #3d3d55);
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sidebar-file-button:hover {
+    border-color: light-dark(#999999, #6677aa);
+}
+
+/* The input is off-screen, so its focus ring would be invisible — surface it on the label. */
+.sidebar-upload-row:focus-within .sidebar-file-button {
+    outline: 2px solid light-dark(#5577cc, #6677aa);
+    outline-offset: 1px;
+}
+
+/* Takes the rest of the line beside the button: the filename is what names the source now,
+   so it gets the room rather than a fixed column. */
+.sidebar-file-name {
+    flex: 1;
+    font-size: 0.75rem;
+    font-family: "Source Sans 3";
+    color: light-dark(#333333, lightgrey);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Matches the muted tone the browser uses for its own empty-state wording. */
+.sidebar-file-name-empty {
+    color: light-dark(#888888, #777788);
 }
 
 /* ─── Compact parameter grid (2-column, for player stat / algo params) ──── */
