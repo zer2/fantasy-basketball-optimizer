@@ -1,15 +1,13 @@
 site_name: Fantasy Basketball Optimization
 nav:
   - Home: index.md
-  - Settings : settings.md
-  - Parameters : parameters.md
+  - League Setup : league-setup.md
+  - Player Stats : projections.md
+  - H-scoring : hscores.md
   - G-scores : gscores.md
-  - H-scores : hscores.md
-  - Rotisserie : roto.md
   - Draft Mode : drafts.md
-  - Auction Mode : auctions.md 
+  - Auction Mode : auctions.md
   - Season Mode : season.md
-  - Projection Adjustment : projectionadjustment.md
 theme: 
   name : material
   favicon: img/favicon.ico
@@ -17,6 +15,9 @@ markdown_extensions:
   - pymdownx.blocks.caption
   - pymdownx.arithmatex:
       generic: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
   - attr_list
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji

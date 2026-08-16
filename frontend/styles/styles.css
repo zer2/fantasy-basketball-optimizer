@@ -1,0 +1,2404 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@100;400&display=swap');
+
+:root {
+    color-scheme: dark;
+
+    /* Line colors — two tiers. Name by role, not appearance, so a value can be retuned
+       without the name lying. --line-structural is the existing edge color (panels, sidebar,
+       dividers); --line-grid is a quieter line for interior data-grid cells. */
+    --line-structural: light-dark(#e5e5e5, #3d3d55);   /* staged for the next pass */
+    --line-grid:       light-dark(#f0f0f0, #2a2c3a);
+}
+
+/* Scale all rem-based sizes with viewport width, min 16px (laptop), max 20px (wide desktop) */
+html { font-size: clamp(16px, 0.93vw, 20px); }
+
+/* On phones, shrink the root font so all rem-based widths (player col, score col,
+   categories, etc.) scale down proportionally — lets the candidate table fit in
+   viewport widths around 375-430px without horizontal scroll. */
+@media (max-width: 768px) {
+    html { font-size: 10px; }
+}
+
+/* ─── App layout ─────────────────────────────────────────────────────────── */
+
+#app-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+#sidebar {
+    width: 280px;
+    min-width: 280px;
+    /* Pin to the viewport height and stick in place as the main content scrolls. Without a fixed
+       height the sidebar stretches to #main-content's height (align-items: stretch), which made the
+       bottom-pinned #docs-link jump up/down whenever a tab changed the content height. This also
+       activates the (previously dormant) overflow-y below so the sidebar scrolls its own content. */
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    background-color: light-dark(#ffffff, #0e1117);
+    border-right: 1px solid light-dark(#e5e5e5, #3d3d55);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hidden by default — only the mobile media block makes the toggle visible
+   and styles it. Desktop never shows it (the sidebar is always in flow). */
+#sidebar-toggle {
+    display: none;
+}
+
+/* Mobile: sidebar is a full-screen overlay. The closed state is a transform
+   off-screen, which is GPU-composited — so toggling the menu doesn't reflow
+   or repaint the candidate panel underneath. This is the entire point of this
+   architecture: the candidate panel never changes width, so the ~400ms paint
+   that previously occurred on every toggle is gone. */
+@media (max-width: 768px) {
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 50;
+        transition: transform 0.2s ease-out;
+        /* Pre-allocate a compositor layer so the slide is GPU-only — without
+           this hint, the browser may paint the sidebar contents on each
+           toggle. */
+        will-change: transform;
+    }
+    #app-layout.sidebar-collapsed #sidebar {
+        transform: translateX(-100%);
+    }
+    /* Hamburger / close toggle. Sits at top-right in BOTH open and closed
+       states — same fixed coordinates → no layout change on collapse, no
+       visual jump. Top: 22px vertically aligns with the first input row.
+       When the sidebar is open, the same coordinates fall inside the
+       .sidebar-title header strip. */
+    #sidebar-toggle {
+        display: flex;
+        position: fixed;
+        top: 22px;
+        right: 8px;
+        z-index: 100;
+        width: 32px;
+        height: 28px;
+        border: none;
+        background: transparent;
+        color: light-dark(#999999, #666688);
+        cursor: pointer;
+        font-family: "Source Sans 3";
+        font-size: 1.3rem;
+        line-height: 1;
+        align-items: center;
+        justify-content: center;
+    }
+    /* Hamburger when closed; X when open. Same font-size so the close
+       affordance doesn't look visually heavier than the open one. */
+    #sidebar-toggle::before {
+        content: '☰';
+    }
+    #app-layout:not(.sidebar-collapsed) #sidebar-toggle::before {
+        content: '✕';
+    }
+    /* Remove the browser's default focus ring on tap — otherwise it appears
+       as a boxy outline around the toggle after the first click. Keep focus
+       visible for keyboard navigation only. */
+    #sidebar-toggle:focus {
+        outline: none;
+    }
+    #sidebar-toggle:focus-visible {
+        outline: 2px solid light-dark(#999999, #666688);
+        outline-offset: 2px;
+    }
+    /* Border-bottom on the sidebar title to demarcate it as a header bar in
+       the open-sidebar overlay. (The matching padding-bottom extension lives
+       in a separate mobile block after the base .sidebar-title rule — it
+       needs to come after the base `padding` shorthand to win the cascade.) */
+    .sidebar-title {
+        border-bottom: 1px solid light-dark(#e5e5e5, #3d3d55);
+    }
+    /* Push the season-mode tabs down to the bottom of the header so they
+       align with the border line — matching how they sit on desktop (where
+       the active tab's underline merges into season-nav's border-bottom).
+       The hamburger overlays the empty space ABOVE the tabs in the top-
+       right corner. */
+    #season-nav {
+        padding-top: 28px;
+    }
+}
+
+.section-apply-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 6px;
+    background: light-dark(#efefef, #2a2a3e);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    color: light-dark(#555555, #aaaacc);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.section-apply-btn:hover {
+    background: light-dark(#e5e5e5, #3d3d55);
+    color: light-dark(black, white);
+}
+
+/* Disabled (e.g. live Refresh Analysis before a platform is connected): greyed, inert. */
+.section-apply-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.section-apply-btn:disabled:hover {
+    background: light-dark(#efefef, #2a2a3e);
+    color: light-dark(#555555, #aaaacc);
+}
+
+/* Inline variant for the live-platform Refresh Analysis button (sits in the tab-row,
+   beside the seat selector). Matches the seat-select box's height/weight (min-height +
+   0.8rem font, inherited border/radius), but is longer. */
+.live-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 220px;
+    min-height: 28px;
+    margin-top: 0;
+    margin-left: 10px;
+    padding: 4px 16px;
+    white-space: nowrap;
+}
+
+.sidebar-title {
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 14px 48px 10px 16px;  /* extra right padding to clear #sidebar-toggle */
+}
+
+/* Mobile: extend the title bar's bottom padding so the bottom border sits
+   below the toggle (top: 22px + height 28px = 50px) instead of cutting
+   through it. Lives here, AFTER the base padding shorthand, to win the
+   same-specificity cascade. */
+@media (max-width: 768px) {
+    .sidebar-title {
+        padding-bottom: 28px;
+    }
+}
+
+.sidebar-divider {
+    border: none;
+    border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
+    margin: 0;
+}
+
+/* Documentation link, pinned to the bottom-left of the flex-column sidebar
+   (margin-top: auto pushes it below the sections). Matches the sidebar-title
+   type and the sidebar/divider edge color. */
+#docs-link {
+    margin-top: auto;
+    display: block;
+    padding: 12px 16px;
+    border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+#docs-link:hover {
+    background-color: light-dark(#f0f0f0, #191c24);
+    text-decoration: underline;
+}
+
+#main-content {
+    flex: 1;
+    overflow-y: auto;
+    /* Single source of truth for the horizontal bounds of every main-column
+       element (pick-control row, entry table, candidate table). Children use
+       max-width: 100% and inherit this padding for their right/left edge —
+       no element computes its own calc(100vw - Npx). Mobile overrides these
+       variables to tighten the gutter; nothing else changes. */
+    --main-content-padding-left:  16px;
+    --main-content-padding-right: 16px;
+    padding: 8px var(--main-content-padding-right) 16px var(--main-content-padding-left);
+}
+
+/* ─── Sidebar sections (collapsible, mirroring Streamlit popovers) ───────── */
+
+.sidebar-section {
+    border-bottom: 1px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+.sidebar-section > summary {
+    color: light-dark(#555555, darkgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 9px 16px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-section > summary::before {
+    content: '▶';
+    font-size: 0.55rem;
+    transition: transform 0.15s;
+    color: light-dark(#999999, #666688);
+}
+
+.sidebar-section[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.sidebar-section-content {
+    padding: 4px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ─── League settings 2-column grid ─────────────────────────────────────── */
+
+.ls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+}
+
+.ls-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;   /* prevent grid blowout from long custom-select text */
+}
+
+.ls-cell-full {
+    grid-column: 1 / -1;
+}
+
+/* ─── Draft board header: editable team label + compact method dropdown ─────── */
+
+.team-header-cell {
+    padding: 2px 4px;
+}
+
+.team-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.team-label-input {
+    min-width: 0;
+    flex: 1 1 auto;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    outline: none;
+    text-align: center;
+    text-overflow: ellipsis;
+    color: light-dark(#555555, #aaaaaa);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 1px 2px;
+}
+
+.team-label-input:hover {
+    border-color: light-dark(#e5e5e5, #3d3d55);
+}
+
+.team-label-input:focus {
+    border-color: light-dark(#bbbbbb, #55557a);
+    background: light-dark(#ffffff, #1a1c28);
+}
+
+.method-dd {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.method-dd-trigger {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: light-dark(#ffffff, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 3px;
+    color: light-dark(#555555, #aaaaaa);
+    font-family: "Source Sans 3";
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+.method-dd-trigger:hover {
+    border-color: light-dark(#bbbbbb, #55557a);
+    color: light-dark(#333333, lightgrey);
+}
+
+/* Highlighted (active) state: this drafter is an H-scoring autodrafter.
+   Reuses the sidebar toggle's checked accent for consistency. */
+.method-dd-trigger.is-autodrafting {
+    background: light-dark(#888888, #4a4a8a);
+    border-color: light-dark(#888888, #4a4a8a);
+    color: #ffffff;
+}
+
+.method-dd-trigger.is-autodrafting:hover {
+    border-color: light-dark(#6f6f6f, #5a5aa5);
+    color: #ffffff;
+}
+
+/* ─── Sidebar input widgets ──────────────────────────────────────────────── */
+
+.sidebar-label {
+    color: light-dark(#555555, darkgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    margin-top: 6px;
+}
+
+.sidebar-static {
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+}
+
+.sidebar-input {
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#333333, lightgrey);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sidebar-input:focus {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
+.sidebar-input[type=number]::-webkit-inner-spin-button,
+.sidebar-input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.sidebar-input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.sidebar-caption {
+    color: light-dark(#999999, #666688);
+    font-family: "Source Sans 3";
+    font-size: 0.73rem;
+}
+
+.sidebar-error {
+    color: #e06c6c;
+    font-family: "Source Sans 3";
+    font-size: 0.75rem;
+}
+
+/* ─── Toggle switch (mirrors st.toggle) ─────────────────────────────────── */
+
+.sidebar-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    color: light-dark(#333333, lightgrey);
+    margin-top: 4px;
+    user-select: none;
+}
+
+.sidebar-toggle-input {
+    display: none; /* hidden — the track acts as the visual */
+}
+
+.sidebar-toggle-track {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    background-color: light-dark(#e5e5e5, #3d3d55);
+    border-radius: 9px;
+    flex-shrink: 0;
+    transition: background-color 0.2s;
+}
+
+.sidebar-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    background-color: light-dark(#f0f0f0, #666688);
+    border-radius: 50%;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.sidebar-toggle-input:checked ~ .sidebar-toggle-track {
+    background-color: light-dark(#888888, #4a4a8a);
+}
+
+.sidebar-toggle-input:checked ~ .sidebar-toggle-track::after {
+    transform: translateX(16px);
+    background-color: light-dark(#ffffff, #aaaaff);
+}
+
+/* ─── Multiselect (chip-style, mirrors st.multiselect) ──────────────────── */
+
+.ms-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ms-container {
+    position: relative;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+}
+
+.ms-input-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    background-color: light-dark(#fafafa, #181923);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    min-height: 30px;
+    box-sizing: border-box;
+    cursor: text;
+    align-items: center;
+}
+
+.ms-input-area:focus-within {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
+.ms-chip {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background-color: light-dark(#e5e5e5, #3a3a52);
+    color: light-dark(#333333, lightgrey);
+    border-radius: 3px;
+    padding: 1px 4px 1px 7px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.ms-chip-remove {
+    background: none;
+    border: none;
+    color: light-dark(#555555, #aaaaaa);
+    cursor: pointer;
+    padding: 0 1px;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.ms-chip-remove:hover {
+    color: light-dark(black, white);
+}
+
+.ms-input {
+    background: none;
+    border: none;
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    outline: none;
+    flex: 1;
+    min-width: 50px;
+    padding: 1px 0;
+}
+
+.ms-input::placeholder {
+    color: light-dark(#999999, #555577);
+}
+
+.ms-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: light-dark(#f8f8f8, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    margin-top: 2px;
+    z-index: 100;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.ms-option {
+    padding: 5px 10px;
+    color: light-dark(#333333, lightgrey);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+}
+
+.ms-option:hover {
+    /* Same fix as .cs-option:hover — #fafafa was invisible on the #f8f8f8 light dropdown. */
+    background-color: light-dark(#e5e5e5, #3d3d55);
+}
+
+.ms-empty {
+    padding: 5px 10px;
+    color: light-dark(#999999, #555577);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+/* ─── Custom select (browser-rendered, avoids OS-native dropdown flash) ──── */
+
+.cs-wrapper {
+    position: relative;
+    width: 100%;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+}
+
+.cs-trigger {
+    position: relative;   /* positioning context for .cs-value-display */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#333333, lightgrey);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 28px;
+}
+
+.cs-trigger:focus,
+.cs-open .cs-trigger {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
+.cs-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    padding: 0;
+    min-width: 0;
+    cursor: pointer;
+    text-overflow: ellipsis;
+}
+
+/* Closed-state rich value: paints the selected player (headshot + name + positions) over
+   the search input while the select is closed. Clicks pass through to the input; opening
+   the dropdown hides the overlay (see custom_select.ts). The input's own text is made
+   transparent underneath so the two never double-render. */
+.cs-value-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 24px 0 8px;   /* clear of the ▾ arrow on the right */
+    overflow: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* The display: flex above outranks the UA's [hidden] { display: none }, so the hidden
+   attribute custom_select.ts sets while typed filter text owns the box needs its own rule. */
+.cs-value-display[hidden] {
+    display: none;
+}
+
+/* While the dropdown is open the overlay plays the placeholder's role — the current
+   selection, dimmed to read as replaceable — until typing hides it. */
+.cs-open .cs-value-display {
+    opacity: 0.55;
+}
+
+.cs-rich-value:not(.cs-open) .cs-search-input {
+    color: transparent;
+}
+
+.cs-search-input::placeholder {
+    color: #888;
+}
+
+.cs-open .cs-search-input {
+    cursor: text;
+}
+
+.cs-no-matches {
+    color: #666;
+    font-style: italic;
+    cursor: default;
+}
+
+.cs-arrow {
+    font-size: 0.7rem;
+    color: #888;
+    margin-left: 6px;
+    flex-shrink: 0;
+    transition: transform 0.1s;
+}
+
+.cs-open .cs-arrow {
+    transform: rotate(180deg);
+}
+
+.cs-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    background-color: light-dark(#f8f8f8, #1a1c28);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    z-index: 200;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.cs-option {
+    padding: 5px 10px;
+    color: light-dark(#333333, lightgrey);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+    /* Rich player options carry an inline headshot before the name (the candidate-row
+       treatment); flex keeps text-only options rendering identically. */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cs-option:hover {
+    /* Light hover matches the already-chosen highlight (#e5e5e5); #fafafa was invisible on the
+       #f8f8f8 dropdown. Dark mode keeps the app's standard #3d3d55 hover. */
+    background-color: light-dark(#e5e5e5, #3d3d55);
+}
+
+.cs-option-selected {
+    background-color: light-dark(#e5e5e5, #2a2a3e);
+    font-weight: 600;
+}
+
+/* ─── Blend weight sliders ───────────────────────────────────────────────── */
+
+.sidebar-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-slider-row label {
+    color: light-dark(#555555, darkgrey);
+    font-size: 0.78rem;
+    font-family: "Source Sans 3";
+    width: 52px;
+    flex-shrink: 0;
+}
+
+/* A custom source is named by the filename on the line above rather than by a label in the
+   row, so its slider is indented by the width of that label column (52px) plus the row gap —
+   otherwise every custom track would start left of the ESPN/DARKO tracks above it. */
+.custom-upload-weight-row {
+    padding-left: 60px;
+}
+
+.sidebar-slider-row input[type="range"] {
+    flex: 1;
+    /* Ranges have an intrinsic ~130px width; without this the flex item cannot
+       shrink below it and the row overflows the sidebar horizontally. */
+    min-width: 0;
+    accent-color: light-dark(#999999, #666688);
+}
+
+.sidebar-slider-row .slider-value {
+    color: light-dark(#333333, lightgrey);
+    font-size: 0.78rem;
+    font-family: "Source Sans 3";
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* The file input is driven through its <label> rather than shown directly: the browser draws
+   its own "No file chosen" text, which cannot be set from script, so a restored upload could
+   never name the file behind it. Hidden this way rather than with display:none, the input
+   stays focusable and keyboard-operable, and the label opens the picker as before. */
+.sidebar-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* A custom-projection slot leads with this row, so its top margin is what separates one
+   slot from the next. The status line wraps onto its own line (flex-basis below) — it is
+   a full sentence, and squeezing it beside the filename would ellipsize both. */
+.sidebar-upload-row {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    margin-top: 8px;
+}
+
+.sidebar-upload-row .sidebar-caption {
+    flex-basis: 100%;
+}
+
+.sidebar-file-button {
+    font-size: 0.75rem;
+    font-family: "Source Sans 3";
+    color: light-dark(#333333, lightgrey);
+    background-color: light-dark(#fafafa, #181923);
+    border: 1px solid light-dark(#d5d5d5, #3d3d55);
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.sidebar-file-button:hover {
+    border-color: light-dark(#999999, #6677aa);
+}
+
+/* The input is off-screen, so its focus ring would be invisible — surface it on the label. */
+.sidebar-upload-row:focus-within .sidebar-file-button {
+    outline: 2px solid light-dark(#5577cc, #6677aa);
+    outline-offset: 1px;
+}
+
+/* Takes the rest of the line beside the button: the filename is what names the source now,
+   so it gets the room rather than a fixed column. */
+.sidebar-file-name {
+    flex: 1;
+    font-size: 0.75rem;
+    font-family: "Source Sans 3";
+    color: light-dark(#333333, lightgrey);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Matches the muted tone the browser uses for its own empty-state wording. */
+.sidebar-file-name-empty {
+    color: light-dark(#888888, #777788);
+}
+
+/* ─── Compact parameter grid (2-column, for player stat / algo params) ──── */
+
+.param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+}
+
+.param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.param-label-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.param-label-row label {
+    color: light-dark(#555555, darkgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    flex: 1;
+}
+
+.info-btn {
+    background: none;
+    border: none;
+    color: light-dark(#999999, #666688);
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.info-btn:hover {
+    color: light-dark(#555555, darkgrey);
+}
+
+.js-tooltip {
+    position: fixed;
+    display: none;
+    background-color: light-dark(#f6f6f6, #1e1e2e);
+    color: light-dark(#333333, lightgrey);
+    font-size: 0.72rem;
+    font-family: "Source Sans 3";
+    font-weight: 400;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    width: 220px;
+    white-space: normal;
+    text-align: left;
+    pointer-events: none;
+    z-index: 1000;
+    transform: translate(-50%, calc(-100% - 8px));
+}
+
+.param-caption {
+    color: light-dark(#999999, #666688);
+    font-family: "Source Sans 3";
+    font-size: 0.72rem;
+    grid-column: 1 / -1;
+    padding: 2px 0 4px;
+}
+
+/* ─── Trade parameters table ─────────────────────────────────────────────── */
+
+.trade-combo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    margin-top: 4px;
+}
+
+.trade-combo-table th {
+    color: light-dark(#555555, darkgrey);
+    font-weight: 500;
+    padding: 3px 4px;
+    border: none;
+    text-align: left;
+}
+
+.trade-combo-table td {
+    padding: 2px 3px;
+    border: none;
+}
+
+.trade-combo-input {
+    width: 52px !important;
+    padding: 3px 5px !important;
+}
+
+.trade-add-btn {
+    background: none;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    color: light-dark(#999999, #666688);
+    font-family: "Source Sans 3";
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.trade-add-btn:hover {
+    color: light-dark(#555555, darkgrey);
+    border-color: light-dark(#999999, #666688);
+}
+
+/* ─── Slot count grid ────────────────────────────────────────────────────── */
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.slot-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.slot-row label {
+    color: light-dark(#555555, darkgrey);
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+    width: 34px;
+    flex-shrink: 0;
+}
+
+.slot-input {
+    width: 52px !important;
+}
+
+/* ─── Main content ───────────────────────────────────────────────────────── */
+
+.playerpopup {
+    flex-shrink: 0;
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#999999, #666688);
+    border: none;
+    cursor: pointer;
+    font-size: 0.6rem;
+    padding: 2px 4px;
+    transition: transform 0.15s;
+    line-height: 1;
+}
+
+.playerpopup.popup-open {
+    transform: rotate(90deg);
+}
+
+body {
+    margin: 0;
+    background-color: light-dark(#ffffff, rgb(14, 17, 23));
+    color: light-dark(#333333, lightgrey);
+}
+
+
+/* Table */
+
+th {
+    padding: 4px 5px;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+
+}
+
+tr {
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+
+}
+
+#hscoretable {
+    border-radius: 12px;
+    background-color: light-dark(#e5e5e5, #3d3d55);
+    border-collapse: collapse;
+    border: 2px solid light-dark(#e5e5e5, #3d3d55);
+    overflow: hidden; /* This clips the sharp cell corners */
+    font-family: "Source Sans 3";
+    font-weight: 400;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;   /* equal-width digits so stat columns align */
+    line-height: 1.6;
+    text-size-adjust: 100%;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.tableheader {
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#555555, darkgrey);
+    font-weight:500;
+    font-size: 0.8rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.table-message {
+    text-align: center;
+    padding: 16px;
+    color: light-dark(#555555, #aaaaaa);
+    font-size: 0.85rem;
+}
+
+/* 1. Top-Left Corner */
+#hscoretable > thead > tr:first-child > :first-child {
+  border-top-left-radius: 12px;
+}
+
+/* 2. Top-Right Corner */
+#hscoretable > thead > tr:first-child > :last-child {
+  border-top-right-radius: 12px;
+}
+
+/* 3. Bottom-Left Corner */
+#hscoretable > tbody > tr:last-child > :first-child {
+  border-bottom-left-radius: 12px;
+}
+
+/* 4. Bottom-Right Corner */
+#hscoretable > tbody > tr:last-child > :last-child {
+  border-bottom-right-radius: 12px;
+}
+
+.playerheader {
+    background-color: light-dark(#ffffff, rgb(14,17,23));
+    color: light-dark(#555555, darkgrey);
+    font-weight:400;
+    font-size: 0.78rem;
+    text-align: left;
+    width: 6rem;
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+.expandedview {
+    display : none;
+}
+
+.playerheaderdiv {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+/* NBA headshot avatar in candidate rows. The CDN images are 260x190 transparent-background
+   PNGs, so no background is set here — the player blends onto whatever surface is behind
+   the row in either theme. */
+.player-avatar {
+    width: 30px;
+    height: 22px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* The name column is far narrower on a phone, and the avatar (plus the expand arrow beside
+   it) is fixed width — so every pixel it takes comes straight out of the name, which then
+   ellipsizes. Shrink the avatar there; it still reads as a face at this size, and the names
+   fit. Keeps the CDN's 260x190 aspect. */
+@media (max-width: 768px) {
+    .player-avatar {
+        width: 22px;
+        height: 16px;
+    }
+}
+
+
+.playername {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Positions suffix inside the full player display — lighter than the name so the
+   name stays the visual anchor. */
+.player-positions {
+    color: light-dark(#999999, #8d8d9e);
+    font-size: 0.85em;
+}
+
+/* Full player display (DOM variant): headshot beside name + positions. Used for
+   G-score table row labels and team views. */
+.player-full-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Minimal inline player display (string variant): headshot beside last name. Used in
+   trade-suggestion cells, where several players share one cell on a single line. */
+.player-minimal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 10px;
+    white-space: nowrap;
+}
+
+/* Trade-suggestion send/receive cells hold a row of minimal displays; let the row wrap
+   rather than stretching the table on multi-player trades. */
+.trade-suggestion-players {
+    white-space: normal;
+}
+
+/* Season roster paste feedback: pasted names the registry doesn't recognize. */
+.paste-warning {
+    color: #e06c6c;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
+.celltypea {
+    background-color: light-dark(#e8e8e8, #3a3a4a);
+    color: light-dark(black, white);
+
+}
+
+.celltypeb {
+    background-color: light-dark(#e1e1e1, #48485a);
+    color: light-dark(black, white);
+}
+
+.overallhscore {
+    background-color: light-dark(#f0f0f6, #3a3a4a);   /* faint cool grey — matches the cool chrome / dark-mode counterpart */
+    color: light-dark(black, white);
+    font-weight:400;
+    text-align:right;
+    padding:5px;
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+.overallhscore:after{
+    content : '%';
+}
+
+.categoricalhscore {
+    font-weight:500;
+    text-align:right;
+    padding:5px;
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
+}
+.categoricalhscore:after{
+    content : '%';
+}
+
+.categoricalRotoHscore {
+    font-weight:500;
+    text-align:right;
+    padding:5px;
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+.rosterabsent {
+    background-color: light-dark(#F6F6F6, #8D8D9E);
+    color: light-dark(#F6F6F6, #8D8D9E);
+    text-align:center;
+}
+
+.rostercandidate {
+    background-color: light-dark(rgb(175,175,255), rgb(54,90,148));
+    color: light-dark(black, white);
+    text-align: center;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+}
+
+/* Occupied roster cells stack a headshot above the player's last name. The headshot is a
+   transparent-background PNG, so it blends onto the cell's own team/candidate color. */
+.roster-player-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* Long last names in narrow board cells clip with an ellipsis; the stack's title
+   tooltip carries the full name. The tightened line-height trims the inherited line
+   box's slack, which otherwise all reads as extra space under the name. */
+.roster-player-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.15;
+}
+
+/* Roster-grid cells holding a player stack drop panel-datacell's vertical padding so
+   their height matches the draft/auction board cells (which pad 0). */
+.panel-datacell.roster-player-cell {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* ─── Board collapse toggle (draft/auction grids) ─────────────────────────── */
+/* The corner header cell ('Round') doubles as the collapse toggle — the familiar
+   rotating arrow without spending a row on it. Collapsing hides the pick rows
+   (tbody/tfoot); the team header row stays visible so team names and autodraft
+   toggles remain usable. */
+
+.board-toggle-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.board-toggle-arrow {
+    display: inline-block;
+    font-size: 0.55rem;
+    margin-right: 4px;
+    transition: transform 0.15s;
+    color: light-dark(#999999, #666688);
+}
+
+.entry-table:not(.board-collapsed) .board-toggle-arrow {
+    transform: rotate(90deg);
+}
+
+.entry-table.board-collapsed > tbody,
+.entry-table.board-collapsed > tfoot {
+    display: none;
+}
+
+.roster-headshot {
+    /* Between the candidate-row avatar (30x22) and the original stacked size (44x32):
+       compact enough for a full board, big enough that faces still read. Keeps the
+       CDN's 260x190 aspect. */
+    width: 37px;
+    height: 27px;
+    object-fit: cover;
+}
+
+/* Board cells are only 64px wide on a phone, where a 37px face crowds out the last name
+   under it. Must sit AFTER the rule above: a media query adds no specificity, so an
+   override placed earlier in the file would simply lose to it. */
+@media (max-width: 768px) {
+    .roster-headshot {
+        width: 26px;
+        height: 19px;
+    }
+}
+
+.rosteronteam {
+    background-color: light-dark(rgb(220,220,255), rgb(36,48,70));
+    color: light-dark(black, white);
+    text-align: center;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+}
+
+.ineligible {
+    /* Match the panel grid-border color in each theme so adjacent "nothing here" cells
+       blend into one seamless region (borders disappear into the fill). */
+    background-color: light-dark(#eeeeee, #555566);
+    color: light-dark(#eeeeee, #555566);
+}
+
+.auction-dollar {
+    font-weight:500;
+    text-align:right;
+    padding:5px;
+    border-top: 2px solid light-dark(#e5e5e5, #3d3d55);
+    border-bottom: 2px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+/* ─── Detail panel ───────────────────────────────────────────────────────── */
+
+.panel-cell {
+    background-color: light-dark(#ffffff, rgb(16, 18, 26));
+    padding: 12px 0;
+    border-top: none;
+    border-bottom: 1px solid light-dark(#e0e0e0, #555566);
+}
+
+.panel-label {
+    color: light-dark(#555555, darkgrey);
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+    margin-bottom: 4px;
+    margin-top: 12px;
+    padding-left: 16px;
+}
+
+.panel-label:first-child {
+    margin-top: 0;
+}
+
+.panel-table {
+    border-collapse: collapse;
+    font-family: "Source Sans 3";
+    font-weight: 400;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;   /* equal-width digits so stat columns align */
+    line-height: 1.5;
+    width: 100%;
+}
+
+.panel-table--rounded {
+    border-radius: 12px;
+    background-color: light-dark(#e5e5e5, #3d3d55);
+    border: 2px solid light-dark(#e5e5e5, #3d3d55);
+    overflow: hidden;
+}
+
+.panel-table--rounded > thead > tr:first-child > :first-child { border-top-left-radius: 12px; }
+.panel-table--rounded > thead > tr:first-child > :last-child  { border-top-right-radius: 12px; }
+.panel-table--rounded > tbody > tr:last-child > :first-child  { border-bottom-left-radius: 12px; }
+.panel-table--rounded > tbody > tr:last-child > :last-child   { border-bottom-right-radius: 12px; }
+
+.panel-table--top-gap { margin-top: 16px; }
+
+.panel-colspacer {
+    background-color: light-dark(#ffffff, rgb(16, 18, 26)); /* matches .panel-cell — invisible */
+    border: none;
+    padding: 0;
+}
+
+.panel-colspacer-name         { width: 200px; }
+.panel-colspacer-name-sm      { width: 136px; }
+.panel-colspacer-total        { width: 83px; }
+.panel-colspacer-weights      { width: 219px; }  /* weights table: combined name+total label column */
+.panel-colspacer-position-label { width: 110px; }  /* flex allocations + roster grid: row label column */
+.panel-colspacer-dollar       { width: 72px; }   /* auction values table: label and value columns */
+
+.panel-indent   { margin-left: 100px; }
+.panel-flex-row { display: flex; gap: 32px; align-items: flex-start; margin-left: 100px; }
+
+.panel-colheader-blank { visibility: hidden; border-top-style: hidden; border-left-style: hidden; }
+
+.panel-colheader {
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#555555, darkgrey);
+    font-weight: 500;
+    font-size: 0.8rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    border: 0.5px solid light-dark(#eeeeee, #555566);
+}
+
+.colheader-long {
+    font-size: clamp(0.65rem, 0.75vw, 0.8rem);
+}
+
+/* Auction $ headers ("Your $", "Gnrc. $", "Orig. $") wrap to two lines on
+   mobile: the word on line 1, the $ on line 2. This lets each column stay
+   at 1.25rem (12.5px) without truncating the header. Desktop is unaffected
+   — at desktop column widths the text already fits on a single line, and
+   white-space: normal would only kick in if it didn't. */
+@media (max-width: 768px) {
+    .colheader-wrap-dollar {
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.05;
+        font-size: 0.7rem;
+    }
+}
+
+.panel-rowlabel {
+    background-color: light-dark(#ffffff, rgb(14, 17, 23));
+    color: light-dark(#555555, darkgrey);
+    font-weight: 400;
+    padding: 3px 10px;
+    text-align: left;
+    border: 0.5px solid light-dark(#eeeeee, #555566);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.panel-rowlabel-total {
+    color: light-dark(#555555, darkgrey);
+    font-weight: 500;
+}
+
+.panel-datacell {
+    padding: 3px 8px;
+    text-align: right;
+    border: 0.5px solid light-dark(#eeeeee, #555566);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.panel-weight::after {
+    content: '%';
+}
+
+/* ─── Main layout ────────────────────────────────────────────────────────────── */
+
+#content-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+#left-panel {
+    flex: 0 0 390px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#candidate-panel {
+    flex: 1;
+    min-width: 0;
+}
+
+#panel-content-width-container {
+    width: 90%;
+}
+
+#right-header:not(:empty) {
+    margin-bottom: 16px;
+}
+
+#tab-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+#seat-selector-container {
+    flex: 1;
+    min-width: 0;
+}
+
+/* The seat-selector-wrap carries a bottom margin (for other layouts); inside #tab-row that
+   margin pushes the Select-team box's visual center above the Refresh Analysis button and the
+   eval indicator (flex align-items: center counts margins in the item's outer box). Zero it
+   in this context so the row's controls line up. */
+#seat-selector-container .seat-selector-wrap {
+    margin-bottom: 0;
+}
+
+#right-sub-header {
+    margin-left: auto;
+}
+
+.pick-btn.active {
+    background: light-dark(#e5e5e5, #3d3d55);
+    border-color: light-dark(#aaaaaa, #555577);
+    color: light-dark(#333333, white);
+}
+
+#season-rosters-row {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+#rosters-left  { width: 100%; }
+#rosters-right { width: 100%; }
+
+#live-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+/* ─── Season tab bar ─────────────────────────────────────────────────────────── */
+
+#season-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border-bottom: 1px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+.season-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: light-dark(#999999, #666688);
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-family: "Source Sans 3";
+}
+
+.season-tab-btn.active {
+    color: light-dark(black, white);
+    border-bottom-color: light-dark(#999999, #666688);
+}
+
+/* ─── Data entry tables ──────────────────────────────────────────────────────── */
+
+.entry-table {
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    table-layout: fixed;
+}
+
+/* Hide dropdown arrows inside roster entry table cells */
+.entry-table td .cs-arrow {
+    display: none;
+}
+
+
+.entry-table th {
+    background: light-dark(#fafafa, #181923);
+    color: light-dark(#555555, #aaaaaa);
+    padding: 5px 8px;
+    text-align: center;
+    font-weight: 500;
+    border: 1px solid var(--line-grid);
+    white-space: nowrap;
+}
+
+.entry-table td {
+    background: light-dark(#ffffff, #1a1c28);
+    border: 1px solid var(--line-grid);
+    padding: 0;
+    text-align: center;
+    color: light-dark(#555555, #aaaaaa);
+}
+
+/* Remove inner border/padding from custom selects inside entry table cells.
+   Text size matches the candidate-table rows (0.8rem) so player names read the same
+   everywhere they appear. */
+.entry-table td .cs-trigger {
+    border: none;
+    border-radius: 0;
+    min-height: 24px;
+    padding: 2px 4px;
+    font-size: 0.8rem;
+}
+
+.entry-table td .cs-trigger:focus,
+.entry-table td .cs-open .cs-trigger {
+    outline: none;
+}
+
+.entry-table td.current-pick {
+    outline: 2px solid light-dark(#999999, #666688);
+    outline-offset: -2px;
+}
+
+.entry-table td.drafted {
+    color: light-dark(black, white);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.entry-cell-label {
+    background: light-dark(#fafafa, #181923) !important;
+    color: light-dark(#555555, #aaaaaa) !important;
+    font-weight: 500;
+    width: 48px;
+}
+
+.entry-table td.entry-cell-selected {
+    outline: 2px solid light-dark(#5577cc, #6677aa);
+    outline-offset: -2px;
+}
+
+/* Scrollable wrapper for tall/wide entry tables */
+.entry-table-scroll {
+    overflow: auto;
+}
+
+/* Transposed draft board (mobile): teams as rows, rounds as columns. Freeze the team-name first
+   column and the round-number header row so they stay visible while scrolling right through rounds.
+   The .transposed class is only added on mobile, so these rules don't need a media query. */
+.entry-table.transposed thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.entry-table.transposed tbody th.team-header-cell {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+.entry-table.transposed thead th:first-child {
+    left: 0;
+    z-index: 3;   /* corner: above both the sticky row and the sticky column */
+}
+/* Honor the column widths so pick cells truncate instead of wrapping long names to many lines. */
+.entry-table.transposed {
+    table-layout: fixed;
+}
+/* In the transposed board the team header sits in the frozen first column, so keep the name and
+   method dropdown on ONE compact row to keep team rows short. (The general mobile rule stacks them,
+   which is right for the column-header layout that auction/season still use, but wrong here.) */
+.entry-table.transposed .team-header {
+    flex-direction: row;
+    gap: 3px;
+}
+.entry-table.transposed .team-label-input {
+    width: auto;
+    font-size: 0.72rem;
+    padding: 0 2px;
+}
+/* Compact every transposed cell: tight padding + line-height, a smaller method trigger, and pick
+   names truncate with an ellipsis rather than wrapping — so team rows stay short. */
+.entry-table.transposed th,
+.entry-table.transposed td {
+    padding: 1px 4px;
+    line-height: 1.2;
+}
+.entry-table.transposed td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.entry-table.transposed .method-dd-trigger {
+    width: 15px;
+    height: 15px;
+    font-size: 0.62rem;
+}
+
+/* ─── Pick control ───────────────────────────────────────────────────────────── */
+
+.pick-control-label {
+    color: light-dark(#555555, #aaaaaa);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.pick-control-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-top: 6px;
+    margin-bottom: 12px;
+}
+
+.pick-control-row:has(> .pick-control-label) {
+    align-items: center;
+}
+
+.pick-control-row .cs-wrapper,
+.seat-selector-wrap .cs-wrapper {
+    min-width: 0;
+}
+
+.pick-control-buttons {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Mobile pick-control-row layout. Mode-specific grid templates are defined
+   below via :has() — auction uses a 3-column grid with a fixed 5rem Cost
+   track, draft uses a single-column grid. Lives AFTER the base
+   `.pick-control-buttons` rule (immediately above) so the `margin-left: 0`
+   override inside the block wins the same-specificity cascade. */
+@media (max-width: 768px) {
+    .pick-control-row {
+        flex-wrap: wrap;
+        margin-top: 0;
+        margin-bottom: 8px;      /* matches #tab-row margin-top so spacing above and below the auction board is symmetric */
+    }
+    /* Auction mode (row contains the .auction-cost-input): use CSS Grid instead
+       of flex-wrap so the layout is explicit — Player/Drafter/Cost on row 1,
+       buttons span the whole of row 2. Flex-wrap was inconsistent about which
+       item wrapped first across browsers.
+       Tracks: minmax(0, 1fr) twice + a fixed 5rem for Cost + a 32px gutter
+       for the fixed-position hamburger toggle. The 1fr tracks have an
+       explicit 0 lower bound so a grid item's min-content (long player
+       names, or the spanning buttons row) doesn't force the tracks wider
+       than the container. The Cost track is fixed-width instead of `auto`
+       because `auto` resolves to minmax(min-content, max-content), which
+       lets the column grow when a spanning item (the buttons row) distributes
+       its content size into it.
+       The trailing 32px gutter reserves space for the hamburger; combined
+       with the 8px grid gap before it, the inputs row stops exactly 40px
+       from the right edge (where the hamburger sits). The buttons row's
+       `grid-column: 1 / -1` lets it span the gutter too, so it extends to
+       the full grid width while the inputs stay clear. */
+    .pick-control-row:has(.auction-cost-input) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5rem 32px;
+        gap: 8px;
+        align-items: end;
+    }
+    .pick-control-row:has(.auction-cost-input) > .pick-control-buttons {
+        grid-column: 1 / -1;
+        /* Without this, the grid item's auto-min equals its content min-width
+           (the sum of three nowrap button labels, ~420px on mobile). That
+           min-width propagates into the tracks via the spanning-item rule and
+           pushes the grid wider than its 327px parent — the row visibly
+           overflows the right edge. min-width: 0 lets the buttons shrink. */
+        min-width: 0;
+    }
+    /* Draft mode (row contains .pick-control-label directly): two-column grid
+       so the "Select Pick X for Drafter Y" label sits above the dropdown,
+       mirroring the label-above-input layout used by auction mode's pick-cols.
+       Buttons take row 3. The 34px second column is a gutter reserving space
+       for the fixed-position hamburger toggle; combined with the 6px gap
+       between columns it totals 40px, so the inputs stop exactly at the
+       hamburger's left edge. Children default to grid-column: 1 so they
+       don't get auto-placed into the gutter; the buttons row overrides with
+       grid-column: 1 / -1 to span both. */
+    .pick-control-row:has(> .pick-control-label) {
+        display: grid;
+        grid-template-columns: 1fr 34px;
+        gap: 6px;
+    }
+    .pick-control-row:has(> .pick-control-label) > * {
+        grid-column: 1;
+    }
+    .pick-control-row:has(> .pick-control-label) > .pick-control-buttons {
+        grid-column: 1 / -1;
+    }
+    /* Spread the wrapped buttons row across the full viewport width: each button
+       gets an equal share, and the row's left edge anchors at x=0 (overrides
+       margin-left: auto). flex-basis: 100% forces the buttons onto their own
+       row inside the flex .pick-control-row (draft mode); auction mode uses
+       grid for the same row, where flex-basis is ignored — grid-column: 1 / -1
+       handles the wrap there. Extending into the hamburger gutter is handled
+       by `grid-column: 1 / -1` on the spanning rules above (the auction and
+       draft templates both include a trailing 40px gutter column); the
+       buttons row simply spans every column including the gutter. */
+    .pick-control-buttons {
+        margin-left: 0;
+        flex-grow: 1;
+        flex-basis: 100%;
+    }
+    .pick-control-buttons .pick-btn {
+        flex: 1;
+    }
+    /* Shrink the seat selector on mobile — at flex: 1 it grows to fill the tab
+       row, pushing the eval indicator and action buttons off-screen. */
+    #seat-selector-container {
+        flex: 0 1 auto;
+        max-width: 12rem;
+    }
+    /* Tighten the horizontal padding inside score / category cells — the 5px
+       default eats too much of the narrow column widths. */
+    .auction-dollar,
+    .overallhscore,
+    .categoricalhscore,
+    .categoricalRotoHscore {
+        padding: 5px 2px;
+    }
+    /* Tabular figures equalise digit widths for column alignment on desktop, but the
+       extra numeral width crowds the narrow mobile stat columns — use proportional
+       figures here so the values stay compact. */
+    #hscoretable,
+    .panel-table,
+    .trade-result-table {
+        font-variant-numeric: normal;
+    }
+    /* Stack each board header so the team name sits on its own line above the method
+       dropdown — keeps the column narrow to save horizontal space. */
+    .team-header {
+        flex-direction: column;
+        gap: 2px;
+    }
+    .team-header .team-label-input {
+        width: 100%;
+    }
+    /* Tighten vertical spacing between the candidate-panel sections so there's
+       not a big empty band between the auction board and the candidate table. */
+    #right-header:not(:empty) {
+        margin-bottom: 0;
+    }
+    #tab-row {
+        margin-bottom: 8px;      /* matches margin-top so Select-team has equal space above and below */
+        margin-top: 8px;         /* small breath of space below the auction board */
+    }
+    /* Hide the vertical scrollbar gutter on the auction board — overflow: auto
+       reserves space for one even when not scrolling, eating ~15px of vertical
+       space below the board. */
+    .entry-table-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    /* (seat-selector-wrap bottom-margin is zeroed in the base #tab-row rules, all widths.) */
+    /* Single source of truth for the mobile main-column edges. Left padding
+       stays at 4px so content isn't flush against the viewport edge; right
+       padding is 0 so the auction board / candidate table extend all the way
+       to the viewport edge (combined with the ~15px overflow-y scrollbar
+       gutter, that already leaves enough space to read the rightmost data).
+       Every main-column element descends from #main-content and inherits
+       this right edge automatically. */
+    #main-content {
+        --main-content-padding-left:  4px;
+        --main-content-padding-right: 0;
+    }
+    #panel-content-width-container {
+        width: 100%;
+        /* Hard floor at 0 so no descendant's intrinsic min-content can stretch
+           the container past its `width: 100%`. Without this, a wide table
+           (e.g. the team-stats gscore view at desktop widths) inside the panel
+           could propagate its min-content up through the chain and visibly
+           stretch the page. With min-width: 0, content that doesn't fit gets
+           clipped or overflows inside the container instead. */
+        min-width: 0;
+    }
+    /* Season → Rosters tab: tighten the team-inspector's Player and Total
+       columns (200px/83px is fine on desktop but pushes per-category stats off
+       the right edge on mobile). Scoped to #rosters-right so other panel tables
+       elsewhere keep their desktop widths. */
+    #rosters-right .panel-colspacer-name  { width: 7rem; }
+    #rosters-right .panel-colspacer-total { width: 3rem; }
+    /* Season → Rosters tab: shrink the roster entry table's drafter columns —
+       at content-sized widths they fit only ~3 drafters before scrolling. The
+       cs-trigger inside each cell already has overflow: hidden so long player
+       names truncate cleanly. */
+    #rosters-left .entry-table th:not(:first-child) {
+        width: 4rem;
+    }
+}
+
+.pick-btn {
+    padding: 5px 10px;
+    white-space: nowrap;
+    background: light-dark(#efefef, #2a2a33);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    color: light-dark(black, white);
+    cursor: pointer;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    font-family: "Source Sans 3";
+}
+
+.pick-btn:hover { background: light-dark(#e5e5e5, #3d3d55); }
+
+/* ─── Auction board ──────────────────────────────────────────────────────────── */
+
+.pick-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.pick-col-label {
+    font-size: 0.75rem;
+    color: light-dark(#555555, #aaaaaa);
+}
+
+.auction-cost-input {
+    width: 5rem;
+    min-height: 28px;            /* match cs-trigger min-height so Cost matches dropdown row height */
+    box-sizing: border-box;
+    padding: 4px 6px;
+    font-size: 0.8rem;
+    font-family: "Source Sans 3";
+    background: light-dark(#f6f6f6, #1e1e2e);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    color: light-dark(black, white);
+    flex-shrink: 0;
+}
+
+.auction-cost-input.over-budget {
+    color: light-dark(#cc2222, #ff6666);
+}
+
+.auction-cell-name {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: light-dark(black, white);
+}
+
+.auction-cell-cost {
+    font-size: 0.7rem;
+    color: light-dark(#777777, #8888aa);
+    margin-top: 1px;
+}
+
+.auction-budget-label {
+    font-size: 0.75rem;
+}
+
+.auction-budget-cell {
+    background: light-dark(#fafafa, #181923);
+    color: light-dark(#555555, #aaaaaa);
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-align: center;
+    padding: 4px 6px;
+    border-top: 1px solid light-dark(#e5e5e5, #3d3d55);
+}
+
+/* ─── Live bar ───────────────────────────────────────────────────────────────── */
+
+.refresh-btn {
+    padding: 6px 14px;
+    background: light-dark(#efefef, #2a2a33);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    color: light-dark(black, white);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: "Source Sans 3";
+}
+
+.refresh-btn:hover { background: light-dark(#e5e5e5, #3d3d55); }
+
+/* ─── Seat selector ──────────────────────────────────────────────────────────── */
+
+.seat-selector-wrap {
+    margin-bottom: 8px;
+}
+
+.draft-tab-bar,
+.auction-tab-bar {
+    display: flex;
+    gap: 6px;
+}
+
+.seat-selector-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ─── Evaluate in-progress indicator ─────────────────────────────────────────── */
+
+.eval-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.85rem;   /* match .pick-control-label beside it */
+    box-sizing: border-box;
+    color: light-dark(#555555, #aaaaaa);   /* neutral secondary grey, matching nearby labels */
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: 130px;
+}
+
+.eval-indicator::before {
+    content: '';
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.eval-indicator[data-state="evaluating"]::before {
+    border: 2px solid light-dark(#999999, #6666aa);
+    border-top-color: transparent;
+    animation: eval-spin 0.65s linear infinite;
+}
+
+.eval-indicator[data-state="fetching"]::before {
+    border: 2px solid light-dark(#aa8844, #997733);
+    border-top-color: transparent;
+    animation: eval-spin 0.65s linear infinite;
+}
+
+/* 'unconnected' needs no rule: it falls back to the base indicator (muted text, no
+   visible dot) — same as the idle 'Updated' state. */
+
+@keyframes eval-spin {
+    to { transform: rotate(360deg); }
+}
+
+.autopilot-running-indicator {
+    width: auto;
+}
+
+/* Mobile: shrink both the width and the font so the indicator stays compact
+   AND the longer states ("Updating...", "Starting...") still fit inside the
+   box. Without the font shrink, the longer text overflows past the box edges
+   on both sides (justify-content: center) and visually overlaps the seat
+   selector to the left. */
+@media (max-width: 768px) {
+    .eval-indicator {
+        width: 7rem;
+        font-size: 0.85rem;
+        overflow: hidden;
+    }
+    /* Allow the "Show candidates" / "Show team statistics" tab-bar buttons to
+       wrap their text onto two lines on mobile so the right-sub-header takes
+       less horizontal space, leaving more room for the seat selector. Other
+       .pick-btn instances (Lock in / Undo / Clear) keep their default nowrap. */
+    .draft-tab-bar .pick-btn,
+    .auction-tab-bar .pick-btn {
+        white-space: normal;
+        line-height: 1.1;
+        text-align: center;
+    }
+}
+
+/* ─── Waiver controls bar ────────────────────────────────────────────────────── */
+
+.waiver-bar {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+}
+
+.waiver-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 160px;
+}
+
+/* ─── Team display stub ──────────────────────────────────────────────────────── */
+
+.team-display-stub {
+    color: light-dark(#999999, #555577);
+    font-size: 0.8rem;
+    margin-top: 12px;
+    font-style: italic;
+}
+
+/* ─── Coming soon ────────────────────────────────────────────────────────────── */
+
+.coming-soon {
+    color: light-dark(#999999, #555577);
+    font-style: italic;
+    padding: 24px 0;
+}
+
+/* ─── Season Trading tab ─────────────────────────────────────────────────────── */
+
+#season-trading-row { padding: 0 16px; }
+
+.trade-selector-row {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 4px;
+}
+
+.trade-selector-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.trade-divider {
+    border: none;
+    border-top: 1px solid light-dark(#e0e0e0, #333355);
+    margin: 16px 0;
+}
+
+.trade-body-row {
+    display: flex;
+    gap: 24px;
+}
+
+.trade-left-col {
+    flex: 0 0 36%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.trade-right-col { flex: 1; min-width: 0; }
+
+/* Trade player multi-selects (reuse .ms-* styles from helper_functions) */
+.trade-multi-select { margin-bottom: 14px; }
+
+/* Inner H/G tab bar */
+.trade-tab-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid light-dark(#e0e0e0, #333355);
+    margin-bottom: 10px;
+}
+
+.trade-tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: light-dark(#999999, #778);
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.trade-tab-btn.active {
+    color: light-dark(#333333, #dde);
+    border-bottom-color: light-dark(#666666, #5577cc);
+}
+
+.trade-tab-pane { min-height: 60px; }
+
+/* G-score result table */
+.trade-result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Source Sans 3";
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;   /* equal-width digits, matching the other H-score tables */
+}
+.trade-result-table th,
+.trade-result-table td {
+    padding: 3px 6px;
+    text-align: right;
+    border-bottom: 1px solid light-dark(#e0e0e0, #222244);
+}
+.trade-result-table th { color: light-dark(#999999, #889); font-weight: 500; }
+.trade-row-label { text-align: left !important; color: light-dark(#555555, #aab); font-weight: 500; }
+.trade-row-subtotal td { border-top: 1px solid light-dark(#e0e0e0, #444466); font-weight: 600; }
+.trade-row-diff td     { border-top: 2px solid light-dark(#e0e0e0, #555577); font-weight: 700; color: light-dark(#222222, #dde); }
+
+/* Stubs */
+.trade-hscore-stub,
+.trade-suggestion-stub {
+    color: light-dark(#999999, #555577);
+    font-style: italic;
+    font-size: 0.8rem;
+    padding: 12px 0;
+}
+
+.trade-suggest-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: light-dark(#333333, #bbc);
+    white-space: nowrap;
+}
+
+.trade-combo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.trade-combo-select .ms-input-area {
+    width: 250px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    /* Tighter trade-sizes selector on mobile — the 250px desktop width was
+       eating most of the row above the suggestion table; ~130px is enough
+       to show a "1 for 1 ×" chip plus a small Add input. */
+    .trade-combo-select .ms-input-area {
+        width: 130px;
+    }
+}
+
+.trade-threshold-group {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.trade-threshold-group label,
+.trade-threshold-label {
+    font-size: 0.78rem;
+    color: light-dark(#555, #aab);
+}
+
+.trade-threshold-input-wrap {
+    display: flex;
+    align-items: center;
+    width: 66px;
+    padding: 4px 6px;
+    background-color: light-dark(#fafafa, #181923);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    min-height: 30px;
+    box-sizing: border-box;
+}
+
+.trade-threshold-input-wrap:focus-within {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
+.trade-threshold-input-wrap input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: light-dark(#333333, lightgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    width: 100%;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.trade-threshold-input-wrap input::-webkit-inner-spin-button,
+.trade-threshold-input-wrap input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+
+
+/* ─── Waiver Wire ─────────────────────────────────────────────────────────────── */
+
+.waiver-selector-row {
+    margin-bottom: 12px;
+}
+
+/* Highlights the dropped player's candidate row in blue */
+.waiver-drop-highlight {
+    background-color: rgba(53, 128, 187, 0.25) !important;
+}
+
+/* ─── Login screen (shown until the user signs in with Google) ────────────────── */
+
+#login-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: light-dark(#f4f4f6, #15161f);
+    font-family: "Source Sans 3";
+}
+
+.login-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 40px 48px;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 10px;
+    background: light-dark(white, #1d1e2a);
+}
+
+.login-logo  { font-size: 2.5rem; }
+.login-title { font-size: 1.3rem; font-weight: 700; color: light-dark(#222222, #e6e6ff); }
+.login-sub   { margin: 0 0 12px; color: light-dark(#666666, #9999bb); }
+
+.login-btn {
+    padding: 10px 22px;
+    border: 1px solid light-dark(#cccccc, #555577);
+    border-radius: 6px;
+    background: light-dark(#ffffff, #2a2a3e);
+    color: light-dark(#222222, #e6e6ff);
+    font-size: 0.95rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.login-btn:hover { background: light-dark(#f0f0f0, #3d3d55); }
+
+/* ─── ESPN auth-instructions pop-up (espn_connector.ts) ───────────────────────── */
+
+.espn-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: light-dark(rgba(20, 20, 30, 0.35), rgba(0, 0, 0, 0.55));
+    font-family: "Source Sans 3";
+}
+
+.espn-modal-box {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 420px;
+    margin: 16px;
+    padding: 24px 28px;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 10px;
+    background: light-dark(white, #1d1e2a);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.espn-modal-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: light-dark(#222222, #e6e6ff);
+}
+
+.espn-modal-body {
+    margin: 0;
+    line-height: 1.5;
+    color: light-dark(#444444, #b8b8d4);
+}
+
+.espn-modal-body code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: light-dark(#f0f0f2, #2a2a3e);
+    font-size: 0.9em;
+}
+
+.espn-modal-body a { color: light-dark(#3a6ea5, #8ab4f8); }
+
+.espn-modal-box .section-apply-btn { align-self: flex-end; }
+
+/* ─── Sidebar account row (signed-in name + sign out) ─────────────────────────── */
+
+.sidebar-account {
+    display: flex;
+    flex-direction: column;    /* name/avatar on top, Sign out below */
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+}
+
+.account-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+}
+
+.account-avatar {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: light-dark(#e5e5e5, #2a2a3e);
+    color: light-dark(#888888, #777799);
+}
+
+.account-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.account-avatar svg {
+    width: 16px;
+    height: 16px;
+}
+
+.account-name {
+    color: light-dark(#555555, darkgrey);   /* match .sidebar-section labels (neutral grey) */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 130px;   /* a long name ellipsizes instead of pushing Sign out off-row */
+}
+
+.account-logout {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    background: light-dark(#efefef, #2a2a3e);
+    color: light-dark(#555555, darkgrey);   /* match .sidebar-section labels (neutral grey) */
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.account-logout:hover { background: light-dark(#e5e5e5, #3d3d55); color: light-dark(black, white); }

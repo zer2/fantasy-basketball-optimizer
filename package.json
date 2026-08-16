@@ -1,0 +1,30 @@
+{
+  "name": "fantasy-basketball-optimizer",
+  "version": "1.0.0",
+  "description": "This is the source code for a [website](https://fantasy-basketball-optimizer-35667048953.us-east1.run.app/) which applies algorithms to category-based fantasy basketball. Please note that these algorithms are based on a simplified model of fantasy basketball, and there is no guarantee that using them will lead to success.",
+  "main": "helper_functions.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "node --test --test-concurrency=1 \"scripts/e2e/*.test.mjs\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zer2/fantasy-basketball-optimizer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/zer2/fantasy-basketball-optimizer/issues"
+  },
+  "homepage": "https://github.com/zer2/fantasy-basketball-optimizer#readme",
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "typescript": "^5.9.3"
+  }
+}

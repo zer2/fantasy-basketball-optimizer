@@ -1,3 +1,9 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+authlib>=1.3.0          # Google OAuth / OIDC login
+httpx                   # async HTTP client used by authlib's Starlette OAuth integration
+itsdangerous>=2.1.0     # signs the session cookie (Starlette SessionMiddleware)
 lxml
 streamlit==1.48.1
 streamlit-extras
@@ -10,6 +16,7 @@ yfpy==15.0.3
 requests_oauthlib
 requests
 pyyaml
+openpyxl               # reads .xlsx projection uploads (pandas' engine for the format)
 numexpr
 statsmodels
 snowflake-connector-python

@@ -1,4 +1,21 @@
 NBA:
+  short-category-names:
+    Field Goal %: FG%
+    Free Throw %: FT%
+    Three %: 3%
+    Threes: 3s
+    Points: Pts
+    Rebounds: Rbds
+    Assists: Asts
+    Steals: Stls
+    Blocks: Blks
+    Turnovers: Tos
+    Def Rebounds: dRbds
+    Off Rebounds: oRbds
+    Assist to TO: A/To
+    Double Doubles: DDs
+    Field Goals Made: FGM
+    Free Throws Made: FTM
   default-categories:
     - Field Goal %
     - Free Throw %
@@ -6,7 +23,7 @@ NBA:
     - Points
     - Rebounds
     - Assists
-    - Steals 
+    - Steals
     - Blocks
     - Turnovers
   counting-statistics:
@@ -14,12 +31,12 @@ NBA:
     - Points
     - Rebounds
     - Assists
-    - Steals 
+    - Steals
     - Blocks
     - Turnovers
     - Def Rebounds
     - Off Rebounds
-    - Double Doubles 
+    - Double Doubles
     - Field Goals Made
     - Free Throws Made
   ratio-statistics: 
@@ -109,47 +126,77 @@ NBA:
     C : C
     G : PG,SG
     F : PF,SF
-  bbm-renamer:
-    Name : Player
+  # Header aliases for uploaded projection files: every spelling a source might use for a
+  # stat, mapped to this codebase's canonical name. There is no notion of a "supported
+  # export format" — a file is interpreted column by column, so any export is readable as
+  # long as its headers appear below. Matching ignores case and surrounding whitespace, so
+  # one entry covers PTS / pts / Pts. Canonical names (the right-hand side) are always
+  # understood, so a file already written in them needs no aliases at all. Unrecognized
+  # columns are dropped, and stats a file simply lacks stay absent (sources that pair
+  # projections with a league export only that league's categories). To teach the parser a
+  # new source, add its spellings here — nothing else needs to change.
+  projection-column-aliases:
+    # ── Identity ──
+    name : Player
+    player : Player
+    player name : Player
+    pos : Position
+    position : Position
+    # ── Games ──
     g : Games Played
+    gp : Games Played
     games : Games Played
+    games played : Games Played
+    # ── Counting stats ──
     p/g : Points
+    pts : Points
+    ppg : Points
+    points : Points
     r/g : Rebounds
+    reb : Rebounds
+    treb : Rebounds
+    trb : Rebounds
+    rpg : Rebounds
+    rebounds : Rebounds
     dr/g : Def Rebounds
+    dreb : Def Rebounds
     or/g : Off Rebounds
+    oreb : Off Rebounds
     a/g : Assists
+    ast : Assists
+    apg : Assists
+    assists : Assists
     s/g : Steals
-    3/g : Threes
+    stl : Steals
+    spg : Steals
+    steals : Steals
     b/g : Blocks
+    blk : Blocks
+    bpg : Blocks
+    blocks : Blocks
     to/g : Turnovers
-    fta/g: Free Throw Attempts
-    ft% : Free Throw %
-    fga/g: Field Goal Attempts
-    fg%: Field Goal %
-    3% : Three %
-    3a/g: Three Attempts
+    to : Turnovers
+    tov : Turnovers
+    turnovers : Turnovers
+    3/g : Threes
+    3pm : Threes
+    threes : Threes
     2d/g : Double Doubles
-    Pos : Position
-  htb-renamer:
-    PLAYER : Player
-    GP : Games Played
-    PTS : Points
-    TREB : Rebounds
-    OREB: Off Rebounds
-    DREB: Def Rebounds
-    AST : Assists
-    STL : Steals
-    3PM : Threes
-    BLK : Blocks
-    TO : Turnovers
-    FTA : Free Throw Attempts
-    FT% : Free Throw %
-    FGA : Field Goal Attempts
-    FG% : Field Goal %
-    3P% : Three %
-    3PA : Three Attempts
-    DD: Double Doubles
-    POS : Position
+    dd : Double Doubles
+    # ── Ratio stats and the volumes they are weighted by ──
+    fg% : Field Goal %
+    fg pct : Field Goal %
+    fga/g : Field Goal Attempts
+    fga : Field Goal Attempts
+    ft% : Free Throw %
+    ft pct : Free Throw %
+    fta/g : Free Throw Attempts
+    fta : Free Throw Attempts
+    3% : Three %
+    3p% : Three %
+    3pt% : Three %
+    3a/g : Three Attempts
+    3pa : Three Attempts
   espn-renamer:
     ESPN_NAME : Player
     GAMES_PLAYED : Games Played
@@ -182,7 +229,7 @@ NBA:
     FIELD_GOALS_MADE : Field Goals Made
     FIELD_GOAL_ATTEMPTS : Field Goal Attempts
     THREE_ATTEMPTS : Three Attempts 
-    DOUBLE_DOUBLE : Double Doubles
+    DOUBLE_DOUBLES : Double Doubles
     POSITION_LIST : Position
     GAMES_PLAYED_PERCENT : Games Played %
   darko-renamer:
@@ -225,27 +272,41 @@ NBA:
       default : 13
       min : 1
       max : 
-    omega : 
-      default : 1.2
+    omega :
+      default : 0.7
       min : 0.0
       max: 2.0
     gamma :
-      default : 0.1
+      default : 0.25
       min : 0.0
       max : 1.0
-    chi : 
+    chi :
       default : 0.6
       min : 0.0
       max: 1.0
-    aleph : 
+    aleph :
       default : 0.2
       min : 0.0
       max: 1.0
-    beth: 
+    kappa :
+      default : 0.3
+      min : 0.0
+      max: 5.0
+    behavior_model_confidence :
+      # Halves how sharply opponents are expected to pursue their predicted punts. 0.5 softens the
+      # self-play field enough that best responses stop crowding into a single open punt lane
+      # (measured: cold-start herding collapses from 10/12 seats to 3/12 and the field gains a
+      # stable interior assists share), which is also what makes the hybrid start policy's early
+      # cold-scan window safe. 1 = full self-play equilibrium; 0 = category-neutral opponents.
+      default : 0.5
+      min : 0.0
+      max: 1.0
+    beth:
       default : 3
-      min : 0 
-      max: 
-    n_iterations : 
+      min : 0
+      max:
+    n_iterations :
+      default : 30
       min : 0
       max: 10000
     S: 
@@ -305,16 +366,16 @@ NBA:
       - PF
       - C
     base:
-      PG : 
-        full_str: Point Guards
-      SG : 
-        full_str: Shooting Guards
-      SF : 
-        full_str: Small Forwards
-      PF : 
-        full_str: Power Forwards
-      C : 
-        full_str: Centers
+      PG :
+        full_str: Point Guard
+      SG :
+        full_str: Shooting Guard
+      SF :
+        full_str: Small Forward
+      PF :
+        full_str: Power Forward
+      C :
+        full_str: Center
     flex_list :
     - G
     - F
@@ -327,34 +388,37 @@ NBA:
         - SF
         - PF
         - C
-        full_str: Utilities
-      G : 
-        bases: 
+        full_str: Utility
+      G :
+        bases:
         - PG
         - SG
-        full_str: Guards
-      F: 
-        bases: 
+        full_str: Guard
+      F:
+        bases:
         - SF
         - PF
-        full_str: Forwards
-  punting_defaults :
-    No dynamic optimization :
-      omega : 0.0 
-      gamma : 0.0
-      n_iterations : 0
-    Moderate punting : 
-      omega : 0.7
-      gamma : 0.25
-      n_iterations : 30
-    Aggressive punting : 
-      omega : 1.0
-      gamma : 0.4
-      n_iterations : 30
-  punting_default : Moderate punting
+        full_str: Forward
   n_games : 82
   n_games_per_week : 3
 WNBA:
+  short-category-names:
+    Field Goal %: FG%
+    Free Throw %: FT%
+    Three %: 3%
+    Threes: 3s
+    Points: Pts
+    Rebounds: Rbds
+    Assists: Asts
+    Steals: Stls
+    Blocks: Blks
+    Turnovers: Tos
+    Def Rebounds: dRbds
+    Off Rebounds: oRbds
+    Assist to TO: A/To
+    Double Doubles: DDs
+    Field Goals Made: FGM
+    Free Throws Made: FTM
   default-categories:
     - Field Goal %
     - Free Throw %
@@ -362,7 +426,7 @@ WNBA:
     - Points
     - Rebounds
     - Assists
-    - Steals 
+    - Steals
     - Blocks
     - Turnovers
   counting-statistics:
@@ -507,18 +571,18 @@ WNBA:
       min : 1
       max : 
     omega : 
-      default : 1.2
+      default : 0.7
       min : 0.0
       max: 2.0
     gamma :
-      default : 0.1
+      default : 0.25
       min : 0.0
       max : 1.0
-    chi : 
+    chi :
       default : 0.6
       min : 0.0
       max: 1
-    n_iterations : 
+    n_iterations :
       default : 30
       min : 10
       max: 10000
@@ -579,35 +643,41 @@ WNBA:
         - PF
         - SF
         full_str: Forwards
-  punting_defaults :
-    No dynamic optimization :
-      omega : 0.0 
-      gamma : 0.0
-      n_iterations : 0
-    Moderate punting : 
-      omega : 0.7
-      gamma : 0.25
-      n_iterations : 30
-    Aggressive punting : 
-      omega : 1.0
-      gamma : 0.4
-      n_iterations : 30
-  punting_default_index : 
-    "Head to Head: Most Categories" : 1
-    "Head to Head: Each Category" : 1
-    "Rotisserie": 1
   n_games : 40
   n_games_per_week : 3
 MLB:
+  short-category-names:
+    Runs: R
+    Home Runs: HR
+    RBI: RBI
+    Stolen Bases: SBs
+    Batting Average: AVG
+    Slugging %: SLG
+    On Base %: OBP
+    Wins: W
+    Saves: SV
+    Strikeouts: Ks
+    ERA: ERA
+    WHIP: WHIP
+    K/9: K/9
+    K/BB: K/BB
+    Hits: H
+    Doubles: 2B
+    Triples: 3B
+    Total Bases: TB
+    Losses: L
+    Quality Starts: QS
+    Holds: HLD
+    Saves and Holds: SVH
   default-categories:
     - Runs
-    - Home Runs 
-    - RBI 
-    - Stolen Bases 
+    - Home Runs
+    - RBI
+    - Stolen Bases
     - Batting Average
-    - Wins 
+    - Wins
     - Saves
-    - Strikeouts 
+    - Strikeouts
     - ERA
     - WHIP
   counting-statistics:
@@ -751,7 +821,8 @@ MLB:
     PITCHING_WALKS_AND_HITS : Pitching WH
     BATTING_WALKS_AND_HITS : Batting WH 
     EFFECTIVE_AT_BATS: Effective At Bats
-  htb-renamer: 
+  # Header aliases for uploaded projection files — see the NBA block for how they are used.
+  projection-column-aliases:
     GP : Games Played
     R : Runs
     H : Hits
@@ -874,18 +945,18 @@ MLB:
       min : 1
       max : 
     omega : 
-      default : 1.2
+      default : 0.7
       min : 0.0
       max: 2.0
     gamma :
-      default : 0.1
+      default : 0.25
       min : 0.0
       max : 1.0
-    chi : 
+    chi :
       default : 0.6
       min : 0.0
       max: 1
-    n_iterations : 
+    n_iterations :
       default : 30
       min : 10
       max: 10000
@@ -910,23 +981,6 @@ MLB:
         MI: 1
         Util: 2
         P: 2
-  punting_defaults :
-    No dynamic optimization :
-      omega : 0.0 
-      gamma : 0.0
-      n_iterations : 0
-    Moderate punting : 
-      omega : 0.7
-      gamma : 0.25
-      n_iterations : 30
-    Aggressive punting : 
-      omega : 1.0
-      gamma : 0.4
-      n_iterations : 30
-  punting_default_index : 
-    "Head to Head: Most Categories" : 1
-    "Head to Head: Each Category" : 1
-    "Rotisserie": 1
   z-score-player-multiplier : 50
   z-score-team-multiplier : 20
   g-score-player-multiplier : 60

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Sports Optimizer</title>
+    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏀</text></svg>'>
+    <link rel = 'stylesheet' href = 'styles/styles.css'>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="app-layout">
+
+        <button id="sidebar-toggle" type="button" aria-label="Toggle sidebar"></button>
+
+        <aside id="sidebar" style="visibility: hidden">
+            <div class="sidebar-title">Fantasy Sports Optimizer</div>
+            <hr class="sidebar-divider">
+            <div id="sidebar-sections"></div>
+            <a id="docs-link"
+               href="https://zer2.github.io/fantasy-basketball-optimizer/"
+               target="_blank"
+               rel="noopener">📖 Documentation</a>
+        </aside>
+
+        <main id="main-content">
+
+            <!-- Season tab bar (Season mode only) -->
+            <nav id="season-nav" style="display:none"></nav>
+
+            <!-- Live data controls (Draft/Auction + live platform only) -->
+            <div id="live-bar" style="display:none"></div>
+
+            <!-- Standard content row: optional left panel + candidate panel -->
+            <div id="content-row">
+                <div id="left-panel" style="display:none"></div>
+                <div id="candidate-panel">
+                    <div id="panel-content-width-container">
+                        <div id="right-header"></div>
+                        <div id="tab-row">
+                            <div id="seat-selector-container" style="display:none"></div>
+                            <!-- Hidden until applyLayout() runs show('eval-indicator'). Without this the
+                                 indicator briefly paints in its raw HTML position before the sidebar/layout
+                                 settles, so the user sees "Starting..." (or "Updating...") flash at the wrong spot. -->
+                            <span id="eval-indicator" class="eval-indicator" data-state="fetching" style="display:none">Starting...</span>
+                            <div id="right-sub-header"></div>
+                        </div>
+                        <table id="hscoretable"><tbody></tbody></table>
+                        <div id="auction-gscore" style="display:none"></div>
+                        <div id="draft-gscore"   style="display:none"></div>
+                        <div id="right-footer"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Season Rosters two-col (replaces content-row for Rosters tab) -->
+            <div id="season-rosters-row" style="display:none">
+                <div id="rosters-left"></div>
+                <div id="rosters-right"></div>
+            </div>
+
+            <div id="season-trading-row" style="display:none"></div>
+
+        </main>
+
+    </div>
+
+    <script src = 'dist/main.js' type = 'module'></script>
+
+</body>
+</html>

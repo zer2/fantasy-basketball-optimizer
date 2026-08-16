@@ -51,3 +51,18 @@ docs/_build/
 
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# Persisted platform OAuth credentials (per-client token dirs)
+.platform_credentials/
+
+# Claude
+claude.md
+.claude
+screenshot_review/
+
+# Node deps (screenshot tooling etc.) — installed, not committed
+node_modules/
+testing_files/experiment_report.md
+testing_files/experiment_report.html
+testing_files/experiment_results/
+testing_files/benchmark_history.jsonl

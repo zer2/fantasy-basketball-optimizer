@@ -1,0 +1,151 @@
+// data_entry/season/season_waiver.ts
+// Renders the Season → Waiver Wire tab controls.
+// Shows team + drop-player selectors above the standard H-score candidate table.
+// On selection, calls evaluate with the dropped player removed from their team,
+// then highlights that player's row in the results.
+
+import { makeCustomSelect } from '../../custom_select.js'
+import { readRequiredIntInput } from '../../helper_functions.js'
+import { readTeamNames, readRosterAssignments } from './season_helpers.js'
+import { getPlayerResultsById } from '../../app_state.js'
+import { getRegistryEntry } from '../../player_registry.js'
+import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
+import { runWaiverEvaluate } from '../../api/season_session.js'
+import { highlightCandidate } from '../../table/player_table.js'
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Returns the id of the player with the highest g_rank (worst) among the given ids.
+ *  Returns null if none of the ids are found in the backend player data. */
+function lowestGRankPlayer(playerIds: number[]): number | null {
+    const byId = getPlayerResultsById()
+    let worst: number | null = null
+    let worstRank = -Infinity
+    for (const playerId of playerIds) {
+        const p = byId.get(playerId)
+        if (p && p.g_rank > worstRank) {
+            worstRank = p.g_rank
+            worst = playerId
+        }
+    }
+    return worst
+}
+
+/** Marks the dropped player's row in the candidate table (virtualization-aware: the candidate may be
+ *  outside the current render window, so the mark is tracked by id and applied when its row renders). */
+function highlightDropPlayer(dropPlayerId: number): void {
+    highlightCandidate(dropPlayerId)
+}
+
+// Tracks the listeners attached by the most recent renderWaiverControls call so
+// they can be detached before the next one. Without this, switching tabs in and
+// out of Waiver would leave the previous render's two custom selects' internal
+// listeners bound to detached nodes.
+let waiverListenerController: AbortController | null = null
+
+// ─── Main render ─────────────────────────────────────────────────────────────
+
+/** Renders waiver wire controls (team + drop-player selectors) into the given container. */
+export function renderWaiverControls(container: HTMLElement): void {
+    waiverListenerController?.abort()
+    waiverListenerController = new AbortController()
+
+    const teamNames   = readTeamNames()
+    const assignments = readRosterAssignments()
+    const nPicks      = readRequiredIntInput('ls-n-picks')
+    // assignments[t] can be undefined for team names beyond nDrafters, hence the optional chain
+    const fullTeams   = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
+
+    if (fullTeams.length < 1) {
+        const msg = document.createElement('p')
+        msg.className   = 'coming-soon'
+        msg.textContent = 'Fill out at least one full team on the Rosters tab to use Waiver Wire.'
+        container.append(msg)
+        return
+    }
+
+    // ── Team selector ────────────────────────────────────────────────────────
+
+    const teamWrap = document.createElement('div')
+    teamWrap.className = 'waiver-selector-row'
+
+    const teamLabel = document.createElement('div')
+    teamLabel.className   = 'pick-control-label'
+    teamLabel.textContent = 'Which team do you want to drop a player from?'
+    teamWrap.append(teamLabel)
+
+    const teamSel = makeCustomSelect(
+        'waiver-team-select',
+        fullTeams.map(n => ({ value: n, label: n })),
+        undefined,
+        undefined,
+        waiverListenerController.signal,
+    )
+    teamWrap.append(teamSel.element)
+    container.append(teamWrap)
+
+    // ── Drop player selector ─────────────────────────────────────────────────
+
+    const dropWrap = document.createElement('div')
+    dropWrap.className = 'waiver-selector-row'
+
+    const dropLabel = document.createElement('div')
+    dropLabel.className   = 'pick-control-label'
+    dropLabel.textContent = 'Which player are you considering dropping?'
+    dropWrap.append(dropLabel)
+
+    // teams in fullTeams are guaranteed to have entries in assignments
+    const buildDropOptions = (team: string) => assignments[team]
+        .map(playerId => ({
+            value: String(playerId),
+            label: buildPlayerOptionLabel(playerId),
+            html:  buildFullPlayerDisplayHtml(playerId),
+        }))
+
+    const initialTeam    = fullTeams[0]
+    const initialRoster  = assignments[initialTeam]
+    // lowestGRankPlayer returns null if roster ids aren't in backend data yet
+    const initialDefault = lowestGRankPlayer(initialRoster) ?? initialRoster[0]
+
+    const dropSel = makeCustomSelect(
+        'waiver-drop-select',
+        buildDropOptions(initialTeam),
+        String(initialDefault),
+        undefined,
+        waiverListenerController.signal,
+    )
+    dropWrap.append(dropSel.element)
+    container.append(dropWrap)
+
+    // ── Evaluate and highlight ───────────────────────────────────────────────
+
+    async function runWaiver(): Promise<void> {
+        const team      = teamSel.getValue()
+        const dropValue = dropSel.getValue()
+        if (!team || !dropValue) return
+        const dropPlayerId = Number(dropValue)
+        if (Number.isNaN(dropPlayerId)) throw new Error(`Waiver drop select carried a non-numeric value: "${dropValue}"`)
+
+        // Remove the drop player from their team; they become a free-agent candidate
+        const modifiedAssignments = { ...assignments }
+        modifiedAssignments[team] = assignments[team].filter(playerId => playerId !== dropPlayerId)
+
+        await runWaiverEvaluate(modifiedAssignments, team)
+        highlightDropPlayer(dropPlayerId)
+    }
+
+    teamSel.element.addEventListener('change', () => {
+        const team        = teamSel.getValue()
+        const roster      = assignments[team]
+        const defaultDrop = lowestGRankPlayer(roster) ?? roster[0]
+        dropSel.setOptions(buildDropOptions(team), String(defaultDrop))
+        runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
+    })
+
+    dropSel.element.addEventListener('change', () => {
+        runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
+    })
+
+    // Run immediately on render
+    runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
+}

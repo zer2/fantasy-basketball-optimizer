@@ -1,0 +1,50 @@
+# What NOT to send to the Docker daemon as build context.
+#
+# Cloud Build checks the repository out (~14.6 MB tracked) and runs `docker build`. The
+# Dockerfile COPYs only backend/, frontend/, coefficient_exploration_output/ and a handful
+# of root files — about 1.3 MB. Everything else is packed and transferred for nothing. The
+# two big items are the built documentation site and the docs sources: together they are
+# roughly 88% of the checkout and neither is served by this container.
+#
+# Careful: anything the Dockerfile COPYs must NOT be listed here, or the build fails on a
+# missing path. Kept deliberately: backend/, frontend/ (minus its build output),
+# coefficient_exploration_output/, parameters.yaml, requirements.txt, package.json,
+# package-lock.json, tsconfig.json, __init__.py.
+
+.git
+.gitignore
+.gcloudignore
+.dockerignore
+
+# ── Documentation: sources and the mkdocs-built site (published to GitHub Pages) ──
+docs/
+site/
+mkdocs.yml
+*.md
+
+# ── Tests, tooling, editor and CI config — never part of the runtime image ────────
+testing_files/
+scripts/
+screenshot_review/
+.github/
+.devcontainer/
+.vscode/
+.claude/
+.ipynb_checkpoints/
+
+# ── Local state, caches, credentials ─────────────────────────────────────────────
+.cache/
+.streamlit/
+.platform_credentials/
+.env
+.env.*
+*.pem
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# ── Built or installed artefacts: the image produces these itself (Dockerfile      ─
+#    stage 1 runs npm ci + npm run build, so a stale local dist must not leak in).
+node_modules/
+frontend/dist/
