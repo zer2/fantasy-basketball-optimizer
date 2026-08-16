@@ -163,16 +163,21 @@ def get_specified_historical_stats(dataset_name : str, league : str) -> pd.DataF
   """
   #not sure but I think copying the dataset instead of slicing it prevents issues with 
   #overwriting the version in the cache
-  if league in ('NBA','WNBA'):
+  if league == 'NBA':
 
     historical_df = get_historical_data()
-    df = historical_df.loc[dataset_name].copy()  
+    df = historical_df.loc[dataset_name].copy()
 
     df.index = df.index + ' (' + df['Position'] + ')'
     df.index.name = 'Player'
 
     return df, gen_key()
-  
+
+  elif league == 'WNBA':
+
+    st.error('Historical datasets are not available for WNBA yet')
+    st.stop()
+
   elif league in ('MLB'):
     
     historical_df = get_baseball_historical_data()

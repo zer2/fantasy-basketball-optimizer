@@ -15,6 +15,11 @@ class PlatformIntegration(abc.ABC):
         #return list of modes available with this integration
         pass
 
+    @property
+    def supported_leagues(self) -> list:
+        #return list of fantasy sports this integration supports
+        return ['NBA']
+
 
     @abc.abstractmethod
     def setup():

@@ -7,10 +7,11 @@ import numpy as np
 from src.math.process_player_data import drop_injured_players
 from src.tabs.drafting import clear_draft_board
 from src.helpers.helper_functions import gen_key, get_data_from_session_state, get_data_key, get_league_type \
-                                            , get_selections_default, listify \
+                                            , get_params, get_selections_default, listify \
                                             , get_player_name_column, store_dataset_in_session_state
 from src.data_retrieval.get_data import get_historical_data, get_specified_historical_stats, combine_nba_projections
 from src.data_retrieval.get_data_baseball import get_baseball_historical_data, combine_baseball_projections
+from src.data_retrieval.get_data_wnba import get_wnba_current_season_data, get_specified_wnba_stats
 
 def player_stats_popover(): 
     """Figures out where to get player stats from, and loads them into a dataframe
@@ -25,9 +26,13 @@ def player_stats_popover():
     if get_league_type() == 'NBA':
 
         get_nba_stats()
-            
+
+    elif get_league_type() == 'WNBA':
+
+        get_wnba_stats()
+
     elif get_league_type() == 'MLB':
-            
+
         get_mlb_stats()
 
     default_injury_list = [p for p in st.session_state['injured_players'] \
@@ -38,6 +43,31 @@ def player_stats_popover():
     df, key = drop_injured_players(player_stats_v0_key, default_injury_list)
     store_dataset_in_session_state(df ,'player_stats_v1', key)
     
+def get_wnba_stats():
+    """Loads current-season stats from the WNBA stats API into a dataframe, specifically for the WNBA
+
+    Args:
+        None
+
+    Returns:
+      None
+    """
+
+    season = get_params()['current-season']
+
+    dataset_names = list(get_wnba_current_season_data(season).keys())
+
+    dataset_name = st.selectbox(
+                            'Which kind of dataset do you want to use?'
+                            , dataset_names
+                            , key = 'wnba_dataset'
+                            , index = 0
+                            , on_change = clear_draft_board
+    )
+
+    df, key = get_specified_wnba_stats(dataset_name, season)
+    store_dataset_in_session_state(df, 'player_stats_v0', key)
+
 def get_nba_stats():
     """Figures out where to get player stats from, and loads them into a dataframe, specifically for the NBA
 

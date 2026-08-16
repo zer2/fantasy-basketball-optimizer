@@ -16,5 +16,5 @@ snowflake-connector-python
 schedule
 unidecode
 fantraxapi
-espn_api
+espn_api>=0.46.0
 st-theme

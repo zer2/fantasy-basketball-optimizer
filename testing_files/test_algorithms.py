@@ -7,7 +7,7 @@ from scipy.stats import norm
 
 def test_x_mu_gradients():
     """Make sure the H-score calculations for x_mu are working"""
-    at = AppTest.from_file("../app.py").run(timeout = 300)
+    at = AppTest.from_file("app.py").run(timeout = 300)
 
     info = at.session_state.info
 
@@ -56,7 +56,7 @@ def test_x_mu_gradients():
 
 def test_objective_gradients():
     """Make sure the H-score calculations for x_mu are working"""
-    at = AppTest.from_file("../app.py").run(timeout = 300)
+    at = AppTest.from_file("app.py").run(timeout = 300)
     #at.selectbox('scoring_format').input('Rotisserie')
 
     info = at.session_state.info

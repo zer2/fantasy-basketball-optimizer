@@ -414,9 +414,9 @@ def process_player_data(weekly_df : pd.DataFrame
         average_round_value = relative_value_helper_df.groupby('Round')['Value'].mean()
 
 
-    elif get_league_type() == 'NBA':
+    elif get_league_type() in ('NBA', 'WNBA'):
         position_means_g = position_means_g.sub(position_means_g.mean(axis = 1), axis = 0)
-        position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1) 
+        position_means_g = position_means_g.sub(position_means_g.mean(axis = 0), axis = 1)
         average_round_value = None
 
 

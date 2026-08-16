@@ -32,6 +32,16 @@ def league_settings_popover():
       None 
     """
 
+    integrations = {integration.get_description_string() : integration for integration in \
+                    [YahooIntegration(), FantraxIntegration(), ESPNIntegration()]}
+
+    #reset the data source if the selected sport does not support it, so that the layout
+    #decision below does not assume an integration which is about to disappear
+    selected_integration = integrations.get(st.session_state.data_source)
+    if (selected_integration is not None) and \
+       (st.session_state.get('league', 'NBA') not in selected_integration.supported_leagues):
+        st.session_state.data_source = 'Enter your own data'
+
     #no need for second column if there is no integration
     if using_manual_entry():
         c1, c2 = st.columns([0.5,0.5])
@@ -42,21 +52,23 @@ def league_settings_popover():
 
         league = st.selectbox(
                 'Which fantasy sport are you playing?',
-                ('NBA') #WNBA and MLB excluded for now
+                ('NBA', 'WNBA') #MLB excluded for now
                 , index = 0
                 , key = 'league'
                 , on_change = clear_draft_board
                 )
-            
+
         set_params(league)
         params = get_params()
 
-        integrations = {integration.get_description_string() : integration for integration in \
-                        [YahooIntegration(), FantraxIntegration(), ESPNIntegration()]}
+        #only offer integrations that support the selected fantasy sport
+        data_source_options = ['Enter your own data'] + \
+            [description for description, integration in integrations.items()
+             if league in integration.supported_leagues]
 
         data_source = st.selectbox(
         'Do you want to integrate with a fantasy platform?'
-        , ['Enter your own data'] + list(integrations.keys())
+        , data_source_options
         , key = 'data_source'
         , index = 0)
 

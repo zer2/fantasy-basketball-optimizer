@@ -1,11 +1,11 @@
 import streamlit as st
-from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key
+from src.helpers.helper_functions import adjust_teams_dict_for_duplicate_names, get_data_key, get_league_type
 import pandas as pd
 from src.platform_integration.platform_integration import PlatformIntegration
 from src.tabs.drafting import clear_draft_board
 from typing import Callable, List, Optional
-from espn_api.basketball import League
-import re 
+from espn_api import basketball, wbasketball
+import re
 
 from requests.auth import HTTPBasicAuth
 from src.platform_integration import yahoo_helper
@@ -27,6 +27,60 @@ import time
 import numpy as np
 
 LOGGER = get_logger(__name__)
+
+#ESPN identifies each fantasy game with an abbreviation ('slug'), e.g. 'fba' for NBA fantasy
+ESPN_GAME_ABBREVS = {'NBA' : 'fba', 'WNBA' : 'wfba'}
+KNOWN_GAME_ABBREVS = ('ffl', 'fba', 'fhl', 'flb', 'wfba')
+
+def get_espn_league_class(league_type):
+    """Get the espn_api League class appropriate for the current fantasy sport
+
+    Args:
+        league_type: string identifying the fantasy sport, e.g. 'NBA' or 'WNBA'
+
+    Returns:
+        espn_api League class
+    """
+    if league_type == 'WNBA':
+        return wbasketball.League
+    else:
+        return basketball.League
+
+def entry_game_abbrev(league_entry):
+    """Get the game abbreviation from a fan API league entry, e.g. 'fba' from 'fba:12345'
+
+    Args:
+        league_entry: dict for one league from the fan API
+
+    Returns:
+        game abbreviation string, or None if it cannot be determined
+    """
+    league_id = league_entry.get('id') if isinstance(league_entry, dict) else None
+    if isinstance(league_id, str) and (':' in league_id):
+        return league_id.split(':')[0]
+    else:
+        return None
+
+def filter_entries_for_league(entries, league_type):
+    """Filter fan API league entries down to those relevant for the current fantasy sport
+
+    For WNBA, keep entries whose game abbreviation is 'wfba'. Entries whose abbreviation
+    cannot be determined or is not a recognized slug are kept rather than silently dropped.
+    For any other sport, entries are returned unchanged to preserve existing behavior
+
+    Args:
+        entries: list of league entry dicts from the fan API
+        league_type: string identifying the fantasy sport, e.g. 'NBA' or 'WNBA'
+
+    Returns:
+        filtered list of league entry dicts
+    """
+    if league_type == 'WNBA':
+        return [entry for entry in entries
+                if (entry_game_abbrev(entry) == ESPN_GAME_ABBREVS['WNBA'])
+                or (entry_game_abbrev(entry) not in KNOWN_GAME_ABBREVS)]
+    else:
+        return entries
 
 class ESPNIntegration(PlatformIntegration):
 
@@ -50,9 +104,13 @@ class ESPNIntegration(PlatformIntegration):
     @property
     def available_modes(self) -> list:
         return ['Season Mode']
-    
+
     def get_available_modes(self) -> list:
         return self.available_modes
+
+    @property
+    def supported_leagues(self) -> list:
+        return ['NBA', 'WNBA']
 
     def setup(self):
         """Collect information from the user, and use it to set up the integration.
@@ -68,12 +126,17 @@ class ESPNIntegration(PlatformIntegration):
         if ('espn_s2' not in st.session_state) or ('espn_swid' not in st.session_state):
             self.get_espn_credentials()
         else:
-            user_leagues = self.get_user_leagues()
+            user_leagues = filter_entries_for_league(self.get_user_leagues(), get_league_type())
 
             def get_league_labels(league):
                 season = league['metaData']['entry']['seasonId']
-                return f"{league['metaData']['entry']['groups'][0]['groupName']} ({str(season - 1)}-{str(season)} Season)"
-   
+                group_name = league['metaData']['entry']['groups'][0]['groupName']
+                if get_league_type() == 'WNBA':
+                    #WNBA seasons fall within a single calendar year
+                    return f"{group_name} ({str(season)} Season)"
+                else:
+                    return f"{group_name} ({str(season - 1)}-{str(season)} Season)"
+
             espn_league = st.selectbox(
                 label='Which league should player data be pulled from?',
                 options=user_leagues,
@@ -101,11 +164,12 @@ class ESPNIntegration(PlatformIntegration):
                        , league_id
                        , division_id = None):
 
-        league = League(league_id = league_id.split(':')[1]
+        league_class = get_espn_league_class(get_league_type())
+        league = league_class(league_id = league_id.split(':')[1]
                 , year = self.year
                 , espn_s2= st.session_state.espn_s2
                 , swid=st.session_state.espn_swid)
-        
+
         return {team.team_id : team.team_name for team in league.teams}
     
     def get_team_names(_self, league_id, division_id = None):
@@ -132,15 +196,18 @@ class ESPNIntegration(PlatformIntegration):
         Returns:
             DataFrame with roster info
         """
-        league = League(league_id = league_id.split(':')[1]
+        league_class = get_espn_league_class(get_league_type())
+        league = league_class(league_id = league_id.split(':')[1]
                         , year = self.year
                         , espn_s2= st.session_state.espn_s2
                         , swid=st.session_state.espn_swid)
-                
+
         teams = league.teams
 
+        #get_fixed_player_name matches ESPN roster names against the loaded stats dataset;
+        #unmatched players (e.g. WNBA players missing from the stats data) degrade to 'RP'
         team_players_dict = {team.team_name :
-                [get_fixed_player_name(player.name, get_data_key('info')) for player in team.roster] 
+                [get_fixed_player_name(player.name, get_data_key('info')) for player in team.roster]
                               for team in teams}
                 
         max_team_size = max([len(x) for x in team_players_dict.values()])

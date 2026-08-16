@@ -373,9 +373,6 @@ WNBA:
     - Steals 
     - Blocks
     - Turnovers
-    - Def Rebounds
-    - Off Rebounds
-    - Double Doubles 
   ratio-statistics: 
     Field Goal % : 
       made-statistic : Field Goals Made
@@ -383,9 +380,6 @@ WNBA:
     Free Throw % : 
       made-statistic : Free Throws Made
       volume-statistic : Free Throw Attempts 
-    Three %:
-      made-statistic: Threes
-      volume-statistic: Three Attempts 
   negative-statistics: 
     - Turnovers
   other-columns:
@@ -415,20 +409,6 @@ WNBA:
     FGA : Field Goal Attempts
     FGM : Field Goals Made
     GAME_DATE : Game Date
-  historical-renamer: 
-    PLAYER_NAME : Player
-    PTS : Points
-    REB : Rebounds
-    AST : Assists
-    STL: Steals
-    BLK : Blocks
-    FG3M : Threes
-    TO : Turnovers
-    FTA : Free Throw Attempts
-    FTM : Free Throws Made
-    FGA : Field Goal Attempts
-    FGM : Field Goals Made
-    date : Date
   rotowire-renamer: 
     NAME : Player
     PTS : Points
@@ -453,41 +433,13 @@ WNBA:
     C : C
     G : PG,SG
     F : PF,SF
-  stat-df-renamer:
-    SEASON : Season
-    NBA_PLAYER_NAME : Player
-    POINTS : Points
-    REBOUNDS : Rebounds
-    ASSISTS : Assists
-    STEALS : Steals
-    BLOCKS : Blocks
-    THREES : Threes
-    TURNOVERS : Turnovers
-    FREE_THROWS_MADE : Free Throws Made
-    FREE_THROW_ATTEMPTS : Free Throw Attempts
-    FIELD_GOALS_MADE : Field Goals Made
-    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
-    POSITION_LIST : Position
-    GAMES_PLAYED_PERCENT : Games Played %
-  darko-renamer:
-    NBA_PLAYER_NAME : Player
-    POINTS : Points
-    REBOUNDS : Rebounds
-    ASSISTS : Assists
-    STEALS : Steals
-    BLOCKS : Blocks
-    THREES : Threes
-    TURNOVERS : Turnovers
-    FREE_THROW_ATTEMPTS : Free Throw Attempts
-    FREE_THROW_PERCENT : Free Throw %
-    FIELD_GOAL_ATTEMPTS : Field Goal Attempts
-    FIELD_GOAL_PERCENT : Field Goal %
-    POSITION_LIST : Position
-    MINUTES_PLAYED : Forecasted Minutes
-  schedule-url : https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json 
+  current-season : "2026"
+  schedule-url : https://cdn.wnba.com/static/json/staticData/scheduleLeagueV2_1.json
   z-score-player-multiplier : 50
+  z-score-total-multiplier : 40
   z-score-team-multiplier : 20
   g-score-player-multiplier : 60
+  g-score-total-multiplier : 50
   g-score-team-multiplier : 24
   options : 
     upsilon : 
@@ -518,6 +470,14 @@ WNBA:
       default : 0.6
       min : 0.0
       max: 1
+    aleph :
+      default : 0.2
+      min : 0.0
+      max: 1.0
+    beth:
+      default : 3
+      min : 0
+      max:
     n_iterations : 
       default : 30
       min : 10
@@ -596,8 +556,9 @@ WNBA:
     "Head to Head: Most Categories" : 1
     "Head to Head: Each Category" : 1
     "Rotisserie": 1
-  n_games : 40
-  n_games_per_week : 3
+  punting_default : Moderate punting
+  n_games : 44
+  n_games_per_week : 2.7
 MLB:
   default-categories:
     - Runs

@@ -156,6 +156,9 @@ def get_conversion_factors():
 def get_correlations():
    if get_league_type() == 'NBA':
     rho =  pd.read_csv('src/data_retrieval/basketball_correlations.csv').set_index('Category')
+   elif get_league_type() == 'WNBA':
+    #NBA correlations are the best available approximation until WNBA-derived ones are computed
+    rho =  pd.read_csv('src/data_retrieval/basketball_correlations.csv').set_index('Category')
    elif get_league_type() == 'MLB':
     rho = pd.read_csv('src/data_retrieval/baseball_correlations.csv').set_index('Category')
 
@@ -204,6 +207,8 @@ def get_counting_statistics():
       if os.environ['SPORT'] == 'NBA':
         return ['Threes','Points','Rebounds','Assists','Steals','Blocks'
                 ,'Turnovers','Double Doubles','Off Rebounds','Def Rebounds','Field Goals Made', 'Free Throws Made']
+      elif os.environ['SPORT'] == 'WNBA':
+        return ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
       elif os.environ['SPORT'] == 'MLB':
         return ['Runs','Home Runs', 'RBI', 'Stolen Bases','Doubles','Triples','Hits','Total Bases'
                 ,'Wins', 'Strikeouts','Saves', 'Holds','Saves and Holds','Innings Pitched', 'Quality Starts','Losses'] 
@@ -215,6 +220,8 @@ def get_ratio_statistics():
     else: 
       if os.environ['SPORT'] == 'NBA':
         return ['Field Goal %','Free Throw %','Three %','Assist to TO']
+      elif os.environ['SPORT'] == 'WNBA':
+        return ['Field Goal %','Free Throw %']
       elif os.environ['SPORT'] == 'MLB':
         return ['Batting Average', 'Slugging %', 'On Base %', 'ERA','WHIP','K/9','K/BB']
     
@@ -230,6 +237,8 @@ def get_selected_counting_statistics():
    else:
       if os.environ['SPORT'] == 'NBA':
         return  ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
+      elif os.environ['SPORT'] == 'WNBA':
+        return  ['Threes','Points','Rebounds','Assists','Steals','Blocks','Turnovers']
       elif os.environ['SPORT'] == 'MLB':
         return ['Runs','Home Runs', 'RBI', 'Stolen Bases', 'Wins', 'Saves', 'Strikeouts'] 
 
@@ -238,6 +247,8 @@ def get_selected_ratio_statistics():
       return [category for category in get_ratio_statistics() if category in st.session_state['selected_categories']]
    else:
       if os.environ['SPORT'] == 'NBA':
+        return ['Field Goal %','Free Throw %']
+      elif os.environ['SPORT'] == 'WNBA':
         return ['Field Goal %','Free Throw %']
       elif os.environ['SPORT'] == 'MLB':
         return ['Batting Average','ERA','WHIP']

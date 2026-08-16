@@ -2,7 +2,7 @@ from streamlit.testing.v1 import AppTest
 
 def test_draft_defaults():
     """Make sure the draft mode is set up correctly in terms of default parameters"""
-    at = AppTest.from_file("../app.py").run(timeout = 300)
+    at = AppTest.from_file("app.py").run(timeout = 300)
 
     #make sure parameters are initialized correctly
     assert not at.session_state.run_h_score

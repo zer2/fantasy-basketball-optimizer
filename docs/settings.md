@@ -8,7 +8,7 @@ Settings are available for live connections to fantasy providers, customizable p
 
 ### Fantasy sport
 
-For now, this will just be NBA. MLB or WNBA may be added in the future
+NBA and WNBA are supported. WNBA uses current-season stats from the WNBA stats API. MLB may be added in the future
 
 ### Data integration 
 
@@ -18,7 +18,7 @@ There is also an option for integrating with a fantasy provider, which allows th
 
 The three platforms currently supported are: 
 
-**Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when Yahoo is selected.
+**Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. Yahoo integration is NBA-only. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when Yahoo is selected.
 
 ![](img/yahoopop.png)
 
@@ -28,11 +28,11 @@ FYI there is a bug in the wrapper used for connecting to the Yahoo API, which cr
 
 ![](img/yahoosettings.png)
 
-**Fantrax**: support exists both for pulling existing teams during the season, and for integrating with drafts. However this only works with public drafts. 
+**Fantrax**: support exists both for pulling existing teams during the season, and for integrating with drafts. However this only works with public drafts. Fantrax integration is NBA-only.
 
 ![](img/fantraxsettings.png)
 
-**ESPN**: support only exists for pulling existing teams during the season. Unfortunately, ESPN has no API for draft access. To authenticate to pull a team, a web plug-in is needed. The instructions are on the pop-up generated when ESPN is selected. 
+**ESPN**: support only exists for pulling existing teams during the season (Season Mode). Unfortunately, ESPN has no API for draft access. ESPN integration is available for both NBA and WNBA leagues; when WNBA is selected, only the user's WNBA fantasy leagues are shown. To authenticate to pull a team, a web plug-in is needed. The instructions are on the pop-up generated when ESPN is selected.
 
 ![](img/espnpop.png)
 

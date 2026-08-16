@@ -546,9 +546,9 @@ class HAgent():
                 category_weights = category_weights + category_updates
                 category_weights[category_weights < 0] = 0
 
-                if get_league_type() == 'NBA':
+                if get_league_type() in ('NBA', 'WNBA'):
                     category_weights = category_weights/category_weights.sum(axis = 1).reshape(-1,1)
-                elif get_league_type() == 'MLB': 
+                elif get_league_type() == 'MLB':
                     batting_weights = category_weights[:,self.batting_stat_indices] 
                     category_weights[:,self.batting_stat_indices] = batting_weights/(2 * batting_weights.sum(axis = 1).reshape(-1,1))
 
@@ -751,7 +751,7 @@ class HAgent():
             #L = np.einsum('aijk, bi-> bjk',self.L_by_position ,future_position_array)
             L = self.L
 
-            if get_league_type() == 'NBA':
+            if get_league_type() in ('NBA', 'WNBA'):
                 expected_future_diff_single = self.get_x_mu_simplified_form(category_weights, L, self.v) + position_mu
                 del_full = (self.n_picks-1-n_players_selected) * self.get_del_full(category_weights, L, self.v)
 
