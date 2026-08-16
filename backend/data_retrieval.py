@@ -127,12 +127,15 @@ def get_historical_data(params: dict) -> pd.DataFrame:
     return df
 
 
-def get_specified_historical_stats(season: str, params: dict) -> pd.DataFrame:
+def get_specified_historical_stats(season: str, params: dict, sport: str = 'NBA') -> pd.DataFrame:
     """Return player stats for a specific season, indexed by player id.
 
     The 'Player' column carries the season row's native display name (registry material
     popped off by run_step1); stats and 'Position' are the pipeline's v0 columns.
     """
+    if sport == 'WNBA':
+        from backend.data_wnba import get_specified_wnba_stats
+        return get_specified_wnba_stats(season, params)
     return get_historical_data(params).loc[season].copy()
 
 

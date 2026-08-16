@@ -151,7 +151,7 @@ def run_step1(
     so repeated session creations with the same data source skip the round-trip and
     rebuild an identical registry.
     """
-    _, params, _ = _sport_params(session)
+    _, params, sport = _sport_params(session)
     cp = session.current_params
     source_type = cp['data_source_type']
     cache_key = _v0_cache_key(cp)
@@ -175,7 +175,7 @@ def run_step1(
                 raise ValueError(
                     "data_source.season is required when data_source.type == 'historical'"
                 )
-            v0_with_names = get_specified_historical_stats(season, params)
+            v0_with_names = get_specified_historical_stats(season, params, sport=sport)
 
         elif source_type == 'projections':
             from backend.data_retrieval import combine_projections

@@ -330,7 +330,7 @@ class HAgent:
         # correction. Sign-flipped for negative statistics so it matches the "good
         # direction" orientation of the differential z-scores.
         if scoring_format in ('Rotisserie', 'Head to Head: Most Categories'):
-            if sport == 'NBA':
+            if sport in ('NBA', 'WNBA'):
                 rho = pd.read_csv('backend/data/basketball_correlations.csv').set_index('Category')
             else:
                 rho = pd.read_csv('backend/data/baseball_correlations.csv').set_index('Category')
