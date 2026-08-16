@@ -42,7 +42,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     const config = getSportConfig()
     if (!config) throw new Error('renderLeagueSettings called before sport config loaded')
     const nDraftersDefault = config.options.n_drafters.default
-    const nPicksDefault    = config.options.n_picks.default
+    const nPicksDefault = config.options.n_picks.default
 
     const grid = document.createElement('div')
     grid.className = 'ls-grid'
@@ -54,10 +54,16 @@ export function renderLeagueSettings(container: HTMLElement): void {
     sportCell.append(makeLabel('ls-sport', 'Sport'))
     const sportSelect = makeCustomSelect(
         'ls-sport',
-        [{ value: 'NBA', label: 'NBA' }],
+        [
+            { value: 'NBA', label: 'NBA' },
+            { value: 'WNBA', label: 'WNBA' }
+        ],
         pref('sport', 'NBA'),
     )
-    sportSelect.element.addEventListener('change', () => savePref('sport', sportSelect.getValue()))
+    sportSelect.element.addEventListener('change', () => {
+        savePref('sport', sportSelect.getValue())
+        window.location.reload()
+    })
     sportCell.append(sportSelect.element)
     grid.append(sportCell)
 
@@ -149,7 +155,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     connectCell.id = 'ls-connect-cell'
 
     const connectStatus = document.createElement('div')
-    connectStatus.id        = 'ls-connect-status'
+    connectStatus.id = 'ls-connect-status'
     connectStatus.className = 'pick-control-label'
     const setConnectStatus = (message: string): void => { connectStatus.textContent = message }
 
@@ -163,9 +169,9 @@ export function renderLeagueSettings(container: HTMLElement): void {
     }
 
     const connectButton = document.createElement('button')
-    connectButton.type        = 'button'
-    connectButton.id          = 'ls-connect-btn'
-    connectButton.className   = 'section-apply-btn'
+    connectButton.type = 'button'
+    connectButton.id = 'ls-connect-btn'
+    connectButton.className = 'section-apply-btn'
     connectButton.textContent = 'Connect'
     connectCell.append(connectButton)
     connectCell.append(connectStatus)
@@ -186,7 +192,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     function refreshConnectControls(): void {
         const platform = platformSelect.getValue()
         const canConnect = isSignedIn()
-        signInPrompt.style.display  = canConnect ? 'none' : ''
+        signInPrompt.style.display = canConnect ? 'none' : ''
         connectButton.style.display = canConnect ? '' : 'none'
         connectStatus.style.display = canConnect ? '' : 'none'
         for (const connector of connectors) {
@@ -224,7 +230,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // would reset the team-name rows — and drive the seat selector via
                 // the hidden textarea's input event (main.ts repopulates it).
                 nDraftersInput.value = String(resp.n_drafters)
-                nPicksInput.value    = String(resp.n_picks)
+                nPicksInput.value = String(resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
                 platformConnected = true   // enables the live-layout Refresh Analysis button
@@ -240,10 +246,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
     function updateVisibility(): void {
         const isOwnData = platformSelect.getValue() === 'Enter your own data'
-        const mode      = modeSelect.getValue()
-        cashCell.style.display       = mode === 'Auction Mode' ? '' : 'none'
-        trrToggle.style.display      = isOwnData && mode === 'Draft Mode' ? '' : 'none'
-        connectCell.style.display    = isOwnData ? 'none' : ''
+        const mode = modeSelect.getValue()
+        cashCell.style.display = mode === 'Auction Mode' ? '' : 'none'
+        trrToggle.style.display = isOwnData && mode === 'Draft Mode' ? '' : 'none'
+        connectCell.style.display = isOwnData ? 'none' : ''
         refreshConnectControls()
         if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
     }
@@ -273,15 +279,15 @@ export function getLeagueSettings(): {
 } {
     const mode = (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
     return {
-        sport:                (document.getElementById('ls-sport') as HTMLInputElement).value,
-        platform:             (document.getElementById('ls-platform') as HTMLInputElement).value as Platform,
+        sport: (document.getElementById('ls-sport') as HTMLInputElement).value,
+        platform: (document.getElementById('ls-platform') as HTMLInputElement).value as Platform,
         mode,
-        n_drafters:           readRequiredIntInput('ls-n-drafters'),
-        n_picks:              readRequiredIntInput('ls-n-picks'),
-        cash_per_team:        readRequiredIntInput('ls-cash-per-team'),
+        n_drafters: readRequiredIntInput('ls-n-drafters'),
+        n_picks: readRequiredIntInput('ls-n-picks'),
+        cash_per_team: readRequiredIntInput('ls-cash-per-team'),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
-        team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-                                  .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
+        team_names: (document.getElementById('ls-team-names') as HTMLTextAreaElement)
+            .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
     }
 }
 

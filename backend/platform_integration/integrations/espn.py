@@ -27,7 +27,8 @@ from __future__ import annotations
 from typing import Optional
 
 import requests
-from espn_api.basketball import League
+from espn_api.basketball import League as NBALeague
+from espn_api.wbasketball import League as WNBALeague
 
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
@@ -63,14 +64,19 @@ class ESPNIntegration(PlatformIntegration):
     # ── League id <-> (espn id, year) ──────────────────────────────────────────
 
     @staticmethod
-    def _split_league_id(league_id: str) -> tuple[str, int]:
+    def _split_league_id(league_id: str) -> tuple[str, str, int]:
         """Our composite league_id carries the season: '<fan-api id>::<year>'."""
-        fan_api_id, year = league_id.rsplit(_LEAGUE_ID_YEAR_SEP, 1)
-        return fan_api_id.split(':')[1], int(year)   # mirrors Streamlit split(':')[1]
+        fan_api_id, year_str = league_id.rsplit(_LEAGUE_ID_YEAR_SEP, 1)
+        prefix = 'wfba' if fan_api_id.startswith('wfba:') else 'fba'
+        numeric_id = fan_api_id.split(':', 1)[-1] if ':' in fan_api_id else fan_api_id
+        return prefix, numeric_id, int(year_str)
 
-    def _make_league(self, league_id: str) -> League:
-        espn_id, year = self._split_league_id(league_id)
-        return League(league_id=espn_id, year=year, espn_s2=self._s2, swid=self._swid)
+    def _make_league(self, league_id: str):
+        prefix, espn_id, year = self._split_league_id(league_id)
+        if prefix == 'wfba':
+            return WNBALeague(league_id=espn_id, year=year, espn_s2=self._s2, swid=self._swid)
+        else:
+            return NBALeague(league_id=espn_id, year=year, espn_s2=self._s2, swid=self._swid)
 
     # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -91,11 +97,16 @@ class ESPNIntegration(PlatformIntegration):
         leagues = sorted(leagues, key=lambda league: league['metaData']['entry']['seasonId'], reverse=True)
         result = []
         for league in leagues:
+            # Filter to only known basketball leagues to prevent NFL ('ffl:') crashes
+            league_api_id = league.get('id', '')
+            if not isinstance(league_api_id, str) or not (league_api_id.startswith('fba:') or league_api_id.startswith('wfba:')):
+                continue
+
             entry = league['metaData']['entry']
             season = entry['seasonId']
             name = entry['groups'][0]['groupName']
             result.append({
-                'id':     f"{league['id']}{_LEAGUE_ID_YEAR_SEP}{season}",
+                'id':     f"{league_api_id}{_LEAGUE_ID_YEAR_SEP}{season}",
                 'name':   f'{name} ({season - 1}-{season})',
                 'season': season,
             })
