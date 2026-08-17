@@ -41,8 +41,8 @@ from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 from backend.data_retrieval import get_available_seasons
 
-SCORING_FORMATS = {'EC': 'Head to Head: Each Category',
-                   'MC': 'Head to Head: Most Categories',
+SCORING_FORMATS = {'EC': 'Each Category',
+                   'MC': 'Most Categories',
                    'Roto': 'Rotisserie'}
 
 # tuned parameter vector is (gamma, omega, kappa); clipped to these [min, max] (from parameters.yaml).
@@ -55,12 +55,12 @@ def _clip(theta: np.ndarray) -> np.ndarray:
     return np.clip(theta, BOUNDS[:, 0], BOUNDS[:, 1])
 
 
-def build_session(season: str, scoring_format: str):
+def build_session(season: str, objective: str):
     """One backend session (=> one reusable H-agent) for a season/format. Built once and cached; theta
     is applied later via `configure`. The expensive processed data (G/X-scores, coefficients, position
     means) is theta-independent and shared via the backend's v0 cache. beth=0: real historical stats,
     so there is nothing for the strength adjustment to doubt."""
-    request = _build_session_request(scoring_format=scoring_format)
+    request = _build_session_request(objective=objective)
     request['data_source']['season'] = season
     request['parameters']['beth']    = 0
     response = client.post('/sessions', json=request)
@@ -196,16 +196,16 @@ def estimate_gradient_population(pool: list
                      for i in range(n_params)])
 
 
-def save_checkpoint(path, scoring_format, theta, theta_avg, velocity, step, A, hyper) -> None:
+def save_checkpoint(path, objective, theta, theta_avg, velocity, step, A, hyper) -> None:
     """Persist enough to resume the same SPSA trajectory: the current point, its Polyak average, the
     momentum velocity, the global step counter (so the alpha/delta decay continues rather than
     restarting), the stability offset A, and the schedule hyper-parameters."""
-    json.dump({'format': scoring_format, 'theta': [float(x) for x in theta],
+    json.dump({'format': objective, 'theta': [float(x) for x in theta],
                'theta_avg': [float(x) for x in theta_avg], 'velocity': [float(x) for x in velocity],
                'step': int(step), 'A': int(A), **hyper}, open(path, 'w'), indent=1)
 
 
-def spsa(scoring_format: str
+def spsa(objective: str
          , seasons: list[str]
          , theta0: np.ndarray
          , n_steps: int
@@ -244,12 +244,12 @@ def spsa(scoring_format: str
 
     def sessions_for(season):
         if season not in sessions:
-            sessions[season] = (build_session(season, scoring_format), build_session(season, scoring_format))
+            sessions[season] = (build_session(season, objective), build_session(season, objective))
         return sessions[season]
 
     def pool_for(season):   # 2*len(PARAMS) sessions for the multi-deviator population gradient
         if season not in pools:
-            pools[season] = [build_session(season, scoring_format) for _ in range(2 * len(PARAMS))]
+            pools[season] = [build_session(season, objective) for _ in range(2 * len(PARAMS))]
         return pools[season]
 
     for step in range(start_step + 1, start_step + n_steps + 1):
@@ -291,10 +291,10 @@ def spsa(scoring_format: str
               f'avg=({theta_avg[0]:.5f},{theta_avg[1]:.5f},{theta_avg[2]:.5f})', flush=True)
 
         if checkpoint_path and step % 25 == 0:
-            save_checkpoint(checkpoint_path, scoring_format, theta, theta_avg, velocity, step, A, hyper)
+            save_checkpoint(checkpoint_path, objective, theta, theta_avg, velocity, step, A, hyper)
 
     if checkpoint_path:
-        save_checkpoint(checkpoint_path, scoring_format, theta, theta_avg, velocity,
+        save_checkpoint(checkpoint_path, objective, theta, theta_avg, velocity,
                         start_step + n_steps, A, hyper)
     return theta_avg
 
@@ -334,7 +334,7 @@ def main() -> None:
         # Continue an existing trajectory: point, Polyak average, velocity, step counter, offset and
         # schedule all come from the checkpoint, so the decay is unbroken. --steps is how many MORE steps.
         ck = json.load(open(args.resume))
-        scoring_format = ck['format']
+        objective = ck['format']
         theta0, theta_avg0 = np.array(ck['theta']), np.array(ck['theta_avg'])
         velocity0 = np.array(ck['velocity']) if 'velocity' in ck else None
         start_step, A = ck['step'], ck['A']
@@ -342,10 +342,10 @@ def main() -> None:
             ck['a'], ck['c'], ck['alpha_decay'], ck['gamma_decay'], ck['polyak_beta'])
         momentum = args.momentum if args.momentum is not None else ck.get('momentum', 0.0)
         gradient_mode = ck.get('gradient_mode', 'spsa')
-        print(f'resume {scoring_format} from step {start_step} | +{args.steps} steps | {gradient_mode} '
+        print(f'resume {objective} from step {start_step} | +{args.steps} steps | {gradient_mode} '
               f'| theta=({theta0[0]:.4f},{theta0[1]:.4f},{theta0[2]:.4f}) | momentum={momentum}', flush=True)
     else:
-        scoring_format = SCORING_FORMATS[args.format]
+        objective = SCORING_FORMATS[args.format]
         theta0 = DEFAULT.copy()
         for i, override in enumerate([args.gamma0, args.omega0, args.kappa0]):
             if override is not None:
@@ -359,7 +359,7 @@ def main() -> None:
               f'{gradient_mode} | a={a} momentum={momentum} '
               f'| theta0=({theta0[0]:.4f},{theta0[1]:.4f},{theta0[2]:.4f})', flush=True)
 
-    theta_star = spsa(scoring_format, seasons, theta0, args.steps, a, c, alpha_decay, gamma_decay,
+    theta_star = spsa(objective, seasons, theta0, args.steps, a, c, alpha_decay, gamma_decay,
                       polyak_beta, args.candidate_limit, rng, start_step, A, theta_avg0,
                       momentum, velocity0, gradient_mode, args.checkpoint)
     print(f'\nPolyak-averaged theta* = gamma={theta_star[0]:.4f} omega={theta_star[1]:.4f} '

@@ -209,7 +209,7 @@ def test_season_mode_waiver():
     """Season Mode: default H-score snake-draft rosters, EC scoring.
     Waiver evaluate: Drafter 1 drops Gary Trent Jr.
     """
-    session_request = _build_session_request(scoring_format='Head to Head: Each Category')
+    session_request = _build_session_request(objective='Each Category')
     response        = client.post('/sessions', json=session_request)
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session_id = response.json()['session_id']

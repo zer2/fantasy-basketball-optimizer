@@ -28,7 +28,7 @@ N_PICKS     = 13
 
 def generate_snake_draft_rosters() -> dict[str, list[str]]:
     """Run an H-score snake draft on an empty board for SEASON, returning rosters by drafter."""
-    session_request = _build_session_request(scoring_format='Head to Head: Each Category')
+    session_request = _build_session_request(objective='Each Category')
     session_request['data_source']['season'] = SEASON
 
     response = client.post('/sessions', json=session_request)

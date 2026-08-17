@@ -24,16 +24,22 @@ from backend.state.session import get_session
 
 # popularity[c] = fraction of the top-40 players whose weakest category (best punt) is c. Values are
 # multiples of 1/40 and sum to 1. Regenerate with UPDATE_PUNT_POPULARITY=1 (see module docstring).
+# Each Category regenerated 2026-08-16, when its gradient became the gradient of the objective it
+# returns rather than n_categories times it. The kappa penalty is part of that same objective and
+# its derivative was always exact, so the penalty had been diluted by that factor in Each Category
+# (and only there — Most Categories, unchanged below, had it right). Four of the forty players'
+# best-punt seed moved as a result, all between near-tied options.
 _GOLDEN = {
-    'Head to Head: Each Category':   [0.0, 0.175, 0.15, 0.0, 0.025, 0.25, 0.0, 0.325, 0.075],
-    'Head to Head: Most Categories': [0.025, 0.175, 0.125, 0.0, 0.05, 0.15, 0.0, 0.425, 0.05],
+    'Each Category':   [0.0, 0.175, 0.1, 0.0, 0.0, 0.35, 0.0, 0.3, 0.075],
+    'Half and Half':   [0.0, 0.2, 0.125, 0.0, 0.0, 0.175, 0.0, 0.45, 0.05],
+    'Most Categories': [0.025, 0.175, 0.125, 0.0, 0.05, 0.15, 0.0, 0.425, 0.05],
 }
 
 
-@pytest.mark.parametrize('scoring_format', list(_GOLDEN))
-def test_punt_popularity(scoring_format):
+@pytest.mark.parametrize('objective', list(_GOLDEN))
+def test_punt_popularity(objective):
     """Pin the field punt-popularity vector the kappa penalty is built from."""
-    request = _build_session_request(scoring_format=scoring_format)
+    request = _build_session_request(objective=objective)
     request['data_source']['season'] = '2024-25'
     request['parameters']['kappa']   = 0.5   # any > 0 triggers the (kappa-independent) measurement
 
@@ -46,12 +52,12 @@ def test_punt_popularity(scoring_format):
     assert abs(float(np.sum(popularity)) - 1.0) < 1e-9, 'popularity should sum to 1'
 
     if os.environ.get('UPDATE_PUNT_POPULARITY'):
-        print(f"\n    '{scoring_format}': {[round(float(x), 4) for x in popularity]},")
+        print(f"\n    '{objective}': {[round(float(x), 4) for x in popularity]},")
         return
 
-    expected = np.array(_GOLDEN[scoring_format])
+    expected = np.array(_GOLDEN[objective])
     assert np.allclose(popularity, expected, atol=1e-6), (
-        f'{scoring_format}: punt popularity changed.\n'
+        f'{objective}: punt popularity changed.\n'
         f'  expected {expected.tolist()}\n'
         f'  actual   {[round(float(x), 4) for x in popularity]}\n'
         'If intentional, regenerate: UPDATE_PUNT_POPULARITY=1 python -m pytest '

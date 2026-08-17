@@ -37,7 +37,7 @@ player_stats_v0   — raw stats, loaded from files/projections at session creati
 player_stats_v1   — derived: v0 minus injured_players
 player_stats_v2   — derived: v1 with upsilon adjustment applied
 info              — derived: process_player_data(v2, psi, chi, scoring_format, n_drafters, n_picks, ...)
-HAgent            — derived: build_h_agent(info, omega, gamma, beth, n_picks, n_drafters, scoring_format, ...)
+HAgent            — derived: build_h_agent(info, omega, gamma, beth, n_picks, n_drafters, scoring_format, most_categories_weight, ...)
 current_params    — snapshot of all params; used to diff PATCH bodies and determine what to re-run
 ```
 
@@ -160,7 +160,8 @@ This is the most expensive call; all subsequent calls are faster.
     "sport": "NBA",
     "n_drafters": 10,
     "n_picks": 13,
-    "scoring_format": "Head to Head: Most Categories",
+    "scoring_format": "Head to Head",
+    "most_categories_weight": 1.0,
     "categories": ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"],
     "cash_per_team": null
   },
@@ -194,8 +195,13 @@ This is the most expensive call; all subsequent calls are faster.
 `league.sport` — one of `"NBA"`, `"MLB"`. Determines which statistical framework the backend
 loads (counting vs ratio stat definitions, negative stats, conversion factors, etc.).
 
-`league.scoring_format` — one of `"Head to Head: Most Categories"`,
-`"Head to Head: Each Category"`, `"Rotisserie"`.
+`league.scoring_format` — one of `"Head to Head"`, `"Rotisserie"`.
+
+`league.most_categories_weight` — Head to Head only (and required there): how much of the
+objective is winning the majority of categories rather than each category on its own. `0.0`
+scores every category separately (what used to be "Each Category"), `1.0` scores only the
+majority ("Most Categories"), and values between blend the two. Must be `null` for
+`"Rotisserie"`, which scores neither way.
 
 `league.cash_per_team` — Auction Mode only; omit or set to `null` for Draft Mode. Only
 consulted when the session's `is_auction` is true, so a value left over from an earlier
@@ -278,7 +284,8 @@ table above. All fields except `from_step` are optional — only send what chang
   "league": {
     "n_drafters": 10,
     "n_picks": 13,
-    "scoring_format": "Head to Head: Most Categories",
+    "scoring_format": "Head to Head",
+    "most_categories_weight": 1.0,
     "categories": ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"],
     "cash_per_team": null
   },

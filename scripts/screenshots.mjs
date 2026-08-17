@@ -22,7 +22,9 @@
 import { chromium } from 'playwright'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mintSessionCookie, setSelect, waitEval, lockInDraftPick } from './browser_helpers.mjs'
+import {
+    mintSessionCookie, setSelect, setObjectiveWeight, waitEval, lockInDraftPick,
+} from './browser_helpers.mjs'
 
 const APP  = process.env.APP_URL ?? 'http://localhost:8000'
 // Defaults to docs/img; set SHOT_OUT to a scratch dir when debugging so real images aren't clobbered.
@@ -138,7 +140,7 @@ let fullAutodraftReady = false
 async function ensureFullAutodraft(page) {
     if (fullAutodraftReady) return
     await setMode(page, 'Draft Mode')
-    await setFmt(page, 'Each Category')
+    await setObjective(page, 0)
     await selectHistoricalSeason(page, '2025-26')   // resets the board + methods
     await setAllSeatsAutodraft(page)
     await waitAutopilotDone(page)
@@ -157,7 +159,14 @@ async function ensure(page, state) {
 }
 
 async function setMode(page, mode) { await setSelect(page, 'ls-mode', mode);          await waitEval(page) }
+// Head to Head became one format with an objective dial: the shots that used to select
+// "Each Category" / "Most Categories" now select Head to Head and set the dial (0 / 1).
 async function setFmt(page, fmt)   { await setSelect(page, 'fc-scoring-format', fmt); await waitEval(page) }
+async function setObjective(page, weight) {
+    await setSelect(page, 'fc-scoring-format', 'Head to Head')
+    await setObjectiveWeight(page, weight)
+    await waitEval(page)
+}
 
 /** Waits until the candidate table actually holds player rows.
  *
@@ -209,8 +218,8 @@ const STATES = {
         await waitCandidateRows(page)
         await page.waitForTimeout(300)
     },
-    async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Each Category');  await waitCandidateRows(page) },
-    async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setFmt(page, 'Most Categories'); await waitCandidateRows(page) },
+    async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setObjective(page, 0);  await waitCandidateRows(page) },
+    async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setObjective(page, 1); await waitCandidateRows(page) },
     async 'draft-Roto'(page) { await setMode(page, 'Draft Mode'); await setFmt(page, 'Rotisserie');      await waitCandidateRows(page) },
 
     async 'position'(page)     { await ensure(page, 'draft-EC'); await expandSection(page, /Position/i) },

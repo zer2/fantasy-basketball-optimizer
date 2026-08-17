@@ -41,7 +41,8 @@ def _build_default_session_request() -> dict:
             'sport':          'NBA'
             , 'n_drafters':   n_drafters
             , 'n_picks':      n_picks
-            , 'scoring_format': 'Head to Head: Most Categories'
+            , 'scoring_format': 'Head to Head'
+            , 'most_categories_weight': 1.0
             , 'categories':   nba['default-categories']
         }
         , 'slot_counts': slot_counts
@@ -133,6 +134,55 @@ def test_session_creation_stores_correct_params():
     assert cp['n_picks']    == yaml_options['n_picks']['default']
 
 
+def test_tiebreaker_category_is_carried_and_changes_the_board():
+    """A tiebreaker reaches the agent and moves the results — the doubled category is worth more,
+    so the players who win it gain. Eight categories, since a tie needs an even number."""
+    request = _build_default_session_request()
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+
+    without = client.post('/sessions', json=request)
+    assert without.status_code == 201, without.text
+
+    request['league']['tiebreaker_category'] = 'Blocks'
+    with_tiebreaker = client.post('/sessions', json=request)
+    assert with_tiebreaker.status_code == 201, with_tiebreaker.text
+
+    session = get_session(with_tiebreaker.json()['session_id'])
+    assert session.current_params['tiebreaker_category'] == 'Blocks'
+    assert session.agent.tiebreaker_index == session.current_params['categories'].index('Blocks')
+
+    # G-scores are per-category value and untouched by how matchups are settled, so the agent's
+    # own objective is where the tiebreaker has to show up — and the session without one must
+    # carry no index at all.
+    assert get_session(without.json()['session_id']).agent.tiebreaker_index is None
+
+
+def test_a_tiebreaker_that_cannot_apply_is_refused_or_dropped():
+    """Rejected when the request itself is incoherent, and quietly dropped when it merely stops
+    applying — an odd category count is a state the user passes through while editing."""
+    request = _build_default_session_request()          # nine categories
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['tiebreaker_category'] = 'Blocks'
+    odd_count = client.post('/sessions', json=request)
+    assert odd_count.status_code == 422, odd_count.text
+
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+    request['league']['tiebreaker_category'] = 'Dunks'
+    unknown_category = client.post('/sessions', json=request)
+    assert unknown_category.status_code == 422, unknown_category.text
+
+    # Weight 0 scores each category on its own, so nothing can tie: the setting is dropped, not
+    # rejected, because the dial is the thing the user is moving.
+    request['league']['tiebreaker_category']    = 'Blocks'
+    request['league']['most_categories_weight'] = 0.0
+    inert = client.post('/sessions', json=request)
+    assert inert.status_code == 201, inert.text
+    assert get_session(inert.json()['session_id']).current_params['tiebreaker_category'] is None
+
+
 def test_session_creation_insufficient_player_pool():
     """A league whose total roster capacity exceeds the available player pool is rejected with 400."""
     request = _build_default_session_request()
@@ -219,7 +269,8 @@ def test_is_auction_patch_toggles_league_type():
     # Auction Mode must not flip the session's league type.
     patch_response = client.patch(
         f'/sessions/{session_id}'
-        , json={'from_step': 4, 'league': {'scoring_format': 'Head to Head: Most Categories'}}
+        , json={'from_step': 4, 'league': {'scoring_format': 'Head to Head',
+                                           'most_categories_weight': 1.0}}
     )
     assert patch_response.status_code == 200, patch_response.text
     assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200

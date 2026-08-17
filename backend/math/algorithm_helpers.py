@@ -8,6 +8,8 @@ The original src/ file is untouched.
 """
 
 import functools
+from typing import Optional
+
 import pandas as pd
 from scipy.stats import norm
 import numpy as np
@@ -75,7 +77,56 @@ def get_tie_grid(n_categories: int) -> np.ndarray:
     return np.expand_dims(grid, axis=2)
 
 
-def compute_win_probability(probs: np.ndarray) -> np.ndarray:
+def category_scoring_weights(
+    n_categories: int
+    , tiebreaker_index: Optional[int]
+) -> list[int]:
+    """How many points each category is worth in the matchup count.
+
+    Every category is worth one, except a designated tiebreaker, which is worth two. That is what
+    a tiebreaker category means: with an even number of categories a 4-4 matchup is a tie, and
+    doubling one category makes the total odd so the matchup always has a winner — the one who
+    took the tiebreaker. Only the tie case changes; a genuine majority still wins either way.
+
+    An odd number of categories is refused rather than accommodated: there is no tie to break, and
+    doubling one category would make the total even, reintroducing the very ties a tiebreaker
+    exists to remove (and leaving the tipping points below, which assume an odd total, wrong by a
+    tie term). Callers decide what a tiebreaker means for an odd count; this is not the place to
+    guess.
+    """
+    if tiebreaker_index is None:
+        return [1] * n_categories
+    if not 0 <= tiebreaker_index < n_categories:
+        raise ValueError(f'tiebreaker_index {tiebreaker_index} is outside the '
+                         f'{n_categories} categories.')
+    if n_categories % 2 == 1:
+        raise ValueError(f'A tiebreaker needs an even number of categories to break a tie; '
+                         f'got {n_categories}.')
+    return [2 if index == tiebreaker_index else 1 for index in range(n_categories)]
+
+
+def win_threshold(scoring_weights: list[int]) -> int:
+    """Points needed to win the matchup: more than half of what is on offer."""
+    return sum(scoring_weights) // 2 + 1
+
+
+def _accumulate_win_counts(
+    distribution: np.ndarray
+    , win_probability_slice: np.ndarray
+    , weight: int
+) -> np.ndarray:
+    """Fold one category into a win-count distribution, shifting by what it is worth."""
+    n_players, size, n_columns = distribution.shape
+    updated = np.zeros((n_players, size + weight, n_columns))
+    updated[:, :size, :]  += distribution * (1 - win_probability_slice)
+    updated[:, weight:, :] += distribution * win_probability_slice
+    return updated
+
+
+def compute_win_probability(
+    probs: np.ndarray
+    , tiebreaker_index: Optional[int] = None
+) -> np.ndarray:
     """Compute P(winning the matchup) for each player vs each opponent via DP.
 
     Uses the same win-count polynomial DP as combinatorial_calculation, but
@@ -83,62 +134,75 @@ def compute_win_probability(probs: np.ndarray) -> np.ndarray:
 
     Args:
         probs: Win probability per category, shape (n_players, n_categories, n_opponents).
+        tiebreaker_index: category worth two points instead of one, or None. With one set the
+            total is odd, so the half-credit tie term below cannot arise.
 
     Returns:
         shape (n_players, n_opponents): probability of winning the matchup.
     """
     n_players, n_categories, n_opponents = probs.shape
-    k_to_win = n_categories // 2 + 1
+    scoring_weights = category_scoring_weights(n_categories, tiebreaker_index)
+    total_points    = sum(scoring_weights)
+    points_to_win   = win_threshold(scoring_weights)
 
-    # dp[:, k, :] = P(win exactly k of the categories processed so far)
+    # dp[:, k, :] = P(winning exactly k points from the categories processed so far)
     dp = np.ones((n_players, 1, n_opponents))
     for i in range(n_categories):
-        p_i     = probs[:, i, :][:, np.newaxis, :]
-        updated = np.zeros((n_players, i + 2, n_opponents))
-        updated[:, :i + 1, :] += dp * (1 - p_i)
-        updated[:, 1:, :]     += dp * p_i
-        dp = updated
+        dp = _accumulate_win_counts(dp, probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
 
-    result = dp[:, k_to_win:, :].sum(axis=1)
-    if n_categories % 2 == 0:
-        result += dp[:, n_categories // 2, :] / 2
+    result = dp[:, points_to_win:, :].sum(axis=1)
+    if total_points % 2 == 0:
+        # An exact split with nothing to break it: half credit, the long-standing behaviour.
+        result += dp[:, total_points // 2, :] / 2
     return result
 
 
-def _build_win_count_prefix_suffix(probs: np.ndarray):
+def _build_win_count_prefix_suffix(
+    probs: np.ndarray
+    , tiebreaker_index: Optional[int] = None
+):
     """Build prefix and suffix DP tables for win-count distributions.
 
-    Each prefix[i] has shape (n_players, i+1, n_opponents) where entry [p, k, o]
-    is the probability of winning exactly k of the first i categories.
+    Each prefix[i] has shape (n_players, points+1, n_opponents) where entry [p, k, o]
+    is the probability of winning exactly k points from the first i categories — one point
+    each, or two for a tiebreaker category.
     Suffix tables mirror this from the right.
     This is the same polynomial-multiplication DP that combinatorial_calculation
     uses recursively, expressed here as explicit tables so we can do leave-one-out
     convolutions for every category in one pass.
     """
     n_players, n_categories, n_opponents = probs.shape
+    scoring_weights = category_scoring_weights(n_categories, tiebreaker_index)
 
     prefix = [None] * (n_categories + 1)
     prefix[0] = np.ones((n_players, 1, n_opponents))
     for i in range(n_categories):
-        p_i = probs[:, i, :][:, np.newaxis, :]   # (n_players, 1, n_opponents)
-        previous = prefix[i]                       # (n_players, i+1, n_opponents)
-        updated = np.zeros((n_players, i + 2, n_opponents))
-        updated[:, :i + 1, :] += previous * (1 - p_i)
-        updated[:, 1:, :]     += previous * p_i
-        prefix[i + 1] = updated
+        prefix[i + 1] = _accumulate_win_counts(
+            prefix[i], probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
 
     suffix = [None] * (n_categories + 1)
     suffix[n_categories] = np.ones((n_players, 1, n_opponents))
     for i in range(n_categories - 1, -1, -1):
-        p_i = probs[:, i, :][:, np.newaxis, :]
-        following = suffix[i + 1]                  # (n_players, n_categories-i, n_opponents)
-        n_following = n_categories - i
-        updated = np.zeros((n_players, n_following + 1, n_opponents))
-        updated[:, :n_following, :] += following * (1 - p_i)
-        updated[:, 1:, :]           += following * p_i
-        suffix[i] = updated
+        suffix[i] = _accumulate_win_counts(
+            suffix[i + 1], probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
 
     return prefix, suffix
+
+
+def _leave_one_out_probability(
+    prefix_table: np.ndarray
+    , suffix_table: np.ndarray
+    , target_points: int
+) -> np.ndarray:
+    """P(the categories either side of the excluded one contribute exactly target_points)."""
+    total = np.zeros((prefix_table.shape[0], prefix_table.shape[2]))
+    if target_points < 0:
+        return total
+    for taken_before in range(min(target_points + 1, prefix_table.shape[1])):
+        taken_after = target_points - taken_before
+        if 0 <= taken_after < suffix_table.shape[1]:
+            total += prefix_table[:, taken_before, :] * suffix_table[:, taken_after, :]
+    return total
 
 
 def _bracket_targets(n_categories_total: int) -> tuple[int, int, float]:
@@ -414,7 +478,10 @@ def calculate_correction_probability_gradient(probs: np.ndarray
     return gradient
 
 
-def calculate_tipping_points(x: np.ndarray) -> np.ndarray:
+def calculate_tipping_points(
+    x: np.ndarray
+    , tiebreaker_index: Optional[int] = None
+) -> np.ndarray:
     """Compute per-category tipping-point probabilities using prefix-suffix DP.
 
     tipping_point[p, c, o] = P(category c is decisive in player p's matchup vs opponent o)
@@ -427,6 +494,10 @@ def calculate_tipping_points(x: np.ndarray) -> np.ndarray:
     backward pass instead of enumerating C(n, k) winning combinations.
     """
     n_players, n_categories, n_opponents = x.shape
+    if tiebreaker_index is not None:
+        # One implementation of the weighted arithmetic, not two: the combined function owns it.
+        return calculate_win_probability_and_tipping_points(x, tiebreaker_index)[1]
+
     k = n_categories // 2
 
     prefix,      suffix      = _build_win_count_prefix_suffix(x)
@@ -462,7 +533,10 @@ def calculate_tipping_points(x: np.ndarray) -> np.ndarray:
     return result
 
 
-def calculate_win_probability_and_tipping_points(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def calculate_win_probability_and_tipping_points(
+    x: np.ndarray
+    , tiebreaker_index: Optional[int] = None
+) -> tuple[np.ndarray, np.ndarray]:
     """compute_win_probability and calculate_tipping_points from ONE prefix/suffix build.
 
     The two share the same win-count DP: the win probability is a reduction of the
@@ -470,34 +544,55 @@ def calculate_win_probability_and_tipping_points(x: np.ndarray) -> tuple[np.ndar
     [x, 1 - x] on the opponent axis, so one build replaces the three the standalone
     functions would run. Every DP operation is elementwise per opponent column, so
     the results are bit-identical to calling the standalone functions.
+
+    A tipping point is d(win probability)/d(category win probability): how much the matchup
+    turns on that category. Without a tiebreaker the total is even and the derivation below
+    keeps its original form. With one, the arithmetic differs enough to be worth stating —
+    see the branch's own comment.
     """
     n_players, n_categories, n_opponents = x.shape
-    k = n_categories // 2
-    k_to_win = k + 1
+    scoring_weights = category_scoring_weights(n_categories, tiebreaker_index)
+    total_points    = sum(scoring_weights)
+    points_to_win   = win_threshold(scoring_weights)
 
     stacked = np.concatenate([x, 1 - x], axis=2)
-    prefix, suffix = _build_win_count_prefix_suffix(stacked)
+    prefix, suffix = _build_win_count_prefix_suffix(stacked, tiebreaker_index)
 
     full_prefix = prefix[n_categories][:, :, :n_opponents]
-    win_probability = full_prefix[:, k_to_win:, :].sum(axis=1)
-    if n_categories % 2 == 0:
-        win_probability = win_probability + full_prefix[:, k, :] / 2
+    win_probability = full_prefix[:, points_to_win:, :].sum(axis=1)
+    if total_points % 2 == 0:
+        win_probability = win_probability + full_prefix[:, total_points // 2, :] / 2
 
     tipping_points = np.zeros((n_players, n_categories, n_opponents))
+    if tiebreaker_index is None:
+        k = n_categories // 2
+        for c in range(n_categories):
+            pre = prefix[c]
+            suf = suffix[c + 1]
+            win_exactly_k_stacked = _leave_one_out_probability(pre, suf, k)
+            x_c = x[:, c, :]
+            tipping_points[:, c, :] = (x_c * win_exactly_k_stacked[:, :n_opponents]
+                                       + (1 - x_c) * win_exactly_k_stacked[:, n_opponents:])
+
+        if n_categories % 2 == 0:
+            tie_prob = prefix[n_categories][:, k, :n_opponents]
+            tipping_points = tipping_points / 2 + tie_prob[:, np.newaxis, :] / 2
+        return win_probability, tipping_points
+
+    # With a tiebreaker the total is odd, so there is no tie term to fold in and the derivative
+    # is read straight off the leave-one-out distribution:
+    #   a one-point category turns the matchup when the rest land exactly one point short;
+    #   the two-point tiebreaker turns it from either one or two points short, so its
+    #   derivative sums both.
+    # Only the x half of the stacked tables is needed here — the complement half exists to
+    # supply the neighbouring index in the branch above, which this reads directly instead.
     for c in range(n_categories):
         pre = prefix[c]
         suf = suffix[c + 1]
-        win_exactly_k_stacked = np.zeros((n_players, 2 * n_opponents))
-        for a in range(min(k + 1, pre.shape[1])):
-            b = k - a
-            if 0 <= b < suf.shape[1]:
-                win_exactly_k_stacked += pre[:, a, :] * suf[:, b, :]
-        x_c = x[:, c, :]
-        tipping_points[:, c, :] = (x_c * win_exactly_k_stacked[:, :n_opponents]
-                                   + (1 - x_c) * win_exactly_k_stacked[:, n_opponents:])
-
-    if n_categories % 2 == 0:
-        tie_prob = prefix[n_categories][:, k, :n_opponents]
-        tipping_points = tipping_points / 2 + tie_prob[:, np.newaxis, :] / 2
+        derivative = _leave_one_out_probability(pre, suf, points_to_win - 1)[:, :n_opponents]
+        if c == tiebreaker_index:
+            derivative = derivative + _leave_one_out_probability(
+                pre, suf, points_to_win - 2)[:, :n_opponents]
+        tipping_points[:, c, :] = derivative
 
     return win_probability, tipping_points

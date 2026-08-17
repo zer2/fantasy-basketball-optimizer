@@ -35,7 +35,7 @@ Settings, available in the left sidebar, control the context in which the algori
 | Drafters and picks | Number of drafters and picks per drafter (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
 | Third-round reversal | Snake-draft order toggle (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
 | Player stats | Configure forward-looking projections, or data from past NBA seasons | [Player Stats](projections.md) |
-| Format | Toggle between H2H Each Category, H2H Most Categories, or Rotisserie | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
+| Format | Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
 | Categories | Select statistical categories for scoring | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
 
 ## Parameter glossary

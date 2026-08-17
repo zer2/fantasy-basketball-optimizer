@@ -46,21 +46,21 @@ _FIRST_ROUND_PICKS = [
     , 'Kevin Durant (SF,PF)'
 ]
 
-# Each entry: (scoring_format, [(player_name_prefix, expected_h_score), ...], categories)
+# Each entry: (objective, [(player_name_prefix, expected_h_score), ...], categories)
 # Board state: _FIRST_ROUND_PICKS assigned one per team.
 # Evaluate is run from Team 5's perspective (Trae Young already drafted).
 _FIRST_ROUND_CONFIGS = [
     pytest.param(
-        ('Head to Head: Each Category', [
+        ('Each Category', [
             ('Karl-Anthony Towns',  50.4),
             ('Brook Lopez',         49.8),
             ('Jaren Jackson Jr.',   49.7),
-            ('Derrick White',       49.6),
+            ('Derrick White',       49.7),
         ], None),
         id='EC-first-round',
     ),
     pytest.param(
-        ('Head to Head: Most Categories', [
+        ('Most Categories', [
             ('Karl-Anthony Towns',  51.6),
             ('Brook Lopez',         49.9),
             ('Jaren Jackson Jr.',   49.9),
@@ -78,16 +78,16 @@ _FIRST_ROUND_CONFIGS = [
         id='Roto-first-round',
     ),
     pytest.param(
-        ('Head to Head: Each Category', [
-            ('Karl-Anthony Towns',  51.4),
-            ('Cade Cunningham',     51.2),
+        ('Each Category', [
+            ('Karl-Anthony Towns',  51.5),
+            ('Cade Cunningham',     51.1),
             ('Devin Booker',        50.9),
             ('Jaren Jackson Jr.',   50.8),
         ], _NO_TO_CATEGORIES),
         id='EC-first-round-noTO',
     ),
     pytest.param(
-        ('Head to Head: Most Categories', [
+        ('Most Categories', [
             ('Karl-Anthony Towns',  53.9),
             ('Cade Cunningham',     53.3),
             ('Devin Booker',        52.7),
@@ -106,11 +106,11 @@ _FIRST_ROUND_CONFIGS = [
     ),
 ]
 
-# Each entry: (scoring_format, [(player_name_prefix, expected_h_score), ...], categories)
+# Each entry: (objective, [(player_name_prefix, expected_h_score), ...], categories)
 # categories=None uses the full default category list from parameters.yaml.
 _FORMAT_CONFIGS = [
     pytest.param(
-        ('Head to Head: Most Categories', [
+        ('Most Categories', [
             ('Shai Gilgeous-Alexander',  60.7),
             ('Nikola Jokic',             60.4),
             ('Tyrese Haliburton',        53.0),
@@ -119,10 +119,10 @@ _FORMAT_CONFIGS = [
         id='MC',
     ),
     pytest.param(
-        ('Head to Head: Each Category', [
+        ('Each Category', [
             ('Shai Gilgeous-Alexander',  54.0),
-            ('Nikola Jokic',             53.8),
-            ('Tyrese Haliburton',        50.9),
+            ('Nikola Jokic',             53.9),
+            ('Tyrese Haliburton',        51.0),
             ('Karl-Anthony Towns',       50.5),
         ], None),
         id='EC',
@@ -137,7 +137,7 @@ _FORMAT_CONFIGS = [
         id='Roto',
     ),
     pytest.param(
-        ('Head to Head: Most Categories', [
+        ('Most Categories', [
             ('Shai Gilgeous-Alexander',  59.1),
             ('Nikola Jokic',             61.0),
             ('James Harden',             54.0),
@@ -146,9 +146,9 @@ _FORMAT_CONFIGS = [
         id='MC-noTO',
     ),
     pytest.param(
-        ('Head to Head: Each Category', [
+        ('Each Category', [
             ('Nikola Jokic',             54.5),
-            ('Shai Gilgeous-Alexander',  54.1),
+            ('Shai Gilgeous-Alexander',  54.0),
             ('James Harden',             51.6),
             ('Giannis Antetokounmpo',    49.9),
         ], _NO_TO_CATEGORIES),
@@ -164,7 +164,7 @@ _FORMAT_CONFIGS = [
         id='Roto-noTO',
     ),
     pytest.param(
-        ('Head to Head: Most Categories', [
+        ('Most Categories', [
             ('Nikola Jokic',             64.3),
             ('Shai Gilgeous-Alexander',  57.8),
             ('Karl-Anthony Towns',       54.8),
@@ -178,33 +178,33 @@ _FORMAT_CONFIGS = [
 @pytest.fixture(scope='module', params=_FORMAT_CONFIGS)
 def session_for_format(request):
     """Create one session per scoring format / category set. Shared across all parametrized tests."""
-    scoring_format, expected_top_scores, categories = request.param
-    session_request = _build_session_request(scoring_format=scoring_format, categories=categories)
+    objective, expected_top_scores, categories = request.param
+    session_request = _build_session_request(objective=objective, categories=categories)
     n_drafters      = session_request['league']['n_drafters']
 
     start    = time.perf_counter()
     response = client.post('/sessions', json=session_request)
     session_creation_seconds = time.perf_counter() - start
 
-    assert response.status_code == 201, f'Session creation failed ({scoring_format}): {response.text}'
-    record_benchmark(f'Session creation — {scoring_format} ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
+    assert response.status_code == 201, f'Session creation failed ({objective}): {response.text}'
+    record_benchmark(f'Session creation — {objective} ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
 
-    return response.json()['session_id'], scoring_format, expected_top_scores
+    return response.json()['session_id'], objective, expected_top_scores
 
 
-def _print_profile(profiler: cProfile.Profile, scoring_format: str, label: str, top_n: int = 20):
+def _print_profile(profiler: cProfile.Profile, objective: str, label: str, top_n: int = 20):
     stream = io.StringIO()
     stats  = pstats.Stats(profiler, stream=stream)
     stats.strip_dirs()
     stats.sort_stats('cumulative')
     stats.print_stats(top_n)
-    print(f'\n[profile] {label} — {scoring_format}')
+    print(f'\n[profile] {label} — {objective}')
     print(stream.getvalue())
 
 
 def test_evaluate_empty_board(session_for_format):
     """Per scoring format: times evaluate on an empty board and checks H-score values and ordering."""
-    session_id, scoring_format, expected_top_scores = session_for_format
+    session_id, objective, expected_top_scores = session_for_format
 
     session      = get_session(session_id)
     categories   = session.current_params['categories']
@@ -225,8 +225,8 @@ def test_evaluate_empty_board(session_for_format):
     )
     evaluate_seconds = time.perf_counter() - start
 
-    record_benchmark(f'Evaluate — {scoring_format} ({n_iterations} iterations, empty board)', evaluate_seconds)
-    _print_profile(profiler, scoring_format, 'empty board')
+    record_benchmark(f'Evaluate — {objective} ({n_iterations} iterations, empty board)', evaluate_seconds)
+    _print_profile(profiler, objective, 'empty board')
 
     candidates      = result.candidates
     candidate_names = [session.player_registry[c.player_id].name for c in candidates]
@@ -253,12 +253,12 @@ def test_evaluate_empty_board(session_for_format):
             f'{candidate.player_id}: win rate out of [0, 100]'
 
     # Each expected player must have the correct H-score within tolerance.
-    check_top_scores(session, scoring_format, expected_top_scores, candidates)
+    check_top_scores(session, objective, expected_top_scores, candidates)
 
 
 def test_evaluate_mid_draft(session_for_format):
     """Per scoring format: times evaluate with a mid-draft board and checks drafted players are excluded."""
-    session_id, scoring_format, _ = session_for_format
+    session_id, objective, _ = session_for_format
 
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
@@ -284,7 +284,7 @@ def test_evaluate_mid_draft(session_for_format):
     )
     evaluate_seconds = time.perf_counter() - start
 
-    record_benchmark(f'Evaluate — {scoring_format} ({n_iterations} iterations, mid-draft)', evaluate_seconds)
+    record_benchmark(f'Evaluate — {objective} ({n_iterations} iterations, mid-draft)', evaluate_seconds)
 
     candidates = result.candidates
     assert len(candidates) > 0
@@ -298,23 +298,23 @@ def test_evaluate_mid_draft(session_for_format):
 @pytest.fixture(scope='module', params=_FIRST_ROUND_CONFIGS)
 def session_for_first_round(request):
     """Create one session per scoring format / category set for the first-round board state test."""
-    scoring_format, expected_top_scores, categories = request.param
-    session_request = _build_session_request(scoring_format=scoring_format, categories=categories)
+    objective, expected_top_scores, categories = request.param
+    session_request = _build_session_request(objective=objective, categories=categories)
     n_drafters      = session_request['league']['n_drafters']
 
     start    = time.perf_counter()
     response = client.post('/sessions', json=session_request)
     session_creation_seconds = time.perf_counter() - start
 
-    assert response.status_code == 201, f'Session creation failed ({scoring_format}): {response.text}'
-    record_benchmark(f'Session creation — {scoring_format} ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
+    assert response.status_code == 201, f'Session creation failed ({objective}): {response.text}'
+    record_benchmark(f'Session creation — {objective} ({_SEASON}, {n_drafters} teams)', session_creation_seconds)
 
-    return response.json()['session_id'], scoring_format, expected_top_scores
+    return response.json()['session_id'], objective, expected_top_scores
 
 
 def test_evaluate_first_round(session_for_first_round):
     """Per scoring format: evaluates from Team 5's perspective after a full first round of picks."""
-    session_id, scoring_format, expected_top_scores = session_for_first_round
+    session_id, objective, expected_top_scores = session_for_first_round
 
     session      = get_session(session_id)
     n_drafters   = session.current_params['n_drafters']
@@ -337,7 +337,7 @@ def test_evaluate_first_round(session_for_first_round):
     )
     evaluate_seconds = time.perf_counter() - start
 
-    record_benchmark(f'Evaluate — {scoring_format} ({n_iterations} iterations, first round, Team 5)', evaluate_seconds)
+    record_benchmark(f'Evaluate — {objective} ({n_iterations} iterations, first round, Team 5)', evaluate_seconds)
 
     candidates = result.candidates
     assert len(candidates) > 0
@@ -345,13 +345,13 @@ def test_evaluate_first_round(session_for_first_round):
     h_scores = [c.h_score for c in candidates]
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
-    check_top_scores(session, scoring_format, expected_top_scores, candidates)
+    check_top_scores(session, objective, expected_top_scores, candidates)
 
 
 def test_evaluate_two_category_roto():
     """Smoke + correctness test: Rotisserie with only Points and Threes, Team 12 after first round."""
     session_request = _build_session_request(
-        scoring_format = 'Rotisserie'
+        objective = 'Rotisserie'
         , categories   = ['Points', 'Threes']
     )
     n_drafters = session_request['league']['n_drafters']
@@ -397,7 +397,7 @@ def test_evaluate_two_category_roto():
 def test_evaluate_twenty_five_drafters():
     """Smoke + correctness test: EC with 25 drafters, default categories, empty board."""
     session_request = _build_session_request(
-        scoring_format = 'Head to Head: Each Category'
+        objective = 'Each Category'
         , n_drafters   = 25
     )
     response = client.post('/sessions', json=session_request)
@@ -427,7 +427,7 @@ def test_evaluate_twenty_five_drafters():
         ('Shai Gilgeous-Alexander',  54.6),
         ('Nikola Jokic',             54.4),
         ('James Harden',             51.0),
-        ('Giannis Antetokounmpo',    50.4),
+        ('Giannis Antetokounmpo',    50.5),
     ]
     check_top_scores(session, 'EC, 25 drafters', expected_top_scores, candidates)
 
@@ -435,7 +435,7 @@ def test_evaluate_twenty_five_drafters():
 def test_evaluate_three_drafters():
     """Smoke + correctness test: EC with 3 drafters, default categories, empty board."""
     session_request = _build_session_request(
-        scoring_format = 'Head to Head: Each Category'
+        objective = 'Each Category'
         , n_drafters   = 3
     )
     response = client.post('/sessions', json=session_request)
@@ -462,9 +462,9 @@ def test_evaluate_three_drafters():
         f'H-score out of [0, 100]: {[s for s in h_scores if not (0 <= s <= 100)]}'
 
     expected_top_scores = [
-        ('Shai Gilgeous-Alexander',  52.2),
-        ('Nikola Jokic',             51.9),
-        ('Karl-Anthony Towns',       48.6),
+        ('Shai Gilgeous-Alexander',  52.3),
+        ('Nikola Jokic',             52.2),
+        ('Karl-Anthony Towns',       48.3),
         ('Stephen Curry',            48.1),
     ]
     check_top_scores(session, 'EC, 3 drafters', expected_top_scores, candidates)

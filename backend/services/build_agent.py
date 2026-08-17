@@ -501,6 +501,13 @@ def run_step4(session: Session) -> None:
     ]
     cp['categories'] = categories
 
+    # The narrowing above can drop the very category chosen to break ties (a percentage whose
+    # attempts column is missing), or leave an odd number, where there is no tie to break. Either
+    # way the tiebreaker no longer refers to anything the agent could resolve, so it is cleared
+    # here — after narrowing, which is the only place the surviving set is known.
+    if cp.get('tiebreaker_category') not in categories or len(categories) % 2 == 1:
+        cp['tiebreaker_category'] = None
+
     info, _ = process_player_data(
         player_stats_v2   = session.v2,
         weekly_df         = None,
@@ -543,6 +550,8 @@ def run_step5(session: Session) -> None:
         n_drafters     = n_drafters,
         dynamic        = cp['n_iterations'] > 0,
         scoring_format = scoring_format,
+        most_categories_weight = cp['most_categories_weight'],
+        tiebreaker_category    = cp.get('tiebreaker_category'),
         sport          = sport,
         params         = params,
         slot_counts    = slot_counts,

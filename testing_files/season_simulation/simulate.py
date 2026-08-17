@@ -40,8 +40,8 @@ from backend.math.position_optimization import check_single_player_eligibility
 
 # scoring-format key -> the exact string the backend expects.
 SCORING_FORMATS = {
-    'EC':   'Head to Head: Each Category',
-    'MC':   'Head to Head: Most Categories',
+    'EC':   'Each Category',
+    'MC':   'Most Categories',
     'Roto': 'Rotisserie',
 }
 
@@ -62,9 +62,9 @@ def _sanitize(obj):
     return obj
 
 
-def _create_session(season: str, scoring_format: str):
+def _create_session(season: str, objective: str):
     """Build one backend session for a (season, format) and return (session, session_id)."""
-    request = _build_session_request(scoring_format=scoring_format)
+    request = _build_session_request(objective=objective)
     request['data_source']['season'] = season
     # Turn OFF the Bayesian strength adjustment (ℶ/beth). It exists to keep the algorithm from being
     # overconfident when it can't trust its own projections — but this analysis uses real historical
@@ -76,7 +76,7 @@ def _create_session(season: str, scoring_format: str):
     # H-vs-G comparison. (A KAPPA env override still wins over this, for behavioral experiments.)
     request['parameters']['kappa'] = 0.0
     response = client.post('/sessions', json=request)
-    assert response.status_code == 201, f'Session creation failed ({season}, {scoring_format}): {response.text}'
+    assert response.status_code == 201, f'Session creation failed ({season}, {objective}): {response.text}'
     session_id = response.json()['session_id']
     return get_session(session_id), session_id
 
@@ -218,8 +218,8 @@ def _simulate_one_seat(
 
 def simulate_season_format(season: str, format_key: str, seats: list[int], top_n: int) -> dict:
     """Simulate all requested seats for one (season, format) and return the full result record."""
-    scoring_format = SCORING_FORMATS[format_key]
-    session, _ = _create_session(season, scoring_format)
+    objective = SCORING_FORMATS[format_key]
+    session, _ = _create_session(season, objective)
     n_drafters   = session.current_params['n_drafters']
     n_picks      = session.current_params['n_picks']
     categories   = session.current_params['categories']
@@ -239,7 +239,7 @@ def simulate_season_format(season: str, format_key: str, seats: list[int], top_n
     return {
         'season':             season,
         'format_key':         format_key,
-        'scoring_format':     scoring_format,
+        'objective':     objective,
         'categories':         list(categories),
         'n_drafters':         n_drafters,
         'n_picks':            n_picks,

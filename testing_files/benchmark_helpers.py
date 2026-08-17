@@ -60,13 +60,39 @@ _count_names    = _NBA_PARAMS.get('counting-statistics', [])
 _ALL_CATEGORIES = _ratio_names + [c for c in _count_names if c not in _ratio_names]
 
 
+# Head to Head is one format with an objective dial (0 = every category its own contest,
+# 1 = only the majority matters), so the two names it used to have are now presets on that dial.
+# Tests name the objective they mean and this maps it onto the wire fields; adding a mixed
+# objective is a line here rather than a new format everywhere.
+OBJECTIVE_PRESETS: dict[str, tuple[str, float | None]] = {
+    'Each Category':   ('Head to Head', 0.0),
+    'Half and Half':   ('Head to Head', 0.5),
+    'Most Categories': ('Head to Head', 1.0),
+    'Rotisserie':      ('Rotisserie',   None),
+}
+
+
+def resolve_objective(objective: str) -> tuple[str, float | None]:
+    """The (scoring_format, most_categories_weight) pair a preset name means. Unknown names raise:
+    a typo would otherwise quietly score a test against a different objective than it claims."""
+    if objective not in OBJECTIVE_PRESETS:
+        raise ValueError(f'Unknown objective {objective!r}. '
+                         f'Known: {sorted(OBJECTIVE_PRESETS)}')
+    return OBJECTIVE_PRESETS[objective]
+
+
 def _build_session_request(
-    scoring_format: str = 'Head to Head: Most Categories'
+    objective: str = 'Most Categories'
     , categories: list = None
     , n_drafters: int = None
     , cash_per_team: int = None
 ) -> dict:
-    """Construct a session request using all default parameters from parameters.yaml."""
+    """Construct a session request using all default parameters from parameters.yaml.
+
+    `objective` names one of OBJECTIVE_PRESETS. The default keeps every caller that never named
+    one on Most Categories, the objective they were built against.
+    """
+    scoring_format, most_categories_weight = resolve_objective(objective)
     with open(_PARAMS_PATH) as f:
         all_params = yaml.safe_load(f)
 
@@ -83,6 +109,7 @@ def _build_session_request(
         'n_drafters':     n_drafters,
         'n_picks':        n_picks,
         'scoring_format': scoring_format,
+        'most_categories_weight': most_categories_weight,
         'categories':     categories if categories is not None else nba['default-categories'],
     }
     if cash_per_team is not None:

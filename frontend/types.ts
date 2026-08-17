@@ -96,6 +96,11 @@ export interface SessionRequest {
         n_drafters: number
         n_picks: number
         scoring_format: string
+        // How much of the Head-to-Head objective is winning the majority of categories (0 = each
+        // category on its own, 1 = the majority alone). Null under Rotisserie, which uses neither.
+        most_categories_weight: number | null
+        // The category that counts twice to settle a level matchup; null when none applies.
+        tiebreaker_category: string | null
         categories: string[]
         cash_per_team?: number   // only consulted by the backend in Auction Mode
     }

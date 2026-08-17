@@ -104,7 +104,7 @@ _COMBO_CONFIGS = [
 @pytest.fixture(scope='module')
 def trading_session():
     """One EC session shared across all trade correctness tests."""
-    session_request = _build_session_request(scoring_format='Head to Head: Each Category')
+    session_request = _build_session_request(objective='Each Category')
     response = client.post('/sessions', json=session_request)
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     return response.json()['session_id']

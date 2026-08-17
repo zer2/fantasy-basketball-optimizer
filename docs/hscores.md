@@ -224,9 +224,23 @@ The context in which H-scoring operates is controlled by a handful of settings a
 
 ### Formats and categories
 
-The website's implementation of H-scoring supports the three common category formats for fantasy basketball: 'H2H Each Category', 'H2H Most Categories', and 'Rotisserie'. It does not have native support for any additional variants, like using a specific category as a tiebreaker. The format selector defaults to H2H Each Category.
+The website's implementation of H-scoring supports the common category formats for fantasy basketball: Head to Head and Rotisserie.
 
-It also supports any combination of categories, across the default nine categories and several alternative options. By default the nine standard categories are selected: Field Goal %, Free Throw %, Threes, Points, Rebounds, Assists, Steals, Blocks, and Turnovers.
+There are two kinds of Head to Head scoring, and the two can be blended together via a slider. When the slider is at zero, H-scoring optimizes for the average probability of winning each category, which is Each Category scoring. When the slider is at one it optimizes for the probability of winning a majority of categories, which is Most Categories scoring. When the slider is in the middle, it computes and optimizes for both objectives, with weight on majority scoring based on the value of the slider. For example if the slider is at 0.6 it weights majority scoring at 60% and total scoring at 40%. Setting the slider to somewhere in the middle can make sense for a league that determines regular season standings with total categories won, and does playoffs with majority scoring. 
+
+??? note "How exactly are the two kinds of scoring blended together?"
+    The objective functions are literally added together with their weights, along with their gradients. This can be justified by considering majority scoring to be equivalent to either winning every category or losing every category. In that case, the expected value of categories won is the probability of winning the matchup times the number of categories for Most Categories scoring, versus the sum of the probabilities of winning each category for Each Category scoring. Dividing each by the number of categories yields the probability of winning a matchup versus the average probability of winning a category, making them sensible objectives to compare. 
+
+With an even number of categories a majority matchup can end level — four each out of eight. By default the website treats that as half a win. It is also possible to declare a tiebreaker category in the **Tiebreaker** selector beneath the category picker: it then counts for two, which makes the total odd and gives every matchup a winner. The selector appears only when it can apply, meaning the majority objective is in play and the category count is even, and leaving it empty keeps the half-a-win treatment.
+
+??? note "Why does counting a category twice give the right answer?"
+    Doubling the tiebreaker changes only the level matchups, which is exactly what a tiebreaker should do. Take eight categories, where nine points are then on offer and five are needed. Split them four-four: winning the tiebreaker gives $3 + 2 = 5$ and takes the matchup, while losing it leaves $4 < 5$. Now take a genuine five-three majority: with the tiebreaker among the five, the other four plus two is six; without it, five of the remaining seven is still five. Either way the majority holds. So the doubling settles ties without ever overturning a decided matchup.
+
+    Since the tiebreaker is counted double, it has a different gradient than the other categories. It is decisive either with the total win count of other categories at one less than what is needed or two less than what is needed, so those possibilities are both included in its gradient.  
+
+    Tiebreaker behavior causes complications with understanding what kinds of teams opponents will likely have. It is not reasonable to assume that other teams will be evenly spread across the categories, since the tiebreaker category counts for more. To account for that, the algorithm builds in a structural edge for all opponents, expecting them to weigh the tiebreaker category double (also weighted by the majority slider)
+
+The website supports any combination of categories, across the default nine categories and several alternative options. By default the nine standard categories are selected: Field Goal %, Free Throw %, Threes, Points, Rebounds, Assists, Steals, Blocks, and Turnovers.
 
 For the alternative categories, when using projections, make sure to include them when sourcing the projections. ESPN and DARKO do not forecast them so all of the weight will be from Hashtag or BBM projections. 
 

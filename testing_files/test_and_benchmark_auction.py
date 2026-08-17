@@ -21,7 +21,7 @@ from backend.services.ranking import rank_candidates
 def test_evaluate_auction():
     """EC auction, 12 drafters, Drafter 1 has Giannis ($50), Drafter 2 has Jokic ($50)."""
     session_request = _build_session_request(
-        scoring_format = 'Head to Head: Each Category'
+        objective = 'Each Category'
         , cash_per_team = 200
     )
     response = client.post('/sessions', json=session_request)
@@ -58,11 +58,16 @@ def test_evaluate_auction():
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
     # (expected_name, diff, your_dollar, gnrc_dollar, orig_dollar)
+    # Regenerated 2026-08-16 with the corrected Each Category gradient. The old values came from a
+    # state no kappa reproduces: the penalty was subtracted from the score at full strength while
+    # reaching the gradient at a ninth of it, because the objective's own gradient was n_categories
+    # too large. Dollar values are differences of H-scores, so they show that mismatch more sharply
+    # than the H-scores do — Tatum's your-vs-generic gap moves most.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',   -2.5,  88.1,  90.6,  89.4),
-        ('Tyrese Haliburton',           2.5,  57.6,  55.1,  54.4),
-        ('Dyson Daniels',             13.8,  54.5,  40.7,  40.2),
-        ('Jayson Tatum',                4.4,  44.5,  40.0,  39.5),
+        ('Shai Gilgeous-Alexander',   -1.3,  91.2,  92.4,  91.2),
+        ('Tyrese Haliburton',           3.0,  58.6,  55.6,  54.8),
+        ('Dyson Daniels',             14.1,  55.9,  41.8,  41.2),
+        ('Jayson Tatum',               -0.0,  39.9,  39.9,  39.4),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):

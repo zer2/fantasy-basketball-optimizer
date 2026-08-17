@@ -43,6 +43,8 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
         'n_drafters':       n,
         'n_picks':          req.league.n_picks,
         'scoring_format':   req.league.scoring_format,
+        'most_categories_weight': req.league.most_categories_weight,
+        'tiebreaker_category':    req.league.tiebreaker_category,
         'categories':       categories,
         'slot_counts':      req.slot_counts,
         'injured_players':  req.injured_players,
@@ -81,6 +83,12 @@ def _build_patch(req: PatchRequest) -> dict:
         for key, val in req.league.model_dump().items():
             if val is not None:
                 patch[key] = val
+        # Every other field here uses null for "unchanged", but the tiebreaker's null IS the value
+        # — it means no category breaks ties. Without this, clearing the selector sent a null that
+        # was read as an omission and the session kept drafting to the old tiebreaker. Keyed off
+        # what the client actually sent, so omitting the field still means "leave it alone".
+        if 'tiebreaker_category' in req.league.model_fields_set:
+            patch['tiebreaker_category'] = req.league.tiebreaker_category
     if req.slot_counts is not None:
         patch['slot_counts'] = req.slot_counts
     if req.injured_players is not None:
@@ -227,6 +235,10 @@ def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[s
                 uploaded_dfs    = uploaded_dfs,
             )
     except InsufficientPlayerPoolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ValueError as exc:
+        # A patch that leaves the format and its objective dial inconsistent (see
+        # normalize_objective_settings) — a malformed request, not a server fault.
         raise HTTPException(status_code=400, detail=str(exc))
     return PatchResponse(ok=True, steps_rerun=list(range(req.from_step, 6)))
 

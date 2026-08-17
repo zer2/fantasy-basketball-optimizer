@@ -6,7 +6,10 @@
 # Gradient tests create a session through the API to obtain session.agent.info, then
 # build HAgent instances directly for targeted testing.
 
+import itertools
+
 import numpy as np
+import pytest
 import pandas as pd
 import yaml
 from fastapi.testclient import TestClient
@@ -18,6 +21,8 @@ from backend.math.algorithm_agents import HAgent
 from backend.math.algorithm_helpers import (
     combinatorial_calculation
     , calculate_tipping_points
+    , calculate_win_probability_and_tipping_points
+    , compute_win_probability
     , savor_calculation
 )
 
@@ -45,7 +50,8 @@ def _build_default_session_request() -> dict:
             'sport':            'NBA'
             , 'n_drafters':     n_drafters
             , 'n_picks':        n_picks
-            , 'scoring_format': 'Head to Head: Most Categories'
+            , 'scoring_format': 'Head to Head'
+            , 'most_categories_weight': 1.0
             , 'categories':     nba['default-categories']
         }
         , 'slot_counts': slot_counts
@@ -75,7 +81,14 @@ def _create_session() -> tuple[str, dict]:
     return session_id, session.agent.info
 
 
-def _build_h_agent(info: dict, scoring_format: str) -> HAgent:
+def _build_h_agent(
+    info: dict
+    , scoring_format: str
+    , most_categories_weight: float | None
+    , tiebreaker_category: str | None = None
+) -> HAgent:
+    """Head to Head takes an objective weight (0 = Each Category, 1 = Most Categories, between =
+    a blend of the two); Rotisserie takes None, since it scores neither way."""
     opts = _load_default_options()
     with open(_PARAMS_PATH) as f:
         all_params = yaml.safe_load(f)
@@ -92,6 +105,8 @@ def _build_h_agent(info: dict, scoring_format: str) -> HAgent:
         , n_drafters   = opts['n_drafters']['default']
         , dynamic      = True
         , scoring_format = scoring_format
+        , most_categories_weight = most_categories_weight
+        , tiebreaker_category = tiebreaker_category
         , sport        = 'NBA'
         , params       = sport_params
         , slot_counts  = slot_counts
@@ -104,7 +119,7 @@ def _build_h_agent(info: dict, scoring_format: str) -> HAgent:
 def test_x_mu_gradients():
     """H-score gradient checks for Head to Head: Most Categories scoring format."""
     _, info = _create_session()
-    H = _build_h_agent(info, 'Head to Head: Most Categories')
+    H = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
 
     c_list = [
         np.array([1/8] * 8 + [0]).reshape(1, 9)
@@ -158,7 +173,7 @@ def test_x_mu_gradients():
 def test_ec_gradients():
     """Each Category objective gradient checks (proportions across categories)."""
     _, info = _create_session()
-    H = _build_h_agent(info, 'Head to Head: Each Category')
+    H = _build_h_agent(info, 'Head to Head', most_categories_weight=0.0)
 
     x_diff_list = [
         np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
@@ -189,7 +204,7 @@ def test_ec_gradients():
 def test_mc_gradients():
     """Most Categories objective gradient checks (proportions across categories)."""
     _, info = _create_session()
-    H = _build_h_agent(info, 'Head to Head: Most Categories')
+    H = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
 
     x_diff_list = [
         np.array([[[0.1] + [0.15] + [0.2]  + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 9])
@@ -223,7 +238,7 @@ def test_mc_gradients():
 def test_objective_gradients():
     """Rotisserie objective gradient checks."""
     _, info = _create_session()
-    H = _build_h_agent(info, 'Rotisserie')
+    H = _build_h_agent(info, 'Rotisserie', most_categories_weight=None)
 
     # diff_vars is uniform across categories when both teams have equal rosters, which
     # is the simplest valid case. Non-uniform diff_vars would require a different gradient
@@ -259,6 +274,275 @@ def test_objective_gradients():
             return gradient
 
         _check_gradient_aggregate(x_diff, rotisserie_objective, rotisserie_gradient)
+
+
+# ─── The Head-to-Head objective dial ──────────────────────────────────────────
+# Head to Head is one format with a weight on how much of the objective is winning the majority
+# of categories rather than each category on its own. The endpoints must reproduce the two former
+# formats exactly, the middle must be a true convex combination, and — the reason any of this is
+# coherent — the two gradients must live on the same scale.
+
+_OBJECTIVE_TEST_DIFFS = np.array(
+    [[[0.1] + [0.15] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]] * 8
+     + [[0.1] + [0.17] + [0.2] + [0.25] + [0.3] + [0.35] + [0.4] + [0.45] + [0.5] + [0.55] + [0.6]]])
+
+
+def _objective_inputs(x_diff_array, diff_vars=1.0):
+    """The (cdf, pdf) pair the objective functions take, for a given differential array."""
+    z_scores = x_diff_array / np.sqrt(diff_vars)
+    return norm.cdf(z_scores), norm.pdf(z_scores) / np.sqrt(diff_vars)
+
+
+def test_each_category_gradient_matches_its_objective_in_absolute_scale():
+    """Each Category's weights must be the gradient of the objective it returns, not of the sum
+    over categories — which is what they were, n_categories too large.
+
+    The other gradient tests normalise both sides by their own sum, so they only ever compared
+    proportions and could not see this. It is invisible under Adam alone, but a blend adds the two
+    objectives' gradients together, so a factor of nine on one of them would silently decide the
+    result no matter what weight the user picked."""
+    _, info = _create_session()
+    agent = _build_h_agent(info, 'Head to Head', most_categories_weight=0.0)
+
+    def each_category_objective(x_diff_array):
+        cdf_estimates, pdf_estimates = _objective_inputs(x_diff_array)
+        return agent.get_objective_and_pdf_weights_ec(cdf_estimates, pdf_estimates)
+
+    cdf_estimates, pdf_estimates = _objective_inputs(_OBJECTIVE_TEST_DIFFS)
+    _, analytic_weights = agent.get_objective_and_pdf_weights_ec(
+        cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+
+    step = 1e-4
+    for category in range(_OBJECTIVE_TEST_DIFFS.shape[1]):
+        raised  = _OBJECTIVE_TEST_DIFFS.copy()
+        lowered = _OBJECTIVE_TEST_DIFFS.copy()
+        raised[0, category, :]  += step
+        lowered[0, category, :] -= step
+        finite_difference = float(
+            (each_category_objective(raised) - each_category_objective(lowered))[0]) / (2 * step)
+        assert np.isclose(finite_difference, analytic_weights[0, category], rtol=1e-6), (
+            f'category {category}: analytic weight {analytic_weights[0, category]} does not match '
+            f'the objective it claims to differentiate ({finite_difference})'
+        )
+
+
+def test_the_objective_endpoints_reproduce_the_two_former_formats_exactly():
+    """Weight 0 and weight 1 must be the old Each Category and Most Categories, bit for bit —
+    that is what lets every existing golden stand as the regression test for this change."""
+    _, info = _create_session()
+    cdf_estimates, pdf_estimates = _objective_inputs(_OBJECTIVE_TEST_DIFFS)
+    call = dict(x_diff_array=_OBJECTIVE_TEST_DIFFS, diff_vars=1.0,
+                cdf_estimates=cdf_estimates, pdf_estimates=pdf_estimates,
+                calculate_pdf_weights=True)
+
+    each_category = _build_h_agent(info, 'Head to Head', most_categories_weight=0.0)
+    objective, weights = each_category.get_objective_and_pdf_weights(**call)
+    reference_objective, reference_weights = each_category.get_objective_and_pdf_weights_ec(
+        cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+    assert np.array_equal(objective, reference_objective)
+    assert np.array_equal(weights, reference_weights)
+
+    most_categories = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
+    objective, weights = most_categories.get_objective_and_pdf_weights(**call)
+    reference_objective, reference_weights = most_categories.get_objective_and_pdf_weights_mc(
+        _OBJECTIVE_TEST_DIFFS, 1.0, cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+    assert np.array_equal(objective, reference_objective)
+    assert np.array_equal(weights, reference_weights)
+
+
+def test_a_blended_objective_is_the_convex_combination_of_the_two():
+    """Half and half is exactly half of each — objective and gradient alike."""
+    _, info = _create_session()
+    cdf_estimates, pdf_estimates = _objective_inputs(_OBJECTIVE_TEST_DIFFS)
+
+    blended = _build_h_agent(info, 'Head to Head', most_categories_weight=0.5)
+    objective, weights = blended.get_objective_and_pdf_weights(
+        _OBJECTIVE_TEST_DIFFS, 1.0, cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+
+    each_objective, each_weights = blended.get_objective_and_pdf_weights_ec(
+        cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+    most_objective, most_weights = blended.get_objective_and_pdf_weights_mc(
+        _OBJECTIVE_TEST_DIFFS, 1.0, cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+
+    assert np.allclose(objective, 0.5 * each_objective + 0.5 * most_objective, rtol=0, atol=1e-15)
+    assert np.allclose(weights, 0.5 * each_weights + 0.5 * most_weights, rtol=0, atol=1e-15)
+
+    # Both ends are probabilities, which is what makes the combination meaningful rather than a
+    # mix of incommensurable quantities.
+    assert 0.0 <= float(each_objective[0]) <= 1.0
+    assert 0.0 <= float(most_objective[0]) <= 1.0
+
+
+def test_the_objective_weight_must_match_the_format():
+    """Rotisserie scores neither way, so a weight there means the caller misunderstands the
+    session; Head to Head cannot be scored without one. Both raise instead of being guessed at."""
+    _, info = _create_session()
+
+    with pytest.raises(ValueError, match='does not apply to Rotisserie'):
+        _build_h_agent(info, 'Rotisserie', most_categories_weight=0.5)
+    with pytest.raises(ValueError, match=r'most_categories_weight in \[0, 1\]'):
+        _build_h_agent(info, 'Head to Head', most_categories_weight=None)
+    with pytest.raises(ValueError, match=r'most_categories_weight in \[0, 1\]'):
+        _build_h_agent(info, 'Head to Head', most_categories_weight=1.5)
+
+
+# ─── Tiebreaker category ──────────────────────────────────────────────────────
+# With an even number of categories a matchup can end level. A tiebreaker settles it by counting
+# for two, which makes the total odd — so the matchup always has a winner, and only the level case
+# changes hands. These check that claim against enumeration rather than against the DP's own logic.
+
+def _enumerate_win_probability(probs, tiebreaker_index):
+    """P(winning the matchup) by walking every win/loss combination and scoring it by hand."""
+    n_players, n_categories, n_opponents = probs.shape
+    weights = [2 if i == tiebreaker_index else 1 for i in range(n_categories)]
+    needed  = sum(weights) / 2
+    result  = np.zeros((n_players, n_opponents))
+    for outcome in itertools.product([0, 1], repeat=n_categories):
+        points = sum(weight for weight, won in zip(weights, outcome) if won)
+        if points < needed:
+            continue
+        probability = np.ones((n_players, n_opponents))
+        for category, won in enumerate(outcome):
+            probability = probability * (probs[:, category, :] if won
+                                         else 1 - probs[:, category, :])
+        result += (0.5 if points == needed else 1.0) * probability
+    return result
+
+
+@pytest.mark.parametrize('n_categories', [4, 6, 8])
+@pytest.mark.parametrize('tiebreaker_index', [None, 0, 2])
+def test_tiebreaker_win_probability_matches_enumeration(n_categories, tiebreaker_index):
+    probs = np.random.default_rng(11).uniform(0.15, 0.85, size=(3, n_categories, 2))
+    expected = _enumerate_win_probability(probs, tiebreaker_index)
+
+    assert np.allclose(compute_win_probability(probs, tiebreaker_index), expected, atol=1e-12)
+    combined, _ = calculate_win_probability_and_tipping_points(probs, tiebreaker_index)
+    assert np.allclose(combined, expected, atol=1e-12)
+
+
+@pytest.mark.parametrize('tiebreaker_index', [None, 0, 3])
+def test_tiebreaker_tipping_points_match_finite_differences(tiebreaker_index):
+    """The tipping points are the objective's gradient, so they must track the enumerated
+    objective — including for the doubled category, which can turn a matchup from either one or
+    two points short and therefore carries two ways of being decisive."""
+    probs = np.random.default_rng(3).uniform(0.2, 0.8, size=(2, 6, 2))
+    _, tipping_points = calculate_win_probability_and_tipping_points(probs, tiebreaker_index)
+
+    step = 1e-6
+    for category in range(probs.shape[1]):
+        raised, lowered = probs.copy(), probs.copy()
+        raised[:, category, :]  += step
+        lowered[:, category, :] -= step
+        finite_difference = (_enumerate_win_probability(raised, tiebreaker_index)
+                             - _enumerate_win_probability(lowered, tiebreaker_index)) / (2 * step)
+        assert np.allclose(finite_difference, tipping_points[:, category, :], atol=1e-6)
+
+
+def test_a_tiebreaker_decides_only_level_matchups():
+    """The whole point of the feature, stated as the four cases that matter."""
+    def certainty(outcomes, tiebreaker_index):
+        probs = np.array([[[float(won)] for won in outcomes]])
+        return float(compute_win_probability(probs, tiebreaker_index)[0, 0])
+
+    assert certainty([1, 1, 0, 0], 0) == 1.0, 'level, tiebreaker won -> a win'
+    assert certainty([0, 1, 1, 0], 0) == 0.0, 'level, tiebreaker lost -> a loss'
+    assert certainty([0, 1, 1, 0], None) == 0.5, 'level with no tiebreaker -> half credit, as before'
+    assert certainty([0, 1, 1, 1], 0) == 1.0, 'a majority still wins after losing the tiebreaker'
+    assert certainty([1, 0, 0, 0], 0) == 0.0, 'the tiebreaker alone does not win a matchup'
+
+
+def test_a_tiebreaker_is_refused_where_there_is_no_tie_to_break():
+    """An odd number of categories already has a winner, and doubling one would reintroduce the
+    ties a tiebreaker exists to remove — so it raises rather than being quietly ignored."""
+    probs = np.full((1, 9, 1), 0.5)
+    with pytest.raises(ValueError, match='even number of categories'):
+        compute_win_probability(probs, 0)
+    with pytest.raises(ValueError, match='outside the'):
+        compute_win_probability(np.full((1, 8, 1), 0.5), 8)
+
+
+def _create_even_category_session() -> dict:
+    """A session with eight categories, so a tiebreaker has a tie to break. Returns its info."""
+    request = _build_default_session_request()
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, response.text
+    return get_session(response.json()['session_id']).agent.info
+
+
+def test_the_descent_starts_with_the_tiebreaker_already_doubled():
+    """Every multi-start seed respects the doubled category, so the scan chooses which category to
+    give up against that backdrop rather than having to discover the doubling first. The same
+    vector prices what the field is assumed to chase."""
+    info = _create_even_category_session()
+    categories = list(info['X-scores'].columns)
+    blocks = categories.index('Blocks')
+    other  = categories.index('Points')
+
+    plain = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
+    assert np.allclose(plain.get_starting_category_weights(), plain.v.reshape(-1)), \
+        'without a tiebreaker the descent starts neutral, exactly as before'
+
+    for weight in (0.5, 1.0):
+        agent = _build_h_agent(info, 'Head to Head', most_categories_weight=weight,
+                               tiebreaker_category='Blocks')
+        start   = agent.get_starting_category_weights()
+        neutral = agent.v.reshape(-1)
+        assert np.isclose(start.sum(), 1.0)
+        # Renormalising rescales everything, so compare the ratio against another category.
+        assert np.isclose(start[blocks] / start[other],
+                          (1 + weight) * neutral[blocks] / neutral[other]), \
+            f'at weight {weight} the tiebreaker starts at {1 + weight}x its neutral share'
+        assert np.allclose(start, agent.get_tiebreaker_weighted_neutral())
+
+
+def test_the_field_is_expected_to_chase_the_tiebreaker():
+    """behavior_model_confidence discounts what the model GUESSES about a seat. A tiebreaker is not
+    a guess — every opponent reads the same league settings — so its pull must reach the field
+    undiscounted, which is what stops the drafter expecting the category unopposed."""
+    info = _create_even_category_session()
+    categories = list(info['X-scores'].columns)
+    blocks = categories.index('Blocks')
+
+    plain = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
+    assert not np.any(plain.get_structural_tiebreaker_edge()), \
+        'no tiebreaker, no structural pull — every other session keeps its opponent model'
+    predicted = np.full(plain.n_categories, 0.3)
+    assert np.allclose(plain.apply_opponent_tilt_confidence(predicted),
+                       plain.behavior_model_confidence * predicted), \
+        'and the damping is then the plain product it always was'
+
+    agent = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0,
+                           tiebreaker_category='Blocks')
+    structural = agent.get_structural_tiebreaker_edge()
+    assert structural[blocks] > 0, 'chasing the doubled category is worth something'
+    assert structural[blocks] == structural.max(), 'and it is worth most in that category'
+
+    # A seat whose predicted edge is exactly the structural pull keeps all of it: there is nothing
+    # speculative left to discount.
+    assert np.allclose(agent.apply_opponent_tilt_confidence(structural), structural)
+
+    # A seat predicted to chase it harder than the rules alone imply keeps the structural part and
+    # has only the speculative excess discounted.
+    speculative = structural.copy()
+    speculative[blocks] += 1.0
+    applied = agent.apply_opponent_tilt_confidence(speculative)
+    assert np.isclose(applied[blocks],
+                      structural[blocks] + agent.behavior_model_confidence * 1.0)
+
+
+def test_the_agent_rejects_a_tiebreaker_that_cannot_apply():
+    _, info = _create_session()   # nine categories, so no tie is possible
+    with pytest.raises(ValueError, match='even number of categories'):
+        _build_h_agent(info, 'Head to Head', most_categories_weight=1.0,
+                       tiebreaker_category='Blocks')
+    with pytest.raises(ValueError, match='not one of'):
+        _build_h_agent(info, 'Head to Head', most_categories_weight=1.0,
+                       tiebreaker_category='Dunks')
+    with pytest.raises(ValueError, match='only applies to the majority objective'):
+        _build_h_agent(info, 'Rotisserie', most_categories_weight=None,
+                       tiebreaker_category='Blocks')
 
 
 # ─── Pure math tests ──────────────────────────────────────────────────────────

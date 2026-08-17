@@ -6,7 +6,7 @@ in backend.models (this module imports from it, never the reverse).
 
 from __future__ import annotations
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from backend.models import ComboParam
 
@@ -31,8 +31,36 @@ class LeagueSettings(BaseModel):
     n_drafters: int
     n_picks: int
     scoring_format: str
+    # How much of the Head-to-Head objective is winning the majority of categories, the rest
+    # being each category on its own: 0 is Each Category, 1 is Most Categories, and anything
+    # between blends them. None under Rotisserie, which scores neither way.
+    most_categories_weight: Optional[float] = None
+    # The category that settles a tied matchup by counting for two. Head to Head with an even
+    # number of categories only; None everywhere else, including at weight 0, where every
+    # category is scored on its own and nothing can tie.
+    tiebreaker_category: Optional[str] = None
     categories: list[str] = []
     cash_per_team: Optional[int] = None   # Auction Mode only
+
+    @model_validator(mode='after')
+    def check_most_categories_weight_matches_format(self) -> 'LeagueSettings':
+        """Head to Head needs the dial; Rotisserie must not carry one. Rejected here rather than
+        defaulted, so a client that forgets it hears about it instead of silently drafting to a
+        different objective than the one it meant."""
+        if self.scoring_format == 'Rotisserie':
+            if self.most_categories_weight is not None:
+                raise ValueError('most_categories_weight does not apply to Rotisserie.')
+        elif self.most_categories_weight is None:
+            raise ValueError('most_categories_weight is required for Head to Head (0 = Each '
+                             'Category, 1 = Most Categories).')
+        elif not 0.0 <= self.most_categories_weight <= 1.0:
+            raise ValueError('most_categories_weight must be between 0 and 1.')
+        if self.tiebreaker_category is not None:
+            if self.categories and self.tiebreaker_category not in self.categories:
+                raise ValueError('tiebreaker_category must be one of the scored categories.')
+            if self.categories and len(self.categories) % 2 == 1:
+                raise ValueError('A tiebreaker needs an even number of categories.')
+        return self
 
 
 class ModelParameters(BaseModel):
@@ -113,6 +141,10 @@ class PatchLeague(BaseModel):
     n_drafters: Optional[int] = None
     n_picks: Optional[int] = None
     scoring_format: Optional[str] = None
+    # Omitted = unchanged, like every field here. The resulting format/weight pair is validated
+    # after the patch merges, in session_management — only there is the outcome known.
+    most_categories_weight: Optional[float] = None
+    tiebreaker_category: Optional[str] = None
     categories: Optional[list[str]] = None
     cash_per_team: Optional[int] = None
 

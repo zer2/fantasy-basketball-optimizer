@@ -5,7 +5,10 @@
 import { SessionRequest } from '../types.js'
 import { setGScores } from '../app_state.js'
 import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/league_settings.js'
-import { getScoringFormat, getSelectedCategories, syncCategoriesFromBackend } from '../parameter_collection/format_and_categories.js'
+import {
+    getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory, getSelectedCategories,
+    syncCategoriesFromBackend,
+} from '../parameter_collection/format_and_categories.js'
 import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
 import { getModelParameters } from '../parameter_collection/model_parameters.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
@@ -77,9 +80,13 @@ export function setAutopilotOff(): void {
 export async function startFreshSession(signal?: AbortSignal): Promise<void> {
     const { sport, platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     const scoring_format = getScoringFormat()
+    const most_categories_weight = getMostCategoriesWeight()
     const categories     = getSelectedCategories()
     const { data_source, injured_players } = getPlayerStatsParams()
-    const league: SessionRequest['league'] = { sport, n_drafters, n_picks, scoring_format, categories }
+    const league: SessionRequest['league'] = {
+        sport, n_drafters, n_picks, scoring_format, most_categories_weight,
+        tiebreaker_category: getTiebreakerCategory(), categories,
+    }
     if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
     const req: SessionRequest = {
         league,

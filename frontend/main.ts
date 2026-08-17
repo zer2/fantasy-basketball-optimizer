@@ -20,7 +20,10 @@ import { setTheme } from './styles/styler_functions.js'
 
 import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
-import { renderFormatAndCategories, getScoringFormat, getSelectedCategories } from './parameter_collection/format_and_categories.js'
+import {
+    renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
+    getSelectedCategories,
+} from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams, waitForSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
 import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
@@ -309,7 +312,12 @@ formatSection.addEventListener('change', () => {
     formatController = new AbortController()
     const { signal } = formatController
     buildTableHeader()
-    createOrPatchSession(4, { league: { scoring_format: getScoringFormat(), categories: getSelectedCategories() } }, signal)
+    createOrPatchSession(4, { league: {
+        scoring_format:         getScoringFormat(),
+        most_categories_weight: getMostCategoriesWeight(),
+        tiebreaker_category:    getTiebreakerCategory(),
+        categories:             getSelectedCategories(),
+    } }, signal)
         .then(() => { if (!signal.aborted) return runModeEval() })
         .then(() => { if (!signal.aborted) applyLayout() })
         .catch(err => {

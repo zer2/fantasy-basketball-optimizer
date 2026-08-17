@@ -292,6 +292,17 @@ NBA:
       default : 0.3
       min : 0.0
       max: 5.0
+    most_categories_weight :
+      # How much of the Head-to-Head objective is the probability of taking the majority of
+      # categories, the rest being the average per-category win probability. 0 reproduces Each
+      # Category exactly and 1 reproduces Most Categories exactly; in between the two objectives
+      # are blended, which is coherent because both are probabilities on the same scale — an Each
+      # Category matchup is one where every category is its own contest, a Most Categories matchup
+      # one where they are settled together. Defaults to 0, so a new session drafts to Each
+      # Category as it always has. Ignored (and pinned to None) under Rotisserie.
+      default : 0.0
+      min : 0.0
+      max: 1.0
     behavior_model_confidence :
       # Halves how sharply opponents are expected to pursue their predicted punts. 0.5 softens the
       # self-play field enough that best responses stop crowding into a single open punt lane

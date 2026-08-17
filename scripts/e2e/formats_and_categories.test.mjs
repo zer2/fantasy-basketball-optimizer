@@ -1,6 +1,7 @@
 // scripts/e2e/formats_and_categories.test.mjs
-// Scoring formats and category selection: the candidate table must re-render across
-// EC / MC / Rotisserie switches, category columns must track the selection while staying
+// Scoring formats and category selection: the candidate table must re-render across every
+// objective — both ends of the Head-to-Head dial, a blend of them, and Rotisserie — category
+// columns must track the selection while staying
 // in CANONICAL order (the sport config's order, not the order the user added them), and
 // the page must keep working with every available category selected at once.
 // Uses the 2025-26 historical season for stable data.
@@ -9,7 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
-    setSelect,
+    setSelect, setObjectiveWeight, openSelectDropdown, chooseDropdownOption,
 } from './helpers.mjs'
 
 test('scoring formats and categories', async t => {
@@ -57,25 +58,80 @@ test('scoring formats and categories', async t => {
         await selectHistoricalSeason(app, '2025-26')
         expectCleanSession(app, 'initial load')
 
-        await t.test('the candidate table re-renders across all three scoring formats', async () => {
-            await setSelect(page, 'fc-scoring-format', 'Most Categories')
+        await t.test('the candidate table re-renders across every objective', async () => {
+            // Head to Head is one format with a dial now: 1 is what used to be Most Categories,
+            // 0 what used to be Each Category, and anything between blends the two objectives.
+            await setSelect(page, 'fc-scoring-format', 'Head to Head')
+            await setObjectiveWeight(page, 1)
             await waitAppSettled(app)
-            assert.ok(await candidateRowCount() > 0, 'Most Categories should render candidates')
-            expectCleanSession(app, 'switch to Most Categories')
+            assert.ok(await candidateRowCount() > 0, 'the majority objective should render candidates')
+            expectCleanSession(app, 'switch to the majority objective')
 
             await setSelect(page, 'fc-scoring-format', 'Rotisserie')
             await waitAppSettled(app)
             assert.ok(await candidateRowCount() > 0, 'Rotisserie should render candidates')
             assert.ok(await page.locator('#hscoretable td.categoricalRotoHscore').count() > 0,
                       'Rotisserie should render its converted category values')
+            assert.ok(!(await page.locator('#fc-objective-row').isVisible()),
+                      'Rotisserie uses neither objective, so the dial should be hidden')
             expectCleanSession(app, 'switch to Rotisserie')
 
-            await setSelect(page, 'fc-scoring-format', 'Each Category')
+            await setSelect(page, 'fc-scoring-format', 'Head to Head')
+            await setObjectiveWeight(page, 0)
             await waitAppSettled(app)
-            assert.ok(await candidateRowCount() > 0, 'Each Category should render candidates')
+            assert.ok(await candidateRowCount() > 0, 'the per-category objective should render candidates')
             assert.ok(await page.locator('#hscoretable td.categoricalhscore').count() > 0,
-                      'Each Category should render win-rate cells')
-            expectCleanSession(app, 'switch back to Each Category')
+                      'the per-category objective should render win-rate cells')
+            expectCleanSession(app, 'switch back to the per-category objective')
+
+            // A blend is a first-class setting, not just the endpoints: half and half must
+            // evaluate as cleanly as either end.
+            await setObjectiveWeight(page, 0.5)
+            await waitAppSettled(app)
+            assert.ok(await candidateRowCount() > 0, 'a blended objective should render candidates')
+            expectCleanSession(app, 'half-and-half objective')
+
+            await setObjectiveWeight(page, 0)
+            await waitAppSettled(app)
+        })
+
+        await t.test('the tiebreaker appears only when a matchup can tie', async () => {
+            const tiebreakerRow = page.locator('#fc-tiebreaker-row')
+
+            // Nine categories and a per-category objective: nothing to break.
+            assert.ok(!(await tiebreakerRow.isVisible()),
+                      'a per-category objective has no ties, so no tiebreaker')
+
+            await setObjectiveWeight(page, 1)
+            await waitAppSettled(app, { timeout: 120000 })
+            assert.ok(!(await tiebreakerRow.isVisible()),
+                      'an odd number of categories already has a winner')
+
+            await removeCategory('Turnovers')          // eight categories: a matchup can now tie
+            await tiebreakerRow.waitFor({ state: 'visible', timeout: 5000 })
+
+            const wrapper = page.locator('[data-testid="fc-tiebreaker-wrapper"]').first()
+            await openSelectDropdown(page, wrapper)
+            await chooseDropdownOption(page, wrapper,
+                w => w.locator('.cs-dropdown .cs-option', { hasText: 'Blocks' }).first())
+            await waitAppSettled(app, { timeout: 120000 })
+            assert.equal(await page.locator('#fc-tiebreaker').inputValue(), 'Blocks')
+            assert.ok(await candidateRowCount() > 0, 'a tiebreaker should re-evaluate cleanly')
+            expectCleanSession(app, 'tiebreaker selected')
+
+            // Back to nine: the control goes away, but the choice is remembered for the return.
+            await addCategory('Turnovers')
+            assert.ok(!(await tiebreakerRow.isVisible()), 'no tie to break at nine categories')
+            expectCleanSession(app, 'tiebreaker no longer applies')
+
+            await removeCategory('Turnovers')
+            await tiebreakerRow.waitFor({ state: 'visible', timeout: 5000 })
+            assert.equal(await page.locator('#fc-tiebreaker').inputValue(), 'Blocks',
+                         'the remembered tiebreaker should come back with the even count')
+
+            await addCategory('Turnovers')
+            await setObjectiveWeight(page, 0)
+            await waitAppSettled(app, { timeout: 120000 })
         })
 
         await t.test('category columns track the selection and stay in canonical order', async () => {
