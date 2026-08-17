@@ -183,7 +183,7 @@ from backend.math.algorithm_helpers import (
     calculate_win_probability_and_tipping_points,
     calculate_correction_terms,
 )
-from backend.math.process_player_data import get_category_level_rv
+from backend.math.process_player_data import get_category_level_rv, scale_tiebreaker_value
 from backend.math.position_optimization import (
     optimize_positions_all_players,
     get_player_rows,
@@ -319,8 +319,6 @@ class HAgent:
                 raise ValueError('A tiebreaker needs an even number of categories to break a tie; '
                                  f'this session has {self.n_categories}.')
             self.tiebreaker_index = category_names.index(tiebreaker_category)
-        # Priced on first use: it needs v and L, which are built further down.
-        self._structural_tiebreaker_edge = None
 
         #TODO: clean this up
         if info['Position-Means'] is not None:
@@ -474,6 +472,14 @@ class HAgent:
             ]
             v = np.sqrt(mov / (mov + vom))
 
+        # A tiebreaker is worth (1 + most_categories_weight) of an ordinary category, and v is what
+        # a category is worth per unit of x-score — so the neutral vector itself carries it, and
+        # everything reading v (punt depth, the field weights in get_x_mu, the descent's starting
+        # point) inherits it. process_player_data applies the same factor to the G-scores it
+        # derives; the shared helper keeps the two from drifting.
+        if self.tiebreaker_index is not None:
+            v = scale_tiebreaker_value(np.asarray(v, dtype=float), self.tiebreaker_index,
+                                       self.most_categories_weight)
         self.original_v = np.array(v)
         self.v          = np.array(v / v.sum()).reshape(self.n_categories, 1)
 
@@ -928,7 +934,7 @@ class HAgent:
                 )
                 if mu_edge is not None:
                     # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
-                    tilt = (self.n_picks - roster_len) * self.apply_opponent_tilt_confidence(mu_edge)
+                    tilt = (self.n_picks - roster_len) * self.behavior_model_confidence * mu_edge
                     base = base - tilt.reshape(1, self.n_categories, 1)
                     return base, np.asarray(tilt).reshape(self.n_categories)
                 return base, np.zeros(self.n_categories)
@@ -971,7 +977,7 @@ class HAgent:
                     score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
                     player_diff_total = (len(my_players) - 1 - 1) * replacement_value_by_category.reshape(1, -1)
                     money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
-                    tilt              = (self.n_picks - 1) * self.apply_opponent_tilt_confidence(anchor_tilts)
+                    tilt              = (self.n_picks - 1) * self.behavior_model_confidence * anchor_tilts
                     columns           = score_diff - player_diff_total + money_diff_total - tilt
                     field_blocks.append(columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
                     tilt_blocks.append(tilt[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
@@ -1075,13 +1081,13 @@ class HAgent:
                         anchor_stats = self.x_scores.loc[anchors].to_numpy()          # (S, n_cat)
                         anchor_tilts = committed_diffs.loc[anchors].to_numpy()        # (S, n_cat)
                         extra_sum    = mean_extra_array.reshape(1, -1) * (target_team_size - 1)
-                        tilt         = (self.n_picks - 1) * self.apply_opponent_tilt_confidence(anchor_tilts)
+                        tilt         = ((self.n_picks - 1) * self.behavior_model_confidence) * anchor_tilts
                         totals_rows  = (anchor_stats + extra_sum) + tilt
                         field_blocks.append(totals_rows.T.reshape(1, self.n_categories, len(anchors)))
                         tilt_blocks.append(tilt.T.reshape(1, self.n_categories, len(anchors)))
                         if spare_anchor is not None:
-                            spare_tilt  = ((self.n_picks - 1) * self.apply_opponent_tilt_confidence(
-                                committed_diffs.loc[spare_anchor].to_numpy()))
+                            spare_tilt  = (((self.n_picks - 1) * self.behavior_model_confidence)
+                                           * committed_diffs.loc[spare_anchor].to_numpy())
                             spare_total = ((self.x_scores.loc[[spare_anchor]].sum(axis=0).to_numpy()
                                             + extra_sum.reshape(-1))
                                            + spare_tilt
@@ -1285,7 +1291,7 @@ class HAgent:
                 return base, np.zeros(self.n_categories)
             picks_left = self.n_picks - len([p for p in roster if p == p])
             # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
-            tilt = picks_left * self.apply_opponent_tilt_confidence(mu_edge)
+            tilt = picks_left * self.behavior_model_confidence * mu_edge
             return base + tilt.reshape(1, self.n_categories, 1), np.asarray(tilt).reshape(self.n_categories)
 
         totals, seat_tilts = {}, {}
@@ -1985,62 +1991,15 @@ class HAgent:
     # ── objective / pdf helpers (unchanged from original) ─────────────────────
 
     def get_starting_category_weights(self) -> np.ndarray:
-        """Where a descent starts: neutral, except that a tiebreaker category starts at the weight
-        the rules give it — (1 + most_categories_weight) times neutral, since it counts twice in
-        the majority half of the objective and once in the per-category half.
+        """Where a descent starts: the neutral weight vector.
 
-        The multi-start seeds are this vector with one category gently punted, so every start
-        already respects the doubled category and the scan chooses which category to give up
-        against that backdrop, rather than having to discover the doubling first.
+        Neutral already accounts for a tiebreaker — v is the value of a category per unit of
+        x-score, and process_player_data scales the tiebreaker's by (1 + most_categories_weight)
+        there, which is the one place that keeps the G-scores, the punt-depth reference and the
+        field weights telling the same story. So there is nothing to add on top here, and adding
+        it would apply the factor twice.
         """
-        weights = self.v.reshape(self.n_categories).copy()
-        if self.tiebreaker_index is None:
-            return weights
-        weights[self.tiebreaker_index] *= 1 + self.most_categories_weight
-        return weights / weights.sum()
-
-    def get_tiebreaker_weighted_neutral(self) -> np.ndarray:
-        """Neutral weights with the tiebreaker carrying the extra share the rules give it."""
-        weights = self.v.reshape(self.n_categories).copy()
-        if self.tiebreaker_index is None:
-            return weights
-        weights[self.tiebreaker_index] *= 1 + self.most_categories_weight
-        return weights / weights.sum()
-
-    def get_structural_tiebreaker_edge(self) -> np.ndarray:
-        """The per-pick category edge every seat is pulled toward by the rules alone.
-
-        Priced with the machinery the descent uses: the expected future differential of a build
-        that gives the tiebreaker the weight the rules give it. That is already the edge relative
-        to a neutral build, since a neutral build has no edge over a neutral field — x_mu at w = v
-        is zero by construction, and is also the singular ray of the closed form, so it is asserted
-        rather than evaluated.
-
-        Zero without a tiebreaker, so every other session's opponent model is untouched.
-        """
-        if self._structural_tiebreaker_edge is None:
-            if self.tiebreaker_index is None:
-                self._structural_tiebreaker_edge = np.zeros(self.n_categories)
-            else:
-                weighted = self.get_tiebreaker_weighted_neutral().reshape(1, self.n_categories)
-                self._structural_tiebreaker_edge = np.asarray(
-                    self.get_x_mu_simplified_form(weighted, self.L, self.v)).reshape(self.n_categories)
-        return self._structural_tiebreaker_edge
-
-    def apply_opponent_tilt_confidence(self, predicted_edge):
-        """Discount what the model GUESSES about a seat, not what the rules tell it to do.
-
-        behavior_model_confidence exists because predicted punts are uncertain, and taking them at
-        face value makes the field herd into whichever lane looks open. A tiebreaker is not a guess
-        of that kind: opponents read the same league settings, so the confidence factor fills the
-        share it does not claim to know with the structural pull instead of with nothing —
-
-            predicted * confidence + structural * (1 - confidence)
-
-        With no tiebreaker the structural pull is zero and this is the plain product it always was.
-        """
-        structural_edge = self.get_structural_tiebreaker_edge()
-        return structural_edge + self.behavior_model_confidence * (predicted_edge - structural_edge)
+        return self.v.reshape(self.n_categories).copy()
 
     def get_objective_and_pdf_weights(self
                                        , x_diff_array

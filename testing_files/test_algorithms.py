@@ -471,65 +471,59 @@ def _create_even_category_session() -> dict:
     return get_session(response.json()['session_id']).agent.info
 
 
-def test_the_descent_starts_with_the_tiebreaker_already_doubled():
-    """Every multi-start seed respects the doubled category, so the scan chooses which category to
-    give up against that backdrop rather than having to discover the doubling first. The same
-    vector prices what the field is assumed to chase."""
+def test_a_tiebreaker_is_priced_into_what_its_category_is_worth():
+    """v is what a category is worth per unit of x-score (g = x * v exactly), so a tiebreaker —
+    worth twice in the majority half of the objective and once in the per-category half — carries
+    (1 + most_categories_weight) there.
+
+    Putting it in v rather than bolting a tilt onto the opponents is what lets a tiebreaker league
+    still punt: the neutral every team drafts toward already knows the rule, so punting is measured
+    against a reference that accounts for it instead of fighting an assumption that all twelve
+    seats chase the category in lockstep.
+    """
     info = _create_even_category_session()
     categories = list(info['X-scores'].columns)
     blocks = categories.index('Blocks')
     other  = categories.index('Points')
 
     plain = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
-    assert np.allclose(plain.get_starting_category_weights(), plain.v.reshape(-1)), \
-        'without a tiebreaker the descent starts neutral, exactly as before'
+    plain_ratio = float(plain.v[blocks, 0] / plain.v[other, 0])
 
     for weight in (0.5, 1.0):
         agent = _build_h_agent(info, 'Head to Head', most_categories_weight=weight,
                                tiebreaker_category='Blocks')
-        start   = agent.get_starting_category_weights()
-        neutral = agent.v.reshape(-1)
-        assert np.isclose(start.sum(), 1.0)
-        # Renormalising rescales everything, so compare the ratio against another category.
-        assert np.isclose(start[blocks] / start[other],
-                          (1 + weight) * neutral[blocks] / neutral[other]), \
-            f'at weight {weight} the tiebreaker starts at {1 + weight}x its neutral share'
-        assert np.allclose(start, agent.get_tiebreaker_weighted_neutral())
+        ratio = float(agent.v[blocks, 0] / agent.v[other, 0])
+        assert np.isclose(ratio, (1 + weight) * plain_ratio),             f'at weight {weight} the tiebreaker should be worth {1 + weight}x an ordinary category'
+        assert np.isclose(float(agent.v.sum()), 1.0), 'the neutral vector stays normalised'
+        # The descent starts at that neutral, with nothing added on top -- adding the factor here
+        # as well would apply it twice.
+        assert np.allclose(agent.get_starting_category_weights(), agent.v.reshape(-1))
 
 
-def test_the_field_is_expected_to_chase_the_tiebreaker():
-    """behavior_model_confidence discounts what the model GUESSES about a seat. A tiebreaker is not
-    a guess — every opponent reads the same league settings — so its pull must reach the field
-    undiscounted, which is what stops the drafter expecting the category unopposed."""
-    info = _create_even_category_session()
-    categories = list(info['X-scores'].columns)
-    blocks = categories.index('Blocks')
+def test_a_tiebreaker_raises_its_category_in_the_g_scores():
+    """G-scores are what a player is worth, and the pipeline orders everything by their total: the
+    draftable pool, the position means drawn from it, and the anchors the opponent field is built
+    from. So the field ends up holding more of the doubled category because those players are worth
+    more, rather than because opponents were assumed to chase it."""
+    request = _build_default_session_request()
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
 
-    plain = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0)
-    assert not np.any(plain.get_structural_tiebreaker_edge()), \
-        'no tiebreaker, no structural pull — every other session keeps its opponent model'
-    predicted = np.full(plain.n_categories, 0.3)
-    assert np.allclose(plain.apply_opponent_tilt_confidence(predicted),
-                       plain.behavior_model_confidence * predicted), \
-        'and the damping is then the plain product it always was'
+    without = client.post('/sessions', json=request)
+    assert without.status_code == 201, without.text
+    request['league']['tiebreaker_category'] = 'Blocks'
+    with_tiebreaker = client.post('/sessions', json=request)
+    assert with_tiebreaker.status_code == 201, with_tiebreaker.text
 
-    agent = _build_h_agent(info, 'Head to Head', most_categories_weight=1.0,
-                           tiebreaker_category='Blocks')
-    structural = agent.get_structural_tiebreaker_edge()
-    assert structural[blocks] > 0, 'chasing the doubled category is worth something'
-    assert structural[blocks] == structural.max(), 'and it is worth most in that category'
+    plain_scores = get_session(without.json()['session_id']).agent.info['G-scores']
+    tiebreaker_scores = get_session(with_tiebreaker.json()['session_id']).agent.info['G-scores']
+    shared = plain_scores.index.intersection(tiebreaker_scores.index)
 
-    # A seat whose predicted edge is exactly the structural pull keeps all of it: there is nothing
-    # speculative left to discount.
-    assert np.allclose(agent.apply_opponent_tilt_confidence(structural), structural)
-
-    # A seat predicted to chase it harder than the rules alone imply keeps the structural part and
-    # has only the speculative excess discounted.
-    speculative = structural.copy()
-    speculative[blocks] += 1.0
-    applied = agent.apply_opponent_tilt_confidence(speculative)
-    assert np.isclose(applied[blocks],
-                      structural[blocks] + agent.behavior_model_confidence * 1.0)
+    ratio = (tiebreaker_scores.loc[shared, 'Blocks'] / plain_scores.loc[shared, 'Blocks']).dropna()
+    assert np.allclose(ratio, 2.0), 'Blocks is worth double when it settles tied matchups'
+    unchanged = (tiebreaker_scores.loc[shared, 'Points'] / plain_scores.loc[shared, 'Points']).dropna()
+    assert np.allclose(unchanged, 1.0), 'and every other category is untouched'
 
 
 def test_the_agent_rejects_a_tiebreaker_that_cannot_apply():

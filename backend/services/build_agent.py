@@ -520,6 +520,9 @@ def run_step4(session: Session) -> None:
         params            = params,
         categories        = categories,
         sport             = sport,
+        # Cleared just above when the narrowing dropped it, so this is always a live category.
+        tiebreaker_category    = cp.get('tiebreaker_category'),
+        most_categories_weight = cp.get('most_categories_weight'),
     )
     # session.info is the pipeline's step-4 intermediate; step 5 builds the agent from it (and the
     # agent retains it, so consumers read G-scores via session.agent.info). On a from_step==5 patch

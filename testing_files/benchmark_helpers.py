@@ -86,11 +86,13 @@ def _build_session_request(
     , categories: list = None
     , n_drafters: int = None
     , cash_per_team: int = None
+    , tiebreaker_category: str = None
 ) -> dict:
     """Construct a session request using all default parameters from parameters.yaml.
 
     `objective` names one of OBJECTIVE_PRESETS. The default keeps every caller that never named
-    one on Most Categories, the objective they were built against.
+    one on Most Categories, the objective they were built against. A tiebreaker needs an even
+    number of categories, so callers passing one pass `categories` too.
     """
     scoring_format, most_categories_weight = resolve_objective(objective)
     with open(_PARAMS_PATH) as f:
@@ -110,6 +112,7 @@ def _build_session_request(
         'n_picks':        n_picks,
         'scoring_format': scoring_format,
         'most_categories_weight': most_categories_weight,
+        'tiebreaker_category': tiebreaker_category,
         'categories':     categories if categories is not None else nba['default-categories'],
     }
     if cash_per_team is not None:

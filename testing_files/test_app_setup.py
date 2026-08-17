@@ -159,6 +159,45 @@ def test_tiebreaker_category_is_carried_and_changes_the_board():
     assert get_session(without.json()['session_id']).agent.tiebreaker_index is None
 
 
+def test_a_tiebreaker_league_still_punts():
+    """The behaviour the tiebreaker's pricing exists to preserve.
+
+    A tiebreaker makes one category worth more, and the wrong way to express that is to assume
+    every opponent chases it: modelling the field as uniformly committed made flat builds optimal
+    and punting vanished (measured 100% of top builds punting without a tiebreaker, 5% with the
+    field tilted). Pricing it into v instead — what a category is worth per unit of x-score, which
+    the neutral vector, the punt-depth reference and the field weights all read — leaves the
+    strategy space intact. This pins that: a tiebreaker league still gives most builds a category
+    they are willing to lose.
+    """
+    request = _build_default_session_request()
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+    request['league']['tiebreaker_category'] = 'Blocks'
+
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, response.text
+    session_id = response.json()['session_id']
+
+    team_names = [f'Drafter {i + 1}' for i in range(request['league']['n_drafters'])]
+    evaluate = client.post(f'/sessions/{session_id}/evaluate',
+                           json={'player_assignments': {team: [] for team in team_names},
+                                 'my_team_id': team_names[0], 'exclusion_list': []})
+    assert evaluate.status_code == 200, evaluate.text
+
+    candidates = [c for c in evaluate.json()['candidates'][:10] if c['win_rates']]
+    assert candidates, 'the evaluate should return candidates with per-category win rates'
+    # A punt is a category far below the build's own average, not merely its lowest. The threshold
+    # is loose on purpose: this guards against punting COLLAPSING, not against it drifting.
+    punting = [c for c in candidates
+               if max(c['win_rates']) - min(c['win_rates']) > 25]
+    assert len(punting) >= len(candidates) // 2, (
+        'a tiebreaker league should still punt; win-rate spreads were '
+        f'{[round(max(c["win_rates"]) - min(c["win_rates"])) for c in candidates]}'
+    )
+
+
 def test_a_tiebreaker_that_cannot_apply_is_refused_or_dropped():
     """Rejected when the request itself is incoherent, and quietly dropped when it merely stops
     applying — an odd category count is a state the user passes through while editing."""
