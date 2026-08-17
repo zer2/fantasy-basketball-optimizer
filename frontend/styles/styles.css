@@ -758,10 +758,16 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 /* The Head-to-Head objective dial. Its track sits in a .sidebar-slider-row so it lines up with
-   the blend sliders; "Each" rides the row's own label column and "Most" closes the track, naming
-   the two ends by the format names people already know. */
+   the blend sliders. The two ends are named by the format names people already know, which are
+   too wide to flank a slider in this sidebar, so they caption the track from above instead. */
 #fc-objective-row {
     margin-top: 6px;
+}
+
+.objective-endpoint-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .objective-endpoint-label {

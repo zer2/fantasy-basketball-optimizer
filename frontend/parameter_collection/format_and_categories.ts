@@ -242,18 +242,27 @@ function makeObjectiveInfoButton(): HTMLButtonElement {
 }
 
 /** The Head-to-Head objective dial: a slider from scoring every category (0) to scoring only the
- *  majority (1), with both ends named on the track. */
+ *  majority (1), with both ends named above the track by the format names people already know. */
 function makeMostCategoriesWeightRow(initialWeight: number): HTMLElement {
     const row = document.createElement('div')
     row.id = 'fc-objective-row'
 
+    const endpointRow = document.createElement('div')
+    endpointRow.className = 'objective-endpoint-row'
+
+    const eachCategoryLabel = document.createElement('label')
+    eachCategoryLabel.className   = 'objective-endpoint-label'
+    eachCategoryLabel.htmlFor     = 'fc-most-categories-weight'
+    eachCategoryLabel.textContent = 'Each Category'
+
+    const mostCategoriesLabel = document.createElement('span')
+    mostCategoriesLabel.className   = 'objective-endpoint-label'
+    mostCategoriesLabel.textContent = 'Most Categories'
+
+    endpointRow.append(eachCategoryLabel, mostCategoriesLabel)
+
     const sliderRow = document.createElement('div')
     sliderRow.className = 'sidebar-slider-row'
-
-    const endpointLabel = document.createElement('label')
-    endpointLabel.htmlFor = 'fc-most-categories-weight'
-    endpointLabel.textContent = 'Total'
-    sliderRow.append(endpointLabel)
 
     const slider = document.createElement('input')
     slider.type  = 'range'
@@ -267,17 +276,13 @@ function makeMostCategoriesWeightRow(initialWeight: number): HTMLElement {
     valueDisplay.className   = 'slider-value'
     valueDisplay.textContent = initialWeight.toFixed(2)
 
-    const majorityLabel = document.createElement('span')
-    majorityLabel.className   = 'objective-endpoint-label'
-    majorityLabel.textContent = 'Majority'
-
     slider.addEventListener('input', () => {
         valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
     })
     slider.addEventListener('change', () => savePref('most_categories_weight', parseFloat(slider.value)))
 
-    sliderRow.append(slider, majorityLabel, valueDisplay)
-    row.append(sliderRow)
+    sliderRow.append(slider, valueDisplay)
+    row.append(endpointRow, sliderRow)
     return row
 }
 
