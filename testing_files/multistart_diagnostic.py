@@ -39,7 +39,7 @@ from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SCORING_FORMAT = 'Head to Head: Each Category'  # punting bites hardest here
+OBJECTIVE = 'Each Category'  # punting bites hardest here
 N_CANDIDATES   = int(sys.argv[1]) if len(sys.argv) > 1 else 40    # top-N players to score
 N_ITERATIONS   = int(sys.argv[2]) if len(sys.argv) > 2 else 250   # per start; bump to check convergence
 MAX_PUNT_COMBO = int(sys.argv[3]) if len(sys.argv) > 3 else 1     # 1 = single-category punts; 2 = also pairs
@@ -50,7 +50,7 @@ IMPROVEMENT_TOLERANCE_PP = 0.05   # count an alternative as "better" only past t
 
 def _build_empty_board_agent():
     """Create a draft session and return (agent, empty_board_assignments, drafter)."""
-    response = client.post('/sessions', json=_build_session_request(scoring_format=SCORING_FORMAT))
+    response = client.post('/sessions', json=_build_session_request(objective=OBJECTIVE))
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session    = get_session(response.json()['session_id'])
     n_drafters = session.current_params['n_drafters']
@@ -114,7 +114,7 @@ def run_diagnostic():
     start_points = _build_start_points(agent)
     shares       = _uniform_shares(agent)
 
-    print(f'Format={SCORING_FORMAT!r}  candidates={len(subset)}  iterations={N_ITERATIONS}  '
+    print(f'Format={OBJECTIVE!r}  candidates={len(subset)}  iterations={N_ITERATIONS}  '
           f'punt_factor={PUNT_FACTOR}  max_combo={MAX_PUNT_COMBO}  starts={len(start_points)}')
 
     heuristic_result = _run_from_start(agent, assignments, drafter, subset, None, shares)

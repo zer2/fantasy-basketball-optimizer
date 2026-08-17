@@ -36,8 +36,8 @@ All large datasets live on the server, keyed by `session_id`. The frontend never
 player_stats_v0   — raw stats, loaded from files/projections at session creation
 player_stats_v1   — derived: v0 minus injured_players
 player_stats_v2   — derived: v1 with upsilon adjustment applied
-info              — derived: process_player_data(v2, psi, chi, scoring_format, n_drafters, n_picks, ...)
-HAgent            — derived: build_h_agent(info, omega, gamma, beth, n_picks, n_drafters, scoring_format, ...)
+info              — derived: process_player_data(v2, psi, chi, scoring_format, n_drafters, n_picks, tiebreaker_category, ...)
+HAgent            — derived: build_h_agent(info, omega, gamma, beth, n_picks, n_drafters, scoring_format, most_categories_weight, tiebreaker_category, ...)
 current_params    — snapshot of all params; used to diff PATCH bodies and determine what to re-run
 ```
 
@@ -52,7 +52,7 @@ When `PATCH /sessions/{id}` is called, the frontend passes `from_step` explicitl
 | `data_source`                                             | 1                 |
 | `injured_players`                                         | 2                 |
 | `upsilon`                                                 | 3                 |
-| `psi`, `chi`, `n_drafters`, `n_picks`, `scoring_format`, `categories`, `slot_counts` | 4 |
+| `psi`, `chi`, `n_drafters`, `n_picks`, `scoring_format`, `most_categories_weight`, `tiebreaker_category`, `categories`, `slot_counts` | 4 |
 | `omega`, `gamma`, `beth`, `n_iterations`, `streaming_noise` | 5              |
 
 Step key:
@@ -160,7 +160,9 @@ This is the most expensive call; all subsequent calls are faster.
     "sport": "NBA",
     "n_drafters": 10,
     "n_picks": 13,
-    "scoring_format": "Head to Head: Most Categories",
+    "scoring_format": "Head to Head",
+    "most_categories_weight": 1.0,
+    "tiebreaker_category": null,
     "categories": ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"],
     "cash_per_team": null
   },
@@ -194,8 +196,21 @@ This is the most expensive call; all subsequent calls are faster.
 `league.sport` — one of `"NBA"`, `"MLB"`. Determines which statistical framework the backend
 loads (counting vs ratio stat definitions, negative stats, conversion factors, etc.).
 
-`league.scoring_format` — one of `"Head to Head: Most Categories"`,
-`"Head to Head: Each Category"`, `"Rotisserie"`.
+`league.scoring_format` — one of `"Head to Head"`, `"Rotisserie"`.
+
+`league.most_categories_weight` — Head to Head only (and required there): how much of the
+objective is winning the majority of categories rather than each category on its own. `0.0`
+scores every category separately (what used to be "Each Category"), `1.0` scores only the
+majority ("Most Categories"), and values between blend the two. Must be `null` for
+`"Rotisserie"`, which scores neither way.
+
+`league.tiebreaker_category` — one of the scored categories, or `null`. With an even number of
+categories a majority matchup can end level; naming a tiebreaker makes that category count for
+two, so the total is odd and every matchup has a winner. Requires an even category count and a
+`most_categories_weight` above `0` — a rejected combination returns 422, while a setting that
+merely stops applying (weight moved to `0`, an odd count, the category deselected) is cleared
+rather than rejected. Unlike every other field here, an explicit `null` in a PATCH **clears** it
+rather than meaning "unchanged", since no-tiebreaker is a value rather than an omission.
 
 `league.cash_per_team` — Auction Mode only; omit or set to `null` for Draft Mode. Only
 consulted when the session's `is_auction` is true, so a value left over from an earlier
@@ -278,7 +293,9 @@ table above. All fields except `from_step` are optional — only send what chang
   "league": {
     "n_drafters": 10,
     "n_picks": 13,
-    "scoring_format": "Head to Head: Most Categories",
+    "scoring_format": "Head to Head",
+    "most_categories_weight": 1.0,
+    "tiebreaker_category": null,
     "categories": ["Field Goal %", "Free Throw %", "Threes", "Points", "Rebounds", "Assists", "Steals", "Blocks", "Turnovers"],
     "cash_per_team": null
   },

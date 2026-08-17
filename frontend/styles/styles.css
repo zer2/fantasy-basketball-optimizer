@@ -28,8 +28,14 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 }
 
 #sidebar {
-    width: 280px;
-    min-width: 280px;
+    /* In rem, not px, because the root font size scales with the viewport (see the clamp on html):
+       a fixed 280px box holding text that grows to 20px on a wide monitor squeezes the two-column
+       parameter grid until labels like "υ (upsilon)" wrap onto a second line. 17.5rem is the same
+       280px at the clamp's 16px floor, so narrower screens are unaffected, and the sidebar now
+       grows with its own contents. Still constant for a given window, which is what the
+       fixed-width candidate panel below depends on. */
+    width: 17.5rem;
+    min-width: 17.5rem;
     /* Pin to the viewport height and stick in place as the main content scrolls. Without a fixed
        height the sidebar stretches to #main-content's height (align-items: stretch), which made the
        bottom-pinned #docs-link jump up/down whenever a tab changed the content height. This also
@@ -751,6 +757,26 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     accent-color: light-dark(#999999, #666688);
 }
 
+/* The Head-to-Head objective dial. Its track sits in a .sidebar-slider-row so it lines up with
+   the blend sliders. The two ends are named by the format names people already know, which are
+   too wide to flank a slider in this sidebar, so they caption the track from above instead. */
+#fc-objective-row {
+    margin-top: 6px;
+}
+
+.objective-endpoint-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.objective-endpoint-label {
+    flex-shrink: 0;
+    color: light-dark(#555555, darkgrey);
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+}
+
 .sidebar-slider-row .slider-value {
     color: light-dark(#333333, lightgrey);
     font-size: 0.78rem;
@@ -833,9 +859,12 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
 
 /* ─── Compact parameter grid (2-column, for player stat / algo params) ──── */
 
+/* minmax(0, 1fr) rather than 1fr: a bare 1fr is minmax(auto, 1fr), so the widest item (the SAVOR
+   label) stretched its column and starved the other one — measured 140px against 62px, which is
+   why the right-hand labels were the ones that wrapped. */
 .param-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px 10px;
 }
 

@@ -63,6 +63,24 @@ export async function setSelect(page, id, optionText) {
         wrapper => wrapper.locator('.cs-dropdown .cs-option', { hasText: optionText }).first())
 }
 
+/**
+ * Sets the Head-to-Head objective dial: 0 scores every category on its own, 1 scores only the
+ * majority. These were two separate scoring formats until they became the ends of one slider, so
+ * anything that used to select "Each Category" or "Most Categories" now selects Head to Head and
+ * comes here. Dispatches both events the app listens for — input redraws the value, change is
+ * what the sidebar patches on.
+ */
+export async function setObjectiveWeight(page, weight) {
+    const slider = page.locator('#fc-most-categories-weight')
+    await slider.evaluate((element, value) => {
+        const details = element.closest('details')
+        if (details && !details.open) details.open = true
+        element.value = String(value)
+        element.dispatchEvent(new Event('input',  { bubbles: true }))
+        element.dispatchEvent(new Event('change', { bubbles: true }))
+    }, weight)
+}
+
 /** Waits for an evaluate to finish (#eval-indicator reaches "idle"; it starts at "fetching"). */
 export async function waitEval(page) {
     await page.waitForFunction(() => {

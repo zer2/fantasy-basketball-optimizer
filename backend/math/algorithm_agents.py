@@ -13,6 +13,7 @@ The original src/ file is untouched.
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -182,7 +183,7 @@ from backend.math.algorithm_helpers import (
     calculate_win_probability_and_tipping_points,
     calculate_correction_terms,
 )
-from backend.math.process_player_data import get_category_level_rv
+from backend.math.process_player_data import get_category_level_rv, scale_tiebreaker_value
 from backend.math.position_optimization import (
     optimize_positions_all_players,
     get_player_rows,
@@ -210,6 +211,8 @@ class HAgent:
                  , n_drafters: int
                  , dynamic: bool
                  , scoring_format: str
+                 , most_categories_weight: Optional[float]
+                 , tiebreaker_category: Optional[str]
                  # ── explicit context (replaces get_*() calls) ──
                  , sport: str
                  , params: dict
@@ -230,6 +233,20 @@ class HAgent:
         self.n_drafters    = n_drafters
         self.collect_info  = collect_info
         self.scoring_format = scoring_format
+
+        # Head to Head is one format with a dial: 0 scores every category on its own (Each
+        # Category), 1 scores only whether the majority was taken (Most Categories), and values
+        # between blend the two objectives. Rotisserie has no such dial and must be given None —
+        # a number there would mean the caller thinks a setting applies that this format ignores,
+        # and would split the pipeline cache across values that build identical agents.
+        if scoring_format == 'Rotisserie':
+            if most_categories_weight is not None:
+                raise ValueError('most_categories_weight does not apply to Rotisserie; pass None. '
+                                 f'Got {most_categories_weight!r}.')
+        elif most_categories_weight is None or not 0.0 <= most_categories_weight <= 1.0:
+            raise ValueError('Head to Head needs a most_categories_weight in [0, 1]. '
+                             f'Got {most_categories_weight!r}.')
+        self.most_categories_weight = most_categories_weight
 
         # Per-format config (the env vars above override any field for A/B testing). All formats run the
         # robustness regulariser; they differ only in the cold-start seed -- Rotisserie uses the lowvar
@@ -281,7 +298,29 @@ class HAgent:
 
         self.n_categories = x_scores.shape[1]
 
-        #TODO: clean this up 
+        # The category that settles an otherwise tied matchup, by counting for two. Resolved to a
+        # column index once here: the objective runs every descent iteration and should not be
+        # looking names up. It means something only where a tie can happen — the majority
+        # objective, with an even number of categories — and callers pin it to None elsewhere when
+        # it cannot apply (see normalize_objective_settings), so anything left over here is a
+        # mistake worth surfacing rather than ignoring.
+        self.tiebreaker_index = None
+        if tiebreaker_category is not None:
+            # Widest question first: does this objective score matchups at all? Then whether the
+            # category exists, then whether there is a tie for it to break.
+            if scoring_format == 'Rotisserie' or most_categories_weight == 0:
+                raise ValueError('A tiebreaker only applies to the majority objective; it does '
+                                 'nothing under Rotisserie or at most_categories_weight 0.')
+            category_names = list(x_scores.columns)
+            if tiebreaker_category not in category_names:
+                raise ValueError(f'Tiebreaker category {tiebreaker_category!r} is not one of this '
+                                 f"session's categories: {category_names}.")
+            if self.n_categories % 2 == 1:
+                raise ValueError('A tiebreaker needs an even number of categories to break a tie; '
+                                 f'this session has {self.n_categories}.')
+            self.tiebreaker_index = category_names.index(tiebreaker_category)
+
+        #TODO: clean this up
         if info['Position-Means'] is not None:
             self.position_means = np.array(info['Position-Means']).reshape(1, -1, self.n_categories)
             
@@ -329,7 +368,7 @@ class HAgent:
         # Used by Rotisserie's variance model and by the Most-Categories correlation
         # correction. Sign-flipped for negative statistics so it matches the "good
         # direction" orientation of the differential z-scores.
-        if scoring_format in ('Rotisserie', 'Head to Head: Most Categories'):
+        if scoring_format == 'Rotisserie' or most_categories_weight > 0:
             if sport == 'NBA':
                 rho = pd.read_csv('backend/data/basketball_correlations.csv').set_index('Category')
             else:
@@ -356,9 +395,15 @@ class HAgent:
         # over-suppresses punting on a contested board (it peaks at win-prob 0.5), which fights the
         # opponent-model work. Set MC_CORRELATION=1 to re-enable.
         self.mc_correlation_enabled = (
-            scoring_format == 'Head to Head: Most Categories'
+            scoring_format != 'Rotisserie' and most_categories_weight > 0
             and os.environ.get('MC_CORRELATION', '0') == '1'
         )
+        if self.mc_correlation_enabled and self.tiebreaker_index is not None:
+            # The correction's bracket matrix is derived for an unweighted majority (see
+            # _bracket_targets); a category worth two points is outside that derivation, so the
+            # combination is refused rather than silently corrected by the wrong quantity.
+            raise ValueError('The Most Categories correlation correction (MC_CORRELATION=1) does '
+                             'not support a tiebreaker category.')
         # Per-descent cache of correction terms (see get_objective_and_pdf_weights_mc);
         # reset at the start of every perform_iterations run.
         self._correction_cache = None
@@ -427,6 +472,14 @@ class HAgent:
             ]
             v = np.sqrt(mov / (mov + vom))
 
+        # A tiebreaker is worth (1 + most_categories_weight) of an ordinary category, and v is what
+        # a category is worth per unit of x-score — so the neutral vector itself carries it, and
+        # everything reading v (punt depth, the field weights in get_x_mu, the descent's starting
+        # point) inherits it. process_player_data applies the same factor to the G-scores it
+        # derives; the shared helper keeps the two from drifting.
+        if self.tiebreaker_index is not None:
+            v = scale_tiebreaker_value(np.asarray(v, dtype=float), self.tiebreaker_index,
+                                       self.most_categories_weight)
         self.original_v = np.array(v)
         self.v          = np.array(v / v.sum()).reshape(self.n_categories, 1)
 
@@ -1406,7 +1459,7 @@ class HAgent:
         weakest category (same for every candidate). Earlier -- no reliable weakness -- multi-start:
         score one punt per category and keep, per candidate, the one with the best pre-descent objective.
         """
-        neutral      = self.v.reshape(self.n_categories)
+        neutral      = self.get_starting_category_weights()
         n_candidates = x_scores_batch_array.shape[0]
 
         def gentle_punt(category_index):
@@ -1937,6 +1990,17 @@ class HAgent:
 
     # ── objective / pdf helpers (unchanged from original) ─────────────────────
 
+    def get_starting_category_weights(self) -> np.ndarray:
+        """Where a descent starts: the neutral weight vector.
+
+        Neutral already accounts for a tiebreaker — v is the value of a category per unit of
+        x-score, and process_player_data scales the tiebreaker's by (1 + most_categories_weight)
+        there, which is the one place that keeps the G-scores, the punt-depth reference and the
+        field weights telling the same story. So there is nothing to add on top here, and adding
+        it would apply the factor twice.
+        """
+        return self.v.reshape(self.n_categories).copy()
+
     def get_objective_and_pdf_weights(self
                                        , x_diff_array
                                        , diff_vars
@@ -1946,18 +2010,41 @@ class HAgent:
                                        , calculate_pdf_weights=False
                                        , correction_mode='full'
                                        , iteration=None):
-        if self.scoring_format == 'Head to Head: Most Categories':
+        """The objective for this session's format, and (optionally) its gradient with respect
+        to the category differentials.
+
+        Head to Head is a spectrum rather than two formats: most_categories_weight is how much
+        of the objective is the probability of taking the majority, the rest being the average
+        per-category win probability. Both ends are probabilities in [0, 1] and both gradients
+        are per-category partials of the same shape, so a weight between them is a convex
+        combination of the two. The endpoints are computed alone — at weight 0 there is no
+        reason to run the win-count DP, and at 1 no reason to average the categories.
+        """
+        if self.scoring_format == 'Rotisserie':
+            return self.get_objective_and_pdf_weights_rotisserie(
+                x_diff_array, diff_vars, cdf_estimates, pdf_estimates,
+                sigma_2_m, calculate_pdf_weights)
+
+        weight = self.most_categories_weight
+        if weight == 1.0:
             return self.get_objective_and_pdf_weights_mc(x_diff_array, diff_vars,
                                                           cdf_estimates, pdf_estimates,
                                                           calculate_pdf_weights,
                                                           correction_mode, iteration)
-        elif self.scoring_format == 'Rotisserie':
-            return self.get_objective_and_pdf_weights_rotisserie(
-                x_diff_array, diff_vars, cdf_estimates, pdf_estimates,
-                sigma_2_m, calculate_pdf_weights)
-        elif self.scoring_format == 'Head to Head: Each Category':
+        if weight == 0.0:
             return self.get_objective_and_pdf_weights_ec(cdf_estimates, pdf_estimates,
                                                           calculate_pdf_weights)
+
+        most_categories = self.get_objective_and_pdf_weights_mc(
+            x_diff_array, diff_vars, cdf_estimates, pdf_estimates,
+            calculate_pdf_weights, correction_mode, iteration)
+        each_category = self.get_objective_and_pdf_weights_ec(
+            cdf_estimates, pdf_estimates, calculate_pdf_weights)
+
+        if not calculate_pdf_weights:
+            return (1 - weight) * each_category + weight * most_categories
+        return ((1 - weight) * each_category[0] + weight * most_categories[0],
+                (1 - weight) * each_category[1] + weight * most_categories[1])
 
     def get_objective_and_pdf_weights_mc(self
                                           , x_diff_array
@@ -1974,9 +2061,10 @@ class HAgent:
         if calculate_pdf_weights:
             # Gradient steps need the tipping points too, and both come out of one
             # shared win-count DP build (bit-identical to the standalone functions).
-            win_probability, tipping_points = calculate_win_probability_and_tipping_points(probs)
+            win_probability, tipping_points = calculate_win_probability_and_tipping_points(
+                probs, self.tiebreaker_index)
         else:
-            win_probability = compute_win_probability(probs)  # (n_players, n_opponents)
+            win_probability = compute_win_probability(probs, self.tiebreaker_index)  # (n_players, n_opponents)
 
         # First-order correlation correction (eq (C4) of the correlation-correction note):
         #   P(win | R) ≈ P_indep + ½ φ(z)ᵀ [(R − I) ∘ B] φ(z)
@@ -2030,9 +2118,19 @@ class HAgent:
                                           , cdf_estimates
                                           , pdf_estimates
                                           , calculate_pdf_weights=False):
+        """Average per-category win probability, and its exact gradient.
+
+        The consumer contracts only the category axis, so a returned weight must be the
+        objective's partial with respect to one category's differential, summed over opponents.
+        Averaging over opponents supplies that axis' 1/n_opponents; the division below supplies
+        the 1/n_categories that the objective's category mean introduces and the per-category
+        partials do not carry. Without it these weights are the gradient of the SUM over
+        categories -- n_categories times too large, which is invisible under Adam on its own but
+        would silently dominate any blend with Most Categories, whose weights are exact.
+        """
         objective = cdf_estimates.mean(axis=2).mean(axis=1)
         if calculate_pdf_weights:
-            return objective, pdf_estimates.mean(axis=2)
+            return objective, pdf_estimates.mean(axis=2) / self.n_categories
         return objective
 
     def get_objective_and_pdf_weights_rotisserie(self
@@ -2434,6 +2532,8 @@ def build_h_agent(info
                   , n_drafters
                   , beth
                   , scoring_format
+                  , most_categories_weight
+                  , tiebreaker_category
                   , dynamic
                   , sport
                   , params
@@ -2448,6 +2548,8 @@ def build_h_agent(info
         n_drafters     = n_drafters,
         dynamic        = dynamic,
         scoring_format = scoring_format,
+        most_categories_weight = most_categories_weight,
+        tiebreaker_category    = tiebreaker_category,
         sport          = sport,
         params         = params,
         slot_counts    = slot_counts,

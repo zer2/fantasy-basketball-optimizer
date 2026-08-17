@@ -41,7 +41,8 @@ def _build_default_session_request() -> dict:
             'sport':          'NBA'
             , 'n_drafters':   n_drafters
             , 'n_picks':      n_picks
-            , 'scoring_format': 'Head to Head: Most Categories'
+            , 'scoring_format': 'Head to Head'
+            , 'most_categories_weight': 1.0
             , 'categories':   nba['default-categories']
         }
         , 'slot_counts': slot_counts
@@ -133,6 +134,94 @@ def test_session_creation_stores_correct_params():
     assert cp['n_picks']    == yaml_options['n_picks']['default']
 
 
+def test_tiebreaker_category_is_carried_and_changes_the_board():
+    """A tiebreaker reaches the agent and moves the results — the doubled category is worth more,
+    so the players who win it gain. Eight categories, since a tie needs an even number."""
+    request = _build_default_session_request()
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+
+    without = client.post('/sessions', json=request)
+    assert without.status_code == 201, without.text
+
+    request['league']['tiebreaker_category'] = 'Blocks'
+    with_tiebreaker = client.post('/sessions', json=request)
+    assert with_tiebreaker.status_code == 201, with_tiebreaker.text
+
+    session = get_session(with_tiebreaker.json()['session_id'])
+    assert session.current_params['tiebreaker_category'] == 'Blocks'
+    assert session.agent.tiebreaker_index == session.current_params['categories'].index('Blocks')
+
+    # G-scores are per-category value and untouched by how matchups are settled, so the agent's
+    # own objective is where the tiebreaker has to show up — and the session without one must
+    # carry no index at all.
+    assert get_session(without.json()['session_id']).agent.tiebreaker_index is None
+
+
+def test_a_tiebreaker_league_still_punts():
+    """The behaviour the tiebreaker's pricing exists to preserve.
+
+    A tiebreaker makes one category worth more, and the wrong way to express that is to assume
+    every opponent chases it: modelling the field as uniformly committed made flat builds optimal
+    and punting vanished (measured 100% of top builds punting without a tiebreaker, 5% with the
+    field tilted). Pricing it into v instead — what a category is worth per unit of x-score, which
+    the neutral vector, the punt-depth reference and the field weights all read — leaves the
+    strategy space intact. This pins that: a tiebreaker league still gives most builds a category
+    they are willing to lose.
+    """
+    request = _build_default_session_request()
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+    request['league']['tiebreaker_category'] = 'Blocks'
+
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, response.text
+    session_id = response.json()['session_id']
+
+    team_names = [f'Drafter {i + 1}' for i in range(request['league']['n_drafters'])]
+    evaluate = client.post(f'/sessions/{session_id}/evaluate',
+                           json={'player_assignments': {team: [] for team in team_names},
+                                 'my_team_id': team_names[0], 'exclusion_list': []})
+    assert evaluate.status_code == 200, evaluate.text
+
+    candidates = [c for c in evaluate.json()['candidates'][:10] if c['win_rates']]
+    assert candidates, 'the evaluate should return candidates with per-category win rates'
+    # A punt is a category far below the build's own average, not merely its lowest. The threshold
+    # is loose on purpose: this guards against punting COLLAPSING, not against it drifting.
+    punting = [c for c in candidates
+               if max(c['win_rates']) - min(c['win_rates']) > 25]
+    assert len(punting) >= len(candidates) // 2, (
+        'a tiebreaker league should still punt; win-rate spreads were '
+        f'{[round(max(c["win_rates"]) - min(c["win_rates"])) for c in candidates]}'
+    )
+
+
+def test_a_tiebreaker_that_cannot_apply_is_refused_or_dropped():
+    """Rejected when the request itself is incoherent, and quietly dropped when it merely stops
+    applying — an odd category count is a state the user passes through while editing."""
+    request = _build_default_session_request()          # nine categories
+    request['league']['most_categories_weight'] = 1.0
+    request['league']['tiebreaker_category'] = 'Blocks'
+    odd_count = client.post('/sessions', json=request)
+    assert odd_count.status_code == 422, odd_count.text
+
+    request['league']['categories'] = [category for category in request['league']['categories']
+                                       if category != 'Turnovers']
+    request['league']['tiebreaker_category'] = 'Dunks'
+    unknown_category = client.post('/sessions', json=request)
+    assert unknown_category.status_code == 422, unknown_category.text
+
+    # Weight 0 scores each category on its own, so nothing can tie: the setting is dropped, not
+    # rejected, because the dial is the thing the user is moving.
+    request['league']['tiebreaker_category']    = 'Blocks'
+    request['league']['most_categories_weight'] = 0.0
+    inert = client.post('/sessions', json=request)
+    assert inert.status_code == 201, inert.text
+    assert get_session(inert.json()['session_id']).current_params['tiebreaker_category'] is None
+
+
 def test_session_creation_insufficient_player_pool():
     """A league whose total roster capacity exceeds the available player pool is rejected with 400."""
     request = _build_default_session_request()
@@ -219,7 +308,8 @@ def test_is_auction_patch_toggles_league_type():
     # Auction Mode must not flip the session's league type.
     patch_response = client.patch(
         f'/sessions/{session_id}'
-        , json={'from_step': 4, 'league': {'scoring_format': 'Head to Head: Most Categories'}}
+        , json={'from_step': 4, 'league': {'scoring_format': 'Head to Head',
+                                           'most_categories_weight': 1.0}}
     )
     assert patch_response.status_code == 200, patch_response.text
     assert client.post(f'/sessions/{session_id}/evaluate', json=auction_request).status_code == 200

@@ -204,7 +204,9 @@ export function renderPlayerStats(container: HTMLElement): void {
     injuredInput.id = 'ps-injured'
     injuredInput.className = 'sidebar-input'
     injuredInput.placeholder = 'One player name per line'
-    injuredInput.rows = 3
+    // Two rows: the box scrolls, and most leagues exclude nobody or a name or two, so the taller
+    // default was mostly empty space in a sidebar that has none to spare.
+    injuredInput.rows = 2
     container.append(injuredInput)
     
 }
@@ -241,18 +243,8 @@ function renderBlendWeights(container: HTMLElement): void {
         container.append(row)
     }
 
-    const customLabel = document.createElement('div')
-    customLabel.className = 'sidebar-label'
-    customLabel.textContent = 'Custom projections'
-    container.append(customLabel)
-
-    const customCaption = document.createElement('div')
-    customCaption.className = 'sidebar-caption'
-    customCaption.textContent =
-        'Upload projections from any source, as CSV or Excel — each column is read on its ' +
-        'own, so most exports work as downloaded.'
-    container.append(customCaption)
-
+    // No heading or explanation above the upload slots: a file chooser sitting under the source
+    // weights, with a weight slider of its own, already says what it is.
     const customRowsContainer = document.createElement('div')
     customRowsContainer.id = 'ps-custom-uploads'
     container.append(customRowsContainer)

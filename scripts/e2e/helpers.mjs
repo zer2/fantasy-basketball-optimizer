@@ -14,10 +14,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import {
-    mintSessionCookie, setSelect, waitEval, lockInDraftPick, openSelectDropdown, chooseDropdownOption,
+    mintSessionCookie, setSelect, setObjectiveWeight, waitEval, lockInDraftPick, openSelectDropdown,
+    chooseDropdownOption,
 } from '../browser_helpers.mjs'
 
-export { setSelect, waitEval, lockInDraftPick, openSelectDropdown, chooseDropdownOption }
+export { setSelect, setObjectiveWeight, waitEval, lockInDraftPick, openSelectDropdown, chooseDropdownOption }
 
 export const APP = process.env.APP_URL ?? 'http://localhost:8000'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')

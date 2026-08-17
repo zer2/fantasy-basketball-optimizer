@@ -34,6 +34,41 @@ def refresh_platform_player_id_lookup(session: Session) -> None:
     )
 
 
+def normalize_objective_settings(current_params: dict) -> None:
+    """Settle the Head-to-Head objective dial and tiebreaker against the format, in place.
+
+    Under Rotisserie the dial is pinned to None: that format ignores it, HAgent rejects a number
+    there, and the pipeline cache is keyed on the whole parameter snapshot — so a leftover slider
+    value would split the cache into entries that build identical Rotisserie agents. Under Head to
+    Head the dial is required, and its absence raises rather than defaulting, since guessing would
+    mean drafting to an objective the caller never chose.
+
+    The tiebreaker is pinned to None wherever it cannot bite — under Rotisserie, at dial 0 (each
+    category scored on its own has no ties to break), and with an odd number of categories, where
+    the majority is already decided. Pinned rather than rejected because a client may legitimately
+    keep the choice while the count is briefly odd, so that it returns when the count is even
+    again; what must not happen is that inert value splitting the cache.
+
+    Applied wherever current_params is assembled or patched, so no caller has to remember.
+    """
+    if current_params.get('scoring_format') == 'Rotisserie':
+        current_params['most_categories_weight'] = None
+        current_params['tiebreaker_category']    = None
+        return
+
+    weight = current_params.get('most_categories_weight')
+    if weight is None or not 0.0 <= weight <= 1.0:
+        raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
+                         f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
+
+    categories = current_params.get('categories') or []
+    tiebreaker = current_params.get('tiebreaker_category')
+    if tiebreaker is not None and (weight == 0
+                                   or len(categories) % 2 == 1
+                                   or tiebreaker not in categories):
+        current_params['tiebreaker_category'] = None
+
+
 def build_session(
     current_params: dict
     , platform_config: Optional[PlatformConfig]
@@ -46,6 +81,7 @@ def build_session(
     that to a 500.
     """
     session = create_session()
+    normalize_objective_settings(current_params)
     session.current_params = current_params
     if platform_config is not None:
         session.platform_config = platform_config
@@ -110,6 +146,9 @@ def apply_patch(
             session.pipeline_cache.popitem(last=False)
 
     session.current_params.update(patch)
+    # After the merge, not before: a patch can change the format, the weight, or both, and the
+    # rule is about the pair that results.
+    normalize_objective_settings(session.current_params)
 
     if platform_config is not None:
         session.platform_config = platform_config

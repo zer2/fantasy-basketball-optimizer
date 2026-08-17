@@ -26,7 +26,7 @@ import pandas as pd
 from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 
-SCORING_FORMAT = 'Head to Head: Each Category'
+OBJECTIVE = 'Each Category'
 N_CANDIDATES   = int(sys.argv[1]) if len(sys.argv) > 1 else 40
 N_ITERATIONS   = int(sys.argv[2]) if len(sys.argv) > 2 else 30
 PUNT_FACTOR    = 0.9
@@ -34,7 +34,7 @@ ROSTER_SIZE    = 5     # how many players the drafting team already holds
 
 
 def _build_agent():
-    response = client.post('/sessions', json=_build_session_request(scoring_format=SCORING_FORMAT))
+    response = client.post('/sessions', json=_build_session_request(objective=OBJECTIVE))
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session    = get_session(response.json()['session_id'])
     n_drafters = session.current_params['n_drafters']
@@ -80,7 +80,7 @@ def run_diagnostic():
     weakest_index = int(np.argmin(team_totals.values))
     weakest_cat   = categories[weakest_index]
 
-    print(f'Format={SCORING_FORMAT!r}  drafter roster ({len(centers)}): {centers}')
+    print(f'Format={OBJECTIVE!r}  drafter roster ({len(centers)}): {centers}')
     print(f'team strength by category (x-score sum):')
     print(team_totals.round(2).to_string())
     print(f'--> weakest category = {weakest_cat!r}  (seed = x0.9 punt of it)\n')

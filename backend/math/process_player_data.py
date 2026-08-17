@@ -128,6 +128,24 @@ def calculate_coefficients_historical(weekly_df: pd.DataFrame
     })
 
 
+def scale_tiebreaker_value(category_values, tiebreaker_position: int, most_categories_weight: float):
+    """Give the tiebreaker category the extra value the scoring rules give it, in place-safe form.
+
+    v is the value of a category per unit of x-score (g = x * v exactly), so a category that
+    counts twice in the majority half of the objective and once in the per-category half is worth
+    (1 + most_categories_weight) of an ordinary one. Everything that reads v inherits that: the
+    neutral weight vector a balanced team drafts to, the reference the anti-crowded-punt penalty
+    measures punt depth against, the field weights inside get_x_mu, and the x <-> g conversion.
+
+    Shared because v is built in two places — here and again in HAgent, which recomputes it from
+    the same coefficients — and the two must not drift apart. Takes and returns a plain array, so
+    the caller keeps whatever index it had.
+    """
+    scaled = np.asarray(category_values, dtype=float).copy()
+    scaled[tiebreaker_position] = scaled[tiebreaker_position] * (1 + most_categories_weight)
+    return scaled
+
+
 def calculate_scores_from_coefficients(player_means: pd.DataFrame
                                         , coefficients: pd.DataFrame
                                         , params: dict
@@ -239,9 +257,15 @@ def process_player_data(player_stats_v2: pd.DataFrame
                         , params: dict
                         , categories: list[str]
                         , sport: str = 'NBA'
+                        , tiebreaker_category: str | None = None
+                        , most_categories_weight: float | None = None
                         ) -> tuple[dict, str]:
     """Explicit-parameter version of process_player_data.
-    Receives player_stats_v2 directly instead of reading from st.session_state."""
+    Receives player_stats_v2 directly instead of reading from st.session_state.
+
+    A tiebreaker category is worth more than the others, so the G-scores below carry that: see
+    the scaling near the Total column. X-scores and the coefficients are deliberately left alone —
+    they describe how categories are DISTRIBUTED, which the scoring rules do not change."""
 
     counting_stats = get_counting_stats(params, categories)
     ratio_stats    = get_ratio_stats(params, categories)
@@ -282,7 +306,29 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
     mov = coefficients.loc[categories, 'Mean of Variances']
     vom = coefficients.loc[categories, 'Variance of Means']
+    # v is the x -> g conversion: g = x * v_original, exactly (the two score calls below differ
+    # only in whether Variance of Means joins the denominator). It is therefore also the statement
+    # of what a category is WORTH per unit of x, which is where a tiebreaker belongs — worth twice
+    # in the majority half of the objective and once in the per-category half, so (1 + weight).
+    #
+    # Putting it here rather than on the G-scores alone keeps every consumer consistent, because v
+    # wears several hats: the neutral weight vector a balanced team drafts to, the reference the
+    # anti-crowded-punt penalty measures punt depth against, the field weights inside get_x_mu, and
+    # the x <-> g conversion for position means. Scaling the G-scores alone would have left all of
+    # those describing a category that counts once.
     v_original = np.sqrt(mov / (mov + vom))
+    if tiebreaker_category is not None:
+        if tiebreaker_category not in list(v_original.index):
+            raise ValueError(f'Tiebreaker category {tiebreaker_category!r} is not among the scored '
+                             f'categories {list(v_original.index)}.')
+        if most_categories_weight is None:
+            raise ValueError('A tiebreaker category needs most_categories_weight to price it.')
+        v_original = pd.Series(
+            scale_tiebreaker_value(v_original,
+                                   list(v_original.index).index(tiebreaker_category),
+                                   most_categories_weight),
+            index=v_original.index,
+        )
     v = v_original / v_original.sum()
     w = vom / mov
 
@@ -302,6 +348,29 @@ def process_player_data(player_stats_v2: pd.DataFrame
     from backend.player_identity import RP_PLAYER_ID
     x_scores.loc[RP_PLAYER_ID, :] = -1
     g_scores.loc[RP_PLAYER_ID, :] = -1
+
+    # A tiebreaker category is worth (1 + most_categories_weight) of an ordinary one: twice in the
+    # majority half of the objective, once in the per-category half. G-scores are the pipeline's
+    # statement of what a player is WORTH, so that belongs here — a shot-blocker really is more
+    # valuable when blocks settle tied matchups, and nothing downstream knew it.
+    #
+    # Applied to the finished table, so every row scales together (the replacement sentinel
+    # included: missing a doubled category costs double too), and before the Total below, so the
+    # ranking carries it. That ranking is load-bearing rather than cosmetic — the agent orders its
+    # X-scores by G-total, which decides the draftable pool, the position means and covariance
+    # drawn from it, and the anchors the opponent field is built out of. The field therefore ends
+    # up holding more of the doubled category because those players are worth more, rather than
+    # because every opponent was assumed to chase it.
+    #
+    # Deliberately NOT scaled: x_scores and the coefficients (mov, vom, v, w). Those describe how
+    # categories are distributed, which is a fact about basketball, not about scoring rules — and
+    # the win-count DP already gives the tiebreaker its doubled weight in the objective, so scaling
+    # them would state the same rule twice, in a form ("you win it by twice as much") that is not
+    # what the rule says. The representative player set is left alone for the same reason: it
+    # anchors the statistical baseline.
+    # The same factor already applied to v above, so g = x * v_original still holds exactly.
+    if tiebreaker_category is not None:
+        g_scores[tiebreaker_category] = g_scores[tiebreaker_category] * (1 + most_categories_weight)
 
     g_scores.insert(loc=0, column='Total', value=g_scores.sum(axis=1))
     g_scores.sort_values('Total', ascending=False, inplace=True)

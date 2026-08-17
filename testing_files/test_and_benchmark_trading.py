@@ -251,7 +251,7 @@ _SUGGEST_CONFIGS = [
 @pytest.fixture(scope='module')
 def trading_session():
     """Create one EC session shared across all trade suggest benchmarks."""
-    session_request = _build_session_request(scoring_format='Head to Head: Each Category')
+    session_request = _build_session_request(objective='Each Category')
 
     start    = time.perf_counter()
     response = client.post('/sessions', json=session_request)

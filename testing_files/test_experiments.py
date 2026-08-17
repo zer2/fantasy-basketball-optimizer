@@ -48,8 +48,8 @@ _ALL_SEASONS = '2020-21,2021-22,2022-23,2023-24,2024-25,2025-26'
 _SEASONS = (os.environ.get('EXPERIMENT_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(',')
 
 _FORMATS = {
-    'EC':   'Head to Head: Each Category',
-    'MC':   'Head to Head: Most Categories',
+    'EC':   'Each Category',
+    'MC':   'Most Categories',
     'Roto': 'Rotisserie',
 }
 
@@ -348,9 +348,9 @@ def write_experiment_report_files(base_directory):
 
 # ── session helpers ───────────────────────────────────────────────────────────
 
-def _build_session(scoring_format, auction=False, season=None, **parameter_overrides):
+def _build_session(objective, auction=False, season=None, **parameter_overrides):
     request = _build_session_request(
-        scoring_format=scoring_format, cash_per_team=200 if auction else None,
+        objective=objective, cash_per_team=200 if auction else None,
     )
     if season is not None:
         request['data_source']['season'] = season

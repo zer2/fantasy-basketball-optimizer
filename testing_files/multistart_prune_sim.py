@@ -29,7 +29,7 @@ import pandas as pd
 from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 
-SCORING_FORMAT = sys.argv[5] if len(sys.argv) > 5 else 'Head to Head: Each Category'
+OBJECTIVE = sys.argv[5] if len(sys.argv) > 5 else 'Each Category'
 N_CANDIDATES   = int(sys.argv[1]) if len(sys.argv) > 1 else 40
 N_ITERATIONS   = int(sys.argv[2]) if len(sys.argv) > 2 else 250   # convergence budget for the survivor
 PUNT_FACTOR    = float(sys.argv[3]) if len(sys.argv) > 3 else 0.1  # punted category -> this fraction of neutral
@@ -39,7 +39,7 @@ PRUNE_STAGES   = ([tuple(int(x) for x in stage.split(':')) for stage in sys.argv
 
 
 def _build_empty_board_agent():
-    response = client.post('/sessions', json=_build_session_request(scoring_format=SCORING_FORMAT))
+    response = client.post('/sessions', json=_build_session_request(objective=OBJECTIVE))
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session    = get_session(response.json()['session_id'])
     n_drafters = session.current_params['n_drafters']
@@ -86,7 +86,7 @@ def run_simulation():
     punts   = _punt_vectors(agent)
     checkpoints = sorted({it for it, _ in PRUNE_STAGES} | {N_ITERATIONS})
 
-    print(f'Format={SCORING_FORMAT!r}  candidates={len(subset)}  convergence={N_ITERATIONS}  '
+    print(f'Format={OBJECTIVE!r}  candidates={len(subset)}  convergence={N_ITERATIONS}  '
           f'seeds={len(punts)}  prune={PRUNE_STAGES}')
 
     # scores[iters] = DataFrame(candidate x seed) of the H-score after `iters` iterations from each seed.

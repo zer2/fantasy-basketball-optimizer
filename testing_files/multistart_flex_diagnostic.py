@@ -32,7 +32,7 @@ import pandas as pd
 from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 
-SCORING_FORMAT = 'Head to Head: Each Category'
+OBJECTIVE = 'Each Category'
 N_CANDIDATES   = int(sys.argv[1]) if len(sys.argv) > 1 else 24
 N_ITERATIONS   = int(sys.argv[2]) if len(sys.argv) > 2 else 250
 PUNT_FACTOR    = 0.1     # down-weight a punted category to this fraction of neutral
@@ -40,7 +40,7 @@ LOAD_FACTOR    = 1.0     # share on the seeded base in each slot that can hold i
 
 
 def _build_empty_board_agent():
-    response = client.post('/sessions', json=_build_session_request(scoring_format=SCORING_FORMAT))
+    response = client.post('/sessions', json=_build_session_request(objective=OBJECTIVE))
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session    = get_session(response.json()['session_id'])
     n_drafters = session.current_params['n_drafters']
@@ -118,7 +118,7 @@ def run_diagnostic():
     seeds      = _build_seeds(agent)
 
     groups = {label: group for label, (_, _, group) in seeds.items()}
-    print(f'Format={SCORING_FORMAT!r}  candidates={len(subset)}  iterations={N_ITERATIONS}  '
+    print(f'Format={OBJECTIVE!r}  candidates={len(subset)}  iterations={N_ITERATIONS}  '
           f'category-seeds={sum(g == "category" for g in groups.values())}  '
           f'position-seeds={sum(g == "position" for g in groups.values())}')
 
