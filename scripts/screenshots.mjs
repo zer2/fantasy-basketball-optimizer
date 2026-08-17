@@ -168,6 +168,12 @@ async function setObjective(page, weight) {
     await waitEval(page)
 }
 
+/** Drops a category from the multiselect by clicking its chip's remove button. */
+async function removeCategoryChip(page, category) {
+    const chip = page.locator('.ms-chip', { hasText: category }).first()
+    await chip.locator('.ms-chip-remove').click()
+}
+
 /** Waits until the candidate table actually holds player rows.
  *
  *  waitEval only watches the eval indicator, which is NOT sufficient after a sidebar change:
@@ -220,7 +226,24 @@ const STATES = {
     },
     async 'draft-EC'(page)   { await setMode(page, 'Draft Mode'); await setObjective(page, 0);  await waitCandidateRows(page) },
     async 'draft-MC'(page)   { await setMode(page, 'Draft Mode'); await setObjective(page, 1); await waitCandidateRows(page) },
+    async 'draft-Half'(page) { await setMode(page, 'Draft Mode'); await setObjective(page, 0.5); await waitCandidateRows(page) },
     async 'draft-Roto'(page) { await setMode(page, 'Draft Mode'); await setFmt(page, 'Rotisserie');      await waitCandidateRows(page) },
+
+    // Tiebreaker states. A tiebreaker only applies where a matchup can end level, so these drop a
+    // category to reach an even count — which leaks into every later state, hence their position at
+    // the end of the manifest.
+    async 'draft-tiebreaker'(page) {
+        await ensure(page, 'draft-Half')
+        await expandSection(page, /Format/i)
+        await removeCategoryChip(page, 'Turnovers')
+        await setSelect(page, 'fc-tiebreaker', 'Points')
+        await waitEval(page)
+        await waitCandidateRows(page)
+    },
+
+    // Rotisserie's format panel: neither the objective slider nor the tiebreaker applies, so the
+    // section is just the format and the categories.
+    async 'format-roto'(page)  { await ensure(page, 'draft-Roto'); await expandSection(page, /Format/i) },
 
     async 'position'(page)     { await ensure(page, 'draft-EC'); await expandSection(page, /Position/i) },
     // Player Stats section open; the base data source (historical, set once after load) is unchanged.
@@ -466,7 +489,11 @@ const SHOTS = [
     { name: 'main',        state: 'load',        selector: '#app-layout', viewport: true, throughRows: 3 },
     { name: 'hec',         state: 'draft-EC',    selector: '#hscoretable', rows: 12 },
     { name: 'hmc',         state: 'draft-MC',    selector: '#hscoretable', rows: 12 },
+    // The dial's middle: half the objective is total category scoring, half is winning the majority.
+    { name: 'hhalf',       state: 'draft-Half',  selector: '#hscoretable', rows: 12 },
     { name: 'rototop',     state: 'draft-Roto',  selector: '#hscoretable', rows: 12 },
+    { name: 'formatpanelroto', state: 'format-roto',
+      selector: 'details.sidebar-section:has(summary:has-text("Format & Categories"))' },
     { name: 'positions',   state: 'position',    selector: '[data-testid="position-structure"]' },
     { name: 'hexp',        state: 'candidate',   selector: '[data-testid="gscore-expectations-table"]' },
     { name: 'hstrat',      state: 'candidate',   selector: '[data-testid="future-pick-strategy-table"]' },
@@ -547,6 +574,12 @@ const SHOTS = [
     // summary table below it — capture the container so the team's H-score row is in frame.
     { name: 'scottie_autodraft', state: 'autodraft-team5', selector: '#draft-gscore' },
     { name: 'sga_autodraft',     state: 'autodraft-team2', selector: '#draft-gscore' },
+
+    // Format panel + the board a tiebreaker produces. Run late: reaching a tiebreaker means dropping
+    // a category, and both the eight-category league and the named tiebreaker leak into later states.
+    { name: 'formatpanel', state: 'draft-tiebreaker',
+      selector: 'details.sidebar-section:has(summary:has-text("Format & Categories"))' },
+    { name: 'htiebreaker', state: 'draft-tiebreaker', selector: '#hscoretable', rows: 12 },
 
     // Live-platform settings — MUST stay last: these switch ls-platform to a live provider, which
     // poisons every own-data auction/season state above (blank rosters, no eval). Nothing own-data
