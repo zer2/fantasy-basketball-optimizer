@@ -677,13 +677,13 @@
 <p>Auction drafters need to decide how much to bid on players, not just which players to take. That makes a pure rank ordering, like what is produced for snake drafting, insufficient for strategic decision making in the auction context. </p>
 <p>To be helpful for auctions, the website leverages the machinery of H-scoring to estimate player values both generically and for the manager in question's team. This gives managers both overall value estimates of how much they should be willing to bet on players, and also a sense of which players benefit them more than they benefit the field. Even if the exact dollar values are inexact, the differentials between personal and generic value can point towards players to bid for. </p>
 <h2 id="using-auction-mode">Using auction mode</h2>
-<p>When the selected mode from the left sidebar is 'Auction', the website will provide analysis for either synthetic or live auctions. </p>
+<p>When the selected mode from the left sidebar is 'Auction Mode', the website will provide analysis for either synthetic or live auctions. </p>
 <h3 id="manual-entry">Manual entry</h3>
 <p><img alt="Manual auction entry table" src="../img/mauction.png" /></p>
 <p>Player selection information can be entered into the table through the selectors above it. There is no autodrafting option because the website does not simulate actual auctions, it only provides reference material for a given auction state. </p>
 <h3 id="live-connection">Live connection</h3>
 <p>Yahoo auctions can be integrated with the website, like drafts. </p>
-<p>For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides, that, the integration works much the same way as for drafting mode. </p>
+<p>For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides that, the integration works much the same way as for drafting mode. </p>
 <h2 id="quantifying-auction-value">Quantifying auction value</h2>
 <p>The concept of estimating player values for auctions is not new. A well known heuristic is described in many places including <a href="https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393">this article from rotowire</a>. It converts player strength quantified by something like Z-score into an equivalent dollar value, and it is the basis for evaluating players in the auction context. </p>
 <details class="note">

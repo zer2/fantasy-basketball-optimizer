@@ -2,20 +2,28 @@
 
 The heart of the website is an algorithmic framework dubbed H-scoring. It evaluates and ranks potential player picks based on drafting context, as first described in [this paper](https://arxiv.org/abs/2409.09884).
 
-In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand general drafting strategy, including the idea of punting (strategicially sacrificing) some categories and modestly over-performing in the rest. It also understands how to work around position requirements, which enforce that e.g. a team must have at least one point guard.
+In short, for each candidate player, it optimizes for future draft pick strategy and estimates performance based on those strategies. This allows the algorithm to understand strategic drafting concepts, including 
+
+- Punting (strategically sacrificing) some categories to earn a consistent edge in the rest 
+- Prioritizing balance among the categories it chooses to compete in, avoiding "overkill" into categories it already has shored up 
+- Considering the opportunity cost of taking roster slots for particular positions 
 
 <!-- Methodology video embeds here, directly under the intro. Left as a comment for now so the guide below stands on its own without it. -->
 
 ## Main H-score table
 
-The H-score table for candidate evaluation lists players in order of their H-score rank, along with additional detail.
+The main H-score table is the focal point of the website. It lists players in order of their H-score rank, along with additional detail.
+
+By default, the H-scoring table applies Head to Head: Each Category scoring. It can be modified for other scoring formats, primarily Head to Head: Most Categories and Rotisserie. It can also modulate between the two Head to Head formats- see the [customizability](#customizability) section for details. 
+
+### Head to Head: Each Category (default)
 
 ![Each Category H-score table](img/hec.png)
 /// caption
 Top Each Category H-scores for the first pick, 2024-25 season
 ///
 
-The overall H-score on the left side of the display is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. By default, it is the expected average win rate across categories, appropriate for Head to Head: Each Category scoring. It can be modified for other scoring formats, including Head to Head: Most Categories and Rotisserie. See the [customizability](#customizability) section for details on how to switch between scoring formats. 
+The overall H-score on the left side of the display is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. For Each Category scoring, it is the average expected win probability across categories.
 
 ??? note "How does the algorithm optimize the overall H-score?"
     While the spinner is up, the algorithm is iterating, attempting to repeatedly improve its solution. Mathematically, the underlying iteration process is a procedure called Adam. 
@@ -53,8 +61,8 @@ Top H-scores for a round seven pick in a mock draft, with relatively stable scor
 
 Most of the time, the algorithm punts one or two categories, reflected by low H-scores in those categories. For the categories it does not punt, it tries to be above average without going overboard.
 
-??? note "Why does H-scoring punt some categories?"
-    Punting is a natural consequence of the category-based structure of fantasy basketball, given the properties of Normal distributions. 
+??? note "Why does H-scoring punt some categories, while maintaining balance with the rest?"
+    The category-based structure of fantasy basketball naturally bifurcates categories into either punting them or slightly over-performing in them. This is due to the fundamental properties of Normal distributions, which are reasonable approximations for sums across many variables. 
 
     Victory probabilities can be estimated with Normal CDFs based on team-level category averages, thanks to the Central Limit Theorem. Normal CDFs are differentiable; their gradients are Normal PDFs.
 
@@ -74,11 +82,11 @@ Most of the time, the algorithm punts one or two categories, reflected by low H-
     This image from the second paper shows how the algorithm actually performed on a category level in a simulation. It largely either punted categories or tried to be competitive in them
     ///
 
-    The algorithm punts the most in Most Categories, for which there is no reward for dominating every category. It punts the least for Rotisserie, since Rotisserie requires good luck to win an entire league, and managers can open themselves up to potential good luck by competing in every category. 
+    The exact degree to which punting is beneficial depends on many factors- the scoring format, correlations between categories, etc. 
 
 ### Head to Head: Most Categories
 
-In Most Categories, teams get wins for every opponent they get a majority of fantasy points against. To reflect that, with Most Categories scoring, the definition of the overall H-score is the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).
+A basic alternative to Each Category scoring is Most Categories scoring. In Most Categories, teams get wins for every opponent they get a majority of fantasy points against. To reflect that, with Most Categories scoring, the definition of the overall H-score is the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive).
 
 ![Most Categories H-score table](img/hmc.png)
 /// caption
@@ -96,9 +104,18 @@ The table above is based on the same dataset as the Each Category version. The o
 
     The gradient of the MC objective turns out to be the 'tipping point' probability, which is the likelihood that any given category will end up being decisive (multiplied by the base EC gradient). It is calculated in much the same way as the overall MC objective is calculated, with a dynamic programming approach to calculate the tipping point probability for each category. 
 
+With an even number of categories a Most Categories matchup can end level — four each out of eight, for example. By default the website treats that as half a win. It is also possible to declare a tiebreaker category. The tiebreaker category essentially counts for two, which makes the total odd and gives every matchup a winner. 
+
+??? note "Why does counting a category twice behave equivalently to having it as a tiebreaker?"
+    Doubling the tiebreaker changes only the level matchups, which is exactly what a tiebreaker should do. Take eight categories, where nine points are then on offer and five are needed. Split them four-four: winning the tiebreaker gives $3 + 2 = 5$ and takes the matchup, while losing it leaves $4 < 5$. Now take a genuine five-three majority: with the tiebreaker among the five, the other four plus two is six; without it, five of the remaining seven is still five. Either way the majority holds. So the doubling settles ties without ever overturning a decided matchup.
+
+    Since the tiebreaker is counted double, it has a different gradient than the other categories. It is decisive either with the total win count of other categories at one less than what is needed or two less than what is needed, so those possibilities are both included in its gradient.  
+
+    Tiebreaker behavior causes complications with understanding what kinds of teams opponents will likely have. It is not reasonable to assume that other teams will be evenly spread across the categories, since the tiebreaker category counts for more. To account for that, the algorithm doubles the baseline weight of the tiebreaker category (also weighted by the EC/MC slider, since total category scoring does not include the tiebreaking mechanism)
+
 ### Rotisserie
 
-Rotisserie is another degree more complicated than Most Categories. Its objective function uses an approximation of the probability to win an entire league. 
+Rotisserie is another degree more complicated than Most Categories. When the scoring format is Rotisserie, H-scores become an approximation of the probability to win an entire league. 
 
 ![Rotisserie H-score table](img/rototop.png)
 /// caption
@@ -107,7 +124,7 @@ Top Rotisserie H-scores, for the 2024-25 season
 
 The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis falls out of the top twelve entirely, which aligns with the traditional wisdom that punting is not as advantageous for that format. 
 
-Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head-to-Head formats. The average is around 8% instead of 50%. 
+Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head to Head formats. The average is around 8% instead of 50%. 
 
 When the format is Rotisserie, category-level H-scores are expected fantasy point totals per category instead of the likelihood to win a single matchup. One should keep in mind that the expected fantasy point total is just a general average, not what the algorithm expects to happen in a winning scenario. While it may look like it expects some categories to end up below-average, it is still hoping to get lucky and do better than expected in those categories. 
 
@@ -147,7 +164,7 @@ Category weights for future picks, for a team considering Daniels after taking G
 
 The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks. Category weights show what the algorithm is thinking in terms of which categories it wants to punt. 
 
-??? note "How does H-scoring pick category weights for future picks? And why are 'punted' categories still high?"
+??? note "How does H-scoring pick category weights for future picks?"
     The heart of the algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being equal in terms of total G-score. It assumes that it will choose the best player available based on its choice of category weights. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on the category weights. The math behind this is quite complicated...
 
     ![Future pick weight formula](img/crazyformula.png)
@@ -162,10 +179,9 @@ The category weightings displayed in the first row are based on H-scoring's inte
 
     This allows the algorithm to understand that it can prioritize or deprioritize categories with future picks, with some cost to overall value.
 
-    In the case above, the weight for Free Throws is perhaps surprisingly high, despite the obvious fact that the algorithm is deprioritizing the category heavily. The reason for this is that in general, the algorithm does not think it needs to adjust weights all that much in order to skew the available candidates to the categories it wants.
+In the case above, the weight for Free Throws is perhaps surprisingly high, despite the obvious fact that the algorithm is deprioritizing the category heavily. The reason for this is that in general, the algorithm does not think it needs to adjust weights all that much in order to skew the available candidates to the categories it wants. Its internal model believes that available candidates are very similar to each other in total value, and using extreme weights leads to a decrease in general value. Under this model, it believes that it can achieve a significant skew towards its favored categories without incurring the extreme weight penalty just by shifting weights subtly, so that is what it chooses to do. 
 
-    This is somewhat a consequence of the assumptions made at the heart of the H-scoring model, which may or may not be fair. Under the assumption that player statistics are distributed roughly Normally and players are chosen in G-score order, slightly deprioritizing a category is enough to find players who are very strong in the other categories. Completely ignoring the punted category only marginally improves the expected strengths in the other categories, while sacrificing the punted category to a harsher degree than necessary.
-    
+This model is a simplification and does not necessarily resemble the actual space of available players perfectly, so the exact weights should be taken with a grain of salt. The important thing is that the algorithm understands that it can skew categories in the direction it wants in accordance with the correlational structure of player statistics. And the magnitude of that skew has been calibrated via the $\gamma$ and $\omega$ parameters so that it is reasonable. 
 
 ### Flex position strategy
 
@@ -221,35 +237,26 @@ The context in which H-scoring operates is controlled by a handful of settings a
 
 ### Formats and categories
 
-The website's implementation of H-scoring is rooted in two main formats: Head to Head and Rotisserie. Within the Head to Head format, the algorithm can modulate between Each Category and Most Categories, or a weighted combination of the two. Rotisserie is a standalone category. 
+In the parameter interface, the three basic kinds of H-score- Head to Head: Each Category, Head to Head: Most Categories, and Rotisserie- are available through the scoring format toggle and EC/MC slider. This allows for the user to choose any of the three basic kinds of H-scores, or a blend between the two Head to Head scoring systems. 
 
 ![The Format & Categories sidebar section](img/formatpanel.png)
 /// caption
 The Head to Head controls.
 ///
 
-When the chosen format is Head to Head, scoring can be modulated between Each Category and Most Categories through the slider. The slider defaults to zero, at which point H-scoring optimizes for purely Each Category scoring. If the slider is moved all the way to one, it optimizes for purely Most Categories scoring. If the slider is in the middle, it computes and optimizes for both objectives, with weight on majority scoring based on the value of the slider. For example if the slider is at 0.6 it weighs majority scoring at 60% and total scoring at 40%. Setting the slider to somewhere in the middle can make sense for a league that determines regular season standings with total categories won, and does playoffs with majority scoring. 
+The Head to Head formats are paired together because they are comparable, and for some leagues, it might make sense to optimize for both at the same time. The slider defaults to zero, at which point H-scoring optimizes for purely Each Category scoring. If the EC/MC slider is moved all the way to one, it optimizes for purely Most Categories scoring. If the slider is somewhere in between, H-scoring computes and optimizes for both objectives, with weight on Most Categories based on the value of the slider. For example if the slider is at 0.6 it weighs Most Categories scoring at 60% and Each Category scoring at 40%. Setting the slider to somewhere in the middle can make sense for a league that determines regular season standings with Each Category, and does playoffs with Most Categories. 
 
-??? note "How exactly are the two kinds of scoring blended together?"
-    The objective functions are literally added together with their weights, along with their gradients. This can be justified by considering majority scoring to be equivalent to either winning every category or losing every category. In that case, the expected value of categories won is the probability of winning the matchup times the number of categories for Most Categories scoring, versus the sum of the probabilities of winning each category for Each Category scoring. Dividing each by the number of categories yields the probability of winning a matchup versus the average probability of winning a category, making them sensible objectives to compare. 
-
-With an even number of categories a majority matchup can end level — four each out of eight, for example. By default the website treats that as half a win. It is also possible to declare a tiebreaker category in the **Tiebreaker** selector beneath the category picker. The tiebreaker category essentially counts for two, which makes the total odd and gives every matchup a winner. The tiebreaker option is only available when it would apply, which is when the number of categories is even and the slider gives some weight to majority scoring. 
-
-??? note "Why does counting a category twice give the right answer?"
-    Doubling the tiebreaker changes only the level matchups, which is exactly what a tiebreaker should do. Take eight categories, where nine points are then on offer and five are needed. Split them four-four: winning the tiebreaker gives $3 + 2 = 5$ and takes the matchup, while losing it leaves $4 < 5$. Now take a genuine five-three majority: with the tiebreaker among the five, the other four plus two is six; without it, five of the remaining seven is still five. Either way the majority holds. So the doubling settles ties without ever overturning a decided matchup.
-
-    Since the tiebreaker is counted double, it has a different gradient than the other categories. It is decisive either with the total win count of other categories at one less than what is needed or two less than what is needed, so those possibilities are both included in its gradient.  
-
-    Tiebreaker behavior causes complications with understanding what kinds of teams opponents will likely have. It is not reasonable to assume that other teams will be evenly spread across the categories, since the tiebreaker category counts for more. To account for that, the algorithm doubles the baseline weight of the tiebreaker category (also weighted by the majority slider, since total category scoring does not include the tiebreaking mechanism)
-
-Rotisserie is considered an entirely different format from the Head to Head formats, because it has a fundamentally different scoring mechanism. It cannot be combined with the two Head to Head formats. 
-
-![The Format & Categories sidebar section for Rotisserie](img/formatpanelroto.png)
+![Half-and-Half H-scores](img/hhalf.png)
 /// caption
-With Rotisserie chosen, neither the slider nor the tiebreaker applies, so the section is just the format and the categories
+H-scores with a half-and-half Each Category and Most Categories objective. The numbers are somewhere between typical Each Category numbers and typical Most Categories numbers 
 ///
 
+??? note "How exactly are the two kinds of scoring blended together?"
+    The objective functions are literally added together with their weights, along with their gradients. This can be justified by considering Most Categories scoring to be equivalent to either winning every category or losing every category. In that case, the expected value of categories won is the probability of winning the matchup times the number of categories for Most Categories scoring, versus the sum of the probabilities of winning each category for Each Category scoring. Dividing each by the number of categories yields the probability of winning a matchup versus the average probability of winning a category, making them sensible objectives to compare. 
+
 For all of the formats, the website supports any combination of categories, across the default nine categories and several alternative options. By default the nine standard categories are selected: Field Goal %, Free Throw %, Threes, Points, Rebounds, Assists, Steals, Blocks, and Turnovers. For the alternative categories, when using projections, make sure to include them when sourcing the projections. ESPN and DARKO do not forecast them so all of the weight will be from Hashtag or BBM projections. 
+
+The tiebreaker option only applies to the Most Categories objective. It becomes available under the category dropdown when the number of categories is even and the slider gives some weight to Most Categories. If weight is given to the Each Category objective as well, the tiebreaker category is ignored for that component. 
 
 ### H-scoring parameters
 
@@ -265,7 +272,7 @@ The position structure used by the algorithm — also shown in the [detailed dro
 
 ![Position structure configuration](img/positions.png)
 
-It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accomodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
+It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accommodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
 
 ## Limitations and corrections
 
@@ -401,14 +408,18 @@ Fantasy basketball analysts often advocate for taking the best player available 
 
 Ideally, the algorithm would model a probability distribution of how circumstances could change, and choose a strategy based on expected value. Instead, for practical reasons, the algorithm is designed to maximize the best strategy under a point estimate of how its strategies would turn out. The lack of understanding of alternate scenarios is a weakness of H-scoring. It does not consider a spectrum of possibilities, so it does not know which strategies are resilient and which are flimsy. 
 
-In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights into H-scores. The algorithm can still plan on a punt, but regularization incentivizess it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
+In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights into H-scores. The algorithm can still plan on a punt, but regularization incentivizes it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
+
+The strength of that pull is the λ (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick.
+
+λ is also scaled by a diminishing factor as the draft goes on. This ensures that regularization applies most for early picks; once the algorithm settles on a strategy, it stops applying as much. 
 
 ??? note "How does the website enforce regularization?"
     The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring, plus an equivalent mechanism for flex positions. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. 
 
-    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, if the weight for the first pick is $A$, the weight for pick $n$ is $A$ multiplied by the phi function evaluated at $\frac{4n}{k}$ where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
+    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, the weight for pick $n$ is $\lambda$ multiplied by the phi function evaluated at $\frac{4n}{k}$ where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
 
-    The absolute values of $A$ for both category weightings and position weightings are hardcoded into the algorithm, and cannot be configured by the user. They were calibrated to regularize meaningfully without collapsing weights to neutral across the board. 
+    The flex position regularizer has the same scheduler, just scaled up because the flex position numbers tend to vary more. 
 
 ### No model of other managers
 
@@ -418,19 +429,19 @@ The website's version of the algorithm has a few ways of dealing with this. Pred
 
 The first is a way of predicting what other teams will look like. Before running H-scoring on all candidates, the algorithm is run on a small subset of the top players, and the expected final statistics for each player's team are recorded. That process iterates, with each successive pass reacting to all previous ones. By the end, the algorithm has a rough picture of what an equilibrium might look like in terms of opposing team strategies. Then, during a draft, the algorithm continues to update its expectations by running H-scoring for opponents, and keeping track of what the algorithm expects from future picks for each opponent. 
 
-For head-to-head formats, the strength of the prediction adjustment to expected team statistics is cut in half. The purpose of that softening is to prevent overconfidence about exact punting builds. The prediction adjustment is kept at full strength for Rotisserie because there is no equivalent uncertainty about punting in Rotisserie; the main strategy that other drafters are expected to adopt is shoring up reliable categories, which is consistent and stable. 
+The strength of the applied prediction is controlled by the C (confidence) parameter in the sidebar. For Head to Head formats it defaults to 0.5, which halves the adjustment to expected team statistics; the purpose of that softening is to prevent overconfidence about exact punting builds. Rotisserie always uses full confidence, so the control is hidden there — there is no equivalent uncertainty about punting in Rotisserie, where the main strategy other drafters are expected to adopt is shoring up reliable categories, which is consistent and stable. 
 
-Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance against pure G-score drafters. It is controlled by the "Opponent sophistication" toggle in the sidebar, which defaults to on. Turning it off treats every other drafter as a neutral picker with no strategic tendencies: the equilibrium passes described above are skipped, and the algorithm stops running H-scoring from opponents' seats as the draft goes on.  
+Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance against pure G-score drafters. Setting C to zero turns the prediction off entirely: every other drafter is treated as a neutral picker with no strategic tendencies.
 
 While the first fix handles the expectations of what other teams will look like, it does not account for how the field of available players changes based on what other drafters are doing. If a punt is strong and likely to be popular, other drafters will compete for players who fit that punt build well, making it more difficult to succeed with the build. The algorithm handles that with the κ (kappa) factor, which subtly discourages the algorithm from using potentially popular punting strategies. It observes which categories are popular to punt during the self-play process, and adds small punishments for punting those categories, scaled by the value of κ. This is to make the cost of competing for a crowded punt explicit. The default value of κ is $0.3$.
 
-Another way to account for other other manager's behavior is modifying the H-scoring parameters. When autodrafters play against each other, the optimum values for $\omega$ and $\gamma$ are approximately $0.5$ and $0.1$, respectively, with κ set to $0.3$. This setting leads to slightly less aggressive punting than the default parameters, which are designed to do well against managers who do not punt. Punting less aggressively against strategic managers is likely appropriate because there is more competition for the best players for punt builds.  
+Another way to account for other managers' behavior is modifying the H-scoring parameters. When autodrafters play against each other, the optimum values for $\omega$ and $\gamma$ are approximately $0.5$ and $0.1$, respectively, with κ set to $0.3$. This setting leads to slightly less aggressive punting than the default parameters, which are designed to do well against managers who do not punt. Punting less aggressively against strategic managers is likely appropriate because there is more competition for the best players for punt builds.  
 
 ??? note "How do we know what the optimal parameters are for H-scoring agents against other H-scoring agents?"
 
-    The optimal values were found via a self-play experiment: across thousands of simulations of different seasons, a full league of identical H-scoring agents drafted against each other, slightly perturbing their parameters each time. Simulations were paired such that each one would have two drafters with a positive $\omega$ peturbation, two with a negative $\omega$ peturbation, etc. and the other simulation would have the same drafters moving in the opposite direction- Spall's method with antithetic variates. After each pair of simulations, the success of the perturbations was judged, and the parameter stepped in the direction that produced better results. This kept going until there was no clear better direction, meaning that the parameters were at a symmetric equilibrium, in which no agent could improve by unilaterally changing its own parameters.
+    The optimal values were found via a self-play experiment: across thousands of simulations of different seasons, a full league of identical H-scoring agents drafted against each other, slightly perturbing their parameters each time. Simulations were paired such that each one would have two drafters with a positive $\omega$ perturbation, two with a negative $\omega$ perturbation, etc. and the other simulation would have the same drafters moving in the opposite direction- Spall's method with antithetic variates. After each pair of simulations, the success of the perturbations was judged, and the parameter stepped in the direction that produced better results. This kept going until there was no clear better direction, meaning that the parameters were at a symmetric equilibrium, in which no agent could improve by unilaterally changing its own parameters.
 
-    This procedure repeatedly settled near $\gamma \approx 0.1$ and $\omega \approx 0.5$, with κ free to vary landing near $0.3$ — consistent with the recommendation above, since a field of H-scoring agents is itself a punting field. To confirm the result was a genuine optimum rather than a degenerate local trap, a head-to-head test of these parameters against the defaults was also run; the tuned parameters won consistently, ruling out a bad basin. 
+    This procedure repeatedly settled near $\gamma \approx 0.1$ and $\omega \approx 0.5$, with κ free to vary landing near $0.3$ — consistent with the recommendation above, since a field of H-scoring agents is itself a punting field. To confirm the result was a genuine optimum rather than a degenerate local trap, a Head to Head test of these parameters against the defaults was also run; the tuned parameters won consistently, ruling out a bad basin. 
 
     These parameters specifically work well in the H-scoring vs H-scoring context. Against G-scores, a similar procedure yielded parameters close to the defaults of $\omega \approx 0.7$ and $\gamma \approx 0.25$.
 
@@ -451,14 +462,14 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
 
 H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
 
-![alt text](img/cwinrates.png)
+![Expected versus actual category win rates](img/cwinrates.png)
 /// caption
 Win rates, expected by H-scoring vs. actual, from the paper. There is a clear gap at values below 10% 
 ///
 
 The paper shows that when hard-punting free throws, teams still win the category surprisingly often. This probably happens because a single poor free throw shooter like Giannis being out can make a team that punts free throws suddenly competitive. On the flipside, teams that punt threes lose even more consistently in the category than predicted. This is because players that don't shoot threes have low variance in how many threes they hit; Rudy Gobert cannot possibly go on a streak from three because he does not attempt them. 
 
-These statistics come from simulations of real seasons using actual player data. Reality is less predictable- players outperform or underperform projections, players get traded or substitued, etc. This increased variance provides a counterbalance to the underprediction for threes. For free throw percent, it compounds, meaning that the algorithm likely underestimates the probability of winning the category despite punting by quite a bit. 
+These statistics come from simulations of real seasons using actual player data. Reality is less predictable- players outperform or underperform projections, players get traded or substituted, etc. This increased variance provides a counterbalance to the underprediction for threes. For free throw percent, it compounds, meaning that the algorithm likely underestimates the probability of winning the category despite punting by quite a bit. 
 
 ??? note "Why doesn't the algorithm take into account player-level variance?"
 

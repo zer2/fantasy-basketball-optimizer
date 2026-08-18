@@ -6,7 +6,7 @@ To be helpful for auctions, the website leverages the machinery of H-scoring to 
 
 ## Using auction mode 
 
-When the selected mode from the left sidebar is 'Auction', the website will provide analysis for either synthetic or live auctions. 
+When the selected mode from the left sidebar is 'Auction Mode', the website will provide analysis for either synthetic or live auctions. 
 
 ### Manual entry 
 
@@ -18,7 +18,7 @@ Player selection information can be entered into the table through the selectors
 
 Yahoo auctions can be integrated with the website, like drafts. 
 
-For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides, that, the integration works much the same way as for drafting mode. 
+For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides that, the integration works much the same way as for drafting mode. 
 
 ## Quantifying auction value
 

@@ -8,7 +8,7 @@ Connecting a provider is the one part of the website that requires signing in wi
 
 The three platforms currently supported are: 
 
-**Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when Yahoo is selected.
+**Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when 'Retrieve from Yahoo' is selected.
 
 ![Yahoo authentication pop-up](img/yahoopop.png)
 
@@ -22,7 +22,7 @@ FYI there is a bug in the wrapper used for connecting to the Yahoo API, which cr
 
 ![Fantrax league settings](img/fantraxsettings.png)
 
-**ESPN**: support only exists for pulling existing teams during the season. Unfortunately, ESPN has no API for draft access. To authenticate to pull a team, a web plug-in is needed. The instructions are on the pop-up generated when ESPN is selected. 
+**ESPN**: support only exists for pulling existing teams during the season. Unfortunately, ESPN has no API for draft access. To authenticate to pull a team, a web plug-in is needed. The instructions are on the pop-up generated when 'Retrieve from ESPN' is selected. 
 
 ![ESPN authentication pop-up](img/espnpop.png)
 

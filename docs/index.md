@@ -35,7 +35,7 @@ Settings, available in the left sidebar, control the context in which the algori
 | Drafters and picks | Number of drafters and picks per drafter (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
 | Third-round reversal | Snake-draft order toggle (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
 | Player stats | Configure forward-looking projections, or data from past NBA seasons | [Player Stats](projections.md) |
-| Format | Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
+| Scoring format | Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
 | Categories | Select statistical categories for scoring | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
 | Tiebreaker | Define a category to breaks ties for majority scoring with an even number of categories| [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
 
@@ -47,7 +47,8 @@ The website's calculations take a number of user-configurable parameters, availa
 |---|---|---|
 | ω, γ (omega, gamma) | How aggressively H-scoring punts categories | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | κ (kappa) | How strongly the algorithm avoids punting categories that are popular punts for the field | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
-| Opponent sophistication | Whether other drafters are modeled as strategic (punting) drafters or as neutral pickers. A toggle, on by default | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
+| C (confidence) | How strongly other drafters are modeled as pursuing the punts H-scoring predicts for them. 0 treats them as neutral pickers; Rotisserie always uses 1 | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
+| λ (lambda) | How strongly early-round category weights are held near balanced, preserving room to pivot | [H-scoring → Only one strategy is evaluated](hscores.md#only-one-strategy-is-evaluated) |
 | Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | Position requirements | The roster/position structure a team must satisfy | [H-scoring → Position structure](hscores.md#position-structure) |
 | υ, ψ (upsilon, psi) | How projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |

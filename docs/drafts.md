@@ -4,11 +4,11 @@ H-scoring is primarily designed for drafting,  which allows drafting mode to use
 
 ## Using draft mode 
 
-When the selected mode from the left sidebar is 'Draft', the website will provide analysis for either synthetic or live drafts. 
+When the selected mode from the left sidebar is 'Draft Mode', the website will provide analysis for either synthetic or live drafts. 
 
 ### Manual entry 
 
-When the data source option from the left sidebar is manual entry, draft picks are entered through the website. 
+When the data source from the left sidebar is 'Enter your own data', draft picks are entered through the website. 
 
 ![Manual draft entry](img/mdraft.png)
 
@@ -18,7 +18,7 @@ The default order in which players are listed in the drop-down is by their H-sco
 
 ### Live connection
 
-When the data source option from the left sidebar is platform, draft selections are provided by the platform. The entire screen becomes a view for candidate evaluation. 
+When the data source from the left sidebar is one of the 'Retrieve from ...' platform options, draft selections are provided by the platform. The entire screen becomes a view for candidate evaluation. 
 
 ![Live draft candidate view](img/livedraft.png)
 
@@ -26,9 +26,9 @@ The 'Refresh Analysis' button fetches new information on draft picks from the pl
 
 ## Evaluation views 
 
-Under the drafting context, two views are available- the [H-scoring table](hscores.md/#main-h-score-table) and the [G-score-based team table](gscores.md/#team-table). The H-scoring table shows how candidates stack up, and the team table shows how the team looks so far. 
+Under the drafting context, two views are available- the [H-scoring table](hscores.md#main-h-score-table) and the [G-score-based team table](gscores.md#team-table). The H-scoring table shows how candidates stack up, and the team table shows how the team looks so far. 
 
-![alt text](img/mid_draft.png)
+![The main drafting view mid-draft](img/mid_draft.png)
 /// caption
 The main drafting view, in the middle of a draft. Switch to the team table by clicking 'Show team statistics'
 /// 
@@ -43,7 +43,7 @@ The exceptions are a few drafting-specific adjustments to the algorithm which in
 
 ??? note "What tricks does the website use to speed up the algorithm during drafting?"
 
-    The website uses two tricks to speed up the algorithm for drafting. Both are made possible beause for drafting, the top choices are the ones that matter. The difference between the 100th best choice and the 101st is not typically important. 
+    The website uses two tricks to speed up the algorithm for drafting. Both are made possible because for drafting, the top choices are the ones that matter. The difference between the 100th best choice and the 101st is not typically important. 
     
     The two tricks are: 
 
@@ -56,11 +56,11 @@ The exceptions are a few drafting-specific adjustments to the algorithm which in
 
 In manual entry mode, next to each team name is a button with the letter 'A' in it, for 'Autodrafter'. Click the button to highlight it and make that team an autodrafter. Instead of waiting for a manual input, autodrafters automatically make selections based on H-scoring. 
 
-Autodrafters only look at the top 100 candidates by empty-board base score, because it is extremely unlikely that a player below that would be the best pick, and limiting the analysis to the top 100 offers a substaintial speed-up. 
+Autodrafters only look at the top 100 candidates by empty-board base score, because it is extremely unlikely that a player below that would be the best pick, and limiting the analysis to the top 100 offers a substantial speed-up. 
 
 ![Autodraft picture](img/autodraft.png)
 /// caption
-Team 2 and Team 3 toggled to autodrafting mode. when Team 1 selects a player, Team 2 and Team 3 will automatically make their picks after
+Team 2 and Team 3 toggled to autodrafting mode. When Team 1 selects a player, Team 2 and Team 3 will automatically make their picks after
 /// 
 
 Teams selected by autodrafting are typically much stronger than those chosen in empty board H-score order, since they form coherent strategies.
