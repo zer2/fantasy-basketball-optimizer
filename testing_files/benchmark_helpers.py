@@ -139,9 +139,10 @@ def _build_session_request(
             # (simulate.py) -- against a non-punting G-drafter field the anti-crowded-punt penalty has no
             # crowd to defect from, so it would only distort that comparison.
             'kappa':           nba_options['kappa']['default'],
+            'reg_lambda':      nba_options['reg_lambda']['default'],
             # Follows the app default like kappa: goldens, benchmarks, and experiments all encode
             # exactly the opponent-punt softening the app ships with.
-            'behavior_model_confidence': nba_options['behavior_model_confidence']['default'],
+            'opponent_model_confidence': nba_options['opponent_model_confidence']['default'],
             'streaming_noise': nba_options['S']['default'],
         },
         'data_source': {

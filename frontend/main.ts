@@ -25,7 +25,7 @@ import {
     getSelectedCategories,
 } from './parameter_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsParams, waitForSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
-import { renderModelParameters, getModelParameters } from './parameter_collection/model_parameters.js'
+import { renderModelParameters, refreshOpponentConfidenceControl, getModelParameters } from './parameter_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
@@ -308,6 +308,7 @@ const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
 let formatController: AbortController | null = null
 formatSection.addEventListener('change', () => {
+    refreshOpponentConfidenceControl(getScoringFormat())
     if (formatController) formatController.abort()
     formatController = new AbortController()
     const { signal } = formatController
@@ -330,6 +331,8 @@ formatSection.addEventListener('change', () => {
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
 renderModelParameters(modelSection)
+// The format section is built first, so its current value decides the control's initial visibility.
+refreshOpponentConfidenceControl(getScoringFormat())
 let modelController: AbortController | null = null
 modelSection.addEventListener('change', () => {
     if (modelController) modelController.abort()

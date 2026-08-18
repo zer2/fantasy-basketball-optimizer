@@ -24,7 +24,7 @@
 # the Bayesian self-doubt would only dilute the measurement); fast display-property tests keep full app
 # settings because they measure exactly what the user sees.
 #
-# All sessions are built through request parameters (opponent_sophistication, kappa, ...) rather than
+# All sessions are built through request parameters (opponent_model_confidence, kappa, ...) rather than
 # environment pins, and every draft loop calls agent.reset_draft_state() so no state leaks across drafts.
 
 import os
@@ -668,18 +668,18 @@ def test_awareness_vs_unaware_h_field():
     all_gains = []
     n_seats = None
     for season in _SEASONS:
-        reference = _build_session(_FORMATS['EC'], season=season, opponent_sophistication=False, beth=0)
+        reference = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0, beth=0)
         n_drafters   = reference.current_params['n_drafters']
         n_picks      = reference.current_params['n_picks']
         n_iterations = reference.current_params['n_iterations']
         n_seats      = _SIM_SEATS or n_drafters
 
         field_sessions = [reference] + [
-            _build_session(_FORMATS['EC'], season=season, opponent_sophistication=False, beth=0)
+            _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0, beth=0)
             for _ in range(n_drafters - 1)
         ]
         aware_deviator = _build_session(_FORMATS['EC'], season=season,
-                                        opponent_sophistication=True, beth=0)
+                                        opponent_model_confidence=0.5, beth=0)
 
         def deviator_score(session_by_seat, seat):
             assignments = draft_population(session_by_seat, n_drafters, n_picks, 40)
@@ -719,9 +719,9 @@ def test_awareness_not_harmful_vs_g_field():
     n_seats = None
     for season in _SEASONS:
         aware   = _build_session(_FORMATS['EC'], season=season, kappa=0.0,
-                                 opponent_sophistication=True, beth=0)
+                                 opponent_model_confidence=0.5, beth=0)
         unaware = _build_session(_FORMATS['EC'], season=season, kappa=0.0,
-                                 opponent_sophistication=False, beth=0)
+                                 opponent_model_confidence=0, beth=0)
         n_seats = _SIM_SEATS or aware.current_params['n_drafters']
         gains = []
         for seat in range(n_seats):
@@ -789,8 +789,8 @@ def test_multi_start_seeding_helps():
     players' builds twice, seeded by the punt scan vs a single neutral seed, and compare PAIRED
     per-player objective values over the scan's top 12."""
     for season in _SEASONS:
-        punt_scan = _build_session(_FORMATS['EC'], season=season, opponent_sophistication=False)
-        neutral   = _build_session(_FORMATS['EC'], season=season, opponent_sophistication=False)
+        punt_scan = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0)
+        neutral   = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0)
         neutral.agent.seed_mode = 'neutral'
         neutral.agent.reset_draft_state()
         neutral.agent.populate_default_h_scores(neutral.current_params['n_iterations'])

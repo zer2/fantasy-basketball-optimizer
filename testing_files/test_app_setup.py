@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.state.session import get_session
+from backend.math.algorithm_agents import REG_LAMBDA_UNIT
 
 client = TestClient(app)
 
@@ -915,3 +916,44 @@ def test_evaluate_nonexistent_session():
         }
     )
     assert response.status_code == 404
+
+
+def test_lambda_reaches_the_regulariser_schedule_in_its_surfaced_units():
+    """reg_lambda is surfaced in units of 1e-5 so the sidebar reads 5 rather than 0.00005. The
+    conversion happens in exactly one place, and this pins it: what the session asks for is what the
+    schedule peaks at."""
+    request = _build_default_session_request()
+    request['parameters']['reg_lambda'] = 0.2
+
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, response.text
+    session = get_session(response.json()['session_id'])
+
+    assert session.current_params['reg_lambda'] == 0.2
+    assert session.agent.reg_schedule[0] == pytest.approx(0.2 * REG_LAMBDA_UNIT)
+
+
+def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
+    """What the parameter is for. The L1 pull is what stops a first-round pick committing to a punt
+    it cannot back out of, so raising it has to visibly shrink how far the weights stray from the
+    neutral vector -- otherwise the control is inert and the sidebar is lying."""
+    def furthest_weight_from_neutral(reg_lambda: float) -> float:
+        request = _build_default_session_request()
+        request['parameters']['reg_lambda'] = reg_lambda
+        response = client.post('/sessions', json=request)
+        assert response.status_code == 201, response.text
+
+        team_names = [f'Drafter {i + 1}' for i in range(request['league']['n_drafters'])]
+        evaluate = client.post(f"/sessions/{response.json()['session_id']}/evaluate",
+                               json={'player_assignments': {team: [] for team in team_names},
+                                     'my_team_id': team_names[0], 'exclusion_list': []})
+        assert evaluate.status_code == 200, evaluate.text
+        # category_weights are a percentage of the neutral vector, so 100 is neutral.
+        weights = evaluate.json()['candidates'][0]['category_weights']
+        return max(abs(weight - 100.0) for weight in weights)
+
+    gentle = furthest_weight_from_neutral(0.01)
+    firm   = furthest_weight_from_neutral(0.5)
+    assert firm < gentle, (
+        f'a 50x stronger pull should hold weights nearer neutral, got {firm:.2f} vs {gentle:.2f}'
+    )

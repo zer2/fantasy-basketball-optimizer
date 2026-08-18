@@ -72,11 +72,12 @@ export interface ModelParameters {
     chi: number
     aleph: number
     kappa: number
-    // Whether other drafters are modeled as strategic players (predicted by running H-scoring from
-    // their seats) or as neutral pickers with no strategic tendencies.
-    opponent_sophistication: boolean
-    // behavior_model_confidence (weight on predicted opponent punting) is deliberately NOT sent by
-    // the frontend: it is not user-facing, so the backend schema default applies to every session.
+    // Peak L1 pull of category weights toward neutral (the algorithm's lambda). Named
+    // reg_lambda to match the wire field, since lambda is a Python keyword server-side.
+    reg_lambda: number
+    // How strongly other drafters are modelled as pursuing the punts H-scoring predicts for them,
+    // from 0 (neutral pickers with no strategy) to 1 (the prediction taken at face value).
+    opponent_model_confidence: number
     n_iterations: number
     streaming_noise: number   // S_σ: SAVOR noise parameter, only meaningful in Auction Mode
 }

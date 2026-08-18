@@ -58,8 +58,8 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
         'chi':              p.chi,
         'aleph':            p.aleph,
         'kappa':            p.kappa,
-        'opponent_sophistication': p.opponent_sophistication,
-        'behavior_model_confidence':   p.behavior_model_confidence,
+        'reg_lambda':       p.reg_lambda,
+        'opponent_model_confidence': p.opponent_model_confidence,
         'n_iterations':     p.n_iterations,
         'streaming_noise':  p.streaming_noise,
         # auction

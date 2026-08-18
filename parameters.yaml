@@ -292,6 +292,14 @@ NBA:
       default : 0.3
       min : 0.0
       max: 5.0
+    reg_lambda :
+      # Peak strength of the L1 pull of category weights toward neutral on an empty roster, in units
+      # of 1e-3 (so 0.05 is the tuned 0.00005); the schedule decays it to ~0 by the final pick, and 0
+      # turns regularisation off. The ceiling is deliberate: past 0.5 the shrink can reach the
+      # singular w == v ray, where the future-pick model divides by zero.
+      default : 0.05
+      min : 0
+      max: 0.5
     most_categories_weight :
       # How much of the Head-to-Head objective is the probability of taking the majority of
       # categories, the rest being the average per-category win probability. 0 reproduces Each
@@ -303,8 +311,8 @@ NBA:
       default : 0.0
       min : 0.0
       max: 1.0
-    behavior_model_confidence :
-      # Halves how sharply opponents are expected to pursue their predicted punts. 0.5 softens the
+    opponent_model_confidence :
+      # How sharply opponents are expected to pursue their predicted punts. 0.5 softens the
       # self-play field enough that best responses stop crowding into a single open punt lane
       # (measured: cold-start herding collapses from 10/12 seats to 3/12 and the field gains a
       # stable interior assists share), which is also what makes the hybrid start policy's early
