@@ -637,7 +637,7 @@
 <td><a href="projections/">Player Stats</a></td>
 </tr>
 <tr>
-<td>Format</td>
+<td>Scoring format</td>
 <td>Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority</td>
 <td><a href="hscores/#formats-and-categories">H-scoring → Formats and categories</a></td>
 </tr>
@@ -675,9 +675,14 @@
 <td><a href="hscores/#no-model-of-other-managers">H-scoring → No model of other managers</a></td>
 </tr>
 <tr>
-<td>Opponent sophistication</td>
-<td>Whether other drafters are modeled as strategic (punting) drafters or as neutral pickers. A toggle, on by default</td>
+<td>C (confidence)</td>
+<td>How strongly other drafters are modeled as pursuing the punts H-scoring predicts for them. 0 treats them as neutral pickers; Rotisserie always uses 1</td>
 <td><a href="hscores/#no-model-of-other-managers">H-scoring → No model of other managers</a></td>
+</tr>
+<tr>
+<td>λ (lambda)</td>
+<td>How strongly early-round category weights are held near balanced, preserving room to pivot</td>
+<td><a href="hscores/#only-one-strategy-is-evaluated">H-scoring → Only one strategy is evaluated</a></td>
 </tr>
 <tr>
 <td>Number of iterations</td>
