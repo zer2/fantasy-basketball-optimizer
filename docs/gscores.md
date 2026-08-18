@@ -20,7 +20,7 @@ G-scores are a refinement. Z-scores implicitly assume every player performs at e
 
 ## Calculation logic 
 
-The definitions of Z-score and G-score are based off a highly idealized version of fantasy basketball, and some thought is needed to calculate them appropriately for a real league. 
+The definitions of Z-score and G-score are based on a highly idealized version of fantasy basketball, and some thought is needed to calculate them appropriately for a real league. 
 
 One of the inputs needed for the scoring process is a player pool. Using the entire pool of NBA players is a sensible starting point, but significantly flawed because most NBA players do not produce enough to be fantasy relevant. The approach of the website is to calculate scores based on the entire playing pool, then use the top players from that calculation as the player pool for the scores it ultimately calculates. This ensures that parameters like the player-to-player standard deviation are calculated based on players that are somewhat likely to be in real leagues. 
 

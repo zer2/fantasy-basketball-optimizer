@@ -82,10 +82,15 @@ _LOWVAR_TILT = float(os.environ.get('LOWVAR_TILT', '0.5'))
 # deviate. The per-pick strength lambda follows a Gaussian (phi) schedule (built per agent from n_picks
 # in __init__): it starts at the peak on an empty roster and decays to ~0 by the final pick.
 # REG_PEAK tunes the peak; PUNT_REG_SCHEDULE (comma-separated floats) overrides the whole schedule.
-# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster). Hardcoded --
-# not user-configurable -- since testing settled on this value; REG_PEAK overrides it for sweeps.
+# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster). Surfaced as
+# the session parameter reg_lambda; this value is what parameters.yaml defaults it to, kept here as the
+# figure testing settled on. REG_PEAK still overrides everything, for sweeps that must not touch a session.
 _REG_STRENGTH = 0.00005
-_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides the hardcoded _REG_STRENGTH
+# reg_lambda reaches the agent in units of REG_LAMBDA_UNIT, so that a sidebar box reads 0.05 rather
+# than 0.00005 -- the scale the other model parameters live on. This is the only place the two
+# representations meet.
+REG_LAMBDA_UNIT = 1e-3
+_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides both the parameter and the default
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
 # component from the singular w==v ray. Only needed if REG_PEAK is raised past ~5e-4, where the small
 # empty-board deviations let the shrink reach v and term_five goes singular (EC in particular).
@@ -219,8 +224,8 @@ class HAgent:
                  , slot_counts: dict
                  , aleph: float = 0.0
                  , kappa: float = 0.3
-                 , opponent_sophistication: bool = True
-                 , behavior_model_confidence: float = 1.0
+                 , reg_lambda: float = _REG_STRENGTH / REG_LAMBDA_UNIT
+                 , opponent_model_confidence: float = 0.5
                  # ── original optional args ──
                  , beth: float = 0
                  , collect_info: bool = False
@@ -257,11 +262,12 @@ class HAgent:
         self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else True
         roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
 
-        # Gaussian (phi) regulariser schedule built from the draft length: strength _REG_STRENGTH (the
-        # hardcoded peak) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
+        # Gaussian (phi) regulariser schedule built from the draft length: strength reg_lambda (the
+        # peak) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
         # with a concave shoulder set by _REG_SHAPE_B. REG_PEAK overrides the peak; PUNT_REG_SCHEDULE the
         # whole schedule.
-        reg_peak = float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None else _REG_STRENGTH
+        reg_peak = (float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None
+                    else reg_lambda * REG_LAMBDA_UNIT)
         _phi0    = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
         self.reg_schedule = ([float(x) for x in _schedule_override.split(',')] if _schedule_override
                              else [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
@@ -409,12 +415,16 @@ class HAgent:
         self._correction_cache = None
 
         # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_states).
-        # The session parameter (opponent_sophistication, default on) is the primary switch; the
-        # OPPONENT_MODEL env var, when set, overrides it globally — same pattern as kappa/KAPPA.
-        # Off restores neutral-opponent behaviour byte-for-byte.
+        # One session parameter carries both halves of it: how sharply opponents are expected to
+        # pursue their predicted punts, and — at zero — whether they are modelled as strategic at
+        # all. The OPPONENT_MODEL env var, when set, overrides it globally (1 = full, 0 = off),
+        # same pattern as kappa/KAPPA. Zero restores neutral-opponent behaviour byte-for-byte.
+        # Rotisserie pins full confidence: there is no equivalent uncertainty about punting there.
         awareness_env_override = os.environ.get('OPPONENT_MODEL')
-        self.opponent_sophistication = (awareness_env_override == '1' if awareness_env_override is not None
-                                       else opponent_sophistication)
+        confidence = (float(awareness_env_override) if awareness_env_override is not None
+                      else float(opponent_model_confidence))
+        self.opponent_model_confidence = 1.0 if scoring_format == 'Rotisserie' else confidence
+        self.models_opponents = self.opponent_model_confidence > 0.0
         # Per-team inferred build, keyed by team name:
         #   {'roster_key': frozenset(their non-NaN roster), 'category_weights': (n_cat,), 'mu_edge': (n_cat,)}.
         # roster_key self-invalidates as rosters grow (a new roster is a new key).
@@ -509,8 +519,6 @@ class HAgent:
         # self-play field is what suppresses the paper model's perverse hard punts (everyone shades the
         # volatile categories, so abandoning one is punished) — at half strength that discouragement
         # fails and extreme-profile players fall back into 2%-win-rate FT% punts (measured, 2020-21).
-        self.behavior_model_confidence = (1.0 if scoring_format == 'Rotisserie'
-                                          else float(behavior_model_confidence))
         # Field punt-popularity vector (per category), measured once on the empty-board multi-start scan
         # and reused for the early picks; drives the anti-crowded-punt (kappa) objective penalty. None
         # until measured (and whenever kappa=0), which makes the penalty inert.
@@ -584,7 +592,7 @@ class HAgent:
         # self._position_mode with ITS view, so the refresh must finish before this evaluate assigns its
         # own. Draft and auction alike; suppressed inside a nested inference solve — one level of
         # best-response.
-        if self.opponent_sophistication and not self._opponent_inference_active:
+        if self.models_opponents and not self._opponent_inference_active:
             self.refresh_stale_team_states(player_assignments, drafter, cash_remaining_per_team)
 
         self.n_drafters = len(player_assignments)
@@ -662,7 +670,7 @@ class HAgent:
             warm_start_shares  = None   # flex shares are PAIRED with the weights: same source, same rows
             self._partial_warm_start_rows = None
             self._warm_start_row_rate_scales = None   # per-row learning-rate multipliers (None = all cold)
-            team_state = self._team_states.get(drafter) if self.opponent_sophistication else None
+            team_state = self._team_states.get(drafter) if self.models_opponents else None
             # HYBRID start policy for a drafter's own evaluates: the first few picks (roster below
             # _WEAKNESS_SEED_MIN_ROSTER) COLD multi-start via the punt seed scan — the strategic
             # window where re-balancing is cheap and exploration pays — and from the third pick on,
@@ -670,7 +678,7 @@ class HAgent:
             # replays use the entry at ANY roster size: the pick being explained is known, so "the
             # Wemby team that added Duren" starts from the Wemby identity, never a fresh Duren-led
             # derivation. Entries are always identity-true (committed anchor build or a replay of
-            # actual picks; evaluates never write them). Measured at behavior_model_confidence 0.5 over
+            # actual picks; evaluates never write them). Measured at opponent_model_confidence 0.5 over
             # full 12-seat drafts: early punt-set re-balancing 44% vs 28% warm-only, late-round
             # stability equal to warm-only (21% vs 19%), 12/12 distinct final builds, no herding.
             # CAUTION: the cold window is only herd-safe on a softened field — at rationality 1.0 the
@@ -887,7 +895,7 @@ class HAgent:
             # cash). Then slots_left * mu_edge tilts the remaining generic fill -- the zero-sum DIRECTION on
             # top of the replacement/cash MAGNITUDE. Off / neutral recursion => no anchors, no tilt =>
             # byte-identical to the pre-feature auction model.
-            model_opponents = self.opponent_sophistication and opponent_model == 'inferred'
+            model_opponents = self.models_opponents and opponent_model == 'inferred'
             opponent_teams = [team for team in team_names if team != drafter]
             # Windowed bootstrap passes stack one complete field per snapshot along the opponent axis
             # (see the draft branch); outside the windowed bootstrap this is a single None entry = the
@@ -933,8 +941,8 @@ class HAgent:
                     replacement_value_by_category,
                 )
                 if mu_edge is not None:
-                    # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
-                    tilt = (self.n_picks - roster_len) * self.behavior_model_confidence * mu_edge
+                    # opponent_model_confidence scales how sharply this seat is expected to pursue its punts.
+                    tilt = (self.n_picks - roster_len) * self.opponent_model_confidence * mu_edge
                     base = base - tilt.reshape(1, self.n_categories, 1)
                     return base, np.asarray(tilt).reshape(self.n_categories)
                 return base, np.zeros(self.n_categories)
@@ -977,7 +985,7 @@ class HAgent:
                     score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
                     player_diff_total = (len(my_players) - 1 - 1) * replacement_value_by_category.reshape(1, -1)
                     money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
-                    tilt              = (self.n_picks - 1) * self.behavior_model_confidence * anchor_tilts
+                    tilt              = (self.n_picks - 1) * self.opponent_model_confidence * anchor_tilts
                     columns           = score_diff - player_diff_total + money_diff_total - tilt
                     field_blocks.append(columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
                     tilt_blocks.append(tilt[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
@@ -1052,7 +1060,7 @@ class HAgent:
             # pick, mirroring the edge the objective already adds for our own remaining picks). Off, or on an
             # inner inference solve (opponent_model='neutral'), the opponents stay category-neutral and the
             # construction below is byte-identical to the pre-feature model.
-            model_opponents = self.opponent_sophistication and opponent_model == 'inferred'
+            model_opponents = self.models_opponents and opponent_model == 'inferred'
             opponent_teams = [team for team in team_names if team != drafter]
             # Windowed bootstrap passes stack one complete field per snapshot along the opponent axis
             # (n_teams * K columns; the objective's mean over that axis weights snapshots uniformly).
@@ -1081,12 +1089,12 @@ class HAgent:
                         anchor_stats = self.x_scores.loc[anchors].to_numpy()          # (S, n_cat)
                         anchor_tilts = committed_diffs.loc[anchors].to_numpy()        # (S, n_cat)
                         extra_sum    = mean_extra_array.reshape(1, -1) * (target_team_size - 1)
-                        tilt         = ((self.n_picks - 1) * self.behavior_model_confidence) * anchor_tilts
+                        tilt         = ((self.n_picks - 1) * self.opponent_model_confidence) * anchor_tilts
                         totals_rows  = (anchor_stats + extra_sum) + tilt
                         field_blocks.append(totals_rows.T.reshape(1, self.n_categories, len(anchors)))
                         tilt_blocks.append(tilt.T.reshape(1, self.n_categories, len(anchors)))
                         if spare_anchor is not None:
-                            spare_tilt  = (((self.n_picks - 1) * self.behavior_model_confidence)
+                            spare_tilt  = (((self.n_picks - 1) * self.opponent_model_confidence)
                                            * committed_diffs.loc[spare_anchor].to_numpy())
                             spare_total = ((self.x_scores.loc[[spare_anchor]].sum(axis=0).to_numpy()
                                             + extra_sum.reshape(-1))
@@ -1290,8 +1298,8 @@ class HAgent:
             if mu_edge is None:
                 return base, np.zeros(self.n_categories)
             picks_left = self.n_picks - len([p for p in roster if p == p])
-            # behavior_model_confidence scales how sharply this seat is expected to pursue its punts.
-            tilt = picks_left * self.behavior_model_confidence * mu_edge
+            # opponent_model_confidence scales how sharply this seat is expected to pursue its punts.
+            tilt = picks_left * self.opponent_model_confidence * mu_edge
             return base + tilt.reshape(1, self.n_categories, 1), np.asarray(tilt).reshape(self.n_categories)
 
         totals, seat_tilts = {}, {}
@@ -2220,7 +2228,7 @@ class HAgent:
         self._populate_pass_scores     = None
         self._bootstrap_field_snapshots = None
 
-        bootstrap = (self.opponent_sophistication and self.n_picks > 1)
+        bootstrap = (self.models_opponents and self.n_picks > 1)
         if not bootstrap:
             result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team)
             self.default_h_scores = result['Scores'].sort_values(ascending=False)
@@ -2539,7 +2547,7 @@ def build_h_agent(info
                   , params
                   , slot_counts
                   , aleph=0.0
-                  , opponent_sophistication=True):
+                  , opponent_model_confidence=0.5):
     return HAgent(
         info           = info,
         omega          = omega,
@@ -2554,6 +2562,6 @@ def build_h_agent(info
         params         = params,
         slot_counts    = slot_counts,
         aleph          = aleph,
-        opponent_sophistication = opponent_sophistication,
+        opponent_model_confidence = opponent_model_confidence,
         beth           = beth,
     )

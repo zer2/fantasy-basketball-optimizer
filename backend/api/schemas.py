@@ -72,14 +72,16 @@ class ModelParameters(BaseModel):
     chi: float
     aleph: float
     kappa: float = 0.3
-    # Rational-opponent modelling (predict opponents as punting H-drafters). On by default; the formal
-    # behaviour tests toggle this per session instead of pinning environment variables.
-    opponent_sophistication: bool = True
+    # Peak L1 pull of category weights toward neutral, in units of 1e-3 (see REG_LAMBDA_UNIT).
+    # Named reg_lambda rather than lambda, which is a Python keyword.
+    reg_lambda: float = 0.05
+    # How sharply opponents are expected to pursue their predicted punts, and at 0 whether they are
+    # modelled as strategic at all. Pinned to 1.0 under Rotisserie by the agent.
+    opponent_model_confidence: float = 0.5
     # How sharply opponents are expected to pursue their predicted punts: every opponent tilt
     # (committed archetype or inferred build) is scaled by this factor at field construction.
     # 1 = full self-play equilibrium; 0 = category-neutral opponents (the pre-awareness model).
     # 0.5 mirrors parameters.yaml: the softened field that keeps best responses from herding.
-    behavior_model_confidence: float = 0.5
     n_iterations: int
     streaming_noise: float
 

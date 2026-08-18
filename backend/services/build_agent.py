@@ -561,8 +561,9 @@ def run_step5(session: Session) -> None:
         aleph          = cp['aleph'],
         kappa          = cp['kappa'],
         # .get: mirrors the schema default for sessions persisted before the parameter existed.
-        opponent_sophistication = cp.get('opponent_sophistication', True),
-        behavior_model_confidence   = cp.get('behavior_model_confidence', 1.0),
+        reg_lambda     = cp.get('reg_lambda', 0.05),
+        # .get: mirrors the schema default for sessions persisted before the parameter existed.
+        opponent_model_confidence = cp.get('opponent_model_confidence', 0.5),
         beth           = cp['beth'],
     )
 

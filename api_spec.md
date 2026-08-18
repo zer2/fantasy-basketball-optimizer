@@ -37,7 +37,7 @@ player_stats_v0   — raw stats, loaded from files/projections at session creati
 player_stats_v1   — derived: v0 minus injured_players
 player_stats_v2   — derived: v1 with upsilon adjustment applied
 info              — derived: process_player_data(v2, psi, chi, scoring_format, n_drafters, n_picks, tiebreaker_category, ...)
-HAgent            — derived: build_h_agent(info, omega, gamma, beth, n_picks, n_drafters, scoring_format, most_categories_weight, tiebreaker_category, ...)
+HAgent            — derived: build_h_agent(info, omega, gamma, beth, reg_lambda, n_picks, n_drafters, scoring_format, most_categories_weight, tiebreaker_category, ...)
 current_params    — snapshot of all params; used to diff PATCH bodies and determine what to re-run
 ```
 
@@ -53,7 +53,7 @@ When `PATCH /sessions/{id}` is called, the frontend passes `from_step` explicitl
 | `injured_players`                                         | 2                 |
 | `upsilon`                                                 | 3                 |
 | `psi`, `chi`, `n_drafters`, `n_picks`, `scoring_format`, `most_categories_weight`, `tiebreaker_category`, `categories`, `slot_counts` | 4 |
-| `omega`, `gamma`, `beth`, `n_iterations`, `streaming_noise` | 5              |
+| `omega`, `gamma`, `beth`, `reg_lambda`, `n_iterations`, `streaming_noise` | 5              |
 
 Step key:
 1. Load player_stats_v0 from data source
@@ -179,6 +179,7 @@ This is the most expensive call; all subsequent calls are faster.
     "psi": 0.5,
     "chi": 0.6,
     "aleph": 0.0,
+    "reg_lambda": 0.05,
     "n_iterations": 15,
     "streaming_noise": 0.0
   },
@@ -287,6 +288,7 @@ table above. All fields except `from_step` are optional — only send what chang
     "psi": 0.5,
     "chi": 0.6,
     "aleph": 0.0,
+    "reg_lambda": 0.05,
     "n_iterations": 15,
     "streaming_noise": 0.0
   },

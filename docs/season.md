@@ -1,6 +1,6 @@
 # Season Mode
 
-## Waiver wire & free agents tab 
+## Waiver tab 
 
 The waiver wire tab evaluates whether an available player might fit better on an existing team than one of the players already on the team.
 
@@ -59,7 +59,7 @@ Which trades end up being shown as suggestions depends on the user-configurable 
 
 ![Trade parameters](img/tp3.png)
 
-Candidate trades are found by iterating through all combinations of possible trades. Those trades are first filtered by a general value difference threshold, which limits candidate trades to those between collections of players whose total general values are similar to each other. Specifically, If the difference in total H-score (calculated for the first pick of a draft, with no players selected) between the two groups of players that are to be traded is above 2%, the trade will not be considered for analysis. E.g. a trade between two 48% players and two 50% players has an H-score difference of 4%, which is above the threshold, so the trade will not be analyzed further. This is to prevent unnecessary computation checking trades that are unlikely to be viable. 
+Candidate trades are found by iterating through all combinations of possible trades. Those trades are first filtered by a general value difference threshold, which limits candidate trades to those between collections of players whose total general values are similar to each other. Specifically, if the difference in total H-score (calculated for the first pick of a draft, with no players selected) between the two groups of players that are to be traded is above 2%, the trade will not be considered for analysis. E.g. a trade between two 48% players and two 50% players has an H-score difference of 4%, which is above the threshold, so the trade will not be analyzed further. This is to prevent unnecessary computation checking trades that are unlikely to be viable. 
 
 After trades are analyzed for H-score implications, one more filter is applied. Only those which meet the H-score differential thresholds as supplied by the user are shown. 
 

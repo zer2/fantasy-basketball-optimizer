@@ -44,6 +44,18 @@ const PARAM_SPECS: ParamSpec[] = [
         caption: 'Anti-crowded-punt strength. Early picks are gently steered away from punts the field is crowding into. 0 disables it.',
     },
     {
+        id: 'mp-opponent-confidence', key: 'opponent_model_confidence', label: 'C (confidence)', step: 0.1,
+        caption: 'How confident the algorithm is that other drafters are pursuing the punt strategies '
+               + 'it predicts for them. 0 treats them as neutral pickers with no strategy at all; 1 '
+               + 'takes the prediction at face value. Rotisserie always uses 1.',
+    },
+    {
+        id: 'mp-reg-lambda', key: 'reg_lambda', label: 'λ (lambda)', step: 0.01,
+        caption: 'How strongly early-round category weights are pulled back toward balanced. Higher '
+               + 'values punt less committally, keeping more room to pivot later; 0 turns the pull '
+               + 'off entirely.',
+    },
+    {
         id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
         caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
     },
@@ -83,35 +95,24 @@ export function renderModelParameters(container: HTMLElement): void {
     const grid = document.createElement('div')
     grid.className = 'param-grid'
     container.append(grid)
+    // The grid is built before the caller can call refreshOpponentConfidenceControl, so the item is
+    // in the DOM by the time the format section asks for its visibility to be reconsidered.
 
     for (const spec of PARAM_SPECS) {
         grid.append(makeParamItem(spec))
     }
-    grid.append(makeOpponentSophisticationItem())
 }
 
-/** The one boolean parameter: the standard sidebar toggle (like third-round reversal), so the
- *  switch sits inline with its text instead of dropping onto its own row. */
-function makeOpponentSophisticationItem(): HTMLElement {
-    const row = makeSidebarToggle('mp-opponent-sophistication', 'Opponent sophistication')
-
-    const infoBtn = document.createElement('button')
-    infoBtn.type = 'button'
-    infoBtn.className = 'info-btn'
-    infoBtn.textContent = 'ⓘ'
-    infoBtn.dataset.tooltip =
-        'When on, other drafters are assumed to choose players strategically — their picks and '
-        + 'future plans are predicted by running H-scoring from their seats. When off, other '
-        + 'drafters are assumed to choose players neutrally, with no strategic tendencies.'
-    // The row is a <label>: without this, clicking the info icon would also flip the toggle.
-    infoBtn.addEventListener('click', event => event.preventDefault())
-    row.append(infoBtn)
-
-    const input = row.querySelector('input') as HTMLInputElement
-    input.checked = Boolean(pref('opponent_sophistication', 1))
-    input.addEventListener('change', () => savePref('opponent_sophistication', input.checked ? 1 : 0))
-    return row
+/** Shows the opponent-confidence control only where it can apply. Rotisserie pins it to full
+ *  confidence — there is no equivalent uncertainty about punting in a format that barely punts — so
+ *  offering the number there would imply a choice the algorithm ignores. */
+export function refreshOpponentConfidenceControl(scoringFormat: string): void {
+    const item = document.getElementById('mp-opponent-confidence')?.closest('.param-item')
+    if (item instanceof HTMLElement) {
+        item.style.display = scoringFormat === 'Rotisserie' ? 'none' : ''
+    }
 }
+
 
 /** Builds one parameter item: label row with ⓘ info button, number input, collapsible caption. */
 function makeParamItem(spec: ParamSpec): HTMLElement {
@@ -157,8 +158,8 @@ export function getModelParameters(): ModelParameters {
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
         kappa:           readNumberInput('mp-kappa'),
-        opponent_sophistication:
-            (document.getElementById('mp-opponent-sophistication') as HTMLInputElement).checked,
+        reg_lambda:      readNumberInput('mp-reg-lambda'),
+        opponent_model_confidence: readNumberInput('mp-opponent-confidence'),
         omega:           readNumberInput('mp-omega'),
         gamma:           readNumberInput('mp-gamma'),
         beth:            readNumberInput('mp-beth'),
