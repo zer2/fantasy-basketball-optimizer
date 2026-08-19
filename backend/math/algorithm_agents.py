@@ -328,9 +328,10 @@ class HAgent:
 
         #TODO: clean this up
         if info['Position-Means'] is not None:
-            self.position_means = np.array(info['Position-Means']).reshape(1, -1, self.n_categories)
+            base_list = self._pos_cfg.position_structure['base_list']
+            self.position_means = np.array(info['Position-Means'].reindex(base_list).fillna(0)).reshape(1, -1, self.n_categories)
             
-            position_means_df = info['Position-Means']
+            position_means_df = info['Position-Means'].copy()
             position_means_df.loc['NP'] = 0
 
             # A player's positional baseline is the average of the position means over ALL of their
