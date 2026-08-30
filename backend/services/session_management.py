@@ -51,18 +51,18 @@ def normalize_objective_settings(current_params: dict) -> None:
 
     Applied wherever current_params is assembled or patched, so no caller has to remember.
     """
-    if current_params.get('scoring_format') == 'Rotisserie':
+    if current_params['scoring_format'] == 'Rotisserie':
         current_params['most_categories_weight'] = None
         current_params['tiebreaker_category']    = None
         return
 
-    weight = current_params.get('most_categories_weight')
+    weight = current_params['most_categories_weight']
     if weight is None or not 0.0 <= weight <= 1.0:
         raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
                          f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
 
-    categories = current_params.get('categories') or []
-    tiebreaker = current_params.get('tiebreaker_category')
+    categories = current_params['categories']
+    tiebreaker = current_params['tiebreaker_category']
     if tiebreaker is not None and (weight == 0
                                    or len(categories) % 2 == 1
                                    or tiebreaker not in categories):

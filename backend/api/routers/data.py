@@ -47,7 +47,7 @@ async def upload_projection(
         raise HTTPException(status_code=413, detail='File exceeds 10 MB limit.')
 
     all_params = load_all_params()
-    params = all_params.get('NBA', {})
+    params = all_params['NBA']
     try:
         df = parse_projection_upload(csv_bytes, params)
     except Exception as exc:

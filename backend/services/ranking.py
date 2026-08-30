@@ -254,7 +254,7 @@ def _build_candidates(
     my_players         = list(player_assignments.get(my_team_id, []))
     position_structure = H.position_structure
     base_list          = position_structure['base_list']
-    slot_counts        = current_params.get('slot_counts', {})
+    slot_counts        = current_params['slot_counts']
     slot_names         = _make_slot_names(slot_counts, position_structure)
 
     # ── Auction dollar values (SAVOR) ─────────────────────────────────────────

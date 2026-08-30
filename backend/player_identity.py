@@ -84,16 +84,17 @@ def make_replacement_player_identity() -> PlayerIdentity:
     )
 
 
-def build_name_to_player_id_resolver() -> dict[str, int]:
+def build_name_to_player_id_resolver(unified_player_table) -> dict[str, int]:
     """Every known spelling of every unified-table player -> NBA player id.
 
-    The ingestion edge for name-keyed sources. Rows without an NBA id are omitted —
-    a name that only maps to an id-less row is treated as unresolvable, exactly like
-    a name the table has never seen (the synthetic-id path handles both).
+    The ingestion edge for name-keyed sources. Takes the UNIFIED_PLAYER_TABLE frame as an
+    argument rather than fetching it, which keeps this module free of data-layer imports —
+    it used to fetch for itself, and that import was one half of a genuine circular
+    dependency with data_retrieval. Rows without an NBA id are omitted — a name that only
+    maps to an id-less row is treated as unresolvable, exactly like a name the table has
+    never seen (the synthetic-id path handles both).
     """
-    from backend.data_retrieval import get_unified_player_table
-
-    players = get_unified_player_table().dropna(subset=['NBA_PLAYER_ID'])
+    players = unified_player_table.dropna(subset=['NBA_PLAYER_ID'])
     resolver: dict[str, int] = {}
     for name_column in PLAYER_NAME_COLUMNS:
         named = players.dropna(subset=[name_column])

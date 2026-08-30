@@ -1,6 +1,6 @@
 // api/season_session.ts
 // Season mode API: trade analysis, trade suggestions, waiver wire evaluate, and season init.
-// Owns #ts-suggest-indicator for trade suggestions.
+// Owns #suggest-indicator for trade suggestions.
 // Directly manages #eval-indicator for waiver wire (no autopilot protection needed in season mode).
 
 import { setCandidatePlayerResults, setPlayerResultsFromGScores } from '../app_state.js'
@@ -102,7 +102,7 @@ export async function runTradeAnalyze(
 
 /**
  * Generates trade suggestions for two teams.
- * Updates #ts-suggest-indicator: "Starting..." while waiting for a session,
+ * Updates #suggest-indicator: "Starting..." while waiting for a session,
  * "Updating..." once the session is ready and computation begins.
  * Hiding the indicator when all fetches complete is the caller's responsibility.
  */

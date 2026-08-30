@@ -20,6 +20,9 @@ import numpy as np
 import pandas as pd
 
 from backend.infra.snowflake_connection import query, run_query, view_cache_timestamp
+# One-way edge: player_identity deliberately imports nothing from this module (the resolver
+# takes the unified table as an argument), so these module-level imports cannot cycle.
+from backend.player_identity import allocate_synthetic_player_ids, build_name_to_player_id_resolver
 
 
 # ── Player name mapping ───────────────────────────────────────────────────────
@@ -143,9 +146,7 @@ def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
     'player_id' column — the ingestion edge for name-keyed sources. Unresolved rows keep
     a null id; the caller decides between synthetic allocation (uploads) and loud
     warnings (curated sources)."""
-    from backend.player_identity import build_name_to_player_id_resolver
-
-    resolver = build_name_to_player_id_resolver()
+    resolver = build_name_to_player_id_resolver(get_unified_player_table())
     df = df.copy()
     df['player_id'] = df['Player'].map(resolver).astype('Int64')
     return df
@@ -267,8 +268,6 @@ def combine_projections(
     uploaded_dfs maps those same ids to their pre-parsed DataFrames. Snowflake
     sources (DARKO, ESPN) are fetched automatically if weight > 0.
     """
-    from backend.player_identity import allocate_synthetic_player_ids
-
     uploaded = uploaded_dfs or {}
 
     # Every source is gated on its weight — an uploaded file at weight zero must not

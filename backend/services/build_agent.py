@@ -85,7 +85,7 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     Returns None only for single-CSV mode, whose bytes arrive outside current_params.
     """
     source_type = cp['data_source_type']
-    sport = cp.get('sport', '')
+    sport = cp['sport']
     if source_type == 'historical':
         return (sport, 'historical', cp['season'])
     if source_type == 'projections':
@@ -560,10 +560,8 @@ def run_step5(session: Session) -> None:
         slot_counts    = slot_counts,
         aleph          = cp['aleph'],
         kappa          = cp['kappa'],
-        # .get: mirrors the schema default for sessions persisted before the parameter existed.
-        reg_lambda     = cp.get('reg_lambda', 0.05),
-        # .get: mirrors the schema default for sessions persisted before the parameter existed.
-        opponent_model_confidence = cp.get('opponent_model_confidence', 0.5),
+        reg_lambda     = cp['reg_lambda'],
+        opponent_model_confidence = cp['opponent_model_confidence'],
         beth           = cp['beth'],
     )
 

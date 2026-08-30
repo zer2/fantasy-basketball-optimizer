@@ -47,7 +47,14 @@ export function applyIndicatorState(
     , state: IndicatorState
 ): void {
     const element = document.getElementById(elementId)
-    if (!element) return
+    if (!element) {
+        // A missing indicator element is a programmer error — a renamed id, or a call before
+        // the owning pane rendered. console.error rather than throw, so a display nicety
+        // cannot take down the flow that called it; the e2e harness promotes console errors
+        // to test failures, so drift here still fails loudly where it matters.
+        console.error(`applyIndicatorState: no element with id '${elementId}'`)
+        return
+    }
     element.dataset.state = state
     element.textContent = INDICATOR_LABELS[state]
 }

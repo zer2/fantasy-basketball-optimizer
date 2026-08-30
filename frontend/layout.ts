@@ -65,6 +65,16 @@ export function applyLayout(): void {
 
 // ─── Own-data layout (Draft or Auction) ───────────────────────────────────────
 
+// Refresh the G-score tab when the auction board changes (pick/undo/clear). Registered once,
+// at module load, on the static #right-header (app.html): the innerHTML = '' in each layout
+// pass clears the element's children but not its own listeners, so registering inside
+// showOwnDataLayout stacked one handler per pass — one board edit then refreshed the table
+// once per accumulated handler. The auction board only dispatches this event while it is
+// mounted, so no mode guard is needed beyond the tab check.
+document.getElementById('right-header')!.addEventListener('auction-board-change', () => {
+    if (currentAuctionTab === 'my-team') refreshAuctionGScore()
+})
+
 /** Renders the own-data layout: draft/auction board + seat selector above the H-score table. */
 function showOwnDataLayout(mode: string): void {
     hide('season-nav')
@@ -94,10 +104,6 @@ function showOwnDataLayout(mode: string): void {
         buildModeTabBar(rightSubHeader, 'auction-tab-bar', currentAuctionTab, activateAuctionTab)
         activateAuctionTab(currentAuctionTab)
 
-        // Refresh G-score table when the auction board changes (pick/undo/clear)
-        rightHeader.addEventListener('auction-board-change', () => {
-            if (currentAuctionTab === 'my-team') refreshAuctionGScore()
-        })
     } else {
         renderDraftBoard(rightHeader)
         hide('auction-gscore')
