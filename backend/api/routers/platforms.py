@@ -38,8 +38,10 @@ def yahoo_token_route(req: YahooTokenRequest, user_key: str = Depends(current_us
         YahooIntegration.exchange_auth_code(
             client_id, client_secret, req.auth_code, yahoo_auth_dir(user_key),
         )
-    except Exception:
-        raise fail(502, 'Yahoo authorization failed.')
+    except Exception as error:
+        # Yahoo's own reason, not a generic failure: the difference between "the code expired" and
+        # "this grant has no fantasy scope" is the difference between retrying and reconfiguring.
+        raise fail(502, f'Yahoo authorization failed. {error}')
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

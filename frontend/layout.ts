@@ -13,7 +13,7 @@ import { renderTeamGScoreTable } from './table/gscore_table.js'
 import { getLeagueSettings, isPlatformConnected } from './parameter_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import { getFullTeamResult, refreshLiveAnalysis } from './api/draft_and_auction_session.js'
-import { setIndicatorState } from './api/session.js'
+import { setIndicatorState, claimDisplay } from './api/session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -150,7 +150,9 @@ function showLiveLayout(): void {
 
     // Until a platform is connected, the status reads "Unconnected" rather than a stale
     // "Updated"; once connected it returns to the neutral idle state (the default rankings
-    // are still shown the whole time — see showDefaultRankings).
+    // are still shown the whole time — see showDefaultRankings). Claimed so an async run
+    // still in flight from the previous layout cannot overwrite this once it settles.
+    claimDisplay()
     setIndicatorState(isPlatformConnected() ? 'idle' : 'unconnected')
 
     show('hscoretable')

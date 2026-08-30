@@ -2,7 +2,7 @@
 // Mirrors player_stats_popover() in src/parameter_collection/player_stats.py
 
 import { makeCustomSelect } from '../custom_select.js'
-import { uploadCsv, getSeasons } from '../api/client.js'
+import { uploadProjectionFile, getSeasons } from '../api/client.js'
 import { DataSource } from '../types.js'
 import { pref, savePref } from '../preferences.js'
 
@@ -349,7 +349,7 @@ function appendCustomUploadRow(
         statusSpan.textContent = 'Uploading…'
         const hadUploadAlready = row.dataId !== null
         try {
-            const resp = await uploadCsv(file)
+            const resp = await uploadProjectionFile(file)
             row.dataId = resp.data_id
             // A source that pairs projections with a league only carries that league's
             // categories — say which standard stats this file lacks so a lighter file

@@ -5,7 +5,10 @@
 
 import { setCandidatePlayerResults, setPlayerResultsFromGScores } from '../app_state.js'
 import { buildTable } from '../table/player_table.js'
-import { ensureSession, getSessionId, setIndicatorState, applyIndicatorState, withSessionRetry } from './session.js'
+import {
+    ensureSession, getSessionId, applyIndicatorState,
+    withDisplayOwnership, withSessionRetry,
+} from './session.js'
 import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState } from './client.js'
 import type { TradeAnalyzeResponse, TradeSuggestResponse } from './client.js'
 
@@ -49,7 +52,7 @@ export async function evaluateTeamHScore(
 ): Promise<{ h_score: number; win_rates: number[] } | null> {
     await ensureSession()
     const resp = await evaluate(getSessionId()!, { player_assignments: playerAssignments, my_team_id: teamId })
-    if (resp.candidates.length === 0) return null
+    if (resp.candidates.length === 0) return null //ZR: Is there any reasonable situation where this gets triggered? 
     return {
         h_score:   resp.candidates[0].h_score,
         win_rates: resp.candidates[0].win_rates,
@@ -63,8 +66,11 @@ export async function evaluateTeamHScore(
  * then builds minimal Player objects for the roster dropdowns.
  */
 export async function runSeasonInit(): Promise<void> {
-    await ensureSession()
-    setIndicatorState('idle')
+    // The build can take seconds; if the user has since left Season Mode, a newer actor
+    // owns the display and the 'idle' is skipped rather than stamped over its state. busy is
+    // omitted — the mode-change flow has already set its own spinner state — and onFailure is
+    // omitted to preserve the pre-wrapper behaviour of writing nothing on a failed init.
+    await withDisplayOwnership({ onSuccess: 'idle' }, () => ensureSession())
     setPlayerResultsFromGScores()
 }
 
@@ -137,15 +143,18 @@ export async function runWaiverEvaluate(
     playerAssignments: Record<string, number[]>
   , myTeamId: string
 ): Promise<void> {
-    setIndicatorState('evaluating')
-    try {
-        await withSessionRetry(async () => {
+    await withDisplayOwnership(
+        { busy: 'evaluating', onSuccess: 'idle', onFailure: 'idle' }
+        , stillOwner => withSessionRetry(async () => {
             const resp = await evaluate(getSessionId()!, { player_assignments: playerAssignments, my_team_id: myTeamId })
-            const players = candidatesToPlayerResults(resp.candidates)
-            setCandidatePlayerResults(players)
-            buildTable(players)
+            // No abort signal cancels this evaluate; by the time it resolves, a newer actor
+            // — another waiver check, or a mode switch into a draft evaluate — may own the
+            // display, and season candidates must not repaint that actor's board.
+            if (stillOwner()) {
+                const players = candidatesToPlayerResults(resp.candidates)
+                setCandidatePlayerResults(players)
+                buildTable(players)
+            }
         })
-    } finally {
-        setIndicatorState('idle')
-    }
+    )
 }
