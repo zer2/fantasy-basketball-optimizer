@@ -525,6 +525,10 @@ class HAgent:
         self._punt_popularity = None
 
         # ── MLB-specific setup (replaces get_pitcher_stats() / get_league_type()) ──
+        # MLB is UNSUPPORTED: kept from the Streamlit port, but no current ingestion path
+        # produces MLB data (every source is NBA-keyed), so the sport == 'MLB' branches in
+        # the backend are unreachable and untested. This is the authoritative note; the
+        # other branches carry a one-line pointer.
         if sport == 'MLB':
             cats = list(x_scores.columns)
             pitcher_stats = params.get('pitcher_stats', [])
@@ -1557,6 +1561,7 @@ class HAgent:
             'Shares': AdamOptimizer(learning_rate=shares_learning_rate),
         }
 
+        # MLB: unsupported and unreachable — see the MLB note in __init__.
         if self.sport == 'MLB':
             optimizers['Pitcher Preference'] = AdamOptimizer(learning_rate=0.05)
             pitching_preference = 0
@@ -1684,6 +1689,7 @@ class HAgent:
 
                 if self.sport == 'NBA':
                     category_weights = category_weights / category_weights.sum(axis=1).reshape(-1, 1)
+                # MLB: unsupported and unreachable — see the MLB note in __init__.
                 elif self.sport == 'MLB':
                     bw = category_weights[:, self.batting_stat_indices]
                     category_weights[:, self.batting_stat_indices] = bw / (2 * bw.sum(axis=1).reshape(-1, 1))
@@ -1901,6 +1907,7 @@ class HAgent:
             )
             del_full = (self.n_picks - 1 - n_players_selected) * self.get_del_full(category_weights, L, self.v)
 
+        # MLB: unsupported and unreachable — see the MLB note in __init__.
         elif self.sport == 'MLB':
             pitching_share = future_position_array[:, -2:].sum(axis=1).reshape(-1, 1, 1)
             batting_share  = 1 - pitching_share
@@ -1982,6 +1989,7 @@ class HAgent:
             gradients  = {'Categories': category_gradient}
             flex_shares = None
 
+        # MLB: unsupported and unreachable — see the MLB note in __init__.
         if self.sport == 'MLB':
             gradients['Pitcher Preference'] = np.einsum(
                 'ai,ik -> a', pdf_weights, self.pitching_preference_vector

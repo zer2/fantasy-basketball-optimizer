@@ -42,7 +42,7 @@ let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
 let livePlayerAssignments: Record<string, number[]> | null = null
 let liveRemainingCash: Record<string, number> | null = null
 
-export function setLivePlayerAssignments(
+function setLivePlayerAssignments(
     assignments: Record<string, number[]>
     , remainingCash?: Record<string, number>
 ): void {
@@ -50,7 +50,7 @@ export function setLivePlayerAssignments(
     liveRemainingCash = remainingCash ?? null
 }
 
-export function clearLivePlayerAssignments(): void {
+function clearLivePlayerAssignments(): void {
     livePlayerAssignments = null
     liveRemainingCash = null
 }
@@ -119,6 +119,12 @@ export async function createOrPatchSession(
 // session — no pipeline step reads it. Driven by an event so league_settings doesn't import
 // this module (it imports league_settings — a cycle).
 document.addEventListener('platform-connected', () => {
+    // A fresh connection invalidates any polled board from the previous league. This is not
+    // automatic: reconnecting to a different league on the SAME platform never touches the
+    // platform-selection reset, so without this clear the old league's assignments would be
+    // evaluated against the new league's session by any evaluate that runs before the first
+    // Refresh Analysis.
+    clearLivePlayerAssignments()
     const { platform, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     createOrPatchSession(4, {
         league: { n_drafters, n_picks, cash_per_team },

@@ -13,7 +13,7 @@ export interface CurrentUser {
     picture: string | null   // Google profile picture URL, when available
 }
 
-export const SIGN_IN_PATH = '/auth/login'
+const SIGN_IN_PATH = '/auth/login'
 
 // The signed-in user for this page load, or null when browsing anonymously. Set once during
 // startup and read wherever a feature has to know — chiefly the live-platform controls, which

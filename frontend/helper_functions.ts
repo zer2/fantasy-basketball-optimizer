@@ -10,7 +10,7 @@ import { pref, savePref } from './preferences.js'
 // where rendering code (e.g. inline column widths, short vs full labels) has
 // to make the same mobile/desktop choice in JS.
 
-export const MOBILE_BREAKPOINT_PX = 768
+const MOBILE_BREAKPOINT_PX = 768
 
 export function isMobileViewport(): boolean {
     return window.innerWidth <= MOBILE_BREAKPOINT_PX

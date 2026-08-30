@@ -40,9 +40,6 @@ document.addEventListener('seat-changed', () => {
     if (mode === 'Auction Mode' && currentAuctionTab === 'my-team') refreshAuctionGScore()
 })
 
-export function getCurrentAuctionTab(): string { return currentAuctionTab }
-export function getCurrentDraftTab():   string { return currentDraftTab   }
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Re-dispatches the layout with current DOM state. */
@@ -325,7 +322,7 @@ function activateAuctionTab(tabId: string): void {
     }
 }
 
-export function refreshDraftGScore(): void {
+function refreshDraftGScore(): void {
     const { player_assignments } = getDraftState()
     renderTeamGScoreTable(
         player_assignments[getCurrentSeat() ?? ''] ?? []
@@ -334,7 +331,7 @@ export function refreshDraftGScore(): void {
     )
 }
 
-export function refreshAuctionGScore(): void {
+function refreshAuctionGScore(): void {
     const { player_assignments } = getAuctionState()
     renderTeamGScoreTable(
         player_assignments[getCurrentSeat() ?? ''] ?? []

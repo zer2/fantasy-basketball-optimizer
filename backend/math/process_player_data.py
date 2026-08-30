@@ -421,6 +421,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
         position_means = position_means.loc[base_position_list, :]
         position_means_g = position_means * v
 
+        # MLB: unsupported and unreachable — no ingestion path produces MLB data
+        # (see the MLB note in algorithm_agents.HAgent.__init__).
         if sport == 'MLB':
             pitching_positions = ['SP', 'RP']
             batting_positions  = [p for p in position_means.index if p not in pitching_positions]

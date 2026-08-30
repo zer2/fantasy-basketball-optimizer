@@ -45,9 +45,9 @@ def rank_candidates(
 ) -> EvaluateResponse:
     """Drive the HAgent gradient-descent loop and return ranked candidates.
 
-    Clears warm-start weights so each evaluate call starts fresh, then advances
-    the get_h_scores generator for the requested number of iterations.  The
-    final yielded result is converted to a serialisable EvaluateResponse.
+    Runs the agent's get_h_scores solve for the requested board and converts the
+    result into a serialisable EvaluateResponse. Warm-start state is managed by
+    the agent itself, primed from the neutral baseline built at session creation.
 
     Args:
         session:            The active session (fetched by the caller). n_iterations

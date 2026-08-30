@@ -15,7 +15,7 @@ export function defaultTeamLabel(index: number): string {
 }
 
 /** The raw saved custom label (may be empty). Use for the header input's value. */
-export function getRawTeamLabel(index: number): string {
+function getRawTeamLabel(index: number): string {
     return pref(`team_label_${index}`, '') as string
 }
 
@@ -25,7 +25,7 @@ export function getTeamLabel(index: number): string {
 }
 
 /** Persists a custom label (empty/whitespace clears back to the default) and notifies listeners. */
-export function setTeamLabel(index: number, text: string): void {
+function setTeamLabel(index: number, text: string): void {
     savePref(`team_label_${index}`, text.trim())
     document.dispatchEvent(new Event(TEAM_LABELS_CHANGED))
 }

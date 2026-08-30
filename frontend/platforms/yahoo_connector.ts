@@ -13,7 +13,7 @@ const PLATFORM = 'Retrieve from Yahoo'
  *  https://basketball.fantasysports.yahoo.com/nba/12345 whose last numeric segment is the league.
  *  Anything else is returned trimmed and unchanged, so a wrong value fails at Yahoo with a message
  *  about that value rather than being silently reinterpreted here. */
-export function extractLeagueId(raw: string): string {
+function extractLeagueId(raw: string): string {
     const trimmed = raw.trim()
     if (!trimmed.includes('/')) return trimmed
     const numericSegments = trimmed.split(/[/?#]/).filter(segment => /^\d+$/.test(segment))

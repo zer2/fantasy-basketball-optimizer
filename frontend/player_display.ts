@@ -118,7 +118,7 @@ function preloadAllHeadshots(): void {
 document.addEventListener('player-registry-updated', preloadAllHeadshots)
 
 /** The proxied headshot URL for a player id, or null when the player has no headshot. */
-export function getHeadshotUrl(playerId: number): string | null {
+function getHeadshotUrl(playerId: number): string | null {
     if (!getRegistryEntry(playerId).has_headshot) return null
     return `${HEADSHOT_BASE_URL}${playerId}.png`
 }

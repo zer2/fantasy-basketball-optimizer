@@ -197,7 +197,7 @@ function makeTiebreakerRow(): HTMLElement {
 
 /** Shows the tiebreaker only where it can bite — majority scoring, even category count — and
  *  keeps its options in step with the categories in play. */
-export function refreshTiebreakerControl(): void {
+function refreshTiebreakerControl(): void {
     const row = document.getElementById('fc-tiebreaker-row')
     if (row === null || tiebreakerSelect === null) return
 
