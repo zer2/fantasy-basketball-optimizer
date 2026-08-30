@@ -375,7 +375,11 @@ export async function fetchLeagues(platform: string): Promise<PlatformLeague[]> 
 
 /** Returns the Yahoo OAuth authorization URL for the user to visit. */
 export async function fetchYahooAuthUrl(): Promise<string> {
-    const data = await jsonRequest<{ auth_url: string }>(`${BASE_URL}/platforms/yahoo/auth-url`, 'Yahoo auth URL')
+    // Cache-busted: the URL carries the OAuth scope, so a response cached from before a scope
+    // change sends the user to consent for the wrong thing -- which mints a token that exchanges
+    // cleanly and then cannot read anything.
+    const data = await jsonRequest<{ auth_url: string }>(
+        `${BASE_URL}/platforms/yahoo/auth-url?t=${Date.now()}`, 'Yahoo auth URL')
     return data.auth_url
 }
 

@@ -9,6 +9,18 @@ import { PlatformConnector } from './connector.js'
 
 const PLATFORM = 'Retrieve from Yahoo'
 
+/** The league id out of whatever the user pasted: a bare id, or a Yahoo URL like
+ *  https://basketball.fantasysports.yahoo.com/nba/12345 whose last numeric segment is the league.
+ *  Anything else is returned trimmed and unchanged, so a wrong value fails at Yahoo with a message
+ *  about that value rather than being silently reinterpreted here. */
+export function extractLeagueId(raw: string): string {
+    const trimmed = raw.trim()
+    if (!trimmed.includes('/')) return trimmed
+    const numericSegments = trimmed.split(/[/?#]/).filter(segment => /^\d+$/.test(segment))
+    return numericSegments.length > 0 ? numericSegments[numericSegments.length - 1] : trimmed
+}
+
+
 export function makeYahooConnector(setStatus: (message: string) => void): PlatformConnector {
     const element = document.createElement('div')
     element.id = 'ls-yahoo-wrap'
@@ -42,6 +54,17 @@ export function makeYahooConnector(setStatus: (message: string) => void): Platfo
     const leagueSelect = makeCustomSelect('ls-yahoo-league', [{ value: '', label: '(authenticate first)' }])
     element.append(leagueSelect.element)
 
+    // Yahoo's API lists only the leagues a user has joined, and a mock draft is not one of them —
+    // so the dropdown can never offer it. The id typed here is passed to exactly the same query as
+    // a picked one, which is why a mock works at all: it is a real league Yahoo just does not list.
+    element.append(makeLabel('ls-yahoo-league-id', 'Or enter a league ID'))
+    const leagueIdInput = document.createElement('input')
+    leagueIdInput.type        = 'text'
+    leagueIdInput.id          = 'ls-yahoo-league-id'
+    leagueIdInput.className   = 'team-name-input'
+    leagueIdInput.placeholder = 'e.g. 12345, or paste the draft URL'
+    element.append(leagueIdInput)
+
     authButton.addEventListener('click', () => {
         fetchYahooAuthUrl()
             .then(url => {
@@ -50,7 +73,8 @@ export function makeYahooConnector(setStatus: (message: string) => void): Platfo
                 codeInput.style.display  = ''
                 codeButton.style.display = ''
                 window.open(url, '_blank', 'noopener')
-                setStatus('Authorize on Yahoo, then paste the code below.')
+                const scope = new URL(url).searchParams.get('scope') ?? 'none'
+                setStatus(`Authorize on Yahoo (requesting scope: ${scope}), then paste the code below.`)
             })
             .catch(err => setStatus(`Yahoo auth failed: ${err.message}`))
     })
@@ -80,6 +104,10 @@ export function makeYahooConnector(setStatus: (message: string) => void): Platfo
         platform: PLATFORM,
         element,
         getSelection() {
+            // A typed id wins over the dropdown: it is the only way to reach a mock draft, and
+            // someone who has just typed one means it.
+            const typed = extractLeagueId(leagueIdInput.value)
+            if (typed) return { league_id: typed, division_id: null }
             const leagueId = leagueSelect.getValue() ?? ''
             if (!leagueId) return null
             return { league_id: leagueId, division_id: null }

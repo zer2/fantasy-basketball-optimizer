@@ -31,6 +31,7 @@ unproven. Known risks to check first at E2E:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from typing import Optional
@@ -42,14 +43,26 @@ from yfpy.query import YahooFantasySportsQuery
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
+from backend.infra.secret_config import get_secret
 from backend.platform_integration.helpers import deduplicate_team_names
 from backend.player_identity import RP_PLAYER_ID
 
 
+_logger = logging.getLogger('fbbo.yahoo')
+
 _GAME_CODE = 'nba'
 _YAHOO_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
 _YAHOO_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
-_REDIRECT_URI = 'oob'           # out-of-band: the user pastes the code (manual flow)
+# Yahoo's out-of-band flow ('oob') still exchanges codes but issues grants carrying no scope and no
+# user GUID -- every fantasy call then 403s. A REGISTERED redirect URI produces an intact grant, and
+# the paste-a-code UX survives: the browser lands on the redirect with ?code=... in the address bar
+# even when nothing is listening there. Set YAHOO_REDIRECT_URI to the exact string registered on the
+# Yahoo app; it must match at both the authorize and token steps, which is why it is read once here.
+_REDIRECT_URI = get_secret('YAHOO_REDIRECT_URI') or 'oob'
+# Yahoo grants scopes at consent time, not from the app's permission page: an authorization request
+# that asks for nothing gets a grant authorized for nothing, which still exchanges cleanly and then
+# 403s on every user-scoped call. fspt-r is Fantasy Sports read.
+_SCOPE = 'fspt-r'
 _DEFAULT_N_PICKS = 13           # Streamlit hard-codes this (ZR there: fix)
 
 # yfpy roster slot positions meaning "injured", excluded in Season Mode.
@@ -85,7 +98,8 @@ class YahooIntegration(PlatformIntegration):
     @staticmethod
     def build_auth_url(client_id: str) -> str:
         """The Yahoo page the user visits to obtain an authorization code to paste back."""
-        return f'{_YAHOO_AUTH_URL}?client_id={client_id}&redirect_uri={_REDIRECT_URI}&response_type=code'
+        return (f'{_YAHOO_AUTH_URL}?client_id={client_id}&redirect_uri={_REDIRECT_URI}'
+                f'&response_type=code&scope={_SCOPE}')
 
     @staticmethod
     def exchange_auth_code(
@@ -114,13 +128,34 @@ class YahooIntegration(PlatformIntegration):
         response.raise_for_status()
         token_data = response.json()
 
+        # Verify the grant can actually read fantasy data before persisting it. A scope-less grant
+        # exchanges and refreshes cleanly and only fails later, which surfaced as an empty league
+        # list and a 502 on connect -- far from the cause. Probing the cheapest fantasy endpoint
+        # turns that into an error at the moment of authorization, quoting Yahoo's own reason.
+        # Tested by use rather than by inspecting the response shape, which Yahoo has changed before.
+        access_token = token_data.get('access_token', '')
+        probe = requests.get(
+            'https://fantasysports.yahooapis.com/fantasy/v2/game/nba/metadata?format=json',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=20,
+        )
+        if probe.status_code != 200:
+            _logger.error('Yahoo authorization probe failed (%s); token response carried keys %s',
+                          probe.status_code, sorted(token_data.keys()))
+            raise RuntimeError(
+                f'Yahoo accepted the code but the token cannot read fantasy data '
+                f'(HTTP {probe.status_code}: {probe.text[:180]}). The grant carries no Fantasy '
+                f'Sports scope -- re-authorize from a freshly generated authorization page.'
+            )
+        guid = token_data.get('xoauth_yahoo_guid')
+
         os.makedirs(auth_dir, exist_ok=True)
         with open(os.path.join(auth_dir, 'token.json'), 'w') as token_file:
             json.dump({
                 'access_token':    token_data.get('access_token', ''),
                 'consumer_key':    client_id,
                 'consumer_secret': client_secret,
-                'guid':            None,
+                'guid':            guid,
                 'refresh_token':   token_data.get('refresh_token', ''),
                 'expires_in':      3600,
                 'token_time':      time.time(),
