@@ -333,7 +333,7 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
     test for the key that excluded uploaded-source weights and upload ids — changing an upload's
     weight served the stale cached blend, silently, and an uploaded blend could leak
     into sessions that never uploaded anything."""
-    from backend.services.build_agent import _v0_cache_key
+    from backend.services.build_agent import _build_v0_cache_key
 
     base_blend = {
         'sport': 'NBA',
@@ -341,26 +341,26 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
         'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'data_abc123': 0.5},
         'custom_data_ids': ['data_abc123'],
     }
-    assert _v0_cache_key(base_blend) is not None, 'uploaded blends are cacheable when fully keyed'
+    assert _build_v0_cache_key(base_blend) is not None, 'uploaded blends are cacheable when fully keyed'
 
     upload_reweighted = {**base_blend,
                          'blend_weights': {**base_blend['blend_weights'], 'data_abc123': 1.0}}
-    assert _v0_cache_key(upload_reweighted) != _v0_cache_key(base_blend), \
+    assert _build_v0_cache_key(upload_reweighted) != _build_v0_cache_key(base_blend), \
         "changing an upload's weight must change the key"
 
     different_upload = {**base_blend, 'custom_data_ids': ['data_def456'],
                         'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'data_def456': 0.5}}
-    assert _v0_cache_key(different_upload) != _v0_cache_key(base_blend), \
+    assert _build_v0_cache_key(different_upload) != _build_v0_cache_key(base_blend), \
         'a different uploaded table must change the key'
 
     no_upload = {**base_blend, 'custom_data_ids': None,
                  'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5}}
-    assert _v0_cache_key(no_upload) != _v0_cache_key(base_blend), \
+    assert _build_v0_cache_key(no_upload) != _build_v0_cache_key(base_blend), \
         'an upload-less blend must never share a key with an uploaded one'
 
     espn_reweighted = {**no_upload,
                        'blend_weights': {**no_upload['blend_weights'], 'ESPN': 1.0, 'DARKO': 0.0}}
-    assert _v0_cache_key(espn_reweighted) != _v0_cache_key(no_upload), \
+    assert _build_v0_cache_key(espn_reweighted) != _build_v0_cache_key(no_upload), \
         'changing a Snowflake source weight must change the key'
 
 

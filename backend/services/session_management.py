@@ -102,7 +102,7 @@ def build_session(
 _PIPELINE_CACHE_ENTRIES = 4
 
 
-def _pipeline_cache_key(current_params: dict) -> tuple:
+def _build_pipeline_cache_key(current_params: dict) -> tuple:
     """A hashable snapshot of the full parameter set that produced a pipeline build."""
     def freeze(value):
         if isinstance(value, dict):
@@ -132,7 +132,7 @@ def apply_patch(
     connecting a platform needs no pipeline rerun of its own.
     """
     if session.agent is not None:
-        outgoing_key = _pipeline_cache_key(session.current_params)
+        outgoing_key = _build_pipeline_cache_key(session.current_params)
         session.pipeline_cache[outgoing_key] = {
             'agent':           session.agent,
             'info':            session.info,
@@ -154,7 +154,7 @@ def apply_patch(
         session.platform_config = platform_config
         session.current_params['team_names'] = list(platform_config.teams_dict.keys())
 
-    cached_pipeline = session.pipeline_cache.get(_pipeline_cache_key(session.current_params))
+    cached_pipeline = session.pipeline_cache.get(_build_pipeline_cache_key(session.current_params))
     if cached_pipeline is not None:
         session.agent           = cached_pipeline['agent']
         session.info            = cached_pipeline['info']
@@ -162,7 +162,7 @@ def apply_patch(
         session.v1_clean        = cached_pipeline['v1_clean']
         session.v2              = cached_pipeline['v2']
         session.player_registry = cached_pipeline['player_registry']
-        session.pipeline_cache.move_to_end(_pipeline_cache_key(session.current_params))
+        session.pipeline_cache.move_to_end(_build_pipeline_cache_key(session.current_params))
     else:
         build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
 

@@ -400,7 +400,7 @@ def _build_candidates(
     # the full slot count — otherwise the table sums to the league total even when the drafter has
     # already filled flex spots with real players. Read straight from the roster slot assignments.
     remaining_flex_by_rank = (
-        _remaining_flex_slots(rosters_rows, len(my_players), slot_counts, position_structure)
+        _count_remaining_flex_slots(rosters_rows, len(my_players), slot_counts, position_structure)
         if has_position_data else {}
     )
     flex_allocations_by_rank = (
@@ -603,7 +603,7 @@ def _build_g_score_rows(
 
 # ── Flex allocations ──────────────────────────────────────────────────────────
 
-def _remaining_flex_slots(
+def _count_remaining_flex_slots(
     rosters_rows: np.ndarray
     , n_team_so_far: int
     , slot_counts: dict

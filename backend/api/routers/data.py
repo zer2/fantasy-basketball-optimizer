@@ -22,7 +22,7 @@ router = APIRouter()
 _REPORTABLE_STAT_COLUMNS = (*_CORE_PROJECTION_COLUMNS, 'Field Goal %', 'Free Throw %')
 
 
-def _missing_reportable_stats(parsed: pd.DataFrame, params: dict) -> list[str]:
+def _find_missing_reportable_stats(parsed: pd.DataFrame, params: dict) -> list[str]:
     """Standard stats this file cannot contribute. A percentage whose attempts column is
     missing counts as absent too: the volume weights the percentage, so without it the
     category is dropped at build time — better to say so on the upload than to let it
@@ -39,7 +39,7 @@ def _missing_reportable_stats(parsed: pd.DataFrame, params: dict) -> list[str]:
 
 @router.post('/data/upload', response_model=UploadResponse,
              dependencies=[Depends(enforce_rate_limit(UPLOAD_POLICY))])
-async def upload_projection(
+async def upload_projection_route(
     file: UploadFile = File(...),
 ):
     csv_bytes = await file.read()
@@ -60,5 +60,5 @@ async def upload_projection(
         data_id=data_id,
         n_players=len(df),
         expires_at=(datetime.now(timezone.utc) + timedelta(seconds=UPLOAD_TTL)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        missing_stats=_missing_reportable_stats(df, params),
+        missing_stats=_find_missing_reportable_stats(df, params),
     )

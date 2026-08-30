@@ -21,7 +21,7 @@ from backend.platform_integration.credential_store import (
 )
 
 
-def credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
+def build_credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
     """Build the credentials an integration needs, or None. Yahoo needs a persisted OAuth
     token directory keyed by client_id; an unauthenticated client_id fails noisily."""
     if platform == 'Retrieve from Yahoo' and client_id:
@@ -35,7 +35,7 @@ def credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
     return None
 
 
-def yahoo_app_credentials() -> tuple[str, str]:
+def read_yahoo_app_credentials() -> tuple[str, str]:
     """The Yahoo *app* (developer) client id/secret, from the environment."""
     client_id = get_secret('YAHOO_CLIENT_ID')
     client_secret = get_secret('YAHOO_CLIENT_SECRET')
@@ -50,7 +50,7 @@ def resolve_live_integration(platform: str, client_id: Optional[str] = None):
     calls that don't hit the API (list_divisions)."""
     if not is_live_platform(platform):
         raise HTTPException(status_code=400, detail=f'No live integration for platform {platform!r}.')
-    return get_integration(platform, credentials_for(platform, client_id))
+    return get_integration(platform, build_credentials_for(platform, client_id))
 
 
 def resolve_platform_config(
@@ -70,7 +70,7 @@ def resolve_platform_config(
             detail=f'platform_config is required for platform {platform!r}.',
         )
     # Credentials are keyed by the authenticated user, never by anything in the request.
-    integration = get_integration(platform, credentials_for(platform, user_key))
+    integration = get_integration(platform, build_credentials_for(platform, user_key))
     try:
         shape = integration.fetch_league_shape(
             platform_config_request.league_id,

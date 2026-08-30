@@ -65,7 +65,7 @@ def clear_v0_cache() -> None:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _sport_params(session: Session) -> tuple[dict, dict, str]:
+def _resolve_sport_params(session: Session) -> tuple[dict, dict, str]:
     """Return (all_params, sport_params, sport) for the current session."""
     all_params = load_all_params()
     sport = session.current_params['sport']
@@ -74,7 +74,7 @@ def _sport_params(session: Session) -> tuple[dict, dict, str]:
 
 # ── Step 1: load player data ──────────────────────────────────────────────────
 
-def _v0_cache_key(current_params: dict) -> tuple | None:
+def _build_v0_cache_key(current_params: dict) -> tuple | None:
     """Return a hashable cache key for v0_clean based on data source params.
 
     A projections blend is fully described by every source weight plus the ids of any
@@ -151,10 +151,10 @@ def run_step1(
     so repeated session creations with the same data source skip the round-trip and
     rebuild an identical registry.
     """
-    _, params, _ = _sport_params(session)
+    _, params, _ = _resolve_sport_params(session)
     current_params = session.current_params
     source_type = current_params['data_source_type']
-    cache_key = _v0_cache_key(current_params)
+    cache_key = _build_v0_cache_key(current_params)
 
     v0_with_names = None
     if cache_key is not None:
@@ -455,7 +455,7 @@ def run_step3(session: Session) -> None:
     """Run make_upsilon_adjustment using a fresh copy of v1_clean."""
     from backend.math.process_player_data import make_upsilon_adjustment
 
-    _, params, _ = _sport_params(session)
+    _, params, _ = _resolve_sport_params(session)
     upsilon = session.current_params['upsilon']
     # Always start from the clean v1 so repeated PATCH calls don't stack adjustments
     v2, _ = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, params)
@@ -468,7 +468,7 @@ def run_step4(session: Session) -> None:
     """Build the info dict (G-scores, X-scores, covariance, etc.) onto session.info."""
     from backend.math.process_player_data import process_player_data
 
-    _, params, sport = _sport_params(session)
+    _, params, sport = _resolve_sport_params(session)
     current_params = session.current_params
 
     scoring_format = current_params['scoring_format']
@@ -536,7 +536,7 @@ def run_step5(session: Session) -> None:
     """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
     from backend.math.algorithm_agents import HAgent
 
-    _, params, sport = _sport_params(session)
+    _, params, sport = _resolve_sport_params(session)
     current_params = session.current_params
 
     scoring_format = current_params['scoring_format']
