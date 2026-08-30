@@ -321,7 +321,7 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
     hScoreLabel.className = 'panel-rowlabel'
     hScoreLabel.textContent = 'H-score'
     hScoreRow.appendChild(hScoreLabel)
-    for (const value of [auctionValues.your_dollar, auctionValues.gnrc_dollar, auctionValues.orig_dollar]) {
+    for (const value of [auctionValues.your_dollar, auctionValues.generic_dollar, auctionValues.original_dollar]) {
         const cell = hScoreRow.insertCell(-1)
         cell.className = 'panel-datacell celltypea'
         cell.textContent = value.toFixed(1)
@@ -336,7 +336,7 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
     const naCell = gScoreRow.insertCell(-1)
     naCell.className = 'panel-datacell celltypea'
     naCell.textContent = '—'
-    for (const value of [auctionValues.gnrc_dollar_g, auctionValues.orig_dollar_g]) {
+    for (const value of [auctionValues.generic_dollar_g_score, auctionValues.original_dollar_g_score]) {
         const cell = gScoreRow.insertCell(-1)
         cell.className = 'panel-datacell celltypea'
         cell.textContent = value.toFixed(1)

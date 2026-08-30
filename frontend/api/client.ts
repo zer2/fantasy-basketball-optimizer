@@ -134,10 +134,10 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
         } : undefined,
         auction_values: c.auction_values ? {
             your_dollar:   c.auction_values.your_dollar,
-            gnrc_dollar:   c.auction_values.gnrc_dollar,
-            orig_dollar:   c.auction_values.orig_dollar,
-            gnrc_dollar_g: c.auction_values.gnrc_dollar_g,
-            orig_dollar_g: c.auction_values.orig_dollar_g,
+            generic_dollar:   c.auction_values.generic_dollar,
+            original_dollar:   c.auction_values.original_dollar,
+            generic_dollar_g_score: c.auction_values.generic_dollar_g_score,
+            original_dollar_g_score: c.auction_values.original_dollar_g_score,
         } : undefined,
     }))
 }

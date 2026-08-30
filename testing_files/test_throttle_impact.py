@@ -82,6 +82,6 @@ def test_throttle_auction_close_to_exact():
         exact_av, thr_av = exact_by[name].auction_values, thr_by[name].auction_values
         if exact_av is None or thr_av is None:
             continue
-        for field in ('your_dollar', 'gnrc_dollar', 'orig_dollar'):
+        for field in ('your_dollar', 'generic_dollar', 'original_dollar'):
             delta_d = abs(getattr(thr_av, field) - getattr(exact_av, field))
             assert delta_d <= _DOLLAR_TOL, f'{name}.{field}: moved ${delta_d:.2f} (> ${_DOLLAR_TOL})'

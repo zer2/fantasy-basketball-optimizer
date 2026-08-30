@@ -201,9 +201,9 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
     if (ctx.isAuction) {
         const av = player.auction_values
         if (av) {
-            const diff = av.your_dollar - av.gnrc_dollar
+            const diff = av.your_dollar - av.generic_dollar
             html += `<td class='auction-dollar' style='${stat_styler_secondary(diff, 10, 0)}'>${diff.toFixed(ctx.decimals)}</td>`
-            for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
+            for (const val of [av.your_dollar, av.generic_dollar, av.original_dollar]) {
                 html += `<td class='auction-dollar celltypeb'>${val.toFixed(ctx.decimals)}</td>`
             }
         } else {

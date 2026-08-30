@@ -121,10 +121,10 @@ export interface SessionRequest {
 
 export interface AuctionValues {
     your_dollar:   number;   // SAVOR on H-scores, team-specific, current cash/picks
-    gnrc_dollar:   number;   // SAVOR on H-scores, current cash/picks (generic baseline)
-    orig_dollar:   number;   // SAVOR on H-scores, full original cash/picks
-    gnrc_dollar_g: number;   // SAVOR on G-scores, current cash/picks
-    orig_dollar_g: number;   // SAVOR on G-scores, full original cash/picks
+    generic_dollar:   number;   // SAVOR on H-scores, current cash/picks (generic baseline)
+    original_dollar:   number;   // SAVOR on H-scores, full original cash/picks
+    generic_dollar_g_score: number;   // SAVOR on G-scores, current cash/picks
+    original_dollar_g_score: number;   // SAVOR on G-scores, full original cash/picks
 }
 
 export interface PlayerResult {

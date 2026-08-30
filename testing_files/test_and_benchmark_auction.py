@@ -57,7 +57,7 @@ def test_evaluate_auction():
     h_scores = [c.h_score for c in candidates]
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
-    # (expected_name, diff, your_dollar, gnrc_dollar, orig_dollar)
+    # (expected_name, diff, your_dollar, generic_dollar, original_dollar)
     # Regenerated 2026-08-16 with the corrected Each Category gradient. The old values came from a
     # state no kappa reproduces: the penalty was subtracted from the score at full strength while
     # reaching the gradient at a ninth of it, because the objective's own gradient was n_categories
@@ -75,8 +75,8 @@ def test_evaluate_auction():
         for expected_name, *_ in expected_auction_values:
             match = next((n for n in candidates_by_name if n.startswith(expected_name)), None)
             a = candidates_by_name[match].auction_values
-            rows.append(f"        ({repr(expected_name) + ',':30} {round(a.your_dollar - a.gnrc_dollar, 1)},"
-                        f"  {round(a.your_dollar, 1)}, {round(a.gnrc_dollar, 1)}, {round(a.orig_dollar, 1)})")
+            rows.append(f"        ({repr(expected_name) + ',':30} {round(a.your_dollar - a.generic_dollar, 1)},"
+                        f"  {round(a.your_dollar, 1)}, {round(a.generic_dollar, 1)}, {round(a.original_dollar, 1)})")
         print('\n# REGEN auction\n' + ',\n'.join(rows))
         return
     for expected_name, expected_diff, expected_your, expected_gnrc, expected_orig in expected_auction_values:
@@ -84,16 +84,16 @@ def test_evaluate_auction():
         assert match is not None, f'{expected_name} not found in candidates'
         auction = candidates_by_name[match].auction_values
         assert auction is not None, f'{match}: auction_values is None'
-        actual_diff = round(auction.your_dollar - auction.gnrc_dollar, 1)
+        actual_diff = round(auction.your_dollar - auction.generic_dollar, 1)
         assert abs(actual_diff - expected_diff) <= _SCORE_TOL, (
             f'{match}: expected diff {expected_diff}, got {actual_diff:.1f}'
         )
         assert abs(auction.your_dollar - expected_your) <= _SCORE_TOL, (
             f'{match}: expected your_dollar {expected_your}, got {auction.your_dollar:.1f}'
         )
-        assert abs(auction.gnrc_dollar - expected_gnrc) <= _SCORE_TOL, (
-            f'{match}: expected gnrc_dollar {expected_gnrc}, got {auction.gnrc_dollar:.1f}'
+        assert abs(auction.generic_dollar - expected_gnrc) <= _SCORE_TOL, (
+            f'{match}: expected generic_dollar {expected_gnrc}, got {auction.generic_dollar:.1f}'
         )
-        assert abs(auction.orig_dollar - expected_orig) <= _SCORE_TOL, (
-            f'{match}: expected orig_dollar {expected_orig}, got {auction.orig_dollar:.1f}'
+        assert abs(auction.original_dollar - expected_orig) <= _SCORE_TOL, (
+            f'{match}: expected original_dollar {expected_orig}, got {auction.original_dollar:.1f}'
         )

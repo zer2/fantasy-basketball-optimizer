@@ -63,7 +63,7 @@ def rank_candidates(
         EvaluateResponse containing the iteration count and ranked Candidate list.
     """
     info           = session.agent.info
-    H              = session.agent
+    h_agent              = session.agent
     current_params = session.current_params
     categories     = current_params['categories']
     n_iterations   = current_params['n_iterations']
@@ -77,7 +77,7 @@ def rank_candidates(
         player_id for team_players in player_assignments.values()
         for player_id in team_players
     ]
-    missing_players = sorted({p for p in rostered_players if p not in H.x_scores.index})
+    missing_players = sorted({p for p in rostered_players if p not in h_agent.x_scores.index})
     if missing_players:
         missing_display = [
             player_registry[p].name if p in player_registry else str(p)
@@ -110,7 +110,7 @@ def rank_candidates(
         total_candidates = None
 
     with record_phase('hscores'):
-        h_score_result = H.get_h_scores(
+        h_score_result = h_agent.get_h_scores(
             player_assignments      = player_assignments,
             drafter                 = my_team_id,
             n_iterations            = n_iterations,
@@ -129,7 +129,7 @@ def rank_candidates(
 
     with record_phase('build_candidates'):
         candidates = _build_candidates(
-            h_score_result, info, H, categories, player_assignments, my_team_id, current_params,
+            h_score_result, info, h_agent, categories, player_assignments, my_team_id, current_params,
             player_registry,
             remaining_cash,
             generic_h_scores=session.agent.default_h_scores,
@@ -148,7 +148,7 @@ def rank_candidates(
 def _build_candidates(
     h_score_result: dict,
     info: dict,
-    H,
+    h_agent,
     categories: list[str],
     player_assignments: dict[str, list[int]],
     my_team_id: str,
@@ -167,7 +167,7 @@ def _build_candidates(
     Args:
         h_score_result: The final dict yielded by HAgent.get_h_scores().
         info:           Session info dict (Positions, G-scores, etc.).
-        H:              The HAgent instance (carries v, original_v, position_structure).
+        h_agent:              The HAgent instance (carries v, original_v, position_structure).
         categories:     Ordered list of scoring category names.
         player_assignments: Current draft/auction state (team → player list).
         my_team_id:     The user's team identifier.
@@ -231,13 +231,13 @@ def _build_candidates(
 
     n_categories = len(categories)
 
-    # H.v is the normalised weight vector (sums to 1), shaped (n_cat, 1).
+    # h_agent.v is the normalised weight vector (sums to 1), shaped (n_cat, 1).
     # Reshape to (n_cat,) so it can broadcast against per-player weight rows.
-    v_reshaped = H.v.reshape(n_categories)
-    original_v = np.array(H.original_v)  # unnormalised weights; see _build_g_score_rows
+    v_reshaped = h_agent.v.reshape(n_categories)
+    original_v = np.array(h_agent.original_v)  # unnormalised weights; see _build_g_score_rows
 
     # Normalise raw category weights relative to v so that 100 = neutral emphasis.
-    # H.v is a scaled version of original_v adjusted to sum to 1 (required by the
+    # h_agent.v is a scaled version of original_v adjusted to sum to 1 (required by the
     # H-score math).  When the algorithm places no punting emphasis on a category,
     # weights_raw ≈ v, so dividing by v and scaling to 100 gives a neutral baseline of 100.
     category_weights_normalized = None if category_weights_raw is None else \
@@ -252,7 +252,7 @@ def _build_candidates(
     )
 
     my_players         = list(player_assignments.get(my_team_id, []))
-    position_structure = H.position_structure
+    position_structure = h_agent.position_structure
     base_list          = position_structure['base_list']
     slot_counts        = current_params['slot_counts']
     slot_names         = _make_slot_names(slot_counts, position_structure)
@@ -262,8 +262,8 @@ def _build_candidates(
     #
     # Three values per player:
     #   your_dollar — SAVOR on H-scores (team-specific, uses remaining cash)
-    #   orig_dollar — SAVOR on generic H-scores (no players taken), original full cash/picks
-    #   gnrc_dollar — orig_dollar restricted to the AVAILABLE players and rescaled so it sums to the
+    #   original_dollar — SAVOR on generic H-scores (no players taken), original full cash/picks
+    #   generic_dollar — original_dollar restricted to the AVAILABLE players and rescaled so it sums to the
     #                 current remaining cash. Not an independent SAVOR run: re-running SAVOR on the
     #                 baseline mid-auction lets already-drafted players absorb part of the remaining
     #                 cash, so the available players' values no longer exhaust the budget (and Diff
@@ -280,7 +280,7 @@ def _build_candidates(
         # auction evaluate always has cash_per_team here (no defensive fallback needed).
         cash_per_team   = current_params['cash_per_team']
         streaming_noise = float(current_params.get('streaming_noise', 10.0)) #ZR: What is this dumb fallback? What does claude.md say about this?
-        total_picks     = H.n_drafters * H.n_picks
+        total_picks     = h_agent.n_drafters * h_agent.n_picks
 
         all_players_chosen = [
             p for team_players in player_assignments.values()
@@ -292,7 +292,7 @@ def _build_candidates(
         total_cash_remaining = float(sum(remaining_cash.values()))
 
         if n_remaining > 0:
-            total_original_cash = float(H.n_drafters * cash_per_team)
+            total_original_cash = float(h_agent.n_drafters * cash_per_team)
 
             # G-scores for available (undrafted) players, used for G-score dollar values.
             available_in_g = [p for p in h_scores_sorted.index if p in player_g_scores.index]
@@ -308,28 +308,28 @@ def _build_candidates(
             your_dollar_series = auction_value_adjuster(
                 h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
             )
-            # orig_dollar: neutral baseline H-scores, full original cash/picks
-            orig_dollar_series = auction_value_adjuster(
+            # original_dollar: neutral baseline H-scores, full original cash/picks
+            original_dollar_series = auction_value_adjuster(
                 baseline_scores, total_picks, total_original_cash, streaming_noise,
             )
-            # gnrc_dollar: orig_dollar over the available players, rescaled to the remaining cash
+            # generic_dollar: original_dollar over the available players, rescaled to the remaining cash
             # (see the column definitions above — the sum over available players must equal the
             # remaining cash exactly, like your_dollar).
-            orig_available     = orig_dollar_series.reindex(h_scores_sorted.index).fillna(0.0)
-            gnrc_dollar_series = orig_available * (total_cash_remaining / orig_available.sum())
+            orig_available     = original_dollar_series.reindex(h_scores_sorted.index).fillna(0.0)
+            generic_dollar_series = orig_available * (total_cash_remaining / orig_available.sum())
             # G-score variants, same construction from the G-score original values.
-            orig_dollar_g_series = auction_value_adjuster(
+            original_dollar_g_score_series = auction_value_adjuster(
                 player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
             )
-            orig_g_available     = orig_dollar_g_series.reindex(g_scores_available.index).fillna(0.0)
-            gnrc_dollar_g_series = orig_g_available * (total_cash_remaining / orig_g_available.sum())
+            orig_g_available     = original_dollar_g_score_series.reindex(g_scores_available.index).fillna(0.0)
+            generic_dollar_g_score_series = orig_g_available * (total_cash_remaining / orig_g_available.sum())
             player_auction_values = {
                 p: AuctionValues(
                     your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),
-                    gnrc_dollar   = round(float(gnrc_dollar_series.get(p, 0.0)), 2),
-                    orig_dollar   = round(float(orig_dollar_series.get(p, 0.0)), 2),
-                    gnrc_dollar_g = round(float(gnrc_dollar_g_series.get(p, 0.0)), 2),
-                    orig_dollar_g = round(float(orig_dollar_g_series.get(p, 0.0)), 2),
+                    generic_dollar   = round(float(generic_dollar_series.get(p, 0.0)), 2),
+                    original_dollar   = round(float(original_dollar_series.get(p, 0.0)), 2),
+                    generic_dollar_g_score = round(float(generic_dollar_g_score_series.get(p, 0.0)), 2),
+                    original_dollar_g_score = round(float(original_dollar_g_score_series.get(p, 0.0)), 2),
                 )
                 for p in h_scores_sorted.index
             }
