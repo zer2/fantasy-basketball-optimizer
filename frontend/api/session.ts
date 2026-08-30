@@ -59,6 +59,63 @@ export function setIndicatorState(state: 'idle' | 'fetching' | 'evaluating' | 'u
     applyIndicatorState('eval-indicator', state)
 }
 
+// ─── Display ownership ────────────────────────────────────────────────────────
+// Ownership token for the eval display — #eval-indicator plus the candidate table. Every
+// actor that starts driving the display claims a new token; writes that happen after an
+// await are applied only while the writer still holds the newest claim, so a superseded
+// run — aborted, or merely slow — cannot stamp its output over its successor's display.
+//
+// Async actors run through withDisplayOwnership, which packages the whole protocol.
+// Synchronous writers (the debounce spinner, a layout switch, the autopilot reset) call
+// claimDisplay directly: nothing can supersede them mid-write, so they need no check, but
+// their claim is what invalidates any stale async run still in flight.
+
+let displayOwnershipToken = 0
+
+/** Take over the eval display without the async lifecycle — for synchronous writers. */
+export function claimDisplay(): number {
+    return ++displayOwnershipToken
+}
+
+function stillOwnsDisplay(token: number): boolean {
+    return displayOwnershipToken === token
+}
+
+/**
+ * Runs `work` as the owner of the eval display: claims it, shows `busy`, and applies the
+ * terminal state — `onSuccess` or `onFailure` — only if no newer actor has claimed the
+ * display in the meantime. An AbortError skips `onFailure` altogether: an abort means a
+ * successor is already driving the display. `work` receives a `stillOwner` predicate for
+ * its own post-await writes, e.g. painting results that arrived late.
+ *
+ * An omitted state means "deliberately no write here" — a handoff, not an accident. A phase
+ * whose success leads straight into another owning actor (a patch chained into an evaluate,
+ * a refresh that delegates to runEvaluate) omits onSuccess, since writing anything would
+ * misreport the app between the two phases.
+ */
+export async function withDisplayOwnership<T>(
+    indicatorStates: {
+        busy?: 'fetching' | 'evaluating'
+        onSuccess?: 'idle' | 'unconnected'
+        onFailure?: 'idle' | 'unconnected'
+    }
+    , work: (stillOwner: () => boolean) => Promise<T>
+): Promise<T> {
+    const ownershipToken = claimDisplay()
+    if (indicatorStates.busy) setIndicatorState(indicatorStates.busy)
+    const stillOwner = () => stillOwnsDisplay(ownershipToken)
+    try {
+        const result = await work(stillOwner)
+        if (indicatorStates.onSuccess && stillOwner()) setIndicatorState(indicatorStates.onSuccess)
+        return result
+    } catch (err: any) {
+        if (indicatorStates.onFailure && err?.name !== 'AbortError' && stillOwner()) {
+            setIndicatorState(indicatorStates.onFailure)
+        }
+        throw err
+    }
+}
+
 /** Enters autopilot indicator mode. While active, setIndicatorState calls are suppressed. */
 export function setAutopilotOn(): void {
     currentIndicatorState = 'autopiloting'
@@ -67,6 +124,8 @@ export function setAutopilotOn(): void {
 
 /** Exits autopilot indicator mode and resets to idle. */
 export function setAutopilotOff(): void {
+    // Claimed so an evaluate left over from before autopilot cannot overwrite the reset.
+    claimDisplay()
     currentIndicatorState = 'idle'
     applyIndicatorState('eval-indicator', 'idle')
 }
@@ -139,6 +198,10 @@ export function makeDebouncer(fn: () => void, delayMs = 300): Debouncer {
     return {
         fire() {
             if (timer) clearTimeout(timer)
+            // Claimed so an already-running evaluate that finishes during the debounce
+            // window cannot flash 'Updated' over this spinner; the debounced fn claims
+            // again itself when it starts.
+            claimDisplay()
             setIndicatorState('evaluating')
             timer = setTimeout(() => { timer = null; fn() }, delayMs)
         },

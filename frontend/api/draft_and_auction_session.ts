@@ -10,19 +10,31 @@ import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, clearTailSpace } from '../table/player_table.js'
 
-// Draft/waiver candidate batch size: score + paint the top players first, then fill in the
-// bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
-const CANDIDATE_BATCH_SIZE = 100
-import { startFreshSession, getSessionId, resetSession, setIndicatorState, withSessionRetry } from './session.js'
+import {
+    startFreshSession, getSessionId, resetSession, setIndicatorState,
+    withDisplayOwnership, withSessionRetry,
+} from './session.js'
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
+
+// Draft/waiver candidate batch size: score + paint the top players first, then fill in the
+// bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
+// A local constant rather than a parameters.yaml entry: batch size is rendering cadence, not
+// model configuration — it changes no score, varies by neither sport nor user, and reading it
+// from config would turn a compile-time constant into an async dependency. The value is still
+// deliberate: 100 covers everyone plausibly picked next, so the first paint is the whole
+// decision-relevant board — and it is the autodraft consideration window, since autopilot
+// scores only the first batch (drafts.md documents autodrafters as "top 100" for this reason).
+const CANDIDATE_BATCH_SIZE = 100
 
 // ─── Draft/auction state ─────────────────────────────────────────────────────
 
 const basePlayersBySession: Map<string, PlayerResult[]> = new Map()
 let evaluateController: AbortController | null = null
-let evaluateGeneration = 0
 let latestFullTeamResult: { h_score: number; win_rates: number[] } | null = null
+
+// Display ownership (withDisplayOwnership, claimDisplay) lives in session.js, beside the
+// indicator it protects; every async writer in this module runs through the wrapper.
 
 // Player assignments pulled from a live platform (Refresh Analysis). When set,
 // evaluateSeat uses these instead of reading the manual draft/auction board,
@@ -70,12 +82,14 @@ export async function createOrPatchSession(
   , patchBody: Record<string, unknown> = {}
   , signal?: AbortSignal
 ): Promise<void> {
-    setIndicatorState('fetching')
     // A data-source change means a new player pool: start warming its headshots now, in
     // parallel with the rebuild (startFreshSession does the same for brand-new sessions).
     const patchDataSource = patchBody.data_source as { type: string; season?: string | null } | undefined
     if (patchDataSource) prefetchHeadshotsForDataSource(patchDataSource.type, patchDataSource.season)
-    try {
+    // On failure the indicator must not stay stuck on "Starting..." — no evaluate follows a
+    // failed create/patch to reset it. onSuccess is omitted because the indicator deliberately
+    // stays 'fetching': the caller chains an evaluate, which claims the display itself.
+    await withDisplayOwnership({ busy: 'fetching', onFailure: 'idle' }, async () => {
         if (!getSessionId()) {
             await startFreshSession(signal)
             return
@@ -93,20 +107,17 @@ export async function createOrPatchSession(
             resetSession()
             await startFreshSession(signal)
         }
-    } catch (err: any) {
-        // This function flips the indicator to 'fetching', so it must restore it when the
-        // create/patch fails — no evaluate runs after a failure, and nothing else would
-        // reset it, leaving the spinner stuck on "Starting..." forever. Aborted calls are
-        // excluded: their successor has already set its own indicator state.
-        if (err.name !== 'AbortError') setIndicatorState('idle')
-        throw err
-    }
+    })
 }
+
 
 // When a live platform connects, patch the session so it carries the platform's config
 // (which drives the draft-state poll + name lookup) and the platform's drafter/pick counts.
-// No recreate needed — platform_config feeds nothing the pipeline computes. Driven by an
-// event so league_settings doesn't import this module (it imports league_settings — a cycle).
+// A patch suffices: the loaded player data is untouched, so the session does not need to be
+// torn down and rebuilt from step 1 the way a data-source change would require. The counts
+// rerun the later pipeline steps (4-5); platform_config itself is merely stored on the
+// session — no pipeline step reads it. Driven by an event so league_settings doesn't import
+// this module (it imports league_settings — a cycle).
 document.addEventListener('platform-connected', () => {
     const { platform, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     createOrPatchSession(4, {
@@ -128,11 +139,8 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
     if (evaluateController) evaluateController.abort()
     evaluateController = new AbortController()
     const { signal } = evaluateController
-    const generation = ++evaluateGeneration
-    setIndicatorState('evaluating')
-
     try {
-        return await withSessionRetry(async () => {
+        const scoreSeat = (stillOwner: () => boolean) => withSessionRetry(async () => {
             const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
             const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
 
@@ -214,7 +222,9 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
                     // The top of the board is what users look at; once the first batch is painted, drop
                     // the spinner even though the deep bench is still scoring. The remaining batches merge
                     // in silently — by the time anyone scrolls past the first ~100, they've arrived.
-                    if (first) setIndicatorState('idle')
+                    // Ownership-checked for non-aborting claimants (the debounce spinner, a patch):
+                    // their state must not be knocked back to 'idle' by this still-running evaluate.
+                    if (first && stillOwner()) setIndicatorState('idle')
                     // Reserve whitespace for the not-yet-scored candidates so the scrollbar stays put as
                     // later batches fill in; drop it once the last batch has arrived.
                     if (resp.has_more) reserveTailSpace(resp.total_candidates ?? 0)
@@ -239,11 +249,11 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             setCandidatePlayerResults(players)
             return null
         })
+        return await withDisplayOwnership(
+            { busy: 'evaluating', onSuccess: 'idle', onFailure: 'idle' }, scoreSeat)
     } catch (err: any) {
         if (err.name === 'AbortError') return null
         throw err
-    } finally {
-        if (evaluateGeneration === generation) setIndicatorState('idle')
     }
 }
 
@@ -270,23 +280,19 @@ export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Pro
 }
 
 /**
- * Live-platform refresh: polls the connected platform for the current draft /
- * roster state, stores it as the live player assignments, then re-evaluates.
- * Backs the "Refresh Analysis" button in the live-platform layout.
- */
-/**
  * Before a live platform is connected, show the base player rankings (everyone vs.
  * empty teams) so the user still sees default rankings pre-auth. Uses generic teams
  * for the evaluation, so it doesn't depend on a selected seat.
  */
 export async function showDefaultRankings(): Promise<void> {
-    // Cancel any in-flight per-seat evaluate and invalidate its generation, so its finally
-    // block can't flip the indicator back to 'idle' after we settle on 'unconnected'.
+    // A per-seat evaluate can still be in flight here — e.g. the user switches from manual
+    // entry to a live platform while the board is mid-score. Abort it and claim the
+    // display: the aborted run still executes its finally block, and only the ownership
+    // check there keeps it from stamping 'idle' over the states set here.
     if (evaluateController) evaluateController.abort()
-    evaluateGeneration++
-    setIndicatorState('fetching')
-    try {
-        await withSessionRetry(async () => {
+    await withDisplayOwnership(
+        { busy: 'fetching', onSuccess: 'unconnected', onFailure: 'unconnected' }
+        , stillOwner => withSessionRetry(async () => {
             const { n_drafters, mode } = getLeagueSettings()
             const genericTeams = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
             const emptyAssignments: Record<string, number[]> = Object.fromEntries(
@@ -298,27 +304,36 @@ export async function showDefaultRankings(): Promise<void> {
                 { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
             if (mode === 'Auction Mode') evalRequest.remaining_cash = buildFullBudgets(genericTeams)
             const resp = await evaluate(getSessionId()!, evalRequest)
-            const players = candidatesToPlayerResults(resp.candidates)
-            setBasePlayerResults(players)
-            setCandidatePlayerResults(players)
+            // Nothing cancels this request — it carries no abort signal — so by the time it
+            // resolves, a newer run may own the display. Its board must not be repainted
+            // with empty-board rankings, so the writes are ownership-gated like the
+            // indicator resets.
+
+            if (stillOwner()) {
+                const players = candidatesToPlayerResults(resp.candidates)
+                setBasePlayerResults(players)
+                setCandidatePlayerResults(players)
+                buildTable(players)
+            }
         })
-        buildTable(getCandidatePlayerResults()!)
-    } finally {
-        setIndicatorState('unconnected')
-    }
+    )
 }
 
+/**
+ * Live-platform refresh: polls the connected platform for the current draft /
+ * roster state, stores it as the live player assignments, then re-evaluates.
+ * Backs the "Refresh Analysis" button in the live-platform layout.
+ */
 export async function refreshLiveAnalysis(): Promise<void> {
-    setIndicatorState('fetching')
-    try {
+    // On a failed poll the spinner must not stay stuck. On success there is no terminal
+    // write to make: runEvaluate has claimed the display itself and owns the ending state,
+    // including for its own failures.
+    await withDisplayOwnership({ busy: 'fetching', onFailure: 'idle' }, async () => {
         await withSessionRetry(async () => {
             const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
             const state = await fetchDraftState(getSessionId()!, mode)
             setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
         })
         await runEvaluate()
-    } catch (err) {
-        setIndicatorState('idle')   // never leave the spinner stuck on a failed poll
-        throw err
-    }
+    })
 }
