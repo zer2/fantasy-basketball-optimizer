@@ -158,8 +158,8 @@ function buildHScoreResult(
     loading.textContent = 'Analyzing trade...'
     pane.append(loading)
 
-    const ignore_position_check = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
-    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, ignore_position_check)
+    const positionCheck = (document.getElementById('ts-check-positions') as HTMLInputElement).checked
+    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, positionCheck)
         .then(resp => renderHScoreResult(pane, resp))
         .catch(err => {
             pane.innerHTML = ''
@@ -328,7 +328,7 @@ function fetchMissingCombos(
 ): void {
     const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value) / 100
     const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value) / 100
-    const ignore_position_check        = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
+    const positionCheck                = (document.getElementById('ts-check-positions') as HTMLInputElement).checked
     const selected = comboSel.getSelected()
 
     for (const key of selected) {
@@ -342,7 +342,7 @@ function fetchMissingCombos(
         runTradeSuggest(
             assignments, yourTeam, theirTeam,
             [cp], your_differential_threshold, their_differential_threshold,
-            ignore_position_check,
+            positionCheck,
         )
             .then(resp => {
                 pendingFetches.delete(key)
@@ -577,14 +577,16 @@ export function renderSeasonTrading(container: HTMLElement): void {
     theirThreshGroup.append(theirThreshLabel, theirThreshInfo, theirThreshWrap)
     comboRow.append(theirThreshGroup)
 
-    // Ignore position toggle
-    const ignorePosToggle = makeSidebarToggle('ts-ignore-position', 'Ignore position')
-    comboRow.append(ignorePosToggle)
+    // Positively framed (CLAUDE.md): the toggle says what it does when on, and it is on by
+    // default. The old 'ts-ignore-position' preference is deliberately orphaned — its polarity
+    // is inverted, so carrying it over would flip every stored choice.
+    const checkPositionsToggle = makeSidebarToggle('ts-check-positions', 'Check positions')
+    comboRow.append(checkPositionsToggle)
 
     container.append(comboRow)
 
-    const ignorePosInput = document.getElementById('ts-ignore-position') as HTMLInputElement
-    ignorePosInput.checked = pref('ts-ignore-position', false)
+    const checkPositionsInput = document.getElementById('ts-check-positions') as HTMLInputElement
+    checkPositionsInput.checked = pref('ts-check-positions', true)
 
     const suggestResults = document.createElement('div')
     suggestResults.dataset.testid = 'trade-suggestions'
@@ -739,8 +741,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
         savePref('ts-their-threshold', parseFloat(theirThreshInput.value))
         clearCacheAndRefetch()
     })
-    ignorePosInput.addEventListener('change', () => {
-        savePref('ts-ignore-position', ignorePosInput.checked)
+    checkPositionsInput.addEventListener('change', () => {
+        savePref('ts-check-positions', checkPositionsInput.checked)
         clearCacheAndRefetch()
     })
 

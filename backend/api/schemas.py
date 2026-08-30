@@ -198,7 +198,7 @@ class TradeAnalyzeRequest(BaseModel):
     their_team: str
     my_trade: list[int]
     their_trade: list[int]
-    ignore_position_check: bool = False
+    position_check: bool = True
 
 
 # ── /sessions/{id}/trade/suggest ─────────────────────────────────────────────
@@ -210,7 +210,7 @@ class TradeSuggestRequest(BaseModel):
     combo_params: list[ComboParam]
     your_differential_threshold: float = 0.0
     their_differential_threshold: float = -0.20
-    ignore_position_check: bool = False
+    position_check: bool = True
 
 
 # ── /platforms/* (live platform integration) ─────────────────────────────────

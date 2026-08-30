@@ -222,11 +222,11 @@ def _build_candidates(
     # candidate cannot be fitted into the current roster and is excluded.
     rosters_sorted = h_score_result['Rosters'].iloc[order]
     rosters_col0 = rosters_sorted.iloc[:, 0]
-    no_position_data = bool((rosters_col0 == -1).all())
+    has_position_data = not bool((rosters_col0 == -1).all())
     player_fits_roster = (
-        pd.Series(True, index=sorted_index)
-        if no_position_data
-        else (rosters_col0 >= 0)                            # already in sorted order
+        (rosters_col0 >= 0)                                 # already in sorted order
+        if has_position_data
+        else pd.Series(True, index=sorted_index)
     )
 
     n_categories = len(categories)
@@ -374,13 +374,14 @@ def _build_candidates(
     # Each entry is (numpy_array, base_to_col) where base_to_col maps base position
     # name → column index in the array, allowing direct positional lookup per player.
     position_shares_arrays = (
-        None if no_position_data else {
+        {
             flex_type: (
                 share_df.iloc[order].values,
                 {base: i for i, base in enumerate(share_df.columns)},
             ) if share_df is not None else None
             for flex_type, share_df in h_score_result['Position-Shares'].items()
         }
+        if has_position_data else None
     )
 
     n_players = len(sorted_index)
@@ -399,12 +400,11 @@ def _build_candidates(
     # the full slot count — otherwise the table sums to the league total even when the drafter has
     # already filled flex spots with real players. Read straight from the roster slot assignments.
     remaining_flex_by_rank = (
-        {} if no_position_data
-        else _remaining_flex_slots(rosters_rows, len(my_players), slot_counts, position_structure)
+        _remaining_flex_slots(rosters_rows, len(my_players), slot_counts, position_structure)
+        if has_position_data else {}
     )
     flex_allocations_by_rank = (
-        None if no_position_data
-        else _build_flex_allocations(
+        _build_flex_allocations(
             n_players
             , base_list
             , position_structure
@@ -412,15 +412,16 @@ def _build_candidates(
             , slot_counts
             , remaining_flex_by_rank
         )
+        if has_position_data else None
     )
     roster_by_rank = (
-        None if no_position_data
-        else _build_roster_assignments(
+        _build_roster_assignments(
             list(sorted_index)
             , my_players
             , rosters_rows
             , slot_names
         )
+        if has_position_data else None
     )
 
     # Everything that doesn't need the expand-view builders is precomputed here in

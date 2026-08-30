@@ -86,7 +86,7 @@ export async function runTradeAnalyze(
   , theirTeam: string
   , myTrade: number[]
   , theirTrade: number[]
-  , ignorePositionCheck?: boolean
+  , checkPositions?: boolean
 ): Promise<TradeAnalyzeResponse> {
     return await withSessionRetry(() => analyzeTrade(getSessionId()!, {
         player_assignments:    playerAssignments,
@@ -94,7 +94,7 @@ export async function runTradeAnalyze(
         their_team:            theirTeam,
         my_trade:              myTrade,
         their_trade:           theirTrade,
-        ignore_position_check: ignorePositionCheck,
+        position_check: checkPositions,
     }))
 }
 
@@ -113,7 +113,7 @@ export async function runTradeSuggest(
   , comboParams: { n_traded: number; n_received: number; threshold: number }[]
   , yourThreshold: number
   , theirThreshold: number
-  , ignorePositionCheck?: boolean
+  , checkPositions?: boolean
 ): Promise<TradeSuggestResponse> {
     return await withSessionRetry(
         async () => {
@@ -125,7 +125,7 @@ export async function runTradeSuggest(
                 combo_params:                 comboParams,
                 your_differential_threshold:  yourThreshold,
                 their_differential_threshold: theirThreshold,
-                ignore_position_check:        ignorePositionCheck,
+                position_check:               checkPositions,
             })
         }
         , () => applyIndicatorState('suggest-indicator', 'fetching')

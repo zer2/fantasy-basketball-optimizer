@@ -31,7 +31,7 @@ def analyze_trade(
     , team_2: str
     , team_2_trade: list[str]
     , n_iterations: int
-    , ignore_position_check: bool = False
+    , position_check: bool = True
 ) -> Optional[dict]:
     """Compute pre/post H-scores for both teams after a trade.
 
@@ -45,7 +45,7 @@ def analyze_trade(
     post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
 
     # Check position eligibility for both teams
-    if not ignore_position_check:
+    if position_check:
         pos_cfg = session.agent._pos_cfg
         team_1_positions = info['Positions'].loc[post_trade_team_1]
         if not check_team_eligibility(team_1_positions, pos_cfg):
@@ -97,7 +97,7 @@ def run_trade_analyze(
     , their_team: str
     , my_trade: list[str]
     , their_trade: list[str]
-    , ignore_position_check: bool = False
+    , position_check: bool = True
 ) -> TradeAnalyzeResponse:
     """Public entry point for the trade/analyze endpoint."""
     if len(my_trade) == 0 or len(their_trade) == 0:
@@ -107,7 +107,7 @@ def run_trade_analyze(
         return TradeAnalyzeResponse(error="Too lopsided of a trade!")
 
     n_iterations = session.current_params['n_iterations']
-    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, ignore_position_check)
+    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, position_check)
 
     if result is None:
         return TradeAnalyzeResponse(
@@ -356,7 +356,7 @@ def run_trade_suggest(
     , combo_params: list[ComboParam]
     , your_threshold: float
     , their_threshold: float
-    , ignore_position_check: bool = False
+    , position_check: bool = True
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
 
@@ -414,7 +414,7 @@ def run_trade_suggest(
     df = df[mask]
 
     # Step 5: position check only on the small set that passed the thresholds
-    if not ignore_position_check and len(df) > 0:
+    if position_check and len(df) > 0:
         pos_cfg = session.agent._pos_cfg
         valid = []
         for _, row in df.iterrows():

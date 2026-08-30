@@ -293,7 +293,7 @@ export async function analyzeTrade(
         their_team: string
         my_trade: number[]
         their_trade: number[]
-        ignore_position_check?: boolean
+        position_check?: boolean
     }
 ): Promise<TradeAnalyzeResponse> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/analyze`, 'Trade analyze', {
@@ -326,7 +326,7 @@ export async function suggestTrades(
         combo_params: { n_traded: number; n_received: number; threshold: number }[]
         your_differential_threshold: number
         their_differential_threshold: number
-        ignore_position_check?: boolean
+        position_check?: boolean
     }
 ): Promise<TradeSuggestResponse> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, 'Trade suggest', {

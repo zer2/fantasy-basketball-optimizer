@@ -492,12 +492,13 @@ post-trade H-scores for both teams.
   "their_team": "Drafter 2",
   "my_trade": ["Shai Gilgeous-Alexander (PG,SG)"],
   "their_trade": ["Nikola Jokic (C)"],
-  "ignore_position_check": false
+  "position_check": true
 }
 ```
 
-`ignore_position_check` — if `true`, skips validation that both teams can legally field
-the post-trade roster (used when position data is unavailable).
+`position_check` — when `true` (the default), validates that both teams can legally
+field the post-trade roster; set `false` to skip that validation (used when position
+data is unavailable).
 
 **Response `200`:**
 ```json
@@ -545,7 +546,7 @@ Returns a list of suggested trades sorted by benefit.
   ],
   "your_differential_threshold": 0.0,
   "their_differential_threshold": -0.20,
-  "ignore_position_check": false
+  "position_check": true
 }
 ```
 
