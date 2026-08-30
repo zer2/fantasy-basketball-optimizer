@@ -28,9 +28,11 @@ export class HTTPError extends Error {
     }
 }
 
+
 /** FastAPI wraps an error message as {"detail": "..."}. Returns that sentence, or the body
- *  unchanged when it is not shaped that way — a caller showing this to a person wants the
- *  message, not the envelope. */
+ *  unchanged when it is not shaped that way. HTTPError messages are displayed verbatim in
+ *  on-screen status lines (e.g. "Connect failed: ..."), so the extracted text should be the
+ *  human-readable sentence, not the JSON envelope around it. */
 function readErrorDetail(body: string): string {
     try {
         const parsed = JSON.parse(body)
@@ -40,12 +42,13 @@ function readErrorDetail(body: string): string {
     }
 }
 
-// In-flight backend work, visible to background consumers: the headshot preloader
-// yields to bursty session traffic (evaluate batches and their follow-ups) and sweeps
-// only while this is zero. Session BUILDS — the bare POST /sessions and the PATCH
-// /sessions/{id} rebuild — are deliberately not counted: each is one long CPU-bound
-// call on the server while image serving is pure I/O, so the build window is free
-// time the sweep should use.
+// In-flight per-session backend work (/sessions/{id}/evaluate, /g-scores, /trade/*,
+// /draft-state), visible to background consumers: the headshot preloader yields to bursty
+// session traffic (evaluate batches and their follow-ups) and sweeps only while this is
+// zero. Session BUILDS are deliberately not counted — the bare POST /sessions never matches
+// the '/sessions/' prefix test (no trailing slash), and the PATCH rebuild is excluded by
+// method — because each build is one long CPU-bound call on the server while image serving
+// is pure I/O, so the build window is free time the sweep should use.
 let inFlightSessionRequests = 0
 
 /** Number of counted session requests in flight (0 = the backend is quiet apart from,
@@ -62,23 +65,27 @@ async function jsonRequest<T>(
     , label: string
     , init?: RequestInit
 ): Promise<T> {
-    const isSessionRequest = url.includes('/sessions/')
+    // Counted: per-session sub-resource work. Session builds are excluded (see the counter's
+    // comment above for how each exclusion happens).
+    const isCountedSessionRequest = url.includes('/sessions/')
         && (init?.method ?? 'GET').toUpperCase() !== 'PATCH'
-    if (isSessionRequest) inFlightSessionRequests += 1
+    if (isCountedSessionRequest) inFlightSessionRequests += 1
     try {
         const res = await fetch(url, init)
         if (!res.ok) {
             const body = await res.text()
-            // A rate-limited response already carries a sentence written for a person ("try
-            // again in N seconds"). Surfacing that instead of the raw JSON body is the
-            // difference between an explanation and an opaque failure.
-            if (res.status === 429) throw new HTTPError(res.status, readErrorDetail(body), label)
-            throw new HTTPError(res.status, body, label)
+            // A rate-limited response already carries a sentence written for the user ("try
+            // again in N seconds"); every other status keeps the raw body, which is aimed at
+            // debugging rather than display.
+            const message = res.status === 429 ? readErrorDetail(body) : body
+            throw new HTTPError(res.status, message, label)
+        } else if (res.status === 204) {
+            return undefined as T   // no content (e.g. token exchange)
+        } else {
+            return await (res.json() as Promise<T>)
         }
-        if (res.status === 204) return undefined as T   // no content (e.g. token exchange)
-        return await (res.json() as Promise<T>)
     } finally {
-        if (isSessionRequest) inFlightSessionRequests -= 1
+        if (isCountedSessionRequest) inFlightSessionRequests -= 1
     }
 }
 
@@ -144,10 +151,11 @@ export async function fetchConfig(sport: string): Promise<SportConfig> {
 
 // ── POST /data/upload ─────────────────────────────────────────────────────────
 
-/** Uploads a projection CSV (headers interpreted server-side) and returns its data_id.
- *  missing_stats lists standard stat columns the file does not carry — a source that pairs
- *  projections with a league only includes that league's active categories. */
-export async function uploadCsv(
+
+/** Uploads a projection file — CSV or Excel, headers interpreted server-side — and returns
+ *  its data_id. missing_stats lists standard stat columns the file does not carry — a source
+ *  that pairs projections with a league only includes that league's active categories. */
+export async function uploadProjectionFile(
     file: File
 ): Promise<{ data_id: string; n_players: number; expires_at: string; missing_stats: string[] }> {
     const form = new FormData()
@@ -159,8 +167,8 @@ export async function uploadCsv(
 
 /** Fetches the list of available historical seasons from the backend. */
 export async function getSeasons(): Promise<string[]> {
-    const data = await jsonRequest<{ seasons: string[] }>(`${BASE_URL}/seasons`, 'Get seasons')
-    return data.seasons
+    const response = await jsonRequest<{ seasons: string[] }>(`${BASE_URL}/seasons`, 'Get seasons')
+    return response.seasons
 }
 
 // ── GET /players/pool-ids ─────────────────────────────────────────────────────
@@ -168,16 +176,17 @@ export async function getSeasons(): Promise<string[]> {
 /** Best-effort NBA id list for a data source's pool, for prefetching headshots while
  *  the session builds. The backend answers only from already-cached frames — an empty
  *  list means "not cheaply known yet" and the post-build registry sweep covers it. */
+
 export async function fetchPoolPlayerIds(
     dataType: string
     , season?: string | null
 ): Promise<number[]> {
     const seasonParam = season ? `&season=${encodeURIComponent(season)}` : ''
-    const data = await jsonRequest<{ player_ids: number[] }>(
+    const response = await jsonRequest<{ player_ids: number[] }>(
         `${BASE_URL}/players/pool-ids?data_type=${encodeURIComponent(dataType)}${seasonParam}`,
         'Pool ids fetch',
     )
-    return data.player_ids
+    return response.player_ids
 }
 
 // ── POST /sessions ─────────────────────────────────────────────────────────────
@@ -203,6 +212,10 @@ export async function createSession(
         body:    JSON.stringify(req),
         signal,
     })
+    // g_scores is rebuilt rather than passed through: adoptRegistryAndGScores installs the
+    // payload's player registry (names/positions must exist before anything renders) and pins
+    // the wire rows to the PlayerGScore shape. fetchGScores uses the same helper, so a
+    // session's first G-scores and every later refetch are shaped by one code path.
     return { ...body, g_scores: adoptRegistryAndGScores(body) }
 }
 
@@ -356,21 +369,21 @@ export async function fetchDivisions(
     platform: string
     , leagueId: string
 ): Promise<PlatformDivision[]> {
-    const data = await jsonRequest<{ divisions: PlatformDivision[] }>(
+    const response = await jsonRequest<{ divisions: PlatformDivision[] }>(
         `${BASE_URL}/platforms/${encodeURIComponent(platform)}/divisions?league_id=${encodeURIComponent(leagueId)}`
         , 'Platform divisions'
     )
-    return data.divisions
+    return response.divisions
 }
 
 /** Lists the user's leagues for an auth-based platform (empty for manual-id platforms).
  *  Credentials are resolved server-side from the signed-in user's session cookie. */
 export async function fetchLeagues(platform: string): Promise<PlatformLeague[]> {
-    const data = await jsonRequest<{ leagues: PlatformLeague[] }>(
+    const response = await jsonRequest<{ leagues: PlatformLeague[] }>(
         `${BASE_URL}/platforms/${encodeURIComponent(platform)}/leagues`
         , 'Platform leagues'
     )
-    return data.leagues
+    return response.leagues
 }
 
 /** Returns the Yahoo OAuth authorization URL for the user to visit. */
@@ -378,9 +391,9 @@ export async function fetchYahooAuthUrl(): Promise<string> {
     // Cache-busted: the URL carries the OAuth scope, so a response cached from before a scope
     // change sends the user to consent for the wrong thing -- which mints a token that exchanges
     // cleanly and then cannot read anything.
-    const data = await jsonRequest<{ auth_url: string }>(
+    const response = await jsonRequest<{ auth_url: string }>(
         `${BASE_URL}/platforms/yahoo/auth-url?t=${Date.now()}`, 'Yahoo auth URL')
-    return data.auth_url
+    return response.auth_url
 }
 
 /** Exchanges a pasted Yahoo authorization code for tokens, persisted for the signed-in user. */
