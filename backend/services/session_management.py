@@ -50,6 +50,13 @@ def normalize_objective_settings(current_params: dict) -> None:
     again; what must not happen is that inert value splitting the cache.
 
     Applied wherever current_params is assembled or patched, so no caller has to remember.
+
+    Validation is layered, not duplicated: the LeagueSettings schema validator rejects
+    incoherent CREATE requests outright (422 — a client that names a tiebreaker outside its
+    categories should hear about it); this function normalizes MERGED state on create and
+    patch alike, lenient about settings that merely stopped applying mid-edit; and
+    HAgent.__init__ re-checks as a leaf contract for agents constructed directly in tests
+    and experiments. Removing any one layer loses a distinct guarantee.
     """
     if current_params['scoring_format'] == 'Rotisserie':
         current_params['most_categories_weight'] = None

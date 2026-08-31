@@ -28,7 +28,7 @@ def _find_missing_reportable_stats(parsed: pd.DataFrame, params: dict) -> list[s
     category is dropped at build time — better to say so on the upload than to let it
     quietly disappear from the category list later."""
     missing = [column for column in _REPORTABLE_STAT_COLUMNS if column not in parsed.columns]
-    for ratio_stat, ratio_info in params.get('ratio-statistics', {}).items():
+    for ratio_stat, ratio_info in params['ratio-statistics'].items():
         volume_statistic = ratio_info['volume-statistic']
         if (ratio_stat in parsed.columns
                 and volume_statistic not in parsed.columns

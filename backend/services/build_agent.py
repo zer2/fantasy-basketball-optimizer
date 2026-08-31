@@ -368,7 +368,7 @@ def _recover_volumes_from_ratio_cells(df: pd.DataFrame, params: dict) -> pd.Data
     does not use them, and emitting a column no other source carries would make the blend
     drop every player that source lacks.
     """
-    for ratio_stat, ratio_info in params.get('ratio-statistics', {}).items():
+    for ratio_stat, ratio_info in params['ratio-statistics'].items():
         volume_statistic = ratio_info['volume-statistic']
         if (ratio_stat not in df.columns
                 or volume_statistic in df.columns
@@ -498,7 +498,7 @@ def run_step4(session: Session) -> None:
     # without this second check the coefficient pass fails on the missing volume column
     # instead of the category simply dropping out.
     available_columns = set(session.v2.columns)
-    ratio_statistics  = params.get('ratio-statistics', {})
+    ratio_statistics  = params['ratio-statistics']
     categories = [
         category for category in current_params['categories']
         if category in available_columns

@@ -3,7 +3,7 @@ Backend-only copy of src/math/algorithm_agents.py.
 
 Changes vs original:
 - HAgent.__init__ takes explicit `sport`, `params`, `slot_counts`, `aleph` params.
-- All get_*() / st.session_state calls replaced with self.sport, self._pos_cfg, etc.
+- All get_*() / st.session_state calls replaced with self.sport, self.position_config, etc.
 - Imports changed to backend.math.position_optimization and backend.math.process_player_data.
 - @st.cache_resource removed; build_h_agent is a plain function.
 - All pure-math methods (get_pdf, get_term_*, Roto helpers, AdamOptimizer) are identical.
@@ -285,7 +285,7 @@ class HAgent:
         self._populate_pass_scores = None
 
         # Build position config (replaces all get_position_*() calls)
-        self._pos_cfg: PositionConfig = build_position_config(params, slot_counts)
+        self.position_config: PositionConfig = build_position_config(params, slot_counts)
 
         # ── info dict unpacking ────────────────────────────────────────────────
         self.positions = info['Positions']
@@ -342,8 +342,8 @@ class HAgent:
         L_by_position = np.array(L_by_position).reshape(1, -1, self.n_categories, self.n_categories)
 
         # ── L_weights (replaces get_L_weights()) ──────────────────────────────
-        pn         = self._pos_cfg.position_numbers
-        ps         = self._pos_cfg.position_structure
+        pn         = self.position_config.position_numbers
+        ps         = self.position_config.position_structure
         base_list  = ps['base_list']
         flex_list  = ps['flex_list']
         n_slots    = sum(pn.values())
@@ -488,8 +488,8 @@ class HAgent:
         self.guard_shares      = None
 
         # ── position structure (replaces get_position_structure()) ────────────
-        self.position_structure = self._pos_cfg.position_structure
-        self.position_indices   = self._pos_cfg.position_indices
+        self.position_structure = self.position_config.position_structure
+        self.position_indices   = self.position_config.position_indices
 
         self.initial_category_weights = None
         # Anti-crowded-punt coupling (the per-session kappa parameter).
@@ -1580,9 +1580,9 @@ class HAgent:
             # Eligibility rows depend only on which players are eligible for which slots — not on the
             # category weights — so build them once here instead of on every gradient iteration.
             if self.position_means is not None:
-                n_total_picks          = sum(self._pos_cfg.position_numbers.values())
-                candidate_player_array = get_player_rows(self.positions.loc[result_index], self._pos_cfg)
-                team_so_far_array      = (get_player_rows(self.positions.loc[self.players], self._pos_cfg)
+                n_total_picks          = sum(self.position_config.position_numbers.values())
+                candidate_player_array = get_player_rows(self.positions.loc[result_index], self.position_config)
+                team_so_far_array      = (get_player_rows(self.positions.loc[self.players], self.position_config)
                                           if len(self.players) > 0
                                           else np.empty((0, n_total_picks)))
             else:
@@ -1871,7 +1871,7 @@ class HAgent:
                 position_rewards,
                 team_so_far_array,
                 position_shares,
-                self._pos_cfg,
+                self.position_config,
                 active_count=active_count,
                 cached_rosters=self._position_rosters_cache,
                 priority_order=self._candidate_priority,

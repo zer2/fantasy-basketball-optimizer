@@ -32,7 +32,7 @@ def get_config_route(sport: str):
     p = all_params[sport]
 
     # All selectable categories = ratio stat names + counting stat names
-    ratio_names = list(p.get('ratio-statistics', {}).keys())
+    ratio_names = list(p['ratio-statistics'].keys())
     counting_names = p.get('counting-statistics', [])
     all_categories = ratio_names + [c for c in counting_names if c not in ratio_names]
 

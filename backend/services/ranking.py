@@ -17,6 +17,7 @@ from backend.models import (
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID
 from backend.infra.server_timing import record_phase
+from backend.math.position_config import PositionConfig
 
 # The engine's internal index for the one result row of a full-roster evaluate
 # (algorithm_agents.get_h_scores, n_players_selected == n_picks branch).
@@ -255,7 +256,7 @@ def _build_candidates(
     position_structure = h_agent.position_structure
     base_list          = position_structure['base_list']
     slot_counts        = current_params['slot_counts']
-    slot_names         = _make_slot_names(slot_counts, position_structure)
+    slot_names         = _make_slot_names(h_agent.position_config)
 
     # ── Auction dollar values (SAVOR) ─────────────────────────────────────────
     # Computed once for all players before the loop; None in draft mode.
@@ -400,7 +401,7 @@ def _build_candidates(
     # the full slot count — otherwise the table sums to the league total even when the drafter has
     # already filled flex spots with real players. Read straight from the roster slot assignments.
     remaining_flex_by_rank = (
-        _count_remaining_flex_slots(rosters_rows, len(my_players), slot_counts, position_structure)
+        _count_remaining_flex_slots(rosters_rows, len(my_players), h_agent.position_config)
         if has_position_data else {}
     )
     flex_allocations_by_rank = (
@@ -606,8 +607,7 @@ def _build_g_score_rows(
 def _count_remaining_flex_slots(
     rosters_rows: np.ndarray
     , n_team_so_far: int
-    , slot_counts: dict
-    , position_structure: dict
+    , position_config: PositionConfig
 ) -> dict[str, np.ndarray]:
     """Per-candidate count of each flex type's slots still open for future picks.
 
@@ -617,29 +617,21 @@ def _count_remaining_flex_slots(
     display scales the shares by this count rather than the full league slot count.
 
     Args:
-        rosters_rows:       Slot-index matrix, shape (n_candidates, n_columns); rosters_rows[rank, j]
-                            is the slot index assigned to player j in order [team_so_far..., candidate, future...].
-        n_team_so_far:      Number of players already on the drafter's team.
-        slot_counts:        Dict mapping position code → number of roster slots.
-        position_structure: Dict with 'base_list' and 'flex_list'.
+        rosters_rows:    Slot-index matrix, shape (n_candidates, n_columns); rosters_rows[rank, j]
+                         is the slot index assigned to player j in order [team_so_far..., candidate, future...].
+        n_team_so_far:   Number of players already on the drafter's team.
+        position_config: The agent's PositionConfig; position_ranges is the slot layout.
 
     Returns:
         Dict flex type → per-candidate array (length n_candidates) of remaining open slots.
     """
-    flex_types     = position_structure['flex_list']
-    position_order = position_structure['base_list'] + flex_types
-    # Slot index → position code, in the same canonical order _make_slot_names uses.
-    slot_type_by_index = [
-        position_code
-        for position_code in position_order
-        for _ in range(slot_counts.get(position_code, 0))
-    ]
     filled = rosters_rows[:, :n_team_so_far + 1].astype(int)   # slots taken by current players + candidate
     remaining: dict[str, np.ndarray] = {}
-    for flex_type in flex_types:
-        type_slot_indices = {i for i, code in enumerate(slot_type_by_index) if code == flex_type}
+    for flex_type in position_config.position_structure['flex_list']:
+        block = position_config.position_ranges[flex_type]
+        type_slot_indices = set(range(block['start'], block['end']))
         taken = np.array([sum(1 for slot in row if slot in type_slot_indices) for row in filled])
-        remaining[flex_type] = np.maximum(slot_counts.get(flex_type, 0) - taken, 0)
+        remaining[flex_type] = np.maximum(len(type_slot_indices) - taken, 0)
     return remaining
 
 
@@ -805,27 +797,22 @@ def _build_roster_assignments(
     return result
 
 
-def _make_slot_names(slot_counts: dict, position_structure: dict) -> list[str]:
+def _make_slot_names(position_config: PositionConfig) -> list[str]:
     """Return slot IDs in canonical order: base positions then flex.
 
-    Each position type contributes as many slot IDs as it has slots, numbered
-    from 1.  For example, two PG slots and one UTIL slot yield
-    ['PG1', 'PG2', 'UTIL1'].
-
-    Args:
-        slot_counts:        Dict mapping position code → number of roster slots.
-        position_structure: Dict with 'base_list' and 'flex_list' for ordering.
+    Each position contributes one ID per slot in its position_ranges block, numbered from
+    1 — two PG slots and one UTIL slot yield ['PG1', 'PG2', 'UTIL1']. Reading the layout
+    from position_ranges keeps these names in lockstep with how the math addresses the
+    roster vector, instead of re-deriving the same ordering by hand.
 
     Returns:
         Flat list of slot ID strings in canonical order.
     """
-    position_order = position_structure['base_list'] + position_structure['flex_list']
-    slot_list: list[str] = []
-    for position_type in position_order:
-        slot_count = slot_counts.get(position_type, 0)
-        for i in range(1, slot_count + 1):
-            slot_list.append(f"{position_type}{i}")
-    return slot_list
+    return [
+        f'{position_code}{i + 1}'
+        for position_code, block in position_config.position_ranges.items()
+        for i in range(block['end'] - block['start'])
+    ]
 
 
 

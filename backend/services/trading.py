@@ -46,13 +46,13 @@ def analyze_trade(
 
     # Check position eligibility for both teams
     if position_check:
-        pos_cfg = session.agent._pos_cfg
+        position_config = session.agent.position_config
         team_1_positions = info['Positions'].loc[post_trade_team_1]
-        if not check_team_eligibility(team_1_positions, pos_cfg):
+        if not check_team_eligibility(team_1_positions, position_config):
             return None
 
         team_2_positions = info['Positions'].loc[post_trade_team_2]
-        if not check_team_eligibility(team_2_positions, pos_cfg):
+        if not check_team_eligibility(team_2_positions, position_config):
             return None
 
     post_trade_assignments = player_assignments.copy()
@@ -415,14 +415,14 @@ def run_trade_suggest(
 
     # Step 5: position check only on the small set that passed the thresholds
     if position_check and len(df) > 0:
-        pos_cfg = session.agent._pos_cfg
+        position_config = session.agent.position_config
         valid = []
         for _, row in df.iterrows():
             sent, received = row['Send'], row['Receive']
             post_my_roster    = [p for p in player_assignments[my_team]    if p not in sent]    + received
             post_their_roster = [p for p in player_assignments[their_team] if p not in received] + sent
-            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    pos_cfg)
-            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], pos_cfg)):
+            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    position_config)
+            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], position_config)):
                 valid.append(row)
         df = pd.DataFrame(valid) if valid else df.iloc[:0]
 
