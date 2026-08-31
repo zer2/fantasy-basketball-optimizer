@@ -13,6 +13,7 @@ import { getSelectedCategories, getScoringFormat } from '../../parameter_collect
 import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
 import { stat_styler_primary } from '../../styles/styler_functions.js'
 import { evaluateTeamHScore, getLivePlatformRosters } from '../../api/season_session.js'
+import { makeSpacerTh } from '../../table/table_helpers.js'
 
 // Tracks the change-event listeners attached by the most recent render so they
 // can be removed before the next one. Without this, calling renderSeasonRosters
@@ -500,13 +501,6 @@ async function buildTeamGScoreTable(
     }
 
     container.appendChild(hScoreTbl)
-}
-
-/** Creates an invisible `<th>` spacer to lock column widths in panel tables. */
-function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
-    const th = document.createElement('th')
-    th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
-    return th
 }
 
 /** Resolves a human-entered roster name to a player id, or null when the registry doesn't

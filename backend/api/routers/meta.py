@@ -17,6 +17,8 @@ from backend.infra.rate_limit import (
     identify_rate_limit_client, get_rate_limiter, rate_limits_enabled, request_is_local,
 )
 from backend.api.errors import fail
+from backend.data_retrieval import get_available_seasons
+from backend.infra.snowflake_connection import peek
 
 router = APIRouter()
 
@@ -62,7 +64,6 @@ def get_config_route(sport: str):
 @router.get('/seasons')
 def get_seasons_route():
     try:
-        from backend.data_retrieval import get_available_seasons
         return {'seasons': get_available_seasons()}
     except Exception:
         raise fail(500, 'Could not load available seasons.')
@@ -78,7 +79,6 @@ def get_pool_player_ids_route(data_type: str, season: str | None = None):
     instead of triggering a Snowflake load that would race the session build's own.
     The registry-driven sweep after the build covers whatever this misses, so empty is
     always safe here (and only here — this endpoint is explicitly an optimization)."""
-    from backend.infra.snowflake_connection import peek
 
     if data_type == 'historical':
         if season is None:

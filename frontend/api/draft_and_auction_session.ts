@@ -8,6 +8,7 @@ import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/le
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
+import { defaultTeamLabel } from '../data_entry/team_labels.js'
 import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, clearTailSpace } from '../table/player_table.js'
 
 import {
@@ -64,6 +65,20 @@ export function getFullTeamResult(): { h_score: number; win_rates: number[] } | 
 function buildFullBudgets(teamNames: string[]): Record<string, number> {
     const { cash_per_team } = getLeagueSettings()
     return Object.fromEntries(teamNames.map(name => [name, cash_per_team]))
+}
+
+/** The evaluate request for an empty board: generic team names, no picks, evaluated from the
+ *  first seat. An auction session requires remaining_cash on every evaluate — with no picks
+ *  made, every team still holds its full budget. */
+function buildEmptyBoardEvaluateRequest(mode: string): Parameters<typeof evaluate>[1] {
+    const { n_drafters } = getLeagueSettings()
+    const genericTeams = Array.from({ length: n_drafters }, (_, index) => defaultTeamLabel(index))
+    const request: Parameters<typeof evaluate>[1] = {
+        player_assignments: Object.fromEntries(genericTeams.map(name => [name, []])),
+        my_team_id: genericTeams[0],
+    }
+    if (mode === 'Auction Mode') request.remaining_cash = buildFullBudgets(genericTeams)
+    return request
 }
 
 export function clearFullTeamResult(): void {
@@ -172,17 +187,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             // a full base evaluation to establish it — skip that work entirely.
             const boardIsEmpty = Object.values(evalReq.player_assignments).flat().length === 0
             if (!forAutopilot && !basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
-                const { n_drafters } = getLeagueSettings()
-                const genericTeams   = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
-                const emptyAssignments: Record<string, number[]> = Object.fromEntries(
-                    genericTeams.map(name => [name, []])
-                )
-                // An auction session requires remaining_cash on every evaluate; the empty board
-                // means every team still holds its full budget.
-                const baseEvalRequest: Parameters<typeof evaluate>[1] =
-                    { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
-                if (mode === 'Auction Mode') baseEvalRequest.remaining_cash = buildFullBudgets(genericTeams)
-                const baseResp = await evaluate(getSessionId()!, baseEvalRequest, signal)
+                const baseResp = await evaluate(getSessionId()!, buildEmptyBoardEvaluateRequest(mode), signal)
                 basePlayersBySession.set(getSessionId()!, candidatesToPlayerResults(baseResp.candidates))
             }
 
@@ -299,17 +304,8 @@ export async function showDefaultRankings(): Promise<void> {
     await withDisplayOwnership(
         { busy: 'fetching', onSuccess: 'unconnected', onFailure: 'unconnected' }
         , stillOwner => withSessionRetry(async () => {
-            const { n_drafters, mode } = getLeagueSettings()
-            const genericTeams = Array.from({ length: n_drafters }, (_, i) => `Team ${i + 1}`)
-            const emptyAssignments: Record<string, number[]> = Object.fromEntries(
-                genericTeams.map(name => [name, []])
-            )
-            // An auction session requires remaining_cash on every evaluate; with no picks made,
-            // every team still holds its full budget.
-            const evalRequest: Parameters<typeof evaluate>[1] =
-                { player_assignments: emptyAssignments, my_team_id: genericTeams[0] }
-            if (mode === 'Auction Mode') evalRequest.remaining_cash = buildFullBudgets(genericTeams)
-            const resp = await evaluate(getSessionId()!, evalRequest)
+            const { mode } = getLeagueSettings()
+            const resp = await evaluate(getSessionId()!, buildEmptyBoardEvaluateRequest(mode))
             // Nothing cancels this request — it carries no abort signal — so by the time it
             // resolves, a newer run may own the display. Its board must not be repainted
             // with empty-board rankings, so the writes are ownership-gated like the

@@ -132,6 +132,11 @@ def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
     return registry
 
 
+def _count_starters(slot_counts: dict, n_picks: int) -> int:
+    """Starters fielded per scoring period: the slot total when a structure is set, else every pick."""
+    return sum(slot_counts.values()) if slot_counts else n_picks
+
+
 def run_step1(
     session: Session,
     csv_bytes: bytes | None = None,
@@ -475,7 +480,7 @@ def run_step4(session: Session) -> None:
     n_drafters  = current_params['n_drafters']
     n_picks     = current_params['n_picks']
     slot_counts = current_params['slot_counts']
-    n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
+    n_starters  = _count_starters(slot_counts, n_picks)
 
     # The pool must be able to fill every roster; otherwise the whole model is ill-posed (there is
     # no replacement-level player to anchor auction values, and managers could not complete teams).
@@ -542,7 +547,7 @@ def run_step5(session: Session) -> None:
     scoring_format = current_params['scoring_format']
     n_picks     = current_params['n_picks']
     slot_counts = current_params['slot_counts']
-    n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
+    n_starters  = _count_starters(slot_counts, n_picks)
     n_drafters  = current_params['n_drafters']
 
     session.agent = HAgent(

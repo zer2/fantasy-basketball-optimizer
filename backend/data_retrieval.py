@@ -19,7 +19,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from backend.infra.snowflake_connection import query, run_query, view_cache_timestamp
+from backend.infra.snowflake_connection import query, run_query
 # One-way edge: player_identity deliberately imports nothing from this module (the resolver
 # takes the unified table as an argument), so these module-level imports cannot cycle.
 from backend.player_identity import allocate_synthetic_player_ids, build_name_to_player_id_resolver
@@ -72,31 +72,19 @@ def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:
 
 # ── Available seasons ─────────────────────────────────────────────────────────
 
-# (view_load_time, seasons). The timestamp is the load time of the cached
-# HISTORICAL_SEASONAL_AVERAGES_VIEW entry — when that entry is refreshed the
-# timestamp changes and we re-derive. This keeps the two in lockstep without
-# re-iterating the DataFrame on every call.
-_seasons_cache: tuple[float, list[str]] | None = None
-
 _HISTORICAL_VIEW = 'HISTORICAL_SEASONAL_AVERAGES_VIEW'
 
 
 def get_available_seasons() -> list[str]:
     """Return distinct historical seasons from Snowflake, newest first.
 
-    Derived from the same cached HISTORICAL_SEASONAL_AVERAGES_VIEW DataFrame
-    that get_historical_data uses, so the season list and the season data
-    cannot drift apart. Re-derived only when the view cache is refreshed.
+    Derived on every call from the same cached HISTORICAL_SEASONAL_AVERAGES_VIEW
+    frame that get_historical_data uses, so the season list and the season data
+    cannot drift apart. Deliberately not memoised: past the first load this is one
+    cached-frame copy and a sort, on a route hit about once per page load.
     """
-    global _seasons_cache
-    load_time = view_cache_timestamp(_HISTORICAL_VIEW)
-    if load_time is not None and _seasons_cache is not None and _seasons_cache[0] == load_time:
-        return _seasons_cache[1]
-
     df = query(_HISTORICAL_VIEW)
-    load_time = view_cache_timestamp(_HISTORICAL_VIEW)
-    _seasons_cache = (load_time, sorted({str(s) for s in df['SEASON'].tolist()}, reverse=True))
-    return _seasons_cache[1]
+    return sorted({str(s) for s in df['SEASON'].tolist()}, reverse=True)
 
 
 # ── Historical data ───────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
+import { defaultTeamLabel } from '../data_entry/team_labels.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -138,7 +139,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     function refreshTeamIdentities(): void {
         const nDrafters = parseInt(nDraftersInput.value)
         if (isNaN(nDrafters) || nDrafters <= 0) return
-        hiddenNamesTextarea.value = Array.from({ length: nDrafters }, (_, i) => `Team ${i + 1}`).join('\n')
+        hiddenNamesTextarea.value = Array.from({ length: nDrafters }, (_, i) => defaultTeamLabel(i)).join('\n')
         hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
     }
     refreshTeamIdentities()
