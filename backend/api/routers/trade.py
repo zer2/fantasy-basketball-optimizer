@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.api.dependencies import require_session
+from backend.api.helpers import fail, require_session
 from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
 from backend.services.trading import run_trade_analyze, run_trade_suggest
 from backend.api.schemas import TradeAnalyzeRequest, TradeSuggestRequest
 from backend.models import TradeAnalyzeResponse, TradeSuggestResponse
-from backend.api.errors import fail
 
 router = APIRouter()
 

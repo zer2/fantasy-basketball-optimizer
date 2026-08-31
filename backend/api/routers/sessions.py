@@ -14,17 +14,15 @@ from fastapi import APIRouter, HTTPException, Depends, status, Response
 from backend.infra.auth import current_user_key_optional
 from backend.infra.rate_limit import enforce_rate_limit, BUILD_POLICY, REBUILD_POLICY
 from backend.parameters import load_all_params
-from backend.api.dependencies import require_session
+from backend.api.helpers import fail, require_session, resolve_platform_config
 from backend.state.session import Session, delete_session
 from backend.services.session_management import build_session, apply_patch
 from backend.services.build_agent import clear_v0_cache, parse_projection_upload, InsufficientPlayerPoolError
 from backend.state.upload_store import get_upload
-from backend.api.platform_helpers import resolve_platform_config
 from backend.api.schemas import (
     SessionRequest, SessionResponse, PlayerGScore, PlayerRegistryEntry,
     PatchRequest, PatchResponse, GScoresResponse,
 )
-from backend.api.errors import fail
 
 router = APIRouter()
 

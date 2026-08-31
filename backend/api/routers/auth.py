@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response, RedirectResponse
 
 from backend.infra.auth import oauth, email_is_allowed
-from backend.api.errors import fail
+from backend.api.helpers import fail
 
 router = APIRouter()
 logger = logging.getLogger('fbbo.api')

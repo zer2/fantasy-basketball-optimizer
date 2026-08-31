@@ -16,7 +16,7 @@ from backend.parameters import load_all_params
 from backend.infra.rate_limit import (
     identify_rate_limit_client, get_rate_limiter, rate_limits_enabled, request_is_local,
 )
-from backend.api.errors import fail
+from backend.api.helpers import fail
 from backend.data_retrieval import get_available_seasons
 from backend.infra.snowflake_connection import peek
 

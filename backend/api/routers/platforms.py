@@ -9,19 +9,18 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Depends, status, Response
 
 from backend.infra.auth import current_user_key
-from backend.api.dependencies import require_session
 from backend.state.session import Session
 from backend.platform_integration.registry import get_integration
 from backend.platform_integration.credential_store import yahoo_auth_dir, store_espn_credentials
 from backend.platform_integration.integrations.yahoo import YahooIntegration
-from backend.api.platform_helpers import (
+from backend.api.helpers import (
+    fail, require_session,
     build_credentials_for, read_yahoo_app_credentials, resolve_live_integration,
 )
 from backend.api.schemas import (
     YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
     LeaguesResponse, DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
 )
-from backend.api.errors import fail
 
 router = APIRouter()
 
