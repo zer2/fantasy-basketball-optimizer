@@ -73,7 +73,7 @@ def _create_session(season: str, objective: str):
     request['parameters']['beth'] = 0
     # Turn OFF kappa (anti-crowded-punt) for this harness only: the field here drafts by G-score and
     # does not punt, so there is no crowd to defect from and the penalty would only distort the
-    # H-vs-G comparison. (A KAPPA env override still wins over this, for behavioral experiments.)
+    # H-vs-G comparison.
     request['parameters']['kappa'] = 0.0
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'Session creation failed ({season}, {objective}): {response.text}'
