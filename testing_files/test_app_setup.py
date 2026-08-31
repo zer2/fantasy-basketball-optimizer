@@ -480,18 +480,19 @@ def test_headshot_is_served_even_when_the_cache_cannot_be_written(monkeypatch):
     handler."""
     from pathlib import Path
     from unittest import mock
-    from backend.api.routers import meta
+    from backend.api.routers import reference
+    from backend.infra import headshot_cache
 
-    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
-    monkeypatch.setattr(meta, '_read_headshot_from_disk', lambda _id: None)
-    monkeypatch.setattr(meta.requests, 'get',
+    headshot_cache._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+    monkeypatch.setattr(headshot_cache, '_read_headshot_from_disk', lambda _id: None)
+    monkeypatch.setattr(headshot_cache.requests, 'get',
                         lambda *args, **kwargs: mock.Mock(status_code=200, content=b'PNG-BYTES'))
     monkeypatch.setattr(Path, 'write_bytes',
                         lambda *args, **kwargs: (_ for _ in ()).throw(OSError('read-only file system')))
 
-    response = meta.get_player_headshot_route(_UNWRITABLE_CACHE_TEST_ID)
+    response = reference.get_player_headshot_route(_UNWRITABLE_CACHE_TEST_ID)
     assert response.body == b'PNG-BYTES', 'the fetched image must still be served'
-    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+    headshot_cache._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
 
 
 _UNWRITABLE_CACHE_TEST_ID = 987654321
