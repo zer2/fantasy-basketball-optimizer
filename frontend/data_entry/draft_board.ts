@@ -3,7 +3,7 @@
 // Mirrors make_drafting_tab_own_data() in src/tabs/drafting.py.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { isMobileViewport, readRequiredIntInput, makeBoardToggleHeaderCell } from '../helper_functions.js'
+import { isMobileViewport, readRequiredIntInput, makeBoardToggleHeaderCell, buildBoardTableShell } from '../helper_functions.js'
 import { getPlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
 import { getRegistryEntry } from '../player_registry.js'
 import { makeMinimalPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../player_display.js'
@@ -13,6 +13,7 @@ import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethod } from './drafter_methods.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
+import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
 import {
     DraftConfig,
     getPickRow, getPickDrafter, getDrafted, getTeamNames, getNDrafters, getNPicks, getConfigKey,
@@ -311,25 +312,8 @@ function buildBoardTable(container: HTMLElement): HTMLTableElement {
 function buildStandardTable(container: HTMLElement): HTMLTableElement {
     const nDrafters = getNDrafters()
 
-    const table = document.createElement('table')
-    table.className      = 'entry-table'
-    table.style.width    = '100%'
-    table.style.minWidth = (ROUND_W + nDrafters * TEAM_W) + 'px'
-
-    const thead = table.createTHead()
-    const hrow  = thead.insertRow()
-    // The corner cell doubles as the board collapse toggle (arrow + 'Round'): the grid
-    // gets very tall once filled with headshots, and the toggle costs no extra row.
-    const roundTh = makeBoardToggleHeaderCell(table, 'draft_board_open', 'Round')
-    roundTh.style.width = ROUND_W + 'px'
-    hrow.append(roundTh)
-    for (let d = 0; d < nDrafters; d++) {
-        const th = document.createElement('th')
-        th.className = 'team-header-cell'
-        th.append(buildTeamHeader(d, container))
-        hrow.append(th)
-    }
-
+    const table = buildBoardTableShell(nDrafters, TEAM_W, ROUND_W, 'draft_board_open',
+        d => buildTeamHeader(d, container))
     table.createTBody()   // filled by rebuildStandardBody
     return table
 }
@@ -472,8 +456,7 @@ function readDraftConfig(): DraftConfig {
     const nPicks             = readRequiredIntInput('ls-n-picks')
     const dataSource         = (document.getElementById('ps-data-type') as HTMLInputElement).value
     const thirdRoundReversal = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
-    const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
+    const teamNames = getSidebarTeamNames()
     // teamNames are excluded from the key: identities are constant "Team N" (so they never
     // trigger a reset), and editable display labels are presentation-only — a rename must not
     // reset the draft or rebuild the header. n_drafters covers any change in team count.

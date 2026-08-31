@@ -9,7 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Depends, status, Response
 
 from backend.infra.auth import current_user_key
-from backend.state.session import get_session
+from backend.api.dependencies import require_session
+from backend.state.session import Session
 from backend.platform_integration.registry import get_integration
 from backend.platform_integration.credential_store import yahoo_auth_dir, store_espn_credentials
 from backend.platform_integration.integrations.yahoo import YahooIntegration
@@ -89,10 +90,8 @@ def connect_platform_route(platform: str, req: ConnectRequest, user_key: str = D
 
 
 @router.get('/sessions/{session_id}/draft-state', response_model=DraftStateResponse)
-def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(current_user_key)):
-    session = get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail='Session not found or expired.')
+def get_draft_state_route(mode: str, session: Session = Depends(require_session),
+                          user_key: str = Depends(current_user_key)):
     config = session.platform_config
     if config is None:
         raise HTTPException(status_code=400, detail='Session is not connected to a live platform.')

@@ -4,18 +4,14 @@
 
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { defaultTeamLabel } from '../team_labels.js'
+import { getTeamNames } from '../../parameter_collection/league_settings.js'
 
-/** Reads team names from the sidebar textarea. */
-export function readTeamNames(): string[] {
-    return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
-}
 
 /** Reads roster assignments from the Rosters tab grid (sr-player-{row}-{col}). The single
  *  DOM-scrape choke point: the grid's hidden inputs carry stringified player ids, so a
  *  non-numeric non-empty value is a programming error and throws rather than being sent on. */
 export function readRosterAssignments(): Record<string, number[]> {
-    const teamNames = readTeamNames()
+    const teamNames = getTeamNames()
     const nDrafters = readRequiredIntInput('ls-n-drafters')
     const nPicks    = readRequiredIntInput('ls-n-picks')
 

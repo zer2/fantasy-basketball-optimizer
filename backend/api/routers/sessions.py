@@ -14,7 +14,8 @@ from fastapi import APIRouter, HTTPException, Depends, status, Response
 from backend.infra.auth import current_user_key_optional
 from backend.infra.rate_limit import enforce_rate_limit, BUILD_POLICY, REBUILD_POLICY
 from backend.parameters import load_all_params
-from backend.state.session import get_session, delete_session
+from backend.api.dependencies import require_session
+from backend.state.session import Session, delete_session
 from backend.services.session_management import build_session, apply_patch
 from backend.services.build_agent import clear_v0_cache, parse_projection_upload, InsufficientPlayerPoolError
 from backend.state.upload_store import get_upload
@@ -202,10 +203,8 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
 
 @router.patch('/sessions/{session_id}', response_model=PatchResponse,
               dependencies=[Depends(enforce_rate_limit(REBUILD_POLICY))])
-def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[str] = Depends(current_user_key_optional)):
-    session = get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail='Session not found or expired.')
+def patch_session_route(req: PatchRequest, session: Session = Depends(require_session),
+                        user_key: Optional[str] = Depends(current_user_key_optional)):
 
     csv_bytes: Optional[bytes] = None
     uploaded_dfs: Optional[dict] = None
@@ -244,10 +243,7 @@ def patch_session_route(session_id: str, req: PatchRequest, user_key: Optional[s
 
 
 @router.get('/sessions/{session_id}/g-scores', response_model=GScoresResponse)
-def get_g_scores_route(session_id: str):
-    session = get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail='Session not found or expired.')
+def get_g_scores_route(session: Session = Depends(require_session)):
     # Reads agent/info state that a concurrent PATCH rebuilds in place — hold the lock so it never
     # observes a half-rebuilt pipeline.
     with session.lock:

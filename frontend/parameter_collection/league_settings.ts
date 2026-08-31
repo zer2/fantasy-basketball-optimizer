@@ -281,8 +281,7 @@ export function getLeagueSettings(): {
         n_picks:              readRequiredIntInput('ls-n-picks'),
         cash_per_team:        readRequiredIntInput('ls-cash-per-team'),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
-        team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-                                  .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
+        team_names:           getTeamNames(),
     }
 }
 

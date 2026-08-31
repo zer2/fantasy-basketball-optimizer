@@ -6,7 +6,8 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
-import { readTeamNames, readRosterAssignments } from './season_helpers.js'
+import { readRosterAssignments } from './season_helpers.js'
+import { getTeamNames } from '../../parameter_collection/league_settings.js'
 import { getPlayerResultsById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
@@ -50,7 +51,7 @@ export function renderWaiverControls(container: HTMLElement): void {
     waiverListenerController?.abort()
     waiverListenerController = new AbortController()
 
-    const teamNames   = readTeamNames()
+    const teamNames   = getTeamNames()
     const assignments = readRosterAssignments()
     const nPicks      = readRequiredIntInput('ls-n-picks')
     // assignments[t] can be undefined for team names beyond nDrafters, hence the optional chain
