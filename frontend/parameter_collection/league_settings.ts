@@ -29,6 +29,21 @@ let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
 // when the platform changes. Gates the live-layout "Refresh Analysis" button.
 let platformConnected = false
 
+// The mode/platform select handles, exposed so main.ts can attach its change listeners to
+// the widgets' own event roots instead of reaching through this section's DOM nesting.
+let modeSelectHandle: ReturnType<typeof makeCustomSelect> | null = null
+let platformSelectHandle: ReturnType<typeof makeCustomSelect> | null = null
+
+export function getModeSelectElement(): HTMLElement {
+    if (modeSelectHandle === null) throw new Error('getModeSelectElement called before renderLeagueSettings')
+    return modeSelectHandle.element
+}
+
+export function getPlatformSelectElement(): HTMLElement {
+    if (platformSelectHandle === null) throw new Error('getPlatformSelectElement called before renderLeagueSettings')
+    return platformSelectHandle.element
+}
+
 /** Whether a live platform connection has been established (Connect succeeded). */
 export function isPlatformConnected(): boolean {
     return platformConnected
@@ -70,6 +85,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         DRAFT_MODE_OPTIONS.map(m => ({ value: m, label: m })),
         pref('mode', 'Draft Mode'),
     )
+    modeSelectHandle = modeSelect
     modeSelect.element.addEventListener('change', () => savePref('mode', modeSelect.getValue()))
     modeCell.append(modeSelect.element)
     grid.append(modeCell)
@@ -83,6 +99,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         PLATFORM_OPTIONS.map(p => ({ value: p, label: p })),
         pref('platform', 'Enter your own data'),
     )
+    platformSelectHandle = platformSelect
     platformSelect.element.addEventListener('change', () => {
         savePref('platform', platformSelect.getValue())
         platformConnected = false   // changing platform invalidates the previous connection
