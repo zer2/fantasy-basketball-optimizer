@@ -124,7 +124,7 @@ def test_trade_suggest_top4(trading_session, label, combo_params):
         , combo_params       = combo_params
         , your_threshold     = _YOUR_THRESHOLD
         , their_threshold    = _THEIR_THRESHOLD
-        , ignore_position_check = False
+        , position_check = True
     )
     elapsed = time.perf_counter() - start
 

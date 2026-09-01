@@ -433,10 +433,10 @@ coefficient calculations (use `PATCH /sessions/{id}` with `injured_players` for 
       },
       "auction_values": {
         "your_dollar":   53.7,
-        "gnrc_dollar":   50.2,
-        "orig_dollar":   51.8,
-        "gnrc_dollar_g": 48.3,
-        "orig_dollar_g": 49.9
+        "generic_dollar":   50.2,
+        "original_dollar":   51.8,
+        "generic_dollar_g_score": 48.3,
+        "original_dollar_g_score": 49.9
       }
     }
   ]
@@ -456,10 +456,10 @@ coefficient calculations (use `PATCH /sessions/{id}` with `injured_players` for 
 | `flex_allocations.values`   | expected count   | `null` = position ineligible for this flex slot    |
 | `roster.assignments`        | —                | `null` slot = empty; `is_candidate: true` = this player |
 | `auction_values.your_dollar` | dollars         | SAVOR on H-scores, team-specific cash/picks        |
-| `auction_values.gnrc_dollar` | dollars         | SAVOR on H-scores, generic baseline (current cash) |
-| `auction_values.orig_dollar` | dollars         | SAVOR on H-scores, full original cash/picks        |
-| `auction_values.gnrc_dollar_g` | dollars       | SAVOR on G-scores, generic baseline                |
-| `auction_values.orig_dollar_g` | dollars       | SAVOR on G-scores, full original cash/picks        |
+| `auction_values.generic_dollar` | dollars         | SAVOR on H-scores, generic baseline (current cash) |
+| `auction_values.original_dollar` | dollars         | SAVOR on H-scores, full original cash/picks        |
+| `auction_values.generic_dollar_g_score` | dollars       | SAVOR on G-scores, generic baseline                |
+| `auction_values.original_dollar_g_score` | dollars       | SAVOR on G-scores, full original cash/picks        |
 
 `iteration` is the number of algorithm iterations completed. Equals `n_iterations` unless
 the algorithm converged early.
@@ -492,12 +492,13 @@ post-trade H-scores for both teams.
   "their_team": "Drafter 2",
   "my_trade": ["Shai Gilgeous-Alexander (PG,SG)"],
   "their_trade": ["Nikola Jokic (C)"],
-  "ignore_position_check": false
+  "position_check": true
 }
 ```
 
-`ignore_position_check` — if `true`, skips validation that both teams can legally field
-the post-trade roster (used when position data is unavailable).
+`position_check` — when `true` (the default), validates that both teams can legally
+field the post-trade roster; set `false` to skip that validation (used when position
+data is unavailable).
 
 **Response `200`:**
 ```json
@@ -545,7 +546,7 @@ Returns a list of suggested trades sorted by benefit.
   ],
   "your_differential_threshold": 0.0,
   "their_differential_threshold": -0.20,
-  "ignore_position_check": false
+  "position_check": true
 }
 ```
 

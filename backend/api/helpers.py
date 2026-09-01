@@ -1,17 +1,20 @@
-"""Platform-integration resolution helpers for the API layer.
+"""Shared helpers for the API layer, in three sections:
 
-These raise HTTPExceptions (401/400/502) — mapping platform + credential failures to status
-codes — so they belong in the transport tier, shared by the sessions and platforms routers.
-The HTTP-free session orchestration lives in services.session_management.
+  - Errors:       fail() — log the failure server-side, return a client-safe HTTPException.
+  - Dependencies: require_session — the Depends target for routes under /sessions/{session_id}.
+  - Platforms:    credential and integration resolution, mapping platform failures to status codes.
+
+Everything here speaks HTTP (HTTPExceptions, Depends targets), which is why it lives in the
+transport tier: the HTTP-free equivalents live in services and state.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from fastapi import HTTPException
 
-from backend.api.errors import fail
 from backend.infra.secret_config import get_secret
 from backend.platform_integration.registry import get_integration, is_live_platform
 from backend.platform_integration.base import PlatformConfig
@@ -19,9 +22,39 @@ from backend.platform_integration.credential_store import (
     yahoo_auth_dir, has_yahoo_credentials,
     get_espn_credentials, has_espn_credentials,
 )
+from backend.state.session import Session, get_session
+
+logger = logging.getLogger('fbbo.api')
 
 
-def credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
+# ─── Errors ───────────────────────────────────────────────────────────────────
+
+def fail(status_code: int, message: str) -> HTTPException:
+    """Log the active exception server-side (with traceback) and return a client-safe error.
+
+    Tracebacks / internal details must never be sent in the response body.
+    """
+    logger.exception(message)
+    return HTTPException(status_code=status_code, detail=message)
+
+
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+
+def require_session(session_id: str) -> Session:
+    """The live session for the path's {session_id}, or a 404 when it is missing or expired.
+
+    A dependency rather than a helper, so a route declares "this needs a live session" in
+    its signature instead of repeating the lookup-and-404 block six times over.
+    """
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found or expired.')
+    return session
+
+
+# ─── Platforms ────────────────────────────────────────────────────────────────
+
+def build_credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
     """Build the credentials an integration needs, or None. Yahoo needs a persisted OAuth
     token directory keyed by client_id; an unauthenticated client_id fails noisily."""
     if platform == 'Retrieve from Yahoo' and client_id:
@@ -35,7 +68,7 @@ def credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
     return None
 
 
-def yahoo_app_credentials() -> tuple[str, str]:
+def read_yahoo_app_credentials() -> tuple[str, str]:
     """The Yahoo *app* (developer) client id/secret, from the environment."""
     client_id = get_secret('YAHOO_CLIENT_ID')
     client_secret = get_secret('YAHOO_CLIENT_SECRET')
@@ -50,7 +83,7 @@ def resolve_live_integration(platform: str, client_id: Optional[str] = None):
     calls that don't hit the API (list_divisions)."""
     if not is_live_platform(platform):
         raise HTTPException(status_code=400, detail=f'No live integration for platform {platform!r}.')
-    return get_integration(platform, credentials_for(platform, client_id))
+    return get_integration(platform, build_credentials_for(platform, client_id))
 
 
 def resolve_platform_config(
@@ -70,7 +103,7 @@ def resolve_platform_config(
             detail=f'platform_config is required for platform {platform!r}.',
         )
     # Credentials are keyed by the authenticated user, never by anything in the request.
-    integration = get_integration(platform, credentials_for(platform, user_key))
+    integration = get_integration(platform, build_credentials_for(platform, user_key))
     try:
         shape = integration.fetch_league_shape(
             platform_config_request.league_id,

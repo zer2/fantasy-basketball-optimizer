@@ -52,7 +52,7 @@ urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
 
 from backend.infra.auth import session_secret_key, session_https_only
 from backend.infra.rate_limit import configure_rate_limits
-from backend.api.routers import auth, meta, data, sessions, ranking, trade, platforms
+from backend.api.routers import auth, reference, health, data, sessions, ranking, trade, platforms
 
 # Read the per-client request limits here, at startup: signing in is optional, so these are what
 # cap how fast one caller can ask for the expensive work, and malformed configuration should stop
@@ -122,7 +122,8 @@ async def _server_timing(request: Request, call_next):
 
 # Routers — one module per concern; handlers live in backend.api.routers.*
 app.include_router(auth.router)
-app.include_router(meta.router)
+app.include_router(reference.router)
+app.include_router(health.router)
 app.include_router(data.router)
 app.include_router(sessions.router)
 app.include_router(ranking.router)

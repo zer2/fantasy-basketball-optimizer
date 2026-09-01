@@ -55,10 +55,10 @@ class Roster:
 
 class AuctionValues(BaseModel):
     your_dollar:   float   # SAVOR on H-scores, team-specific, current cash/picks
-    gnrc_dollar:   float   # SAVOR on H-scores, current cash/picks (generic baseline)
-    orig_dollar:   float   # SAVOR on H-scores, full original cash/picks
-    gnrc_dollar_g: float   # SAVOR on G-scores, current cash/picks
-    orig_dollar_g: float   # SAVOR on G-scores, full original cash/picks
+    generic_dollar:   float   # SAVOR on H-scores, current cash/picks (generic baseline)
+    original_dollar:   float   # SAVOR on H-scores, full original cash/picks
+    generic_dollar_g_score: float   # SAVOR on G-scores, current cash/picks
+    original_dollar_g_score: float   # SAVOR on G-scores, full original cash/picks
 
 
 class Candidate(BaseModel):

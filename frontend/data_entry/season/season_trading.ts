@@ -7,12 +7,13 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../../helper_functions.js'
-import { readTeamNames, readRosterAssignments } from './season_helpers.js'
+import { readRosterAssignments } from './season_helpers.js'
+import { getTeamNames } from '../../parameter_collection/league_settings.js'
 import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildMinimalPlayerDisplayHtml, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
-import { stat_styler_primary } from '../../styles/styler_functions.js'
+import { stat_styler_primary, G_SCORE_MULTIPLIER } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
 import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
@@ -109,7 +110,7 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
         const totalCell = tr.insertCell()
         totalCell.textContent = row.total.toFixed(2)
         if (useGradient) {
-            totalCell.style.cssText = stat_styler_primary(row.total, 60, 0)
+            totalCell.style.cssText = stat_styler_primary(row.total, G_SCORE_MULTIPLIER, 0)
         } else {
             totalCell.className = 'celltypeb'
         }
@@ -117,7 +118,7 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
             const td = tr.insertCell()
             td.textContent = v.toFixed(2)
             if (useGradient) {
-                td.style.cssText = stat_styler_primary(v, 60, 0)
+                td.style.cssText = stat_styler_primary(v, G_SCORE_MULTIPLIER, 0)
             } else {
                 td.className = 'celltypeb'
             }
@@ -158,8 +159,8 @@ function buildHScoreResult(
     loading.textContent = 'Analyzing trade...'
     pane.append(loading)
 
-    const ignore_position_check = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
-    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, ignore_position_check)
+    const positionCheck = (document.getElementById('ts-check-positions') as HTMLInputElement).checked
+    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, positionCheck)
         .then(resp => renderHScoreResult(pane, resp))
         .catch(err => {
             pane.innerHTML = ''
@@ -328,7 +329,7 @@ function fetchMissingCombos(
 ): void {
     const your_differential_threshold  = parseFloat((document.getElementById('ts-your-threshold')  as HTMLInputElement).value) / 100
     const their_differential_threshold = parseFloat((document.getElementById('ts-their-threshold') as HTMLInputElement).value) / 100
-    const ignore_position_check        = (document.getElementById('ts-ignore-position') as HTMLInputElement).checked
+    const positionCheck                = (document.getElementById('ts-check-positions') as HTMLInputElement).checked
     const selected = comboSel.getSelected()
 
     for (const key of selected) {
@@ -342,7 +343,7 @@ function fetchMissingCombos(
         runTradeSuggest(
             assignments, yourTeam, theirTeam,
             [cp], your_differential_threshold, their_differential_threshold,
-            ignore_position_check,
+            positionCheck,
         )
             .then(resp => {
                 pendingFetches.delete(key)
@@ -433,7 +434,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
 
     container.innerHTML = ''
 
-    const teamNames   = readTeamNames()
+    const teamNames   = getTeamNames()
     const assignments = readRosterAssignments()
 
     const nPicks = readRequiredIntInput('ls-n-picks')
@@ -577,14 +578,16 @@ export function renderSeasonTrading(container: HTMLElement): void {
     theirThreshGroup.append(theirThreshLabel, theirThreshInfo, theirThreshWrap)
     comboRow.append(theirThreshGroup)
 
-    // Ignore position toggle
-    const ignorePosToggle = makeSidebarToggle('ts-ignore-position', 'Ignore position')
-    comboRow.append(ignorePosToggle)
+    // Positively framed (CLAUDE.md): the toggle says what it does when on, and it is on by
+    // default. The old 'ts-ignore-position' preference is deliberately orphaned — its polarity
+    // is inverted, so carrying it over would flip every stored choice.
+    const checkPositionsToggle = makeSidebarToggle('ts-check-positions', 'Check positions')
+    comboRow.append(checkPositionsToggle)
 
     container.append(comboRow)
 
-    const ignorePosInput = document.getElementById('ts-ignore-position') as HTMLInputElement
-    ignorePosInput.checked = pref('ts-ignore-position', false)
+    const checkPositionsInput = document.getElementById('ts-check-positions') as HTMLInputElement
+    checkPositionsInput.checked = pref('ts-check-positions', true)
 
     const suggestResults = document.createElement('div')
     suggestResults.dataset.testid = 'trade-suggestions'
@@ -739,8 +742,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
         savePref('ts-their-threshold', parseFloat(theirThreshInput.value))
         clearCacheAndRefetch()
     })
-    ignorePosInput.addEventListener('change', () => {
-        savePref('ts-ignore-position', ignorePosInput.checked)
+    checkPositionsInput.addEventListener('change', () => {
+        savePref('ts-check-positions', checkPositionsInput.checked)
         clearCacheAndRefetch()
     })
 

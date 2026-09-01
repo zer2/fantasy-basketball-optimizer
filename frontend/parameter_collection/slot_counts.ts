@@ -190,12 +190,3 @@ export function getSlotCounts(): Record<string, number> {
     return getSlotCountsFromPositions(basePositions, flexPositions)
 }
 
-/**
- * Returns the number of bench slots to exclude from optimization.
- * These are roster spots that the platform counts but the optimizer should ignore.
- */
-export function getBenchSlots(): number {
-    const el = document.getElementById('sc-bench-slots') as HTMLInputElement | null
-    if (!el) throw new Error('sc-bench-slots element not found')
-    return parseInt(el.value)
-}

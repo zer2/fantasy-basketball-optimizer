@@ -1,29 +1,27 @@
 """
 Pipeline orchestration for the 5-step initialization chain.
 
-Steps:
-  1. Load player_stats_v0 from CSV / Snowflake → session.v0_clean
-  2. drop_injured_players → session.v1_clean
-  3. make_upsilon_adjustment → session.v2
-  4. process_player_data → session.info
-  5. build HAgent (retains info; populates the default baseline) → session.agent
+Steps (build_agent dispatches by number; each function is one step):
+  1. load_player_pool         — CSV / Snowflake → session.v0_clean + player_registry
+  2. remove_injured_players   — → session.v1_clean
+  3. apply_upsilon_adjustment — → session.v2
+  4. build_scoring_info       — process_player_data → session.info
+  5. build_session_agent      — HAgent + primed baseline → session.agent
 
 No session_context or _SessionState: each step reads/writes session fields directly.
+The projection-file parser this module orchestrates around lives in projection_parsing.
 """
 
 from __future__ import annotations
 
-import codecs
-import io
-import logging
 import time
 import threading
 
-import charset_normalizer
 import pandas as pd
 from pathlib import Path
 
 from backend.parameters import load_all_params
+from backend.services.projection_parsing import parse_projection_upload
 from backend.state.session import Session
 
 
@@ -37,7 +35,7 @@ class InsufficientPlayerPoolError(Exception):
 _MEAN_OF_VARIANCES_PATH = Path(__file__).parents[2] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
 
 
-def _load_mean_of_variances(sport: str) -> pd.Series:
+def _load_mean_of_variances() -> pd.Series:
     """Load empirical mean-of-variances for the most recent season from the
     coefficient exploration output CSV.  The CSV has stats as rows and seasons
     as columns (newest first); the first data column is the most recent season.
@@ -47,7 +45,7 @@ def _load_mean_of_variances(sport: str) -> pd.Series:
 
 
 # ── v0_clean cache ────────────────────────────────────────────────────────────
-# Caches the output of run_step1 (loaded + processed player stats) independently
+# Caches the output of load_player_pool (loaded + processed player stats) independently
 # of session ID, keyed by data source parameters.  This avoids re-querying
 # Snowflake and re-processing the DataFrame every time a new session is created
 # with the same data source.
@@ -65,7 +63,7 @@ def clear_v0_cache() -> None:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _sport_params(session: Session) -> tuple[dict, dict, str]:
+def _resolve_sport_params(session: Session) -> tuple[dict, dict, str]:
     """Return (all_params, sport_params, sport) for the current session."""
     all_params = load_all_params()
     sport = session.current_params['sport']
@@ -74,7 +72,7 @@ def _sport_params(session: Session) -> tuple[dict, dict, str]:
 
 # ── Step 1: load player data ──────────────────────────────────────────────────
 
-def _v0_cache_key(cp: dict) -> tuple | None:
+def _build_v0_cache_key(current_params: dict) -> tuple | None:
     """Return a hashable cache key for v0_clean based on data source params.
 
     A projections blend is fully described by every source weight plus the ids of any
@@ -84,13 +82,13 @@ def _v0_cache_key(cp: dict) -> tuple | None:
     changed, and could leak an uploaded blend into sessions that never uploaded anything.)
     Returns None only for single-CSV mode, whose bytes arrive outside current_params.
     """
-    source_type = cp['data_source_type']
-    sport = cp.get('sport', '')
+    source_type = current_params['data_source_type']
+    sport = current_params['sport']
     if source_type == 'historical':
-        return (sport, 'historical', cp['season'])
+        return (sport, 'historical', current_params['season'])
     if source_type == 'projections':
-        blend_weights = cp.get('blend_weights', {})
-        custom_data_ids = cp.get('custom_data_ids') or []
+        blend_weights = current_params.get('blend_weights', {})
+        custom_data_ids = current_params.get('custom_data_ids') or []
         weight_keys = tuple(sorted(blend_weights.items()))
         upload_keys = tuple(sorted(custom_data_ids))
         return (sport, 'projections', weight_keys, upload_keys)
@@ -132,7 +130,12 @@ def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
     return registry
 
 
-def run_step1(
+def _count_starters(slot_counts: dict, n_picks: int) -> int:
+    """Starters fielded per scoring period: the slot total when a structure is set, else every pick."""
+    return sum(slot_counts.values()) if slot_counts else n_picks
+
+
+def load_player_pool(
     session: Session,
     csv_bytes: bytes | None = None,
     uploaded_dfs: dict | None = None,
@@ -151,10 +154,10 @@ def run_step1(
     so repeated session creations with the same data source skip the round-trip and
     rebuild an identical registry.
     """
-    _, params, _ = _sport_params(session)
-    cp = session.current_params
-    source_type = cp['data_source_type']
-    cache_key = _v0_cache_key(cp)
+    _, params, _ = _resolve_sport_params(session)
+    current_params = session.current_params
+    source_type = current_params['data_source_type']
+    cache_key = _build_v0_cache_key(current_params)
 
     v0_with_names = None
     if cache_key is not None:
@@ -170,7 +173,7 @@ def run_step1(
         elif source_type == 'historical':
             from backend.data_retrieval import get_specified_historical_stats
 
-            season = cp['season']
+            season = current_params['season']
             if not season:
                 raise ValueError(
                     "data_source.season is required when data_source.type == 'historical'"
@@ -180,7 +183,7 @@ def run_step1(
         elif source_type == 'projections':
             from backend.data_retrieval import combine_projections
 
-            blend_weights = cp.get('blend_weights', {})
+            blend_weights = current_params.get('blend_weights', {})
             # All-zero weights would blend nothing and crash deep in the pipeline with an
             # opaque 500 — reject it up front with an actionable message instead.
             if not any(weight > 0 for weight in blend_weights.values()):
@@ -208,237 +211,9 @@ def run_step1(
     session.v0_clean = v0_with_names.drop(columns=['Player'])
 
 
-# The per-game stats a projection file CAN carry. A file need not carry all of them:
-# sources that pair a projection set with a league export only that league's active
-# categories, so several may legitimately be absent. Recognition therefore asks only for
-# Player, Position, and _MIN_MATCHED_CORE_COLUMNS of these — still unmistakably a
-# projection file, while a spreadsheet of something else entirely maps ~nothing and is
-# rejected with a clear message instead of failing much later, deep in the blend, as a
-# baffling "0 players available" error.
-_CORE_PROJECTION_COLUMNS = ('Points', 'Rebounds', 'Assists', 'Steals', 'Blocks', 'Turnovers', 'Threes')
-_MIN_MATCHED_CORE_COLUMNS = 3
+# ── Step 2: remove injured players ────────────────────────────────────────────
 
-_COLUMN_ALIASES_KEY = 'projection-column-aliases'
-
-
-def _normalize_projection_header(header) -> str:
-    """Header spellings differ only by case and padding far more often than by wording, so
-    both sides of an alias lookup are folded to one form."""
-    return str(header).strip().lower()
-
-
-def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
-    """{column in the file: canonical name} for every column the aliases recognize.
-
-    Columns that match nothing are left out (the parse drops them). A canonical name that
-    two of the file's columns both claim is taken by the first, so a file carrying e.g.
-    both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
-    """
-    aliases = {_normalize_projection_header(alias): canonical
-               for alias, canonical in params.get(_COLUMN_ALIASES_KEY, {}).items()}
-    mapping, claimed = {}, set()
-    for column in df_raw.columns:
-        canonical = aliases.get(_normalize_projection_header(column))
-        if canonical is not None and canonical not in claimed:
-            mapping[column] = canonical
-            claimed.add(canonical)
-    return mapping
-
-
-# A .xlsx is a ZIP archive, so every one begins with this signature. The older .xls is an
-# OLE2 compound file with a different one — detected only to say so plainly, since reading it
-# would need another engine and anything that can save .xls can also save .xlsx or .csv.
-_XLSX_SIGNATURE = b'PK\x03\x04'
-_XLS_SIGNATURE  = b'\xd0\xcf\x11\xe0'
-
-
-def _read_projection_table(upload_bytes: bytes) -> pd.DataFrame:
-    """Load an upload into a frame, whether it is a spreadsheet or a text file.
-
-    People reach these tools by copying a projection table into a spreadsheet, so the file
-    that comes back is as often .xlsx as .csv — and telling someone to re-export as CSV is
-    asking them to do work the parser can do. Format is decided by the file's own signature
-    rather than its name, because a download saved with the wrong extension is common and the
-    bytes cannot lie."""
-    if upload_bytes.startswith(_XLSX_SIGNATURE):
-        try:
-            return pd.read_excel(io.BytesIO(upload_bytes), engine='openpyxl')
-        except Exception as exc:
-            raise ValueError(f'Could not read this spreadsheet: {type(exc).__name__}: {exc}')
-    if upload_bytes.startswith(_XLS_SIGNATURE):
-        raise ValueError(
-            'This is an older .xls spreadsheet, which cannot be read directly. '
-            'Save it as .xlsx or .csv and upload again.')
-    return pd.read_csv(io.StringIO(_decode_projection_text(upload_bytes)))
-
-
-def _decode_projection_text(csv_bytes: bytes) -> str:
-    """Decode an uploaded text file whatever it was saved as.
-
-    Spreadsheets export in whatever codepage the machine defaults to, so a file that opens
-    fine locally can be UTF-8, UTF-16 (Excel's "Unicode text"), or a legacy Windows codepage.
-    Assuming UTF-8 made those fail on the first non-ASCII byte — a decode error naming a byte
-    offset, which tells a user nothing except that saving it again as UTF-8 helps.
-
-    Order matters. A byte-order mark is decisive, so it is honoured first; UTF-16 in
-    particular must never be guessed at, since its text decodes as plausible-looking rubbish
-    under a single-byte codepage. UTF-8 is tried next because it is both the common case and
-    self-validating — invalid sequences raise rather than silently mis-decode. Only then do we
-    detect, which is what gets accented names right: Jokić and Dončić live in Central European
-    codepages that a blind cp1252 fallback would mangle, and a mangled name resolves to no
-    player id. latin-1 is the floor: it cannot raise, so a file always loads.
-    """
-    if csv_bytes.startswith(codecs.BOM_UTF16_LE) or csv_bytes.startswith(codecs.BOM_UTF16_BE):
-        return csv_bytes.decode('utf-16')
-    try:
-        return csv_bytes.decode('utf-8-sig')
-    except UnicodeDecodeError:
-        pass
-
-    detected = charset_normalizer.from_bytes(csv_bytes).best()
-    if detected is not None:
-        logging.getLogger('fbbo').info(
-            'Projection upload is not UTF-8; decoded as %s', detected.encoding)
-        return str(detected)
-    logging.getLogger('fbbo').warning(
-        'Projection upload encoding could not be identified; decoding as latin-1, '
-        'so accented names may be wrong')
-    return csv_bytes.decode('latin-1')
-
-
-def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
-    """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
-
-    There is no format detection: each column is interpreted on its own through the alias
-    table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
-    as long as its header spellings are known, and a file already written in canonical
-    names needs no aliases at all. Raises ValueError naming what could not be found when
-    the file does not read as a projection set.
-    """
-    df_raw = _read_projection_table(upload_bytes)
-    column_mapping  = _map_columns_to_canonical(df_raw, params)
-    # Unrecognized columns keep their own names, so a file already using canonical names
-    # is understood without any alias matching at all.
-    renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
-
-    missing_identity = [column for column in ('Player', 'Position')
-                        if column not in renamed_columns]
-    matched_cores    = [column for column in _CORE_PROJECTION_COLUMNS
-                        if column in renamed_columns]
-    if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
-        # Every name the aliases can produce, so a file already written in canonical names
-        # keeps those columns even though they never went through the mapping.
-        canonical_columns = set(params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
-        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, params)
-
-    if missing_identity:
-        problem = f"no column for {' or '.join(missing_identity)}"
-    else:
-        missing_cores = [column for column in _CORE_PROJECTION_COLUMNS
-                         if column not in renamed_columns]
-        problem = (f'only {len(matched_cores)} of {len(_CORE_PROJECTION_COLUMNS)} core stats '
-                   f"were recognized (no {', '.join(missing_cores)})")
-    unrecognized = [column for column in df_raw.columns if column not in column_mapping]
-    raise ValueError(
-        f'File does not read as a projection set: {problem}. Headers that were not '
-        f"recognized: {', '.join(map(str, unrecognized))}. Add their spellings to "
-        f'{_COLUMN_ALIASES_KEY} to teach the parser this source.'
-    )
-
-
-# Attempts hiding inside a ratio cell: sources that print a percentage with its makes and
-# attempts behind it — "0.583 (10.2/17.5)" — and ship no attempts column of their own.
-# Captures the second number, the attempts.
-_ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
-
-
-def _recover_volumes_from_ratio_cells(df: pd.DataFrame, params: dict) -> pd.DataFrame:
-    """Fill in a missing attempts column from the text of its percentage column.
-
-    Attempt volume is load-bearing: a ratio G-score weights the percentage deviation by it,
-    so a percentage without its volume cannot be scored at all. When a source carries that
-    volume only inside the percentage cell, take it from there rather than discard it with
-    the rest of the text. A file's own attempts column always wins — this fires only when
-    there is none. Only the attempts are recovered, never the makes: the projection path
-    does not use them, and emitting a column no other source carries would make the blend
-    drop every player that source lacks.
-    """
-    for ratio_stat, ratio_info in params.get('ratio-statistics', {}).items():
-        volume_statistic = ratio_info['volume-statistic']
-        if (ratio_stat not in df.columns
-                or volume_statistic in df.columns
-                or df[ratio_stat].dtype != object):
-            continue
-        attempts = pd.to_numeric(
-            df[ratio_stat].astype(str).str.extract(_ATTEMPTS_IN_RATIO_CELL_PATTERN, expand=False),
-            errors='coerce',
-        )
-        if attempts.notna().any():
-            df[volume_statistic] = attempts
-    return df
-
-
-def _parse_with_renamer(
-    df_raw: pd.DataFrame
-    , column_mapping: dict
-    , canonical_columns: set
-    , params: dict
-) -> pd.DataFrame:
-    """Rename this file's columns to canonical names, drop junk, coerce stats."""
-    df = df_raw.rename(columns=column_mapping)
-
-    # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
-    # would otherwise join the blend's column union, where every player from the OTHER
-    # sources is "missing" them — and the blend drops any player missing any column
-    # across all sources, so a single junk column can wipe out the entire pool.
-    df = df[[column for column in df.columns if column in canonical_columns]].copy()
-
-    # Before the ratio cells are reduced to their leading number below, mine them for any
-    # attempts column the file does not carry separately.
-    df = _recover_volumes_from_ratio_cells(df, params)
-
-    # Sources carry non-numeric stat values: some repeat the header row inside the table
-    # body (every stat cell a string), and some format ratio stats as
-    # "0.474 (5.2/11.0)". Extract the leading number where a stat column holds strings,
-    # then drop rows with no numeric stats at all — those are the embedded header/junk rows.
-    def coerce_stat_column(column: pd.Series) -> pd.Series:
-        if column.dtype == object:
-            # Leading number only, and not one embedded in a word — the repeated header
-            # rows contain cells like "3PM", which must NOT read as the number 3.
-            column = column.astype(str).str.extract(
-                r'^\s*(-?(?:\d+\.?\d*|\.\d+))(?![A-Za-z])', expand=False)
-        return pd.to_numeric(column, errors='coerce')
-
-    stat_columns = [column for column in df.columns if column not in ('Player', 'Position')]
-    df[stat_columns] = df[stat_columns].apply(coerce_stat_column)
-    df = df.dropna(subset=stat_columns, how='all')
-
-    if 'Games Played %' not in df.columns:
-        if 'Games Played' in df.columns:
-            df['Games Played %'] = df['Games Played'] / 82.0
-        else:
-            raise ValueError(
-                "CSV missing both 'Games Played %' and 'Games Played' columns after rename"
-            )
-
-    # Clamp GP to 0–1
-    df['Games Played %'] = df['Games Played %'].clip(0, 1)
-
-    # Raw games played is only an intermediate for the % above. Left in, it becomes an
-    # upload-only column in the blend's union, and the blend's coverage rule (a player
-    # must have every column covered by some source that carries them) would then drop
-    # every player the upload doesn't cover — a partial upload would gut the pool.
-    df = df.drop(columns=['Games Played'], errors='ignore')
-
-    if 'Player' in df.columns:
-        df = df.set_index('Player')
-
-    return df
-
-
-# ── Step 2: drop injured players ──────────────────────────────────────────────
-
-def run_step2(session: Session) -> None:
+def remove_injured_players(session: Session) -> None:
     """Resolve the free-typed injured list to player ids and drop them into v1_clean."""
     from backend.math.process_player_data import drop_injured_players
     from backend.player_identity import resolve_typed_player_names
@@ -451,31 +226,31 @@ def run_step2(session: Session) -> None:
 
 # ── Step 3: upsilon adjustment ────────────────────────────────────────────────
 
-def run_step3(session: Session) -> None:
+def apply_upsilon_adjustment(session: Session) -> None:
     """Run make_upsilon_adjustment using a fresh copy of v1_clean."""
     from backend.math.process_player_data import make_upsilon_adjustment
 
-    _, params, _ = _sport_params(session)
+    _, params, _ = _resolve_sport_params(session)
     upsilon = session.current_params['upsilon']
     # Always start from the clean v1 so repeated PATCH calls don't stack adjustments
     v2, _ = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, params)
     session.v2 = v2
 
 
-# ── Step 4: process_player_data ───────────────────────────────────────────────
+# ── Step 4: build the scoring info ────────────────────────────────────────────
 
-def run_step4(session: Session) -> None:
+def build_scoring_info(session: Session) -> None:
     """Build the info dict (G-scores, X-scores, covariance, etc.) onto session.info."""
     from backend.math.process_player_data import process_player_data
 
-    _, params, sport = _sport_params(session)
-    cp = session.current_params
+    _, params, sport = _resolve_sport_params(session)
+    current_params = session.current_params
 
-    scoring_format = cp['scoring_format']
-    n_drafters  = cp['n_drafters']
-    n_picks     = cp['n_picks']
-    slot_counts = cp['slot_counts']
-    n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
+    scoring_format = current_params['scoring_format']
+    n_drafters  = current_params['n_drafters']
+    n_picks     = current_params['n_picks']
+    slot_counts = current_params['slot_counts']
+    n_starters  = _count_starters(slot_counts, n_picks)
 
     # The pool must be able to fill every roster; otherwise the whole model is ill-posed (there is
     # no replacement-level player to anchor auction values, and managers could not complete teams).
@@ -493,27 +268,27 @@ def run_step4(session: Session) -> None:
     # without this second check the coefficient pass fails on the missing volume column
     # instead of the category simply dropping out.
     available_columns = set(session.v2.columns)
-    ratio_statistics  = params.get('ratio-statistics', {})
+    ratio_statistics  = params['ratio-statistics']
     categories = [
-        category for category in cp['categories']
+        category for category in current_params['categories']
         if category in available_columns
         and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
     ]
-    cp['categories'] = categories
+    current_params['categories'] = categories
 
     # The narrowing above can drop the very category chosen to break ties (a percentage whose
     # attempts column is missing), or leave an odd number, where there is no tie to break. Either
     # way the tiebreaker no longer refers to anything the agent could resolve, so it is cleared
     # here — after narrowing, which is the only place the surviving set is known.
-    if cp.get('tiebreaker_category') not in categories or len(categories) % 2 == 1:
-        cp['tiebreaker_category'] = None
+    if current_params.get('tiebreaker_category') not in categories or len(categories) % 2 == 1:
+        current_params['tiebreaker_category'] = None
 
     info, _ = process_player_data(
         player_stats_v2   = session.v2,
         weekly_df         = None,
-        mean_of_variances = _load_mean_of_variances(sport),
-        psi               = cp['psi'],
-        chi               = cp['chi'],
+        mean_of_variances = _load_mean_of_variances(),
+        psi               = current_params['psi'],
+        chi               = current_params['chi'],
         scoring_format    = scoring_format,
         n_drafters        = n_drafters,
         n_starters        = n_starters,
@@ -521,8 +296,8 @@ def run_step4(session: Session) -> None:
         categories        = categories,
         sport             = sport,
         # Cleared just above when the narrowing dropped it, so this is always a live category.
-        tiebreaker_category    = cp.get('tiebreaker_category'),
-        most_categories_weight = cp.get('most_categories_weight'),
+        tiebreaker_category    = current_params.get('tiebreaker_category'),
+        most_categories_weight = current_params.get('most_categories_weight'),
     )
     # session.info is the pipeline's step-4 intermediate; step 5 builds the agent from it (and the
     # agent retains it, so consumers read G-scores via session.agent.info). On a from_step==5 patch
@@ -530,53 +305,51 @@ def run_step4(session: Session) -> None:
     session.info = info
 
 
-# ── Step 5: build HAgent ──────────────────────────────────────────────────────
+# ── Step 5: build the session's agent ─────────────────────────────────────────
 
-def run_step5(session: Session) -> None:
+def build_session_agent(session: Session) -> None:
     """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
     from backend.math.algorithm_agents import HAgent
 
-    _, params, sport = _sport_params(session)
-    cp = session.current_params
+    _, params, sport = _resolve_sport_params(session)
+    current_params = session.current_params
 
-    scoring_format = cp['scoring_format']
-    n_picks     = cp['n_picks']
-    slot_counts = cp['slot_counts']
-    n_starters  = sum(slot_counts.values()) if slot_counts else n_picks
-    n_drafters  = cp['n_drafters']
+    scoring_format = current_params['scoring_format']
+    n_picks     = current_params['n_picks']
+    slot_counts = current_params['slot_counts']
+    n_starters  = _count_starters(slot_counts, n_picks)
+    n_drafters  = current_params['n_drafters']
 
     session.agent = HAgent(
         info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
-        omega          = cp['omega'],
-        gamma          = cp['gamma'],
+        omega          = current_params['omega'],
+        gamma          = current_params['gamma'],
         n_picks        = n_starters,
         n_drafters     = n_drafters,
-        dynamic        = cp['n_iterations'] > 0,
+        dynamic        = current_params['n_iterations'] > 0,
         scoring_format = scoring_format,
-        most_categories_weight = cp['most_categories_weight'],
-        tiebreaker_category    = cp.get('tiebreaker_category'),
+        most_categories_weight = current_params['most_categories_weight'],
+        tiebreaker_category    = current_params.get('tiebreaker_category'),
         sport          = sport,
         params         = params,
         slot_counts    = slot_counts,
-        aleph          = cp['aleph'],
-        kappa          = cp['kappa'],
-        # .get: mirrors the schema default for sessions persisted before the parameter existed.
-        reg_lambda     = cp.get('reg_lambda', 0.05),
-        # .get: mirrors the schema default for sessions persisted before the parameter existed.
-        opponent_model_confidence = cp.get('opponent_model_confidence', 0.5),
-        beth           = cp['beth'],
+        aleph          = current_params['aleph'],
+        kappa          = current_params['kappa'],
+        reg_lambda     = current_params['reg_lambda'],
+        opponent_model_confidence = current_params['opponent_model_confidence'],
+        beth           = current_params['beth'],
     )
 
     # Prime the neutral (empty-board) baseline as part of the build — this workflow always evaluates,
     # so the throttle ranking + auction anchor are always needed. Auction sessions pass full cash
     # (every team at cash_per_team); everything else passes None — the is_auction gate matters
     # because a cash_per_team value can linger on the session after the user leaves Auction Mode.
-    cash_per_team = cp.get('cash_per_team') if cp.get('is_auction') else None
+    cash_per_team = current_params.get('cash_per_team') if current_params.get('is_auction') else None
     default_cash = (
         {f'Team {i + 1}': cash_per_team for i in range(n_drafters)}
         if cash_per_team is not None else None
     )
-    session.agent.populate_default_h_scores(cp['n_iterations'], default_cash)
+    session.agent.populate_default_h_scores(current_params['n_iterations'], default_cash)
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
@@ -589,13 +362,13 @@ def build_agent(
 ) -> None:
     """Re-run the pipeline starting from the given step number (1–5), leaving session.agent built."""
     if from_step <= 1:
-        run_step1(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
+        load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
     if from_step <= 2:
-        run_step2(session)
+        remove_injured_players(session)
     if from_step <= 3:
-        run_step3(session)
+        apply_upsilon_adjustment(session)
     if from_step <= 4:
-        run_step4(session)
+        build_scoring_info(session)
     if from_step <= 5:
-        run_step5(session)
+        build_session_agent(session)
 

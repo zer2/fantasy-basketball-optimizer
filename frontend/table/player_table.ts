@@ -17,7 +17,7 @@
 // first): resetTable() clears it, addBatch() merges a sorted batch into `candidateRows` (data only), and
 // renderWindow() syncs the DOM. buildTable() is the single-shot entry point (auction).
 
-import { stat_styler_primary, stat_styler_secondary } from '../styles/styler_functions.js'
+import { stat_styler_primary, stat_styler_secondary, H_MULTIPLIER } from '../styles/styler_functions.js'
 import { buildExpandPanel } from './expand_view.js'
 import { PlayerResult } from '../types.js'
 import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
@@ -201,9 +201,9 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
     if (ctx.isAuction) {
         const av = player.auction_values
         if (av) {
-            const diff = av.your_dollar - av.gnrc_dollar
+            const diff = av.your_dollar - av.generic_dollar
             html += `<td class='auction-dollar' style='${stat_styler_secondary(diff, 10, 0)}'>${diff.toFixed(ctx.decimals)}</td>`
-            for (const val of [av.your_dollar, av.gnrc_dollar, av.orig_dollar]) {
+            for (const val of [av.your_dollar, av.generic_dollar, av.original_dollar]) {
                 html += `<td class='auction-dollar celltypeb'>${val.toFixed(ctx.decimals)}</td>`
             }
         } else {
@@ -219,9 +219,9 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
     for (const value of player.win_rates) {
         if (ctx.rotoData) {
             const rotoValue = 1 + (value / 100) * (ctx.rotoData.nDrafters - 1)
-            html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, 3 * (ctx.rotoData.nDrafters - 1), ctx.rotoData.rotoMiddle)}'>${rotoValue.toFixed(ctx.decimals)}</td>`
+            html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, H_MULTIPLIER * (ctx.rotoData.nDrafters - 1), ctx.rotoData.rotoMiddle)}'>${rotoValue.toFixed(ctx.decimals)}</td>`
         } else {
-            html += `<td class='categoricalhscore' style='${stat_styler_primary(value, 3, 50)}'>${value.toFixed(ctx.decimals)}</td>`
+            html += `<td class='categoricalhscore' style='${stat_styler_primary(value, H_MULTIPLIER, 50)}'>${value.toFixed(ctx.decimals)}</td>`
         }
     }
 

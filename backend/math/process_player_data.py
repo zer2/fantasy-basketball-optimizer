@@ -13,7 +13,6 @@ The original src/ file is untouched.
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import numpy as np
@@ -240,8 +239,8 @@ def games_played_adjustment(scores: pd.DataFrame
 # actually fills flex/late slots; the star-dominated full pool over-states how much value a stacked
 # position delivers, which pushed the optimiser to over-commit to a single position. Default 0.25
 # trims the top quartile (a mild shrink that stays net-positive without over-flattening the tilts).
-# 0.0 recovers the prior full-pool behaviour; overridable via the POSITION_MEAN_POOL_TOP_TRIM env var.
-_POSITION_MEAN_POOL_TOP_TRIM = float(os.environ.get('POSITION_MEAN_POOL_TOP_TRIM', '0.25'))
+# 0.0 recovers the prior full-pool behaviour.
+_POSITION_MEAN_POOL_TOP_TRIM = 0.25
 
 
 # ── public pipeline steps ──────────────────────────────────────────────────────
@@ -421,6 +420,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
         position_means = position_means.loc[base_position_list, :]
         position_means_g = position_means * v
 
+        # MLB: unsupported and unreachable — no ingestion path produces MLB data
+        # (see the MLB note in algorithm_agents.HAgent.__init__).
         if sport == 'MLB':
             pitching_positions = ['SP', 'RP']
             batting_positions  = [p for p in position_means.index if p not in pitching_positions]

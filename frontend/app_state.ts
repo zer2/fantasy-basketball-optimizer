@@ -7,7 +7,7 @@ import { PlayerResult, PlayerGScore, SportConfig } from './types.js'
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
-export type SessionPhase = 'uninitialized' | 'session-created' | 'evaluated'
+type SessionPhase = 'uninitialized' | 'session-created' | 'evaluated'
 
 let sessionPhase: SessionPhase = 'uninitialized'
 
@@ -20,7 +20,6 @@ let allPlayerResults:      PlayerResult[] | null = null   // full dataset — on
 let candidates:            PlayerResult[] | null = null   // current evaluate output (may be a subset, e.g. waiver free agents)
 let playerResultsById:     Map<number, PlayerResult> | null = null
 let gScoreById:        Map<number, PlayerGScore> | null = null
-let playerIdsByGScore: number[] | null = null   // player ids sorted descending by G-score total
 
 /** Returns every player in the loaded dataset, or null if no evaluate has run yet. */
 export function getPlayerResults(): PlayerResult[] | null { return allPlayerResults }
@@ -36,7 +35,7 @@ export function getPlayerResultsById(): Map<number, PlayerResult> {
 
 /** Replaces the full player dataset. Call after a full evaluate (draft/auction/season).
  *  Also updates candidates, since a full evaluate's candidate list = the full pool. */
-export function setAllPlayerResults(p: PlayerResult[]): void {
+function setAllPlayerResults(p: PlayerResult[]): void {
     setBasePlayerResults(p)
     setCandidatePlayerResults(p)
 }
@@ -61,17 +60,10 @@ export function getGScoreById(): Map<number, PlayerGScore> {
     else return gScoreById
 }
 
-/** Returns player ids sorted descending by G-score total (pre-computed at session creation). */
-export function getPlayerIdsByGScore(): number[] {
-    if (playerIdsByGScore === null) throw new Error('getPlayerIdsByGScore called before G-scores were loaded')
-    else return playerIdsByGScore
-}
-
 /** Replaces the G-score map. Called by session.ts after session creation.
  *  `scores` arrives from the backend already sorted by total descending. */
 export function setGScores(scores: PlayerGScore[]): void {
     gScoreById        = new Map(scores.map(s => [s.player_id, s]))
-    playerIdsByGScore = scores.map(s => s.player_id)
     if (sessionPhase === 'uninitialized') sessionPhase = 'session-created'
 }
 

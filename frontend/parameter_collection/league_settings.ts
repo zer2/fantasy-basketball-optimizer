@@ -10,6 +10,7 @@ import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
+import { defaultTeamLabel } from '../data_entry/team_labels.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -27,6 +28,21 @@ let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
 // True once a live platform has been connected successfully (Connect succeeded); reset
 // when the platform changes. Gates the live-layout "Refresh Analysis" button.
 let platformConnected = false
+
+// The mode/platform select handles, exposed so main.ts can attach its change listeners to
+// the widgets' own event roots instead of reaching through this section's DOM nesting.
+let modeSelectHandle: ReturnType<typeof makeCustomSelect> | null = null
+let platformSelectHandle: ReturnType<typeof makeCustomSelect> | null = null
+
+export function getModeSelectElement(): HTMLElement {
+    if (modeSelectHandle === null) throw new Error('getModeSelectElement called before renderLeagueSettings')
+    return modeSelectHandle.element
+}
+
+export function getPlatformSelectElement(): HTMLElement {
+    if (platformSelectHandle === null) throw new Error('getPlatformSelectElement called before renderLeagueSettings')
+    return platformSelectHandle.element
+}
 
 /** Whether a live platform connection has been established (Connect succeeded). */
 export function isPlatformConnected(): boolean {
@@ -69,6 +85,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         DRAFT_MODE_OPTIONS.map(m => ({ value: m, label: m })),
         pref('mode', 'Draft Mode'),
     )
+    modeSelectHandle = modeSelect
     modeSelect.element.addEventListener('change', () => savePref('mode', modeSelect.getValue()))
     modeCell.append(modeSelect.element)
     grid.append(modeCell)
@@ -82,6 +99,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
         PLATFORM_OPTIONS.map(p => ({ value: p, label: p })),
         pref('platform', 'Enter your own data'),
     )
+    platformSelectHandle = platformSelect
     platformSelect.element.addEventListener('change', () => {
         savePref('platform', platformSelect.getValue())
         platformConnected = false   // changing platform invalidates the previous connection
@@ -138,7 +156,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     function refreshTeamIdentities(): void {
         const nDrafters = parseInt(nDraftersInput.value)
         if (isNaN(nDrafters) || nDrafters <= 0) return
-        hiddenNamesTextarea.value = Array.from({ length: nDrafters }, (_, i) => `Team ${i + 1}`).join('\n')
+        hiddenNamesTextarea.value = Array.from({ length: nDrafters }, (_, i) => defaultTeamLabel(i)).join('\n')
         hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
     }
     refreshTeamIdentities()
@@ -280,8 +298,7 @@ export function getLeagueSettings(): {
         n_picks:              readRequiredIntInput('ls-n-picks'),
         cash_per_team:        readRequiredIntInput('ls-cash-per-team'),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
-        team_names:           (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-                                  .value.split('\n').map(s => s.trim()).filter(s => s.length > 0),
+        team_names:           getTeamNames(),
     }
 }
 

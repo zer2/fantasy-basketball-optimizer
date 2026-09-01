@@ -3,7 +3,7 @@ Backend-only copy of src/math/algorithm_agents.py.
 
 Changes vs original:
 - HAgent.__init__ takes explicit `sport`, `params`, `slot_counts`, `aleph` params.
-- All get_*() / st.session_state calls replaced with self.sport, self._pos_cfg, etc.
+- All get_*() / st.session_state calls replaced with self.sport, self.position_config, etc.
 - Imports changed to backend.math.position_optimization and backend.math.process_player_data.
 - @st.cache_resource removed; build_h_agent is a plain function.
 - All pure-math methods (get_pdf, get_term_*, Roto helpers, AdamOptimizer) are identical.
@@ -12,7 +12,6 @@ The original src/ file is untouched.
 
 from __future__ import annotations
 
-import os
 from typing import Optional
 
 import numpy as np
@@ -69,55 +68,50 @@ _WEAKNESS_SEED_MIN_ROSTER = 3
 # Per-format best-practice configuration, resolved per agent in __init__:
 #   Rotisserie:  lowvar seed (tilts weight off the noisy categories), regulariser on, unified stability v
 #   H2H (EC/MC): multi-start punt seeding, regulariser on (5x schedule)
-# The env vars below override individual fields for A/B testing only; when unset (the production path)
-# each format uses its per-format default. Leave them unset in production.
-_SEED_MODE_OVERRIDE      = os.environ.get('SEED_MODE')        # multistart | heuristic | neutral | lowvar
-_PUNT_REG_OVERRIDE       = os.environ.get('PUNT_REG')         # '0' | '1'
-_ROTO_V_UNIFIED_OVERRIDE = os.environ.get('ROTO_V_UNIFIED')   # '0' | '1'
+# There are deliberately no environment overrides in this module: experiments vary the
+# session parameters the same way a user could, so every run is reproducible from its
+# request alone.
 # lowvar seed (Roto): exponent on the seed tilt that down-weights high-v (less stable) categories.
-_LOWVAR_TILT = float(os.environ.get('LOWVAR_TILT', '0.5'))
+_LOWVAR_TILT = 0.5
 # Robustness regulariser: each iteration soft-thresholds the category weights toward neutral v -- the
 # proximal step for an L1 penalty -lambda*||w-v||_1. L1 rewards balance without over-penalising a
 # committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
 # deviate. The per-pick strength lambda follows a Gaussian (phi) schedule (built per agent from n_picks
 # in __init__): it starts at the peak on an empty roster and decays to ~0 by the final pick.
-# REG_PEAK tunes the peak; PUNT_REG_SCHEDULE (comma-separated floats) overrides the whole schedule.
 # Regularisation strength: the peak of the decay schedule (the lambda on an empty roster). Surfaced as
 # the session parameter reg_lambda; this value is what parameters.yaml defaults it to, kept here as the
-# figure testing settled on. REG_PEAK still overrides everything, for sweeps that must not touch a session.
+# figure testing settled on.
 _REG_STRENGTH = 0.00005
 # reg_lambda reaches the agent in units of REG_LAMBDA_UNIT, so that a sidebar box reads 0.05 rather
 # than 0.00005 -- the scale the other model parameters live on. This is the only place the two
 # representations meet.
 REG_LAMBDA_UNIT = 1e-3
-_REG_PEAK_OVERRIDE = os.environ.get('REG_PEAK')  # None unless set; overrides both the parameter and the default
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
-# component from the singular w==v ray. Only needed if REG_PEAK is raised past ~5e-4, where the small
-# empty-board deviations let the shrink reach v and term_five goes singular (EC in particular).
-_REG_FLOOR = float(os.environ.get('REG_FLOOR', '0.0'))
+# component from the singular w==v ray. Only needed if reg_lambda's ceiling is ever raised past the
+# ~5e-4 it caps at today (parameters.yaml max 0.5 x REG_LAMBDA_UNIT), where the small empty-board
+# deviations let the shrink reach v and term_five goes singular (EC in particular).
+_REG_FLOOR = 0.0
 # Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
 # (few bases), so they need a firmer pull toward uniform to have a comparable effect.
-_POSITION_REG_MULT = float(os.environ.get('POSITION_REG_MULT', '1000'))
+_POSITION_REG_MULT = 1000.0
 # Anti-crowded-punt coupling ("kappa"): a linear penalty in the objective on punting categories the
 # FIELD is crowding into. On the empty-board first run, the multi-start seed scan reveals which single
 # punts the top _PUNT_POPULARITY_TOP_N players most want (the popularity vector); the penalty then
 # discourages joining those popular punts, dispersing the crowd (crowded punts are competed away). It
 # acts only in the early multi-start rounds (roster < _WEAKNESS_SEED_MIN_ROSTER). 0 disables it (no
 # behaviour change); higher = firmer defection from the crowd. Surfaced as the per-session `kappa`
-# parameter (default 0.5); the env KAPPA overrides that per-session value for sweeps.
-_KAPPA_OVERRIDE = os.environ.get('KAPPA')   # None unless set
-_PUNT_POPULARITY_TOP_N = int(os.environ.get('PUNT_POPULARITY_TOP_N', '40'))
+# parameter (default 0.3).
+_PUNT_POPULARITY_TOP_N = 40
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
 # empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
-_REG_SHAPE_B = float(os.environ.get('REG_SHAPE_B', '4'))
-_schedule_override = os.environ.get('PUNT_REG_SCHEDULE')
+_REG_SHAPE_B = 4.0
 # Correlation-correction refresh interval, mirroring the position-optimiser throttle: the
 # correction terms are recomputed on iterations where (iteration+1) % interval == 0 (plus
 # the cold start) and reused between — they drift slowly with the category weights, so a
 # small staleness buys back most of the correction's per-iteration cost. One-shot scoring
 # calls (full team, trades, auction values) always compute fresh.
-_MC_CORRELATION_REFRESH_INTERVAL = int(os.environ.get('MC_CORRELATION_REFRESH', '4'))
+_MC_CORRELATION_REFRESH_INTERVAL = 4
 # Opponent modelling: instead of padding every opponent's future picks with a category-neutral
 # average, treat each opponent as a rational H-score drafter who punts. We track a per-opponent
 # mu_edge (the expected per-pick edge vector implied by their inferred category weights) and add
@@ -125,9 +119,10 @@ _MC_CORRELATION_REFRESH_INTERVAL = int(os.environ.get('MC_CORRELATION_REFRESH', 
 # own remaining picks. Stale opponents are refreshed EAGERLY at the top of every evaluate: a pick makes
 # exactly one seat stale, and each refresh replays that seat's most recent pick through the real solver
 # as a single-candidate solve (~1/40th of an evaluate), so there is no lazy budget and the field model
-# is always current. _OPPONENT_INFERENCE_ITERATIONS bounds that nested solve's descent. Env
-# OPPONENT_MODEL=0 disables the whole feature and restores byte-identical neutral-opponent behaviour.
-_OPPONENT_INFERENCE_ITERATIONS = int(os.environ.get('OPPONENT_INFERENCE_ITERATIONS', '50'))
+# is always current. _OPPONENT_INFERENCE_ITERATIONS bounds that nested solve's descent. Setting the
+# opponent_model_confidence session parameter to 0 disables the whole feature and restores
+# byte-identical neutral-opponent behaviour.
+_OPPONENT_INFERENCE_ITERATIONS = 50
 # Build-time fictitious-play bootstrap: the base H-scores are recomputed several times, each pass
 # best-responding to the RUNNING AVERAGE of prior passes' builds rather than the latest one. Pure
 # best-response oscillates (every seat flips the same way each pass); averaging damps that and lets the
@@ -136,17 +131,17 @@ _OPPONENT_INFERENCE_ITERATIONS = int(os.environ.get('OPPONENT_INFERENCE_ITERATIO
 # convergence experiment), the 8-pass serve lands within 0.16pp of the 15-pass serve with an identical
 # top-40, and dropping to 7 or 6 quintuples that drift. Cost is quadratic in the pass count (pass k
 # faces k stacked field snapshots), so 15 -> 8 halves populate time.
-_OPPONENT_BOOTSTRAP_PASSES = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES', '8'))
+_OPPONENT_BOOTSTRAP_PASSES = 8
 # Rotisserie keeps the longer run: it uses the EMA field path (window 0), whose fixed-rate smoothing
 # stabilises more slowly than the window's 1/t fictitious-play steps — at 8 passes a 2024-25 top-12
 # Roto build hard-punts a category (breaking the minimal-punting floor), at 15 none do. Roto passes
 # face a single 11-column field, so its cost is linear in the pass count and the longer run is cheap.
-_OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE = int(os.environ.get('OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE', '15'))
+_OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE = 15
 # Damping for the fixed-point field: each bootstrap pass nudges the committed field a fraction alpha
 # toward that pass's best-response (exponential smoothing), instead of a running mean. Smoothing
 # converges to a genuine fixed point (field == its own best-response — a committed equilibrium), whereas
 # a mean converges to a smeared blend of oscillating responses that erases specific punts.
-_OPPONENT_SMOOTHING = float(os.environ.get('OPPONENT_SMOOTHING', '0.3'))
+_OPPONENT_SMOOTHING = 0.3
 # Windowed fictitious play for the BOOTSTRAP PASSES ONLY (H2H formats). Each pass best-responds to the
 # raw fields of the last K passes stacked as separate opponents (11*K columns; the objective's mean over
 # the opponent axis weights them uniformly) instead of the single EMA-blended field above. At a mixed
@@ -155,15 +150,15 @@ _OPPONENT_SMOOTHING = float(os.environ.get('OPPONENT_SMOOTHING', '0.3'))
 # build nobody would draft. The window also replaces the EMA's damping: one new pass moves at most 1/K
 # of the field's mass. The DEFAULT keeps the ENTIRE history (any value >= the pass count): that is true
 # fictitious play, whose 1/t step decay is what converges — measured settling in all six seasons,
-# whereas a small sliding window (fixed step size) sustains large limit cycles. 0 restores the EMA
-# path for A/B comparison. Strictly self-play machinery: the serve pass and everything mid-draft face
+# whereas a small sliding window (fixed step size) sustains large limit cycles. 0 selects the EMA
+# path. Strictly self-play machinery: the serve pass and everything mid-draft face
 # the FINAL pass's single field. Rotisserie always uses the EMA path (its standings objective scales
 # with opponent count, and its punts are structural anyway).
-_OPPONENT_FIELD_WINDOW = int(os.environ.get('OPPONENT_FIELD_WINDOW', '999'))
+_OPPONENT_FIELD_WINDOW = 999
 # Descent iterations for the field-building bootstrap passes. These only need approximate opponent builds
 # (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
 # the session's full n_iterations for accurate base H-scores.
-_OPPONENT_PASS_ITERATIONS = int(os.environ.get('OPPONENT_PASS_ITERATIONS', '15'))
+_OPPONENT_PASS_ITERATIONS = 15
 # Learning-rate scales for WARM-STARTED category descents, tiered by how far the optimum can plausibly
 # have moved since the stored weights were computed. A warm start begins inside an established basin, so
 # the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds), full-size Adam
@@ -179,8 +174,8 @@ _OPPONENT_PASS_ITERATIONS = int(os.environ.get('OPPONENT_PASS_ITERATIONS', '15')
 #   warm, MY roster unchanged since storage     -> 1/100th: only the field moved (opponent picks are
 #       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust. This
 #       static tier is where the display-stability guarantees live.
-_WARM_START_LEARNING_RATE_SCALE = float(os.environ.get('WARM_START_LR_SCALE', '1.0'))
-_WARM_START_STATIC_ROSTER_SCALE = float(os.environ.get('WARM_START_STATIC_LR_SCALE', '0.01'))
+_WARM_START_LEARNING_RATE_SCALE = 1.0
+_WARM_START_STATIC_ROSTER_SCALE = 0.01
 from itertools import combinations
 
 from backend.math.algorithm_helpers import (
@@ -258,21 +253,16 @@ class HAgent:
         # tilt (its punts are structural, not a strategic fork), the H2H formats use multi-start punt
         # seeding so early picks avoid over-committing to a punt they may drop.
         is_rotisserie       = scoring_format == 'Rotisserie'
-        self.seed_mode      = _SEED_MODE_OVERRIDE or ('lowvar' if is_rotisserie else 'multistart')
-        self.regulariser_on = (_PUNT_REG_OVERRIDE == '1') if _PUNT_REG_OVERRIDE is not None else True
-        roto_v_unified      = (_ROTO_V_UNIFIED_OVERRIDE == '1') if _ROTO_V_UNIFIED_OVERRIDE is not None else True
+        self.seed_mode = 'lowvar' if is_rotisserie else 'multistart'
 
         # Gaussian (phi) regulariser schedule built from the draft length: strength reg_lambda (the
         # peak) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
-        # with a concave shoulder set by _REG_SHAPE_B. REG_PEAK overrides the peak; PUNT_REG_SCHEDULE the
-        # whole schedule.
-        reg_peak = (float(_REG_PEAK_OVERRIDE) if _REG_PEAK_OVERRIDE is not None
-                    else reg_lambda * REG_LAMBDA_UNIT)
+        # with a concave shoulder set by _REG_SHAPE_B.
+        reg_peak = reg_lambda * REG_LAMBDA_UNIT
         _phi0    = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
-        self.reg_schedule = ([float(x) for x in _schedule_override.split(',')] if _schedule_override
-                             else [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
-                                               - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
-                                   for k in range(n_picks)])
+        self.reg_schedule = [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
+                                         - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
+                             for k in range(n_picks)]
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
@@ -295,7 +285,7 @@ class HAgent:
         self._populate_pass_scores = None
 
         # Build position config (replaces all get_position_*() calls)
-        self._pos_cfg: PositionConfig = build_position_config(params, slot_counts)
+        self.position_config: PositionConfig = build_position_config(params, slot_counts)
 
         # ── info dict unpacking ────────────────────────────────────────────────
         self.positions = info['Positions']
@@ -352,8 +342,8 @@ class HAgent:
         L_by_position = np.array(L_by_position).reshape(1, -1, self.n_categories, self.n_categories)
 
         # ── L_weights (replaces get_L_weights()) ──────────────────────────────
-        pn         = self._pos_cfg.position_numbers
-        ps         = self._pos_cfg.position_structure
+        pn         = self.position_config.position_numbers
+        ps         = self.position_config.position_structure
         base_list  = ps['base_list']
         flex_list  = ps['flex_list']
         n_slots    = sum(pn.values())
@@ -397,18 +387,16 @@ class HAgent:
             self.rho = None
 
         # Most-Categories correlation correction (see docs: correlation-correction note, eq (C4)).
-        # Temporarily OFF by default while the opponent model is under development: the correction
-        # over-suppresses punting on a contested board (it peaks at win-prob 0.5), which fights the
-        # opponent-model work. Set MC_CORRELATION=1 to re-enable.
-        self.mc_correlation_enabled = (
-            scoring_format != 'Rotisserie' and most_categories_weight > 0
-            and os.environ.get('MC_CORRELATION', '0') == '1'
-        )
+        # Parked OFF while the opponent model is under development: the correction over-suppresses
+        # punting on a contested board (it peaks at win-prob 0.5), which fights the opponent-model
+        # work. The machinery it gates stays wired for the correlation-factor branch; re-enabling
+        # means flipping this flag (deliberately no runtime switch).
+        self.mc_correlation_enabled = False
         if self.mc_correlation_enabled and self.tiebreaker_index is not None:
             # The correction's bracket matrix is derived for an unweighted majority (see
             # _bracket_targets); a category worth two points is outside that derivation, so the
             # combination is refused rather than silently corrected by the wrong quantity.
-            raise ValueError('The Most Categories correlation correction (MC_CORRELATION=1) does '
+            raise ValueError('The Most Categories correlation correction (mc_correlation_enabled) does '
                              'not support a tiebreaker category.')
         # Per-descent cache of correction terms (see get_objective_and_pdf_weights_mc);
         # reset at the start of every perform_iterations run.
@@ -417,13 +405,10 @@ class HAgent:
         # Rational-opponent modelling (see get_diff_distributions / refresh_stale_team_states).
         # One session parameter carries both halves of it: how sharply opponents are expected to
         # pursue their predicted punts, and — at zero — whether they are modelled as strategic at
-        # all. The OPPONENT_MODEL env var, when set, overrides it globally (1 = full, 0 = off),
-        # same pattern as kappa/KAPPA. Zero restores neutral-opponent behaviour byte-for-byte.
-        # Rotisserie pins full confidence: there is no equivalent uncertainty about punting there.
-        awareness_env_override = os.environ.get('OPPONENT_MODEL')
-        confidence = (float(awareness_env_override) if awareness_env_override is not None
-                      else float(opponent_model_confidence))
-        self.opponent_model_confidence = 1.0 if scoring_format == 'Rotisserie' else confidence
+        # all. Zero restores neutral-opponent behaviour byte-for-byte. Rotisserie pins full
+        # confidence: there is no equivalent uncertainty about punting there.
+        self.opponent_model_confidence = (1.0 if scoring_format == 'Rotisserie'
+                                          else float(opponent_model_confidence))
         self.models_opponents = self.opponent_model_confidence > 0.0
         # Per-team inferred build, keyed by team name:
         #   {'roster_key': frozenset(their non-NaN roster), 'category_weights': (n_cat,), 'mu_edge': (n_cat,)}.
@@ -465,7 +450,7 @@ class HAgent:
             self.x_scores = x_scores.loc[
                 info['G-scores'].sum(axis=1).sort_values(ascending=False).index
             ]
-            v = np.sqrt(mov / (mov + vom)) if roto_v_unified else np.sqrt(mov / vom)
+            v = np.sqrt(mov / (mov + vom))
 
             # ── max_info (replaces get_max_info()) ────────────────────────────
             if self.n_drafters <= 21:
@@ -503,12 +488,12 @@ class HAgent:
         self.guard_shares      = None
 
         # ── position structure (replaces get_position_structure()) ────────────
-        self.position_structure = self._pos_cfg.position_structure
-        self.position_indices   = self._pos_cfg.position_indices
+        self.position_structure = self.position_config.position_structure
+        self.position_indices   = self.position_config.position_indices
 
         self.initial_category_weights = None
-        # Anti-crowded-punt coupling (session parameter; env KAPPA overrides for sweeps).
-        self.kappa = float(_KAPPA_OVERRIDE) if _KAPPA_OVERRIDE is not None else kappa
+        # Anti-crowded-punt coupling (the per-session kappa parameter).
+        self.kappa = kappa
         # How much weight the predicted punting behavior of other teams carries: every opponent tilt
         # read (committed archetype, inferred build, spare seat — draft and auction alike) is scaled by
         # this factor at field construction, so the bootstrap, the serve, and in-draft evaluates all
@@ -525,6 +510,10 @@ class HAgent:
         self._punt_popularity = None
 
         # ── MLB-specific setup (replaces get_pitcher_stats() / get_league_type()) ──
+        # MLB is UNSUPPORTED: kept from the Streamlit port, but no current ingestion path
+        # produces MLB data (every source is NBA-keyed), so the sport == 'MLB' branches in
+        # the backend are unreachable and untested. This is the authoritative note; the
+        # other branches carry a one-line pointer.
         if sport == 'MLB':
             cats = list(x_scores.columns)
             pitcher_stats = params.get('pitcher_stats', [])
@@ -1557,6 +1546,7 @@ class HAgent:
             'Shares': AdamOptimizer(learning_rate=shares_learning_rate),
         }
 
+        # MLB: unsupported and unreachable — see the MLB note in __init__.
         if self.sport == 'MLB':
             optimizers['Pitcher Preference'] = AdamOptimizer(learning_rate=0.05)
             pitching_preference = 0
@@ -1590,9 +1580,9 @@ class HAgent:
             # Eligibility rows depend only on which players are eligible for which slots — not on the
             # category weights — so build them once here instead of on every gradient iteration.
             if self.position_means is not None:
-                n_total_picks          = sum(self._pos_cfg.position_numbers.values())
-                candidate_player_array = get_player_rows(self.positions.loc[result_index], self._pos_cfg)
-                team_so_far_array      = (get_player_rows(self.positions.loc[self.players], self._pos_cfg)
+                n_total_picks          = sum(self.position_config.position_numbers.values())
+                candidate_player_array = get_player_rows(self.positions.loc[result_index], self.position_config)
+                team_so_far_array      = (get_player_rows(self.positions.loc[self.players], self.position_config)
                                           if len(self.players) > 0
                                           else np.empty((0, n_total_picks)))
             else:
@@ -1629,7 +1619,7 @@ class HAgent:
             # (proximal step for an L1 penalty -lambda*||w-v||_1), strongest on an empty roster and
             # decaying to 0 by mid-draft (see self.reg_schedule), so early picks stay flexible.
             reg_lambda  = (self.reg_schedule[len(self.players)]
-                           if (self.regulariser_on and len(self.players) < len(self.reg_schedule)) else 0.0)
+                           if len(self.players) < len(self.reg_schedule) else 0.0)
             # Warm-started rows skip the regulariser: it is a COLD-start robustness device, and on a warm
             # start it drags an already-converged equilibrium build back toward neutral -- worse, at the
             # reduced warm-start step sizes its pull exceeds the descent step, snapping weights exactly
@@ -1684,6 +1674,7 @@ class HAgent:
 
                 if self.sport == 'NBA':
                     category_weights = category_weights / category_weights.sum(axis=1).reshape(-1, 1)
+                # MLB: unsupported and unreachable — see the MLB note in __init__.
                 elif self.sport == 'MLB':
                     bw = category_weights[:, self.batting_stat_indices]
                     category_weights[:, self.batting_stat_indices] = bw / (2 * bw.sum(axis=1).reshape(-1, 1))
@@ -1880,7 +1871,7 @@ class HAgent:
                 position_rewards,
                 team_so_far_array,
                 position_shares,
-                self._pos_cfg,
+                self.position_config,
                 active_count=active_count,
                 cached_rosters=self._position_rosters_cache,
                 priority_order=self._candidate_priority,
@@ -1901,6 +1892,7 @@ class HAgent:
             )
             del_full = (self.n_picks - 1 - n_players_selected) * self.get_del_full(category_weights, L, self.v)
 
+        # MLB: unsupported and unreachable — see the MLB note in __init__.
         elif self.sport == 'MLB':
             pitching_share = future_position_array[:, -2:].sum(axis=1).reshape(-1, 1, 1)
             batting_share  = 1 - pitching_share
@@ -1982,6 +1974,7 @@ class HAgent:
             gradients  = {'Categories': category_gradient}
             flex_shares = None
 
+        # MLB: unsupported and unreachable — see the MLB note in __init__.
         if self.sport == 'MLB':
             gradients['Pitcher Preference'] = np.einsum(
                 'ai,ik -> a', pdf_weights, self.pitching_preference_vector
@@ -2254,7 +2247,7 @@ class HAgent:
         pass_iters = _OPPONENT_PASS_ITERATIONS
         result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)  # neutral
         committed = result['Future-Diff'] / (self.n_picks - 1)
-        window_size = (_OPPONENT_FIELD_WINDOW if self.scoring_format != 'Rotisserie' else 0) #ZR: This could be reversed to 0 if Rotisserie
+        window_size = (0 if self.scoring_format == 'Rotisserie' else _OPPONENT_FIELD_WINDOW)
         bootstrap_passes = (_OPPONENT_BOOTSTRAP_PASSES if self.scoring_format != 'Rotisserie'
                             else _OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE)
         if window_size >= 2:

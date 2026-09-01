@@ -6,7 +6,7 @@
 
 import { pref, savePref } from '../preferences.js'
 
-export const DRAFTER_METHOD_OPTIONS = ['Manual input', 'H-scoring'] as const
+const DRAFTER_METHOD_OPTIONS = ['Manual input', 'H-scoring'] as const
 export type DrafterMethod = typeof DRAFTER_METHOD_OPTIONS[number]
 
 /** The method for a drafter index; defaults to 'Manual input'. Any stored value that is not

@@ -1,25 +1,30 @@
 // main.ts
-// Application entry point. Sets up the sidebar, registers event listeners,
-// initializes the layout, and triggers the first backend evaluation.
-// All heavy logic lives in api/session.ts, table/player_table.ts, and layout.ts.
+// Application entry point: wiring, in order. Builds the sidebar sections, registers every
+// event listener, and triggers the first backend evaluation. The widgets it places live in
+// their own modules (seat_selector.ts, account_row.ts, parameter_collection/*); the heavy
+// logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
 import { makeDebouncer } from './api/session.js'
-import { setSportConfig, getCurrentSeat, setCurrentSeat } from './app_state.js'
+import { setSportConfig } from './app_state.js'
 import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings } from './api/draft_and_auction_session.js'
 import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
-import { fetchCurrentUser, setSignedInUser, makeSignInLink, logout } from './api/auth.js'
+import { fetchCurrentUser, setSignedInUser } from './api/auth.js'
 import { buildTableHeader } from './table/player_table.js'
 import { applyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
-import { makeCustomSelect } from './custom_select.js'
 import { pref, savePref } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
+import { renderSeatSelector, refreshSeatOptions, clearSeatOptions } from './seat_selector.js'
+import { renderAccountRow } from './account_row.js'
 
-import { renderLeagueSettings, getLeagueSettings, getTeamNames, isPlatformConnected } from './parameter_collection/league_settings.js'
-import { getTeamLabel, defaultTeamLabel, TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
+import {
+    renderLeagueSettings, getLeagueSettings, isPlatformConnected,
+    getModeSelectElement, getPlatformSelectElement,
+} from './parameter_collection/league_settings.js'
+import { TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories,
@@ -38,6 +43,33 @@ async function runModeEval(): Promise<void> {
     // base ("default") rankings instead, which leaves the indicator on 'Unconnected'.
     if (platform !== 'Enter your own data' && !isPlatformConnected()) return showDefaultRankings()
     await runEvaluate()   // discard the autopilot-only top-pick return; runModeEval yields void
+}
+
+/** One sidebar section's apply pipeline: abort any in-flight run for the section, rebuild
+ *  the table header, patch the session from `fromStep`, then re-evaluate and re-layout —
+ *  each post-patch step skipped once a newer run has superseded this one. Every section
+ *  owns one chain, so rapid edits cancel their own stale backend calls without cancelling
+ *  another section's. Player Stats does not use this: its expired-upload retry and
+ *  pool-reset logic are real differences, not boilerplate (see applyPlayerStats). */
+function makeApplyChain(label: string) {
+    let controller: AbortController | null = null
+    return function runApplyChain(
+        fromStep: number
+      , patch: Record<string, unknown>
+      , { rebuildTableHeader = true, evaluate = true } = {}
+    ): Promise<void> {
+        controller?.abort()
+        controller = new AbortController()
+        const { signal } = controller
+        if (rebuildTableHeader) buildTableHeader()
+        return createOrPatchSession(fromStep, patch, signal)
+            .then(() => { if (!signal.aborted && evaluate) return runModeEval() })
+            .then(() => { if (!signal.aborted) applyLayout() })
+            .catch(err => {
+                if (err.name === 'AbortError') return
+                console.error(`${label} failed:`, err)
+            })
+    }
 }
 
 // ─── Async init: fetch config, then build sidebar ────────────────────────────
@@ -62,52 +94,18 @@ const sidebarSections = document.getElementById('sidebar-sections')!
 
 renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
 
-// Seat selector option from a team identity: the value is always the identity ("Team N" for own
-// data; the real name for a live platform). For own-data identities we show the editable display
-// label; a live-platform name (which differs from the "Team N" default) is shown as-is.
-function seatOption(identityName: string, index: number): { value: string; label: string } {
-    const label = identityName === defaultTeamLabel(index) ? getTeamLabel(index) : identityName
-    return { value: identityName, label }
-}
-function seatOptions(names: string[]): { value: string; label: string }[] {
-    return names.map(seatOption)
-}
-
-// Seat selector: rendered once into the fixed DOM element; layout.ts shows/hides the container.
-const seatSelectorContainer = document.getElementById('seat-selector-container') as HTMLElement
-const initialTeamNames = getTeamNames()
-const seatSelect = makeCustomSelect(
-    'seat-select',
-    seatOptions(initialTeamNames),
-)
-seatSelect.element.style.flex = '1'
-
-const seatLabel = document.createElement('div')
-seatLabel.className   = 'pick-control-label'
-seatLabel.textContent = 'Select team'
-
-const seatSelectorRow = document.createElement('div')
-seatSelectorRow.className = 'seat-selector-row'
-seatSelectorRow.append(seatLabel, seatSelect.element)
-
-const seatSelectorWrap = document.createElement('div')
-seatSelectorWrap.className = 'seat-selector-wrap'
-seatSelectorWrap.append(seatSelectorRow)
-seatSelectorContainer.append(seatSelectorWrap)
-
-if (initialTeamNames.length > 0) {
-    setCurrentSeat(initialTeamNames[0])
-    seatSelect.setValue(initialTeamNames[0])
-}
-
-seatSelect.element.addEventListener('change', () => {
-    setCurrentSeat(seatSelect.getValue() ?? null)
+// Seat selector: rendered once into the fixed DOM element; layout.ts shows/hides the
+// container. The widget keeps the app-state seat in sync itself; what a seat change CAUSES
+// is decided here — and the same flow runs when a null seat adopts a team, since adoption
+// deliberately dispatches no event (see refreshSeatOptions).
+function handleSeatChanged(): void {
     clearFullTeamResult()
     buildTableHeader()
     runModeEval()
         .then(() => applyLayout())
         .catch(err => console.error('Seat change evaluate failed:', err))
-})
+}
+renderSeatSelector().addEventListener('change', handleSeatChanged)
 
 // Mode change: rebuild table and sync session.
 // Registered before the applyLayout listener so buildTableHeader fires first, ensuring
@@ -115,49 +113,26 @@ seatSelect.element.addEventListener('change', () => {
 // is_auction is a session parameter (its league type): the backend requires remaining_cash
 // on every evaluate exactly when it is set. Entering Auction Mode also patches cash_per_team
 // so the backend can compute dollar values.
-// AbortController cancels stale backend calls on rapid mode switches.
-let modeChangeController: AbortController | null = null
-document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
-    if (modeChangeController) modeChangeController.abort()
-    modeChangeController = new AbortController()
-    const { signal } = modeChangeController
-
+const applyModeChange = makeApplyChain('Mode change')
+getModeSelectElement().addEventListener('change', () => {
     const { mode, cash_per_team } = getLeagueSettings()
     const patch = mode === 'Auction Mode'
         ? { is_auction: true, league: { cash_per_team } }
         : { is_auction: false }
-
-    if (mode === 'Season Mode') {
-        // The table is hidden in season mode, so there is no rebuild or evaluate here — but the
-        // session's league type must be patched BEFORE the season layout renders, because
-        // rendering fires season evaluates (waiver, roster inspection) that omit remaining_cash.
-        // The standalone applyLayout listener below skips Season Mode for the same reason:
-        // layout comes after the patch, not concurrently with it.
-        createOrPatchSession(4, patch, signal)
-            .then(() => { if (!signal.aborted) applyLayout() })
-            .catch(err => {
-                if (err.name === 'AbortError') return
-                console.error('Mode change failed:', err)
-            })
-        return
-    }
-
-    buildTableHeader()
-
-    createOrPatchSession(4, patch, signal)
-        .then(() => { if (!signal.aborted) return runModeEval() })
-        .then(() => { if (!signal.aborted) applyLayout() })
-        .catch(err => {
-            if (err.name === 'AbortError') return
-            console.error('Mode change failed:', err)
-        })
+    // Season Mode: the table is hidden, so there is no rebuild or evaluate — but the session's
+    // league type must be patched BEFORE the season layout renders, because rendering fires
+    // season evaluates (waiver, roster inspection) that omit remaining_cash. The standalone
+    // applyLayout listener below skips Season Mode for the same reason: layout comes after
+    // the patch, not concurrently with it.
+    const entersSeasonMode = mode === 'Season Mode'
+    applyModeChange(4, patch, { rebuildTableHeader: !entersSeasonMode, evaluate: !entersSeasonMode })
 })
 // Instant layout switch for draft/auction (their evaluates are sequenced after the patch by
 // the handler above). Season Mode's layout is deferred until its session patch lands — see above.
-document.getElementById('ls-mode')!.parentElement!.addEventListener('change', () => {
+getModeSelectElement().addEventListener('change', () => {
     if (getLeagueSettings().mode !== 'Season Mode') applyLayout()
 })
-document.getElementById('ls-platform')!.parentElement!.addEventListener('change', applyLayout)
+getPlatformSelectElement().addEventListener('change', applyLayout)
 
 // Season Mode + live platform: pull the platform's rosters into the grid when the user
 // switches into that state (via either the mode or the platform dropdown). The poll is
@@ -173,8 +148,8 @@ function refreshSeasonRostersIfLive(): void {
         clearLivePlatformRosters()
     }
 }
-document.getElementById('ls-mode')!.parentElement!.addEventListener('change', refreshSeasonRostersIfLive)
-document.getElementById('ls-platform')!.parentElement!.addEventListener('change', refreshSeasonRostersIfLive)
+getModeSelectElement().addEventListener('change', refreshSeasonRostersIfLive)
+getPlatformSelectElement().addEventListener('change', refreshSeasonRostersIfLive)
 
 // On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
 // for the new data source. Mode switches don't change the data source, so they're handled by
@@ -186,63 +161,47 @@ function syncForPlatformSwitch(): void {
     const { platform, mode } = getLeagueSettings()
     if (mode === 'Season Mode') return   // season handled by refreshSeasonRostersIfLive
     if (platform !== 'Enter your own data' && !isPlatformConnected()) {
-        setCurrentSeat(null)
-        seatSelect.setOptions([])
+        clearSeatOptions()
         showDefaultRankings().catch(err => console.error('Default rankings failed:', err))
     } else {
-        const names = getTeamNames()
-        seatSelect.setOptions(seatOptions(names), getCurrentSeat() ?? names[0])
-        if (getCurrentSeat() === null && names.length > 0) setCurrentSeat(names[0])
+        refreshSeatOptions()
         buildTableHeader()
         runModeEval()
             .then(() => applyLayout())
             .catch(err => console.error('Platform-switch evaluate failed:', err))
     }
 }
-document.getElementById('ls-platform')!.parentElement!.addEventListener('change', syncForPlatformSwitch)
+getPlatformSelectElement().addEventListener('change', syncForPlatformSwitch)
 
 // Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
-// AbortController cancels stale calls if the user changes multiple fields quickly.
-let leagueSettingsController: AbortController | null = null
+const applyLeagueSettings = makeApplyChain('League settings update')
 for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     document.getElementById(id)!.addEventListener('change', () => {
-        if (leagueSettingsController) leagueSettingsController.abort()
-        leagueSettingsController = new AbortController()
-        const { signal } = leagueSettingsController
-
         buildTableHeader()
         applyLayout()  // re-renders draft board with new n_drafters/n_picks so getDraftState() is current before evaluate
         revalidateSlotCounts()
         if (!isSlotCountsValid()) return
         const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-        createOrPatchSession(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() }, signal)
-            .then(() => { if (!signal.aborted) return runModeEval() })
-            .then(() => { if (!signal.aborted) applyLayout() })
-            .catch(err => {
-                if (err.name === 'AbortError') return
-                console.error('League settings update failed:', err)
-            })
+        applyLeagueSettings(
+            4,
+            { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() },
+            { rebuildTableHeader: false },   // built above, before the layout pre-render
+        )
     })
 }
 
 // Team identities (#ls-team-names) only change when the drafter count changes (own data) or a
-// live platform connects — both already drive a layout re-render elsewhere — so this handler just
-// keeps the seat-selector options in sync with the identity set.
+// live platform connects — both already drive a layout re-render elsewhere — so this handler
+// keeps the seat-selector options in sync with the identity set. When a null seat adopts the
+// first new team, that adoption is a real seat change and runs the same flow a manual
+// selection would.
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
-    const updatedTeamNames = getTeamNames()
-    seatSelect.setOptions(seatOptions(updatedTeamNames), getCurrentSeat() ?? updatedTeamNames[0])
-    if (getCurrentSeat() === null && updatedTeamNames.length > 0) {
-        setCurrentSeat(updatedTeamNames[0])
-        seatSelect.setValue(updatedTeamNames[0])
-    }
+    if (refreshSeatOptions() !== null) handleSeatChanged()
 })
 
-// A team's display label changed (header input). Identity/value is unchanged, so only relabel the
-// seat selector's options — preserving the current selection by value.
-document.addEventListener(TEAM_LABELS_CHANGED, () => {
-    const names = getTeamNames()
-    seatSelect.setOptions(seatOptions(names), getCurrentSeat() ?? names[0])
-})
+// A team's display label changed (header input). Identity/value is unchanged, so only relabel
+// the seat selector's options — preserving the current selection by value.
+document.addEventListener(TEAM_LABELS_CHANGED, () => { refreshSeatOptions() })
 
 // ─── 2. Player Stats ──────────────────────────────────────────────────────────
 
@@ -306,25 +265,15 @@ playerStatsSection.addEventListener('change', (event) => {
 
 const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
-let formatController: AbortController | null = null
+const applyFormatChange = makeApplyChain('Format & categories apply')
 formatSection.addEventListener('change', () => {
     refreshOpponentConfidenceControl(getScoringFormat())
-    if (formatController) formatController.abort()
-    formatController = new AbortController()
-    const { signal } = formatController
-    buildTableHeader()
-    createOrPatchSession(4, { league: {
+    applyFormatChange(4, { league: {
         scoring_format:         getScoringFormat(),
         most_categories_weight: getMostCategoriesWeight(),
         tiebreaker_category:    getTiebreakerCategory(),
         categories:             getSelectedCategories(),
-    } }, signal)
-        .then(() => { if (!signal.aborted) return runModeEval() })
-        .then(() => { if (!signal.aborted) applyLayout() })
-        .catch(err => {
-            if (err.name === 'AbortError') return
-            console.error('Format & categories apply failed:', err)
-        })
+    } })
 })
 
 // ─── 4. Model Parameters ──────────────────────────────────────────────────────
@@ -333,32 +282,19 @@ const modelSection = createSection(sidebarSections, 'Model Parameters')
 renderModelParameters(modelSection)
 // The format section is built first, so its current value decides the control's initial visibility.
 refreshOpponentConfidenceControl(getScoringFormat())
-let modelController: AbortController | null = null
+const applyModelParameters = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
-    if (modelController) modelController.abort()
-    modelController = new AbortController()
-    const { signal } = modelController
-    buildTableHeader()
-    createOrPatchSession(3, { parameters: getModelParameters() }, signal)
-        .then(() => { if (!signal.aborted) return runModeEval() })
-        .then(() => { if (!signal.aborted) applyLayout() })
-        .catch(err => {
-            if (err.name === 'AbortError') return
-            console.error('Model parameters apply failed:', err)
-        })
+    applyModelParameters(3, { parameters: getModelParameters() })
 })
 
 // ─── 5. Position Parameters ───────────────────────────────────────────────────
 
 const slotSection = createSection(sidebarSections, 'Position Parameters')
 renderSlotCounts(slotSection)
+const applySlotCounts = makeApplyChain('Position parameters apply')
 addApplyBtn(slotSection, async () => {
     if (!isSlotCountsValid()) return
-    const slot_counts = getSlotCounts()
-    buildTableHeader()
-    await createOrPatchSession(4, { slot_counts })
-    await runModeEval()
-    applyLayout()
+    await applySlotCounts(4, { slot_counts: getSlotCounts() })
 })
 
 // ─── 6. Display ───────────────────────────────────────────────────────────────
@@ -390,57 +326,7 @@ sidebarToggle.addEventListener('click', () => {
 
 // ─── Account (signed-in name + sign out) ──────────────────────────────────────
 
-const accountRow = document.createElement('div')
-accountRow.className = 'sidebar-account'
-
-const identity = document.createElement('div')
-identity.className = 'account-identity'
-
-const avatar = document.createElement('span')
-avatar.className = 'account-avatar'
-
-/** Default person icon — shown when no Google picture is available, and swapped in when a
- *  stored picture URL stops resolving (Google's profile-photo URLs are tokenized and expire;
- *  the session stores the URL from login, so a long-lived login eventually holds a dead link). */
-function showDefaultAccountIcon(): void {
-    avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
-        + '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>'
-}
-
-if (currentUser?.picture) {
-    const avatarImg = document.createElement('img')
-    avatarImg.src = currentUser.picture
-    avatarImg.alt = ''
-    avatarImg.referrerPolicy = 'no-referrer'   // Google pic URLs 403 without this
-    avatarImg.addEventListener('error', showDefaultAccountIcon)
-    avatar.append(avatarImg)
-} else {
-    showDefaultAccountIcon()
-}
-
-const accountName = document.createElement('span')
-accountName.className   = 'account-name'
-// Signed out, the row still shows the account slot — with an invitation rather than a name,
-// so signing in stays one click away instead of being something the visitor has to look for.
-accountName.textContent = currentUser ? currentUser.name : 'Not signed in'
-identity.append(avatar, accountName)
-
-if (currentUser) {
-    const logoutBtn = document.createElement('button')
-    logoutBtn.type        = 'button'
-    logoutBtn.className    = 'account-logout'
-    logoutBtn.textContent  = 'Sign out'
-    logoutBtn.addEventListener('click', () => { logout().catch(err => console.error('Logout failed:', err)) })
-    accountRow.append(identity, logoutBtn)
-} else {
-    accountRow.append(identity, makeSignInLink('Sign in'))
-}
-// Place it below the title's divider line, above the sidebar options, with its own
-// divider separating it from the first option.
-sidebar.insertBefore(accountRow, sidebarSections)
-const accountDivider = document.createElement('hr')
-accountDivider.className = 'sidebar-divider'
-sidebar.insertBefore(accountDivider, sidebarSections)
+renderAccountRow(sidebar, sidebarSections, currentUser)
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 

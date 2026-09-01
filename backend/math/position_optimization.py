@@ -2,7 +2,7 @@
 Backend-only copy of src/math/position_optimization.py.
 
 The only change vs the original: every function that read position structure
-from st.session_state now takes an explicit `pos_cfg: PositionConfig` parameter.
+from st.session_state now takes an explicit `position_config: PositionConfig` parameter.
 The original src/ file is untouched.
 """
 
@@ -17,13 +17,13 @@ from backend.math.position_config import PositionConfig
 # ── internal helpers ──────────────────────────────────────────────────────────
 
 def get_future_player_rows(position_rewards: np.ndarray
-                           , pos_cfg: PositionConfig) -> np.ndarray:
+                           , position_config: PositionConfig) -> np.ndarray:
     """Takes an array of rewards by simplified position (5 cols) and
     translates them to rewards per slot (13) by player."""
 
-    position_numbers   = pos_cfg.position_numbers
-    position_structure = pos_cfg.position_structure
-    position_indices   = pos_cfg.position_indices
+    position_numbers   = position_config.position_numbers
+    position_structure = position_config.position_structure
+    position_indices   = position_config.position_indices
     base_list          = position_structure['base_list']
 
     base_rewards = {
@@ -51,7 +51,7 @@ def get_future_player_rows(position_rewards: np.ndarray
     return row
 
 
-def get_player_rows(players: list, pos_cfg: PositionConfig) -> np.ndarray:
+def get_player_rows(players: list, position_config: PositionConfig) -> np.ndarray:
     """Turns a list of player eligibilities into a row array for the assignment
     problem: one row per player, one column per roster slot, 0 where the player is
     eligible for that slot and -inf where not.
@@ -60,8 +60,8 @@ def get_player_rows(players: list, pos_cfg: PositionConfig) -> np.ndarray:
     times) then flex positions, matching get_future_player_rows / the optimiser.
     """
     n_players          = len(players)
-    position_structure = pos_cfg.position_structure
-    position_numbers   = pos_cfg.position_numbers
+    position_structure = position_config.position_structure
+    position_numbers   = position_config.position_numbers
     base_list          = position_structure['base_list']
     flex_list          = position_structure['flex_list']
     base_index         = {position_code: i for i, position_code in enumerate(base_list)}
@@ -117,9 +117,9 @@ def _optimize_positions_for_prospective_player(
 def get_position_array_from_res(res: np.ndarray
                                  , position_shares: dict
                                  , n_remaining_players: int
-                                 , pos_cfg: PositionConfig):
-    position_ranges    = pos_cfg.position_ranges
-    position_structure = pos_cfg.position_structure
+                                 , position_config: PositionConfig):
+    position_ranges    = position_config.position_ranges
+    position_structure = position_config.position_structure
 
     future_positions = res[:, -n_remaining_players:]
     position_sums: dict = {}
@@ -154,7 +154,7 @@ def optimize_positions_all_players(
     , position_rewards: np.ndarray
     , team_so_far_array: np.ndarray
     , position_shares: dict
-    , pos_cfg: PositionConfig
+    , position_config: PositionConfig
     , scale_down: bool = True
     , active_count: int | None = None
     , cached_rosters: np.ndarray | None = None
@@ -162,11 +162,11 @@ def optimize_positions_all_players(
 ):
     # The eligibility rows (candidate_player_array, team_so_far_array) are weight-independent, so the
     # caller builds them once per evaluate via get_player_rows rather than once per gradient iteration.
-    n_total_picks       = sum(pos_cfg.position_numbers.values())
+    n_total_picks       = sum(position_config.position_numbers.values())
     n_remaining_players = n_total_picks - 1 - team_so_far_array.shape[0]
     n_candidates        = candidate_player_array.shape[0]
 
-    reward_array = get_future_player_rows(position_rewards, pos_cfg)
+    reward_array = get_future_player_rows(position_rewards, position_config)
 
     # Throttle: re-solve the roster assignment only for the top `active_count` candidates — ranked by
     # `priority_order` (the cached default-H-score ranking supplied by the caller) — and reuse the
@@ -197,7 +197,7 @@ def optimize_positions_all_players(
             ])
 
     final_positions, flex_shares = get_position_array_from_res(
-        rosters, position_shares, n_remaining_players, pos_cfg
+        rosters, position_shares, n_remaining_players, position_config
     )
 
     if scale_down:
@@ -209,19 +209,19 @@ def optimize_positions_all_players(
 def check_single_player_eligibility(
     player: list
     , team_so_far: list
-    , pos_cfg: PositionConfig
+    , position_config: PositionConfig
 ) -> bool:
-    position_numbers = pos_cfg.position_numbers
+    position_numbers = position_config.position_numbers
     n_total_picks    = sum(position_numbers.values())
-    n_base_positions = len(pos_cfg.position_structure['base_list'])
+    n_base_positions = len(position_config.position_structure['base_list'])
 
     position_rewards    = np.array([[0] * n_base_positions])
     n_remaining_players = n_total_picks - 1 - len(team_so_far)
-    reward_vector       = get_future_player_rows(position_rewards, pos_cfg)[0]
-    team_so_far_array   = (get_player_rows(team_so_far, pos_cfg)
+    reward_vector       = get_future_player_rows(position_rewards, position_config)[0]
+    team_so_far_array   = (get_player_rows(team_so_far, position_config)
                            if len(team_so_far) > 0
                            else np.empty((0, n_total_picks)))
-    candidate_vector    = get_player_rows([player], pos_cfg)[0]
+    candidate_vector    = get_player_rows([player], position_config)[0]
 
     all_res = _optimize_positions_for_prospective_player(
         candidate_vector, reward_vector, team_so_far_array, n_remaining_players
@@ -229,7 +229,7 @@ def check_single_player_eligibility(
     return bool(all(all_res >= 0))
 
 
-def check_team_eligibility(team: list, pos_cfg: PositionConfig) -> bool:
+def check_team_eligibility(team: list, position_config: PositionConfig) -> bool:
     """Checks if a full team satisfies position constraints.
 
     scipy's linear_sum_assignment raises ValueError when no feasible assignment
@@ -238,7 +238,7 @@ def check_team_eligibility(team: list, pos_cfg: PositionConfig) -> bool:
     """
     if len(team) == 0:
         return True
-    team_array = get_player_rows(team, pos_cfg)
+    team_array = get_player_rows(team, position_config)
     try:
         linear_sum_assignment(team_array, maximize=True)
         return True
@@ -249,19 +249,19 @@ def check_team_eligibility(team: list, pos_cfg: PositionConfig) -> bool:
 def check_all_player_eligibility(
     players: list
     , team_so_far: list
-    , pos_cfg: PositionConfig
+    , position_config: PositionConfig
 ) -> list[bool]:
-    position_numbers = pos_cfg.position_numbers
+    position_numbers = position_config.position_numbers
     n_total_picks    = sum(position_numbers.values())
-    n_base_positions = len(pos_cfg.position_structure['base_list'])
+    n_base_positions = len(position_config.position_structure['base_list'])
 
     position_rewards    = np.array([[0] * n_base_positions])
     n_remaining_players = n_total_picks - 1 - len(team_so_far)
-    reward_vector       = get_future_player_rows(position_rewards, pos_cfg)[0]
-    team_so_far_array   = (get_player_rows(team_so_far, pos_cfg)
+    reward_vector       = get_future_player_rows(position_rewards, position_config)[0]
+    team_so_far_array   = (get_player_rows(team_so_far, position_config)
                            if len(team_so_far) > 0
                            else np.empty((0, n_total_picks)))
-    player_rows = get_player_rows(players, pos_cfg)
+    player_rows = get_player_rows(players, position_config)
 
     return [
         all(

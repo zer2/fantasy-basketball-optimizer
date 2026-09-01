@@ -2,7 +2,7 @@
 // Builds the expandable detail panel beneath each player row in the main table.
 // Mirrors the detail panels in the original Streamlit app.
 
-import { stat_styler_primary, stat_styler_tertiary } from '../styles/styler_functions.js'
+import { stat_styler_primary, stat_styler_tertiary, G_SCORE_MULTIPLIER } from '../styles/styler_functions.js'
 import { PlayerResult, FlexAllocations, Roster } from '../types.js'
 import { getPositionNames } from '../app_state.js'
 import { makeSpacerTh } from './table_helpers.js'
@@ -104,7 +104,7 @@ function makePanelLabel(text: string, paddingLeft?: string): HTMLDivElement {
 
 // ─── G-score expectations table ───────────────────────────────────────────────
 // Rows: current diff, player contribution, future diff, total diff.
-// Category cells: stat_styler_primary (middle=0, multiplier=60).
+// Category cells: stat_styler_primary (middle=0, multiplier=G_SCORE_MULTIPLIER).
 // Total column: celltypea / celltypeb for the summary row.
 
 /**
@@ -157,7 +157,7 @@ function makeGScoreTable(playerData: PlayerResult, categories: string[]): HTMLDi
         for (const value of rowData.values) {
             const cell = row.insertCell(-1)
             cell.textContent = value.toFixed(2)
-            cell.style.cssText = stat_styler_primary(value, 60, 0)
+            cell.style.cssText = stat_styler_primary(value, G_SCORE_MULTIPLIER, 0)
             cell.className = 'panel-datacell'
         }
     }
@@ -321,7 +321,7 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
     hScoreLabel.className = 'panel-rowlabel'
     hScoreLabel.textContent = 'H-score'
     hScoreRow.appendChild(hScoreLabel)
-    for (const value of [auctionValues.your_dollar, auctionValues.gnrc_dollar, auctionValues.orig_dollar]) {
+    for (const value of [auctionValues.your_dollar, auctionValues.generic_dollar, auctionValues.original_dollar]) {
         const cell = hScoreRow.insertCell(-1)
         cell.className = 'panel-datacell celltypea'
         cell.textContent = value.toFixed(1)
@@ -336,7 +336,7 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
     const naCell = gScoreRow.insertCell(-1)
     naCell.className = 'panel-datacell celltypea'
     naCell.textContent = '—'
-    for (const value of [auctionValues.gnrc_dollar_g, auctionValues.orig_dollar_g]) {
+    for (const value of [auctionValues.generic_dollar_g_score, auctionValues.original_dollar_g_score]) {
         const cell = gScoreRow.insertCell(-1)
         cell.className = 'panel-datacell celltypea'
         cell.textContent = value.toFixed(1)

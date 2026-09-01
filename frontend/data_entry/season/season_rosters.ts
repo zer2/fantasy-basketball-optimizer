@@ -3,16 +3,20 @@
 // inspector table (right).  Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
-import { getPlayerResults, getGScoreById, getShortCategoryNames } from '../../app_state.js'
+import { getPlayerResults } from '../../app_state.js'
 import { getRegistryEntry, findPlayerIdByName } from '../../player_registry.js'
-import { makeFullPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
+import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
-import { getSelectedCategories, getScoringFormat } from '../../parameter_collection/format_and_categories.js'
-import { getLeagueSettings } from '../../parameter_collection/league_settings.js'
-import { stat_styler_primary } from '../../styles/styler_functions.js'
+import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
+import { getLeagueSettings, getTeamNames } from '../../parameter_collection/league_settings.js'
 import { evaluateTeamHScore, getLivePlatformRosters } from '../../api/season_session.js'
+import { makeSpacerTh } from '../../table/table_helpers.js'
+import {
+    GScoreRowData, getGScoreRowOrThrow, appendGScoreHeaderRow,
+    appendGScoreBodyAndTotals, buildAlignedHScoreTable,
+} from '../../table/gscore_table.js'
 
 // Tracks the change-event listeners attached by the most recent render so they
 // can be removed before the next one. Without this, calling renderSeasonRosters
@@ -36,8 +40,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
     const nDrafters = readRequiredIntInput('ls-n-drafters')
     const nPicks    = readRequiredIntInput('ls-n-picks')
-    const teamNames = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
+    const teamNames = getTeamNames()
     // Option order follows playerResults (G-rank descending), so the dropdowns list the
     // best players first; labels come from the registry.
     const playerOptions = playerResults.map(p => ({
@@ -339,16 +342,13 @@ async function buildTeamGScoreTable(
 ): Promise<void> {
     container.innerHTML = ''
     const categories = getSelectedCategories()
-    const gScoreMap  = getGScoreById()
 
     // Collect G-scores for players on this team
-    const rows: { playerId: number; values: number[]; total: number }[] = []
+    const rows: GScoreRowData[] = []
     for (let r = 0; r < nPicks; r++) {
         const playerId = readSelectedPlayerId(selects[r][teamIdx])
         if (playerId === null) continue
-        const gs = gScoreMap.get(playerId)
-        if (!gs) throw new Error(`G-score not found for player id ${playerId}`)
-        rows.push({ playerId, values: gs.values, total: gs.total })
+        rows.push(getGScoreRowOrThrow(playerId))
     }
 
     if (rows.length === 0) return
@@ -360,7 +360,9 @@ async function buildTeamGScoreTable(
     tbl.style.tableLayout = 'fixed'
     tbl.dataset.testid = 'roster-inspection-gscore'
 
-    // Spacer row to lock column widths
+    // Spacer row to lock column widths: this panel's widths come from the
+    // .panel-colspacer-* classes (and their #rosters-right mobile overrides) rather than
+    // the colgroup the team-statistics panel uses — the one deliberate shell difference.
     const tHead = tbl.createTHead()
     const spacerRow = tHead.insertRow(-1)
     spacerRow.style.border = 'none'
@@ -368,68 +370,9 @@ async function buildTeamGScoreTable(
     spacerRow.appendChild(makeSpacerTh('panel-colspacer-total'))
     for (let i = 0; i < categories.length; i++) spacerRow.appendChild(makeSpacerTh())
 
-    // Header row — on mobile, swap full category names for their short form
-    // (e.g. "Points" → "Pts") to keep columns narrow.
-    const isMobile   = isMobileViewport()
-    const shortNames = isMobile ? getShortCategoryNames() : {}
-    const headerRow = tHead.insertRow(-1)
-    headerRow.appendChild(makeSpacerTh())  // invisible label spacer
-    const totalTh = document.createElement('th')
-    totalTh.className = 'panel-colheader'
-    totalTh.textContent = 'Total'
-    headerRow.appendChild(totalTh)
-    for (const cat of categories) {
-        const label = shortNames[cat] ?? cat
-        const th = document.createElement('th')
-        th.className = label.length >= 10 ? 'panel-colheader colheader-long' : 'panel-colheader'
-        th.textContent = label
-        headerRow.appendChild(th)
-    }
-
-    // Data rows — one per player
-    const tBody = tbl.createTBody()
-    const teamTotals = new Array(categories.length).fill(0)
-    let teamTotalSum = 0
-
-    for (const row of rows) {
-        const tr = tBody.insertRow(-1)
-
-        const labelCell = document.createElement('th')
-        labelCell.className = 'panel-rowlabel'
-        labelCell.append(makeFullPlayerDisplay(row.playerId))
-        tr.appendChild(labelCell)
-
-        const totalCell = tr.insertCell(-1)
-        totalCell.textContent = row.total.toFixed(2)
-        totalCell.className = 'panel-datacell celltypea'
-        teamTotalSum += row.total
-
-        for (let i = 0; i < row.values.length; i++) {
-            const cell = tr.insertCell(-1)
-            cell.textContent = row.values[i].toFixed(2)
-            cell.style.cssText = stat_styler_primary(row.values[i], 60, 0)
-            cell.className = 'panel-datacell'
-            teamTotals[i] += row.values[i]
-        }
-    }
-
-    // Totals row
-    const totalsRow = tBody.insertRow(-1)
-    const totalsLabel = document.createElement('th')
-    totalsLabel.className = 'panel-rowlabel'
-    totalsLabel.textContent = 'Team Total'
-    totalsRow.appendChild(totalsLabel)
-
-    const totalsCell = totalsRow.insertCell(-1)
-    totalsCell.textContent = teamTotalSum.toFixed(2)
-    totalsCell.className = 'panel-datacell celltypeb'
-
-    for (const val of teamTotals) {
-        const cell = totalsRow.insertCell(-1)
-        cell.textContent = val.toFixed(2)
-        cell.style.cssText = stat_styler_primary(val, 60, 0)
-        cell.className = 'panel-datacell'
-    }
+    const isMobile = isMobileViewport()
+    appendGScoreHeaderRow(tHead, categories, isMobile)
+    appendGScoreBodyAndTotals(tbl, rows, categories)
 
     container.appendChild(tbl)
 
@@ -453,60 +396,10 @@ async function buildTeamGScoreTable(
     const result = await evaluateTeamHScore(playerAssignments, teamName)
     if (!result) return
 
-    const isRoto     = getScoringFormat() === 'Rotisserie'
-    const rotoNDrafters = isRoto ? getLeagueSettings().n_drafters : 0
-    const rotoMiddle = (rotoNDrafters - 1) / 2 + 1
-
-    const hScoreTbl = document.createElement('table')
-    hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
-    hScoreTbl.style.tableLayout = 'fixed'
-    hScoreTbl.dataset.testid = 'roster-inspection-hscore'
-
-    // Match the team-inspector's column widths above so the two tables line up.
-    // Mobile values mirror the #rosters-right .panel-colspacer-* overrides.
-    const colgroup = document.createElement('colgroup')
-    const nameCol  = document.createElement('col')
-    nameCol.style.width = isMobile ? '7rem' : '200px'
-    const totalCol = document.createElement('col')
-    totalCol.style.width = isMobile ? '3rem' : '83px'
-    colgroup.append(nameCol, totalCol)
-    for (let i = 0; i < categories.length; i++) colgroup.appendChild(document.createElement('col'))
-    hScoreTbl.appendChild(colgroup)
-
-    const hScoreTBody = hScoreTbl.createTBody()
-    const hScoreRow = hScoreTBody.insertRow(-1)
-
-    const hScoreLabel = document.createElement('th')
-    hScoreLabel.className = 'panel-rowlabel'
-    hScoreLabel.textContent = 'H-Score (est. win rate)'
-    hScoreRow.appendChild(hScoreLabel)
-
-    const hScoreTotalCell = hScoreRow.insertCell(-1)
-    hScoreTotalCell.textContent = result.h_score.toFixed(1)
-    hScoreTotalCell.className = 'overallhscore'
-
-    for (const winRate of result.win_rates) {
-        const cell = hScoreRow.insertCell(-1)
-        if (isRoto) {
-            const rotoValue = 1 + (winRate / 100) * (rotoNDrafters - 1)
-            cell.textContent = rotoValue.toFixed(1)
-            cell.className = 'categoricalRotoHscore'
-            cell.style.cssText = stat_styler_primary(rotoValue, 3 * (rotoNDrafters - 1), rotoMiddle)
-        } else {
-            cell.textContent = winRate.toFixed(1)
-            cell.className = 'categoricalhscore'
-            cell.style.cssText = stat_styler_primary(winRate, 3, 50)
-        }
-    }
-
-    container.appendChild(hScoreTbl)
-}
-
-/** Creates an invisible `<th>` spacer to lock column widths in panel tables. */
-function makeSpacerTh(extraClass?: string): HTMLTableCellElement {
-    const th = document.createElement('th')
-    th.className = extraClass ? `panel-colspacer ${extraClass}` : 'panel-colspacer'
-    return th
+    // This panel's H-table keeps the colgroup-derived widths but not the 100% stretch —
+    // it aligns to the spacer-row-sized table above it.
+    container.appendChild(buildAlignedHScoreTable(result, categories.length, isMobile,
+        { testId: 'roster-inspection-hscore', fullWidth: false }))
 }
 
 /** Resolves a human-entered roster name to a player id, or null when the registry doesn't

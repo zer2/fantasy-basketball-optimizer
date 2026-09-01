@@ -38,7 +38,7 @@ class Session:
     v2:       Optional[pd.DataFrame] = None   # after upsilon adjustment
 
     # The session's player identities: {player_id -> PlayerIdentity (name, last name,
-    # positions, headshot availability)}. Built by run_step1 alongside v0_clean — the two
+    # positions, headshot availability)}. Built by load_player_pool alongside v0_clean — the two
     # travel together through every cache — and includes the RP sentinel. The ONLY place
     # names live server-side; everything else keys by id.
     player_registry: Optional[dict] = None

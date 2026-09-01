@@ -4,27 +4,22 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from backend.state.session import get_session
+from backend.api.helpers import fail, require_session
+from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
 from backend.services.ranking import rank_candidates, UnknownRosterPlayersError
 from backend.infra.server_timing import begin_timing, server_timing_header
 from backend.api.schemas import EvaluateRequest
 from backend.models import EvaluateResponse
-from backend.api.errors import fail
 
 router = APIRouter()
 
 
 @router.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse,
              dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
-def rank_candidates_route(session_id: str, req: EvaluateRequest, response: Response):
+def rank_candidates_route(req: EvaluateRequest, response: Response,
+                          session: Session = Depends(require_session)):
     begin_timing()
-
-    # Fetch once here so a missing/expired session returns a clean 404; the live
-    # session object is handed to rank_candidates, which reads n_iterations from it.
-    session = get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail='Session not found or expired.')
 
     # Auction vs draft is all-or-nothing: an auction session must get per-team remaining_cash
     # on every evaluate, and any other session must never get it. Reject a request that mixes the

@@ -2,7 +2,7 @@
 
 Application state, a peer of the session store: the /data/upload route stashes an
 uploaded file here and returns a short id; session creation/patch later pulls it back
-out by that id (see session_management._resolve_csv / _resolve_uploaded_dfs).
+out by that id (see _resolve_csv / _resolve_uploaded_dfs in api/routers/sessions.py).
 
 Lifetime rules mirror the session store, because an upload must outlive every session
 that references it — a session whose upload has vanished cannot be rebuilt at all

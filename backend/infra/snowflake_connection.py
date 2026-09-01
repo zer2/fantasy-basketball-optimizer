@@ -10,7 +10,6 @@ in-memory dict plus an optional Parquet disk cache).
 Public API:
   - query(view_name)            cached SELECT * FROM <view>
   - run_query(sql)              uncached arbitrary SQL
-  - view_cache_timestamp(name)  load-time of a cached view, for lockstep derivations
 """
 
 from __future__ import annotations
@@ -112,27 +111,17 @@ def query(view_name: str) -> pd.DataFrame:
 
 
 def peek(view_name: str) -> pd.DataFrame | None:
-    """The cached frame for view_name if present and unexpired, else None — NEVER loads.
+    """The cached frame for view_name if present and unexpired, else None — it NEVER loads.
 
-    For best-effort consumers (the headshot-prefetch id listing) that must not trigger
-    a Snowflake query or race a load already in progress elsewhere. Returns the live
-    cached object to avoid copying a full view per call — callers must only read it.
+    Deliberately not query() with a flag. Its callers (the headshot-prefetch id listing)
+    run in parallel with a session build that is fetching the same view, so triggering a
+    load here would duplicate that Snowflake query; and they only read, so the defensive
+    copy query() makes would be waste — the live cached object is returned, and callers
+    must not mutate it. None on a cold cache is the expected answer, not a failure: the
+    post-build registry sweep covers whatever the prefetch could not see.
     """
     with _cache_lock:
         entry = _cache.get(view_name)
         if entry is not None and time.time() - entry[0] < _CACHE_TTL:
             return entry[1]
-    return None
-
-
-def view_cache_timestamp(view_name: str) -> float | None:
-    """Load-time of the cached entry for view_name if present and unexpired, else None.
-
-    Lets a caller derive something from a cached view and stay in lockstep with the
-    cache's refreshes without re-fetching or re-iterating (see get_available_seasons).
-    """
-    with _cache_lock:
-        entry = _cache.get(view_name)
-        if entry is not None and time.time() - entry[0] < _CACHE_TTL:
-            return entry[0]
     return None

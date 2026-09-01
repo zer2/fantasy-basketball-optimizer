@@ -294,7 +294,7 @@ def test_trade_suggest_speed(trading_session, config):
         , combo_params         = combo_params
         , your_threshold       = your_threshold
         , their_threshold      = their_threshold
-        , ignore_position_check = False
+        , position_check = True
     )
     elapsed = time.perf_counter() - start
 

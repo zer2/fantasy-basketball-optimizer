@@ -31,7 +31,7 @@ def analyze_trade(
     , team_2: str
     , team_2_trade: list[str]
     , n_iterations: int
-    , ignore_position_check: bool = False
+    , position_check: bool = True
 ) -> Optional[dict]:
     """Compute pre/post H-scores for both teams after a trade.
 
@@ -39,20 +39,20 @@ def analyze_trade(
     Otherwise returns {1: {pre: ..., post: ...}, 2: {pre: ..., post: ...}}.
     """
     info = session.agent.info
-    H = session.agent
+    h_agent = session.agent
 
     post_trade_team_1 = [p for p in player_assignments[team_1] if p not in team_1_trade] + team_2_trade
     post_trade_team_2 = [p for p in player_assignments[team_2] if p not in team_2_trade] + team_1_trade
 
     # Check position eligibility for both teams
-    if not ignore_position_check:
-        pos_cfg = session.agent._pos_cfg
+    if position_check:
+        position_config = session.agent.position_config
         team_1_positions = info['Positions'].loc[post_trade_team_1]
-        if not check_team_eligibility(team_1_positions, pos_cfg):
+        if not check_team_eligibility(team_1_positions, position_config):
             return None
 
         team_2_positions = info['Positions'].loc[post_trade_team_2]
-        if not check_team_eligibility(team_2_positions, pos_cfg):
+        if not check_team_eligibility(team_2_positions, position_config):
             return None
 
     post_trade_assignments = player_assignments.copy()
@@ -60,12 +60,12 @@ def analyze_trade(
     post_trade_assignments[team_2] = post_trade_team_2
 
     # Pre-trade H-scores
-    res_1_pre = H.get_h_scores(player_assignments, team_1, n_iterations)
-    res_2_pre = H.get_h_scores(player_assignments, team_2, n_iterations)
+    res_1_pre = h_agent.get_h_scores(player_assignments, team_1, n_iterations)
+    res_2_pre = h_agent.get_h_scores(player_assignments, team_2, n_iterations)
 
     # Post-trade H-scores
-    res_1_post = H.get_h_scores(post_trade_assignments, team_1, n_iterations)
-    res_2_post = H.get_h_scores(post_trade_assignments, team_2, n_iterations)
+    res_1_post = h_agent.get_h_scores(post_trade_assignments, team_1, n_iterations)
+    res_2_post = h_agent.get_h_scores(post_trade_assignments, team_2, n_iterations)
 
     def _extract(result: dict) -> tuple[float, list[float]]:
         scores = result['Scores']
@@ -97,7 +97,7 @@ def run_trade_analyze(
     , their_team: str
     , my_trade: list[str]
     , their_trade: list[str]
-    , ignore_position_check: bool = False
+    , position_check: bool = True
 ) -> TradeAnalyzeResponse:
     """Public entry point for the trade/analyze endpoint."""
     if len(my_trade) == 0 or len(their_trade) == 0:
@@ -107,7 +107,7 @@ def run_trade_analyze(
         return TradeAnalyzeResponse(error="Too lopsided of a trade!")
 
     n_iterations = session.current_params['n_iterations']
-    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, ignore_position_check)
+    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, position_check)
 
     if result is None:
         return TradeAnalyzeResponse(
@@ -123,7 +123,7 @@ def run_trade_analyze(
 # ── Fast trade evaluation ────────────────────────────────────────────────────
 
 def _build_trade_context(
-    H: object
+    h_agent: object
     , player_assignments: dict[str, list[str]]
     , my_team: str
     , their_team: str
@@ -143,14 +143,14 @@ def _build_trade_context(
     # Available player pool is the same for every combo (traded players are assigned
     # to one team or the other regardless of which swap we evaluate).
     players_chosen     = [p for roster in player_assignments.values() for p in roster if p == p]
-    x_scores_available = H.x_scores[
-        ~H.x_scores.index.isin(players_chosen)
-        & H.x_scores.index.isin(H.positions.index)
+    x_scores_available = h_agent.x_scores[
+        ~h_agent.x_scores.index.isin(players_chosen)
+        & h_agent.x_scores.index.isin(h_agent.positions.index)
     ]
 
     # Pre-compute each team's raw stat sum once.
     team_sums = {
-        team: np.array(H.x_scores.loc[[p for p in roster if p == p]].sum(axis=0))
+        team: np.array(h_agent.x_scores.loc[[p for p in roster if p == p]].sum(axis=0))
         for team, roster in player_assignments.items()
     }
 
@@ -167,13 +167,13 @@ def _build_trade_context(
 
         other_sums = np.vstack([
             (team_sums[team] + max(n_my - len(player_assignments[team]), 0) * mean_extra)
-            .reshape(1, H.n_categories, 1)
+            .reshape(1, h_agent.n_categories, 1)
             for team in team_names if team != drafter
         ]).T  # (1, n_categories, n_drafters-1)
 
         return (
-            team_sums[drafter].reshape(1, H.n_categories, 1)
-            - other_sums.reshape(1, H.n_categories, n_drafters - 1)
+            team_sums[drafter].reshape(1, h_agent.n_categories, 1)
+            - other_sums.reshape(1, h_agent.n_categories, n_drafters - 1)
         )
 
     baseline_diff_means_my    = build_baseline_diff_means(my_team)
@@ -181,31 +181,31 @@ def _build_trade_context(
 
     # diff_vars depend only on team sizes — constant for equal-size trades.
     diff_vars_my = np.vstack([
-        H.get_diff_var(len([p for p in player_assignments[team] if p == p]))
+        h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
         for team in team_names if team != my_team
-    ]).T.reshape(1, H.n_categories, n_drafters - 1)
+    ]).T.reshape(1, h_agent.n_categories, n_drafters - 1)
 
     diff_vars_their = np.vstack([
-        H.get_diff_var(len([p for p in player_assignments[team] if p == p]))
+        h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
         for team in team_names if team != their_team
-    ]).T.reshape(1, H.n_categories, n_drafters - 1)
+    ]).T.reshape(1, h_agent.n_categories, n_drafters - 1)
 
     # Pre-trade H-scores — constant across all combos, compute once.
     my_players    = [p for p in player_assignments[my_team]    if p == p]
     their_players = [p for p in player_assignments[their_team] if p == p]
 
-    pre_my_h = H.compute_h_score_from_diff_means(
+    pre_my_h = h_agent.compute_h_score_from_diff_means(
         diff_means = baseline_diff_means_my,
         diff_vars  = diff_vars_my,
     )
-    pre_their_h = H.compute_h_score_from_diff_means(
+    pre_their_h = h_agent.compute_h_score_from_diff_means(
         diff_means = baseline_diff_means_their,
         diff_vars  = diff_vars_their,
     )
 
-    # Pre-slice x_scores for each trading team so _make_combo_df never touches H.x_scores.
-    my_x_scores    = H.x_scores.loc[my_players]
-    their_x_scores = H.x_scores.loc[their_players]
+    # Pre-slice x_scores for each trading team so _make_combo_df never touches h_agent.x_scores.
+    my_x_scores    = h_agent.x_scores.loc[my_players]
+    their_x_scores = h_agent.x_scores.loc[their_players]
 
     # Column indices for the two trading teams in each perspective's diff_means.
     their_col_in_my_view = [t for t in team_names if t != my_team].index(their_team)
@@ -277,7 +277,7 @@ def _get_cross_combos(
 
 
 def _make_combo_df(
-    H: object
+    h_agent: object
     , all_combos: pd.DataFrame
     , my_team: str
     , their_team: str
@@ -294,7 +294,7 @@ def _make_combo_df(
     the counterparty column (their roster also weakened). Both perspectives are
     computed in a single batched call to compute_h_scores_batched.
     """
-    ctx = _build_trade_context(H, player_assignments, my_team, their_team)
+    ctx = _build_trade_context(h_agent, player_assignments, my_team, their_team)
 
     n_combos = len(all_combos)
     if n_combos == 0:
@@ -325,8 +325,8 @@ def _make_combo_df(
     post_diff_means_my   [:, :, ctx['their_col_in_my_view']]    += trade_deltas
     post_diff_means_their[:, :, ctx['my_col_in_their_view']]    -= trade_deltas
 
-    post_my_h_scores    = H.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'])
-    post_their_h_scores = H.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'])
+    post_my_h_scores    = h_agent.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'])
+    post_their_h_scores = h_agent.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'])
 
     df = pd.DataFrame({
         'Send':        list(all_combos['My Trade']),
@@ -356,7 +356,7 @@ def run_trade_suggest(
     , combo_params: list[ComboParam]
     , your_threshold: float
     , their_threshold: float
-    , ignore_position_check: bool = False
+    , position_check: bool = True
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
 
@@ -414,15 +414,15 @@ def run_trade_suggest(
     df = df[mask]
 
     # Step 5: position check only on the small set that passed the thresholds
-    if not ignore_position_check and len(df) > 0:
-        pos_cfg = session.agent._pos_cfg
+    if position_check and len(df) > 0:
+        position_config = session.agent.position_config
         valid = []
         for _, row in df.iterrows():
             sent, received = row['Send'], row['Receive']
             post_my_roster    = [p for p in player_assignments[my_team]    if p not in sent]    + received
             post_their_roster = [p for p in player_assignments[their_team] if p not in received] + sent
-            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    pos_cfg)
-            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], pos_cfg)):
+            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    position_config)
+            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], position_config)):
                 valid.append(row)
         df = pd.DataFrame(valid) if valid else df.iloc[:0]
 

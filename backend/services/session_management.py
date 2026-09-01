@@ -50,19 +50,26 @@ def normalize_objective_settings(current_params: dict) -> None:
     again; what must not happen is that inert value splitting the cache.
 
     Applied wherever current_params is assembled or patched, so no caller has to remember.
+
+    Validation is layered, not duplicated: the LeagueSettings schema validator rejects
+    incoherent CREATE requests outright (422 — a client that names a tiebreaker outside its
+    categories should hear about it); this function normalizes MERGED state on create and
+    patch alike, lenient about settings that merely stopped applying mid-edit; and
+    HAgent.__init__ re-checks as a leaf contract for agents constructed directly in tests
+    and experiments. Removing any one layer loses a distinct guarantee.
     """
-    if current_params.get('scoring_format') == 'Rotisserie':
+    if current_params['scoring_format'] == 'Rotisserie':
         current_params['most_categories_weight'] = None
         current_params['tiebreaker_category']    = None
         return
 
-    weight = current_params.get('most_categories_weight')
+    weight = current_params['most_categories_weight']
     if weight is None or not 0.0 <= weight <= 1.0:
         raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
                          f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
 
-    categories = current_params.get('categories') or []
-    tiebreaker = current_params.get('tiebreaker_category')
+    categories = current_params['categories']
+    tiebreaker = current_params['tiebreaker_category']
     if tiebreaker is not None and (weight == 0
                                    or len(categories) % 2 == 1
                                    or tiebreaker not in categories):
@@ -102,7 +109,7 @@ def build_session(
 _PIPELINE_CACHE_ENTRIES = 4
 
 
-def _pipeline_cache_key(current_params: dict) -> tuple:
+def _build_pipeline_cache_key(current_params: dict) -> tuple:
     """A hashable snapshot of the full parameter set that produced a pipeline build."""
     def freeze(value):
         if isinstance(value, dict):
@@ -132,7 +139,7 @@ def apply_patch(
     connecting a platform needs no pipeline rerun of its own.
     """
     if session.agent is not None:
-        outgoing_key = _pipeline_cache_key(session.current_params)
+        outgoing_key = _build_pipeline_cache_key(session.current_params)
         session.pipeline_cache[outgoing_key] = {
             'agent':           session.agent,
             'info':            session.info,
@@ -154,7 +161,7 @@ def apply_patch(
         session.platform_config = platform_config
         session.current_params['team_names'] = list(platform_config.teams_dict.keys())
 
-    cached_pipeline = session.pipeline_cache.get(_pipeline_cache_key(session.current_params))
+    cached_pipeline = session.pipeline_cache.get(_build_pipeline_cache_key(session.current_params))
     if cached_pipeline is not None:
         session.agent           = cached_pipeline['agent']
         session.info            = cached_pipeline['info']
@@ -162,7 +169,7 @@ def apply_patch(
         session.v1_clean        = cached_pipeline['v1_clean']
         session.v2              = cached_pipeline['v2']
         session.player_registry = cached_pipeline['player_registry']
-        session.pipeline_cache.move_to_end(_pipeline_cache_key(session.current_params))
+        session.pipeline_cache.move_to_end(_build_pipeline_cache_key(session.current_params))
     else:
         build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
 

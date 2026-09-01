@@ -333,7 +333,7 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
     test for the key that excluded uploaded-source weights and upload ids — changing an upload's
     weight served the stale cached blend, silently, and an uploaded blend could leak
     into sessions that never uploaded anything."""
-    from backend.services.build_agent import _v0_cache_key
+    from backend.services.build_agent import _build_v0_cache_key
 
     base_blend = {
         'sport': 'NBA',
@@ -341,26 +341,26 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
         'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'data_abc123': 0.5},
         'custom_data_ids': ['data_abc123'],
     }
-    assert _v0_cache_key(base_blend) is not None, 'uploaded blends are cacheable when fully keyed'
+    assert _build_v0_cache_key(base_blend) is not None, 'uploaded blends are cacheable when fully keyed'
 
     upload_reweighted = {**base_blend,
                          'blend_weights': {**base_blend['blend_weights'], 'data_abc123': 1.0}}
-    assert _v0_cache_key(upload_reweighted) != _v0_cache_key(base_blend), \
+    assert _build_v0_cache_key(upload_reweighted) != _build_v0_cache_key(base_blend), \
         "changing an upload's weight must change the key"
 
     different_upload = {**base_blend, 'custom_data_ids': ['data_def456'],
                         'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5, 'data_def456': 0.5}}
-    assert _v0_cache_key(different_upload) != _v0_cache_key(base_blend), \
+    assert _build_v0_cache_key(different_upload) != _build_v0_cache_key(base_blend), \
         'a different uploaded table must change the key'
 
     no_upload = {**base_blend, 'custom_data_ids': None,
                  'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5}}
-    assert _v0_cache_key(no_upload) != _v0_cache_key(base_blend), \
+    assert _build_v0_cache_key(no_upload) != _build_v0_cache_key(base_blend), \
         'an upload-less blend must never share a key with an uploaded one'
 
     espn_reweighted = {**no_upload,
                        'blend_weights': {**no_upload['blend_weights'], 'ESPN': 1.0, 'DARKO': 0.0}}
-    assert _v0_cache_key(espn_reweighted) != _v0_cache_key(no_upload), \
+    assert _build_v0_cache_key(espn_reweighted) != _build_v0_cache_key(no_upload), \
         'changing a Snowflake source weight must change the key'
 
 
@@ -368,7 +368,7 @@ def test_parse_projection_upload_reads_any_recognized_spelling():
     """Files are interpreted column by column through the alias table, not matched against
     named export formats: differently-spelled headers for the same stat all land on the
     canonical column, casing is irrelevant, and unrecognized columns are dropped."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     # Extra unmapped columns (Rank, Value, m/g) must be dropped: they would otherwise
@@ -411,7 +411,7 @@ def test_projection_upload_accepts_xlsx():
     its name, since a download saved with the wrong extension is common."""
     import io as io_module
     import pandas as pd
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     frame = pd.DataFrame([
@@ -450,7 +450,7 @@ def test_projection_csv_reads_whatever_encoding_it_was_saved_in():
     table, so the player silently falls through to a synthetic id with no headshot. Central
     European codepages carry most NBA diacritics and are exactly what a blind cp1252 fallback
     would corrupt."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     def csv_text(player_name: str) -> str:
@@ -480,18 +480,19 @@ def test_headshot_is_served_even_when_the_cache_cannot_be_written(monkeypatch):
     handler."""
     from pathlib import Path
     from unittest import mock
-    from backend.api.routers import meta
+    from backend.api.routers import reference
+    from backend.infra import headshot_cache
 
-    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
-    monkeypatch.setattr(meta, '_read_headshot_from_disk', lambda _id: None)
-    monkeypatch.setattr(meta.requests, 'get',
+    headshot_cache._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+    monkeypatch.setattr(headshot_cache, '_read_headshot_from_disk', lambda _id: None)
+    monkeypatch.setattr(headshot_cache.requests, 'get',
                         lambda *args, **kwargs: mock.Mock(status_code=200, content=b'PNG-BYTES'))
     monkeypatch.setattr(Path, 'write_bytes',
                         lambda *args, **kwargs: (_ for _ in ()).throw(OSError('read-only file system')))
 
-    response = meta.get_player_headshot_route(_UNWRITABLE_CACHE_TEST_ID)
+    response = reference.get_player_headshot_route(_UNWRITABLE_CACHE_TEST_ID)
     assert response.body == b'PNG-BYTES', 'the fetched image must still be served'
-    meta._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
+    headshot_cache._headshot_cache.pop(_UNWRITABLE_CACHE_TEST_ID, None)
 
 
 _UNWRITABLE_CACHE_TEST_ID = 987654321
@@ -515,7 +516,7 @@ def test_ratio_cells_supply_missing_attempt_columns():
     weights the percentage deviation in a ratio G-score, so it must be recovered from the
     cell rather than discarded with the rest of the text. A file's own attempts column
     always wins, and a percentage with no attempts anywhere is reported as missing."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     volumes_inside_the_cell = (
@@ -587,7 +588,7 @@ def test_parse_projection_upload_tolerates_files_missing_categories():
     columns. It must still parse; the absent stats simply stay absent (the blend covers
     them from other active sources, and step 4 narrows the category list when nothing
     carries them). The upload endpoint reports the absences so the caption can show them."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     partial_csv = (
@@ -698,7 +699,7 @@ def test_parse_projection_upload_filters_non_numeric_rows():
     """Some sources repeat the header row inside the table body (every stat cell a string)
     and format ratio stats as '0.583 (10.2/17.5)'. The parser must extract the leading
     numbers, drop the embedded header rows, and never crash dividing a string by 82."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     messy_csv = (

@@ -9,31 +9,31 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Depends, status, Response
 
 from backend.infra.auth import current_user_key
-from backend.state.session import get_session
+from backend.state.session import Session
 from backend.platform_integration.registry import get_integration
 from backend.platform_integration.credential_store import yahoo_auth_dir, store_espn_credentials
 from backend.platform_integration.integrations.yahoo import YahooIntegration
-from backend.api.platform_helpers import (
-    credentials_for, yahoo_app_credentials, resolve_live_integration,
+from backend.api.helpers import (
+    fail, require_session,
+    build_credentials_for, read_yahoo_app_credentials, resolve_live_integration,
 )
 from backend.api.schemas import (
     YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
     LeaguesResponse, DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
 )
-from backend.api.errors import fail
 
 router = APIRouter()
 
 
 @router.get('/platforms/yahoo/auth-url', response_model=YahooAuthUrlResponse)
-def yahoo_auth_url_route():
-    client_id, _ = yahoo_app_credentials()
+def get_yahoo_auth_url_route():
+    client_id, _ = read_yahoo_app_credentials()
     return YahooAuthUrlResponse(auth_url=YahooIntegration.build_auth_url(client_id))
 
 
 @router.post('/platforms/yahoo/token', status_code=status.HTTP_204_NO_CONTENT)
-def yahoo_token_route(req: YahooTokenRequest, user_key: str = Depends(current_user_key)):
-    client_id, client_secret = yahoo_app_credentials()
+def exchange_yahoo_token_route(req: YahooTokenRequest, user_key: str = Depends(current_user_key)):
+    client_id, client_secret = read_yahoo_app_credentials()
     try:
         YahooIntegration.exchange_auth_code(
             client_id, client_secret, req.auth_code, yahoo_auth_dir(user_key),
@@ -46,7 +46,7 @@ def yahoo_token_route(req: YahooTokenRequest, user_key: str = Depends(current_us
 
 
 @router.post('/platforms/espn/credentials', status_code=status.HTTP_204_NO_CONTENT)
-def espn_credentials_route(req: EspnCredentialsRequest, user_key: str = Depends(current_user_key)):
+def store_espn_credentials_route(req: EspnCredentialsRequest, user_key: str = Depends(current_user_key)):
     # SWID is stored with braces stripped (as the Streamlit integration did).
     swid = req.swid.replace('{', '').replace('}', '')
     store_espn_credentials(user_key, req.s2, swid)
@@ -89,15 +89,13 @@ def connect_platform_route(platform: str, req: ConnectRequest, user_key: str = D
 
 
 @router.get('/sessions/{session_id}/draft-state', response_model=DraftStateResponse)
-def get_draft_state_route(session_id: str, mode: str, user_key: str = Depends(current_user_key)):
-    session = get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail='Session not found or expired.')
+def get_draft_state_route(mode: str, session: Session = Depends(require_session),
+                          user_key: str = Depends(current_user_key)):
     config = session.platform_config
     if config is None:
         raise HTTPException(status_code=400, detail='Session is not connected to a live platform.')
     # Poll with the requesting user's own credentials, never the key stored on the session.
-    integration = get_integration(config.platform, credentials_for(config.platform, user_key))
+    integration = get_integration(config.platform, build_credentials_for(config.platform, user_key))
     # The lookup is built at session creation and rebuilt on data/injured/connect patches, so a
     # connected session always has it here; no defensive rebuild (its absence would be an upstream bug).
     try:

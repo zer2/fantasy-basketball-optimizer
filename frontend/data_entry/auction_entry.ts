@@ -3,13 +3,14 @@
 // Mirrors the draft board structure: pick control on top, grid below.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { readRequiredIntInput, makeBoardToggleHeaderCell } from '../helper_functions.js'
+import { readRequiredIntInput, makeBoardToggleHeaderCell, buildBoardTableShell } from '../helper_functions.js'
 import { getPlayerResults } from '../app_state.js'
 import { getRegistryEntry } from '../player_registry.js'
 import { makeMinimalPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../player_display.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
+import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
 import {
     AuctionConfig,
     getPicks, getTeamNames, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
@@ -214,26 +215,13 @@ function buildAuctionBoard(): HTMLElement {
     const picks       = getPicks()
     const cashPerTeam = getCashPerTeam()
 
-    const table = document.createElement('table')
-    table.className    = 'entry-table'
-    table.style.width    = '100%'
-    table.style.minWidth = (ROUND_W + nDrafters * TEAM_W) + 'px'
-
-    // Header: Round | Team1 | Team2 | … The corner cell doubles as the board collapse
-    // toggle (see makeBoardToggleHeaderCell) — the filled grid of headshots is tall.
-    const thead = table.createTHead()
-    const hrow  = thead.insertRow()
-    const roundTh = makeBoardToggleHeaderCell(table, 'auction_board_open', 'Round')
-    roundTh.style.width = ROUND_W + 'px'
-    hrow.append(roundTh)
-    teamNames.forEach((_, d) => {
-        const th = document.createElement('th')
-        th.className = 'team-header-cell'
+    // Header columns follow nDrafters rather than the name list: board identities are
+    // positional, so a half-edited textarea must not change the column count.
+    const table = buildBoardTableShell(nDrafters, TEAM_W, ROUND_W, 'auction_board_open', d => {
         const headerWrap = document.createElement('div')
         headerWrap.className = 'team-header'
         headerWrap.append(makeTeamLabelInput(d, auctionListenerController?.signal))
-        th.append(headerWrap)
-        hrow.append(th)
+        return headerWrap
     })
 
     // Body rows
@@ -300,8 +288,7 @@ function readAuctionConfig(): AuctionConfig {
     const nPicks      = readRequiredIntInput('ls-n-picks')
     const cashPerTeam = readRequiredIntInput('ls-cash-per-team')
     const dataSource  = (document.getElementById('ps-data-type') as HTMLInputElement).value
-    const teamNames   = (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
+    const teamNames   = getSidebarTeamNames()
     return {
         nDrafters
         , nPicks

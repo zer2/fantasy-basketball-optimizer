@@ -10,7 +10,7 @@ import { pref, savePref } from './preferences.js'
 // where rendering code (e.g. inline column widths, short vs full labels) has
 // to make the same mobile/desktop choice in JS.
 
-export const MOBILE_BREAKPOINT_PX = 768
+const MOBILE_BREAKPOINT_PX = 768
 
 export function isMobileViewport(): boolean {
     return window.innerWidth <= MOBILE_BREAKPOINT_PX
@@ -340,6 +340,38 @@ export function createSection(parent: HTMLElement, title: string): HTMLElement {
  *  collapse a row of its own. The team header row stays visible, so team names and
  *  autodraft toggles remain usable while collapsed. The state persists under the given
  *  preference key. */
+/** The shared shell of a draft/auction board table: 'entry-table' styling, a minimum width
+ *  sized from the column count, and a header row of the collapse-toggle Round cell plus one
+ *  'team-header-cell' <th> per drafter, filled by buildTeamHeaderContent. The per-team width
+ *  is a parameter because the boards deliberately differ (auction cells also carry a cost). */
+export function buildBoardTableShell(
+    nDrafters: number
+    , teamWidth: number
+    , roundWidth: number
+    , boardOpenPreferenceKey: string
+    , buildTeamHeaderContent: (drafterIndex: number) => Node
+): HTMLTableElement {
+    const table = document.createElement('table')
+    table.className      = 'entry-table'
+    table.style.width    = '100%'
+    table.style.minWidth = (roundWidth + nDrafters * teamWidth) + 'px'
+
+    const headerRow = table.createTHead().insertRow()
+    // The corner cell doubles as the board collapse toggle (arrow + 'Round'): the grid gets
+    // very tall once filled with headshots, and the toggle costs no extra row.
+    const roundTh = makeBoardToggleHeaderCell(table, boardOpenPreferenceKey, 'Round')
+    roundTh.style.width = roundWidth + 'px'
+    headerRow.append(roundTh)
+    for (let drafterIndex = 0; drafterIndex < nDrafters; drafterIndex++) {
+        const th = document.createElement('th')
+        th.className = 'team-header-cell'
+        th.append(buildTeamHeaderContent(drafterIndex))
+        headerRow.append(th)
+    }
+    return table
+}
+
+
 export function makeBoardToggleHeaderCell(
     table: HTMLTableElement
     , preferenceKey: string

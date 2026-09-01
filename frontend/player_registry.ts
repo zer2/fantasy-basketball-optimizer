@@ -13,8 +13,6 @@ export interface PlayerRegistryEntry {
     has_headshot: boolean
 }
 
-export const RP_PLAYER_ID = -1
-
 let entriesById: Map<number, PlayerRegistryEntry> | null = null
 let playerIdByName: Map<string, number> | null = null
 
