@@ -144,8 +144,10 @@ class YahooIntegration(PlatformIntegration):
                           probe.status_code, sorted(token_data.keys()))
             raise RuntimeError(
                 f'Yahoo accepted the code but the token cannot read fantasy data '
-                f'(HTTP {probe.status_code}: {probe.text[:180]}). The grant carries no Fantasy '
-                f'Sports scope -- re-authorize from a freshly generated authorization page.'
+                f"(HTTP {probe.status_code}: {probe.text[:600]}). Either the application's "
+                f'Fantasy Sports API access is not active yet (approval pending or incomplete) '
+                f"or the grant lacks the fantasy scope -- Yahoo's own message above is the "
+                f'authoritative reason. Nothing was stored; re-authorize freshly once access is active.'
             )
         guid = token_data.get('xoauth_yahoo_guid')
 
