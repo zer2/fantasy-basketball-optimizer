@@ -13,7 +13,7 @@ import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildMinimalPlayerDisplayHtml, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
-import { stat_styler_primary } from '../../styles/styler_functions.js'
+import { stat_styler_primary, G_SCORE_MULTIPLIER } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
 import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
@@ -110,7 +110,7 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
         const totalCell = tr.insertCell()
         totalCell.textContent = row.total.toFixed(2)
         if (useGradient) {
-            totalCell.style.cssText = stat_styler_primary(row.total, 60, 0)
+            totalCell.style.cssText = stat_styler_primary(row.total, G_SCORE_MULTIPLIER, 0)
         } else {
             totalCell.className = 'celltypeb'
         }
@@ -118,7 +118,7 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
             const td = tr.insertCell()
             td.textContent = v.toFixed(2)
             if (useGradient) {
-                td.style.cssText = stat_styler_primary(v, 60, 0)
+                td.style.cssText = stat_styler_primary(v, G_SCORE_MULTIPLIER, 0)
             } else {
                 td.className = 'celltypeb'
             }
