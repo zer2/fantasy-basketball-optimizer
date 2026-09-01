@@ -1,5 +1,5 @@
 """Projection CSV upload endpoint. Headers are interpreted through the alias table, so no
-particular export format is assumed (see build_agent.parse_projection_upload)."""
+particular export format is assumed (see projection_parsing.parse_projection_upload)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 from backend.infra.rate_limit import enforce_rate_limit, UPLOAD_POLICY
 from backend.parameters import load_all_params
-from backend.services.build_agent import parse_projection_upload, _CORE_PROJECTION_COLUMNS
+from backend.services.projection_parsing import parse_projection_upload, CORE_PROJECTION_COLUMNS
 from backend.state.upload_store import store_upload, UPLOAD_TTL, MAX_FILE_BYTES
 from backend.api.schemas import UploadResponse
 
@@ -19,7 +19,7 @@ router = APIRouter()
 
 # The stats worth calling out when a file lacks them: the core counting stats plus the
 # two ratio categories every standard league scores.
-_REPORTABLE_STAT_COLUMNS = (*_CORE_PROJECTION_COLUMNS, 'Field Goal %', 'Free Throw %')
+_REPORTABLE_STAT_COLUMNS = (*CORE_PROJECTION_COLUMNS, 'Field Goal %', 'Free Throw %')
 
 
 def _find_missing_reportable_stats(parsed: pd.DataFrame, params: dict) -> list[str]:

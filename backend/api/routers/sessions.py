@@ -17,7 +17,8 @@ from backend.parameters import load_all_params
 from backend.api.helpers import fail, require_session, resolve_platform_config
 from backend.state.session import Session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_agent import clear_v0_cache, parse_projection_upload, InsufficientPlayerPoolError
+from backend.services.build_agent import clear_v0_cache, InsufficientPlayerPoolError
+from backend.services.projection_parsing import parse_projection_upload
 from backend.state.upload_store import get_upload
 from backend.api.schemas import (
     SessionRequest, SessionResponse, PlayerGScore, PlayerRegistryEntry,

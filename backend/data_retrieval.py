@@ -122,7 +122,7 @@ def get_specified_historical_stats(season: str, params: dict) -> pd.DataFrame:
     """Return player stats for a specific season, indexed by player id.
 
     The 'Player' column carries the season row's native display name (registry material
-    popped off by run_step1); stats and 'Position' are the pipeline's v0 columns.
+    popped off by load_player_pool); stats and 'Position' are the pipeline's v0 columns.
     """
     return get_historical_data(params).loc[season].copy()
 

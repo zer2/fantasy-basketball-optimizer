@@ -368,7 +368,7 @@ def test_parse_projection_upload_reads_any_recognized_spelling():
     """Files are interpreted column by column through the alias table, not matched against
     named export formats: differently-spelled headers for the same stat all land on the
     canonical column, casing is irrelevant, and unrecognized columns are dropped."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     # Extra unmapped columns (Rank, Value, m/g) must be dropped: they would otherwise
@@ -411,7 +411,7 @@ def test_projection_upload_accepts_xlsx():
     its name, since a download saved with the wrong extension is common."""
     import io as io_module
     import pandas as pd
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     frame = pd.DataFrame([
@@ -450,7 +450,7 @@ def test_projection_csv_reads_whatever_encoding_it_was_saved_in():
     table, so the player silently falls through to a synthetic id with no headshot. Central
     European codepages carry most NBA diacritics and are exactly what a blind cp1252 fallback
     would corrupt."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     def csv_text(player_name: str) -> str:
@@ -516,7 +516,7 @@ def test_ratio_cells_supply_missing_attempt_columns():
     weights the percentage deviation in a ratio G-score, so it must be recovered from the
     cell rather than discarded with the rest of the text. A file's own attempts column
     always wins, and a percentage with no attempts anywhere is reported as missing."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     volumes_inside_the_cell = (
@@ -588,7 +588,7 @@ def test_parse_projection_upload_tolerates_files_missing_categories():
     columns. It must still parse; the absent stats simply stay absent (the blend covers
     them from other active sources, and step 4 narrows the category list when nothing
     carries them). The upload endpoint reports the absences so the caption can show them."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     partial_csv = (
@@ -699,7 +699,7 @@ def test_parse_projection_upload_filters_non_numeric_rows():
     """Some sources repeat the header row inside the table body (every stat cell a string)
     and format ratio stats as '0.583 (10.2/17.5)'. The parser must extract the leading
     numbers, drop the embedded header rows, and never crash dividing a string by 82."""
-    from backend.services.build_agent import parse_projection_upload
+    from backend.services.projection_parsing import parse_projection_upload
     params = _load_params()['NBA']
 
     messy_csv = (
