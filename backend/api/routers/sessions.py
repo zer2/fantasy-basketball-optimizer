@@ -17,7 +17,7 @@ from backend.parameters import load_all_params
 from backend.api.helpers import fail, require_session, resolve_platform_config
 from backend.state.session import Session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_agent import clear_v0_cache, InsufficientPlayerPoolError
+from backend.services.build_agent import clear_v0_cache, derive_effective_objective, InsufficientPlayerPoolError
 from backend.services.projection_parsing import parse_projection_upload
 from backend.state.upload_store import get_upload
 from backend.api.schemas import (
@@ -130,7 +130,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) ->
 
 def _serialize_g_scores(session) -> list[PlayerGScore]:
     """Serialize the session's G-scores DataFrame into a list of PlayerGScore objects."""
-    categories = session.current_params['categories']
+    categories, _ = derive_effective_objective(session)
     g_scores_df = session.agent.info['G-scores']
     return [
         PlayerGScore(
@@ -195,7 +195,7 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     return SessionResponse(
         session_id=session.id,
         n_players_loaded=len(session.v0_clean),
-        categories=list(session.current_params['categories']),
+        categories=derive_effective_objective(session)[0],
         players=_serialize_player_registry(session),
         g_scores=_serialize_g_scores(session),
         expires_at=(datetime.now(timezone.utc) + timedelta(seconds=4 * 3600)).strftime('%Y-%m-%dT%H:%M:%SZ'),

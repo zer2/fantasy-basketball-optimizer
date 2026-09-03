@@ -17,6 +17,7 @@ from backend.models import (
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID
 from backend.infra.server_timing import record_phase
+from backend.services.build_agent import derive_effective_objective
 from backend.math.position_config import PositionConfig
 
 # The engine's internal index for the one result row of a full-roster evaluate
@@ -66,7 +67,7 @@ def rank_candidates(
     info           = session.agent.info
     h_agent              = session.agent
     current_params = session.current_params
-    categories     = current_params['categories']
+    categories, _  = derive_effective_objective(session)
     n_iterations   = current_params['n_iterations']
     player_registry = session.player_registry
 

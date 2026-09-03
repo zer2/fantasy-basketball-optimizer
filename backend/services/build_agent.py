@@ -137,6 +137,36 @@ def _count_starters(slot_counts: dict, n_picks: int) -> int:
     return sum(slot_counts.values()) if slot_counts else n_picks
 
 
+def derive_effective_objective(session: Session) -> tuple[list[str], str | None]:
+    """The categories and tiebreaker the build can actually score, derived from the
+    REQUESTED objective in current_params and the columns v2 actually carries.
+
+    A category needs its own column, and a ratio category also needs the volume column
+    that weights it (a percentage cannot be scored without the attempts behind it).
+    The narrowing can drop the very category chosen to break ties, or leave an odd
+    count where no tie can arise — either way the tiebreaker no longer refers to
+    anything the agent could resolve, so it comes back as None.
+
+    Deliberately a pure derivation, recomputed by every consumer (both build steps, the
+    evaluate path, the response serializers) rather than written back into
+    current_params: the request snapshot keeps saying what the user REQUESTED, the
+    pipeline cache keys stay coherent with the request, and a category dropped for one
+    data source comes back by itself when a later patch restores its columns.
+    """
+    _, params, _ = _resolve_sport_params(session)
+    available_columns = set(session.v2.columns)
+    ratio_statistics  = params['ratio-statistics']
+    categories = [
+        category for category in session.current_params['categories']
+        if category in available_columns
+        and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
+    ]
+    tiebreaker = session.current_params['tiebreaker_category']
+    if tiebreaker not in categories or len(categories) % 2 == 1:
+        tiebreaker = None
+    return categories, tiebreaker
+
+
 def load_player_pool(
     session: Session,
     csv_bytes: bytes | None = None,
@@ -156,6 +186,9 @@ def load_player_pool(
     so repeated session creations with the same data source skip the round-trip and
     rebuild an identical registry.
     """
+
+    #ZR: params and current_params are confusing semantically. params should be called sport_params or something maybe
+    #also why re-declare current_params? we can just call session.current_params every time, its not too wordy IMO
     _, params, _ = _resolve_sport_params(session)
     current_params = session.current_params
     source_type = current_params['data_source_type']
@@ -259,25 +292,9 @@ def build_scoring_info(session: Session) -> None:
             f'({n_drafters} teams x {n_picks} roster spots) to fill every roster.'
         )
 
-    # A category needs its own column, and a ratio category also needs the volume column
-    # that weights it (a percentage cannot be scored without the attempts behind it) —
-    # without this second check the coefficient pass fails on the missing volume column
-    # instead of the category simply dropping out.
-    available_columns = set(session.v2.columns)
-    ratio_statistics  = params['ratio-statistics']
-    categories = [
-        category for category in current_params['categories']
-        if category in available_columns
-        and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
-    ]
-    current_params['categories'] = categories
-
-    # The narrowing above can drop the very category chosen to break ties (a percentage whose
-    # attempts column is missing), or leave an odd number, where there is no tie to break. Either
-    # way the tiebreaker no longer refers to anything the agent could resolve, so it is cleared
-    # here — after narrowing, which is the only place the surviving set is known.
-    if current_params.get('tiebreaker_category') not in categories or len(categories) % 2 == 1:
-        current_params['tiebreaker_category'] = None
+    # The requested objective, narrowed to what this data source can score. Derived, never
+    # written back: current_params stays the request (see derive_effective_objective).
+    effective_categories, effective_tiebreaker = derive_effective_objective(session)
 
     info = process_player_data(
         player_stats_v2   = session.v2,
@@ -289,10 +306,9 @@ def build_scoring_info(session: Session) -> None:
         n_drafters        = n_drafters,
         n_starters        = n_starters,
         params            = params,
-        categories        = categories,
+        categories        = effective_categories,
         sport             = sport,
-        # Cleared just above when the narrowing dropped it, so this is always a live category.
-        tiebreaker_category    = current_params.get('tiebreaker_category'),
+        tiebreaker_category    = effective_tiebreaker,   # always a live category, by derivation
         most_categories_weight = current_params.get('most_categories_weight'),
     )
     # session.info is the pipeline's step-4 intermediate; step 5 builds the agent from it (and the
@@ -314,6 +330,7 @@ def build_session_agent(session: Session) -> None:
     slot_counts = current_params['slot_counts']
     n_starters  = _count_starters(slot_counts, n_picks)
     n_drafters  = current_params['n_drafters']
+    _, effective_tiebreaker = derive_effective_objective(session)
 
     session.agent = HAgent(
         info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
@@ -324,7 +341,7 @@ def build_session_agent(session: Session) -> None:
         dynamic        = current_params['n_iterations'] > 0,
         scoring_format = scoring_format,
         most_categories_weight = current_params['most_categories_weight'],
-        tiebreaker_category    = current_params.get('tiebreaker_category'),
+        tiebreaker_category    = effective_tiebreaker,
         sport          = sport,
         params         = params,
         slot_counts    = slot_counts,

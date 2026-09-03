@@ -195,6 +195,15 @@ function makeTiebreakerRow(): HTMLElement {
     return row
 }
 
+/** Whether a tiebreaker can currently apply: majority scoring with an even category count.
+ *  The row's visibility AND the value sent to the backend both derive from this one
+ *  predicate, so the request payload can never depend on how the row happens to be hidden. */
+function tiebreakerCanApply(): boolean {
+    return getScoringFormat() !== ROTISSERIE
+        && getSelectedCategories().length % 2 === 0
+        && (getMostCategoriesWeight() ?? 0) > 0
+}
+
 /** Shows the tiebreaker only where it can bite — majority scoring, even category count — and
  *  keeps its options in step with the categories in play. */
 function refreshTiebreakerControl(): void {
@@ -202,9 +211,7 @@ function refreshTiebreakerControl(): void {
     if (row === null || tiebreakerSelect === null) return
 
     const categories = getSelectedCategories()
-    const applies = getScoringFormat() !== ROTISSERIE
-        && categories.length % 2 === 0
-        && (getMostCategoriesWeight() ?? 0) > 0
+    const applies = tiebreakerCanApply()
     row.style.display = applies ? '' : 'none'
     if (!applies) return
 
@@ -219,8 +226,7 @@ function refreshTiebreakerControl(): void {
 /** The category that counts twice, or null when no tie can arise (Rotisserie, an odd number of
  *  categories, or a purely per-category objective) — the backend rejects a value it would ignore. */
 export function getTiebreakerCategory(): string | null {
-    const row = document.getElementById('fc-tiebreaker-row')
-    if (row === null || row.style.display === 'none' || tiebreakerSelect === null) return null
+    if (tiebreakerSelect === null || !tiebreakerCanApply()) return null
     const selected = tiebreakerSelect.getValue()
     return selected === NO_TIEBREAKER ? null : selected
 }
