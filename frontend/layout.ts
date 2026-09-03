@@ -180,7 +180,6 @@ function showSeasonLayout(): void {
     // Clear sub-header so the tab bar from draft/auction mode doesn't bleed in
     const rightSubHeader = document.getElementById('right-sub-header')!
     rightSubHeader.innerHTML = ''
-    document.getElementById('tab-row')!.style.maxWidth = ''
 
     show('season-nav')
 

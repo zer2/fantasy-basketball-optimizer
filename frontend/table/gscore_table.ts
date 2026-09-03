@@ -10,7 +10,10 @@ import { getGScoreById, getShortCategoryNames } from '../app_state.js'
 import { makeFullPlayerDisplay } from '../player_display.js'
 import { getSelectedCategories, getScoringFormat } from '../parameter_collection/format_and_categories.js'
 import { getLeagueSettings } from '../parameter_collection/league_settings.js'
-import { stat_styler_primary, G_SCORE_MULTIPLIER, H_MULTIPLIER } from '../styles/styler_functions.js'
+import {
+    stat_styler_primary, G_SCORE_MULTIPLIER, H_MULTIPLIER,
+    convertWinRateToRotoPoints, computeRotoMiddle,
+} from '../styles/styler_functions.js'
 import { isMobileViewport } from '../helper_functions.js'
 import { makeSpacerTh } from './table_helpers.js'
 
@@ -145,7 +148,7 @@ export function buildAlignedHScoreTable(
 ): HTMLTableElement {
     const isRoto     = getScoringFormat() === 'Rotisserie'
     const nDrafters  = isRoto ? getLeagueSettings().n_drafters : 0
-    const rotoMiddle = (nDrafters - 1) / 2 + 1
+    const rotoMiddle = computeRotoMiddle(nDrafters)
 
     const hScoreTbl = document.createElement('table')
     hScoreTbl.className = 'panel-table panel-table--rounded panel-table--top-gap'
@@ -170,7 +173,7 @@ export function buildAlignedHScoreTable(
     for (const winRate of fullTeamResult.win_rates) {
         const cell = hScoreRow.insertCell(-1)
         if (isRoto) {
-            const rotoValue = 1 + (winRate / 100) * (nDrafters - 1)
+            const rotoValue = convertWinRateToRotoPoints(winRate, nDrafters)
             cell.textContent = rotoValue.toFixed(1)
             cell.className = 'categoricalRotoHscore'
             cell.style.cssText = stat_styler_primary(rotoValue, H_MULTIPLIER * (nDrafters - 1), rotoMiddle)
@@ -188,7 +191,7 @@ export function buildAlignedHScoreTable(
  *  auto-sized column per category. Desktop uses 200px/83px (matches
  *  .panel-colspacer-name / .panel-colspacer-total); mobile uses 7rem/3rem so
  *  the table fits inside the panel without forcing it wider. */
-export function makeNameTotalCategoriesColgroup(
+function makeNameTotalCategoriesColgroup(
     nCategories: number
   , isMobile: boolean
 ): HTMLTableColElement {

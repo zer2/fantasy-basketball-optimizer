@@ -11,7 +11,7 @@ import { readRosterAssignments } from './season_helpers.js'
 import { getTeamNames } from '../../parameter_collection/league_settings.js'
 import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
-import { buildMinimalPlayerDisplayHtml, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
+import { buildPlayerOption, buildMinimalPlayerDisplayHtml } from '../../player_display.js'
 import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
 import { stat_styler_primary, G_SCORE_MULTIPLIER } from '../../styles/styler_functions.js'
 import { DEFAULT_COMBOS } from '../../parameter_collection/trade_parameters.js'
@@ -22,13 +22,15 @@ import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 // ─── Player id <-> multiselect value helpers ─────────────────────────────────
 
+// Styler multipliers for this pane's fraction-scaled scores (the app-wide G/H multipliers
+// live in styler_functions). Matchup H-scores and win rates arrive as 0-1 fractions centred
+// at even (0.5); suggestion score deltas are far smaller fractions, hence the larger gain.
+const MATCHUP_H_MULTIPLIER        = 200
+const SUGGESTION_SCORE_MULTIPLIER = 15000
+
 /** Multiselect options for a roster: player ids as values, registry names as labels. */
-function buildPlayerOptions(playerIds: number[]): { value: string; label: string }[] {
-    return playerIds.map(playerId => ({
-        value: String(playerId),
-        label: buildPlayerOptionLabel(playerId),
-        html:  buildFullPlayerDisplayHtml(playerId),
-    }))
+function buildPlayerOptions(playerIds: number[]): { value: string; label: string; html: string }[] {
+    return playerIds.map(buildPlayerOption)
 }
 
 /** Parses multiselect values back to player ids. Throws on a non-numeric value — the
@@ -253,12 +255,12 @@ function buildHScoreComparisonTable(
 
         const hCell = tr.insertCell()
         hCell.textContent = (hScore * 100).toFixed(2) + '%'
-        hCell.style.cssText = stat_styler_primary(hScore - 0.5, 200, 0)
+        hCell.style.cssText = stat_styler_primary(hScore - 0.5, MATCHUP_H_MULTIPLIER, 0)
 
         for (const rate of rates) {
             const td = tr.insertCell()
             td.textContent = (rate * 100).toFixed(1) + '%'
-            td.style.cssText = stat_styler_primary(rate - 0.5, 200, 0)
+            td.style.cssText = stat_styler_primary(rate - 0.5, MATCHUP_H_MULTIPLIER, 0)
         }
     }
 
@@ -400,11 +402,11 @@ function buildSuggestionTable(
 
         const yourCell = tr.insertCell()
         yourCell.textContent = (sug.your_score * 100).toFixed(2) + '%'
-        yourCell.style.cssText = stat_styler_primary(sug.your_score, 15000, 0)
+        yourCell.style.cssText = stat_styler_primary(sug.your_score, SUGGESTION_SCORE_MULTIPLIER, 0)
 
         const theirCell = tr.insertCell()
         theirCell.textContent = (sug.their_score * 100).toFixed(2) + '%'
-        theirCell.style.cssText = stat_styler_primary(sug.their_score, 15000, 0)
+        theirCell.style.cssText = stat_styler_primary(sug.their_score, SUGGESTION_SCORE_MULTIPLIER, 0)
 
         // Clicking a suggestion populates the send/receive selectors.
         // Both are set silently to avoid two separate updateResults() calls

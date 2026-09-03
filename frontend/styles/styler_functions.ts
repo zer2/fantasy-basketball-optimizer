@@ -89,6 +89,18 @@ export const G_SCORE_MULTIPLIER = 60   // G-score cells (middle 0): full colour 
 export const H_MULTIPLIER = 3          // per-category H cells: win % (middle 50); Rotisserie
                                        // standings points scale this by the (n_drafters - 1) range
 
+/** Expected Rotisserie standings points for a category win rate (%), on the
+ *  1..n_drafters scale. Every Roto cell colours this with H_MULTIPLIER scaled by
+ *  the same (n_drafters - 1) range. */
+export function convertWinRateToRotoPoints(winRate: number, nDrafters: number): number {
+    return 1 + (winRate / 100) * (nDrafters - 1)
+}
+
+/** The midpoint of the standings-points scale — the neutral middle Roto cells colour around. */
+export function computeRotoMiddle(nDrafters: number): number {
+    return (nDrafters - 1) / 2 + 1
+}
+
 export function stat_styler_primary(value: number
                                     , multiplier: number
                                     , middle: number): string {

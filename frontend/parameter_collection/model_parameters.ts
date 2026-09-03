@@ -8,7 +8,6 @@
 import { ModelParameters } from '../types.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
-import { makeSidebarToggle } from '../helper_functions.js'
 
 interface ParamSpec {
     id:      string

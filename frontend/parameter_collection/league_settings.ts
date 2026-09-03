@@ -271,6 +271,13 @@ export function renderLeagueSettings(container: HTMLElement): void {
     platformSelect.element.addEventListener('change', updateVisibility)
 }
 
+/** The current mode alone. A light accessor for paths that only need the mode:
+ *  getLeagueSettings() also reads the numeric inputs, which throw on an invalid
+ *  in-progress value, so a display path mid-edit must not go through it. */
+export function getMode(): DraftMode {
+    return (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
+}
+
 export function getTeamNames(): string[] {
     return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
@@ -289,7 +296,7 @@ export function getLeagueSettings(): {
     third_round_reversal: boolean
     team_names: string[]
 } {
-    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
+    const mode = getMode()
     return {
         sport:                (document.getElementById('ls-sport') as HTMLInputElement).value,
         platform:             (document.getElementById('ls-platform') as HTMLInputElement).value as Platform,

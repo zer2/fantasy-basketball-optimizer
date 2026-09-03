@@ -3,14 +3,13 @@
 // Mirrors the draft board structure: pick control on top, grid below.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { readRequiredIntInput, makeBoardToggleHeaderCell, buildBoardTableShell } from '../helper_functions.js'
+import { readRequiredIntInput, buildBoardTableShell } from '../helper_functions.js'
 import { getPlayerResults } from '../app_state.js'
-import { getRegistryEntry } from '../player_registry.js'
-import { makeMinimalPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../player_display.js'
+import { buildPlayerOption, makeMinimalPlayerDisplay } from '../player_display.js'
+import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
-import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
 import {
     AuctionConfig,
     getPicks, getTeamNames, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
@@ -28,6 +27,12 @@ const _auctionDebouncer = makeDebouncer(() => { runEvaluate().catch(err => conso
 // custom selects' internal listeners (~9 each × 2 selects) bound to detached
 // nodes. The closures keep the old wrapper DOM alive until the cycle is broken.
 let auctionListenerController: AbortController | null = null
+
+/** Total auction dollars a drafter has spent across the board's picks. The budget cap on
+ *  the cost input and the lock-in enforcement both read this, so they cannot disagree. */
+function sumSpentByDrafter(picks: ReturnType<typeof getPicks>, drafterIndex: number): number {
+    return picks.reduce((sum, pickRow) => sum + (pickRow[drafterIndex]?.cost ?? 0), 0)
+}
 
 const ROUND_W = 46   // fits the collapse arrow beside 'Round'
 const TEAM_W  = 60
@@ -85,11 +90,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         'auction-pick-player',
         [
             { value: '', label: '' },
-            ...available.map(playerId => ({
-                value: String(playerId),
-                label: buildPlayerOptionLabel(playerId),
-                html:  buildFullPlayerDisplayHtml(playerId),
-            })),
+            ...available.map(buildPlayerOption),
         ],
         undefined,
         undefined,
@@ -136,7 +137,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         const team = teamSel.getValue()
         if (team) {
             const drafterIndex = getTeamNames().indexOf(team)
-            const spent = getPicks().reduce((sum, pickRow) => sum + (pickRow[drafterIndex]?.cost ?? 0), 0)
+            const spent = sumSpentByDrafter(getPicks(), drafterIndex)
             costInput.max = String(getCashPerTeam() - spent)
         } else {
             costInput.removeAttribute('max')
@@ -164,7 +165,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         const drafterIndex = getTeamNames().indexOf(team)
         const cost = parseFloat(costInput.value)
         if (isNaN(cost) || cost <= 0) return
-        const spent = getPicks().reduce((sum, pickRow) => sum + (pickRow[drafterIndex]?.cost ?? 0), 0)
+        const spent = sumSpentByDrafter(getPicks(), drafterIndex)
         if (cost > getCashPerTeam() - spent) return
         const succeeded    = recordAuctionPick(chosenPlayerId, cost, drafterIndex)
         if (succeeded) {
@@ -211,7 +212,6 @@ function buildAuctionBoard(): HTMLElement {
 
     const nPicks      = getNPicks()
     const nDrafters   = getNDrafters()
-    const teamNames   = getTeamNames()
     const picks       = getPicks()
     const cashPerTeam = getCashPerTeam()
 
@@ -257,7 +257,7 @@ function buildAuctionBoard(): HTMLElement {
     frow.append(budgetLabel)
 
     for (let d = 0; d < nDrafters; d++) {
-        const spent = picks.reduce((sum, r) => sum + (r[d] ? r[d]!.cost : 0), 0)
+        const spent = sumSpentByDrafter(picks, d)
         const td = document.createElement('td')
         td.className   = 'auction-budget-cell'
         td.textContent = `$${cashPerTeam - spent}`

@@ -77,6 +77,14 @@ export function refreshSeatOptions(): string | null {
     return null
 }
 
+/** Shows or hides the whole selector container. Autopilot hides it while it drives the
+ *  seat itself; layout.ts separately toggles display per layout, on a different property,
+ *  so the two writers cannot fight. */
+export function setSeatSelectorVisible(visible: boolean): void {
+    ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility =
+        visible ? '' : 'hidden'
+}
+
 /** Empties the selector and the seat — the unconnected-live-platform state, where there is
  *  no draft board and nothing to evaluate for. */
 export function clearSeatOptions(): void {

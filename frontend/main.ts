@@ -4,7 +4,7 @@
 // their own modules (seat_selector.ts, account_row.ts, parameter_collection/*); the heavy
 // logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
-import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
+import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
 import { makeDebouncer } from './api/session.js'
 import { setSportConfig } from './app_state.js'
 import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings } from './api/draft_and_auction_session.js'
@@ -314,10 +314,10 @@ themeInput.addEventListener('change', () => {
 
 // ─── Sidebar toggle ───────────────────────────────────────────────────────────
 
-const SIDEBAR_COLLAPSE_BREAKPOINT = 768  // px; viewports narrower than this default to a collapsed sidebar
 const sidebarToggle = document.getElementById('sidebar-toggle') as HTMLButtonElement
 const appLayout     = document.getElementById('app-layout') as HTMLElement
-const defaultCollapsed = window.innerWidth < SIDEBAR_COLLAPSE_BREAKPOINT
+// Viewports below the shared mobile breakpoint default to a collapsed sidebar.
+const defaultCollapsed = window.innerWidth < MOBILE_BREAKPOINT_PX
 if (pref('sidebar_collapsed', defaultCollapsed)) appLayout.classList.add('sidebar-collapsed')
 sidebarToggle.addEventListener('click', () => {
     const collapsed = appLayout.classList.toggle('sidebar-collapsed')

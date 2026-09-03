@@ -2,6 +2,7 @@
 // Mirrors player_stats_popover() in src/parameter_collection/player_stats.py
 
 import { makeCustomSelect } from '../custom_select.js'
+import { makeWeightSlider } from '../helper_functions.js'
 import { uploadProjectionFile, getSeasons } from '../api/client.js'
 import { DataSource } from '../types.js'
 import { pref, savePref } from '../preferences.js'
@@ -256,29 +257,6 @@ function renderBlendWeights(container: HTMLElement): void {
         appendCustomUploadRow(customRowsContainer, storedUpload)
     }
     if (customUploadRows.length < MAX_CUSTOM_UPLOADS) appendCustomUploadRow(customRowsContainer)
-}
-
-/** Builds a weight slider + its value display (shared by Snowflake and custom sources). */
-function makeWeightSlider(
-    id: string
-    , initialWeight: number
-): { slider: HTMLInputElement; valueDisplay: HTMLSpanElement } {
-    const slider = document.createElement('input')
-    slider.type = 'range'
-    slider.id = id
-    slider.min = '0'
-    slider.max = '1'
-    slider.step = '0.05'
-    slider.value = String(initialWeight)
-
-    const valueDisplay = document.createElement('span')
-    valueDisplay.className = 'slider-value'
-    valueDisplay.textContent = initialWeight.toFixed(2)
-
-    slider.addEventListener('input', () => {
-        valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
-    })
-    return { slider, valueDisplay }
 }
 
 /** Appends one custom-projection slot: [file chooser | filename] over [weight slider], with

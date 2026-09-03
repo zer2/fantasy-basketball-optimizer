@@ -5,7 +5,7 @@
 // (parameters.yaml) via getSportConfig(). Throws if the config is not loaded.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { makeLabel, renderMultiselect } from '../helper_functions.js'
+import { makeLabel, makeWeightSlider, renderMultiselect } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
@@ -264,21 +264,7 @@ function makeMostCategoriesWeightRow(initialWeight: number): HTMLElement {
     const sliderRow = document.createElement('div')
     sliderRow.className = 'sidebar-slider-row'
 
-    const slider = document.createElement('input')
-    slider.type  = 'range'
-    slider.id    = 'fc-most-categories-weight'
-    slider.min   = '0'
-    slider.max   = '1'
-    slider.step  = '0.05'
-    slider.value = String(initialWeight)
-
-    const valueDisplay = document.createElement('span')
-    valueDisplay.className   = 'slider-value'
-    valueDisplay.textContent = initialWeight.toFixed(2)
-
-    slider.addEventListener('input', () => {
-        valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
-    })
+    const { slider, valueDisplay } = makeWeightSlider('fc-most-categories-weight', initialWeight)
     slider.addEventListener('change', () => savePref('most_categories_weight', parseFloat(slider.value)))
 
     sliderRow.append(slider, valueDisplay)

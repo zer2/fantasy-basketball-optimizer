@@ -4,7 +4,7 @@
 
 import { PlayerResult } from '../types.js'
 import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat } from '../app_state.js'
-import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/league_settings.js'
+import { getLeagueSettings, getPlatformConfig, getMode } from '../parameter_collection/league_settings.js'
 import { getSlotCounts } from '../parameter_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
@@ -162,7 +162,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
     const { signal } = evaluateController
     try {
         const scoreSeat = (stillOwner: () => boolean) => withSessionRetry(async () => {
-            const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+            const mode = getMode()
             const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
 
             let evalReq: Parameters<typeof evaluate>[1]
@@ -278,7 +278,7 @@ export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Pro
     if (seat === undefined) throw new Error('runEvaluate: no seat selected and league has no team names')
     const topPick = await evaluateSeat(seat, forAutopilot)
     if (forAutopilot) return topPick   // autopilot needs only the top candidate; nothing is shown
-    const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+    const mode = getMode()
     if (mode !== 'Season Mode') {
         if (getFullTeamResult()) {
             showTableMessage('Your team is full.')
@@ -332,7 +332,7 @@ export async function refreshLiveAnalysis(): Promise<void> {
     // including for its own failures.
     await withDisplayOwnership({ busy: 'fetching', onFailure: 'idle' }, async () => {
         await withSessionRetry(async () => {
-            const mode = (document.getElementById('ls-mode') as HTMLInputElement).value
+            const mode = getMode()
             const state = await fetchDraftState(getSessionId()!, mode)
             setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
         })
