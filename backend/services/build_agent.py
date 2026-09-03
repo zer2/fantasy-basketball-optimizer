@@ -153,9 +153,9 @@ def derive_effective_objective(session: Session) -> tuple[list[str], str | None]
     pipeline cache keys stay coherent with the request, and a category dropped for one
     data source comes back by itself when a later patch restores its columns.
     """
-    _, params, _ = _resolve_sport_params(session)
+    _, sport_params, _ = _resolve_sport_params(session)
     available_columns = set(session.v2.columns)
-    ratio_statistics  = params['ratio-statistics']
+    ratio_statistics  = sport_params['ratio-statistics']
     categories = [
         category for category in session.current_params['categories']
         if category in available_columns
@@ -187,9 +187,8 @@ def load_player_pool(
     rebuild an identical registry.
     """
 
-    #ZR: params and current_params are confusing semantically. params should be called sport_params or something maybe
     #also why re-declare current_params? we can just call session.current_params every time, its not too wordy IMO
-    _, params, _ = _resolve_sport_params(session)
+    _, sport_params, _ = _resolve_sport_params(session)
     current_params = session.current_params
     source_type = current_params['data_source_type']
     cache_key = _build_v0_cache_key(current_params)
@@ -203,7 +202,7 @@ def load_player_pool(
 
     if v0_with_names is None:
         if source_type == 'csv':
-            v0_with_names = _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, params))
+            v0_with_names = _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params))
 
         elif source_type == 'historical':
 
@@ -212,7 +211,7 @@ def load_player_pool(
                 raise ValueError(
                     "data_source.season is required when data_source.type == 'historical'"
                 )
-            v0_with_names = get_specified_historical_stats(season, params)
+            v0_with_names = get_specified_historical_stats(season, sport_params)
 
         elif source_type == 'projections':
 
@@ -225,7 +224,7 @@ def load_player_pool(
                 )
             v0_with_names = combine_projections(
                 blend_weights = blend_weights,
-                params        = params,
+                params        = sport_params,
                 uploaded_dfs  = uploaded_dfs,
             )
 
@@ -260,10 +259,10 @@ def remove_injured_players(session: Session) -> None:
 def apply_upsilon_adjustment(session: Session) -> None:
     """Run make_upsilon_adjustment using a fresh copy of v1_clean."""
 
-    _, params, _ = _resolve_sport_params(session)
+    _, sport_params, _ = _resolve_sport_params(session)
     upsilon = session.current_params['upsilon']
     # Always start from the clean v1 so repeated PATCH calls don't stack adjustments
-    v2 = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, params)
+    v2 = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, sport_params)
     session.v2 = v2
 
 
@@ -272,7 +271,7 @@ def apply_upsilon_adjustment(session: Session) -> None:
 def build_scoring_info(session: Session) -> None:
     """Build the info dict (G-scores, X-scores, covariance, etc.) onto session.info."""
 
-    _, params, sport = _resolve_sport_params(session)
+    _, sport_params, sport = _resolve_sport_params(session)
     current_params = session.current_params
 
     scoring_format = current_params['scoring_format']
@@ -305,7 +304,7 @@ def build_scoring_info(session: Session) -> None:
         scoring_format    = scoring_format,
         n_drafters        = n_drafters,
         n_starters        = n_starters,
-        params            = params,
+        params            = sport_params,
         categories        = effective_categories,
         sport             = sport,
         tiebreaker_category    = effective_tiebreaker,   # always a live category, by derivation
@@ -322,7 +321,7 @@ def build_scoring_info(session: Session) -> None:
 def build_session_agent(session: Session) -> None:
     """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
 
-    _, params, sport = _resolve_sport_params(session)
+    _, sport_params, sport = _resolve_sport_params(session)
     current_params = session.current_params
 
     scoring_format = current_params['scoring_format']
@@ -343,7 +342,7 @@ def build_session_agent(session: Session) -> None:
         most_categories_weight = current_params['most_categories_weight'],
         tiebreaker_category    = effective_tiebreaker,
         sport          = sport,
-        params         = params,
+        params         = sport_params,
         slot_counts    = slot_counts,
         aleph          = current_params['aleph'],
         kappa          = current_params['kappa'],

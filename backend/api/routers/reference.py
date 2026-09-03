@@ -25,18 +25,18 @@ def get_config_route(sport: str):
     if sport not in all_params:
         raise HTTPException(status_code=400, detail=f'Unknown sport: {sport!r}')
 
-    params = all_params[sport]
+    sport_params = all_params[sport]
 
     # All selectable categories = ratio stat names + counting stat names
-    ratio_names = list(params['ratio-statistics'].keys())
-    counting_names = params['counting-statistics']
+    ratio_names = list(sport_params['ratio-statistics'].keys())
+    counting_names = sport_params['counting-statistics']
     all_categories = ratio_names + [c for c in counting_names if c not in ratio_names]
 
     # Options (min/max/default for each parameter), excluding positions
-    raw_options = params['options']
+    raw_options = sport_params['options']
     options = {k: v for k, v in raw_options.items() if k != 'positions'}
 
-    position_structure = params['position_structure']
+    position_structure = sport_params['position_structure']
     position_names = {}
     for abbreviation, position_info in position_structure['base'].items():
         position_names[abbreviation] = position_info['full_str']
@@ -44,9 +44,9 @@ def get_config_route(sport: str):
         position_names[abbreviation] = position_info['full_str']
 
     return {
-        'default_categories': params['default-categories'],
+        'default_categories': sport_params['default-categories'],
         'all_categories': all_categories,
-        'short_category_names': params['short-category-names'],
+        'short_category_names': sport_params['short-category-names'],
         'options': options,
         'positions': raw_options['positions'],
         'position_structure': {
