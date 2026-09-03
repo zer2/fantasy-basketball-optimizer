@@ -1,6 +1,6 @@
 // preferences.ts
 // Persists individual sidebar settings in localStorage so they survive page refreshes.
-// Distinct from parameter_collection (which gathers values to send to the backend).
+// Distinct from setting_collection (which gathers values to send to the backend).
 
 const PREFIX = 'fbbo-'
 

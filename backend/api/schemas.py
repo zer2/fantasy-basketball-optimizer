@@ -63,7 +63,7 @@ class LeagueSettings(BaseModel):
         return self
 
 
-class ModelParameters(BaseModel):
+class ModelSettings(BaseModel):
     omega: float
     gamma: float
     beth: float
@@ -78,10 +78,6 @@ class ModelParameters(BaseModel):
     # How sharply opponents are expected to pursue their predicted punts, and at 0 whether they are
     # modelled as strategic at all. Pinned to 1.0 under Rotisserie by the agent.
     opponent_model_confidence: float = 0.5
-    # How sharply opponents are expected to pursue their predicted punts: every opponent tilt
-    # (committed archetype or inferred build) is scaled by this factor at field construction.
-    # 1 = full self-play equilibrium; 0 = category-neutral opponents (the pre-awareness model).
-    # 0.5 mirrors parameters.yaml: the softened field that keeps best responses from herding.
     n_iterations: int
     streaming_noise: float
 
@@ -105,7 +101,7 @@ class SessionRequest(BaseModel):
     is_auction: bool = False
     platform: str = 'Enter your own data'
     slot_counts: dict[str, int]
-    parameters: ModelParameters
+    model_settings: ModelSettings
     data_source: DataSource
     injured_players: list[str] = []
     my_team_id: Optional[str] = None
@@ -154,7 +150,7 @@ class PatchLeague(BaseModel):
 class PatchRequest(BaseModel):
     from_step: int
     is_auction: Optional[bool] = None   # omitted = unchanged; True/False sets the league type
-    parameters: Optional[ModelParameters] = None
+    model_settings: Optional[ModelSettings] = None
     league: Optional[PatchLeague] = None
     data_source: Optional[DataSource] = None
     slot_counts: Optional[dict[str, int]] = None
@@ -221,11 +217,6 @@ class DivisionsResponse(BaseModel):
 
 class LeaguesResponse(BaseModel):
     leagues: list[dict]              # [{id, name, season}]; empty for manual-id platforms (Fantrax)
-
-
-class ConnectRequest(BaseModel):
-    league_id: str
-    division_id: Optional[str] = None
 
 
 class ConnectResponse(BaseModel):

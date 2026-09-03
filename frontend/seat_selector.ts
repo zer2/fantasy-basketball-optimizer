@@ -8,7 +8,7 @@
 import { makeCustomSelect } from './custom_select.js'
 import { getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { getTeamLabel, defaultTeamLabel } from './data_entry/team_labels.js'
-import { getTeamNames } from './parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from './setting_collection/league_settings.js'
 
 let seatSelect: ReturnType<typeof makeCustomSelect> | null = null
 
@@ -30,7 +30,7 @@ function requireSeatSelect(): ReturnType<typeof makeCustomSelect> {
  *  element so the caller can attach its seat-change listener. */
 export function renderSeatSelector(): HTMLElement {
     const seatSelectorContainer = document.getElementById('seat-selector-container') as HTMLElement
-    const initialTeamNames = getTeamNames()
+    const initialTeamNames = getTeamIdentitiesFromSidebar()
     seatSelect = makeCustomSelect(
         'seat-select',
         initialTeamNames.map(buildSeatOption),
@@ -68,13 +68,21 @@ export function renderSeatSelector(): HTMLElement {
  *  evaluate, so the reaction is theirs. Returns the adopted identity, or null when the
  *  existing selection survived. */
 export function refreshSeatOptions(): string | null {
-    const names = getTeamNames()
+    const names = getTeamIdentitiesFromSidebar()
     requireSeatSelect().setOptions(names.map(buildSeatOption), getCurrentSeat() ?? names[0])
     if (getCurrentSeat() === null && names.length > 0) {
         setCurrentSeat(names[0])
         return names[0]
     }
     return null
+}
+
+/** Shows or hides the whole selector container. Autopilot hides it while it drives the
+ *  seat itself; layout.ts separately toggles display per layout, on a different property,
+ *  so the two writers cannot fight. */
+export function setSeatSelectorVisible(visible: boolean): void {
+    ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility =
+        visible ? '' : 'hidden'
 }
 
 /** Empties the selector and the seat — the unconnected-live-platform state, where there is

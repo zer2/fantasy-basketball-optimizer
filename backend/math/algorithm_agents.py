@@ -1,13 +1,10 @@
 """
-Backend-only copy of src/math/algorithm_agents.py.
+The H-scoring agent: category-weight optimisation over the drafting objective.
 
-Changes vs original:
-- HAgent.__init__ takes explicit `sport`, `params`, `slot_counts`, `aleph` params.
-- All get_*() / st.session_state calls replaced with self.sport, self.position_config, etc.
-- Imports changed to backend.math.position_optimization and backend.math.process_player_data.
-- @st.cache_resource removed; build_h_agent is a plain function.
-- All pure-math methods (get_pdf, get_term_*, Roto helpers, AdamOptimizer) are identical.
-The original src/ file is untouched.
+Ported from the original Streamlit implementation (whose src/ tree is retired); the port
+replaced st.session_state and get_*() config reads with explicit constructor parameters
+and moved caching to the Session layer. The pure-math methods (get_pdf, get_term_*, the
+Rotisserie helpers, AdamOptimizer) are unchanged from that original.
 """
 
 from __future__ import annotations
@@ -176,7 +173,11 @@ _OPPONENT_PASS_ITERATIONS = 15
 #       static tier is where the display-stability guarantees live.
 _WARM_START_LEARNING_RATE_SCALE = 1.0
 _WARM_START_STATIC_ROSTER_SCALE = 0.01
+from pathlib import Path
 from itertools import combinations
+
+# Anchored on this file so the reference CSVs load from any working directory.
+_DATA_DIR = Path(__file__).parents[1] / 'data'
 
 from backend.math.algorithm_helpers import (
     compute_win_probability,
@@ -189,6 +190,7 @@ from backend.math.position_optimization import (
     get_player_rows,
 )
 from backend.math.position_config import PositionConfig, build_position_config
+from backend.player_identity import RP_PLAYER_ID
 
 
 class HAgent:
@@ -215,7 +217,7 @@ class HAgent:
                  , tiebreaker_category: Optional[str]
                  # ── explicit context (replaces get_*() calls) ──
                  , sport: str
-                 , params: dict
+                 , sport_params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
                  , kappa: float = 0.3
@@ -223,7 +225,6 @@ class HAgent:
                  , opponent_model_confidence: float = 0.5
                  # ── original optional args ──
                  , beth: float = 0
-                 , collect_info: bool = False
                  ):
 
         self.omega         = omega
@@ -231,7 +232,6 @@ class HAgent:
         self.n_picks       = n_picks
         self.dynamic       = dynamic
         self.n_drafters    = n_drafters
-        self.collect_info  = collect_info
         self.scoring_format = scoring_format
 
         # Head to Head is one format with a dial: 0 scores every category on its own (Each
@@ -248,7 +248,7 @@ class HAgent:
                              f'Got {most_categories_weight!r}.')
         self.most_categories_weight = most_categories_weight
 
-        # Per-format config (the env vars above override any field for A/B testing). All formats run the
+        # Per-format config. All formats run the
         # robustness regulariser; they differ only in the cold-start seed -- Rotisserie uses the lowvar
         # tilt (its punts are structural, not a strategic fork), the H2H formats use multi-start punt
         # seeding so early picks avoid over-committing to a punt they may drop.
@@ -266,7 +266,6 @@ class HAgent:
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
-        self.params = params
 
         # Retain the processed player data so callers read G-scores / positions off the agent
         # (it is explanation-oriented — see _build_candidates). Consumers use agent.info directly.
@@ -285,7 +284,7 @@ class HAgent:
         self._populate_pass_scores = None
 
         # Build position config (replaces all get_position_*() calls)
-        self.position_config: PositionConfig = build_position_config(params, slot_counts)
+        self.position_config: PositionConfig = build_position_config(sport_params, slot_counts)
 
         # ── info dict unpacking ────────────────────────────────────────────────
         self.positions = info['Positions']
@@ -326,7 +325,6 @@ class HAgent:
             # A player's positional baseline is the average of the position means over ALL of their
             # eligible positions (e.g. a PF/C uses the mean of the PF and C means, not just PF). reindex
             # then mean(axis=0) skips any listed position absent from position_means_df.
-            from backend.player_identity import RP_PLAYER_ID
             rel_players = [p for p in x_scores.index if p != RP_PLAYER_ID]
             self.pos_avg = pd.DataFrame(
                 [position_means_df.reindex(self.positions.get(p)).mean(axis=0)
@@ -366,15 +364,15 @@ class HAgent:
         # direction" orientation of the differential z-scores.
         if scoring_format == 'Rotisserie' or most_categories_weight > 0:
             if sport == 'NBA':
-                rho = pd.read_csv('backend/data/basketball_correlations.csv').set_index('Category')
+                rho = pd.read_csv(_DATA_DIR / 'basketball_correlations.csv').set_index('Category')
             else:
-                rho = pd.read_csv('backend/data/baseball_correlations.csv').set_index('Category')
+                rho = pd.read_csv(_DATA_DIR / 'baseball_correlations.csv').set_index('Category')
 
-            counting_stats_all = params['counting-statistics']
+            counting_stats_all = sport_params['counting-statistics']
             rho.loc[counting_stats_all, counting_stats_all] = np.clip(
                 rho.loc[counting_stats_all, counting_stats_all] + aleph, -1, 1
             )
-            negative_stats = params['negative-statistics']
+            negative_stats = sport_params['negative-statistics']
             rho.loc[:, negative_stats] = -rho.loc[:, negative_stats]
             rho.loc[negative_stats, :] = -rho.loc[negative_stats, :]
             rho.loc[negative_stats, negative_stats] = 1
@@ -454,7 +452,7 @@ class HAgent:
 
             # ── max_info (replaces get_max_info()) ────────────────────────────
             if self.n_drafters <= 21:
-                max_table = pd.read_csv('backend/data/max_table.csv')
+                max_table = pd.read_csv(_DATA_DIR / 'max_table.csv')
                 info_row = max_table.set_index('N').loc[self.n_drafters - 1]
                 self.max_ev, self.max_var = float(info_row['EV(X)']), float(info_row['VAR(X)'])
             else:
@@ -483,9 +481,6 @@ class HAgent:
         self.turnover_inverted_v = turnover_inverted_v / turnover_inverted_v.sum()
 
         self.category_weights  = None
-        self.utility_shares    = None
-        self.forward_shares    = None
-        self.guard_shares      = None
 
         # ── position structure (replaces get_position_structure()) ────────────
         self.position_structure = self.position_config.position_structure
@@ -516,7 +511,7 @@ class HAgent:
         # other branches carry a one-line pointer.
         if sport == 'MLB':
             cats = list(x_scores.columns)
-            pitcher_stats = params.get('pitcher_stats', [])
+            pitcher_stats = sport_params.get('pitcher_stats', [])
             self.pitching_stat_indices = [i for i, c in enumerate(cats) if c in pitcher_stats]
             self.batting_stat_indices  = [i for i in range(len(cats)) if i not in self.pitching_stat_indices]
 
@@ -542,7 +537,6 @@ class HAgent:
             self.pitching_preference_vector = pitching_preference_vector
             self.pitching_preference_damper = 1
 
-        self.all_res_list = []
         self.players      = []
 
         transformation_matrix = (
@@ -2179,7 +2173,6 @@ class HAgent:
 
     def clear_initial_weights(self):
         self.initial_category_weights = None
-        self.initial_position_shares  = None
         return self
 
     def reset_draft_state(self):
@@ -2523,38 +2516,3 @@ class AdamOptimizer:
         v_hat = self.v_adam / (1 - self.beta2 ** self.t)
         return self.learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
-
-# ── plain factory function (no @st.cache_resource) ────────────────────────────
-
-def build_h_agent(info
-                  , omega
-                  , gamma
-                  , n_starters
-                  , n_drafters
-                  , beth
-                  , scoring_format
-                  , most_categories_weight
-                  , tiebreaker_category
-                  , dynamic
-                  , sport
-                  , params
-                  , slot_counts
-                  , aleph=0.0
-                  , opponent_model_confidence=0.5):
-    return HAgent(
-        info           = info,
-        omega          = omega,
-        gamma          = gamma,
-        n_picks        = n_starters,
-        n_drafters     = n_drafters,
-        dynamic        = dynamic,
-        scoring_format = scoring_format,
-        most_categories_weight = most_categories_weight,
-        tiebreaker_category    = tiebreaker_category,
-        sport          = sport,
-        params         = params,
-        slot_counts    = slot_counts,
-        aleph          = aleph,
-        opponent_model_confidence = opponent_model_confidence,
-        beth           = beth,
-    )

@@ -1,5 +1,5 @@
 // Collects: slot_counts, bench_slots
-// Mirrors position_requirement_popover() in src/parameter_collection/position_requirement.py
+// Mirrors position_requirement_popover() in src/setting_collection/position_requirement.py
 //
 // Position types and default slot counts are loaded from the backend config
 // (parameters.yaml) via getSportConfig().
@@ -92,8 +92,8 @@ export function renderSlotCounts(container: HTMLElement): void {
     container.append(validationMsg)
 
     // Update validation on any input change
-    grid.addEventListener('input', () => validateSlotCounts(validationMsg, basePositions, flexPositions))
-    validateSlotCounts(validationMsg, basePositions, flexPositions)
+    grid.addEventListener('input', () => validateSlotCounts(validationMsg))
+    validateSlotCounts(validationMsg)
 }
 
 /** Creates a labelled number input row for a single position slot count. */
@@ -118,16 +118,26 @@ function makeSlotRow(pos: string, defaultValue: number): HTMLElement {
     return row
 }
 
+/** The slot total and the picks-per-drafter it must equal. A missing sport config or a
+ *  missing input element is a programmer error and throws (fail noisily); NaN values from
+ *  in-progress typing are a user state and flow through for the callers to judge. */
+function readSlotTotalAndPicks(): { total: number; nPicks: number } {
+    const config = getSportConfig()
+    if (!config) throw new Error('Sport config not loaded')
+    const counts = getSlotCountsFromPositions(
+        config.position_structure.base_list, config.position_structure.flex_list)
+    const total = Object.values(counts).reduce((a, b) => a + b, 0)
+    const nPicksEl = document.getElementById('ls-n-picks') as HTMLInputElement | null
+    if (!nPicksEl) throw new Error('ls-n-picks element not found')
+    return { total, nPicks: parseInt(nPicksEl.value) }
+}
+
 /**
  * Validates that the sum of all slot counts equals picks-per-drafter.
  * Writes an error message to `msgEl` if mismatched, or clears it if valid.
  */
-function validateSlotCounts(msgEl: HTMLElement, basePositions: string[], flexPositions: string[]): void {
-    const counts = getSlotCountsFromPositions(basePositions, flexPositions)
-    const total = Object.values(counts).reduce((a, b) => a + b, 0)
-    const nPicksEl = document.getElementById('ls-n-picks') as HTMLInputElement | null
-    if (!nPicksEl) throw new Error('ls-n-picks element not found')
-    const nPicks = parseInt(nPicksEl.value)
+function validateSlotCounts(msgEl: HTMLElement): void {
+    const { total, nPicks } = readSlotTotalAndPicks()
     if (isNaN(total) || isNaN(nPicks)) return
     if (total > nPicks) {
         msgEl.textContent = `Slot total (${total}) exceeds picks per drafter (${nPicks}).`
@@ -140,18 +150,12 @@ function validateSlotCounts(msgEl: HTMLElement, basePositions: string[], flexPos
 
 /**
  * Returns true if the current slot count total equals the current picks-per-drafter value.
- * Call this before applying slot count or n_picks changes to the backend.
+ * Call this before applying slot count or n_picks changes to the backend. Throws (rather
+ * than quietly answering false) when the config or the inputs are missing — those are
+ * programmer errors, not invalid user input.
  */
 export function isSlotCountsValid(): boolean {
-    const config = getSportConfig()
-    if (!config) return false
-    const basePositions = config.position_structure.base_list
-    const flexPositions = config.position_structure.flex_list
-    const counts = getSlotCountsFromPositions(basePositions, flexPositions)
-    const total = Object.values(counts).reduce((a, b) => a + b, 0)
-    const nPicksEl = document.getElementById('ls-n-picks') as HTMLInputElement | null
-    if (!nPicksEl) return false
-    const nPicks = parseInt(nPicksEl.value)
+    const { total, nPicks } = readSlotTotalAndPicks()
     return total === nPicks
 }
 
@@ -161,10 +165,8 @@ export function isSlotCountsValid(): boolean {
  */
 export function revalidateSlotCounts(): void {
     const msgEl = document.getElementById('sc-validation')
-    if (!msgEl) return
-    const config = getSportConfig()
-    if (!config) return
-    validateSlotCounts(msgEl, config.position_structure.base_list, config.position_structure.flex_list)
+    if (!msgEl) throw new Error('sc-validation element not found')
+    validateSlotCounts(msgEl)
 }
 
 /** Reads slot counts for a given set of positions from the DOM. */

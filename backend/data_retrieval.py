@@ -3,11 +3,11 @@ Backend data retrieval from Snowflake.
 
 Domain data-access layer: player mapping, historical stats, projections, and
 seasons — all the fantasy-basketball-specific reads. The generic Snowflake
-connection + query caching lives in backend.snowflake_connection.
+connection + query caching lives in backend.infra.snowflake_connection.
 
-Equivalent to src/data_retrieval/get_data.py but:
+Ported from the original Streamlit data-retrieval module, but:
 - No Streamlit dependencies
-- Explicit `params: dict` instead of get_params()
+- Explicit `sport_params: dict` instead of get_params()
 - Player names always mapped to the canonical 'Player' column
 """
 
@@ -54,17 +54,17 @@ def get_unified_player_table() -> pd.DataFrame:
 
 # ── Weekly box scores ─────────────────────────────────────────────────────────
 
-def get_weekly_box_scores(season: str, params: dict) -> pd.DataFrame:
+def get_weekly_box_scores(season: str, sport_params: dict) -> pd.DataFrame:
     """Fetch weekly box score totals for a season from WEEKLY_NUMBERS_VIEW.
 
-    Column names are mapped using params['stat-df-renamer'].
+    Column names are mapped using sport_params['stat-df-renamer'].
 
     Returns a DataFrame indexed by ('Player', 'Week') with one summed-stat
     row per player per week — the format expected by
     calculate_coefficients_historical.
     """
     df = run_query(f"SELECT * FROM WEEKLY_NUMBERS_VIEW WHERE SEASON = '{season}'")
-    df = df.rename(columns=params['stat-df-renamer'])
+    df = df.rename(columns=sport_params['stat-df-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
     df = df.set_index(['Player', 'WEEK']).sort_index()
     return df.select_dtypes(include='number')
@@ -89,7 +89,7 @@ def get_available_seasons() -> list[str]:
 
 # ── Historical data ───────────────────────────────────────────────────────────
 
-def get_historical_data(params: dict) -> pd.DataFrame:
+def get_historical_data(sport_params: dict) -> pd.DataFrame:
     """Fetch full historical player data from Snowflake.
 
     Returns a DataFrame indexed by (Season, player id), with the season row's native
@@ -97,7 +97,7 @@ def get_historical_data(params: dict) -> pd.DataFrame:
     row back to 1984-85, so historical identity never depends on the unified table.
     """
     df = query('HISTORICAL_SEASONAL_AVERAGES_VIEW')
-    df = df.rename(columns=params['stat-df-renamer'])
+    df = df.rename(columns=sport_params['stat-df-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
 
     df['Free Throw %']  = df['Free Throws Made'] / df['Free Throw Attempts']
@@ -110,21 +110,21 @@ def get_historical_data(params: dict) -> pd.DataFrame:
     # ROW ORDER IS LOAD-BEARING: the pool has always been name-sorted, and stable sorts
     # downstream (G-score ties, anchor ordering, top-N selections) inherit it — id-sorting
     # here would change served H-scores. Sort by name, then key by id.
-    # The id index level keeps the legacy 'Player' name through Stage A of the identity
-    # refactor (pipeline internals reference the level name); renamed in the cleanup stage.
+    # The id index level keeps the legacy 'Player' level name: pipeline internals
+    # reference the level by that name.
     df = df.sort_values(['Season', 'Player']).fillna(0)
     df = df.set_index(['Season', 'NBA_PLAYER_ID'])
     df.index = df.index.set_names(['Season', 'Player'])
     return df
 
 
-def get_specified_historical_stats(season: str, params: dict) -> pd.DataFrame:
+def get_specified_historical_stats(season: str, sport_params: dict) -> pd.DataFrame:
     """Return player stats for a specific season, indexed by player id.
 
     The 'Player' column carries the season row's native display name (registry material
     popped off by load_player_pool); stats and 'Position' are the pipeline's v0 columns.
     """
-    return get_historical_data(params).loc[season].copy()
+    return get_historical_data(sport_params).loc[season].copy()
 
 
 # ── Projection data ───────────────────────────────────────────────────────────
@@ -140,25 +140,25 @@ def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_espn_projections(params: dict) -> pd.DataFrame:
+def get_espn_projections(sport_params: dict) -> pd.DataFrame:
     """Fetch ESPN projections from Snowflake, with 'player_id' resolved from ESPN names."""
-    n_games = params['n_games']
+    n_games = sport_params['n_games']
     df = query('ESPN_PROJECTION_VIEW')
-    df = df.rename(columns=params['espn-renamer'])
+    df = df.rename(columns=sport_params['espn-renamer'])
     df = attach_player_ids_by_name(df)      # resolve the raw ESPN spellings
     df = _map_player_names(df, 'ESPN_NAME')  # display names stay master-mapped as today
     df['Games Played %'] = df['Games Played'] / n_games
     return df
 
 
-def get_darko_data(params: dict) -> pd.DataFrame:
+def get_darko_data(sport_params: dict) -> pd.DataFrame:
     """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game.
     DARKO carries NBA_PLAYER_ID natively; position/minutes ride in from the ESPN table
     joined by id (its names resolved through the unified table)."""
-    n_games = params['n_games']
+    n_games = sport_params['n_games']
 
     df = query('DARKO_VIEW')
-    df = df.rename(columns=params['darko-renamer'])
+    df = df.rename(columns=sport_params['darko-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
     df = _map_player_names(df, 'DARKO_NAME')
     df['player_id'] = df['NBA_PLAYER_ID'].astype('Int64')
@@ -195,10 +195,10 @@ def get_darko_data(params: dict) -> pd.DataFrame:
     df['Assist to TO'] = df['Assists'] / df['Turnovers']
 
     required = (
-        params['counting-statistics']
-        + list(params['ratio-statistics'].keys())
-        + [info['volume-statistic'] for info in params['ratio-statistics'].values()]
-        + params['other-columns']
+        sport_params['counting-statistics']
+        + list(sport_params['ratio-statistics'].keys())
+        + [info['volume-statistic'] for info in sport_params['ratio-statistics'].values()]
+        + sport_params['other-columns']
         + ['Player', 'player_id']
     )
     required = [c for c in required if c in df.columns]
@@ -207,7 +207,7 @@ def get_darko_data(params: dict) -> pd.DataFrame:
 
 # ── Canonical position eligibility ────────────────────────────────────────────
 
-def get_canonical_position_eligibility(params: dict) -> pd.Series:
+def get_canonical_position_eligibility(sport_params: dict) -> pd.Series:
     """Per-player position eligibility from Yahoo — the single authority for the blend.
 
     Positions are never blended across projection sources: every source contributes
@@ -222,7 +222,7 @@ def get_canonical_position_eligibility(params: dict) -> pd.Series:
     """
     base_order = {
         position: rank
-        for rank, position in enumerate(params['position_structure']['base_list'])
+        for rank, position in enumerate(sport_params['position_structure']['base_list'])
     }
 
     eligibility = query('YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE')
@@ -246,7 +246,7 @@ def get_canonical_position_eligibility(params: dict) -> pd.Series:
 
 def combine_projections(
     blend_weights: dict[str, float],
-    params: dict,
+    sport_params: dict,
     uploaded_dfs: dict[str, Optional[pd.DataFrame]] | None = None,
 ) -> pd.DataFrame:
     """Blend multiple projection sources using provided weights.
@@ -266,8 +266,8 @@ def combine_projections(
         key: uploaded_df if blend_weights.get(key, 0) > 0 else None
         for key, uploaded_df in sorted(uploaded.items())
     }
-    sources['DARKO'] = get_darko_data(params)       if blend_weights.get('DARKO', 0) > 0 else None
-    sources['ESPN']  = get_espn_projections(params) if blend_weights.get('ESPN', 0)  > 0 else None
+    sources['DARKO'] = get_darko_data(sport_params)       if blend_weights.get('DARKO', 0) > 0 else None
+    sources['ESPN']  = get_espn_projections(sport_params) if blend_weights.get('ESPN', 0)  > 0 else None
     source_keys = list(sources.keys())
 
     weights = [blend_weights.get(k, 0.0) for k in source_keys]
@@ -349,7 +349,7 @@ def combine_projections(
     # player is known, so identity is stable across any combination of active sources.
     # A source's own Position survives only for players the canonical table lacks —
     # who, in practice, exist in that source alone, so no identity conflict is possible.
-    canonical_positions = get_canonical_position_eligibility(params)
+    canonical_positions = get_canonical_position_eligibility(sport_params)
     mapped_positions = pd.Series(df.index.map(canonical_positions), index=df.index)
     df['Position'] = mapped_positions.fillna(df['Position'])
 

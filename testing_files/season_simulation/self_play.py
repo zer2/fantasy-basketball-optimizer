@@ -62,7 +62,7 @@ def build_session(season: str, objective: str):
     so there is nothing for the strength adjustment to doubt."""
     request = _build_session_request(objective=objective)
     request['data_source']['season'] = season
-    request['parameters']['beth']    = 0
+    request['model_settings']['beth']    = 0
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'session build failed: {response.text}'
     return get_session(response.json()['session_id'])
@@ -74,7 +74,7 @@ def configure(session, theta: np.ndarray) -> None:
     popularity). No rebuild, no data reprocessing."""
     agent = session.agent
     agent.gamma, agent.omega, agent.kappa = float(theta[0]), float(theta[1]), float(theta[2])
-    agent.populate_default_h_scores(session.current_params['n_iterations'])
+    agent.populate_default_h_scores(session.current_settings['n_iterations'])
 
 
 def draft_and_score(field_session, deviator_session, seat: int, candidate_limit: int) -> float:
@@ -86,9 +86,9 @@ def draft_and_score(field_session, deviator_session, seat: int, candidate_limit:
     # Fresh draft: clear both agents' in-draft state so nothing leaks from a previous draft.
     field_session.agent.reset_draft_state()
     deviator_session.agent.reset_draft_state()
-    n_drafters   = field_session.current_params['n_drafters']
-    n_picks      = field_session.current_params['n_picks']
-    n_iterations = field_session.current_params['n_iterations']
+    n_drafters   = field_session.current_settings['n_drafters']
+    n_picks      = field_session.current_settings['n_picks']
+    n_iterations = field_session.current_settings['n_iterations']
     team_names   = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments  = {name: [] for name in team_names}
     deviator     = team_names[seat]
@@ -157,9 +157,9 @@ def estimate_gradient_population(pool: list
     pool holds 2*len(PARAMS) reusable sessions: pool[2*i] is configured to theta+delta*e_i and
     pool[2*i+1] to theta-delta*e_i."""
     n_params     = len(PARAMS)
-    n_drafters   = pool[0].current_params['n_drafters']
-    n_picks      = pool[0].current_params['n_picks']
-    n_iterations = pool[0].current_params['n_iterations']
+    n_drafters   = pool[0].current_settings['n_drafters']
+    n_picks      = pool[0].current_settings['n_picks']
+    n_iterations = pool[0].current_settings['n_iterations']
     assert n_drafters % (2 * n_params) == 0, (
         f'population gradient needs n_drafters ({n_drafters}) divisible by 2*len(PARAMS) ({2 * n_params})')
     seats_per_param = n_drafters // n_params
@@ -264,7 +264,7 @@ def spsa(objective: str
         else:
             field_session, deviator_session = sessions_for(season)
             configure(field_session, theta)
-            seat = int(rng.integers(field_session.current_params['n_drafters']))
+            seat = int(rng.integers(field_session.current_settings['n_drafters']))
 
             def probe(offset):   # deviator's final H-score at theta+offset, vs the field at theta
                 configure(deviator_session, _clip(theta + offset))

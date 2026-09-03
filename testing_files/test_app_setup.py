@@ -47,7 +47,7 @@ def _build_default_session_request() -> dict:
             , 'categories':   nba['default-categories']
         }
         , 'slot_counts': slot_counts
-        , 'parameters': {
+        , 'model_settings': {
             'omega':           opts['omega']['default']
             , 'gamma':         opts['gamma']['default']
             , 'beth':          opts['beth']['default']
@@ -128,7 +128,7 @@ def test_session_creation_stores_correct_params():
     assert response.status_code == 201
 
     session = get_session(response.json()['session_id'])
-    cp      = session.current_params
+    cp      = session.current_settings
 
     assert cp['sport']      == 'NBA'
     assert cp['n_drafters'] == yaml_options['n_drafters']['default']
@@ -151,8 +151,8 @@ def test_tiebreaker_category_is_carried_and_changes_the_board():
     assert with_tiebreaker.status_code == 201, with_tiebreaker.text
 
     session = get_session(with_tiebreaker.json()['session_id'])
-    assert session.current_params['tiebreaker_category'] == 'Blocks'
-    assert session.agent.tiebreaker_index == session.current_params['categories'].index('Blocks')
+    assert session.current_settings['tiebreaker_category'] == 'Blocks'
+    assert session.agent.tiebreaker_index == session.current_settings['categories'].index('Blocks')
 
     # G-scores are per-category value and untouched by how matchups are settled, so the agent's
     # own objective is where the tiebreaker has to show up — and the session without one must
@@ -220,7 +220,7 @@ def test_a_tiebreaker_that_cannot_apply_is_refused_or_dropped():
     request['league']['most_categories_weight'] = 0.0
     inert = client.post('/sessions', json=request)
     assert inert.status_code == 201, inert.text
-    assert get_session(inert.json()['session_id']).current_params['tiebreaker_category'] is None
+    assert get_session(inert.json()['session_id']).current_settings['tiebreaker_category'] is None
 
 
 def test_session_creation_insufficient_player_pool():
@@ -875,17 +875,17 @@ def test_pipeline_cache_restores_prior_builds():
     original_agent = get_session(session_id).agent
     assert original_agent is not None
 
-    base_parameters = request_body['parameters']
+    base_parameters = request_body['model_settings']
     changed_parameters = {**base_parameters, 'upsilon': base_parameters['upsilon'] + 0.1}
 
     patch_response = client.patch(f'/sessions/{session_id}',
-                                  json={'from_step': 3, 'parameters': changed_parameters})
+                                  json={'from_step': 3, 'model_settings': changed_parameters})
     assert patch_response.status_code == 200, patch_response.text
     changed_agent = get_session(session_id).agent
     assert changed_agent is not original_agent, 'a new configuration builds a new agent'
 
     patch_response = client.patch(f'/sessions/{session_id}',
-                                  json={'from_step': 3, 'parameters': base_parameters})
+                                  json={'from_step': 3, 'model_settings': base_parameters})
     assert patch_response.status_code == 200, patch_response.text
     assert get_session(session_id).agent is original_agent, \
         'returning to the original configuration must restore its cached build'
@@ -901,7 +901,7 @@ def test_pipeline_cache_restores_prior_builds():
 
     # And the other configuration was stashed too — toggling forward restores it as well
     patch_response = client.patch(f'/sessions/{session_id}',
-                                  json={'from_step': 3, 'parameters': changed_parameters})
+                                  json={'from_step': 3, 'model_settings': changed_parameters})
     assert patch_response.status_code == 200, patch_response.text
     assert get_session(session_id).agent is changed_agent, \
         'both sides of a toggle should be served from the cache'
@@ -924,13 +924,13 @@ def test_lambda_reaches_the_regulariser_schedule_in_its_surfaced_units():
     conversion happens in exactly one place, and this pins it: what the session asks for is what the
     schedule peaks at."""
     request = _build_default_session_request()
-    request['parameters']['reg_lambda'] = 0.2
+    request['model_settings']['reg_lambda'] = 0.2
 
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, response.text
     session = get_session(response.json()['session_id'])
 
-    assert session.current_params['reg_lambda'] == 0.2
+    assert session.current_settings['reg_lambda'] == 0.2
     assert session.agent.reg_schedule[0] == pytest.approx(0.2 * REG_LAMBDA_UNIT)
 
 
@@ -940,7 +940,7 @@ def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
     neutral vector -- otherwise the control is inert and the sidebar is lying."""
     def furthest_weight_from_neutral(reg_lambda: float) -> float:
         request = _build_default_session_request()
-        request['parameters']['reg_lambda'] = reg_lambda
+        request['model_settings']['reg_lambda'] = reg_lambda
         response = client.post('/sessions', json=request)
         assert response.status_code == 201, response.text
 

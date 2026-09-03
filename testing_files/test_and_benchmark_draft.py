@@ -207,9 +207,9 @@ def test_evaluate_empty_board(session_for_format):
     session_id, objective, expected_top_scores = session_for_format
 
     session      = get_session(session_id)
-    categories   = session.current_params['categories']
-    n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
+    categories   = session.current_settings['categories']
+    n_drafters   = session.current_settings['n_drafters']
+    n_iterations = session.current_settings['n_iterations']
 
     player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
 
@@ -261,8 +261,8 @@ def test_evaluate_mid_draft(session_for_format):
     session_id, objective, _ = session_for_format
 
     session      = get_session(session_id)
-    n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
+    n_drafters   = session.current_settings['n_drafters']
+    n_iterations = session.current_settings['n_iterations']
     g_scores     = session.agent.info['G-scores']
 
     # Take the top 8 G-score players and split them across two teams.
@@ -317,8 +317,8 @@ def test_evaluate_first_round(session_for_first_round):
     session_id, objective, expected_top_scores = session_for_first_round
 
     session      = get_session(session_id)
-    n_drafters   = session.current_params['n_drafters']
-    n_iterations = session.current_params['n_iterations']
+    n_drafters   = session.current_settings['n_drafters']
+    n_iterations = session.current_settings['n_iterations']
 
     assert len(_FIRST_ROUND_PICKS) == n_drafters, (
         f'_FIRST_ROUND_PICKS has {len(_FIRST_ROUND_PICKS)} entries but n_drafters={n_drafters}'
@@ -405,7 +405,7 @@ def test_evaluate_twenty_five_drafters():
     session_id = response.json()['session_id']
 
     session      = get_session(session_id)
-    n_drafters   = session.current_params['n_drafters']
+    n_drafters   = session.current_settings['n_drafters']
 
     result = rank_candidates(
         session            = session
@@ -443,7 +443,7 @@ def test_evaluate_three_drafters():
     session_id = response.json()['session_id']
 
     session      = get_session(session_id)
-    n_drafters   = session.current_params['n_drafters']
+    n_drafters   = session.current_settings['n_drafters']
 
     result = rank_candidates(
         session            = session

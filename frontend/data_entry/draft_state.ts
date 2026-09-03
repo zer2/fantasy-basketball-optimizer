@@ -28,7 +28,7 @@ let configKey = ''   // detects sidebar changes that require a reset
 export function getPickRow():     number              { return pickRow     }
 export function getPickDrafter(): number              { return pickDrafter }
 export function getDrafted():     (number | null)[][] { return drafted     }
-export function getTeamNames():   string[]            { return teamNames   }
+export function getTeamIdentitiesFromBoard():   string[]            { return teamNames   }
 export function getNDrafters(): number { return nDrafters }
 export function getNPicks():    number { return nPicks    }
 export function getConfigKey():   string              { return configKey   }

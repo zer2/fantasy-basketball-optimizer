@@ -2,7 +2,7 @@
 // The threshold inputs and position toggle are rendered inline by season_trading.ts.
 // Combo sizes are fixed (DEFAULT_COMBOS) and not user-editable.
 
-export interface TradeComboRow {
+interface TradeComboRow {
     n_traded:   number
     n_received: number
     threshold:  number

@@ -1,7 +1,8 @@
 // Collects: data_source (type, blend_weights, custom_data_ids), injured_players
-// Mirrors player_stats_popover() in src/parameter_collection/player_stats.py
+// Mirrors player_stats_popover() in src/setting_collection/player_stats.py
 
 import { makeCustomSelect } from '../custom_select.js'
+import { makeWeightSlider } from '../helper_functions.js'
 import { uploadProjectionFile, getSeasons } from '../api/client.js'
 import { DataSource } from '../types.js'
 import { pref, savePref } from '../preferences.js'
@@ -103,7 +104,7 @@ let _seasonsPromise: Promise<void> = Promise.resolve()
 /** Returns a promise that resolves once the seasons dropdown is ready (immediately when
  *  no fetch is needed or one has already completed). Anything that reads the data source
  *  must await this first: until the fetch lands there is no `ps-season` element, and
- *  getPlayerStatsParams() refuses to report a historical source without a season. */
+ *  getPlayerStatsSettings() refuses to report a historical source without a season. */
 export function waitForSeasons(): Promise<void> {
     return _seasonsPromise
 }
@@ -258,29 +259,6 @@ function renderBlendWeights(container: HTMLElement): void {
     if (customUploadRows.length < MAX_CUSTOM_UPLOADS) appendCustomUploadRow(customRowsContainer)
 }
 
-/** Builds a weight slider + its value display (shared by Snowflake and custom sources). */
-function makeWeightSlider(
-    id: string
-    , initialWeight: number
-): { slider: HTMLInputElement; valueDisplay: HTMLSpanElement } {
-    const slider = document.createElement('input')
-    slider.type = 'range'
-    slider.id = id
-    slider.min = '0'
-    slider.max = '1'
-    slider.step = '0.05'
-    slider.value = String(initialWeight)
-
-    const valueDisplay = document.createElement('span')
-    valueDisplay.className = 'slider-value'
-    valueDisplay.textContent = initialWeight.toFixed(2)
-
-    slider.addEventListener('input', () => {
-        valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
-    })
-    return { slider, valueDisplay }
-}
-
 /** Appends one custom-projection slot: [file chooser | filename] over [weight slider], with
  *  the upload's status line beneath. The file's own name identifies the source, so the slider
  *  needs no label of its own. The slider stays locked at zero until this slot's upload
@@ -390,7 +368,7 @@ function appendCustomUploadRow(
  * Reads data source type, blend weights, and excluded player list from the DOM.
  * custom_data_ids are populated by the CSV upload handlers above.
  */
-export function getPlayerStatsParams(): { data_source: DataSource; injured_players: string[] } {
+export function getPlayerStatsSettings(): { data_source: DataSource; injured_players: string[] } {
     const type = (document.getElementById('ps-data-type') as HTMLInputElement).value as DataSource['type']
 
     // Snowflake sources plus one entry per live upload, keyed by its data_id.

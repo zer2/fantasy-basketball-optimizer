@@ -35,7 +35,7 @@ def _normalize_projection_header(header) -> str:
     return str(header).strip().lower()
 
 
-def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
+def _map_columns_to_canonical(df_raw: pd.DataFrame, sport_params: dict) -> dict:
     """{column in the file: canonical name} for every column the aliases recognize.
 
     Columns that match nothing are left out (the parse drops them). A canonical name that
@@ -43,7 +43,7 @@ def _map_columns_to_canonical(df_raw: pd.DataFrame, params: dict) -> dict:
     both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
     """
     aliases = {_normalize_projection_header(alias): canonical
-               for alias, canonical in params.get(_COLUMN_ALIASES_KEY, {}).items()}
+               for alias, canonical in sport_params.get(_COLUMN_ALIASES_KEY, {}).items()}
     mapping, claimed = {}, set()
     for column in df_raw.columns:
         canonical = aliases.get(_normalize_projection_header(column))
@@ -114,7 +114,7 @@ def _decode_projection_text(csv_bytes: bytes) -> str:
     return csv_bytes.decode('latin-1')
 
 
-def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
+def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataFrame:
     """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
 
     There is no format detection: each column is interpreted on its own through the alias
@@ -124,7 +124,7 @@ def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
     the file does not read as a projection set.
     """
     df_raw = _read_projection_table(upload_bytes)
-    column_mapping  = _map_columns_to_canonical(df_raw, params)
+    column_mapping  = _map_columns_to_canonical(df_raw, sport_params)
     # Unrecognized columns keep their own names, so a file already using canonical names
     # is understood without any alias matching at all.
     renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
@@ -136,8 +136,8 @@ def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
     if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
         # Every name the aliases can produce, so a file already written in canonical names
         # keeps those columns even though they never went through the mapping.
-        canonical_columns = set(params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
-        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, params)
+        canonical_columns = set(sport_params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
+        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, sport_params)
 
     if missing_identity:
         problem = f"no column for {' or '.join(missing_identity)}"
@@ -160,7 +160,7 @@ def parse_projection_upload(upload_bytes: bytes, params: dict) -> pd.DataFrame:
 _ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
 
 
-def _recover_volumes_from_ratio_cells(df: pd.DataFrame, params: dict) -> pd.DataFrame:
+def _recover_volumes_from_ratio_cells(df: pd.DataFrame, sport_params: dict) -> pd.DataFrame:
     """Fill in a missing attempts column from the text of its percentage column.
 
     Attempt volume is load-bearing: a ratio G-score weights the percentage deviation by it,
@@ -171,7 +171,7 @@ def _recover_volumes_from_ratio_cells(df: pd.DataFrame, params: dict) -> pd.Data
     does not use them, and emitting a column no other source carries would make the blend
     drop every player that source lacks.
     """
-    for ratio_stat, ratio_info in params['ratio-statistics'].items():
+    for ratio_stat, ratio_info in sport_params['ratio-statistics'].items():
         volume_statistic = ratio_info['volume-statistic']
         if (ratio_stat not in df.columns
                 or volume_statistic in df.columns
@@ -190,7 +190,7 @@ def _parse_with_renamer(
     df_raw: pd.DataFrame
     , column_mapping: dict
     , canonical_columns: set
-    , params: dict
+    , sport_params: dict
 ) -> pd.DataFrame:
     """Rename this file's columns to canonical names, drop junk, coerce stats."""
     df = df_raw.rename(columns=column_mapping)
@@ -203,7 +203,7 @@ def _parse_with_renamer(
 
     # Before the ratio cells are reduced to their leading number below, mine them for any
     # attempts column the file does not carry separately.
-    df = _recover_volumes_from_ratio_cells(df, params)
+    df = _recover_volumes_from_ratio_cells(df, sport_params)
 
     # Sources carry non-numeric stat values: some repeat the header row inside the table
     # body (every stat cell a string), and some format ratio stats as

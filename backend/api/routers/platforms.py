@@ -19,7 +19,7 @@ from backend.api.helpers import (
 )
 from backend.api.schemas import (
     YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
-    LeaguesResponse, DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
+    LeaguesResponse, DivisionsResponse, PlatformConfigRequest, ConnectResponse, DraftStateResponse,
 )
 
 router = APIRouter()
@@ -74,7 +74,7 @@ def get_platform_divisions_route(platform: str, league_id: str):
 
 
 @router.post('/platforms/{platform}/connect', response_model=ConnectResponse)
-def connect_platform_route(platform: str, req: ConnectRequest, user_key: str = Depends(current_user_key)):
+def connect_platform_route(platform: str, req: PlatformConfigRequest, user_key: str = Depends(current_user_key)):
     integration = resolve_live_integration(platform, user_key)
     try:
         shape = integration.fetch_league_shape(req.league_id, req.division_id)
@@ -114,7 +114,7 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
     if selections.costs is None:
         remaining_cash = None
     else:
-        cash_per_team = session.current_params['cash_per_team']
+        cash_per_team = session.current_settings['cash_per_team']
         remaining_cash = {
             team: cash_per_team - sum(team_costs)
             for team, team_costs in selections.costs.items()

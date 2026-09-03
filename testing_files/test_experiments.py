@@ -354,7 +354,7 @@ def _build_session(objective, auction=False, season=None, **parameter_overrides)
     )
     if season is not None:
         request['data_source']['season'] = season
-    request['parameters'].update(parameter_overrides)
+    request['model_settings'].update(parameter_overrides)
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'session build failed: {response.text}'
     return get_session(response.json()['session_id'])
@@ -415,7 +415,7 @@ def test_punt_diversity(sessions, format_key, auction):
     for season in _SEASONS:
         session = sessions(format_key, auction, season)
         agent   = session.agent
-        categories = session.current_params['categories']
+        categories = session.current_settings['categories']
         punts    = [_classify_punts(rates) for _, rates in _anchor_rate_rows(agent)]
         distinct = len(set(punts))
         breakdown = ', '.join(f'{_punt_label(categories, punt_set)} x{count}'
@@ -441,7 +441,7 @@ def test_roto_minimal_punting(sessions, auction):
     for season in _SEASONS:
         session = sessions('Roto', auction, season)
         agent   = session.agent
-        categories = session.current_params['categories']
+        categories = session.current_settings['categories']
         rows = _anchor_rate_rows(agent)
         hard_count = sum(1 for _, rates in rows for r in rates if r < _HARD_PUNT_RATE)
         soft_count = sum(1 for _, rates in rows for r in rates if _HARD_PUNT_RATE <= r < _SOFT_PUNT_RATE)
@@ -490,7 +490,7 @@ def test_early_pick_stability(sessions, auction):
     for season in _SEASONS:
         session = sessions('EC', auction, season)
         agent   = session.agent
-        teams   = session.current_params['team_names']
+        teams   = session.current_settings['team_names']
         cash    = {t: 200.0 for t in teams} if auction else None
 
         agent.reset_draft_state()
@@ -526,7 +526,7 @@ def test_early_pick_stability(sessions, auction):
                 punt_flips[name] = crossed
         if punt_flips:
             flip_id, flip_cats = max(punt_flips.items(), key=lambda kv: max(abs(a - b) for _, b, a in kv[1]))
-            categories = session.current_params['categories']
+            categories = session.current_settings['categories']
             worst_flip = ', '.join(f'{_SHORT_CATEGORY.get(categories[i], categories[i])} {b:.0f}->{a:.0f}'
                                    for i, b, a in flip_cats)
             flip_text = f'{session.player_registry[flip_id].name}: {worst_flip}'
@@ -567,11 +567,11 @@ def test_self_play_convergence(sessions):
 
         agent._run_bootstrap_pass = recording_pass
         try:
-            agent.populate_default_h_scores(session.current_params['n_iterations'])
+            agent.populate_default_h_scores(session.current_settings['n_iterations'])
         finally:
             del agent._run_bootstrap_pass   # drop the instance shadow, restoring the class method
 
-        categories = session.current_params['categories']
+        categories = session.current_settings['categories']
         short      = [_SHORT_CATEGORY.get(category, category) for category in categories]
         # Track a FIXED set of players across passes so the counts are comparable: the top 12 of the
         # anchor subset (generic ranking), present in every pass.
@@ -602,9 +602,9 @@ def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
 
     agent        = h_session.agent
     agent.reset_draft_state()
-    n_drafters   = h_session.current_params['n_drafters']
-    n_picks      = h_session.current_params['n_picks']
-    n_iterations = h_session.current_params['n_iterations']
+    n_drafters   = h_session.current_settings['n_drafters']
+    n_picks      = h_session.current_settings['n_picks']
+    n_iterations = h_session.current_settings['n_iterations']
     teams        = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments  = {t: [] for t in teams}
     g_ranking    = _gscore_ranking(h_session)
@@ -643,7 +643,7 @@ def test_h_scoring_beats_g_field(format_key):
     for season in _SEASONS:
         # beth=0, kappa=0: the season-sim conventions (see the header notes).
         session = _build_session(_FORMATS[format_key], season=season, kappa=0.0, beth=0)
-        n_seats = _SIM_SEATS or session.current_params['n_drafters']
+        n_seats = _SIM_SEATS or session.current_settings['n_drafters']
         scores  = [100 * _draft_h_seat_in_g_field(session, seat) for seat in range(n_seats)]
         pooled.extend(scores)
         _record_row('H-scoring vs a G-score field',
@@ -669,9 +669,9 @@ def test_awareness_vs_unaware_h_field():
     n_seats = None
     for season in _SEASONS:
         reference = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0, beth=0)
-        n_drafters   = reference.current_params['n_drafters']
-        n_picks      = reference.current_params['n_picks']
-        n_iterations = reference.current_params['n_iterations']
+        n_drafters   = reference.current_settings['n_drafters']
+        n_picks      = reference.current_settings['n_picks']
+        n_iterations = reference.current_settings['n_iterations']
         n_seats      = _SIM_SEATS or n_drafters
 
         field_sessions = [reference] + [
@@ -722,7 +722,7 @@ def test_awareness_not_harmful_vs_g_field():
                                  opponent_model_confidence=0.5, beth=0)
         unaware = _build_session(_FORMATS['EC'], season=season, kappa=0.0,
                                  opponent_model_confidence=0, beth=0)
-        n_seats = _SIM_SEATS or aware.current_params['n_drafters']
+        n_seats = _SIM_SEATS or aware.current_settings['n_drafters']
         gains = []
         for seat in range(n_seats):
             gains.append(100 * (_draft_h_seat_in_g_field(aware, seat)
@@ -752,7 +752,7 @@ def test_warm_start_no_convergence_cost():
     for season in _SEASONS:
         session = _build_session(_FORMATS['EC'], season=season)
         agent   = session.agent
-        teams   = session.current_params['team_names']
+        teams   = session.current_settings['team_names']
         assignments = {t: [] for t in teams}
         assignments[teams[0]] = [agent._anchor_player_order[0]]
 
@@ -793,7 +793,7 @@ def test_multi_start_seeding_helps():
         neutral   = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0)
         neutral.agent.seed_mode = 'neutral'
         neutral.agent.reset_draft_state()
-        neutral.agent.populate_default_h_scores(neutral.current_params['n_iterations'])
+        neutral.agent.populate_default_h_scores(neutral.current_settings['n_iterations'])
 
         scan_scores    = punt_scan.agent.default_h_scores
         neutral_scores = neutral.agent.default_h_scores

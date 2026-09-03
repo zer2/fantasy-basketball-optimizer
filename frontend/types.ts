@@ -63,7 +63,7 @@ export interface Roster {
 
 // ─── API request types ────────────────────────────────────────────────────────
 
-export interface ModelParameters {
+export interface ModelSettings {
     omega: number
     gamma: number
     beth: number
@@ -111,7 +111,7 @@ export interface SessionRequest {
     platform: string
     platform_config?: { league_id: string; division_id?: string | null }   // live platforms only
     slot_counts: Record<string, number>
-    parameters: ModelParameters
+    model_settings: ModelSettings
     data_source: DataSource
     injured_players: string[]
     my_team_id?: string   // provided by seat selector in main content, not sidebar

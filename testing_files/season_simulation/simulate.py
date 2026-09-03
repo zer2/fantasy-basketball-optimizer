@@ -70,11 +70,11 @@ def _create_session(season: str, objective: str):
     # overconfident when it can't trust its own projections — but this analysis uses real historical
     # data with objectively-correct stats, so there is nothing to doubt. With beth>0 the draft-time
     # H-scores are regressed toward average (self-doubt), which is not what we want to measure here.
-    request['parameters']['beth'] = 0
+    request['model_settings']['beth'] = 0
     # Turn OFF kappa (anti-crowded-punt) for this harness only: the field here drafts by G-score and
     # does not punt, so there is no crowd to defect from and the penalty would only distort the
     # H-vs-G comparison.
-    request['parameters']['kappa'] = 0.0
+    request['model_settings']['kappa'] = 0.0
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'Session creation failed ({season}, {objective}): {response.text}'
     session_id = response.json()['session_id']
@@ -173,7 +173,7 @@ def _simulate_one_seat(
     """Run one snake draft where `hscore_seat` drafts by H-score and the rest by G-score. Returns the
     H-score drafter's final score, its roster, and its per-pick candidate tables."""
     position_config = session.agent._pos_cfg
-    n_iterations    = session.current_params['n_iterations']
+    n_iterations    = session.current_settings['n_iterations']
     team_names      = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments     = {name: [] for name in team_names}
     drafted: set[str] = set()
@@ -220,9 +220,9 @@ def simulate_season_format(season: str, format_key: str, seats: list[int], top_n
     """Simulate all requested seats for one (season, format) and return the full result record."""
     objective = SCORING_FORMATS[format_key]
     session, _ = _create_session(season, objective)
-    n_drafters   = session.current_params['n_drafters']
-    n_picks      = session.current_params['n_picks']
-    categories   = session.current_params['categories']
+    n_drafters   = session.current_settings['n_drafters']
+    n_picks      = session.current_settings['n_picks']
+    categories   = session.current_settings['categories']
     has_positions = _has_position_data(session)
     gscore_order = _gscore_ranking(session)
 

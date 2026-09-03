@@ -125,7 +125,7 @@ def _build_session_request(
         # router enforces this consistency; service-level tests must declare it themselves).
         'is_auction': cash_per_team is not None,
         'slot_counts': slot_counts,
-        'parameters': {
+        'model_settings': {
             'omega':           nba_options['omega']['default'],
             'gamma':           nba_options['gamma']['default'],
             'n_iterations':    nba_options['n_iterations']['default'],

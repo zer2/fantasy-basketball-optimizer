@@ -7,10 +7,9 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readRosterAssignments } from './season_helpers.js'
-import { getTeamNames } from '../../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import { getPlayerResultsById } from '../../app_state.js'
-import { getRegistryEntry } from '../../player_registry.js'
-import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
+import { buildPlayerOption } from '../../player_display.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
 import { highlightCandidate } from '../../table/player_table.js'
 
@@ -51,7 +50,7 @@ export function renderWaiverControls(container: HTMLElement): void {
     waiverListenerController?.abort()
     waiverListenerController = new AbortController()
 
-    const teamNames   = getTeamNames()
+    const teamNames   = getTeamIdentitiesFromSidebar()
     const assignments = readRosterAssignments()
     const nPicks      = readRequiredIntInput('ls-n-picks')
     // assignments[t] can be undefined for team names beyond nDrafters, hence the optional chain
@@ -96,12 +95,7 @@ export function renderWaiverControls(container: HTMLElement): void {
     dropWrap.append(dropLabel)
 
     // teams in fullTeams are guaranteed to have entries in assignments
-    const buildDropOptions = (team: string) => assignments[team]
-        .map(playerId => ({
-            value: String(playerId),
-            label: buildPlayerOptionLabel(playerId),
-            html:  buildFullPlayerDisplayHtml(playerId),
-        }))
+    const buildDropOptions = (team: string) => assignments[team].map(buildPlayerOption)
 
     const initialTeam    = fullTeams[0]
     const initialRoster  = assignments[initialTeam]

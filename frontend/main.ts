@@ -1,10 +1,10 @@
 // main.ts
 // Application entry point: wiring, in order. Builds the sidebar sections, registers every
 // event listener, and triggers the first backend evaluation. The widgets it places live in
-// their own modules (seat_selector.ts, account_row.ts, parameter_collection/*); the heavy
+// their own modules (seat_selector.ts, account_row.ts, setting_collection/*); the heavy
 // logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
-import { createSection, addApplyBtn, makeSidebarToggle } from './helper_functions.js'
+import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
 import { makeDebouncer } from './api/session.js'
 import { setSportConfig } from './app_state.js'
 import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings } from './api/draft_and_auction_session.js'
@@ -23,15 +23,15 @@ import { renderAccountRow } from './account_row.js'
 import {
     renderLeagueSettings, getLeagueSettings, isPlatformConnected,
     getModeSelectElement, getPlatformSelectElement,
-} from './parameter_collection/league_settings.js'
+} from './setting_collection/league_settings.js'
 import { TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories,
-} from './parameter_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsParams, waitForSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
-import { renderModelParameters, refreshOpponentConfidenceControl, getModelParameters } from './parameter_collection/model_parameters.js'
-import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
+} from './setting_collection/format_and_categories.js'
+import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, markUploadedSourcesExpired } from './setting_collection/player_stats.js'
+import { renderModelSettings, refreshOpponentConfidenceControl, getModelSettings } from './setting_collection/model_parameters.js'
+import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
 // depending on the current mode selector value.
@@ -107,32 +107,23 @@ function handleSeatChanged(): void {
 }
 renderSeatSelector().addEventListener('change', handleSeatChanged)
 
-// Mode change: rebuild table and sync session.
-// Registered before the applyLayout listener so buildTableHeader fires first, ensuring
-// hscoretable.style.width is correct when applyLayout reads it.
-// is_auction is a session parameter (its league type): the backend requires remaining_cash
-// on every evaluate exactly when it is set. Entering Auction Mode also patches cash_per_team
-// so the backend can compute dollar values.
+// Mode change, step 1: patch the session's league type. is_auction is a session parameter:
+// the backend requires remaining_cash on every evaluate exactly when it is set, and entering
+// Auction Mode also patches cash_per_team so the backend can compute dollar values.
 const applyModeChange = makeApplyChain('Mode change')
-getModeSelectElement().addEventListener('change', () => {
+function patchSessionForModeChange(): void {
     const { mode, cash_per_team } = getLeagueSettings()
     const patch = mode === 'Auction Mode'
         ? { is_auction: true, league: { cash_per_team } }
         : { is_auction: false }
     // Season Mode: the table is hidden, so there is no rebuild or evaluate — but the session's
     // league type must be patched BEFORE the season layout renders, because rendering fires
-    // season evaluates (waiver, roster inspection) that omit remaining_cash. The standalone
-    // applyLayout listener below skips Season Mode for the same reason: layout comes after
-    // the patch, not concurrently with it.
+    // season evaluates (waiver, roster inspection) that omit remaining_cash. Step 2 below
+    // skips Season Mode for the same reason: its layout comes after the patch, not
+    // concurrently with it.
     const entersSeasonMode = mode === 'Season Mode'
     applyModeChange(4, patch, { rebuildTableHeader: !entersSeasonMode, evaluate: !entersSeasonMode })
-})
-// Instant layout switch for draft/auction (their evaluates are sequenced after the patch by
-// the handler above). Season Mode's layout is deferred until its session patch lands — see above.
-getModeSelectElement().addEventListener('change', () => {
-    if (getLeagueSettings().mode !== 'Season Mode') applyLayout()
-})
-getPlatformSelectElement().addEventListener('change', applyLayout)
+}
 
 // Season Mode + live platform: pull the platform's rosters into the grid when the user
 // switches into that state (via either the mode or the platform dropdown). The poll is
@@ -148,8 +139,14 @@ function refreshSeasonRostersIfLive(): void {
         clearLivePlatformRosters()
     }
 }
-getModeSelectElement().addEventListener('change', refreshSeasonRostersIfLive)
-getPlatformSelectElement().addEventListener('change', refreshSeasonRostersIfLive)
+// One listener per select, with the steps in explicit order — the sequencing used to be
+// three separate listeners relying on registration order. Step 1's buildTableHeader (inside
+// the apply chain) must precede step 2's applyLayout, which reads hscoretable.style.width.
+getModeSelectElement().addEventListener('change', () => {
+    patchSessionForModeChange()                                     // 1. patch the session's league type
+    if (getLeagueSettings().mode !== 'Season Mode') applyLayout()   // 2. instant layout (Season defers to the patch)
+    refreshSeasonRostersIfLive()                                    // 3. season live-roster sync
+})
 
 // On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
 // for the new data source. Mode switches don't change the data source, so they're handled by
@@ -171,7 +168,11 @@ function syncForPlatformSwitch(): void {
             .catch(err => console.error('Platform-switch evaluate failed:', err))
     }
 }
-getPlatformSelectElement().addEventListener('change', syncForPlatformSwitch)
+getPlatformSelectElement().addEventListener('change', () => {
+    applyLayout()                 // 1. swap the layout for the new platform
+    refreshSeasonRostersIfLive()  // 2. season live-roster sync
+    syncForPlatformSwitch()       // 3. seat options + the right evaluation for the new source
+})
 
 // Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
 const applyLeagueSettings = makeApplyChain('League settings update')
@@ -212,9 +213,9 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
     // Switching the data source to Historical starts an async seasons fetch and fires this
     // change handler in the same breath, so the ps-season dropdown may not exist yet. Wait
     // for it (already resolved in every other case) rather than read a season that is not
-    // there — getPlayerStatsParams rightly refuses a historical source without one.
+    // there — getPlayerStatsSettings rightly refuses a historical source without one.
     await waitForSeasons()
-    const { data_source, injured_players } = getPlayerStatsParams()
+    const { data_source, injured_players } = getPlayerStatsSettings()
     // The boards reset when the player pool's identity changes (data source, season,
     // uploads, injured list) so stale names are never sent to the backend. A blend-weight
     // change re-weights the same pool, so in-progress draft/auction boards survive it.
@@ -279,12 +280,12 @@ formatSection.addEventListener('change', () => {
 // ─── 4. Model Parameters ──────────────────────────────────────────────────────
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
-renderModelParameters(modelSection)
+renderModelSettings(modelSection)
 // The format section is built first, so its current value decides the control's initial visibility.
 refreshOpponentConfidenceControl(getScoringFormat())
-const applyModelParameters = makeApplyChain('Model parameters apply')
+const applyModelSettings = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
-    applyModelParameters(3, { parameters: getModelParameters() })
+    applyModelSettings(3, { model_settings: getModelSettings() })
 })
 
 // ─── 5. Position Parameters ───────────────────────────────────────────────────
@@ -314,10 +315,10 @@ themeInput.addEventListener('change', () => {
 
 // ─── Sidebar toggle ───────────────────────────────────────────────────────────
 
-const SIDEBAR_COLLAPSE_BREAKPOINT = 768  // px; viewports narrower than this default to a collapsed sidebar
 const sidebarToggle = document.getElementById('sidebar-toggle') as HTMLButtonElement
 const appLayout     = document.getElementById('app-layout') as HTMLElement
-const defaultCollapsed = window.innerWidth < SIDEBAR_COLLAPSE_BREAKPOINT
+// Viewports below the shared mobile breakpoint default to a collapsed sidebar.
+const defaultCollapsed = window.innerWidth < MOBILE_BREAKPOINT_PX
 if (pref('sidebar_collapsed', defaultCollapsed)) appLayout.classList.add('sidebar-collapsed')
 sidebarToggle.addEventListener('click', () => {
     const collapsed = appLayout.classList.toggle('sidebar-collapsed')

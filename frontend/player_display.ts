@@ -160,6 +160,16 @@ function buildPositionsHtml(positions: string[]): string {
 /** Plain-text "Name (POS)" label for select options: the closed trigger and multiselect
  *  chips are text-only, and the label also drives filtering — so positions ride in it
  *  (typing "PG" matches point guards). The rich dropdown row comes from the html field. */
+/** A rich select option for a player: id as the value, plain name as the filterable
+ *  label, and the full display as the option HTML (the lazy-headshot contract). */
+export function buildPlayerOption(playerId: number): { value: string; label: string; html: string } {
+    return {
+        value: String(playerId),
+        label: buildPlayerOptionLabel(playerId),
+        html:  buildFullPlayerDisplayHtml(playerId),
+    }
+}
+
 export function buildPlayerOptionLabel(playerId: number): string {
     const entry = getRegistryEntry(playerId)
     if (entry.positions.length === 0) return entry.name

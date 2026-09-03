@@ -35,7 +35,7 @@ def generate_snake_draft_rosters() -> dict[str, list[str]]:
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session_id   = response.json()['session_id']
     session      = get_session(session_id)
-    n_iterations = session.current_params['n_iterations']
+    n_iterations = session.current_settings['n_iterations']
 
     team_names    = [f'Drafter {i + 1}' for i in range(N_DRAFTERS)]
     assignments   = {name: [] for name in team_names}

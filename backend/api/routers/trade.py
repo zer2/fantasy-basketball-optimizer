@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.post('/sessions/{session_id}/trade/analyze', response_model=TradeAnalyzeResponse,
              dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
-def trade_analyze_route(req: TradeAnalyzeRequest, session: Session = Depends(require_session)):
+def analyze_trade_route(req: TradeAnalyzeRequest, session: Session = Depends(require_session)):
 
     # Trade scoring runs get_h_scores, which mutates shared agent state; hold the per-session lock so
     # it cannot overlap an evaluate or another trade call on the same session (see Session.lock).
@@ -37,7 +37,7 @@ def trade_analyze_route(req: TradeAnalyzeRequest, session: Session = Depends(req
 
 @router.post('/sessions/{session_id}/trade/suggest', response_model=TradeSuggestResponse,
              dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
-def trade_suggest_route(req: TradeSuggestRequest, session: Session = Depends(require_session)):
+def suggest_trades_route(req: TradeSuggestRequest, session: Session = Depends(require_session)):
 
     try:
         with session.lock:

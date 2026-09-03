@@ -1,5 +1,5 @@
 // helper_functions.ts
-// Shared UI building blocks used across sidebar and parameter_collection modules.
+// Shared UI building blocks used across sidebar and setting_collection modules.
 // Table-specific helpers (ExpandView and friends) live in table/expand_view.ts.
 
 import { pref, savePref } from './preferences.js'
@@ -10,7 +10,30 @@ import { pref, savePref } from './preferences.js'
 // where rendering code (e.g. inline column widths, short vs full labels) has
 // to make the same mobile/desktop choice in JS.
 
-const MOBILE_BREAKPOINT_PX = 768
+export const MOBILE_BREAKPOINT_PX = 768
+
+/** Builds a weight slider + its value display (the projection blends and the Head to Head objective dial). */
+export function makeWeightSlider(
+    id: string
+    , initialWeight: number
+): { slider: HTMLInputElement; valueDisplay: HTMLSpanElement } {
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    slider.id = id
+    slider.min = '0'
+    slider.max = '1'
+    slider.step = '0.05'
+    slider.value = String(initialWeight)
+
+    const valueDisplay = document.createElement('span')
+    valueDisplay.className = 'slider-value'
+    valueDisplay.textContent = initialWeight.toFixed(2)
+
+    slider.addEventListener('input', () => {
+        valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
+    })
+    return { slider, valueDisplay }
+}
 
 export function isMobileViewport(): boolean {
     return window.innerWidth <= MOBILE_BREAKPOINT_PX

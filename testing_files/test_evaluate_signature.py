@@ -127,7 +127,7 @@ def warmed_session(request):
         objective=objective, categories=categories, tiebreaker_category=tiebreaker))
     assert response.status_code == 201, f'Session creation failed ({label}): {response.text}'
     session    = get_session(response.json()['session_id'])
-    n_drafters = session.current_params['n_drafters']
+    n_drafters = session.current_settings['n_drafters']
     return session, label, n_drafters
 
 

@@ -26,13 +26,13 @@ def rank_candidates_route(req: EvaluateRequest, response: Response,
     # two rather than silently producing a draft-style result for an auction (or vice versa).
     # is_auction is patched whenever the user switches modes; a cash_per_team value left over
     # from an earlier auction lingers harmlessly — it is only consulted on auction sessions.
-    is_auction_league = bool(session.current_params.get('is_auction'))
+    is_auction_league = bool(session.current_settings.get('is_auction'))
     if is_auction_league != (req.remaining_cash is not None):
         raise HTTPException(
             status_code=400,
             detail='remaining_cash is required for auction leagues and must be omitted for draft leagues.',
         )
-    if is_auction_league and session.current_params.get('cash_per_team') is None:
+    if is_auction_league and session.current_settings.get('cash_per_team') is None:
         raise HTTPException(
             status_code=400,
             detail='cash_per_team must be set on the session for auction evaluates.',

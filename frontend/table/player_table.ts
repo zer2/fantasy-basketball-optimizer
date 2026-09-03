@@ -17,11 +17,14 @@
 // first): resetTable() clears it, addBatch() merges a sorted batch into `candidateRows` (data only), and
 // renderWindow() syncs the DOM. buildTable() is the single-shot entry point (auction).
 
-import { stat_styler_primary, stat_styler_secondary, H_MULTIPLIER } from '../styles/styler_functions.js'
+import {
+    stat_styler_primary, stat_styler_secondary, H_MULTIPLIER,
+    convertWinRateToRotoPoints, computeRotoMiddle,
+} from '../styles/styler_functions.js'
 import { buildExpandPanel } from './expand_view.js'
 import { PlayerResult } from '../types.js'
-import { getScoringFormat, getSelectedCategories } from '../parameter_collection/format_and_categories.js'
-import { getLeagueSettings } from '../parameter_collection/league_settings.js'
+import { getScoringFormat, getSelectedCategories } from '../setting_collection/format_and_categories.js'
+import { getLeagueSettings, getMode } from '../setting_collection/league_settings.js'
 import { getShortCategoryNames } from '../app_state.js'
 import { isMobileViewport } from '../helper_functions.js'
 import { buildFullPlayerDisplayHtml } from '../player_display.js'
@@ -39,7 +42,7 @@ const SCORE_COL_W_REM  = 1.5
 const CAT_COL_W_REM    = 3      // desired minimum width per category column
 
 function computeContentMinWidth(): string {
-    const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
+    const isAuction  = getMode() === 'Auction Mode'
     const nScoreCols = isAuction ? 4 : 1
     const categories = getSelectedCategories()
     return (PLAYER_COL_W_REM + nScoreCols * SCORE_COL_W_REM + categories.length * CAT_COL_W_REM) + 'rem'
@@ -121,7 +124,7 @@ export function showTableMessage(message: string): void {
 export function buildTableHeader(): void {
 
     const categories = getSelectedCategories()
-    const isAuction  = (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode'
+    const isAuction  = getMode() === 'Auction Mode'
 
     const widthContainer = document.getElementById('panel-content-width-container')!
     // The min-width acts as a desktop floor so the candidate table doesn't get
@@ -218,7 +221,7 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
     // Category win rate cells
     for (const value of player.win_rates) {
         if (ctx.rotoData) {
-            const rotoValue = 1 + (value / 100) * (ctx.rotoData.nDrafters - 1)
+            const rotoValue = convertWinRateToRotoPoints(value, ctx.rotoData.nDrafters)
             html += `<td class='categoricalRotoHscore' style='${stat_styler_primary(rotoValue, H_MULTIPLIER * (ctx.rotoData.nDrafters - 1), ctx.rotoData.rotoMiddle)}'>${rotoValue.toFixed(ctx.decimals)}</td>`
         } else {
             html += `<td class='categoricalhscore' style='${stat_styler_primary(value, H_MULTIPLIER, 50)}'>${value.toFixed(ctx.decimals)}</td>`
@@ -450,14 +453,14 @@ export function resetTable(): void {
     const isRoto = getScoringFormat() === 'Rotisserie'
     renderCtx = {
         categories: getSelectedCategories(),
-        isAuction:  (document.getElementById('ls-mode') as HTMLInputElement).value === 'Auction Mode',
+        isAuction:  getMode() === 'Auction Mode',
         isRoto,
         // Mobile shows integer-rounded values so columns stay narrow ("47" vs "47.5");
         // desktop keeps 1-decimal precision. H-Score always keeps 1 decimal (see buildRowPairHtml).
         decimals:   isMobileViewport() ? 0 : 1,
         rotoData:   isRoto
             ? (() => { const nDrafters = getLeagueSettings().n_drafters
-                       return { nDrafters, rotoMiddle: (nDrafters - 1) / 2 + 1 } })()
+                       return { nDrafters, rotoMiddle: computeRotoMiddle(nDrafters) } })()
             : null,
     }
     columnCount = 1 + (renderCtx.isAuction ? 4 : 1) + renderCtx.categories.length

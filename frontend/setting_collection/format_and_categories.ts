@@ -1,11 +1,11 @@
 // Collects: scoring_format, categories
-// Mirrors format_popover() in src/parameter_collection/format.py
+// Mirrors format_popover() in src/setting_collection/format.py
 //
 // Available categories and defaults are loaded from the backend config
 // (parameters.yaml) via getSportConfig(). Throws if the config is not loaded.
 
 import { makeCustomSelect } from '../custom_select.js'
-import { makeLabel, renderMultiselect } from '../helper_functions.js'
+import { makeLabel, makeWeightSlider, renderMultiselect } from '../helper_functions.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
@@ -195,6 +195,15 @@ function makeTiebreakerRow(): HTMLElement {
     return row
 }
 
+/** Whether a tiebreaker can currently apply: majority scoring with an even category count.
+ *  The row's visibility AND the value sent to the backend both derive from this one
+ *  predicate, so the request payload can never depend on how the row happens to be hidden. */
+function tiebreakerCanApply(): boolean {
+    return getScoringFormat() !== ROTISSERIE
+        && getSelectedCategories().length % 2 === 0
+        && (getMostCategoriesWeight() ?? 0) > 0
+}
+
 /** Shows the tiebreaker only where it can bite — majority scoring, even category count — and
  *  keeps its options in step with the categories in play. */
 function refreshTiebreakerControl(): void {
@@ -202,9 +211,7 @@ function refreshTiebreakerControl(): void {
     if (row === null || tiebreakerSelect === null) return
 
     const categories = getSelectedCategories()
-    const applies = getScoringFormat() !== ROTISSERIE
-        && categories.length % 2 === 0
-        && (getMostCategoriesWeight() ?? 0) > 0
+    const applies = tiebreakerCanApply()
     row.style.display = applies ? '' : 'none'
     if (!applies) return
 
@@ -219,8 +226,7 @@ function refreshTiebreakerControl(): void {
 /** The category that counts twice, or null when no tie can arise (Rotisserie, an odd number of
  *  categories, or a purely per-category objective) — the backend rejects a value it would ignore. */
 export function getTiebreakerCategory(): string | null {
-    const row = document.getElementById('fc-tiebreaker-row')
-    if (row === null || row.style.display === 'none' || tiebreakerSelect === null) return null
+    if (tiebreakerSelect === null || !tiebreakerCanApply()) return null
     const selected = tiebreakerSelect.getValue()
     return selected === NO_TIEBREAKER ? null : selected
 }
@@ -264,21 +270,7 @@ function makeMostCategoriesWeightRow(initialWeight: number): HTMLElement {
     const sliderRow = document.createElement('div')
     sliderRow.className = 'sidebar-slider-row'
 
-    const slider = document.createElement('input')
-    slider.type  = 'range'
-    slider.id    = 'fc-most-categories-weight'
-    slider.min   = '0'
-    slider.max   = '1'
-    slider.step  = '0.05'
-    slider.value = String(initialWeight)
-
-    const valueDisplay = document.createElement('span')
-    valueDisplay.className   = 'slider-value'
-    valueDisplay.textContent = initialWeight.toFixed(2)
-
-    slider.addEventListener('input', () => {
-        valueDisplay.textContent = parseFloat(slider.value).toFixed(2)
-    })
+    const { slider, valueDisplay } = makeWeightSlider('fc-most-categories-weight', initialWeight)
     slider.addEventListener('change', () => savePref('most_categories_weight', parseFloat(slider.value)))
 
     sliderRow.append(slider, valueDisplay)

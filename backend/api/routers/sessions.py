@@ -17,7 +17,7 @@ from backend.parameters import load_all_params
 from backend.api.helpers import fail, require_session, resolve_platform_config
 from backend.state.session import Session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_agent import clear_v0_cache, InsufficientPlayerPoolError
+from backend.services.build_agent import clear_v0_cache, derive_effective_objective, InsufficientPlayerPoolError
 from backend.services.projection_parsing import parse_projection_upload
 from backend.state.upload_store import get_upload
 from backend.api.schemas import (
@@ -30,10 +30,10 @@ router = APIRouter()
 
 # ── Request/response mapping helpers (transport-tier: request DTO <-> plain dicts) ──────
 
-def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
-    """Flatten a SessionRequest into the flat current_params dict."""
+def _build_current_settings(req: SessionRequest, all_params: dict) -> dict:
+    """Flatten a SessionRequest into the flat current_settings dict."""
     sport      = req.league.sport
-    p          = req.parameters
+    p          = req.model_settings
     categories = req.league.categories or all_params[sport]['default-categories']
     n          = req.league.n_drafters
 
@@ -73,12 +73,12 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 
 
 def _build_patch(req: PatchRequest) -> dict:
-    """Assemble the current_params patch from the non-None pieces of a PatchRequest."""
+    """Assemble the current_settings patch from the non-None pieces of a PatchRequest."""
     patch: dict = {}
     if req.is_auction is not None:
         patch['is_auction'] = req.is_auction
-    if req.parameters is not None:
-        patch.update(req.parameters.model_dump())
+    if req.model_settings is not None:
+        patch.update(req.model_settings.model_dump())
     if req.league is not None:
         for key, val in req.league.model_dump().items():
             if val is not None:
@@ -104,31 +104,33 @@ def _build_patch(req: PatchRequest) -> dict:
     return patch
 
 
+def _require_upload(data_id: str) -> dict:
+    """The stored upload for data_id, or a 404 when it is missing or TTL-expired."""
+    entry = get_upload(data_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
+    return entry
+
+
 def _resolve_csv(custom_data_ids: Optional[list[str]]) -> Optional[bytes]:
     """Return csv_bytes for the first custom data_id ('csv' source; format auto-detected later)."""
     for data_id in custom_data_ids or []:
-        entry = get_upload(data_id)
-        if entry is None:
-            raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        return entry['bytes']
+        return _require_upload(data_id)['bytes']
     return None
 
 
-def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) -> dict:
+def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], sport_params: dict) -> dict:
     """Return {data_id: DataFrame} for all custom data_ids ('projections' source). The data_id
     is the upload's identity throughout the blend — it keys the blend weights too."""
     result = {}
     for data_id in custom_data_ids or []:
-        entry = get_upload(data_id)
-        if entry is None:
-            raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        result[data_id] = parse_projection_upload(entry['bytes'], params)
+        result[data_id] = parse_projection_upload(_require_upload(data_id)['bytes'], sport_params)
     return result
 
 
 def _serialize_g_scores(session) -> list[PlayerGScore]:
     """Serialize the session's G-scores DataFrame into a list of PlayerGScore objects."""
-    categories = session.current_params['categories']
+    categories, _ = derive_effective_objective(session)
     g_scores_df = session.agent.info['G-scores']
     return [
         PlayerGScore(
@@ -163,24 +165,24 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     if req.league.sport not in all_params:
         raise HTTPException(status_code=400, detail=f'Unknown sport: {req.league.sport!r}')
 
-    params = all_params[req.league.sport]
+    sport_params = all_params[req.league.sport]
     source_type = req.data_source.type
     if source_type == 'csv':
         csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         uploaded_dfs = None
     elif source_type == 'projections':
         csv_bytes = None
-        uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
+        uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, sport_params)
     else:
         csv_bytes, uploaded_dfs = None, None
 
     # Resolve any live-platform connection up front so a bad league fails before the pipeline.
     platform_config = resolve_platform_config(req.platform, req.platform_config, user_key)
-    current_params = _build_current_params(req, all_params)
+    current_settings = _build_current_settings(req, all_params)
 
     try:
         session = build_session(
-            current_params  = current_params,
+            current_settings  = current_settings,
             platform_config = platform_config,
             csv_bytes       = csv_bytes,
             uploaded_dfs    = uploaded_dfs,
@@ -193,7 +195,7 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     return SessionResponse(
         session_id=session.id,
         n_players_loaded=len(session.v0_clean),
-        categories=list(session.current_params['categories']),
+        categories=derive_effective_objective(session)[0],
         players=_serialize_player_registry(session),
         g_scores=_serialize_g_scores(session),
         expires_at=(datetime.now(timezone.utc) + timedelta(seconds=4 * 3600)).strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -208,11 +210,11 @@ def patch_session_route(req: PatchRequest, session: Session = Depends(require_se
     csv_bytes: Optional[bytes] = None
     uploaded_dfs: Optional[dict] = None
     if req.data_source is not None and req.data_source.custom_data_ids is not None:
-        params = load_all_params()[session.current_params['sport']]
+        sport_params = load_all_params()[session.current_settings['sport']]
         if req.data_source.type == 'csv':
             csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         elif req.data_source.type == 'projections':
-            uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
+            uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, sport_params)
 
     # Connecting/switching a live platform resolves up front so a bad league fails fast.
     platform_config = (

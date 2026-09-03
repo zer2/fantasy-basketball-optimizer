@@ -42,7 +42,7 @@ def _build_empty_board_agent():
     response = client.post('/sessions', json=_build_session_request(objective=OBJECTIVE))
     assert response.status_code == 201, f'Session creation failed: {response.text}'
     session    = get_session(response.json()['session_id'])
-    n_drafters = session.current_params['n_drafters']
+    n_drafters = session.current_settings['n_drafters']
     return session.agent, {f'Team {i + 1}': [] for i in range(n_drafters)}, 'Team 1'
 
 

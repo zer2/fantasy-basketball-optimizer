@@ -5,18 +5,18 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { isMobileViewport, readRequiredIntInput, makeBoardToggleHeaderCell, buildBoardTableShell } from '../helper_functions.js'
 import { getPlayerResults, getSessionPhase, getCurrentSeat, setCurrentSeat } from '../app_state.js'
-import { getRegistryEntry } from '../player_registry.js'
-import { makeMinimalPlayerDisplay, buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../player_display.js'
+import { buildPlayerOption, makeMinimalPlayerDisplay } from '../player_display.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_session.js'
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethod } from './drafter_methods.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
-import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
-import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
+import { getTeamLabel, defaultTeamLabel, makeTeamLabelInput } from './team_labels.js'
+import { setSeatSelectorVisible } from '../seat_selector.js'
+import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_settings.js'
 import {
     DraftConfig,
-    getPickRow, getPickDrafter, getDrafted, getTeamNames, getNDrafters, getNPicks, getConfigKey,
+    getPickRow, getPickDrafter, getDrafted, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getConfigKey,
     resetDraftState, applyDraftConfig,
     recordDraftPick, clearDraftPick, clearAllDraftPicks,
     advanceDraftPick, goBackDraftPick,
@@ -155,13 +155,13 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
     // could restart it — the "autopiloting…" loop). Autopilot refreshes the board itself when it finishes.
     _draftDebouncer.cancel()
     const userSeat = getCurrentSeat()
-    ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = 'hidden'
+    setSeatSelectorVisible(false)
     try {
         while (getPickRow() < getNPicks()) {
             if (getDrafterMethod(getPickDrafter()) === 'Manual input') break
 
             clearFullTeamResult()
-            setCurrentSeat(getTeamNames()[getPickDrafter()] ?? `Team ${getPickDrafter() + 1}`)
+            setCurrentSeat(getTeamIdentitiesFromBoard()[getPickDrafter()] ?? defaultTeamLabel(getPickDrafter()))
             // Autopilot only needs the top pick: score just the first batch and render nothing. Use the
             // value this evaluate returns — not a shared global — so a competing evaluate that aborts
             // this one yields null (stop cleanly) instead of a stale pick from a previous drafter.
@@ -176,7 +176,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
         setCurrentSeat(userSeat)
         _autopilotRunning = false
         setAutopilotOff()
-        ;(document.getElementById('seat-selector-container') as HTMLElement).style.visibility = ''
+        setSeatSelectorVisible(true)
     }
     // Re-render now that _autopilotRunning is false so the pick control switches back to the normal
     // Manual input state, and refresh the available players / full-team result. Suppress auto-start for
@@ -233,11 +233,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     if (!isDone && !isAutopilot) {
         const sel = makeCustomSelect(
             'draft-pick-select',
-            available.map(playerId => ({
-                value: String(playerId),
-                label: buildPlayerOptionLabel(playerId),
-                html:  buildFullPlayerDisplayHtml(playerId),
-            })),
+            available.map(buildPlayerOption),
             undefined,
             undefined,
             pickListenerController?.signal,
@@ -456,7 +452,7 @@ function readDraftConfig(): DraftConfig {
     const nPicks             = readRequiredIntInput('ls-n-picks')
     const dataSource         = (document.getElementById('ps-data-type') as HTMLInputElement).value
     const thirdRoundReversal = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
-    const teamNames = getSidebarTeamNames()
+    const teamNames = getTeamIdentitiesFromSidebar()
     // teamNames are excluded from the key: identities are constant "Team N" (so they never
     // trigger a reset), and editable display labels are presentation-only — a rename must not
     // reset the draft or rebuild the header. n_drafters covers any change in team count.

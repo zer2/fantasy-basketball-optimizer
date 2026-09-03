@@ -245,29 +245,3 @@ def check_team_eligibility(team: list, position_config: PositionConfig) -> bool:
     except ValueError:
         return False
 
-
-def check_all_player_eligibility(
-    players: list
-    , team_so_far: list
-    , position_config: PositionConfig
-) -> list[bool]:
-    position_numbers = position_config.position_numbers
-    n_total_picks    = sum(position_numbers.values())
-    n_base_positions = len(position_config.position_structure['base_list'])
-
-    position_rewards    = np.array([[0] * n_base_positions])
-    n_remaining_players = n_total_picks - 1 - len(team_so_far)
-    reward_vector       = get_future_player_rows(position_rewards, position_config)[0]
-    team_so_far_array   = (get_player_rows(team_so_far, position_config)
-                           if len(team_so_far) > 0
-                           else np.empty((0, n_total_picks)))
-    player_rows = get_player_rows(players, position_config)
-
-    return [
-        all(
-            _optimize_positions_for_prospective_player(
-                row, reward_vector, team_so_far_array, n_remaining_players
-            ) >= 0
-        )
-        for row in player_rows
-    ]

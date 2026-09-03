@@ -10,7 +10,7 @@ import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { getAuctionState }     from './data_entry/auction_state.js'
 import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
-import { getLeagueSettings, isPlatformConnected } from './parameter_collection/league_settings.js'
+import { getLeagueSettings, isPlatformConnected } from './setting_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import { getFullTeamResult, refreshLiveAnalysis } from './api/draft_and_auction_session.js'
 import { setIndicatorState, claimDisplay } from './api/session.js'
@@ -180,7 +180,6 @@ function showSeasonLayout(): void {
     // Clear sub-header so the tab bar from draft/auction mode doesn't bleed in
     const rightSubHeader = document.getElementById('right-sub-header')!
     rightSubHeader.innerHTML = ''
-    document.getElementById('tab-row')!.style.maxWidth = ''
 
     show('season-nav')
 

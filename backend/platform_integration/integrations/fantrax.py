@@ -19,6 +19,7 @@ from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
 from backend.platform_integration.helpers import deduplicate_team_names
+from backend.player_identity import RP_PLAYER_ID
 
 
 # Standings tabs that are not divisions.
@@ -126,7 +127,6 @@ class FantraxIntegration(PlatformIntegration):
         and logged — a whole-roster fallback means the mapping is broken, not the roster).
         In Season Mode, players flagged injured-reserve are moved to injured_players
         instead of the roster."""
-        from backend.player_identity import RP_PLAYER_ID
 
         api = self._make_api(config.league_id)
         exclude_injured = mode == 'Season Mode'
