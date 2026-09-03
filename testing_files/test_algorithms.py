@@ -108,7 +108,7 @@ def _build_h_agent(
         , most_categories_weight = most_categories_weight
         , tiebreaker_category = tiebreaker_category
         , sport        = 'NBA'
-        , params       = sport_params
+        , sport_params = sport_params
         , slot_counts  = slot_counts
         , beth         = opts['beth']['default']
     )

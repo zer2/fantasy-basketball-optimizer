@@ -119,12 +119,12 @@ def _resolve_csv(custom_data_ids: Optional[list[str]]) -> Optional[bytes]:
     return None
 
 
-def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) -> dict:
+def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], sport_params: dict) -> dict:
     """Return {data_id: DataFrame} for all custom data_ids ('projections' source). The data_id
     is the upload's identity throughout the blend — it keys the blend weights too."""
     result = {}
     for data_id in custom_data_ids or []:
-        result[data_id] = parse_projection_upload(_require_upload(data_id)['bytes'], params)
+        result[data_id] = parse_projection_upload(_require_upload(data_id)['bytes'], sport_params)
     return result
 
 
@@ -165,14 +165,14 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     if req.league.sport not in all_params:
         raise HTTPException(status_code=400, detail=f'Unknown sport: {req.league.sport!r}')
 
-    params = all_params[req.league.sport]
+    sport_params = all_params[req.league.sport]
     source_type = req.data_source.type
     if source_type == 'csv':
         csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         uploaded_dfs = None
     elif source_type == 'projections':
         csv_bytes = None
-        uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
+        uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, sport_params)
     else:
         csv_bytes, uploaded_dfs = None, None
 
@@ -210,11 +210,11 @@ def patch_session_route(req: PatchRequest, session: Session = Depends(require_se
     csv_bytes: Optional[bytes] = None
     uploaded_dfs: Optional[dict] = None
     if req.data_source is not None and req.data_source.custom_data_ids is not None:
-        params = load_all_params()[session.current_params['sport']]
+        sport_params = load_all_params()[session.current_params['sport']]
         if req.data_source.type == 'csv':
             csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         elif req.data_source.type == 'projections':
-            uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, params)
+            uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, sport_params)
 
     # Connecting/switching a live platform resolves up front so a bad league fails fast.
     platform_config = (

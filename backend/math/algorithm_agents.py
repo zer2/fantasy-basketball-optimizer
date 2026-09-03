@@ -217,7 +217,7 @@ class HAgent:
                  , tiebreaker_category: Optional[str]
                  # ── explicit context (replaces get_*() calls) ──
                  , sport: str
-                 , params: dict
+                 , sport_params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
                  , kappa: float = 0.3
@@ -225,7 +225,6 @@ class HAgent:
                  , opponent_model_confidence: float = 0.5
                  # ── original optional args ──
                  , beth: float = 0
-                 , collect_info: bool = False
                  ):
 
         self.omega         = omega
@@ -233,7 +232,6 @@ class HAgent:
         self.n_picks       = n_picks
         self.dynamic       = dynamic
         self.n_drafters    = n_drafters
-        self.collect_info  = collect_info
         self.scoring_format = scoring_format
 
         # Head to Head is one format with a dial: 0 scores every category on its own (Each
@@ -268,7 +266,6 @@ class HAgent:
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
-        self.params = params
 
         # Retain the processed player data so callers read G-scores / positions off the agent
         # (it is explanation-oriented — see _build_candidates). Consumers use agent.info directly.
@@ -287,7 +284,7 @@ class HAgent:
         self._populate_pass_scores = None
 
         # Build position config (replaces all get_position_*() calls)
-        self.position_config: PositionConfig = build_position_config(params, slot_counts)
+        self.position_config: PositionConfig = build_position_config(sport_params, slot_counts)
 
         # ── info dict unpacking ────────────────────────────────────────────────
         self.positions = info['Positions']
@@ -371,11 +368,11 @@ class HAgent:
             else:
                 rho = pd.read_csv(_DATA_DIR / 'baseball_correlations.csv').set_index('Category')
 
-            counting_stats_all = params['counting-statistics']
+            counting_stats_all = sport_params['counting-statistics']
             rho.loc[counting_stats_all, counting_stats_all] = np.clip(
                 rho.loc[counting_stats_all, counting_stats_all] + aleph, -1, 1
             )
-            negative_stats = params['negative-statistics']
+            negative_stats = sport_params['negative-statistics']
             rho.loc[:, negative_stats] = -rho.loc[:, negative_stats]
             rho.loc[negative_stats, :] = -rho.loc[negative_stats, :]
             rho.loc[negative_stats, negative_stats] = 1
@@ -484,9 +481,6 @@ class HAgent:
         self.turnover_inverted_v = turnover_inverted_v / turnover_inverted_v.sum()
 
         self.category_weights  = None
-        self.utility_shares    = None
-        self.forward_shares    = None
-        self.guard_shares      = None
 
         # ── position structure (replaces get_position_structure()) ────────────
         self.position_structure = self.position_config.position_structure
@@ -517,7 +511,7 @@ class HAgent:
         # other branches carry a one-line pointer.
         if sport == 'MLB':
             cats = list(x_scores.columns)
-            pitcher_stats = params.get('pitcher_stats', [])
+            pitcher_stats = sport_params.get('pitcher_stats', [])
             self.pitching_stat_indices = [i for i, c in enumerate(cats) if c in pitcher_stats]
             self.batting_stat_indices  = [i for i in range(len(cats)) if i not in self.pitching_stat_indices]
 
@@ -543,7 +537,6 @@ class HAgent:
             self.pitching_preference_vector = pitching_preference_vector
             self.pitching_preference_damper = 1
 
-        self.all_res_list = []
         self.players      = []
 
         transformation_matrix = (
@@ -2180,7 +2173,6 @@ class HAgent:
 
     def clear_initial_weights(self):
         self.initial_category_weights = None
-        self.initial_position_shares  = None
         return self
 
     def reset_draft_state(self):

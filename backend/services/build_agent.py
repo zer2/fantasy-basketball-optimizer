@@ -224,7 +224,7 @@ def load_player_pool(
                 )
             v0_with_names = combine_projections(
                 blend_weights = blend_weights,
-                params        = sport_params,
+                sport_params  = sport_params,
                 uploaded_dfs  = uploaded_dfs,
             )
 
@@ -304,7 +304,7 @@ def build_scoring_info(session: Session) -> None:
         scoring_format    = scoring_format,
         n_drafters        = n_drafters,
         n_starters        = n_starters,
-        params            = sport_params,
+        sport_params      = sport_params,
         categories        = effective_categories,
         sport             = sport,
         tiebreaker_category    = effective_tiebreaker,   # always a live category, by derivation
@@ -342,7 +342,7 @@ def build_session_agent(session: Session) -> None:
         most_categories_weight = current_params['most_categories_weight'],
         tiebreaker_category    = effective_tiebreaker,
         sport          = sport,
-        params         = sport_params,
+        sport_params   = sport_params,
         slot_counts    = slot_counts,
         aleph          = current_params['aleph'],
         kappa          = current_params['kappa'],

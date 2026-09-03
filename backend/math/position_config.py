@@ -1,4 +1,4 @@
-"""Pre-computed position structure, derived once from sport params + slot_counts.
+"""Pre-computed position structure, derived once from sport sport_params + slot_counts.
 
 WHY IT EXISTS: the Streamlit original read the position structure out of
 st.session_state wherever it was needed. This is the explicit-argument replacement —
@@ -37,11 +37,11 @@ class PositionConfig:
 
 
 def build_position_config(
-    params: dict
+    sport_params: dict
     , slot_counts: dict
 ) -> PositionConfig:
-    """Build a PositionConfig from sport-level params and the session's slot_counts."""
-    position_structure = params['position_structure']
+    """Build a PositionConfig from sport-level sport_params and the session's slot_counts."""
+    position_structure = sport_params['position_structure']
     base_list  = position_structure['base_list']
     flex_list  = position_structure['flex_list']
     all_positions = base_list + flex_list

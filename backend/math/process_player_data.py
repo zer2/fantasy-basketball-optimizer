@@ -14,14 +14,14 @@ from backend.player_identity import RP_PLAYER_ID
 
 # ── public helpers ─────────────────────────────────────────────────────────────
 
-def get_counting_stats(params: dict, categories: list[str]) -> list[str]:
-    """Return counting statistics from params that are in the active categories."""
-    return [c for c in params['counting-statistics'] if c in categories]
+def get_counting_stats(sport_params: dict, categories: list[str]) -> list[str]:
+    """Return counting statistics from sport_params that are in the active categories."""
+    return [c for c in sport_params['counting-statistics'] if c in categories]
 
 
-def get_ratio_stats(params: dict, categories: list[str]) -> list[str]:
-    """Return ratio statistics from params that are in the active categories."""
-    return [c for c in params['ratio-statistics'] if c in categories]
+def get_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
+    """Return ratio statistics from sport_params that are in the active categories."""
+    return [c for c in sport_params['ratio-statistics'] if c in categories]
 
 
 def get_category_level_rv(rv: float
@@ -43,12 +43,12 @@ def calculate_coefficients(player_means: pd.DataFrame
                             , mean_of_variances: pd.Series
                             , counting_stats: list[str]
                             , ratio_stats: list[str]
-                            , params: dict) -> pd.DataFrame:
+                            , sport_params: dict) -> pd.DataFrame:
 
     var_of_means  = player_means.loc[representative_player_set, counting_stats].var(axis=0)
     mean_of_means = player_means.loc[representative_player_set, counting_stats].mean(axis=0)
 
-    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
         if ratio_stat in ratio_stats:
             volume_statistic = ratio_stat_info['volume-statistic']
 
@@ -76,7 +76,7 @@ def calculate_coefficients(player_means: pd.DataFrame
 
 def calculate_coefficients_historical(weekly_df: pd.DataFrame
                                        , representative_player_set: list
-                                       , params: dict
+                                       , sport_params: dict
                                        , counting_stats: list[str]
                                        , ratio_stats: list[str]
                                        ) -> pd.DataFrame:
@@ -86,7 +86,7 @@ def calculate_coefficients_historical(weekly_df: pd.DataFrame
     var_of_means  = player_stats.loc[representative_player_set, (counting_stats, 'mean')].var(axis=0)
     mean_of_means = player_stats.loc[representative_player_set, (counting_stats, 'mean')].mean(axis=0)
 
-    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
         if ratio_stat in ratio_stats:
             volume_statistic = ratio_stat_info['volume-statistic']
             made_statistic   = ratio_stat_info['made-statistic']
@@ -140,7 +140,7 @@ def scale_tiebreaker_value(category_values, tiebreaker_position: int, most_categ
 
 def calculate_scores_from_coefficients(player_means: pd.DataFrame
                                         , coefficients: pd.DataFrame
-                                        , params: dict
+                                        , sport_params: dict
                                         , alpha_weight: float
                                         , beta_weight: float
                                         , counting_stats: list[str]
@@ -157,7 +157,7 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
     main_scores = num.divide(denom)
 
     ratio_scores: dict = {}
-    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
         if ratio_stat in ratio_stats:
             volume_statistic = ratio_stat_info['volume-statistic']
             denom_r = (
@@ -189,7 +189,7 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
     )
     res.columns = ratio_stats + counting_stats
 
-    for neg_stat in params['negative-statistics']:
+    for neg_stat in sport_params['negative-statistics']:
         if neg_stat in res.columns:
             res[neg_stat] = -res[neg_stat]
 
@@ -206,7 +206,7 @@ def _weighted_cov_matrix(df: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
 def games_played_adjustment(scores: pd.DataFrame
                              , replacement_games_rate: pd.Series
                              , representative_player_set: list[str]
-                             , params: dict
+                             , sport_params: dict
                              , categories: list[str]
                              , v: pd.Series = None) -> pd.DataFrame:
 
@@ -246,7 +246,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
                         , scoring_format: str
                         , n_drafters: int
                         , n_starters: int
-                        , params: dict
+                        , sport_params: dict
                         , categories: list[str]
                         , sport: str = 'NBA'
                         , tiebreaker_category: str | None = None
@@ -259,19 +259,19 @@ def process_player_data(player_stats_v2: pd.DataFrame
     the scaling near the Total column. X-scores and the coefficients are deliberately left alone —
     they describe how categories are DISTRIBUTED, which the scoring rules do not change."""
 
-    counting_stats = get_counting_stats(params, categories)
-    ratio_stats    = get_ratio_stats(params, categories)
+    counting_stats = get_counting_stats(sport_params, categories)
+    ratio_stats    = get_ratio_stats(sport_params, categories)
     n_players      = n_drafters * n_starters
     player_means   = player_stats_v2
 
     if weekly_df is not None:
         all_players = list(pd.unique(weekly_df.index.get_level_values('Player')))
-        coeff_first = calculate_coefficients_historical(weekly_df, all_players, params,
+        coeff_first = calculate_coefficients_historical(weekly_df, all_players, sport_params,
                                                         counting_stats, ratio_stats)
     else:
         coeff_first = calculate_coefficients(player_means, player_means.index,
                                              mean_of_variances, counting_stats,
-                                             ratio_stats, params)
+                                             ratio_stats, sport_params)
 
     # Bake the chi factor into the noise term (Mean of Variances) up front -- Rotisserie only -- so it
     # propagates consistently to the scores AND to v (the x->g weighting) and w (the opponent-variance
@@ -280,7 +280,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
     chi_factor = chi if scoring_format == 'Rotisserie' else 1
     coeff_first['Mean of Variances'] = coeff_first['Mean of Variances'] * chi_factor
 
-    g_first = calculate_scores_from_coefficients(player_means, coeff_first, params, 1, 1,
+    g_first = calculate_scores_from_coefficients(player_means, coeff_first, sport_params, 1, 1,
                                                   counting_stats, ratio_stats, categories,
                                                   n_starters)
     representative_player_set = (
@@ -289,10 +289,10 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
     if weekly_df is not None:
         coefficients = calculate_coefficients_historical(weekly_df, representative_player_set,
-                                                         params, counting_stats, ratio_stats)
+                                                         sport_params, counting_stats, ratio_stats)
     else:
         coefficients = calculate_coefficients(player_means, representative_player_set,
-                                             mean_of_variances, counting_stats, ratio_stats, params)
+                                             mean_of_variances, counting_stats, ratio_stats, sport_params)
 
     coefficients['Mean of Variances'] = coefficients['Mean of Variances'] * chi_factor
 
@@ -324,18 +324,18 @@ def process_player_data(player_stats_v2: pd.DataFrame
     v = v_original / v_original.sum()
     w = vom / mov
 
-    g_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 1, 1,
+    g_scores = calculate_scores_from_coefficients(player_means, coefficients, sport_params, 1, 1,
                                                    counting_stats, ratio_stats, categories,
                                                    n_starters)
-    x_scores = calculate_scores_from_coefficients(player_means, coefficients, params, 0, 1,
+    x_scores = calculate_scores_from_coefficients(player_means, coefficients, sport_params, 0, 1,
                                                    counting_stats, ratio_stats, categories,
                                                    n_starters)
 
     replacement_games_rate = (1 - player_means['Games Played %'] / 100) * psi
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
-                                        params, categories)
+                                        sport_params, categories)
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
-                                        params, categories, v=v)
+                                        sport_params, categories, v=v)
 
     x_scores.loc[RP_PLAYER_ID, :] = -1
     g_scores.loc[RP_PLAYER_ID, :] = -1
@@ -368,7 +368,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = x_scores.loc[g_scores.index]
 
     positions = player_means['Position'].str.split(',')
-    position_structure = params['position_structure']
+    position_structure = sport_params['position_structure']
     base_position_list = position_structure['base_list']
 
     players_and_positions = pd.merge(x_scores, positions, left_index=True, right_index=True)
@@ -417,8 +417,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
         if sport == 'MLB':
             pitching_positions = ['SP', 'RP']
             batting_positions  = [p for p in position_means.index if p not in pitching_positions]
-            batting_stats  = [x for x in params['batter_stats']  if x in position_means.columns]
-            pitching_stats = [x for x in params['pitcher_stats'] if x in position_means.columns]
+            batting_stats  = [x for x in sport_params['batter_stats']  if x in position_means.columns]
+            pitching_stats = [x for x in sport_params['pitcher_stats'] if x in position_means.columns]
 
             # Balanced default since slot_counts is not available in this path; MLB
             # historical mode is not the primary use case.
@@ -485,14 +485,14 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
 def make_upsilon_adjustment(player_stats_v1: pd.DataFrame
                              , upsilon: float
-                             , params: dict) -> pd.DataFrame:
+                             , sport_params: dict) -> pd.DataFrame:
     """Explicit-parameter version: receives the DataFrame directly."""
     df = player_stats_v1.copy()
     df['Games Played %'] = 1 - (1 - df['Games Played %']) * upsilon
 
-    counting_stats   = params['counting-statistics']
-    volume_stats     = [info['volume-statistic'] for info in params['ratio-statistics'].values()]
-    games_per_week   = params['n_games_per_week']
+    counting_stats   = sport_params['counting-statistics']
+    volume_stats     = [info['volume-statistic'] for info in sport_params['ratio-statistics'].values()]
+    games_per_week   = sport_params['n_games_per_week']
 
     for col in set(counting_stats + volume_stats):
         if col in df.columns:

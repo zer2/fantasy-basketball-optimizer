@@ -3,7 +3,7 @@ Standalone coefficient exploration for historical seasons.
 
 Computes coefficients (Mean of Means, Variance of Means, Mean of Variances),
 the tau/sigma ratio, and the inter-category correlation matrix for each season.
-Uses all statistics defined in params, not just the currently selected categories.
+Uses all statistics defined in sport_params, not just the currently selected categories.
 
 Intended to be run locally as a script to inform coefficient and covariance
 calibration. Not part of the production server path.
@@ -25,7 +25,7 @@ from backend.math.process_player_data import (
 
 def compute_season_coefficients(
     weekly_df: pd.DataFrame
-    , params: dict
+    , sport_params: dict
     , n_drafters: int
     , n_starters: int
 ) -> dict:
@@ -34,7 +34,7 @@ def compute_season_coefficients(
     Args:
         weekly_df:   DataFrame indexed by ('Player', 'Week'), one summed-stat
                      row per player per week, as returned by get_weekly_box_scores.
-        params:      Full params dict for the sport (e.g. NBA entry from parameters.yaml).
+        sport_params:      Full sport_params dict for the sport (e.g. NBA entry from parameters.yaml).
         n_drafters:  Number of drafters in the representative league.
         n_starters:  Number of picks per drafter.
 
@@ -48,8 +48,8 @@ def compute_season_coefficients(
                                       within-player weekly correlation)
           'representative_player_set' — list of players used for final pass
     """
-    all_counting_stats = params['counting-statistics']
-    all_ratio_stats    = list(params['ratio-statistics'].keys())
+    all_counting_stats = sport_params['counting-statistics']
+    all_ratio_stats    = list(sport_params['ratio-statistics'].keys())
     all_categories     = all_counting_stats + all_ratio_stats
 
     all_players = pd.unique(weekly_df.index.get_level_values('Player'))
@@ -57,7 +57,7 @@ def compute_season_coefficients(
     # Player means for score calculation — includes made/volume columns for ratio stats
     extra_columns = {
         col
-        for info in params['ratio-statistics'].values()
+        for info in sport_params['ratio-statistics'].values()
         for col in (info['made-statistic'], info['volume-statistic'])
         if col in weekly_df.columns
     }
@@ -65,7 +65,7 @@ def compute_season_coefficients(
     player_means = weekly_df[player_means_columns].groupby(level='Player').mean()
 
     # Ratio stats are not in weekly_df; compute them from player-level made/volume means
-    for ratio_stat, ratio_stat_info in params['ratio-statistics'].items():
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
         made_statistic   = ratio_stat_info['made-statistic']
         volume_statistic = ratio_stat_info['volume-statistic']
         if made_statistic in player_means.columns and volume_statistic in player_means.columns:
@@ -75,7 +75,7 @@ def compute_season_coefficients(
     first_order_coefficients = calculate_coefficients_historical(
         weekly_df.copy()
         , all_players
-        , params
+        , sport_params
         , all_counting_stats
         , all_ratio_stats
     )
@@ -83,7 +83,7 @@ def compute_season_coefficients(
     first_order_scores = calculate_scores_from_coefficients(
         player_means
         , first_order_coefficients
-        , params
+        , sport_params
         , alpha_weight  = 1
         , beta_weight   = 1
         , counting_stats = all_counting_stats
@@ -103,7 +103,7 @@ def compute_season_coefficients(
     coefficients = calculate_coefficients_historical(
         weekly_df_copy
         , representative_player_set
-        , params
+        , sport_params
         , all_counting_stats
         , all_ratio_stats
     )
@@ -136,7 +136,7 @@ def compute_season_coefficients(
 
 
 def explore_all_seasons(
-    params: dict
+    sport_params: dict
     , n_drafters: int
     , n_starters: int
     , seasons: list[str] | None = None
@@ -144,7 +144,7 @@ def explore_all_seasons(
     """Run coefficient exploration across all (or specified) historical seasons.
 
     Args:
-        params:     Full params dict for the sport.
+        sport_params:     Full sport_params dict for the sport.
         n_drafters: Number of drafters in the representative league.
         n_starters: Number of picks per drafter.
         seasons:    Explicit list of season strings to run. If None, all
@@ -158,8 +158,8 @@ def explore_all_seasons(
 
     return {
         season: compute_season_coefficients(
-            get_weekly_box_scores(season, params)
-            , params
+            get_weekly_box_scores(season, sport_params)
+            , sport_params
             , n_drafters
             , n_starters
         )
@@ -205,12 +205,12 @@ if __name__ == '__main__':
     params_path  = Path(__file__).parents[2] / 'parameters.yaml'
     with open(params_path) as f:
         all_params = yaml.safe_load(f)
-    params = all_params['NBA']
+    sport_params = all_params['NBA']
 
     output_dir = Path(__file__).parents[2] / 'coefficient_exploration_output'
     output_dir.mkdir(exist_ok=True)
 
-    results = explore_all_seasons(params, n_drafters=12, n_starters=13)
+    results = explore_all_seasons(sport_params, n_drafters=12, n_starters=13)
     tables  = tabulate_results(results)
 
     tables['tau_sigma_ratio'].to_csv(output_dir / 'tau_sigma_ratio.csv')
