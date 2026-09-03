@@ -55,8 +55,9 @@ def normalize_objective_settings(current_params: dict) -> None:
     incoherent CREATE requests outright (422 — a client that names a tiebreaker outside its
     categories should hear about it); this function normalizes MERGED state on create and
     patch alike, lenient about settings that merely stopped applying mid-edit; and
-    HAgent.__init__ re-checks as a leaf contract for agents constructed directly in tests
-    and experiments. Removing any one layer loses a distinct guarantee.
+    the math layer re-checks pieces as leaf contracts for direct construction in tests
+    and experiments (HAgent.__init__, plus narrower checks in process_player_data and
+    algorithm_helpers). Removing any one layer loses a distinct guarantee.
     """
     if current_params['scoring_format'] == 'Rotisserie':
         current_params['most_categories_weight'] = None
@@ -161,7 +162,8 @@ def apply_patch(
         session.platform_config = platform_config
         session.current_params['team_names'] = list(platform_config.teams_dict.keys())
 
-    cached_pipeline = session.pipeline_cache.get(_build_pipeline_cache_key(session.current_params))
+    patched_pipeline_key = _build_pipeline_cache_key(session.current_params)
+    cached_pipeline = session.pipeline_cache.get(patched_pipeline_key)
     if cached_pipeline is not None:
         session.agent           = cached_pipeline['agent']
         session.info            = cached_pipeline['info']
@@ -169,7 +171,7 @@ def apply_patch(
         session.v1_clean        = cached_pipeline['v1_clean']
         session.v2              = cached_pipeline['v2']
         session.player_registry = cached_pipeline['player_registry']
-        session.pipeline_cache.move_to_end(_build_pipeline_cache_key(session.current_params))
+        session.pipeline_cache.move_to_end(patched_pipeline_key)
     else:
         build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
 

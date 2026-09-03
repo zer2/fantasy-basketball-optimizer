@@ -22,6 +22,13 @@ from pathlib import Path
 
 from backend.parameters import load_all_params
 from backend.services.projection_parsing import parse_projection_upload
+from backend.data_retrieval import attach_player_ids_by_name, combine_projections, get_specified_historical_stats
+from backend.math.algorithm_agents import HAgent
+from backend.math.process_player_data import drop_injured_players, make_upsilon_adjustment, process_player_data
+from backend.player_identity import (
+    RP_PLAYER_ID, allocate_synthetic_player_ids, make_player_identity,
+    make_replacement_player_identity, resolve_typed_player_names,
+)
 from backend.state.session import Session
 
 
@@ -87,7 +94,7 @@ def _build_v0_cache_key(current_params: dict) -> tuple | None:
     if source_type == 'historical':
         return (sport, 'historical', current_params['season'])
     if source_type == 'projections':
-        blend_weights = current_params.get('blend_weights', {})
+        blend_weights = current_params['blend_weights']
         custom_data_ids = current_params.get('custom_data_ids') or []
         weight_keys = tuple(sorted(blend_weights.items()))
         upload_keys = tuple(sorted(custom_data_ids))
@@ -99,8 +106,6 @@ def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
     """Bring a single uploaded CSV (name-indexed by parse_projection_upload) to the id-keyed
     contract: resolve names via the unified table, keep unresolved rows under synthetic
     ids, and return an id-indexed frame with the display 'Player' column retained."""
-    from backend.data_retrieval import attach_player_ids_by_name
-    from backend.player_identity import allocate_synthetic_player_ids
 
     frame = attach_player_ids_by_name(parsed_csv.reset_index())
     synthetic_ids = allocate_synthetic_player_ids(
@@ -117,9 +122,6 @@ def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
 def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
     """One PlayerIdentity per pool row (from the id index + 'Player'/'Position' columns),
     plus the replacement-player sentinel."""
-    from backend.player_identity import (
-        RP_PLAYER_ID, make_player_identity, make_replacement_player_identity,
-    )
 
     registry = {
         int(player_id): make_player_identity(int(player_id), str(name), position_value)
@@ -171,7 +173,6 @@ def load_player_pool(
             v0_with_names = _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, params))
 
         elif source_type == 'historical':
-            from backend.data_retrieval import get_specified_historical_stats
 
             season = current_params['season']
             if not season:
@@ -181,9 +182,8 @@ def load_player_pool(
             v0_with_names = get_specified_historical_stats(season, params)
 
         elif source_type == 'projections':
-            from backend.data_retrieval import combine_projections
 
-            blend_weights = current_params.get('blend_weights', {})
+            blend_weights = current_params['blend_weights']
             # All-zero weights would blend nothing and crash deep in the pipeline with an
             # opaque 500 — reject it up front with an actionable message instead.
             if not any(weight > 0 for weight in blend_weights.values()):
@@ -215,12 +215,10 @@ def load_player_pool(
 
 def remove_injured_players(session: Session) -> None:
     """Resolve the free-typed injured list to player ids and drop them into v1_clean."""
-    from backend.math.process_player_data import drop_injured_players
-    from backend.player_identity import resolve_typed_player_names
 
-    injured_names = session.current_params.get('injured_players', [])
+    injured_names = session.current_params['injured_players']
     injured_player_ids = resolve_typed_player_names(session.player_registry, injured_names)
-    v1, _ = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
+    v1 = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
 
 
@@ -228,12 +226,11 @@ def remove_injured_players(session: Session) -> None:
 
 def apply_upsilon_adjustment(session: Session) -> None:
     """Run make_upsilon_adjustment using a fresh copy of v1_clean."""
-    from backend.math.process_player_data import make_upsilon_adjustment
 
     _, params, _ = _resolve_sport_params(session)
     upsilon = session.current_params['upsilon']
     # Always start from the clean v1 so repeated PATCH calls don't stack adjustments
-    v2, _ = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, params)
+    v2 = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, params)
     session.v2 = v2
 
 
@@ -241,7 +238,6 @@ def apply_upsilon_adjustment(session: Session) -> None:
 
 def build_scoring_info(session: Session) -> None:
     """Build the info dict (G-scores, X-scores, covariance, etc.) onto session.info."""
-    from backend.math.process_player_data import process_player_data
 
     _, params, sport = _resolve_sport_params(session)
     current_params = session.current_params
@@ -283,7 +279,7 @@ def build_scoring_info(session: Session) -> None:
     if current_params.get('tiebreaker_category') not in categories or len(categories) % 2 == 1:
         current_params['tiebreaker_category'] = None
 
-    info, _ = process_player_data(
+    info = process_player_data(
         player_stats_v2   = session.v2,
         weekly_df         = None,
         mean_of_variances = _load_mean_of_variances(),
@@ -309,7 +305,6 @@ def build_scoring_info(session: Session) -> None:
 
 def build_session_agent(session: Session) -> None:
     """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
-    from backend.math.algorithm_agents import HAgent
 
     _, params, sport = _resolve_sport_params(session)
     current_params = session.current_params
@@ -344,7 +339,7 @@ def build_session_agent(session: Session) -> None:
     # so the throttle ranking + auction anchor are always needed. Auction sessions pass full cash
     # (every team at cash_per_team); everything else passes None — the is_auction gate matters
     # because a cash_per_team value can linger on the session after the user leaves Auction Mode.
-    cash_per_team = current_params.get('cash_per_team') if current_params.get('is_auction') else None
+    cash_per_team = current_params['cash_per_team'] if current_params['is_auction'] else None
     default_cash = (
         {f'Team {i + 1}': cash_per_team for i in range(n_drafters)}
         if cash_per_team is not None else None

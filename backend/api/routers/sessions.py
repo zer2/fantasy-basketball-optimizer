@@ -104,13 +104,18 @@ def _build_patch(req: PatchRequest) -> dict:
     return patch
 
 
+def _require_upload(data_id: str) -> dict:
+    """The stored upload for data_id, or a 404 when it is missing or TTL-expired."""
+    entry = get_upload(data_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
+    return entry
+
+
 def _resolve_csv(custom_data_ids: Optional[list[str]]) -> Optional[bytes]:
     """Return csv_bytes for the first custom data_id ('csv' source; format auto-detected later)."""
     for data_id in custom_data_ids or []:
-        entry = get_upload(data_id)
-        if entry is None:
-            raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        return entry['bytes']
+        return _require_upload(data_id)['bytes']
     return None
 
 
@@ -119,10 +124,7 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], params: dict) ->
     is the upload's identity throughout the blend — it keys the blend weights too."""
     result = {}
     for data_id in custom_data_ids or []:
-        entry = get_upload(data_id)
-        if entry is None:
-            raise HTTPException(status_code=404, detail=f'data_id {data_id!r} not found or expired.')
-        result[data_id] = parse_projection_upload(entry['bytes'], params)
+        result[data_id] = parse_projection_upload(_require_upload(data_id)['bytes'], params)
     return result
 
 

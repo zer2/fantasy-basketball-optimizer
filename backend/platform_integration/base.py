@@ -1,11 +1,11 @@
 """
 Abstract base for live fantasy-platform integrations (ESPN, Yahoo, Fantrax).
 
-Ported from the Streamlit src/platform_integration/platform_integration.py, but
+Ported from the original Streamlit platform-integration module, but
 framework-agnostic: these classes perform only data retrieval and contain no UI
 or HTTP-framework code. The credential collection, league selection, and polling
 control flow that lived in the Streamlit setup() method are handled by the API
-routes (backend/main.py) and the frontend.
+routes (backend/api/routers) and the frontend.
 
 This module is the dependency-free root of the package: concrete integrations and
 the registry import it, never the reverse.
@@ -49,7 +49,7 @@ class PlatformSelections:
     platform flags as out (Season Mode only); empty otherwise. `costs` is populated
     only for auctions: costs[team][i] is the price paid for player_assignments[team][i].
     """
-    player_assignments: dict[str, list[str]]
+    player_assignments: dict[str, list[int]]
     status:             str
     injured_players:    list[str]
     costs:              Optional[dict[str, list[float]]] = None

@@ -1,8 +1,8 @@
 """
 Trade analysis and suggestion engine.
 
-Ported from src/tabs/trading.py, adapted to use the backend Session pattern
-(session.agent, session.agent.info) instead of Streamlit session state.
+Ported from the original Streamlit trading tab, adapted to use the backend Session
+pattern (session.agent, session.agent.info) instead of Streamlit session state.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from backend.math.algorithm_agents import HAgent
 from backend.state.session import Session
 from backend.models import (
     TeamHScore, TeamTradeResult, TradeAnalyzeResponse,
@@ -25,11 +26,11 @@ from backend.math.position_optimization import check_team_eligibility
 
 def analyze_trade(
     session: Session
-    , player_assignments: dict[str, list[str]]
+    , player_assignments: dict[str, list[int]]
     , team_1: str
-    , team_1_trade: list[str]
+    , team_1_trade: list[int]
     , team_2: str
-    , team_2_trade: list[str]
+    , team_2_trade: list[int]
     , n_iterations: int
     , position_check: bool = True
 ) -> Optional[dict]:
@@ -92,11 +93,11 @@ def analyze_trade(
 
 def run_trade_analyze(
     session: Session
-    , player_assignments: dict[str, list[str]]
+    , player_assignments: dict[str, list[int]]
     , my_team: str
     , their_team: str
-    , my_trade: list[str]
-    , their_trade: list[str]
+    , my_trade: list[int]
+    , their_trade: list[int]
     , position_check: bool = True
 ) -> TradeAnalyzeResponse:
     """Public entry point for the trade/analyze endpoint."""
@@ -123,8 +124,8 @@ def run_trade_analyze(
 # ── Fast trade evaluation ────────────────────────────────────────────────────
 
 def _build_trade_context(
-    h_agent: object
-    , player_assignments: dict[str, list[str]]
+    h_agent: HAgent
+    , player_assignments: dict[str, list[int]]
     , my_team: str
     , their_team: str
 ) -> dict:
@@ -203,17 +204,11 @@ def _build_trade_context(
         diff_vars  = diff_vars_their,
     )
 
-    # Pre-slice x_scores for each trading team so _make_combo_df never touches h_agent.x_scores.
-    my_x_scores    = h_agent.x_scores.loc[my_players]
-    their_x_scores = h_agent.x_scores.loc[their_players]
-
     # Column indices for the two trading teams in each perspective's diff_means.
     their_col_in_my_view = [t for t in team_names if t != my_team].index(their_team)
     my_col_in_their_view = [t for t in team_names if t != their_team].index(my_team)
 
     return {
-        'my_x_scores':                 my_x_scores,
-        'their_x_scores':              their_x_scores,
         'baseline_diff_means_my':      baseline_diff_means_my,
         'baseline_diff_means_their':   baseline_diff_means_their,
         'diff_vars_my':                diff_vars_my,
@@ -277,11 +272,11 @@ def _get_cross_combos(
 
 
 def _make_combo_df(
-    h_agent: object
+    h_agent: HAgent
     , all_combos: pd.DataFrame
     , my_team: str
     , their_team: str
-    , player_assignments: dict[str, list[str]]
+    , player_assignments: dict[str, list[int]]
     , my_x_numpy: np.ndarray
     , their_x_numpy: np.ndarray
     , my_name_to_index: dict[str, int]
@@ -339,18 +334,9 @@ def _make_combo_df(
 
 # ── Suggestion orchestrator ──────────────────────────────────────────────────
 
-def _get_general_values(session: Session) -> pd.Series:
-    """The default (neutral-board) H-score ranking for all players.
-
-    Computed once at build time (agent.populate_default_h_scores) and shared with
-    auction dollar anchoring and the ranking throttle — so a trade search reuses it.
-    """
-    return session.agent.default_h_scores
-
-
 def run_trade_suggest(
     session: Session
-    , player_assignments: dict[str, list[str]]
+    , player_assignments: dict[str, list[int]]
     , my_team: str
     , their_team: str
     , combo_params: list[ComboParam]
@@ -360,8 +346,9 @@ def run_trade_suggest(
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
 
-    # Step 1: get general values for filtering
-    general_values = _get_general_values(session)
+    # Step 1: the neutral-board H-score ranking, computed once at build time
+    # (populate_default_h_scores) and shared with auction anchoring and the throttle.
+    general_values = session.agent.default_h_scores
 
     n_picks = session.current_params['n_picks']
     n_drafters = session.current_params['n_drafters']

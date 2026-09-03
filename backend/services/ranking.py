@@ -130,7 +130,7 @@ def rank_candidates(
 
     with record_phase('build_candidates'):
         candidates = _build_candidates(
-            h_score_result, info, h_agent, categories, player_assignments, my_team_id, current_params,
+            h_score_result, h_agent, categories, player_assignments, my_team_id, current_params,
             player_registry,
             remaining_cash,
             generic_h_scores=session.agent.default_h_scores,
@@ -148,7 +148,6 @@ def rank_candidates(
 
 def _build_candidates(
     h_score_result: dict,
-    info: dict,
     h_agent,
     categories: list[str],
     player_assignments: dict[str, list[int]],
@@ -167,7 +166,6 @@ def _build_candidates(
 
     Args:
         h_score_result: The final dict yielded by HAgent.get_h_scores().
-        info:           Session info dict (Positions, G-scores, etc.).
         h_agent:              The HAgent instance (carries v, original_v, position_structure).
         categories:     Ordered list of scoring category names.
         player_assignments: Current draft/auction state (team → player list).
@@ -213,7 +211,7 @@ def _build_candidates(
     future_diff_df           = h_score_result['Future-Diff'].iloc[order] if h_score_result['Future-Diff'] is not None else None
     opponent_tilt_df         = (h_score_result.get('Opponent-Future-Tilt').iloc[order]
                                 if h_score_result.get('Opponent-Future-Tilt') is not None else None)
-    player_g_scores          = info['G-scores']            # full-population: used for auction dollar values
+    player_g_scores          = h_agent.info['G-scores']    # full-population: used for auction dollar values
 
     # res['Rosters'] column 0 encodes whether a valid slot assignment was found.
     # When position data is entirely absent the algorithm yields a single-column
@@ -280,7 +278,7 @@ def _build_candidates(
         # The evaluate route enforces that remaining_cash and cash_per_team are set together, so an
         # auction evaluate always has cash_per_team here (no defensive fallback needed).
         cash_per_team   = current_params['cash_per_team']
-        streaming_noise = float(current_params.get('streaming_noise', 10.0)) #ZR: What is this dumb fallback? What does claude.md say about this?
+        streaming_noise = current_params['streaming_noise']
         total_picks     = h_agent.n_drafters * h_agent.n_picks
 
         all_players_chosen = [
@@ -289,19 +287,18 @@ def _build_candidates(
         ]
         n_remaining          = total_picks - len(all_players_chosen)
 
-        #ZR: Why are these float calls needed? How would these be anything but floats or ints, which would also be fine I think?
-        total_cash_remaining = float(sum(remaining_cash.values()))
+        total_cash_remaining = sum(remaining_cash.values())
 
         if n_remaining > 0:
-            total_original_cash = float(h_agent.n_drafters * cash_per_team)
+            total_original_cash = h_agent.n_drafters * cash_per_team
 
             # G-scores for available (undrafted) players, used for G-score dollar values.
             available_in_g = [p for p in h_scores_sorted.index if p in player_g_scores.index]
             g_scores_available = player_g_scores.loc[available_in_g, 'Total']
 
-            # Baseline scores for gnrc/orig: generic run (no players taken) if cached,
-            # otherwise fall back to the current team-specific scores.
-            baseline_scores = generic_h_scores if generic_h_scores is not None else h_scores_sorted
+            # Baseline scores for the generic/original dollars: the neutral-board run,
+            # populated unconditionally at session build (build_session_agent).
+            baseline_scores = generic_h_scores
 
             # No defensive guard here: build_agent rejects any league whose pool can't fill every
             # roster, so the replacement-level index inside auction_value_adjuster always resolves.
@@ -468,7 +465,7 @@ def _build_g_score_rows(
 ) -> list[list[GScoreRow]]:
     """Build the G-score breakdown table rows for every candidate at once.
 
-    Mirrors make_main_df_styled() in src/tabs/candidate_subtabs.py.
+    Ported from the original Streamlit candidate-table builder.
 
     The table always ends with a 'Total diff' row = current team diff + this
     player's own G-scores.  Depending on whether a future component was
@@ -666,6 +663,7 @@ def _build_flex_allocations(
                                 numpy_array has shape (n_candidates, n_bases); base_to_col
                                 maps base position name → column index.
         slot_counts:            Dict mapping position code → number of roster slots.
+        remaining_flex_by_rank: Dict flex type → per-candidate array of still-open flex slots.
 
     Returns:
         One FlexAllocations per candidate rank, each with one row per active flex

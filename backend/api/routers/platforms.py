@@ -19,7 +19,7 @@ from backend.api.helpers import (
 )
 from backend.api.schemas import (
     YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
-    LeaguesResponse, DivisionsResponse, ConnectRequest, ConnectResponse, DraftStateResponse,
+    LeaguesResponse, DivisionsResponse, PlatformConfigRequest, ConnectResponse, DraftStateResponse,
 )
 
 router = APIRouter()
@@ -74,7 +74,7 @@ def get_platform_divisions_route(platform: str, league_id: str):
 
 
 @router.post('/platforms/{platform}/connect', response_model=ConnectResponse)
-def connect_platform_route(platform: str, req: ConnectRequest, user_key: str = Depends(current_user_key)):
+def connect_platform_route(platform: str, req: PlatformConfigRequest, user_key: str = Depends(current_user_key)):
     integration = resolve_live_integration(platform, user_key)
     try:
         shape = integration.fetch_league_shape(req.league_id, req.division_id)

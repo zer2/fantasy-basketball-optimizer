@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import copy
 import os
+from pathlib import Path
 
 import yaml
 
-_PARAMS_PATH = 'parameters.yaml'
+# Anchored on this file so the load works from any working directory.
+_PARAMS_PATH = Path(__file__).parents[1] / 'parameters.yaml'
 _cache: tuple[float, dict] | None = None   # (mtime, parsed params)
 
 

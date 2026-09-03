@@ -78,10 +78,6 @@ class ModelParameters(BaseModel):
     # How sharply opponents are expected to pursue their predicted punts, and at 0 whether they are
     # modelled as strategic at all. Pinned to 1.0 under Rotisserie by the agent.
     opponent_model_confidence: float = 0.5
-    # How sharply opponents are expected to pursue their predicted punts: every opponent tilt
-    # (committed archetype or inferred build) is scaled by this factor at field construction.
-    # 1 = full self-play equilibrium; 0 = category-neutral opponents (the pre-awareness model).
-    # 0.5 mirrors parameters.yaml: the softened field that keeps best responses from herding.
     n_iterations: int
     streaming_noise: float
 
@@ -221,11 +217,6 @@ class DivisionsResponse(BaseModel):
 
 class LeaguesResponse(BaseModel):
     leagues: list[dict]              # [{id, name, season}]; empty for manual-id platforms (Fantrax)
-
-
-class ConnectRequest(BaseModel):
-    league_id: str
-    division_id: Optional[str] = None
 
 
 class ConnectResponse(BaseModel):

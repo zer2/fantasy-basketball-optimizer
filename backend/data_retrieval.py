@@ -3,9 +3,9 @@ Backend data retrieval from Snowflake.
 
 Domain data-access layer: player mapping, historical stats, projections, and
 seasons — all the fantasy-basketball-specific reads. The generic Snowflake
-connection + query caching lives in backend.snowflake_connection.
+connection + query caching lives in backend.infra.snowflake_connection.
 
-Equivalent to src/data_retrieval/get_data.py but:
+Ported from the original Streamlit data-retrieval module, but:
 - No Streamlit dependencies
 - Explicit `params: dict` instead of get_params()
 - Player names always mapped to the canonical 'Player' column
@@ -110,8 +110,8 @@ def get_historical_data(params: dict) -> pd.DataFrame:
     # ROW ORDER IS LOAD-BEARING: the pool has always been name-sorted, and stable sorts
     # downstream (G-score ties, anchor ordering, top-N selections) inherit it — id-sorting
     # here would change served H-scores. Sort by name, then key by id.
-    # The id index level keeps the legacy 'Player' name through Stage A of the identity
-    # refactor (pipeline internals reference the level name); renamed in the cleanup stage.
+    # The id index level keeps the legacy 'Player' level name: pipeline internals
+    # reference the level by that name.
     df = df.sort_values(['Season', 'Player']).fillna(0)
     df = df.set_index(['Season', 'NBA_PLAYER_ID'])
     df.index = df.index.set_names(['Season', 'Player'])

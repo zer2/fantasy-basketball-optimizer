@@ -1,5 +1,8 @@
-"""Domain-free plumbing: Snowflake access, secret resolution, request timing, and OAuth.
+"""Domain-free plumbing: Snowflake access, secret resolution, request timing, OAuth,
+rate limiting, and the headshot cache.
 
-These modules would work unchanged if the app stopped being about fantasy basketball —
-that is the criterion for living here rather than at the backend top level.
+The criterion for living here is being app-shaped rather than sport-shaped: these modules
+would survive the app changing domains. headshot_cache bends the letter of that rule (it
+hardcodes the NBA CDN) but not its structure — a generic fetch-and-cache with one
+configured endpoint.
 """

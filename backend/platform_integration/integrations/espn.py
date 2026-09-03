@@ -33,6 +33,7 @@ from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
 from backend.platform_integration.helpers import deduplicate_team_names
+from backend.player_identity import RP_PLAYER_ID
 
 
 _ESPN_FAN_API = 'https://fan.api.espn.com/apis/v2/fans/'
@@ -128,7 +129,6 @@ class ESPNIntegration(PlatformIntegration):
         , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
         """Current rosters per team (ESPN supports only Season Mode)."""
-        from backend.player_identity import RP_PLAYER_ID
 
         league = self._make_league(config.league_id)
         team_by_id = {str(team.team_id): team for team in league.teams}

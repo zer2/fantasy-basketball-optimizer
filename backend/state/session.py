@@ -95,16 +95,16 @@ _lock = threading.Lock()
 def _evict_expired_sessions(now: float) -> None:
     """Remove every session past its TTL. Caller must hold _lock."""
     expired_ids = [
-        sid for sid, session in _store.items()
+        session_id for session_id, session in _store.items()
         if now - session.last_accessed > SESSION_TTL
     ]
-    for sid in expired_ids:
-        del _store[sid]
+    for session_id in expired_ids:
+        del _store[session_id]
 
 
 def create_session() -> Session:
-    sid = uuid.uuid4().hex[:8]
-    session = Session(id=sid)
+    session_id = uuid.uuid4().hex[:8]
+    session = Session(id=session_id)
     with _lock:
         # Reclaim abandoned sessions on each create. get_session only evicts a
         # session when it is actively looked up, so sessions that are never
@@ -112,27 +112,27 @@ def create_session() -> Session:
         # DataFrames in memory forever. Sweeping here bounds the store to the
         # active set plus whatever expired since the last create.
         _evict_expired_sessions(time.time())
-        _store[sid] = session
+        _store[session_id] = session
     return session
 
 
-def get_session(sid: str) -> Optional[Session]:
+def get_session(session_id: str) -> Optional[Session]:
     with _lock:
-        session = _store.get(sid)
+        session = _store.get(session_id)
         if session is None:
             return None
         if time.time() - session.last_accessed > SESSION_TTL:
             # Expired on read: never serve a stale session. Bulk reclamation of
             # abandoned sessions happens in create_session via _evict_expired_sessions.
-            del _store[sid]
+            del _store[session_id]
             return None
         session.last_accessed = time.time()
         return session
 
 
-def delete_session(sid: str) -> bool:
+def delete_session(session_id: str) -> bool:
     with _lock:
-        if sid in _store:
-            del _store[sid]
+        if session_id in _store:
+            del _store[session_id]
             return True
         return False

@@ -1,22 +1,16 @@
 """
-Backend-only copy of src/math/process_player_data.py.
+Player-stat processing: G-scores, X-scores, covariance, and the info dict the agent runs on.
 
-Changes vs original:
-- All st.session_state / helper_function calls replaced with explicit parameters.
-- process_player_data receives player_stats_v2 DataFrame directly.
-- make_upsilon_adjustment receives player_stats_v1 DataFrame directly.
-- drop_injured_players receives player_stats_v0 DataFrame directly.
-- get_category_level_rv takes `categories` explicitly.
-- @st.cache_data decorators removed (caching handled by the Session layer).
-The original src/ file is untouched.
+Ported from the original Streamlit implementation (whose src/ tree is retired); every
+function receives its DataFrame and parameters explicitly, and caching moved to the
+Session layer.
 """
 
 from __future__ import annotations
 
-import uuid
-
 import numpy as np
 import pandas as pd
+from backend.player_identity import RP_PLAYER_ID
 
 # ── public helpers ─────────────────────────────────────────────────────────────
 
@@ -85,7 +79,6 @@ def calculate_coefficients_historical(weekly_df: pd.DataFrame
                                        , params: dict
                                        , counting_stats: list[str]
                                        , ratio_stats: list[str]
-                                       , coefficient_exploration_mode: bool = False
                                        ) -> pd.DataFrame:
     player_stats = weekly_df.groupby(level='Player').agg(['mean', 'var'])
 
@@ -258,7 +251,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
                         , sport: str = 'NBA'
                         , tiebreaker_category: str | None = None
                         , most_categories_weight: float | None = None
-                        ) -> tuple[dict, str]:
+                        ) -> dict:
     """Explicit-parameter version of process_player_data.
     Receives player_stats_v2 directly instead of reading from st.session_state.
 
@@ -344,7 +337,6 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
                                         params, categories, v=v)
 
-    from backend.player_identity import RP_PLAYER_ID
     x_scores.loc[RP_PLAYER_ID, :] = -1
     g_scores.loc[RP_PLAYER_ID, :] = -1
 
@@ -488,12 +480,12 @@ def process_player_data(player_stats_v2: pd.DataFrame
         'Average-Round-Value': average_round_value,
     }
 
-    return info, str(uuid.uuid4())
+    return info
 
 
 def make_upsilon_adjustment(player_stats_v1: pd.DataFrame
                              , upsilon: float
-                             , params: dict) -> tuple[pd.DataFrame, str]:
+                             , params: dict) -> pd.DataFrame:
     """Explicit-parameter version: receives the DataFrame directly."""
     df = player_stats_v1.copy()
     df['Games Played %'] = 1 - (1 - df['Games Played %']) * upsilon
@@ -506,11 +498,10 @@ def make_upsilon_adjustment(player_stats_v1: pd.DataFrame
         if col in df.columns:
             df[col] = df[col].astype(float) * df['Games Played %'] * games_per_week
 
-    return df, str(uuid.uuid4())
+    return df
 
 
 def drop_injured_players(player_stats_v0: pd.DataFrame
-                          , injured_players: tuple | list) -> tuple[pd.DataFrame, str]:
+                          , injured_players: tuple | list) -> pd.DataFrame:
     """Explicit-parameter version: receives the DataFrame directly."""
-    res = player_stats_v0.drop(list(injured_players), errors='ignore')
-    return res, str(uuid.uuid4())
+    return player_stats_v0.drop(list(injured_players), errors='ignore')

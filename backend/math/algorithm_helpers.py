@@ -1,10 +1,9 @@
 """
-Backend-only copy of src/math/algorithm_helpers.py.
+Shared H-scoring math: SAVOR dollar conversion, win-probability combinatorics, and the
+correlation-correction stencils.
 
-Changes vs original:
-- `import streamlit as st` removed.
-- @st.cache_data() replaced with @functools.lru_cache on get_win_grid / get_tie_grid.
-The original src/ file is untouched.
+Ported from the original Streamlit implementation (whose src/ tree is retired), with
+@functools.lru_cache standing in for st.cache_data on get_win_grid / get_tie_grid.
 """
 
 import functools
