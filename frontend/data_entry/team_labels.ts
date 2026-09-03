@@ -1,6 +1,6 @@
 // data_entry/team_labels.ts
 // Per-drafter DISPLAY labels — presentation only. Team *identity* stays "Team N" (see
-// league_settings #ls-team-names / getTeamNames); a label is purely what's shown in the UI.
+// league_settings #ls-team-names / getTeamIdentitiesFromSidebar); a label is purely what's shown in the UI.
 // Editing a label changes nothing in logic (my_team_id, draft/auction state, the backend all
 // use the identity), so it can never reset the draft or affect an evaluate.
 

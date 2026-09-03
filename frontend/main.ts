@@ -107,32 +107,23 @@ function handleSeatChanged(): void {
 }
 renderSeatSelector().addEventListener('change', handleSeatChanged)
 
-// Mode change: rebuild table and sync session.
-// Registered before the applyLayout listener so buildTableHeader fires first, ensuring
-// hscoretable.style.width is correct when applyLayout reads it.
-// is_auction is a session parameter (its league type): the backend requires remaining_cash
-// on every evaluate exactly when it is set. Entering Auction Mode also patches cash_per_team
-// so the backend can compute dollar values.
+// Mode change, step 1: patch the session's league type. is_auction is a session parameter:
+// the backend requires remaining_cash on every evaluate exactly when it is set, and entering
+// Auction Mode also patches cash_per_team so the backend can compute dollar values.
 const applyModeChange = makeApplyChain('Mode change')
-getModeSelectElement().addEventListener('change', () => {
+function patchSessionForModeChange(): void {
     const { mode, cash_per_team } = getLeagueSettings()
     const patch = mode === 'Auction Mode'
         ? { is_auction: true, league: { cash_per_team } }
         : { is_auction: false }
     // Season Mode: the table is hidden, so there is no rebuild or evaluate — but the session's
     // league type must be patched BEFORE the season layout renders, because rendering fires
-    // season evaluates (waiver, roster inspection) that omit remaining_cash. The standalone
-    // applyLayout listener below skips Season Mode for the same reason: layout comes after
-    // the patch, not concurrently with it.
+    // season evaluates (waiver, roster inspection) that omit remaining_cash. Step 2 below
+    // skips Season Mode for the same reason: its layout comes after the patch, not
+    // concurrently with it.
     const entersSeasonMode = mode === 'Season Mode'
     applyModeChange(4, patch, { rebuildTableHeader: !entersSeasonMode, evaluate: !entersSeasonMode })
-})
-// Instant layout switch for draft/auction (their evaluates are sequenced after the patch by
-// the handler above). Season Mode's layout is deferred until its session patch lands — see above.
-getModeSelectElement().addEventListener('change', () => {
-    if (getLeagueSettings().mode !== 'Season Mode') applyLayout()
-})
-getPlatformSelectElement().addEventListener('change', applyLayout)
+}
 
 // Season Mode + live platform: pull the platform's rosters into the grid when the user
 // switches into that state (via either the mode or the platform dropdown). The poll is
@@ -148,8 +139,14 @@ function refreshSeasonRostersIfLive(): void {
         clearLivePlatformRosters()
     }
 }
-getModeSelectElement().addEventListener('change', refreshSeasonRostersIfLive)
-getPlatformSelectElement().addEventListener('change', refreshSeasonRostersIfLive)
+// One listener per select, with the steps in explicit order — the sequencing used to be
+// three separate listeners relying on registration order. Step 1's buildTableHeader (inside
+// the apply chain) must precede step 2's applyLayout, which reads hscoretable.style.width.
+getModeSelectElement().addEventListener('change', () => {
+    patchSessionForModeChange()                                     // 1. patch the session's league type
+    if (getLeagueSettings().mode !== 'Season Mode') applyLayout()   // 2. instant layout (Season defers to the patch)
+    refreshSeasonRostersIfLive()                                    // 3. season live-roster sync
+})
 
 // On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
 // for the new data source. Mode switches don't change the data source, so they're handled by
@@ -171,7 +168,11 @@ function syncForPlatformSwitch(): void {
             .catch(err => console.error('Platform-switch evaluate failed:', err))
     }
 }
-getPlatformSelectElement().addEventListener('change', syncForPlatformSwitch)
+getPlatformSelectElement().addEventListener('change', () => {
+    applyLayout()                 // 1. swap the layout for the new platform
+    refreshSeasonRostersIfLive()  // 2. season live-roster sync
+    syncForPlatformSwitch()       // 3. seat options + the right evaluation for the new source
+})
 
 // Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
 const applyLeagueSettings = makeApplyChain('League settings update')

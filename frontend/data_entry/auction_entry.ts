@@ -6,13 +6,13 @@ import { makeCustomSelect } from '../custom_select.js'
 import { readRequiredIntInput, buildBoardTableShell } from '../helper_functions.js'
 import { getPlayerResults } from '../app_state.js'
 import { buildPlayerOption, makeMinimalPlayerDisplay } from '../player_display.js'
-import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../parameter_collection/league_settings.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
 import {
     AuctionConfig,
-    getPicks, getTeamNames, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
+    getPicks, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
     resetAuctionState, applyAuctionConfig,
     recordAuctionPick, undoLastAuctionPick, clearAllAuctionPicks,
 } from './auction_state.js'
@@ -104,7 +104,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     // Drafter dropdown — before cost so the cap makes sense visually; full teams excluded.
     // Option value is the team identity ("Team N", mapped back via indexOf on lock-in); the
     // shown label is the editable display label.
-    const availableTeamOptions = getTeamNames()
+    const availableTeamOptions = getTeamIdentitiesFromBoard()
         .map((name, index) => ({ value: name, label: getTeamLabel(index), index }))
         .filter(({ index }) => currentPicks.some(pickRow => pickRow[index] === null))
         .map(({ value, label }) => ({ value, label }))
@@ -136,7 +136,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     function updateCostMax(): void {
         const team = teamSel.getValue()
         if (team) {
-            const drafterIndex = getTeamNames().indexOf(team)
+            const drafterIndex = getTeamIdentitiesFromBoard().indexOf(team)
             const spent = sumSpentByDrafter(getPicks(), drafterIndex)
             costInput.max = String(getCashPerTeam() - spent)
         } else {
@@ -162,7 +162,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
         if (Number.isNaN(chosenPlayerId)) throw new Error(`Auction pick select carried a non-numeric value: "${chosen}"`)
         const team = teamSel.getValue()
         if (!team) return
-        const drafterIndex = getTeamNames().indexOf(team)
+        const drafterIndex = getTeamIdentitiesFromBoard().indexOf(team)
         const cost = parseFloat(costInput.value)
         if (isNaN(cost) || cost <= 0) return
         const spent = sumSpentByDrafter(getPicks(), drafterIndex)
@@ -288,7 +288,7 @@ function readAuctionConfig(): AuctionConfig {
     const nPicks      = readRequiredIntInput('ls-n-picks')
     const cashPerTeam = readRequiredIntInput('ls-cash-per-team')
     const dataSource  = (document.getElementById('ps-data-type') as HTMLInputElement).value
-    const teamNames   = getSidebarTeamNames()
+    const teamNames   = getTeamIdentitiesFromSidebar()
     return {
         nDrafters
         , nPicks

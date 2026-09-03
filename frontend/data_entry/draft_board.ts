@@ -13,10 +13,10 @@ import { getDrafterMethod } from './drafter_methods.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
 import { getTeamLabel, defaultTeamLabel, makeTeamLabelInput } from './team_labels.js'
 import { setSeatSelectorVisible } from '../seat_selector.js'
-import { getTeamNames as getSidebarTeamNames } from '../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../parameter_collection/league_settings.js'
 import {
     DraftConfig,
-    getPickRow, getPickDrafter, getDrafted, getTeamNames, getNDrafters, getNPicks, getConfigKey,
+    getPickRow, getPickDrafter, getDrafted, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getConfigKey,
     resetDraftState, applyDraftConfig,
     recordDraftPick, clearDraftPick, clearAllDraftPicks,
     advanceDraftPick, goBackDraftPick,
@@ -161,7 +161,7 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
             if (getDrafterMethod(getPickDrafter()) === 'Manual input') break
 
             clearFullTeamResult()
-            setCurrentSeat(getTeamNames()[getPickDrafter()] ?? defaultTeamLabel(getPickDrafter()))
+            setCurrentSeat(getTeamIdentitiesFromBoard()[getPickDrafter()] ?? defaultTeamLabel(getPickDrafter()))
             // Autopilot only needs the top pick: score just the first batch and render nothing. Use the
             // value this evaluate returns — not a shared global — so a competing evaluate that aborts
             // this one yields null (stop cleanly) instead of a stale pick from a previous drafter.
@@ -452,7 +452,7 @@ function readDraftConfig(): DraftConfig {
     const nPicks             = readRequiredIntInput('ls-n-picks')
     const dataSource         = (document.getElementById('ps-data-type') as HTMLInputElement).value
     const thirdRoundReversal = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
-    const teamNames = getSidebarTeamNames()
+    const teamNames = getTeamIdentitiesFromSidebar()
     // teamNames are excluded from the key: identities are constant "Team N" (so they never
     // trigger a reset), and editable display labels are presentation-only — a rename must not
     // reset the draft or rebuild the header. n_drafters covers any change in team count.

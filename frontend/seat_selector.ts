@@ -8,7 +8,7 @@
 import { makeCustomSelect } from './custom_select.js'
 import { getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { getTeamLabel, defaultTeamLabel } from './data_entry/team_labels.js'
-import { getTeamNames } from './parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from './parameter_collection/league_settings.js'
 
 let seatSelect: ReturnType<typeof makeCustomSelect> | null = null
 
@@ -30,7 +30,7 @@ function requireSeatSelect(): ReturnType<typeof makeCustomSelect> {
  *  element so the caller can attach its seat-change listener. */
 export function renderSeatSelector(): HTMLElement {
     const seatSelectorContainer = document.getElementById('seat-selector-container') as HTMLElement
-    const initialTeamNames = getTeamNames()
+    const initialTeamNames = getTeamIdentitiesFromSidebar()
     seatSelect = makeCustomSelect(
         'seat-select',
         initialTeamNames.map(buildSeatOption),
@@ -68,7 +68,7 @@ export function renderSeatSelector(): HTMLElement {
  *  evaluate, so the reaction is theirs. Returns the adopted identity, or null when the
  *  existing selection survived. */
 export function refreshSeatOptions(): string | null {
-    const names = getTeamNames()
+    const names = getTeamIdentitiesFromSidebar()
     requireSeatSelect().setOptions(names.map(buildSeatOption), getCurrentSeat() ?? names[0])
     if (getCurrentSeat() === null && names.length > 0) {
         setCurrentSeat(names[0])

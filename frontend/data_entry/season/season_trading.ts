@@ -8,7 +8,7 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../../helper_functions.js'
 import { readRosterAssignments } from './season_helpers.js'
-import { getTeamNames } from '../../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../../parameter_collection/league_settings.js'
 import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildPlayerOption, buildMinimalPlayerDisplayHtml } from '../../player_display.js'
@@ -436,7 +436,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
 
     container.innerHTML = ''
 
-    const teamNames   = getTeamNames()
+    const teamNames   = getTeamIdentitiesFromSidebar()
     const assignments = readRosterAssignments()
 
     const nPicks = readRequiredIntInput('ls-n-picks')

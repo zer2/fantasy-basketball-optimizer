@@ -152,7 +152,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     container.append(trrToggle)
 
     /** Reset #ls-team-names to "Team 1".."Team N" for the current drafter count, then notify
-     *  readers (main.ts rebuilds the seat selector from getTeamNames + getTeamLabel). */
+     *  readers (the seat selector rebuilds its options from getTeamIdentitiesFromSidebar + getTeamLabel). */
     function refreshTeamIdentities(): void {
         const nDrafters = parseInt(nDraftersInput.value)
         if (isNaN(nDrafters) || nDrafters <= 0) return
@@ -278,7 +278,7 @@ export function getMode(): DraftMode {
     return (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
 }
 
-export function getTeamNames(): string[] {
+export function getTeamIdentitiesFromSidebar(): string[] {
     return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
         .value.split('\n').map(s => s.trim()).filter(Boolean)
 }
@@ -305,7 +305,7 @@ export function getLeagueSettings(): {
         n_picks:              readRequiredIntInput('ls-n-picks'),
         cash_per_team:        readRequiredIntInput('ls-cash-per-team'),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
-        team_names:           getTeamNames(),
+        team_names:           getTeamIdentitiesFromSidebar(),
     }
 }
 
