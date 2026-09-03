@@ -73,13 +73,13 @@ def clear_v0_cache() -> None:
 def _resolve_sport_params(session: Session) -> tuple[dict, dict, str]:
     """Return (all_params, sport_params, sport) for the current session."""
     all_params = load_all_params()
-    sport = session.current_params['sport']
+    sport = session.current_settings['sport']
     return all_params, all_params[sport], sport
 
 
 # ── Step 1: load player data ──────────────────────────────────────────────────
 
-def _build_v0_cache_key(current_params: dict) -> tuple | None:
+def _build_v0_cache_key(current_settings: dict) -> tuple | None:
     """Return a hashable cache key for v0_clean based on data source params.
 
     A projections blend is fully described by every source weight plus the ids of any
@@ -87,15 +87,15 @@ def _build_v0_cache_key(current_params: dict) -> tuple | None:
     id doubles as a content key. (Leaving the uploaded-source weights or the upload ids out of
     the key — as an earlier version did — served stale blends when an upload's weight
     changed, and could leak an uploaded blend into sessions that never uploaded anything.)
-    Returns None only for single-CSV mode, whose bytes arrive outside current_params.
+    Returns None only for single-CSV mode, whose bytes arrive outside current_settings.
     """
-    source_type = current_params['data_source_type']
-    sport = current_params['sport']
+    source_type = current_settings['data_source_type']
+    sport = current_settings['sport']
     if source_type == 'historical':
-        return (sport, 'historical', current_params['season'])
+        return (sport, 'historical', current_settings['season'])
     if source_type == 'projections':
-        blend_weights = current_params['blend_weights']
-        custom_data_ids = current_params.get('custom_data_ids') or []
+        blend_weights = current_settings['blend_weights']
+        custom_data_ids = current_settings.get('custom_data_ids') or []
         weight_keys = tuple(sorted(blend_weights.items()))
         upload_keys = tuple(sorted(custom_data_ids))
         return (sport, 'projections', weight_keys, upload_keys)
@@ -139,7 +139,7 @@ def _count_starters(slot_counts: dict, n_picks: int) -> int:
 
 def derive_effective_objective(session: Session) -> tuple[list[str], str | None]:
     """The categories and tiebreaker the build can actually score, derived from the
-    REQUESTED objective in current_params and the columns v2 actually carries.
+    REQUESTED objective in current_settings and the columns v2 actually carries.
 
     A category needs its own column, and a ratio category also needs the volume column
     that weights it (a percentage cannot be scored without the attempts behind it).
@@ -149,7 +149,7 @@ def derive_effective_objective(session: Session) -> tuple[list[str], str | None]
 
     Deliberately a pure derivation, recomputed by every consumer (both build steps, the
     evaluate path, the response serializers) rather than written back into
-    current_params: the request snapshot keeps saying what the user REQUESTED, the
+    current_settings: the request snapshot keeps saying what the user REQUESTED, the
     pipeline cache keys stay coherent with the request, and a category dropped for one
     data source comes back by itself when a later patch restores its columns.
     """
@@ -157,11 +157,11 @@ def derive_effective_objective(session: Session) -> tuple[list[str], str | None]
     available_columns = set(session.v2.columns)
     ratio_statistics  = sport_params['ratio-statistics']
     categories = [
-        category for category in session.current_params['categories']
+        category for category in session.current_settings['categories']
         if category in available_columns
         and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
     ]
-    tiebreaker = session.current_params['tiebreaker_category']
+    tiebreaker = session.current_settings['tiebreaker_category']
     if tiebreaker not in categories or len(categories) % 2 == 1:
         tiebreaker = None
     return categories, tiebreaker
@@ -174,9 +174,9 @@ def load_player_pool(
 ) -> None:
     """Load player_stats_v0 into session.v0_clean and build session.player_registry.
 
-    Branches on current_params['data_source_type']:
+    Branches on current_settings['data_source_type']:
       'csv'        — single uploaded CSV (csv_bytes required; format auto-detected)
-      'historical' — Snowflake historical stats for current_params['season']
+      'historical' — Snowflake historical stats for current_settings['season']
       'projections' — weighted blend of Snowflake sources + any uploaded_dfs
 
     Every branch produces a frame INDEXED BY PLAYER ID with the display name in a
@@ -187,11 +187,11 @@ def load_player_pool(
     rebuild an identical registry.
     """
 
-    #also why re-declare current_params? we can just call session.current_params every time, its not too wordy IMO
+    #also why re-declare current_settings? we can just call session.current_settings every time, its not too wordy IMO
     _, sport_params, _ = _resolve_sport_params(session)
-    current_params = session.current_params
-    source_type = current_params['data_source_type']
-    cache_key = _build_v0_cache_key(current_params)
+    current_settings = session.current_settings
+    source_type = current_settings['data_source_type']
+    cache_key = _build_v0_cache_key(current_settings)
 
     v0_with_names = None
     if cache_key is not None:
@@ -206,7 +206,7 @@ def load_player_pool(
 
         elif source_type == 'historical':
 
-            season = current_params['season']
+            season = current_settings['season']
             if not season:
                 raise ValueError(
                     "data_source.season is required when data_source.type == 'historical'"
@@ -215,7 +215,7 @@ def load_player_pool(
 
         elif source_type == 'projections':
 
-            blend_weights = current_params['blend_weights']
+            blend_weights = current_settings['blend_weights']
             # All-zero weights would blend nothing and crash deep in the pipeline with an
             # opaque 500 — reject it up front with an actionable message instead.
             if not any(weight > 0 for weight in blend_weights.values()):
@@ -248,7 +248,7 @@ def load_player_pool(
 def remove_injured_players(session: Session) -> None:
     """Resolve the free-typed injured list to player ids and drop them into v1_clean."""
 
-    injured_names = session.current_params['injured_players']
+    injured_names = session.current_settings['injured_players']
     injured_player_ids = resolve_typed_player_names(session.player_registry, injured_names)
     v1 = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
@@ -260,7 +260,7 @@ def apply_upsilon_adjustment(session: Session) -> None:
     """Run make_upsilon_adjustment using a fresh copy of v1_clean."""
 
     _, sport_params, _ = _resolve_sport_params(session)
-    upsilon = session.current_params['upsilon']
+    upsilon = session.current_settings['upsilon']
     # Always start from the clean v1 so repeated PATCH calls don't stack adjustments
     v2 = make_upsilon_adjustment(session.v1_clean.copy(), upsilon, sport_params)
     session.v2 = v2
@@ -272,12 +272,12 @@ def build_scoring_info(session: Session) -> None:
     """Build the info dict (G-scores, X-scores, covariance, etc.) onto session.info."""
 
     _, sport_params, sport = _resolve_sport_params(session)
-    current_params = session.current_params
+    current_settings = session.current_settings
 
-    scoring_format = current_params['scoring_format']
-    n_drafters  = current_params['n_drafters']
-    n_picks     = current_params['n_picks']
-    slot_counts = current_params['slot_counts']
+    scoring_format = current_settings['scoring_format']
+    n_drafters  = current_settings['n_drafters']
+    n_picks     = current_settings['n_picks']
+    slot_counts = current_settings['slot_counts']
     n_starters  = _count_starters(slot_counts, n_picks)
 
     # The pool must be able to fill every roster; otherwise the whole model is ill-posed (there is
@@ -292,15 +292,15 @@ def build_scoring_info(session: Session) -> None:
         )
 
     # The requested objective, narrowed to what this data source can score. Derived, never
-    # written back: current_params stays the request (see derive_effective_objective).
+    # written back: current_settings stays the request (see derive_effective_objective).
     effective_categories, effective_tiebreaker = derive_effective_objective(session)
 
     info = process_player_data(
         player_stats_v2   = session.v2,
         weekly_df         = None,
         mean_of_variances = _load_mean_of_variances(),
-        psi               = current_params['psi'],
-        chi               = current_params['chi'],
+        psi               = current_settings['psi'],
+        chi               = current_settings['chi'],
         scoring_format    = scoring_format,
         n_drafters        = n_drafters,
         n_starters        = n_starters,
@@ -308,7 +308,7 @@ def build_scoring_info(session: Session) -> None:
         categories        = effective_categories,
         sport             = sport,
         tiebreaker_category    = effective_tiebreaker,   # always a live category, by derivation
-        most_categories_weight = current_params.get('most_categories_weight'),
+        most_categories_weight = current_settings.get('most_categories_weight'),
     )
     # session.info is the pipeline's step-4 intermediate; step 5 builds the agent from it (and the
     # agent retains it, so consumers read G-scores via session.agent.info). On a from_step==5 patch
@@ -322,45 +322,45 @@ def build_session_agent(session: Session) -> None:
     """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
 
     _, sport_params, sport = _resolve_sport_params(session)
-    current_params = session.current_params
+    current_settings = session.current_settings
 
-    scoring_format = current_params['scoring_format']
-    n_picks     = current_params['n_picks']
-    slot_counts = current_params['slot_counts']
+    scoring_format = current_settings['scoring_format']
+    n_picks     = current_settings['n_picks']
+    slot_counts = current_settings['slot_counts']
     n_starters  = _count_starters(slot_counts, n_picks)
-    n_drafters  = current_params['n_drafters']
+    n_drafters  = current_settings['n_drafters']
     _, effective_tiebreaker = derive_effective_objective(session)
 
     session.agent = HAgent(
         info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
-        omega          = current_params['omega'],
-        gamma          = current_params['gamma'],
+        omega          = current_settings['omega'],
+        gamma          = current_settings['gamma'],
         n_picks        = n_starters,
         n_drafters     = n_drafters,
-        dynamic        = current_params['n_iterations'] > 0,
+        dynamic        = current_settings['n_iterations'] > 0,
         scoring_format = scoring_format,
-        most_categories_weight = current_params['most_categories_weight'],
+        most_categories_weight = current_settings['most_categories_weight'],
         tiebreaker_category    = effective_tiebreaker,
         sport          = sport,
         sport_params   = sport_params,
         slot_counts    = slot_counts,
-        aleph          = current_params['aleph'],
-        kappa          = current_params['kappa'],
-        reg_lambda     = current_params['reg_lambda'],
-        opponent_model_confidence = current_params['opponent_model_confidence'],
-        beth           = current_params['beth'],
+        aleph          = current_settings['aleph'],
+        kappa          = current_settings['kappa'],
+        reg_lambda     = current_settings['reg_lambda'],
+        opponent_model_confidence = current_settings['opponent_model_confidence'],
+        beth           = current_settings['beth'],
     )
 
     # Prime the neutral (empty-board) baseline as part of the build — this workflow always evaluates,
     # so the throttle ranking + auction anchor are always needed. Auction sessions pass full cash
     # (every team at cash_per_team); everything else passes None — the is_auction gate matters
     # because a cash_per_team value can linger on the session after the user leaves Auction Mode.
-    cash_per_team = current_params['cash_per_team'] if current_params['is_auction'] else None
+    cash_per_team = current_settings['cash_per_team'] if current_settings['is_auction'] else None
     default_cash = (
         {f'Team {i + 1}': cash_per_team for i in range(n_drafters)}
         if cash_per_team is not None else None
     )
-    session.agent.populate_default_h_scores(current_params['n_iterations'], default_cash)
+    session.agent.populate_default_h_scores(current_settings['n_iterations'], default_cash)
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────

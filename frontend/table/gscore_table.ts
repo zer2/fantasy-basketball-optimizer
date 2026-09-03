@@ -8,8 +8,8 @@
 
 import { getGScoreById, getShortCategoryNames } from '../app_state.js'
 import { makeFullPlayerDisplay } from '../player_display.js'
-import { getSelectedCategories, getScoringFormat } from '../parameter_collection/format_and_categories.js'
-import { getLeagueSettings } from '../parameter_collection/league_settings.js'
+import { getSelectedCategories, getScoringFormat } from '../setting_collection/format_and_categories.js'
+import { getLeagueSettings } from '../setting_collection/league_settings.js'
 import {
     stat_styler_primary, G_SCORE_MULTIPLIER, H_MULTIPLIER,
     convertWinRateToRotoPoints, computeRotoMiddle,

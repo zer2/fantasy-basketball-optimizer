@@ -1,5 +1,5 @@
 // helper_functions.ts
-// Shared UI building blocks used across sidebar and parameter_collection modules.
+// Shared UI building blocks used across sidebar and setting_collection modules.
 // Table-specific helpers (ExpandView and friends) live in table/expand_view.ts.
 
 import { pref, savePref } from './preferences.js'

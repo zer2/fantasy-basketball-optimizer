@@ -1,5 +1,5 @@
 // Collects: scoring_format, categories
-// Mirrors format_popover() in src/parameter_collection/format.py
+// Mirrors format_popover() in src/setting_collection/format.py
 //
 // Available categories and defaults are loaded from the backend config
 // (parameters.yaml) via getSportConfig(). Throws if the config is not loaded.

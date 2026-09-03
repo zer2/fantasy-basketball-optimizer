@@ -7,7 +7,7 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readRosterAssignments } from './season_helpers.js'
-import { getTeamIdentitiesFromSidebar } from '../../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import { getPlayerResultsById } from '../../app_state.js'
 import { buildPlayerOption } from '../../player_display.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'

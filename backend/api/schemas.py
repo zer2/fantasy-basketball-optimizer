@@ -63,7 +63,7 @@ class LeagueSettings(BaseModel):
         return self
 
 
-class ModelParameters(BaseModel):
+class ModelSettings(BaseModel):
     omega: float
     gamma: float
     beth: float
@@ -101,7 +101,7 @@ class SessionRequest(BaseModel):
     is_auction: bool = False
     platform: str = 'Enter your own data'
     slot_counts: dict[str, int]
-    parameters: ModelParameters
+    model_settings: ModelSettings
     data_source: DataSource
     injured_players: list[str] = []
     my_team_id: Optional[str] = None
@@ -150,7 +150,7 @@ class PatchLeague(BaseModel):
 class PatchRequest(BaseModel):
     from_step: int
     is_auction: Optional[bool] = None   # omitted = unchanged; True/False sets the league type
-    parameters: Optional[ModelParameters] = None
+    model_settings: Optional[ModelSettings] = None
     league: Optional[PatchLeague] = None
     data_source: Optional[DataSource] = None
     slot_counts: Optional[dict[str, int]] = None

@@ -4,14 +4,14 @@
 
 import { SessionRequest } from '../types.js'
 import { setGScores } from '../app_state.js'
-import { getLeagueSettings, getPlatformConfig } from '../parameter_collection/league_settings.js'
+import { getLeagueSettings, getPlatformConfig } from '../setting_collection/league_settings.js'
 import {
     getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory, getSelectedCategories,
     syncCategoriesFromBackend,
-} from '../parameter_collection/format_and_categories.js'
-import { getPlayerStatsParams } from '../parameter_collection/player_stats.js'
-import { getModelParameters } from '../parameter_collection/model_parameters.js'
-import { getSlotCounts } from '../parameter_collection/slot_counts.js'
+} from '../setting_collection/format_and_categories.js'
+import { getPlayerStatsSettings } from '../setting_collection/player_stats.js'
+import { getModelSettings } from '../setting_collection/model_parameters.js'
+import { getSlotCounts } from '../setting_collection/slot_counts.js'
 import { createSession, HTTPError } from './client.js'
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
 
@@ -148,7 +148,7 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
     const scoring_format = getScoringFormat()
     const most_categories_weight = getMostCategoriesWeight()
     const categories     = getSelectedCategories()
-    const { data_source, injured_players } = getPlayerStatsParams()
+    const { data_source, injured_players } = getPlayerStatsSettings()
     const league: SessionRequest['league'] = {
         sport, n_drafters, n_picks, scoring_format, most_categories_weight,
         tiebreaker_category: getTiebreakerCategory(), categories,
@@ -159,7 +159,7 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
         is_auction: mode === 'Auction Mode',
         platform,
         slot_counts: getSlotCounts(),
-        parameters: getModelParameters(),
+        model_settings: getModelSettings(),
         data_source,
         injured_players,
     }

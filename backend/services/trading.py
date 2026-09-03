@@ -107,7 +107,7 @@ def run_trade_analyze(
     if abs(len(my_trade) - len(their_trade)) > 6:
         return TradeAnalyzeResponse(error="Too lopsided of a trade!")
 
-    n_iterations = session.current_params['n_iterations']
+    n_iterations = session.current_settings['n_iterations']
     result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, position_check)
 
     if result is None:
@@ -350,8 +350,8 @@ def run_trade_suggest(
     # (populate_default_h_scores) and shared with auction anchoring and the throttle.
     general_values = session.agent.default_h_scores
 
-    n_picks = session.current_params['n_picks']
-    n_drafters = session.current_params['n_drafters']
+    n_picks = session.current_settings['n_picks']
+    n_drafters = session.current_settings['n_drafters']
     total_players = n_picks * n_drafters
     replacement_value = float(general_values.iloc[min(total_players, len(general_values) - 1)])
 

@@ -4,7 +4,7 @@ In-memory session store for the FastAPI backend.
 Each Session holds:
   - agent: the built HAgent — the whole scoring model (retains info; owns the default baseline)
   - info: the step-4 processed player data (pipeline intermediate; also readable via agent.info)
-  - current_params: snapshot of all mutable parameters, used to diff PATCH bodies
+  - current_settings: snapshot of all mutable parameters, used to diff PATCH bodies
   - v0_clean: immutable copy of raw player stats (before any transformations)
   - v1_clean: immutable copy after injured players dropped (before upsilon)
   - v2: DataFrame after upsilon adjustment (input to process_player_data)
@@ -29,7 +29,7 @@ class Session:
     last_accessed: float = field(default_factory=time.time)
 
     # Snapshot of current parameters — used to diff PATCH requests
-    current_params: dict = field(default_factory=dict)
+    current_settings: dict = field(default_factory=dict)
 
     # Pipeline intermediate DataFrames (kept for resumable PATCH re-runs from a step).
     # All three are indexed by player id; display names live only in player_registry.

@@ -171,7 +171,7 @@ This is the most expensive call; all subsequent calls are faster.
     "PG": 1, "SG": 1, "SF": 1, "PF": 1, "C": 2,
     "G": 2, "F": 2, "Util": 3
   },
-  "parameters": {
+  "model_settings": {
     "omega": 0.85,
     "gamma": 1.0,
     "beth": 0.0,
@@ -280,7 +280,7 @@ table above. All fields except `from_step` are optional — only send what chang
 ```json
 {
   "from_step": 5,
-  "parameters": {
+  "model_settings": {
     "omega": 0.95,
     "gamma": 1.2,
     "beth": 0.0,

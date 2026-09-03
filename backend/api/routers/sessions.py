@@ -30,10 +30,10 @@ router = APIRouter()
 
 # ── Request/response mapping helpers (transport-tier: request DTO <-> plain dicts) ──────
 
-def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
-    """Flatten a SessionRequest into the flat current_params dict."""
+def _build_current_settings(req: SessionRequest, all_params: dict) -> dict:
+    """Flatten a SessionRequest into the flat current_settings dict."""
     sport      = req.league.sport
-    p          = req.parameters
+    p          = req.model_settings
     categories = req.league.categories or all_params[sport]['default-categories']
     n          = req.league.n_drafters
 
@@ -73,12 +73,12 @@ def _build_current_params(req: SessionRequest, all_params: dict) -> dict:
 
 
 def _build_patch(req: PatchRequest) -> dict:
-    """Assemble the current_params patch from the non-None pieces of a PatchRequest."""
+    """Assemble the current_settings patch from the non-None pieces of a PatchRequest."""
     patch: dict = {}
     if req.is_auction is not None:
         patch['is_auction'] = req.is_auction
-    if req.parameters is not None:
-        patch.update(req.parameters.model_dump())
+    if req.model_settings is not None:
+        patch.update(req.model_settings.model_dump())
     if req.league is not None:
         for key, val in req.league.model_dump().items():
             if val is not None:
@@ -178,11 +178,11 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
 
     # Resolve any live-platform connection up front so a bad league fails before the pipeline.
     platform_config = resolve_platform_config(req.platform, req.platform_config, user_key)
-    current_params = _build_current_params(req, all_params)
+    current_settings = _build_current_settings(req, all_params)
 
     try:
         session = build_session(
-            current_params  = current_params,
+            current_settings  = current_settings,
             platform_config = platform_config,
             csv_bytes       = csv_bytes,
             uploaded_dfs    = uploaded_dfs,
@@ -210,7 +210,7 @@ def patch_session_route(req: PatchRequest, session: Session = Depends(require_se
     csv_bytes: Optional[bytes] = None
     uploaded_dfs: Optional[dict] = None
     if req.data_source is not None and req.data_source.custom_data_ids is not None:
-        sport_params = load_all_params()[session.current_params['sport']]
+        sport_params = load_all_params()[session.current_settings['sport']]
         if req.data_source.type == 'csv':
             csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
         elif req.data_source.type == 'projections':

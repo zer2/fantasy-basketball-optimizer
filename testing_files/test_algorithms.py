@@ -55,7 +55,7 @@ def _build_default_session_request() -> dict:
             , 'categories':     nba['default-categories']
         }
         , 'slot_counts': slot_counts
-        , 'parameters': {
+        , 'model_settings': {
             'omega':             opts['omega']['default']
             , 'gamma':           opts['gamma']['default']
             , 'beth':            opts['beth']['default']

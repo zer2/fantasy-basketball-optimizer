@@ -4,8 +4,8 @@
 
 import { PlayerResult } from '../types.js'
 import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat } from '../app_state.js'
-import { getLeagueSettings, getPlatformConfig, getMode } from '../parameter_collection/league_settings.js'
-import { getSlotCounts } from '../parameter_collection/slot_counts.js'
+import { getLeagueSettings, getPlatformConfig, getMode } from '../setting_collection/league_settings.js'
+import { getSlotCounts } from '../setting_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'

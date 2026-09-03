@@ -1,11 +1,11 @@
 // Collects: all model parameters (upsilon, psi, chi, aleph, omega, gamma, beth, n_iterations)
 // Mirrors player_stat_param_popover() + algorithm_param_popover()
-//   in src/parameter_collection/parameters.py
+//   in src/setting_collection/parameters.py
 //
 // Defaults are loaded from the backend config (parameters.yaml) via
 // getSportConfig().
 
-import { ModelParameters } from '../types.js'
+import { ModelSettings } from '../types.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
@@ -90,7 +90,7 @@ function resolveSpec(spec: ParamSpec): { default: number; min: number; max: numb
  * collapsible ⓘ captions. Covers all parameters from both player_stat_param_popover()
  * and algorithm_param_popover() in parameters.py.
  */
-export function renderModelParameters(container: HTMLElement): void {
+export function renderModelSettings(container: HTMLElement): void {
     const grid = document.createElement('div')
     grid.className = 'param-grid'
     container.append(grid)
@@ -150,7 +150,7 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
 }
 
 /** Reads all model parameter values from the DOM and returns them as a typed object. */
-export function getModelParameters(): ModelParameters {
+export function getModelSettings(): ModelSettings {
     return {
         upsilon:         readNumberInput('mp-upsilon'),
         psi:             readNumberInput('mp-psi'),

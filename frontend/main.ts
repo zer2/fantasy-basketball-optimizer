@@ -1,7 +1,7 @@
 // main.ts
 // Application entry point: wiring, in order. Builds the sidebar sections, registers every
 // event listener, and triggers the first backend evaluation. The widgets it places live in
-// their own modules (seat_selector.ts, account_row.ts, parameter_collection/*); the heavy
+// their own modules (seat_selector.ts, account_row.ts, setting_collection/*); the heavy
 // logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
@@ -23,15 +23,15 @@ import { renderAccountRow } from './account_row.js'
 import {
     renderLeagueSettings, getLeagueSettings, isPlatformConnected,
     getModeSelectElement, getPlatformSelectElement,
-} from './parameter_collection/league_settings.js'
+} from './setting_collection/league_settings.js'
 import { TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories,
-} from './parameter_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsParams, waitForSeasons, markUploadedSourcesExpired } from './parameter_collection/player_stats.js'
-import { renderModelParameters, refreshOpponentConfidenceControl, getModelParameters } from './parameter_collection/model_parameters.js'
-import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './parameter_collection/slot_counts.js'
+} from './setting_collection/format_and_categories.js'
+import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, markUploadedSourcesExpired } from './setting_collection/player_stats.js'
+import { renderModelSettings, refreshOpponentConfidenceControl, getModelSettings } from './setting_collection/model_parameters.js'
+import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
 // depending on the current mode selector value.
@@ -213,9 +213,9 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
     // Switching the data source to Historical starts an async seasons fetch and fires this
     // change handler in the same breath, so the ps-season dropdown may not exist yet. Wait
     // for it (already resolved in every other case) rather than read a season that is not
-    // there — getPlayerStatsParams rightly refuses a historical source without one.
+    // there — getPlayerStatsSettings rightly refuses a historical source without one.
     await waitForSeasons()
-    const { data_source, injured_players } = getPlayerStatsParams()
+    const { data_source, injured_players } = getPlayerStatsSettings()
     // The boards reset when the player pool's identity changes (data source, season,
     // uploads, injured list) so stale names are never sent to the backend. A blend-weight
     // change re-weights the same pool, so in-progress draft/auction boards survive it.
@@ -280,12 +280,12 @@ formatSection.addEventListener('change', () => {
 // ─── 4. Model Parameters ──────────────────────────────────────────────────────
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
-renderModelParameters(modelSection)
+renderModelSettings(modelSection)
 // The format section is built first, so its current value decides the control's initial visibility.
 refreshOpponentConfidenceControl(getScoringFormat())
-const applyModelParameters = makeApplyChain('Model parameters apply')
+const applyModelSettings = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
-    applyModelParameters(3, { parameters: getModelParameters() })
+    applyModelSettings(3, { model_settings: getModelSettings() })
 })
 
 // ─── 5. Position Parameters ───────────────────────────────────────────────────

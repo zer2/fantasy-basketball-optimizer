@@ -215,7 +215,7 @@ def test_season_mode_waiver():
     session_id = response.json()['session_id']
 
     session      = get_session(session_id)
-    n_iterations = session.current_params['n_iterations']
+    n_iterations = session.current_settings['n_iterations']
 
     drafter_1_roster = _DEFAULT_SEASON_ROSTERS['Drafter 1']
 

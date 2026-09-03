@@ -34,7 +34,7 @@ def refresh_platform_player_id_lookup(session: Session) -> None:
     )
 
 
-def normalize_objective_settings(current_params: dict) -> None:
+def normalize_objective_settings(current_settings: dict) -> None:
     """Settle the Head-to-Head objective dial and tiebreaker against the format, in place.
 
     Under Rotisserie the dial is pinned to None: that format ignores it, HAgent rejects a number
@@ -49,7 +49,7 @@ def normalize_objective_settings(current_params: dict) -> None:
     keep the choice while the count is briefly odd, so that it returns when the count is even
     again; what must not happen is that inert value splitting the cache.
 
-    Applied wherever current_params is assembled or patched, so no caller has to remember.
+    Applied wherever current_settings is assembled or patched, so no caller has to remember.
 
     Validation is layered, not duplicated: the LeagueSettings schema validator rejects
     incoherent CREATE requests outright (422 — a client that names a tiebreaker outside its
@@ -59,26 +59,26 @@ def normalize_objective_settings(current_params: dict) -> None:
     and experiments (HAgent.__init__, plus narrower checks in process_player_data and
     algorithm_helpers). Removing any one layer loses a distinct guarantee.
     """
-    if current_params['scoring_format'] == 'Rotisserie':
-        current_params['most_categories_weight'] = None
-        current_params['tiebreaker_category']    = None
+    if current_settings['scoring_format'] == 'Rotisserie':
+        current_settings['most_categories_weight'] = None
+        current_settings['tiebreaker_category']    = None
         return
 
-    weight = current_params['most_categories_weight']
+    weight = current_settings['most_categories_weight']
     if weight is None or not 0.0 <= weight <= 1.0:
         raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
                          f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
 
-    categories = current_params['categories']
-    tiebreaker = current_params['tiebreaker_category']
+    categories = current_settings['categories']
+    tiebreaker = current_settings['tiebreaker_category']
     if tiebreaker is not None and (weight == 0
                                    or len(categories) % 2 == 1
                                    or tiebreaker not in categories):
-        current_params['tiebreaker_category'] = None
+        current_settings['tiebreaker_category'] = None
 
 
 def build_session(
-    current_params: dict
+    current_settings: dict
     , platform_config: Optional[PlatformConfig]
     , csv_bytes: Optional[bytes]
     , uploaded_dfs: Optional[dict]
@@ -89,11 +89,11 @@ def build_session(
     that to a 500.
     """
     session = create_session()
-    normalize_objective_settings(current_params)
-    session.current_params = current_params
+    normalize_objective_settings(current_settings)
+    session.current_settings = current_settings
     if platform_config is not None:
         session.platform_config = platform_config
-        session.current_params['team_names'] = list(platform_config.teams_dict.keys())
+        session.current_settings['team_names'] = list(platform_config.teams_dict.keys())
     try:
         build_agent(session, from_step=1, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
         if session.platform_config is not None:
@@ -110,7 +110,7 @@ def build_session(
 _PIPELINE_CACHE_ENTRIES = 4
 
 
-def _build_pipeline_cache_key(current_params: dict) -> tuple:
+def _build_pipeline_cache_key(current_settings: dict) -> tuple:
     """A hashable snapshot of the full parameter set that produced a pipeline build."""
     def freeze(value):
         if isinstance(value, dict):
@@ -118,7 +118,7 @@ def _build_pipeline_cache_key(current_params: dict) -> tuple:
         if isinstance(value, (list, tuple)):
             return tuple(freeze(v) for v in value)
         return value
-    return freeze(current_params)
+    return freeze(current_settings)
 
 
 def apply_patch(
@@ -140,7 +140,7 @@ def apply_patch(
     connecting a platform needs no pipeline rerun of its own.
     """
     if session.agent is not None:
-        outgoing_key = _build_pipeline_cache_key(session.current_params)
+        outgoing_key = _build_pipeline_cache_key(session.current_settings)
         session.pipeline_cache[outgoing_key] = {
             'agent':           session.agent,
             'info':            session.info,
@@ -153,16 +153,16 @@ def apply_patch(
         while len(session.pipeline_cache) > _PIPELINE_CACHE_ENTRIES:
             session.pipeline_cache.popitem(last=False)
 
-    session.current_params.update(patch)
+    session.current_settings.update(patch)
     # After the merge, not before: a patch can change the format, the weight, or both, and the
     # rule is about the pair that results.
-    normalize_objective_settings(session.current_params)
+    normalize_objective_settings(session.current_settings)
 
     if platform_config is not None:
         session.platform_config = platform_config
-        session.current_params['team_names'] = list(platform_config.teams_dict.keys())
+        session.current_settings['team_names'] = list(platform_config.teams_dict.keys())
 
-    patched_pipeline_key = _build_pipeline_cache_key(session.current_params)
+    patched_pipeline_key = _build_pipeline_cache_key(session.current_settings)
     cached_pipeline = session.pipeline_cache.get(patched_pipeline_key)
     if cached_pipeline is not None:
         session.agent           = cached_pipeline['agent']

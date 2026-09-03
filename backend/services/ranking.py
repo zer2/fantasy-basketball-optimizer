@@ -53,7 +53,7 @@ def rank_candidates(
 
     Args:
         session:            The active session (fetched by the caller). n_iterations
-                            is read from its current_params.
+                            is read from its current_settings.
         player_assignments: Maps each team name to the list of player ids already
                             drafted/won by that team.
         my_team_id:         The team name whose perspective the evaluation is from.
@@ -66,9 +66,9 @@ def rank_candidates(
     """
     info           = session.agent.info
     h_agent              = session.agent
-    current_params = session.current_params
+    current_settings = session.current_settings
     categories, _  = derive_effective_objective(session)
-    n_iterations   = current_params['n_iterations']
+    n_iterations   = current_settings['n_iterations']
     player_registry = session.player_registry
 
     # Every rostered player must exist in the pool under exactly the identity the board
@@ -131,7 +131,7 @@ def rank_candidates(
 
     with record_phase('build_candidates'):
         candidates = _build_candidates(
-            h_score_result, h_agent, categories, player_assignments, my_team_id, current_params,
+            h_score_result, h_agent, categories, player_assignments, my_team_id, current_settings,
             player_registry,
             remaining_cash,
             generic_h_scores=session.agent.default_h_scores,
@@ -153,7 +153,7 @@ def _build_candidates(
     categories: list[str],
     player_assignments: dict[str, list[int]],
     my_team_id: str,
-    current_params: dict,
+    current_settings: dict,
     player_registry: dict,
     remaining_cash: Optional[dict[str, float]] = None,
     generic_h_scores: Optional[pd.Series] = None,
@@ -171,7 +171,7 @@ def _build_candidates(
         categories:     Ordered list of scoring category names.
         player_assignments: Current draft/auction state (team → player list).
         my_team_id:     The user's team identifier.
-        current_params: Session parameters dict (contains slot_counts, etc.).
+        current_settings: Session parameters dict (contains slot_counts, etc.).
         remaining_cash: Per-team auction budget remaining; None in draft mode.
 
     Returns:
@@ -254,7 +254,7 @@ def _build_candidates(
     my_players         = list(player_assignments.get(my_team_id, []))
     position_structure = h_agent.position_structure
     base_list          = position_structure['base_list']
-    slot_counts        = current_params['slot_counts']
+    slot_counts        = current_settings['slot_counts']
     slot_names         = _make_slot_names(h_agent.position_config)
 
     # ── Auction dollar values (SAVOR) ─────────────────────────────────────────
@@ -278,8 +278,8 @@ def _build_candidates(
     if remaining_cash is not None:
         # The evaluate route enforces that remaining_cash and cash_per_team are set together, so an
         # auction evaluate always has cash_per_team here (no defensive fallback needed).
-        cash_per_team   = current_params['cash_per_team']
-        streaming_noise = current_params['streaming_noise']
+        cash_per_team   = current_settings['cash_per_team']
+        streaming_noise = current_settings['streaming_noise']
         total_picks     = h_agent.n_drafters * h_agent.n_picks
 
         all_players_chosen = [

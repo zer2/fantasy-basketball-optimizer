@@ -4,7 +4,7 @@
 
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { defaultTeamLabel } from '../team_labels.js'
-import { getTeamIdentitiesFromSidebar } from '../../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 
 
 /** Reads roster assignments from the Rosters tab grid (sr-player-{row}-{col}). The single

@@ -13,7 +13,7 @@ import { getDrafterMethod } from './drafter_methods.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
 import { getTeamLabel, defaultTeamLabel, makeTeamLabelInput } from './team_labels.js'
 import { setSeatSelectorVisible } from '../seat_selector.js'
-import { getTeamIdentitiesFromSidebar } from '../parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_settings.js'
 import {
     DraftConfig,
     getPickRow, getPickDrafter, getDrafted, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getConfigKey,

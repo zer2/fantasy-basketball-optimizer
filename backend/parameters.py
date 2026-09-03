@@ -5,6 +5,10 @@ backend top level and imports nothing internal. The parse is cached and reused u
 parameters.yaml changes on disk (keyed on its mtime), so a single request doesn't re-read
 and re-parse the file the handful of times it asks for params. Each call returns an
 independent copy, so a caller can't mutate the shared cache.
+
+Vocabulary: in code, "parameters" always means values from this file (all_params, the
+per-sport sport_params); the user's choices are "settings" (current_settings, the wire
+model_settings). Client-facing text may still say "parameters" descriptively.
 """
 
 from __future__ import annotations

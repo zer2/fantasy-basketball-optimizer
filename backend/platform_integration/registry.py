@@ -28,7 +28,7 @@ def is_live_platform(platform: str) -> bool:
 
 def get_integration(platform: str, credentials: Optional[dict] = None) -> PlatformIntegration:
     """Construct the integration for a platform. The credentials bag is spread into the
-    class's explicit constructor params (Yahoo's {'auth_dir': ...} -> auth_dir=...);
+    class's explicit constructor credentials (Yahoo's {'auth_dir': ...} -> auth_dir=...);
     Fantrax takes none, so an empty bag constructs it with no args. A bag key the
     constructor doesn't declare raises TypeError — fail-noisily."""
     if platform not in _INTEGRATION_CLASSES_BY_PLATFORM:

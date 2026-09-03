@@ -1,5 +1,5 @@
 // Collects: data_source (type, blend_weights, custom_data_ids), injured_players
-// Mirrors player_stats_popover() in src/parameter_collection/player_stats.py
+// Mirrors player_stats_popover() in src/setting_collection/player_stats.py
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeWeightSlider } from '../helper_functions.js'
@@ -104,7 +104,7 @@ let _seasonsPromise: Promise<void> = Promise.resolve()
 /** Returns a promise that resolves once the seasons dropdown is ready (immediately when
  *  no fetch is needed or one has already completed). Anything that reads the data source
  *  must await this first: until the fetch lands there is no `ps-season` element, and
- *  getPlayerStatsParams() refuses to report a historical source without a season. */
+ *  getPlayerStatsSettings() refuses to report a historical source without a season. */
 export function waitForSeasons(): Promise<void> {
     return _seasonsPromise
 }
@@ -368,7 +368,7 @@ function appendCustomUploadRow(
  * Reads data source type, blend weights, and excluded player list from the DOM.
  * custom_data_ids are populated by the CSV upload handlers above.
  */
-export function getPlayerStatsParams(): { data_source: DataSource; injured_players: string[] } {
+export function getPlayerStatsSettings(): { data_source: DataSource; injured_players: string[] } {
     const type = (document.getElementById('ps-data-type') as HTMLInputElement).value as DataSource['type']
 
     // Snowflake sources plus one entry per live upload, keyed by its data_id.

@@ -1,5 +1,5 @@
 // Collects: slot_counts, bench_slots
-// Mirrors position_requirement_popover() in src/parameter_collection/position_requirement.py
+// Mirrors position_requirement_popover() in src/setting_collection/position_requirement.py
 //
 // Position types and default slot counts are loaded from the backend config
 // (parameters.yaml) via getSportConfig().

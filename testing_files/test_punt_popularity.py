@@ -41,7 +41,7 @@ def test_punt_popularity(objective):
     """Pin the field punt-popularity vector the kappa penalty is built from."""
     request = _build_session_request(objective=objective)
     request['data_source']['season'] = '2024-25'
-    request['parameters']['kappa']   = 0.5   # any > 0 triggers the (kappa-independent) measurement
+    request['model_settings']['kappa']   = 0.5   # any > 0 triggers the (kappa-independent) measurement
 
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'Session creation failed: {response.text}'

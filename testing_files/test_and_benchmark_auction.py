@@ -29,7 +29,7 @@ def test_evaluate_auction():
     session_id = response.json()['session_id']
 
     session      = get_session(session_id)
-    n_drafters   = session.current_params['n_drafters']
+    n_drafters   = session.current_settings['n_drafters']
 
     team_names = [f'Drafter {i + 1}' for i in range(n_drafters)]
 

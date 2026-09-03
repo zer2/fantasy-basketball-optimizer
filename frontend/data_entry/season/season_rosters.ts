@@ -9,8 +9,8 @@ import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
-import { getSelectedCategories } from '../../parameter_collection/format_and_categories.js'
-import { getLeagueSettings, getTeamIdentitiesFromSidebar } from '../../parameter_collection/league_settings.js'
+import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
+import { getLeagueSettings, getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import { evaluateTeamHScore, getLivePlatformRosters } from '../../api/season_session.js'
 import { makeSpacerTh } from '../../table/table_helpers.js'
 import {

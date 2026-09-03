@@ -8,7 +8,7 @@
 import { makeCustomSelect } from './custom_select.js'
 import { getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { getTeamLabel, defaultTeamLabel } from './data_entry/team_labels.js'
-import { getTeamIdentitiesFromSidebar } from './parameter_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar } from './setting_collection/league_settings.js'
 
 let seatSelect: ReturnType<typeof makeCustomSelect> | null = null
 

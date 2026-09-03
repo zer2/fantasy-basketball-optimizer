@@ -57,7 +57,7 @@ class PlatformSelections:
 
 class PlatformIntegration(abc.ABC):
     # No __init__ here on purpose: the ABC constrains behavior, not construction.
-    # Each integration declares its own explicit constructor params (Fantrax none;
+    # Each integration declares its own explicit constructor credentials (Fantrax none;
     # Yahoo auth_dir), and the registry spreads the credentials bag into them via
     # get_integration's cls(**(credentials or {})).
 

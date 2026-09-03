@@ -1,6 +1,6 @@
 // Collects: sport, platform, mode, n_drafters, n_picks,
 //           cash_per_team (Auction Mode only), third_round_reversal, team_names, my_team_id
-// Mirrors league_settings_popover() in src/parameter_collection/league_settings.py
+// Mirrors league_settings_popover() in src/setting_collection/league_settings.py
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeNumberInput, makeSidebarToggle, readRequiredIntInput } from '../helper_functions.js'

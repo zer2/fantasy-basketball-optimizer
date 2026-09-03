@@ -114,7 +114,7 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
     if selections.costs is None:
         remaining_cash = None
     else:
-        cash_per_team = session.current_params['cash_per_team']
+        cash_per_team = session.current_settings['cash_per_team']
         remaining_cash = {
             team: cash_per_team - sum(team_costs)
             for team, team_costs in selections.costs.items()

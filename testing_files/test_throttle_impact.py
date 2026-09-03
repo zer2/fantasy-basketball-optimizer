@@ -35,7 +35,7 @@ def _evaluate(session, mode, **kwargs):
 def test_throttle_draft_close_to_exact():
     """The tiered draft throttle must not move the top-N h-score ranking or scores meaningfully."""
     session = get_session(client.post('/sessions', json=_build_session_request()).json()['session_id'])
-    n_drafters = session.current_params['n_drafters']
+    n_drafters = session.current_settings['n_drafters']
     top_eight  = list(session.agent.info['G-scores'].sort_values('Total', ascending=False).head(8).index)
     player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
     player_assignments['Team 1'] = top_eight[:4]
@@ -59,7 +59,7 @@ def test_throttle_auction_close_to_exact():
     """The light auction throttle must keep the top-N ordering, h-scores, and dollar values close."""
     req = _build_session_request(objective='Each Category', cash_per_team=200)
     session = get_session(client.post('/sessions', json=req).json()['session_id'])
-    teams = [f'Drafter {i + 1}' for i in range(session.current_params['n_drafters'])]
+    teams = [f'Drafter {i + 1}' for i in range(session.current_settings['n_drafters'])]
 
     player_assignments = {t: [] for t in teams}
     player_assignments['Drafter 1'] = resolve_player_ids(session, ['Giannis Antetokounmpo'])
