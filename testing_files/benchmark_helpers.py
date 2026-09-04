@@ -128,6 +128,7 @@ def _build_session_request(
         'model_settings': {
             'omega':           nba_options['omega']['default'],
             'gamma':           nba_options['gamma']['default'],
+            'pick_pool_size':  nba_options['pick_pool_size']['default'],
             'n_iterations':    nba_options['n_iterations']['default'],
             'beth':            nba_options['beth']['default'],
             'upsilon':         nba_options['upsilon']['default'],

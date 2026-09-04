@@ -333,8 +333,7 @@ def build_session_agent(session: Session) -> None:
 
     session.agent = HAgent(
         info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
-        omega          = current_settings['omega'],
-        gamma          = current_settings['gamma'],
+        pick_pool_size = current_settings['pick_pool_size'],
         n_picks        = n_starters,
         n_drafters     = n_drafters,
         dynamic        = current_settings['n_iterations'] > 0,

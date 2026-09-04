@@ -6,6 +6,8 @@ The routes here own the HTTP concerns — parse the request into plain dicts, re
 
 from __future__ import annotations
 
+import logging
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -50,8 +52,7 @@ def _build_current_settings(req: SessionRequest, all_params: dict) -> dict:
         'injured_players':  req.injured_players,
         'team_names':       [f'Drafter {i + 1}' for i in range(n)],
         # model parameters
-        'omega':            p.omega,
-        'gamma':            p.gamma,
+        'pick_pool_size':   p.pick_pool_size,
         'beth':             p.beth,
         'upsilon':          p.upsilon,
         'psi':              p.psi,
@@ -162,6 +163,9 @@ def _serialize_player_registry(session) -> list[PlayerRegistryEntry]:
              dependencies=[Depends(enforce_rate_limit(BUILD_POLICY))])
 def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(current_user_key_optional)):
     all_params = load_all_params()
+    # The full incoming request, so a session's behavior is always attributable to its exact
+    # inputs (settings arrive from persisted client prefs, which are easy to misremember).
+    logging.getLogger('fbbo').info('create_session request: %s', req.model_dump_json())
     if req.league.sport not in all_params:
         raise HTTPException(status_code=400, detail=f'Unknown sport: {req.league.sport!r}')
 
@@ -206,6 +210,8 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
               dependencies=[Depends(enforce_rate_limit(REBUILD_POLICY))])
 def patch_session_route(req: PatchRequest, session: Session = Depends(require_session),
                         user_key: Optional[str] = Depends(current_user_key_optional)):
+    # Full request logging, matching the session-create log (see create_session_route).
+    logging.getLogger('fbbo').info('patch request: %s', req.model_dump_json())
 
     csv_bytes: Optional[bytes] = None
     uploaded_dfs: Optional[dict] = None

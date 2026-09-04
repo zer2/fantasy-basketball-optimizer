@@ -1,4 +1,4 @@
-// Collects: all model parameters (upsilon, psi, chi, aleph, omega, gamma, beth, n_iterations)
+// Collects: all model parameters (upsilon, psi, chi, aleph, pick_pool_size, beth, n_iterations)
 // Mirrors player_stat_param_popover() + algorithm_param_popover()
 //   in src/setting_collection/parameters.py
 //
@@ -11,7 +11,7 @@ import { pref, savePref } from '../preferences.js'
 
 interface ParamSpec {
     id:      string
-    key:     string        // key in config.options (e.g. 'omega', 'S')
+    key:     string        // key in config.options (e.g. 'pick_pool_size', 'S')
     label:   string
     caption: string
     step:    number
@@ -55,12 +55,10 @@ const PARAM_SPECS: ParamSpec[] = [
                + 'off entirely.',
     },
     {
-        id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
-        caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
-    },
-    {
-        id: 'mp-gamma', key: 'gamma', label: 'γ (gamma)', step: 0.05,
-        caption: 'Complements omega. Higher values require more general value to be sacrificed to pursue a punting strategy.',
+        id: 'mp-pick-pool-size', key: 'pick_pool_size', label: 'M (pool size)', step: 1,
+        caption: 'How many available players each future pick effectively chooses among. Larger '
+               + 'windows give future picks more freedom to pursue the build, making punting more '
+               + 'aggressive; smaller windows keep builds balanced.',
     },
     {
         id: 'mp-beth', key: 'beth', label: 'ב (beth)', step: 0.5,
@@ -159,8 +157,7 @@ export function getModelSettings(): ModelSettings {
         kappa:           readNumberInput('mp-kappa'),
         reg_lambda:      readNumberInput('mp-reg-lambda'),
         opponent_model_confidence: readNumberInput('mp-opponent-confidence'),
-        omega:           readNumberInput('mp-omega'),
-        gamma:           readNumberInput('mp-gamma'),
+        pick_pool_size:  readNumberInput('mp-pick-pool-size'),
         beth:            readNumberInput('mp-beth'),
         n_iterations:    readNumberInput('mp-n-iterations'),
         streaming_noise: readNumberInput('mp-s'),

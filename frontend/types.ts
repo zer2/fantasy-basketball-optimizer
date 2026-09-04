@@ -64,8 +64,9 @@ export interface Roster {
 // ─── API request types ────────────────────────────────────────────────────────
 
 export interface ModelSettings {
-    omega: number
-    gamma: number
+    // Window of the truncated-max future-pick model: how many surviving players each
+    // future pick effectively chooses among (the punt-aggressiveness dial).
+    pick_pool_size: number
     beth: number
     upsilon: number
     psi: number

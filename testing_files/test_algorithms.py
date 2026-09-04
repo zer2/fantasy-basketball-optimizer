@@ -101,6 +101,7 @@ def _build_h_agent(
         info           = info
         , omega        = opts['omega']['default']
         , gamma        = opts['gamma']['default']
+        , pick_pool_size = opts['pick_pool_size']['default']
         , n_picks      = opts['n_picks']['default']
         , n_drafters   = opts['n_drafters']['default']
         , dynamic      = True

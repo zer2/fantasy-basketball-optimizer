@@ -9,6 +9,8 @@ Rotisserie helpers, AdamOptimizer) are unchanged from that original.
 
 from __future__ import annotations
 
+import logging
+
 from typing import Optional
 
 import numpy as np
@@ -53,11 +55,20 @@ def _softmax_rows(logits):
 # because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
 # gradient-iteration budget rather than still drifting at the final iteration.
 _SHARES_LEARNING_RATE = 0.3
+# Adam's per-coordinate step is capped at +/- the learning rate, so lr x n_iterations is a
+# travel budget in weight space. The truncated-max model's optima sit far from the neutral
+# start (a real punt moves a weight ~0.1 against neutral entries of ~0.11), so the rate is
+# 10x the value tuned for the simplified-form model, whose optima hugged neutral: at 0.001
+# the descent ran out of road and every build parked near its start, tilts half-formed.
+_CATEGORY_LEARNING_RATE = 0.01
 
-# Punt-seeding for the cold-start category weights (replaces the old heuristic init). Each seed gently
-# down-weights one category to this fraction of neutral; a gentle seed starts near the 30-iteration
-# optimum so the short descent can reach it, whereas an aggressive punt starts too far and loses.
-_PUNT_SEED_FACTOR = 0.9
+# Punt-seeding for the cold-start category weights (replaces the old heuristic init). Each seed
+# down-weights one category to this fraction of neutral. 0.9 was tuned for the simplified-form
+# model, whose converged weights hugged neutral; the truncated-max model's punt optima sit at
+# 0.1-0.5 of neutral, so 0.9 seeds all scored nearly alike (the scan's argmax picked punt
+# identities from noise) while sitting in the steepest part of the supply curve. 0.5 puts each
+# seed at a genuinely differentiated punt depth the scan can compare.
+_PUNT_SEED_FACTOR = 0.5
 # From this many of the drafter's own picks on, the roster has a real shape, so seed a single punt of
 # its weakest category. Earlier than that there is no reliable weakness, so multi-start over every punt.
 _WEAKNESS_SEED_MIN_ROSTER = 3
@@ -75,18 +86,22 @@ _LOWVAR_TILT = 0.5
 # committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
 # deviate. The per-pick strength lambda follows a Gaussian (phi) schedule (built per agent from n_picks
 # in __init__): it starts at the peak on an empty roster and decays to ~0 by the final pick.
-# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster). Surfaced as
-# the session parameter reg_lambda; this value is what parameters.yaml defaults it to, kept here as the
-# figure testing settled on.
-_REG_STRENGTH = 0.00005
-# reg_lambda reaches the agent in units of REG_LAMBDA_UNIT, so that a sidebar box reads 0.05 rather
-# than 0.00005 -- the scale the other model parameters live on. This is the only place the two
-# representations meet.
-REG_LAMBDA_UNIT = 1e-3
+# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster), as a
+# FRACTION of the per-iteration category step. Surfaced as the session parameter reg_lambda; this
+# value is what parameters.yaml defaults it to — 5% of each Adam step, the ratio testing settled on
+# (as 0.00005 against the original 0.001 rate).
+_REG_STEP_FRACTION = 0.05
+# reg_lambda is denominated in per-iteration category steps: the proximal shrink competes with
+# Adam's step (capped at +/- the learning rate per coordinate), so a raw weight-unit lambda would
+# silently change meaning whenever the rate is recalibrated — the 0.001 -> 0.01 change for the
+# truncated-max model's longer travel distances would have made it 10x weaker. Tying the unit to
+# the rate keeps a sidebar 0.05 meaning "5% of each step" under any rate.
+REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
-# component from the singular w==v ray. Only needed if reg_lambda's ceiling is ever raised past the
-# ~5e-4 it caps at today (parameters.yaml max 0.5 x REG_LAMBDA_UNIT), where the small empty-board
-# deviations let the shrink reach v and term_five goes singular (EC in particular).
+# component from the w==v ray. Snapping onto v is only cosmetic for the truncated-max path (finite at
+# w == v via its rho clamp; the term_five 0/0 lived in the legacy simplified-form methods), so the
+# guard stays off; raise it if reg_lambda's ceiling (0.5 x REG_LAMBDA_UNIT = half a step) is ever
+# actually used and neutral-adjacent builds start pinning to exact v.
 _REG_FLOOR = 0.0
 # Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
 # (few bases), so they need a firmer pull toward uniform to have a comparable effect.
@@ -128,7 +143,10 @@ _OPPONENT_INFERENCE_ITERATIONS = 50
 # convergence experiment), the 8-pass serve lands within 0.16pp of the 15-pass serve with an identical
 # top-40, and dropping to 7 or 6 quintuples that drift. Cost is quadratic in the pass count (pass k
 # faces k stacked field snapshots), so 15 -> 8 halves populate time.
-_OPPONENT_BOOTSTRAP_PASSES = 8
+# 16 (was 8): the average-field drift diagnostic showed the archetype mixture still
+# rebalancing at 8 passes (drift plateau ~0.12-0.27); at 16 the running-average field
+# converges cleanly (0.012 -> 0.0006) and the served equilibrium survives defection pins.
+_OPPONENT_BOOTSTRAP_PASSES = 16
 # Rotisserie keeps the longer run: it uses the EMA field path (window 0), whose fixed-rate smoothing
 # stabilises more slowly than the window's 1/t fictitious-play steps — at 8 passes a 2024-25 top-12
 # Roto build hard-punts a category (breaking the minimal-punting floor), at 15 none do. Roto passes
@@ -152,10 +170,25 @@ _OPPONENT_SMOOTHING = 0.3
 # the FINAL pass's single field. Rotisserie always uses the EMA path (its standings objective scales
 # with opponent count, and its punts are structural anyway).
 _OPPONENT_FIELD_WINDOW = 999
+# How many of the newest bootstrap field snapshots stay armed BEYOND populate, so the
+# Level-1/Level-2 serves and every live evaluate face the equilibrium MIXTURE (the
+# empirical distribution of recent fields) rather than one knife-edge phase of it.
+# Bounds the evaluate cost: opponent columns scale as n_teams x this.
+_SERVE_FIELD_STACK = 8
 # Descent iterations for the field-building bootstrap passes. These only need approximate opponent builds
 # (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
 # the session's full n_iterations for accurate base H-scores.
-_OPPONENT_PASS_ITERATIONS = 15
+# 30 (was 15, tuned for the simplified-form model's short travel): each bootstrap pass is a
+# COLD best response, and under the truncated-max geometry 15 iterations left every pass's
+# build under-converged — the sloppy responses formed both the mixture's snapshots and the
+# seed-selection menu, and the served board inherited the sloppiness as a threes-concession
+# monoculture. At 30 the passes converge and concession identities diversify (measured at
+# C=0.5: {Blocks 5, Assists 3, Threes 1} across the top ten, from {Threes 10, FT 5}).
+_OPPONENT_PASS_ITERATIONS = 30
+# Candidate pool for the Level-0 (naive, universe-selecting) pass: a wide G-score
+# pre-filter so the pass costs ~1/4 of a full-pool serve while the top-3N-by-Level-0-H
+# universe it selects is unaffected (populate startup time is user-visible).
+_LEVEL_ZERO_POOL = 150
 # Learning-rate scales for WARM-STARTED category descents, tiered by how far the optimum can plausibly
 # have moved since the stored weights were computed. A warm start begins inside an established basin, so
 # the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds), full-size Adam
@@ -190,6 +223,10 @@ from backend.math.position_optimization import (
     get_player_rows,
 )
 from backend.math.position_config import PositionConfig, build_position_config
+from backend.math.truncated_max_pick_model import (
+    compute_expected_pick_tilt_jacobian,
+    compute_expected_pick_tilts,
+)
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -207,8 +244,6 @@ class HAgent:
 
     def __init__(self
                  , info: dict
-                 , omega: float
-                 , gamma: float
                  , n_picks: int
                  , n_drafters: int
                  , dynamic: bool
@@ -221,14 +256,22 @@ class HAgent:
                  , slot_counts: dict
                  , aleph: float = 0.0
                  , kappa: float = 0.3
-                 , reg_lambda: float = _REG_STRENGTH / REG_LAMBDA_UNIT
+                 , reg_lambda: float = _REG_STEP_FRACTION
                  , opponent_model_confidence: float = 0.5
+                 , pick_pool_size: int = 25
                  # ── original optional args ──
                  , beth: float = 0
+                 # Legacy simplified-form x_mu levers (the MLB path's get_term_four still reads
+                 # them); the NBA path's truncated-max model has no tilt price or generic level.
+                 , omega: float = 0.7
+                 , gamma: float = 0.25
                  ):
 
         self.omega         = omega
         self.gamma         = gamma
+        # The window of the truncated-max future-pick model: how many surviving players a
+        # future pick effectively chooses among. Replaces omega/gamma in the NBA path.
+        self.pick_pool_size = pick_pool_size
         self.n_picks       = n_picks
         self.dynamic       = dynamic
         self.n_drafters    = n_drafters
@@ -275,7 +318,11 @@ class HAgent:
         # the ones most likely to be picked, and anchors auction dollar values. Populated by
         # populate_default_h_scores at the end of the build. None => "not built yet", which makes
         # get_h_scores run a full exact solve (no throttle).
-        self.default_h_scores = None   # sorted pd.Series
+        self.default_h_scores = None   # sorted pd.Series (Level 2: the served board)
+        # Level-1 store: full-pool scores from the serve that committed the field — the
+        # equilibrium-consistent valuations. Internal consumers that need values rather
+        # than a display (auction dollar anchoring, trading baselines) read THESE.
+        self.level_one_h_scores = None
         self._default_result  = None   # full empty-board result dict (for the empty-board short-circuit)
         # Throttle ranking DURING populate, where default_h_scores is deliberately None (that also
         # disarms the empty-board short-circuit): each bootstrap pass stores its scores here so the
@@ -504,6 +551,17 @@ class HAgent:
         # until measured (and whenever kappa=0), which makes the penalty inert.
         self._punt_popularity = None
 
+        # Anchor weight table of the modelled field (set alongside the committed tilts in
+        # refresh_field), from which each evaluate derives the field's average drafting
+        # direction. The future-pick pool is truncated on THAT direction rather than generic
+        # value: who is gone from the board is decided by what the field drafts by, so
+        # categories the field tilts away from survive into the window — the emergent
+        # anti-crowding supply effect, moderated by opponent_model_confidence. None (and
+        # confidence 0) fall back to generic value: the field contorts nothing.
+        self._field_anchor_weights = None
+        # Per-evaluate cache of the blended direction (set at the top of every get_h_scores).
+        self._field_truncation_direction = None
+
         # ── MLB-specific setup (replaces get_pitcher_stats() / get_league_type()) ──
         # MLB is UNSUPPORTED: kept from the Streamlit port, but no current ingestion path
         # produces MLB data (every source is NBA-keyed), so the sport == 'MLB' branches in
@@ -616,6 +674,10 @@ class HAgent:
             player_assignments, drafter, x_scores_available, cash_remaining_per_team,
             candidate_batch=list(x_scores_batch.index),
         )
+
+        # The direction the modelled field drafts by, for this evaluate's future-pick pool
+        # truncation (constant across candidates and iterations; see _field_anchor_weights).
+        self._field_truncation_direction = self.compute_field_truncation_direction()
 
         x_scores_batch_array = np.expand_dims(np.array(x_scores_batch), axis=2)
 
@@ -749,13 +811,13 @@ class HAgent:
                 ).mean(axis=2)
                 initial_category_weights /= initial_category_weights.sum(axis=1).reshape(-1, 1)
             elif self.seed_mode == 'neutral':
-                # Start at neutral v (no punt bias) and let the descent re-balance. Nudge off the exact
-                # singular ray -- term_five_b (a Cauchy-Schwarz Gram determinant) vanishes when w is
-                # parallel to v, giving a 0/0. The nudge must comfortably exceed the L1 regulariser's
-                # capture radius (reg_lambda ~ 5e-5): the prox shrinks toward EXACT v each iteration and
-                # _REG_FLOOR defaults to 0, so a sub-radius jitter gets snapped onto the singularity
-                # (2022-23 collapsed every neutral-seeded descent to NaN this way). 1% is ~20x the
-                # radius while still being neutral for all practical purposes.
+                # Start at neutral v (no punt bias) and let the descent re-balance. The truncated-max
+                # model is finite at w == v (its rho clamp), so exact-neutral is no longer the NaN
+                # trap the legacy term_five machinery made it — the nudge survives for the L1
+                # regulariser: the prox shrinks toward EXACT v by up to 5% of a step per iteration
+                # (default reg, ~5e-4), and a start inside that radius wastes early iterations pinned
+                # to v. The 1% jitter puts each component ~2x outside the default radius, and Adam's
+                # first full step (the learning rate, 20x the shrink) breaks free immediately.
                 neutral = self.v.reshape(self.n_categories)
                 jitter  = 1.0 + 1e-2 * np.where(np.arange(self.n_categories) % 2 == 0, 1.0, -1.0)
                 initial_category_weights = np.array(
@@ -1525,10 +1587,10 @@ class HAgent:
         self._warm_start_row_rate_scales = None
         if warm_start_row_rate_scales is not None:
             rate_column            = warm_start_row_rate_scales.reshape(-1, 1)
-            category_learning_rate = 0.001 * rate_column
+            category_learning_rate = _CATEGORY_LEARNING_RATE * rate_column
             shares_learning_rate   = _SHARES_LEARNING_RATE * rate_column
         else:
-            category_learning_rate = 0.001
+            category_learning_rate = _CATEGORY_LEARNING_RATE
             shares_learning_rate   = _SHARES_LEARNING_RATE
 
         optimizers = {
@@ -1881,10 +1943,22 @@ class HAgent:
         L = self.L
 
         if self.sport == 'NBA':
+            # Truncated-max future-pick model (see backend/math/truncated_max_pick_model.py):
+            # each future pick is the best of pick_pool_size surviving players, relative to the
+            # pick a generic team makes from the same pool. Replaces the simplified-form x_mu,
+            # whose gamma priced weight deviation linearly while the realized tilt saturates.
             expected_future_diff_single = (
-                self.get_x_mu_simplified_form(category_weights, L, self.v) + position_mu
+                compute_expected_pick_tilts(
+                    category_weights, L[0], self.v, self.pick_pool_size,
+                    field_direction=self._field_truncation_direction)
+                + position_mu
             )
-            del_full = (self.n_picks - 1 - n_players_selected) * self.get_del_full(category_weights, L, self.v)
+            del_full = (
+                (self.n_picks - 1 - n_players_selected)
+                * compute_expected_pick_tilt_jacobian(
+                    category_weights, L[0], self.v, self.pick_pool_size,
+                    field_direction=self._field_truncation_direction)
+            )
 
         # MLB: unsupported and unreachable — see the MLB note in __init__.
         elif self.sport == 'MLB':
@@ -2207,6 +2281,7 @@ class HAgent:
         self._team_states              = {}
         self._anchor_player_order   = None
         self._player_committed_future_diffs  = None
+        self._field_anchor_weights     = None
         self._player_frozen_weights    = None
         self._player_frozen_shares     = None
         self._default_result           = None
@@ -2218,6 +2293,9 @@ class HAgent:
         if not bootstrap:
             result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team)
             self.default_h_scores = result['Scores'].sort_values(ascending=False)
+            # With no opponent modelling there is no field to equilibrate: every level collapses
+            # to the one naive pass, so the Level-1 store is the same scores.
+            self.level_one_h_scores = self.default_h_scores
             self._default_result  = result
             self._populate_pass_scores = None   # populate-scoped; default_h_scores ranks from here on
             return
@@ -2231,18 +2309,38 @@ class HAgent:
             self._player_committed_future_diffs = committed
             # Just the ordering (an Index): seat assignment consumes only the ranking, never the values.
             self._anchor_player_order = from_result['Scores'].sort_values(ascending=False).index[: top_count]
+            # The same pass's converged weights, for the field's average drafting direction
+            # (the future-pick pool's truncation). Same-state discipline as the committed
+            # tilts: the field the pool reflects is the field the tilts describe.
+            self._field_anchor_weights = from_result['Weights']
 
-        # The field only needs the committed builds of the top-3N anchors, so the iteration passes score
-        # just those players (~36) instead of the whole pool (~577) — the position solve is the cost and it
-        # scales with the candidate count. Only the final serve pass ranks everyone.
-        anchor_subset = list(self.x_scores.index[: top_count])
-
+        # ── Level 0: naive H, the universe filter ─────────────────────────────
+        # One full-pool pass with NO committed field (every seat generic): contextual value
+        # before any opponent behavior. Its product is the self-play universe — the top-3N
+        # players by LEVEL-0 H. The old G-score filter was blind to punt-fit players
+        # (generic value is exactly what a punt template trades away), which let them
+        # free-ride outside the equilibrium; Level-0 H admits whoever a draft would
+        # actually consider. Its Future-Diffs also seed the first field, as pass 0 always did.
         pass_iters = _OPPONENT_PASS_ITERATIONS
-        result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)  # neutral
+        # Level 0 only has to RANK candidates for the top-3N universe, so it runs on a wide
+        # G-score pre-filter instead of the whole pool: any universe-relevant player is
+        # comfortably inside the top _LEVEL_ZERO_POOL by generic value even when his
+        # contextual (Level-0 H) rank is far higher. Same iteration count as every other
+        # pass — the budget stays uniform across the chain; only the pool narrows.
+        level_zero_pool = list(self.x_scores.index[: _LEVEL_ZERO_POOL])
+        result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team,
+                                             level_zero_pool)  # neutral field
         committed = result['Future-Diff'] / (self.n_picks - 1)
+        anchor_subset = list(result['Scores'].sort_values(ascending=False).index[: top_count])
+
+        # ── Level 1: equilibrium formation (damped fictitious play) ───────────
+        # Position solves run EXACT here: the field's builds decide every downstream
+        # valuation, and the throttle's approximation systematically undervalues
+        # multi-position players (measured ~0.12 H on 4-position wings) — cheap at 3N.
         window_size = (0 if self.scoring_format == 'Rotisserie' else _OPPONENT_FIELD_WINDOW)
         bootstrap_passes = (_OPPONENT_BOOTSTRAP_PASSES if self.scoring_format != 'Rotisserie'
                             else _OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE)
+        self._position_mode_override = 'exact'
         if window_size >= 2:
             # Windowed fictitious play (see _OPPONENT_FIELD_WINDOW): each pass best-responds to the RAW
             # fields of the last K passes stacked as separate opponents — no EMA blending, the window
@@ -2250,48 +2348,158 @@ class HAgent:
             # historical build keeps its specific punts. The snapshots exist only between passes; the
             # serve and everything mid-draft face the FINAL pass's single field, set after the loop.
             snapshots = []
+            weights_history = []
+            running_average = None
             try:
-                for _ in range(bootstrap_passes):
+                for pass_index in range(bootstrap_passes):
                     committed = result['Future-Diff'] / (self.n_picks - 1)
                     refresh_field(result)   # single-field store tracks the latest pass throughout
                     snapshots.append((committed, self._anchor_player_order))
+                    weights_history.append(result['Weights'])
                     self._bootstrap_field_snapshots = snapshots[-window_size:]
+                    # Mixture-convergence diagnostic: drift of the RUNNING AVERAGE field (the
+                    # thing fictitious play converges), not the raw per-pass best response —
+                    # near a mixed equilibrium payoffs equalize, so raw responses flip between
+                    # archetypes ever harder while the average settles. A non-decaying average
+                    # drift means bootstrap_passes should rise.
+                    previous_average = running_average
+                    stacked = pd.concat([snap for snap, _ in snapshots])
+                    running_average = stacked.groupby(level=0).mean()
+                    if previous_average is not None:
+                        shared = running_average.index.intersection(previous_average.index)
+                        drift = float(np.mean(np.abs(running_average.loc[shared].to_numpy()
+                                                     - previous_average.loc[shared].to_numpy())))
+                        logging.getLogger('fbbo').info(
+                            'self-play pass %d average-field drift: %.4f', pass_index, drift)
                     result = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)
             finally:
-                self._bootstrap_field_snapshots = None
+                self._position_mode_override = None
+            # The equilibrium is the MIXTURE — but per-player AVERAGING of builds is the
+            # wrong collapse (a player whose best response flips archetypes across passes
+            # averages to a washed-out middle: measured, it erased punting from the board
+            # entirely). The faithful fictitious-play object is the empirical DISTRIBUTION
+            # of fields, so the tail of the snapshot stack STAYS ARMED beyond populate:
+            # the Level-1/Level-2 serves and every live evaluate score against the stacked
+            # recent fields, exactly as the bootstrap passes did. reset_draft_state
+            # preserves it (a populate artifact, like the frozen tables). The averaged
+            # weights still summarize the field's mean drafting direction (the pool
+            # truncation is inherently a mean).
             committed = result['Future-Diff'] / (self.n_picks - 1)
+            refresh_field(result)
+            snapshots.append((committed, self._anchor_player_order))
+            self._bootstrap_field_snapshots = snapshots[-_SERVE_FIELD_STACK:]
+            averaged_weights = pd.concat(weights_history + [result['Weights']]) \
+                                 .groupby(level=0).mean()
         else:
-            for _ in range(bootstrap_passes):
-                refresh_field(result)
-                result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)
-                committed = (1 - _OPPONENT_SMOOTHING) * committed \
-                            + _OPPONENT_SMOOTHING * (result['Future-Diff'] / (self.n_picks - 1))
+            try:
+                for _ in range(bootstrap_passes):
+                    refresh_field(result)
+                    result    = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, anchor_subset)
+                    committed = (1 - _OPPONENT_SMOOTHING) * committed \
+                                + _OPPONENT_SMOOTHING * (result['Future-Diff'] / (self.n_picks - 1))
+            finally:
+                self._position_mode_override = None
 
-        # Serve the full-pool base H-scores against the converged field (in-draft evaluates use it too).
-        # The serve WARM-STARTS from the final iteration pass's weights where they exist -- the top-3N
-        # anchors, the players whose displayed builds actually get scrutinised -- so their served builds
-        # continue the bootstrap's converged builds instead of re-deriving cold (a cold re-derive lands
-        # elsewhere on flat plateaus, and the first in-draft evaluate then visibly "switches" the build).
-        # The rest of the pool cold-starts via the punt seed scan and may drift slightly; acceptable.
+        # ── Level 1 store: the full-pool serve that COMMITS the field ─────────
+        # Serve the full pool against the bootstrap-converged field, warm-starting the
+        # universe rows from their equilibrium builds at the polish tier (a full-rate
+        # re-converge hands every candidate the same best defection — measured 12/12
+        # herding). This pass's state IS the canonical Level-1 valuation of the league:
+        # its scores rank the seats, its Future-Diffs are the committed opponent tilts,
+        # its weights are the field's drafting direction — all captured from ONE result
+        # so every consumer describes the same world (capturing tilts from the bootstrap
+        # state instead once made Rotisserie project losing every high-value category).
         refresh_field(result)
-        # Anchor rows: warm-start source for the serve (weights and flex shares always travel together).
-        self._player_frozen_weights = result['Weights']
-        self._player_frozen_shares  = result['Position-Shares']
-        # The serve keeps the polish tier for its warm rows IN BOTH PATHS. Under the window the final
-        # pass's weights answered the stacked-history field, not the single field the serve scores
-        # against — but re-converging them at the full rate against one converged field hands every
-        # candidate the SAME best defection and herds the whole board into one punt (measured: 12/12
-        # EC anchors punting 3s). The polish tier preserves each anchor's own equilibrium build, which
-        # is exactly the diversity a mixed equilibrium consists of; the mild score-at-mixture-weights
-        # inconsistency is the same approximation the EMA path has always lived with.
+        if window_size >= 2:
+            # The field's mean drafting direction — the pool truncation, inherently an
+            # average — comes from the across-pass mean.
+            self._field_anchor_weights = averaged_weights
+        self._player_frozen_shares = result['Position-Shares']
+
+        # ── Seed selection: each universe player's best build vs the mixture ──
+        # Near the mixed equilibrium the raw passes oscillate between archetypes, so the
+        # LAST pass's build is a knife-edge draw — and the serve's polish tier preserves
+        # whatever it is seeded with, so the seed effectively decides the served board.
+        # Measured failure modes of inherited seeds: last-flip seeding served Jokic a
+        # punt-template build 0.025 WORSE than plain neutral; per-player averaged seeding
+        # washed every identity out to no-punting. So the seed is CHOSEN instead: score,
+        # for every universe player, each candidate build — neutral, the nine gentle
+        # single-category punts, and his own build from every bootstrap pass — against
+        # the armed snapshot stack (one polish-pinned scoring pass per candidate table,
+        # no descent), and warm-start each player from his own argmax.
+        if window_size >= 2:
+            neutral_row = self.v.reshape(-1)
+            candidate_tables = [
+                pd.DataFrame([neutral_row] * len(anchor_subset), index=anchor_subset,
+                             columns=self.x_scores.columns)
+            ]
+            for category_index in range(self.n_categories):
+                punt = neutral_row.copy()
+                punt[category_index] *= _PUNT_SEED_FACTOR
+                punt = punt / punt.sum()
+                candidate_tables.append(
+                    pd.DataFrame([punt] * len(anchor_subset), index=anchor_subset,
+                                 columns=self.x_scores.columns))
+            candidate_tables += [table.reindex(anchor_subset).dropna()
+                                 for table in weights_history + [result['Weights']]]
+            self._position_mode_override = 'exact'
+            try:
+                seed_scores = []
+                for table in candidate_tables:
+                    self._player_frozen_weights = table
+                    scored = self._run_bootstrap_pass(empty, 1, cash_remaining_per_team,
+                                                      anchor_subset, preserve_frozen_weights=True)
+                    seed_scores.append(scored['Scores'].reindex(anchor_subset))
+            finally:
+                self._position_mode_override = None
+            score_matrix = pd.concat(seed_scores, axis=1)
+            score_array = score_matrix.to_numpy()
+            best_index = np.argmax(score_array, axis=1)
+            best_rows = [candidate_tables[k].loc[player]
+                         for player, k in zip(anchor_subset, best_index)]
+            self._player_frozen_weights = pd.DataFrame(best_rows, index=anchor_subset)
+            # Health metrics: how decisively the chosen seeds beat the neutral candidate.
+            # A large uniform margin for one archetype is the herding signature; margins
+            # near zero mean the board sits at mixture indifference.
+            margin_over_neutral = score_array[np.arange(len(best_index)), best_index] - score_array[:, 0]
+            logging.getLogger('fbbo').info(
+                'seed selection: %d neutral, %d punt-seed, %d history of %d players; '
+                'margin over neutral mean %.4f max %.4f',
+                int((best_index == 0).sum()),
+                int(((best_index >= 1) & (best_index <= self.n_categories)).sum()),
+                int((best_index > self.n_categories).sum()), len(anchor_subset),
+                float(np.mean(margin_over_neutral)), float(np.max(margin_over_neutral)))
+        else:
+            self._player_frozen_weights = result['Weights']
+
+        level_one = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
+                                             candidate_subset=None, preserve_frozen_weights=True)
+        committed = level_one['Future-Diff'] / (self.n_picks - 1)
+        refresh_field(level_one)
+        if window_size >= 2:
+            # The pool-truncation direction stays the ACROSS-PASS MIXTURE mean for the whole
+            # serve chain: refresh_field just reset it to this one pass's weights, which
+            # would put the seed scan, the serves, and live evaluates in different
+            # contortion contexts (measured: the scan then rejected the neutral seed for a
+            # player whose neutral build was 0.02 better in the served context).
+            self._field_anchor_weights = averaged_weights
+        self.level_one_h_scores     = level_one['Scores'].sort_values(ascending=False)
+        self._player_frozen_weights = level_one['Weights']
+        self._player_frozen_shares  = level_one['Position-Shares']
+
+        # ── Level 2: score-after-commit — the served board ────────────────────
+        # One more full-pool pass against the JUST-committed Level-1 field, stored with NO
+        # further commit. What is stored is therefore the same computation a live evaluate
+        # performs (warm from the frozen table, against the committed field) — the stored
+        # and displayed boards cannot sit on opposite phases of a best-response cycle
+        # (the undamped re-serve loop this replaces oscillated stars <-> punt-template at
+        # MC 1.0, freezing one phase into the store while every evaluate showed the other;
+        # cycle damping is Level 1's window's job, not the serve's). Frozen rows update to
+        # this pass so evaluates continue the builds users were shown.
         result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
                                           candidate_subset=None, preserve_frozen_weights=True)
         self.default_h_scores = result['Scores'].sort_values(ascending=False)
         self._default_result  = result
-        # Freeze the per-player self-play weights AND flex shares (each player's converged build vs the
-        # equilibrium field, sitting alongside the committed mu_edge tilts). FROZEN from here on:
-        # empty-roster evaluates warm-start each candidate from its rows, and opponent inference seeds
-        # from the row of a newly drafted player. In-draft refresh is at the TEAM level only (_team_states).
         self._player_frozen_weights = result['Weights']
         self._player_frozen_shares  = result['Position-Shares']
         self._populate_pass_scores  = None   # populate-scoped; default_h_scores ranks from here on
@@ -2320,6 +2528,32 @@ class HAgent:
         # window pass's anchor scores, with the unranked rest of the pool sorting last.
         self._populate_pass_scores = result['Scores']
         return result
+
+    def compute_field_truncation_direction(self):
+        """The direction the modelled field drafts by: the confidence-blended average of
+        the seated anchors' converged weights, normalized. This is what the future-pick
+        pool is truncated on — who is gone from the board is decided by what the field
+        actually values, so categories the field collectively tilts away from survive
+        into the selection window (the emergent anti-crowding supply effect). Falls back
+        to generic value v when the field is unmodelled, unmeasured, or confidence is 0,
+        which reproduces the field-blind model exactly.
+        """
+        if (not self.models_opponents
+                or self._field_anchor_weights is None
+                or self._anchor_player_order is None):
+            return None
+        seated = [player for player in self._anchor_player_order[: self.n_drafters - 1]
+                  if player in self._field_anchor_weights.index]
+        if not seated:
+            return None
+        field_mean = self._field_anchor_weights.loc[seated].to_numpy(dtype=float).mean(axis=0)
+        total = field_mean.sum()
+        if not np.isfinite(total) or total <= 0.0:
+            return None
+        field_mean = field_mean / total
+        confidence = self.opponent_model_confidence
+        blended = (1.0 - confidence) * self.v.reshape(-1) + confidence * field_mean
+        return (blended / blended.sum()).reshape(-1, 1)
 
     # ── simplified-form x_mu helpers (unchanged) ──────────────────────────────
 
