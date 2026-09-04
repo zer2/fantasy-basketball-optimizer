@@ -605,7 +605,9 @@ def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
     assignments  = {t: [] for t in teams}
     g_ranking    = _gscore_ranking(h_session)
     has_positions   = _has_position_data(h_session)
-    position_config = agent._pos_cfg
+    position_config = agent.position_config
+    positions_by_player = {player_id: identity.positions
+                           for player_id, identity in h_session.player_registry.items()}
     drafted: set    = set()
 
     for pick_row in range(n_picks):
@@ -614,10 +616,11 @@ def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
             team  = teams[index]
             if index == seat:
                 result = rank_candidates(h_session, assignments, team, [], None, 0, candidate_limit)
-                chosen = result.candidates[0].name
+                chosen = result.candidates[0].player_id
             else:
                 chosen = _pick_gscore_player(
-                    g_ranking, drafted, assignments[team], position_config, has_positions)
+                    g_ranking, drafted, assignments[team], position_config, has_positions,
+                    positions_by_player)
             assignments[team].append(chosen)
             drafted.add(chosen)
 
