@@ -292,14 +292,6 @@ NBA:
       default : 0.2
       min : 0.0
       max: 1.0
-    kappa :
-      # Superseded by the field-truncated future-pick pool (the anti-crowding supply effect,
-      # moderated by opponent_model_confidence): with the pool contorting away from what the
-      # field punts, the popularity penalty double-counts and smears builds. Kept as a knob;
-      # default off.
-      default : 0.0
-      min : 0.0
-      max: 5.0
     reg_lambda :
       # Peak strength of the L1 pull of category weights toward neutral on an empty roster, as a
       # fraction of the descent's per-iteration step (0.05 shrinks up to 5% of each step; see

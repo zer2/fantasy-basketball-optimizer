@@ -135,13 +135,8 @@ def _build_session_request(
             'psi':             nba_options['psi']['default'],
             'chi':             nba_options['chi']['default'],
             'aleph':           nba_options['aleph']['default'],
-            # kappa follows the app default (parameters.yaml): goldens and benchmarks encode exactly what
-            # ships. The one place kappa is deliberately pinned to 0 is the G-score season-sim harness
-            # (simulate.py) -- against a non-punting G-drafter field the anti-crowded-punt penalty has no
-            # crowd to defect from, so it would only distort that comparison.
-            'kappa':           nba_options['kappa']['default'],
             'reg_lambda':      nba_options['reg_lambda']['default'],
-            # Follows the app default like kappa: goldens, benchmarks, and experiments all encode
+            # Follows the app default: goldens, benchmarks, and experiments all encode
             # exactly the opponent-punt softening the app ships with.
             'opponent_model_confidence': nba_options['opponent_model_confidence']['default'],
             'streaming_noise': nba_options['S']['default'],

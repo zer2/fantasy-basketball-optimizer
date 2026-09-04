@@ -46,7 +46,6 @@ The website's calculations take a number of user-configurable parameters, availa
 | Parameter | Controls | Explained in |
 |---|---|---|
 | ω, γ (omega, gamma) | How aggressively H-scoring punts categories | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
-| κ (kappa) | How strongly the algorithm avoids punting categories that are popular punts for the field | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
 | C (confidence) | How strongly other drafters are modeled as pursuing the punts H-scoring predicts for them. 0 treats them as neutral pickers; Rotisserie always uses 1 | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
 | λ (lambda) | How strongly early-round category weights are held near balanced, preserving room to pivot | [H-scoring → Only one strategy is evaluated](hscores.md#only-one-strategy-is-evaluated) |
 | Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |

@@ -58,7 +58,6 @@ def _build_current_settings(req: SessionRequest, all_params: dict) -> dict:
         'psi':              p.psi,
         'chi':              p.chi,
         'aleph':            p.aleph,
-        'kappa':            p.kappa,
         'reg_lambda':       p.reg_lambda,
         'opponent_model_confidence': p.opponent_model_confidence,
         'n_iterations':     p.n_iterations,

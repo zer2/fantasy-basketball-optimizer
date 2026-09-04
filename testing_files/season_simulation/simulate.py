@@ -71,10 +71,6 @@ def _create_session(season: str, objective: str):
     # data with objectively-correct stats, so there is nothing to doubt. With beth>0 the draft-time
     # H-scores are regressed toward average (self-doubt), which is not what we want to measure here.
     request['model_settings']['beth'] = 0
-    # Turn OFF kappa (anti-crowded-punt) for this harness only: the field here drafts by G-score and
-    # does not punt, so there is no crowd to defect from and the penalty would only distort the
-    # H-vs-G comparison.
-    request['model_settings']['kappa'] = 0.0
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'Session creation failed ({season}, {objective}): {response.text}'
     session_id = response.json()['session_id']

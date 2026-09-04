@@ -73,7 +73,6 @@ class ModelSettings(BaseModel):
     psi: float
     chi: float
     aleph: float
-    kappa: float = 0.3
     # Peak L1 pull of category weights toward neutral, as a fraction of the descent's
     # per-iteration category step (see REG_LAMBDA_UNIT): 0.05 shrinks up to 5% of a step.
     # Named reg_lambda rather than lambda, which is a Python keyword.

@@ -72,7 +72,6 @@ export interface ModelSettings {
     psi: number
     chi: number
     aleph: number
-    kappa: number
     // Peak L1 pull of category weights toward neutral (the algorithm's lambda). Named
     // reg_lambda to match the wire field, since lambda is a Python keyword server-side.
     reg_lambda: number

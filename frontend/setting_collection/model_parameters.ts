@@ -39,10 +39,6 @@ const PARAM_SPECS: ParamSpec[] = [
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
-        id: 'mp-kappa', key: 'kappa', label: 'κ (kappa)', step: 0.1,
-        caption: 'Anti-crowded-punt strength. Early picks are gently steered away from punts the field is crowding into. 0 disables it.',
-    },
-    {
         id: 'mp-opponent-confidence', key: 'opponent_model_confidence', label: 'C (confidence)', step: 0.1,
         caption: 'How confident the algorithm is that other drafters are pursuing the punt strategies '
                + 'it predicts for them. 0 treats them as neutral pickers with no strategy at all; 1 '
@@ -154,7 +150,6 @@ export function getModelSettings(): ModelSettings {
         psi:             readNumberInput('mp-psi'),
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
-        kappa:           readNumberInput('mp-kappa'),
         reg_lambda:      readNumberInput('mp-reg-lambda'),
         opponent_model_confidence: readNumberInput('mp-opponent-confidence'),
         pick_pool_size:  readNumberInput('mp-pick-pool-size'),
