@@ -209,21 +209,75 @@ _SEED_INCUMBENT_MARGIN = 0.005
 # gate is global across the candidate batch, and one still-moving row keeps the whole
 # batch iterating (56-60 of 60 iterations throughout the chain). Real savings there
 # would require dropping frozen ROWS from the batch, since objective cost is per-row.
-# Confidence schedule, keyed PER SEAT on that seat's own observed picks: a prediction
-# about an empty seat is pure prior and capped at the base; each real pick a seat makes
-# earns it another step of trust, up to the configured confidence. Full confidence in
-# PRIORS is what breaks — the self-play loop at C=1.0 has no pure equilibrium (full-field
-# limit cycles, measured; every damping fails) — but an inference built on observed picks
-# deserves increasing trust. Keying on the seat (not on this drafter's roster) makes the
-# schedule mode-agnostic: snake rosters grow in lockstep so drafts are barely changed,
-# while auction rosters are asymmetric and each seat is trusted exactly as far as its own
-# evidence. The cap is consumed where committed tilts are scaled, so populate and the
-# served board always run at the (convergent) base and stored == live holds on the empty
-# board; the ramp simply scales the same stored tilts up as evidence accumulates.
-# Rotisserie is exempt: it pins full confidence by design and its window-0 EMA self-play
-# is stable there.
-_OPPONENT_CONFIDENCE_SCHEDULE_BASE     = 0.5
-_OPPONENT_CONFIDENCE_SCHEDULE_PER_PICK = 0.1
+# Above this confidence the raw best-response cycle stops converging (no pure
+# equilibrium at C=1.0 — full-field limit cycles, measured; every damping fails), so
+# populate switches to mean-field beliefs (see the constants below). At or below it the
+# recent-states stack converges on its own.
+# NOTE (so it is not rebuilt): a per-seat confidence phase-in (trust above the base
+# earned per observed pick) shipped 2026-09-04 and died 2026-09-05: above the base it
+# was suspended (stored == live requires evaluates to consume tilts at the confidence
+# the served board was computed at, and the mean-field belief converges AT the
+# configured confidence), and at or below the base min(C, base + ramp) never binds.
+# Every seat now runs at the configured confidence in all regimes.
+_MEAN_FIELD_CONFIDENCE_THRESHOLD = 0.5
+# How many disjoint groups a solve cycle splits the universe into (see the loop): each
+# pass solves one group, so 1/this of the field moves per pass.
+# NOTE (measured 2026-09-05, so it is not rebuilt): 3 groups (a third per pass) at the
+# 96-pass budget leans hard on the served board ({Ast: 10}/{Blk: 9} at C=1.0) and saves
+# only ~13% wall clock — smaller commits make consecutive states more correlated, so the
+# averaged belief needs proportionally more passes to recover the same effective sample
+# count and the saving cancels. Group size is not a latency lever.
+_SOLVE_GROUP_COUNT = 2
+# Mean-field budget (high-confidence self-play): every pass runs at the configured
+# confidence, and the belief is the Cesaro average of the committed fields — but the
+# accumulator RESTARTS once at the burn-in boundary, so the cold-start transient (the
+# field travelling from the seed toward the full-confidence equilibrium) never enters
+# the average (measured: without the discard, one lane goes uniform on the served board
+# — 8-10 of the top 10 all winning the same category — at every pass budget tried).
+# NOTE (so they are not rebuilt, all measured 2026-09-05): an annealed variant (8
+# base-confidence passes before raising to full C) still leaned one lane on the served
+# board and was discarded by user ruling; averaging length is NON-monotone in quality
+# under shorter budgets (a 60-pass average measured worse than a 28-pass one — the field
+# creeps during a long stage, so a long average re-accumulates staleness); and a
+# momentum-style exponential moving average of the field (half-lives 8 and 12, budgets
+# 40 and 64) leaned identically — its effective sample size (1+beta)/(1-beta) matches a
+# same-budget Cesaro average, so it buys nothing. The budget frontier: 80 total passes
+# (48 averaged states) leans hard, 96 (64 states) is clean on every board inspected at
+# ~9.5s, 128 adds ~3.5s and nothing else — so 64 settled states is the working minimum.
+# A board that leans is a bad board at ANY latency, so there is no faster leaning tier;
+# the parked Chebyshev pick-model core is the path to making this cheap.
+_MEAN_FIELD_BURN_IN_PASSES = 32
+_MEAN_FIELD_TOTAL_PASSES   = 96
+# NOTE (measured 2026-09-05, so it is not rebuilt): staged finishing gated on
+# split-half agreement of the settled states does NOT work. The disagreement (mean abs
+# difference between the first-half and second-half averages of the post-burn-in
+# states) sits at 0.10-0.20 for clean and failing seasons alike, and on 2023-24 it
+# RISES with depth — the empirical mixture keeps slowly wandering (fictitious play in
+# an n-player general-sum game carries no convergence guarantee), so field-level
+# stability never certifies the served board. Budget is also NON-monotone per season:
+# 96 passes fails 2021-22 ({FG: 9, Blk: 9} uniform lanes) but is clean elsewhere,
+# while 192 heals 2021-22 and instead leans 2023-24 ({Ast: 10}) and 2025-26
+# ({Ast: 9}). No budget in 96..192 is uniformly clean.
+# So the finish is staged on the served FIELD itself — the signal that tracks the
+# user-facing failure: after the base budget the Level-1 serve runs, and if more than
+# half of the top _SERVED_FIELD_TOP_SEATS anchor seats' builds punt the SAME category
+# (win rate below _SERVED_FIELD_PUNT_RATE, the convergence test's soft-punt line), the
+# loop runs another extension block and re-serves. Counting candidate WINNERS instead
+# (many top candidates above 55% in one category) was the first criterion and is wrong
+# (user ruling 2026-09-05): a couple of legitimate extreme punters in the top rows lift
+# every other candidate's win rate, so a winners count conflates healthy punt ecology
+# (2023-24's assists, stable at every horizon) with genuine field herding. Each
+# configuration stops at its own first clean horizon; at the cap the best horizon seen
+# is served, so a season that never fully clears still ends no worse than its best.
+_MEAN_FIELD_EXTENSION_PASSES     = 16
+_MEAN_FIELD_MAXIMUM_TOTAL_PASSES = 192
+_SERVED_FIELD_TOP_SEATS = 12
+_SERVED_FIELD_PUNT_RATE = 0.40
+# Burn-in passes only POSITION the field — their states are discarded from the belief —
+# so their convergence depth need not match the serve (user design 2026-09-05); they run
+# this fraction of the session iteration budget. The uniform-budget rule (see pass_iters)
+# still binds every pass whose state enters the belief.
+_MEAN_FIELD_BURN_IN_ITERATION_FRACTION = 0.5
 # NOTE on position throttling (measured 2026-09-04, so it is not rebuilt): an early-pass
 # solve stride (rosters re-solved every 10th iteration, cached between) engaged on 591 of
 # 1383 calls and changed NEITHER results (bit-identical boards) NOR time (0.76s vs 0.70s):
@@ -937,7 +991,7 @@ class HAgent:
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
         # The batched all-empty-seat paths below model every opponent from its predicted
         # anchor — zero observed picks, so they all share the base-capped confidence.
-        prior_confidence = self.resolve_effective_opponent_confidence(0)
+        prior_confidence = self.opponent_model_confidence
 
         if cash_remaining_per_team:
             total_cash = sum(cash_remaining_per_team.values())
@@ -1014,7 +1068,7 @@ class HAgent:
                 )
                 if mu_edge is not None:
                     # The seat's own observed picks set how far its predicted punts are trusted.
-                    seat_confidence = self.resolve_effective_opponent_confidence(len(roster))
+                    seat_confidence = self.opponent_model_confidence
                     tilt = (self.n_picks - roster_len) * seat_confidence * mu_edge
                     base = base - tilt.reshape(1, self.n_categories, 1)
                     return base, np.asarray(tilt).reshape(self.n_categories)
@@ -1149,6 +1203,7 @@ class HAgent:
                                       for team in opponent_teams)
                 mean_extra_array = np.asarray(mean_extra)
                 field_blocks, tilt_blocks, snapshot_exclusions = [], [], []
+                belief_variance_blocks = []
                 for snapshot in field_snapshots:
                     committed_diffs = (self._player_committed_future_diffs if snapshot is None else snapshot[0])
                     anchor_order    = (None if snapshot is None else snapshot[1])
@@ -1366,16 +1421,12 @@ class HAgent:
         empty_seat_anchor, spare_anchor = self._assign_empty_seat_anchors(player_assignments, drafter,
                                                                           anchor_player_order)
 
-        def team_total(roster, mu_edge, n_observed_picks):
-            """n_observed_picks is the seat's REAL pick count — a predicted-anchor seat is
-            modelled with a roster of one but has observed nothing, so it stays at prior
-            confidence (see the confidence-schedule constants)."""
+        def team_total(roster, mu_edge):
             base = self.get_opposing_team_means(roster, mean_extra, target_team_size)
             if mu_edge is None:
                 return base, np.zeros(self.n_categories)
             picks_left = self.n_picks - len([p for p in roster if p == p])
-            seat_confidence = self.resolve_effective_opponent_confidence(n_observed_picks)
-            tilt = picks_left * seat_confidence * mu_edge
+            tilt = picks_left * self.opponent_model_confidence * mu_edge
             return base + tilt.reshape(1, self.n_categories, 1), np.asarray(tilt).reshape(self.n_categories)
 
         totals, seat_tilts = {}, {}
@@ -1384,21 +1435,20 @@ class HAgent:
                 continue
             roster = [p for p in player_assignments[team] if p == p]
             if len(roster) >= self.n_picks:
-                totals[team], seat_tilts[team] = team_total(roster, None, len(roster))
+                totals[team], seat_tilts[team] = team_total(roster, None)
             elif roster:
                 state = self._team_states.get(team)
-                totals[team], seat_tilts[team] = team_total(roster, None if state is None else state['mu_edge'],
-                                                            len(roster))
+                totals[team], seat_tilts[team] = team_total(roster, None if state is None else state['mu_edge'])
             elif team in empty_seat_anchor:
                 predicted = empty_seat_anchor[team]
                 totals[team], seat_tilts[team] = team_total([predicted],
-                                                            committed_future_diffs.loc[predicted].to_numpy(), 0)
+                                                            committed_future_diffs.loc[predicted].to_numpy())
             else:
-                totals[team], seat_tilts[team] = team_total(roster, None, 0)   # no prediction left: neutral padding
+                totals[team], seat_tilts[team] = team_total(roster, None)   # no prediction left: neutral padding
 
         spare_total, spare_tilt = ((None, None) if spare_anchor is None
                                    else team_total([spare_anchor],
-                                                   committed_future_diffs.loc[spare_anchor].to_numpy(), 0))
+                                                   committed_future_diffs.loc[spare_anchor].to_numpy()))
         return totals, seat_tilts, empty_seat_anchor, spare_total, spare_tilt
 
     def refresh_stale_team_states(self, player_assignments, drafter, cash_remaining_per_team=None):
@@ -1522,15 +1572,6 @@ class HAgent:
     def get_diff_var(self, n_their_players):
         return self.n_picks * (2 + self.w * (self.n_picks - n_their_players) / self.n_picks)
 
-    def resolve_effective_opponent_confidence(self, n_observed_picks):
-        """The confidence applied to one seat's predicted tilt, given how many picks that
-        seat has actually made (see the _OPPONENT_CONFIDENCE_SCHEDULE_* constants)."""
-        if self.scoring_format == 'Rotisserie':
-            return self.opponent_model_confidence
-        return min(self.opponent_model_confidence,
-                   _OPPONENT_CONFIDENCE_SCHEDULE_BASE
-                   + _OPPONENT_CONFIDENCE_SCHEDULE_PER_PICK * n_observed_picks)
-
     # NOTE: the money->win-probability curve (get_value_of_money_auction, stored as
     # self.value_of_money) was removed 2026-08-11: nothing consumed it -- the service layer converts
     # H-scores to dollars via auction_value_adjuster -- and rebuilding a 2000-price-point tensor
@@ -1573,6 +1614,11 @@ class HAgent:
         # player's own converged build from every pass in the BELIEF WINDOW — the same
         # window the snapshot stack arms, so the menu's memory and the field's memory are
         # one and the same, and a build the belief has forgotten cannot be resurrected.
+        # NOTE (measured 2026-09-05, so it is not rebuilt): retiring the category-punt
+        # seeds after the mean-field burn-in (menu = neutral + history only, ~2.4s saved)
+        # degraded the served boards — challenger seeds win 24% of bootstrap solves, and
+        # without them one lane leans (mildly alone, severely combined with the
+        # half-iteration burn-in). The full menu stays.
         seed_matrices = [np.tile(gentle_punt(i), (n_candidates, 1))
                          for i in range(self.n_categories)]
         seed_matrices.append(np.tile(neutral, (n_candidates, 1)))
@@ -2364,6 +2410,8 @@ class HAgent:
         # both serves all run the session's n_iterations. Any pass running a different
         # budget than the serve makes the belief and the served responses products of
         # different convergence depths, which surfaces as one-lane herding on the board.
+        # (Mean-field burn-in passes are the one exception: discarded from the belief,
+        # they only position the field — see _MEAN_FIELD_BURN_IN_ITERATION_FRACTION.)
         pass_iters = n_iterations
         # Level 0 only has to RANK candidates for the top-3N universe, so it runs on a wide
         # G-score pre-filter instead of the whole pool: any universe-relevant player is
@@ -2409,10 +2457,124 @@ class HAgent:
             split_rng = np.random.default_rng(0)
             snapshots = []
             running_average = None
-            for pass_index in range(bootstrap_passes):
-                committed = field_committed
+            # MEAN-FIELD BELIEFS above the confidence-schedule base: at high confidence
+            # the best-response cycle never dies (full-field limit cycles, measured at
+            # every damping), but the TIME AVERAGE of play settles at 1/t (Cesaro) even
+            # while responses cycle — so beliefs face the cumulative average field (one
+            # snapshot) instead of the recent-states stack, and the served board becomes
+            # the best response to the mixed equilibrium's expectation. Opponent totals
+            # enter diffs linearly, so the average field is the mixture's correct first
+            # moment (the recent-states stack additionally carries mixture variance,
+            # which is why it stays the belief at C <= base, where it converges).
+            mean_field_beliefs = (self.opponent_model_confidence
+                                  > _MEAN_FIELD_CONFIDENCE_THRESHOLD
+                                  and self.scoring_format != 'Rotisserie')
+            if mean_field_beliefs:
+                bootstrap_passes = _MEAN_FIELD_TOTAL_PASSES
+            cumulative_field_sum = None
+            averaged_state_count = 0
+            scheduled_passes  = bootstrap_passes
+            pass_index        = 0
+            best_served_board = None
+            while True:
+                if pass_index == scheduled_passes:
+                    # ── Level 1 store: the full-pool serve, board-gated ──────────
+                    # The serve is an ORDINARY pass — the same cold multi-start
+                    # (punts + balanced + belief-window history, see
+                    # _select_starting_weights) and the same full-rate descent as
+                    # every bootstrap pass, just over the whole pool. A serve that
+                    # runs a richer process than the passes can discover lanes the
+                    # field never priced (measured: a served assists-punt herd
+                    # against an assists-neutral belief). The serve is a READ-OUT of
+                    # the converged world, not another dynamics step: the Level-1
+                    # result only fills committed rows the calm field lacks —
+                    # sub-universe players — never overwriting a converged universe
+                    # row (re-ranking the seats from the serve was measured flipping
+                    # four seats' builds into new basins at mid M). The equilibrium
+                    # is the MIXTURE: the snapshot stack stays armed beyond populate
+                    # and every live evaluate scores against it. On the empty board
+                    # the Level-2 read-out IS Level 1 (measured: max score diff
+                    # 0.0004 across the settings grid).
+                    if mean_field_beliefs:
+                        # The serve faces the settled average (which the Cesaro
+                        # identity makes ~equal to the current field), final state
+                        # included — computed WITHOUT folding into the accumulator,
+                        # so extension passes continue from the raw field.
+                        served_field = ((cumulative_field_sum + field_committed)
+                                        / (averaged_state_count + 1))
+                    else:
+                        served_field = field_committed
+                    committed = served_field
+                    refresh_field({'Scores': merged_scores})
+                    snapshots.append((served_field, self._anchor_player_order))
+                    self._bootstrap_field_snapshots = snapshots[-_SERVE_FIELD_STACK:]
+                    self._pass_weights_history = ((self._pass_weights_history or [])
+                                                  + [merged_weights])[-_SERVE_FIELD_STACK:]
+                    level_one = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
+                                                         candidate_subset=None)
+                    self.level_one_h_scores = level_one['Scores'].sort_values(ascending=False)
+                    level_one_committed = level_one['Future-Diff'] / (self.n_picks - 1)
+                    merged_committed = level_one_committed.copy()
+                    merged_committed.loc[served_field.index] = served_field
+                    self._player_committed_future_diffs = merged_committed
+                    committed = merged_committed
+                    result = level_one
+                    if not mean_field_beliefs:
+                        break
+                    # Field-punt gate (see the _SERVED_FIELD_* constants): the modelled
+                    # seats are the top anchor players, and each one's serve row is his
+                    # own build's category win rates.
+                    seat_rates = level_one['Rates'].loc[
+                        list(self._anchor_player_order[:_SERVED_FIELD_TOP_SEATS])]
+                    punt_counts = (seat_rates.to_numpy() < _SERVED_FIELD_PUNT_RATE).sum(axis=0)
+                    board_degeneracy = int(punt_counts.max())
+                    logging.getLogger('fbbo').info(
+                        'served-field gate at pass %d: most-punted category %d/%d seats',
+                        pass_index, board_degeneracy, _SERVED_FIELD_TOP_SEATS)
+                    if board_degeneracy <= _SERVED_FIELD_TOP_SEATS // 2:
+                        break
+                    board_state = {
+                        'result': result,
+                        'committed': merged_committed,
+                        'level_one_h_scores': self.level_one_h_scores,
+                        'field_snapshots': self._bootstrap_field_snapshots,
+                        'weights_history': self._pass_weights_history,
+                        'degeneracy': board_degeneracy,
+                    }
+                    if (best_served_board is None
+                            or board_degeneracy < best_served_board['degeneracy']):
+                        best_served_board = board_state
+                    if pass_index >= _MEAN_FIELD_MAXIMUM_TOTAL_PASSES:
+                        if best_served_board['degeneracy'] < board_degeneracy:
+                            result    = best_served_board['result']
+                            committed = best_served_board['committed']
+                            self.level_one_h_scores             = best_served_board['level_one_h_scores']
+                            self._bootstrap_field_snapshots     = best_served_board['field_snapshots']
+                            self._pass_weights_history          = best_served_board['weights_history']
+                            self._player_committed_future_diffs = best_served_board['committed']
+                        logging.getLogger('fbbo').warning(
+                            'served-field gate: still %d/%d seats at the %d-pass cap; serving the best horizon',
+                            best_served_board['degeneracy'], _SERVED_FIELD_TOP_SEATS,
+                            _MEAN_FIELD_MAXIMUM_TOTAL_PASSES)
+                        break
+                    scheduled_passes = min(pass_index + _MEAN_FIELD_EXTENSION_PASSES,
+                                           _MEAN_FIELD_MAXIMUM_TOTAL_PASSES)
+                if mean_field_beliefs:
+                    # Burn-in discard: restart the accumulator once the field has had
+                    # time to travel from the seed to the full-confidence equilibrium's
+                    # neighbourhood, so only settled states enter the belief.
+                    if pass_index == _MEAN_FIELD_BURN_IN_PASSES:
+                        cumulative_field_sum = None
+                        averaged_state_count = 0
+                    cumulative_field_sum = (field_committed.copy() if cumulative_field_sum is None
+                                            else cumulative_field_sum + field_committed)
+                    averaged_state_count += 1
+                    belief_field = cumulative_field_sum / averaged_state_count
+                else:
+                    belief_field = field_committed
+                committed = belief_field
                 refresh_field({'Scores': merged_scores})
-                snapshots.append((field_committed, self._anchor_player_order))
+                snapshots.append((belief_field, self._anchor_player_order))
                 self._bootstrap_field_snapshots = snapshots[-window_size:]
                 # Belief-window history seeds for the multi-start menu, in lockstep with
                 # the snapshot stack (same window, same memory — see
@@ -2434,19 +2596,26 @@ class HAgent:
                                                  - previous_average.loc[shared].to_numpy())))
                     logging.getLogger('fbbo').info(
                         'self-play pass %d average-field drift: %.4f', pass_index, drift)
-                # Complementary pairs: each even pass draws a fresh random half, the odd
-                # pass that follows solves the other half — every player is re-solved
-                # exactly once per pair, bounding staleness at two passes, while redrawing
-                # the split each pair avoids the period-2 resonance a FIXED alternation
-                # was measured to build.
-                if pass_index % 2 == 0:
-                    permutation = split_rng.permutation(len(universe))
-                    half_size = max(1, len(universe) // 2)
-                    solve_half = [universe[i] for i in permutation[:half_size]]
-                    resting_half = [universe[i] for i in permutation[half_size:]]
-                else:
-                    solve_half = resting_half
-                result = self._run_bootstrap_pass(empty, pass_iters, cash_remaining_per_team, solve_half)
+                # Complementary groups: every _SOLVE_GROUP_COUNT passes, a fresh random
+                # permutation splits the universe into that many disjoint groups, and the
+                # passes of the cycle solve them in turn — every player is re-solved
+                # exactly once per cycle, staleness bounded at the cycle length, while
+                # redrawing each cycle avoids the fixed-alternation resonance. 2 = the
+                # measured default (solve-half pairs); larger counts commit a smaller
+                # fraction per pass (heavier damping of the field's motion).
+                cycle_position = pass_index % _SOLVE_GROUP_COUNT
+                if cycle_position == 0:
+                    solve_permutation = split_rng.permutation(len(universe))
+                group_size = max(1, len(universe) // _SOLVE_GROUP_COUNT)
+                group_start = cycle_position * group_size
+                group_end = (len(universe) if cycle_position == _SOLVE_GROUP_COUNT - 1
+                             else group_start + group_size)
+                solve_half = [universe[i] for i in solve_permutation[group_start:group_end]]
+                in_burn_in = mean_field_beliefs and pass_index < _MEAN_FIELD_BURN_IN_PASSES
+                burn_in_iterations = max(1, round(pass_iters * _MEAN_FIELD_BURN_IN_ITERATION_FRACTION))
+                result = self._run_bootstrap_pass(empty,
+                                                  burn_in_iterations if in_burn_in else pass_iters,
+                                                  cash_remaining_per_team, solve_half)
                 response_committed = result['Future-Diff'] / (self.n_picks - 1)
                 field_committed = field_committed.copy()
                 field_committed.loc[solve_half] = response_committed
@@ -2454,20 +2623,7 @@ class HAgent:
                 merged_weights.loc[result['Weights'].index] = result['Weights']
                 merged_scores = merged_scores.copy()
                 merged_scores.loc[result['Scores'].index] = result['Scores']
-            # The equilibrium is the MIXTURE — but per-player AVERAGING of builds is the
-            # wrong collapse (a player whose best response flips archetypes across passes
-            # averages to a washed-out middle: measured, it erased punting from the board
-            # entirely). The faithful fictitious-play object is the empirical DISTRIBUTION
-            # of fields, so the tail of the snapshot stack STAYS ARMED beyond populate:
-            # the Level-1/Level-2 serves and every live evaluate score against the stacked
-            # recent fields, exactly as the bootstrap passes did. reset_draft_state
-            # preserves it (a populate artifact, like the frozen tables).
-            committed = field_committed
-            refresh_field({'Scores': merged_scores})
-            snapshots.append((field_committed, self._anchor_player_order))
-            self._bootstrap_field_snapshots = snapshots[-_SERVE_FIELD_STACK:]
-            self._pass_weights_history = ((self._pass_weights_history or [])
-                                          + [merged_weights])[-_SERVE_FIELD_STACK:]
+                pass_index += 1
         else:
             try:
                 for _ in range(bootstrap_passes):
@@ -2478,51 +2634,20 @@ class HAgent:
             finally:
                 self._position_mode_override = None
             refresh_field(result)
-
-        # ── Level 1 store: the full-pool serve ────────────────────────────────
-        # The serve is an ORDINARY pass — the same cold multi-start (punts + balanced +
-        # belief-window history, see _select_starting_weights) and the same full-rate
-        # descent as every bootstrap pass, just over the whole pool. A serve that runs a
-        # richer process than the passes can discover lanes the field never priced
-        # (measured: a served assists-punt herd against an assists-neutral belief,
-        # response-belief gap -0.39 in one category vs ±0.05 elsewhere, resurrected by a
-        # history menu reaching outside the belief window). This pass's state IS the
-        # canonical Level-1 valuation of the league: its scores rank the seats, its
-        # Future-Diffs are the committed opponent tilts — captured from ONE result so
-        # every consumer describes the same world (capturing tilts from the bootstrap
-        # state instead once made Rotisserie project losing every high-value category).
-        # (Each branch above has already refreshed the field from its own final full-
-        # universe state — the windowed branch from the MERGED frames, never a half
-        # result, which was the original stampede-at-the-handoff bug.)
-        level_one = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
-                                             candidate_subset=None)
-        self.level_one_h_scores = level_one['Scores'].sort_values(ascending=False)
-        if window_size >= 1:
-            # The serve is a READ-OUT of the converged world, not another dynamics step:
-            # the belief (seats, committed field, snapshot stack, history menu) stays
-            # pinned to the confirmed-calm self-play state. The Level-1 result only fills
-            # committed rows the calm field lacks — sub-universe players, needed so a
-            # priced-in pick of any pool player confirms a prediction — never overwriting
-            # a converged universe row and never joining the stack. Re-ranking the seats
-            # and committing the serve's fresh snapshot was measured flipping four seats'
-            # builds into new basins at mid M (the residual gap after every lane froze).
-            level_one_committed = level_one['Future-Diff'] / (self.n_picks - 1)
-            merged_committed = level_one_committed.copy()
-            merged_committed.loc[field_committed.index] = field_committed
-            self._player_committed_future_diffs = merged_committed
-            committed = merged_committed
-            # On the empty board the Level-2 read-out IS Level 1: the serve no longer
-            # perturbs the converged world, so re-scoring against the identical state
-            # reproduces the same result (measured: max score diff 0.0004 across the
-            # settings grid) — the second full-pool pass only spent time. Live evaluates
-            # diverge from Level 1 naturally as boards fill.
-            result = level_one
-        else:
+            # ── Level 1 store: the full-pool serve (Rotisserie/EMA path) ──────
+            # An ordinary pass over the whole pool; its state IS the canonical
+            # Level-1 valuation — captured from ONE result so every consumer
+            # describes the same world (capturing tilts from the bootstrap state
+            # instead once made Rotisserie project losing every high-value
+            # category). The serve COMMITS (the EMA path has no snapshot stack),
+            # so the stored board must be scored AFTER that commit for
+            # stored == live — one more ordinary full-pool pass with no further
+            # commit.
+            level_one = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
+                                                 candidate_subset=None)
+            self.level_one_h_scores = level_one['Scores'].sort_values(ascending=False)
             committed = level_one['Future-Diff'] / (self.n_picks - 1)
             refresh_field(level_one)
-            # Rotisserie's serve COMMITS (the EMA path has no snapshot stack), so the
-            # stored board must be scored AFTER that commit for stored == live — one
-            # more ordinary full-pool pass with no further commit.
             result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team,
                                               candidate_subset=None)
         self._player_frozen_weights = result['Weights']

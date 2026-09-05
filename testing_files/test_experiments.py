@@ -574,7 +574,14 @@ def test_self_play_convergence(sessions):
         tracked = list(records[0][1].index[:12])
 
         for pass_number, (is_full_pool, rates) in enumerate(records):
-            tracked_rates = rates.reindex(tracked).to_numpy()
+            # Solve-half passes only carry rows for the group they solved, so each pass
+            # reports the punts of whichever tracked players it re-solved; the Level-0
+            # pass and the serves cover the full tracked set.
+            present = rates.index.intersection(tracked)
+            if is_full_pool:
+                assert len(present) == len(tracked), (
+                    f'{season} pass {pass_number}: full-pool pass missing tracked players')
+            tracked_rates = rates.loc[present].to_numpy()
             assert not np.isnan(tracked_rates).any(), f'{season} pass {pass_number}: NaN win rates'
             punt_counts = (tracked_rates < _SOFT_PUNT_RATE).sum(axis=0)
             label = 'serve' if is_full_pool else str(pass_number)
