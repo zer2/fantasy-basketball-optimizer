@@ -198,7 +198,8 @@ export function renderLeagueSettings(container: HTMLElement): void {
     const yahooAttributionLabel = document.createElement('span')
     yahooAttributionLabel.textContent = 'Fantasy data provided by'
     const yahooAttributionLogo = document.createElement('img')
-    yahooAttributionLogo.src = 'https://763445962456-brand-assets.s3.us-west-2.amazonaws.com/brandwebsite/s3fs-public/Yahoo_Fantasy.svg'
+    // Self-hosted copy of Yahoo's brand asset (the S3 original trips content blockers).
+    yahooAttributionLogo.src = '/assets/yahoo_fantasy.svg'
     yahooAttributionLogo.alt = 'Yahoo Fantasy'
     yahooAttribution.append(yahooAttributionLabel, yahooAttributionLogo)
     connectCell.append(yahooAttribution)
