@@ -198,7 +198,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
     const yahooAttributionLabel = document.createElement('span')
     yahooAttributionLabel.textContent = 'Fantasy data provided by'
     const yahooAttributionLogo = document.createElement('img')
-    // Self-hosted copy of Yahoo's brand asset (the S3 original trips content blockers).
+    // Self-hosted copy of Yahoo's wordmark, cropped to its artwork: the original ships
+    // the strip of lettering inside a 293x293 canvas, so uncropped it renders as a
+    // near-invisible sliver. The letterforms are unified to Yahoo purple so the mark
+    // reads on the dark theme (the source's "fantasy" paths default to black).
     yahooAttributionLogo.src = '/assets/yahoo_fantasy.svg'
     yahooAttributionLogo.alt = 'Yahoo Fantasy'
     yahooAttribution.append(yahooAttributionLabel, yahooAttributionLogo)
