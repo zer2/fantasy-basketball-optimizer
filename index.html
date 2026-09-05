@@ -639,17 +639,17 @@
 <tr>
 <td>Scoring format</td>
 <td>Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority</td>
-<td><a href="hscores/#formats-and-categories">H-scoring → Formats and categories</a></td>
+<td><a href="hscores/#main-h-score-table">H-scoring → Main H-score table</a></td>
 </tr>
 <tr>
 <td>Categories</td>
 <td>Select statistical categories for scoring</td>
-<td><a href="hscores/#formats-and-categories">H-scoring → Formats and categories</a></td>
+<td><a href="hscores/#main-h-score-table">H-scoring → Main H-score table</a></td>
 </tr>
 <tr>
 <td>Tiebreaker</td>
-<td>Define a category to breaks ties for majority scoring with an even number of categories</td>
-<td><a href="hscores/#formats-and-categories">H-scoring → Formats and categories</a></td>
+<td>Define a category to break ties for majority scoring with an even number of categories</td>
+<td><a href="hscores/#head-to-head-most-categories">H-scoring → Most Categories</a></td>
 </tr>
 </tbody>
 </table>
@@ -665,18 +665,13 @@
 </thead>
 <tbody>
 <tr>
-<td>ω, γ (omega, gamma)</td>
-<td>How aggressively H-scoring punts categories</td>
+<td>M (pool size)</td>
+<td>How many reasonable players are available per pick in the future pick model. Effectively, a punting aggressiveness dial</td>
 <td><a href="hscores/#h-scoring-parameters">H-scoring → H-scoring parameters</a></td>
 </tr>
 <tr>
-<td>κ (kappa)</td>
-<td>How strongly the algorithm avoids punting categories that are popular punts for the field</td>
-<td><a href="hscores/#no-model-of-other-managers">H-scoring → No model of other managers</a></td>
-</tr>
-<tr>
 <td>C (confidence)</td>
-<td>How strongly other drafters are modeled as pursuing the punts H-scoring predicts for them. 0 treats them as neutral pickers; Rotisserie always uses 1</td>
+<td>Confidence in other drafters using an H-scoring like algorithm. 0 -&gt; neutral, 1 -&gt; using H-scoring</td>
 <td><a href="hscores/#no-model-of-other-managers">H-scoring → No model of other managers</a></td>
 </tr>
 <tr>
