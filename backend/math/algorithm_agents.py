@@ -219,6 +219,21 @@ _CONCESSION_LANE_THRESHOLD    = -0.25
 # iterations instead of spending the full budget.
 _DESCENT_STATIONARY_STEP_FRACTION = 0.1
 _DESCENT_STATIONARY_ITERATIONS    = 3
+# Confidence schedule, keyed PER SEAT on that seat's own observed picks: a prediction
+# about an empty seat is pure prior and capped at the base; each real pick a seat makes
+# earns it another step of trust, up to the configured confidence. Full confidence in
+# PRIORS is what breaks — the self-play loop at C=1.0 has no pure equilibrium (full-field
+# limit cycles, measured; every damping fails) — but an inference built on observed picks
+# deserves increasing trust. Keying on the seat (not on this drafter's roster) makes the
+# schedule mode-agnostic: snake rosters grow in lockstep so drafts are barely changed,
+# while auction rosters are asymmetric and each seat is trusted exactly as far as its own
+# evidence. The cap is consumed where committed tilts are scaled, so populate and the
+# served board always run at the (convergent) base and stored == live holds on the empty
+# board; the ramp simply scales the same stored tilts up as evidence accumulates.
+# Rotisserie is exempt: it pins full confidence by design and its window-0 EMA self-play
+# is stable there.
+_OPPONENT_CONFIDENCE_SCHEDULE_BASE     = 0.5
+_OPPONENT_CONFIDENCE_SCHEDULE_PER_PICK = 0.1
 # NOTE on position throttling (measured 2026-09-04, so it is not rebuilt): an early-pass
 # solve stride (rosters re-solved every 10th iteration, cached between) engaged on 591 of
 # 1383 calls and changed NEITHER results (bit-identical boards) NOR time (0.76s vs 0.70s):
@@ -930,6 +945,9 @@ class HAgent:
         my_players = [p for p in player_assignments[drafter] if p == p]
         x_self_sum = np.array(self.x_scores.loc[my_players].sum(axis=0))
         players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        # The batched all-empty-seat paths below model every opponent from its predicted
+        # anchor — zero observed picks, so they all share the base-capped confidence.
+        prior_confidence = self.resolve_effective_opponent_confidence(0)
 
         if cash_remaining_per_team:
             total_cash = sum(cash_remaining_per_team.values())
@@ -1005,8 +1023,9 @@ class HAgent:
                     replacement_value_by_category,
                 )
                 if mu_edge is not None:
-                    # opponent_model_confidence scales how sharply this seat is expected to pursue its punts.
-                    tilt = (self.n_picks - roster_len) * self.opponent_model_confidence * mu_edge
+                    # The seat's own observed picks set how far its predicted punts are trusted.
+                    seat_confidence = self.resolve_effective_opponent_confidence(len(roster))
+                    tilt = (self.n_picks - roster_len) * seat_confidence * mu_edge
                     base = base - tilt.reshape(1, self.n_categories, 1)
                     return base, np.asarray(tilt).reshape(self.n_categories)
                 return base, np.zeros(self.n_categories)
@@ -1049,7 +1068,7 @@ class HAgent:
                     score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
                     player_diff_total = (len(my_players) - 1 - 1) * replacement_value_by_category.reshape(1, -1)
                     money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
-                    tilt              = (self.n_picks - 1) * self.opponent_model_confidence * anchor_tilts
+                    tilt              = (self.n_picks - 1) * prior_confidence * anchor_tilts
                     columns           = score_diff - player_diff_total + money_diff_total - tilt
                     field_blocks.append(columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
                     tilt_blocks.append(tilt[:len(anchors)].T.reshape(1, self.n_categories, len(anchors)))
@@ -1153,12 +1172,12 @@ class HAgent:
                         anchor_stats = self.x_scores.loc[anchors].to_numpy()          # (S, n_cat)
                         anchor_tilts = committed_diffs.loc[anchors].to_numpy()        # (S, n_cat)
                         extra_sum    = mean_extra_array.reshape(1, -1) * (target_team_size - 1)
-                        tilt         = ((self.n_picks - 1) * self.opponent_model_confidence) * anchor_tilts
+                        tilt         = ((self.n_picks - 1) * prior_confidence) * anchor_tilts
                         totals_rows  = (anchor_stats + extra_sum) + tilt
                         field_blocks.append(totals_rows.T.reshape(1, self.n_categories, len(anchors)))
                         tilt_blocks.append(tilt.T.reshape(1, self.n_categories, len(anchors)))
                         if spare_anchor is not None:
-                            spare_tilt  = (((self.n_picks - 1) * self.opponent_model_confidence)
+                            spare_tilt  = (((self.n_picks - 1) * prior_confidence)
                                            * committed_diffs.loc[spare_anchor].to_numpy())
                             spare_total = ((self.x_scores.loc[[spare_anchor]].sum(axis=0).to_numpy()
                                             + extra_sum.reshape(-1))
@@ -1357,13 +1376,16 @@ class HAgent:
         empty_seat_anchor, spare_anchor = self._assign_empty_seat_anchors(player_assignments, drafter,
                                                                           anchor_player_order)
 
-        def team_total(roster, mu_edge):
+        def team_total(roster, mu_edge, n_observed_picks):
+            """n_observed_picks is the seat's REAL pick count — a predicted-anchor seat is
+            modelled with a roster of one but has observed nothing, so it stays at prior
+            confidence (see the confidence-schedule constants)."""
             base = self.get_opposing_team_means(roster, mean_extra, target_team_size)
             if mu_edge is None:
                 return base, np.zeros(self.n_categories)
             picks_left = self.n_picks - len([p for p in roster if p == p])
-            # opponent_model_confidence scales how sharply this seat is expected to pursue its punts.
-            tilt = picks_left * self.opponent_model_confidence * mu_edge
+            seat_confidence = self.resolve_effective_opponent_confidence(n_observed_picks)
+            tilt = picks_left * seat_confidence * mu_edge
             return base + tilt.reshape(1, self.n_categories, 1), np.asarray(tilt).reshape(self.n_categories)
 
         totals, seat_tilts = {}, {}
@@ -1372,20 +1394,21 @@ class HAgent:
                 continue
             roster = [p for p in player_assignments[team] if p == p]
             if len(roster) >= self.n_picks:
-                totals[team], seat_tilts[team] = team_total(roster, None)
+                totals[team], seat_tilts[team] = team_total(roster, None, len(roster))
             elif roster:
                 state = self._team_states.get(team)
-                totals[team], seat_tilts[team] = team_total(roster, None if state is None else state['mu_edge'])
+                totals[team], seat_tilts[team] = team_total(roster, None if state is None else state['mu_edge'],
+                                                            len(roster))
             elif team in empty_seat_anchor:
                 predicted = empty_seat_anchor[team]
                 totals[team], seat_tilts[team] = team_total([predicted],
-                                                            committed_future_diffs.loc[predicted].to_numpy())
+                                                            committed_future_diffs.loc[predicted].to_numpy(), 0)
             else:
-                totals[team], seat_tilts[team] = team_total(roster, None)   # no prediction left: neutral padding
+                totals[team], seat_tilts[team] = team_total(roster, None, 0)   # no prediction left: neutral padding
 
         spare_total, spare_tilt = ((None, None) if spare_anchor is None
                                    else team_total([spare_anchor],
-                                                   committed_future_diffs.loc[spare_anchor].to_numpy()))
+                                                   committed_future_diffs.loc[spare_anchor].to_numpy(), 0))
         return totals, seat_tilts, empty_seat_anchor, spare_total, spare_tilt
 
     def refresh_stale_team_states(self, player_assignments, drafter, cash_remaining_per_team=None):
@@ -1508,6 +1531,15 @@ class HAgent:
 
     def get_diff_var(self, n_their_players):
         return self.n_picks * (2 + self.w * (self.n_picks - n_their_players) / self.n_picks)
+
+    def resolve_effective_opponent_confidence(self, n_observed_picks):
+        """The confidence applied to one seat's predicted tilt, given how many picks that
+        seat has actually made (see the _OPPONENT_CONFIDENCE_SCHEDULE_* constants)."""
+        if self.scoring_format == 'Rotisserie':
+            return self.opponent_model_confidence
+        return min(self.opponent_model_confidence,
+                   _OPPONENT_CONFIDENCE_SCHEDULE_BASE
+                   + _OPPONENT_CONFIDENCE_SCHEDULE_PER_PICK * n_observed_picks)
 
     # NOTE: the money->win-probability curve (get_value_of_money_auction, stored as
     # self.value_of_money) was removed 2026-08-11: nothing consumed it -- the service layer converts
