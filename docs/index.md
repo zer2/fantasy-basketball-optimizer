@@ -35,9 +35,9 @@ Settings, available in the left sidebar, control the context in which the algori
 | Drafters and picks | Number of drafters and picks per drafter (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
 | Third-round reversal | Snake-draft order toggle (manual entry) | [League Setup → Manual entry](league-setup.md#manual-entry) |
 | Player stats | Configure forward-looking projections, or data from past NBA seasons | [Player Stats](projections.md) |
-| Scoring format | Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
-| Categories | Select statistical categories for scoring | [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
-| Tiebreaker | Define a category to breaks ties for majority scoring with an even number of categories| [H-scoring → Formats and categories](hscores.md#formats-and-categories) |
+| Scoring format | Toggle between Head to Head and Rotisserie, and — for Head to Head — slide between scoring each category and winning the majority | [H-scoring → Main H-score table](hscores.md#main-h-score-table) |
+| Categories | Select statistical categories for scoring | [H-scoring → Main H-score table](hscores.md#main-h-score-table) |
+| Tiebreaker | Define a category to break ties for majority scoring with an even number of categories| [H-scoring → Most Categories](hscores.md#head-to-head-most-categories) |
 
 ## Parameter glossary
 
