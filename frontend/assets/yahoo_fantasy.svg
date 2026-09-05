@@ -7,10 +7,6 @@
         fill: none;
       }
 
-      path {
-        fill: #ffffff;
-      }
-
       .st1 {
         fill: #7d2eff;
       }

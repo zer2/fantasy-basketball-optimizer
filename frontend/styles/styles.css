@@ -2432,6 +2432,15 @@ tr {
     text-decoration: none;
 }
 
-.yahoo-attribution img {
+.yahoo-attribution svg {
     height: 14px;
+    width: auto;
+    display: block;
+}
+
+/* The wordmark's unclassed paths are the "fantasy" letterforms — black in Yahoo's
+   light-background treatment, white in the dark one. The classed "yahoo!" paths keep
+   their brand purple from the SVG's own styles. */
+.yahoo-attribution svg path:not([class]) {
+    fill: light-dark(#1a1a1a, #ffffff);
 }
