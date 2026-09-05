@@ -200,8 +200,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
     const yahooAttributionLogo = document.createElement('img')
     // Self-hosted copy of Yahoo's wordmark, cropped to its artwork: the original ships
     // the strip of lettering inside a 293x293 canvas, so uncropped it renders as a
-    // near-invisible sliver. The letterforms are unified to Yahoo purple so the mark
-    // reads on the dark theme (the source's "fantasy" paths default to black).
+    // near-invisible sliver. The "fantasy" letterforms (black in the source, per Yahoo's
+    // light-background treatment) are recolored white to match Yahoo's dark-background
+    // treatment — the app is dark-only (color-scheme: dark in styles.css). If a light
+    // mode ever ships, this needs the black variant behind a theme switch.
     yahooAttributionLogo.src = '/assets/yahoo_fantasy.svg'
     yahooAttributionLogo.alt = 'Yahoo Fantasy'
     yahooAttribution.append(yahooAttributionLabel, yahooAttributionLogo)
