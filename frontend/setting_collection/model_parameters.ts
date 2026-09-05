@@ -42,9 +42,7 @@ const PARAM_SPECS: ParamSpec[] = [
         id: 'mp-opponent-confidence', key: 'opponent_model_confidence', label: 'C (confidence)', step: 0.1,
         caption: 'How confident the algorithm is that other drafters are pursuing the punt strategies '
                + 'it predicts for them. 0 treats them as neutral pickers with no strategy at all; 1 '
-               + 'takes the prediction at face value. Above 0.5, the extra confidence phases in per '
-               + 'opponent as their actual picks accumulate — a prediction about a team that has not '
-               + 'picked yet is never trusted above 0.5. Rotisserie always uses 1.',
+               + 'takes the prediction at face value. Rotisserie always uses 1.',
     },
     {
         id: 'mp-reg-lambda', key: 'reg_lambda', label: 'λ (lambda)', step: 0.01,

@@ -17,6 +17,7 @@ import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_setti
 import {
     DraftConfig,
     getPickRow, getPickDrafter, getDrafted, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getConfigKey,
+    getBoardGeneration,
     resetDraftState, applyDraftConfig,
     recordDraftPick, clearDraftPick, clearAllDraftPicks,
     advanceDraftPick, goBackDraftPick,
@@ -165,8 +166,13 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
             // Autopilot only needs the top pick: score just the first batch and render nothing. Use the
             // value this evaluate returns — not a shared global — so a competing evaluate that aborts
             // this one yields null (stop cleanly) instead of a stale pick from a previous drafter.
+            const generationBeforeEvaluate = getBoardGeneration()
             const topPlayerId = await runEvaluate({ forAutopilot: true })
 
+            // The board was reset while this evaluate was in flight (a data-source or league
+            // change): the pick was chosen against a pool that no longer exists, so recording
+            // it would land an old-registry player id on the new board.
+            if (getBoardGeneration() !== generationBeforeEvaluate) break
             if (topPlayerId === null) break
             recordDraftPick(getPickRow(), getPickDrafter(), topPlayerId)
             advanceDraftPick(readDraftConfig().thirdRoundReversal)

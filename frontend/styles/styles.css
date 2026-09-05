@@ -2419,3 +2419,19 @@ tr {
 }
 
 .account-logout:hover { background: light-dark(#e5e5e5, #3d3d55); color: light-dark(black, white); }
+
+/* Yahoo brand attribution under the Connect button (shown for the Yahoo platform only). */
+.yahoo-attribution {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    color: light-dark(#999999, #666688);
+    font-family: "Source Sans 3";
+    font-size: 0.73rem;
+    text-decoration: none;
+}
+
+.yahoo-attribution img {
+    height: 18px;
+}
