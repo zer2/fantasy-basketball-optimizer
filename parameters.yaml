@@ -280,6 +280,10 @@ NBA:
       default : 0.25
       min : 0.0
       max : 1.0
+    pick_pool_size :
+      default : 25
+      min : 2
+      max : 200
     chi :
       default : 0.6
       min : 0.0
@@ -288,15 +292,13 @@ NBA:
       default : 0.2
       min : 0.0
       max: 1.0
-    kappa :
-      default : 0.3
-      min : 0.0
-      max: 5.0
     reg_lambda :
-      # Peak strength of the L1 pull of category weights toward neutral on an empty roster, in units
-      # of 1e-3 (so 0.05 is the tuned 0.00005); the schedule decays it to ~0 by the final pick, and 0
-      # turns regularisation off. The ceiling is deliberate: past 0.5 the shrink can reach the
-      # singular w == v ray, where the future-pick model divides by zero.
+      # Peak strength of the L1 pull of category weights toward neutral on an empty roster, as a
+      # fraction of the descent's per-iteration step (0.05 shrinks up to 5% of each step; see
+      # REG_LAMBDA_UNIT — step-denominated so the meaning survives learning-rate recalibrations).
+      # The schedule decays it to ~0 by the final pick, and 0 turns regularisation off. The ceiling
+      # is deliberate: past 0.5 the shrink competes with the descent step itself and can hold
+      # weights pinned at exact neutral.
       default : 0.05
       min : 0
       max: 0.5

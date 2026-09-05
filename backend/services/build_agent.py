@@ -333,8 +333,7 @@ def build_session_agent(session: Session) -> None:
 
     session.agent = HAgent(
         info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
-        omega          = current_settings['omega'],
-        gamma          = current_settings['gamma'],
+        pick_pool_size = current_settings['pick_pool_size'],
         n_picks        = n_starters,
         n_drafters     = n_drafters,
         dynamic        = current_settings['n_iterations'] > 0,
@@ -345,7 +344,6 @@ def build_session_agent(session: Session) -> None:
         sport_params   = sport_params,
         slot_counts    = slot_counts,
         aleph          = current_settings['aleph'],
-        kappa          = current_settings['kappa'],
         reg_lambda     = current_settings['reg_lambda'],
         opponent_model_confidence = current_settings['opponent_model_confidence'],
         beth           = current_settings['beth'],

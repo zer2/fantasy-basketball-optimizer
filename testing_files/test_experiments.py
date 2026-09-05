@@ -17,14 +17,11 @@
 # Results persist per section in experiment_results/<slug>.json, so running a subset of tests with -k in
 # report mode regenerates only those sections; the tabbed page is rebuilt from everything stored.
 #
-# KAPPA POLICY: kappa = 0.3 (the app default, via the fixture) EVERYWHERE, with exactly one exception:
-# simulations against a G-score field, where the field does not punt, so there is no crowd for the
-# anti-crowded-punt penalty to defect from and kappa would only distort the H-vs-G comparison.
 # beth = 0 in all SIMULATIONS (the season-sim convention: historical stats are objectively correct, so
 # the Bayesian self-doubt would only dilute the measurement); fast display-property tests keep full app
 # settings because they measure exactly what the user sees.
 #
-# All sessions are built through request parameters (opponent_model_confidence, kappa, ...) rather than
+# All sessions are built through request parameters (opponent_model_confidence, ...) rather than
 # environment pins, and every draft loop calls agent.reset_draft_state() so no state leaks across drafts.
 
 import os
@@ -106,15 +103,14 @@ _SECTION_EXPLANATIONS = {
         'Full snake drafts: one seat drafts by H-score, the other 11 pick greedily by G-score ranking. '
         'Numbers are the H seat\'s expected head-to-head category win rate against that field in '
         'percentage points (50.0 = break-even; every point above is real edge). Seat columns are draft '
-        'positions 1..12 — later positions are genuinely harder. kappa=0 here (the one exception: a G '
-        'field does not punt, so the anti-crowding penalty would only distort the comparison); beth=0 '
+        'positions 1..12 — later positions are genuinely harder. beth=0 '
         'per the season-sim convention. This is the most basic utility claim of the whole system.',
     'Awareness (opponent model on vs off)':
         'Identical drafts by the same seat with the opponent model ON minus OFF; gains are in H-score '
         'percentage points (+1.0 = one extra point of expected category win rate). vs an UNAWARE H '
-        'field (at app kappa): kappa already prices punt-crowding, so expect small positive-to-zero '
+        'field: expect small positive-to-zero '
         'means — clearly negative would mean the model hurts against naive H-drafters; the ALL row '
-        'pools every season and seat, with its standard error. vs a G field (kappa=0 exception): the '
+        'pools every season and seat, with its standard error. vs a G field: the '
         'model\'s predictions are simply wrong there (G drafters never punt), so the property is '
         'harmlessness, mean ~0. Every seat drafts with its own independent agent.',
     'Warm start (purpose: display stability, not better answers)':
@@ -578,7 +574,14 @@ def test_self_play_convergence(sessions):
         tracked = list(records[0][1].index[:12])
 
         for pass_number, (is_full_pool, rates) in enumerate(records):
-            tracked_rates = rates.reindex(tracked).to_numpy()
+            # Solve-half passes only carry rows for the group they solved, so each pass
+            # reports the punts of whichever tracked players it re-solved; the Level-0
+            # pass and the serves cover the full tracked set.
+            present = rates.index.intersection(tracked)
+            if is_full_pool:
+                assert len(present) == len(tracked), (
+                    f'{season} pass {pass_number}: full-pool pass missing tracked players')
+            tracked_rates = rates.loc[present].to_numpy()
             assert not np.isnan(tracked_rates).any(), f'{season} pass {pass_number}: NaN win rates'
             punt_counts = (tracked_rates < _SOFT_PUNT_RATE).sum(axis=0)
             label = 'serve' if is_full_pool else str(pass_number)
@@ -609,7 +612,9 @@ def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
     assignments  = {t: [] for t in teams}
     g_ranking    = _gscore_ranking(h_session)
     has_positions   = _has_position_data(h_session)
-    position_config = agent._pos_cfg
+    position_config = agent.position_config
+    positions_by_player = {player_id: identity.positions
+                           for player_id, identity in h_session.player_registry.items()}
     drafted: set    = set()
 
     for pick_row in range(n_picks):
@@ -618,10 +623,11 @@ def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
             team  = teams[index]
             if index == seat:
                 result = rank_candidates(h_session, assignments, team, [], None, 0, candidate_limit)
-                chosen = result.candidates[0].name
+                chosen = result.candidates[0].player_id
             else:
                 chosen = _pick_gscore_player(
-                    g_ranking, drafted, assignments[team], position_config, has_positions)
+                    g_ranking, drafted, assignments[team], position_config, has_positions,
+                    positions_by_player)
             assignments[team].append(chosen)
             drafted.add(chosen)
 
@@ -642,7 +648,7 @@ def test_h_scoring_beats_g_field(format_key):
     n_seats = None
     for season in _SEASONS:
         # beth=0, kappa=0: the season-sim conventions (see the header notes).
-        session = _build_session(_FORMATS[format_key], season=season, kappa=0.0, beth=0)
+        session = _build_session(_FORMATS[format_key], season=season, beth=0)
         n_seats = _SIM_SEATS or session.current_settings['n_drafters']
         scores  = [100 * _draft_h_seat_in_g_field(session, seat) for seat in range(n_seats)]
         pooled.extend(scores)
@@ -658,7 +664,7 @@ def test_h_scoring_beats_g_field(format_key):
 
 @sims
 def test_awareness_vs_unaware_h_field():
-    """Awareness against a field of UNAWARE H-drafters, at app kappa. ONE AGENT PER DRAFTER: a shared
+    """Awareness against a field of UNAWARE H-drafters. ONE AGENT PER DRAFTER: a shared
     field agent cross-contaminates its seats (an inference from seat A's perspective can overwrite seat
     B's own team entry, so B would warm-start from A's model of B); every seat drafts with its own
     session."""
@@ -718,9 +724,9 @@ def test_awareness_not_harmful_vs_g_field():
     all_gains = []
     n_seats = None
     for season in _SEASONS:
-        aware   = _build_session(_FORMATS['EC'], season=season, kappa=0.0,
+        aware   = _build_session(_FORMATS['EC'], season=season,
                                  opponent_model_confidence=0.5, beth=0)
-        unaware = _build_session(_FORMATS['EC'], season=season, kappa=0.0,
+        unaware = _build_session(_FORMATS['EC'], season=season,
                                  opponent_model_confidence=0, beth=0)
         n_seats = _SIM_SEATS or aware.current_settings['n_drafters']
         gains = []
@@ -731,14 +737,14 @@ def test_awareness_not_harmful_vs_g_field():
         season_se = float(np.std(gains, ddof=1) / np.sqrt(len(gains)))
         _record_row(section,
                     ['Comparison', 'Season', 'Mean (pp)', 'SE (pp)'] + _seat_columns(n_seats),
-                    ['vs G field (kappa=0)', season, f'{np.mean(gains):+.2f}', f'{season_se:.2f}']
+                    ['vs G field', season, f'{np.mean(gains):+.2f}', f'{season_se:.2f}']
                     + [f'{g:+.2f}' for g in gains])
 
     pooled_mean = float(np.mean(all_gains))
     pooled_se   = float(np.std(all_gains, ddof=1) / np.sqrt(len(all_gains)))
     _record_row(section,
                 ['Comparison', 'Season', 'Mean (pp)', 'SE (pp)'] + _seat_columns(n_seats),
-                ['vs G field (kappa=0)', f'ALL ({len(all_gains)} drafts)', f'{pooled_mean:+.2f}',
+                ['vs G field', f'ALL ({len(all_gains)} drafts)', f'{pooled_mean:+.2f}',
                  f'{pooled_se:.2f}'] + ['—'] * n_seats)
     assert pooled_mean > -1.0, f'awareness is harmful against a G field: {pooled_mean:+.2f}pp'
 

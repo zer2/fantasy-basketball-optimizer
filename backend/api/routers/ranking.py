@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.api.helpers import fail, require_session
@@ -20,6 +22,9 @@ router = APIRouter()
 def rank_candidates_route(req: EvaluateRequest, response: Response,
                           session: Session = Depends(require_session)):
     begin_timing()
+    # Full request logging, matching the session-create log: a board is only attributable
+    # to its inputs when every evaluate's exact payload is on record too.
+    logging.getLogger('fbbo').info('evaluate request: %s', req.model_dump_json())
 
     # Auction vs draft is all-or-nothing: an auction session must get per-team remaining_cash
     # on every evaluate, and any other session must never get it. Reject a request that mixes the

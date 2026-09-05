@@ -22,6 +22,11 @@ let nDrafters:          number
 let nPicks:             number
 let thirdRoundReversal: boolean
 let configKey = ''   // detects sidebar changes that require a reset
+// Bumped on every reset so async flows spanning a reset (autopilot's awaited evaluates)
+// can tell their pick was chosen against a board that no longer exists. Without it, a
+// data-source switch mid-autopilot lands old-pool player ids on the new board, and the
+// next evaluate fails with "Player id ... is not in the session registry".
+let boardGeneration = 0
 
 // ─── Getters ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +37,7 @@ export function getTeamIdentitiesFromBoard():   string[]            { return tea
 export function getNDrafters(): number { return nDrafters }
 export function getNPicks():    number { return nPicks    }
 export function getConfigKey():   string              { return configKey   }
+export function getBoardGeneration(): number          { return boardGeneration }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -41,12 +47,14 @@ export function resetDraftState(): void {
     pickDrafter = 0
     drafted     = Array.from({ length: nPicks }, () => Array(nDrafters).fill(null))
     configKey   = ''
+    boardGeneration += 1
 }
 
 /** Applies a new league config, resetting all pick data. */
 export function applyDraftConfig(cfg: DraftConfig): void {
     pickRow     = 0
     pickDrafter = 0
+    boardGeneration += 1
     drafted     = Array.from({ length: cfg.nPicks }, () => Array(cfg.nDrafters).fill(null))
     teamNames          = cfg.teamNames
     nDrafters          = cfg.nDrafters

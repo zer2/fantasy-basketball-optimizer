@@ -472,7 +472,7 @@ const STATES = {
 //   NEW (3, wired up but NOT yet verified against a live run — confirm framing/timing once):
 //     mid_draft (candidate view mid-draft), scottie_autodraft (Team 5 team-stats after a full 2025-26
 //     autodraft), sga_autodraft (Team 2, same draft). The two team shots reproduce the doc captions'
-//     draft (SGA at seat 2 / Scottie at seat 5) using the current defaults, kappa included.
+//     draft (SGA at seat 2 / Scottie at seat 5) using the current defaults.
 //
 //   NOTE: removed as low-value-out-of-context: the single-parameter crops (chi aleph beth iterations
 //     puntcontrol injury savorinput) and the settings dropdowns (formats categories historical =

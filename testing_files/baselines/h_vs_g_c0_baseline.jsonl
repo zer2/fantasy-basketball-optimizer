@@ -1,0 +1,85 @@
+{"meta": "H-vs-G canonical baseline: 42 seasons, opponent_model_confidence=0, beth=0, M=25, lambda=0.05, iterations=30, deduplicated player table (data-scripts e9eb8a2). Recorded 2026-09-05 at app commit 1476311+simplifications. Pooled: MC 59.59, EC 52.68."}
+{"format": "EC", "season": "1984-85", "mean": 52.3}
+{"format": "EC", "season": "1985-86", "mean": 52.5}
+{"format": "EC", "season": "1986-87", "mean": 53.3}
+{"format": "EC", "season": "1987-88", "mean": 53.0}
+{"format": "EC", "season": "1988-89", "mean": 52.5}
+{"format": "EC", "season": "1989-90", "mean": 52.9}
+{"format": "EC", "season": "1990-91", "mean": 53.4}
+{"format": "EC", "season": "1991-92", "mean": 52.6}
+{"format": "EC", "season": "1992-93", "mean": 52.2}
+{"format": "EC", "season": "1993-94", "mean": 52.7}
+{"format": "EC", "season": "1994-95", "mean": 53.1}
+{"format": "EC", "season": "1995-96", "mean": 52.6}
+{"format": "EC", "season": "1996-97", "mean": 52.7}
+{"format": "EC", "season": "1997-98", "mean": 52.2}
+{"format": "EC", "season": "1998-99", "mean": 53.4}
+{"format": "EC", "season": "1999-00", "mean": 53.0}
+{"format": "EC", "season": "2000-01", "mean": 53.4}
+{"format": "EC", "season": "2001-02", "mean": 52.1}
+{"format": "EC", "season": "2002-03", "mean": 51.8}
+{"format": "EC", "season": "2003-04", "mean": 52.7}
+{"format": "EC", "season": "2004-05", "mean": 52.5}
+{"format": "EC", "season": "2005-06", "mean": 51.5}
+{"format": "EC", "season": "2006-07", "mean": 51.7}
+{"format": "EC", "season": "2007-08", "mean": 54.1}
+{"format": "EC", "season": "2008-09", "mean": 52.4}
+{"format": "EC", "season": "2009-10", "mean": 51.7}
+{"format": "EC", "season": "2010-11", "mean": 51.9}
+{"format": "EC", "season": "2011-12", "mean": 52.8}
+{"format": "EC", "season": "2012-13", "mean": 51.6}
+{"format": "EC", "season": "2013-14", "mean": 52.8}
+{"format": "EC", "season": "2014-15", "mean": 53.9}
+{"format": "EC", "season": "2015-16", "mean": 53.3}
+{"format": "EC", "season": "2016-17", "mean": 52.7}
+{"format": "EC", "season": "2017-18", "mean": 53.2}
+{"format": "EC", "season": "2018-19", "mean": 54.3}
+{"format": "EC", "season": "2019-20", "mean": 52.7}
+{"format": "EC", "season": "2020-21", "mean": 53.8, "seats": [54.3, 53.3, 54.0, 53.8, 54.1, 54.3, 53.9, 53.7, 53.7, 53.7, 53.7, 53.4]}
+{"format": "EC", "season": "2021-22", "mean": 52.6, "seats": [55.5, 51.2, 53.0, 53.0, 53.0, 53.0, 54.2, 52.1, 52.1, 51.6, 51.6, 51.1]}
+{"format": "EC", "season": "2022-23", "mean": 51.6, "seats": [51.9, 51.0, 52.2, 52.6, 50.0, 51.4, 51.4, 51.7, 51.3, 51.9, 52.8, 50.7]}
+{"format": "EC", "season": "2023-24", "mean": 51.8, "seats": [53.2, 52.9, 52.4, 52.9, 49.1, 51.3, 50.1, 53.2, 52.4, 51.9, 51.0, 51.1]}
+{"format": "EC", "season": "2024-25", "mean": 52.6, "seats": [54.5, 55.2, 52.8, 52.9, 52.9, 52.9, 52.2, 52.2, 52.2, 52.2, 50.7, 51.2]}
+{"format": "EC", "season": "2025-26", "mean": 52.5, "seats": [52.0, 51.1, 53.2, 54.1, 54.0, 54.0, 53.2, 52.8, 51.8, 51.9, 51.3, 51.1]}
+{"format": "MC", "season": "1984-85", "mean": 58.3}
+{"format": "MC", "season": "1985-86", "mean": 59.1}
+{"format": "MC", "season": "1986-87", "mean": 61.2}
+{"format": "MC", "season": "1987-88", "mean": 60.4}
+{"format": "MC", "season": "1988-89", "mean": 58.9}
+{"format": "MC", "season": "1989-90", "mean": 59.6}
+{"format": "MC", "season": "1990-91", "mean": 62.6}
+{"format": "MC", "season": "1991-92", "mean": 59.4}
+{"format": "MC", "season": "1992-93", "mean": 58.0}
+{"format": "MC", "season": "1993-94", "mean": 60.2}
+{"format": "MC", "season": "1994-95", "mean": 60.5}
+{"format": "MC", "season": "1995-96", "mean": 60.0}
+{"format": "MC", "season": "1996-97", "mean": 60.3}
+{"format": "MC", "season": "1997-98", "mean": 58.6}
+{"format": "MC", "season": "1998-99", "mean": 60.0}
+{"format": "MC", "season": "1999-00", "mean": 61.3}
+{"format": "MC", "season": "2000-01", "mean": 60.4}
+{"format": "MC", "season": "2001-02", "mean": 56.7}
+{"format": "MC", "season": "2002-03", "mean": 56.5}
+{"format": "MC", "season": "2003-04", "mean": 57.9}
+{"format": "MC", "season": "2004-05", "mean": 58.3}
+{"format": "MC", "season": "2005-06", "mean": 55.5}
+{"format": "MC", "season": "2006-07", "mean": 54.8}
+{"format": "MC", "season": "2007-08", "mean": 63.2}
+{"format": "MC", "season": "2008-09", "mean": 59.7}
+{"format": "MC", "season": "2009-10", "mean": 55.5}
+{"format": "MC", "season": "2010-11", "mean": 59.0}
+{"format": "MC", "season": "2011-12", "mean": 59.5}
+{"format": "MC", "season": "2012-13", "mean": 55.3}
+{"format": "MC", "season": "2013-14", "mean": 58.9}
+{"format": "MC", "season": "2014-15", "mean": 63.6}
+{"format": "MC", "season": "2015-16", "mean": 63.6}
+{"format": "MC", "season": "2016-17", "mean": 60.5}
+{"format": "MC", "season": "2017-18", "mean": 61.1}
+{"format": "MC", "season": "2018-19", "mean": 66.9}
+{"format": "MC", "season": "2019-20", "mean": 60.9}
+{"format": "MC", "season": "2020-21", "mean": 65.1, "seats": [67.4, 66.2, 66.1, 66.1, 67.8, 68.3, 65.6, 64.6, 64.1, 64.1, 64.1, 57.1]}
+{"format": "MC", "season": "2021-22", "mean": 59.5, "seats": [68.2, 55.5, 53.8, 60.3, 60.3, 60.3, 60.3, 60.3, 62.2, 57.5, 57.5, 57.5]}
+{"format": "MC", "season": "2022-23", "mean": 55.4, "seats": [55.3, 53.4, 57.1, 58.2, 55.2, 55.2, 55.2, 54.4, 53.6, 53.6, 57.1, 57.1]}
+{"format": "MC", "season": "2023-24", "mean": 57.3, "seats": [59.7, 61.8, 58.5, 58.7, 57.9, 57.0, 50.5, 61.1, 58.6, 55.1, 53.1, 55.3]}
+{"format": "MC", "season": "2024-25", "mean": 58.7, "seats": [67.7, 66.0, 58.6, 61.6, 61.6, 58.4, 55.7, 55.7, 55.7, 55.7, 54.2, 53.3]}
+{"format": "MC", "season": "2025-26", "mean": 60.7, "seats": [55.3, 63.5, 64.8, 61.3, 65.3, 65.3, 61.9, 61.9, 57.4, 57.4, 56.9, 56.9]}

@@ -71,10 +71,6 @@ def _create_session(season: str, objective: str):
     # data with objectively-correct stats, so there is nothing to doubt. With beth>0 the draft-time
     # H-scores are regressed toward average (self-doubt), which is not what we want to measure here.
     request['model_settings']['beth'] = 0
-    # Turn OFF kappa (anti-crowded-punt) for this harness only: the field here drafts by G-score and
-    # does not punt, so there is no crowd to defect from and the penalty would only distort the
-    # H-vs-G comparison.
-    request['model_settings']['kappa'] = 0.0
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, f'Session creation failed ({season}, {objective}): {response.text}'
     session_id = response.json()['session_id']
@@ -98,23 +94,28 @@ def _gscore_ranking(session) -> list[str]:
 
 
 def _pick_gscore_player(
-    gscore_order: list[str]
-    , drafted: set[str]
-    , team_so_far: list[str]
+    gscore_order: list
+    , drafted: set
+    , team_so_far: list
     , position_config
     , has_positions: bool
-) -> str:
+    , positions_by_player: dict
+) -> int:
     """Highest-Total-G-score available player that keeps the roster position-eligible. Walking the
-    ranking top-down and taking the first eligible name is cheap: early picks the top name almost
-    always fits, so it is usually a single eligibility check."""
+    ranking top-down and taking the first eligible player is cheap: early picks the top player almost
+    always fits, so it is usually a single eligibility check. positions_by_player maps player id to
+    its positions list (the eligibility checker consumes positions, not identifiers)."""
     first_undrafted = None
-    for name in gscore_order:
-        if name in drafted:
+    for player_id in gscore_order:
+        if player_id in drafted:
             continue
         if first_undrafted is None:
-            first_undrafted = name
-        if not has_positions or check_single_player_eligibility(name, team_so_far, position_config):
-            return name
+            first_undrafted = player_id
+        if not has_positions or check_single_player_eligibility(
+                positions_by_player[player_id],
+                [positions_by_player[teammate] for teammate in team_so_far],
+                position_config):
+            return player_id
     # No position-eligible player remains: greedy G-score drafters can corner their own roster, and
     # transition seasons (~1999-00) carry patchy positions. Fall back to the best undrafted player —
     # the G-score seats only need to be filled to form the field; only the H-score team is scored, and
@@ -172,7 +173,9 @@ def _simulate_one_seat(
 ) -> dict:
     """Run one snake draft where `hscore_seat` drafts by H-score and the rest by G-score. Returns the
     H-score drafter's final score, its roster, and its per-pick candidate tables."""
-    position_config = session.agent._pos_cfg
+    position_config = session.agent.position_config
+    positions_by_player = {player_id: identity.positions
+                           for player_id, identity in session.player_registry.items()}
     n_iterations    = session.current_settings['n_iterations']
     team_names      = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments     = {name: [] for name in team_names}
@@ -200,6 +203,7 @@ def _simulate_one_seat(
             else:
                 chosen = _pick_gscore_player(
                     gscore_order, drafted, assignments[drafter_name], position_config, has_positions,
+                    positions_by_player,
                 )
 
             assignments[drafter_name].append(chosen)

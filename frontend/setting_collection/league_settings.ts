@@ -186,6 +186,23 @@ export function renderLeagueSettings(container: HTMLElement): void {
     connectButton.className   = 'section-apply-btn'
     connectButton.textContent = 'Connect'
     connectCell.append(connectButton)
+
+    // Yahoo brand attribution, required when serving Yahoo fantasy data; the whole row
+    // links to Yahoo Fantasy. Shown only while the Yahoo platform is selected.
+    const yahooAttribution = document.createElement('a')
+    yahooAttribution.id        = 'ls-yahoo-attribution'
+    yahooAttribution.className = 'yahoo-attribution'
+    yahooAttribution.href      = 'https://sports.yahoo.com/fantasy/'
+    yahooAttribution.target    = '_blank'
+    yahooAttribution.rel       = 'noopener'
+    const yahooAttributionLabel = document.createElement('span')
+    yahooAttributionLabel.textContent = 'Fantasy data provided by'
+    const yahooAttributionLogo = document.createElement('img')
+    yahooAttributionLogo.src = 'https://763445962456-brand-assets.s3.us-west-2.amazonaws.com/brandwebsite/s3fs-public/Yahoo_Fantasy.svg'
+    yahooAttributionLogo.alt = 'Yahoo Fantasy'
+    yahooAttribution.append(yahooAttributionLabel, yahooAttributionLogo)
+    connectCell.append(yahooAttribution)
+
     connectCell.append(connectStatus)
 
     // Connecting a league stores that platform's credentials against a Google account, so it is
@@ -204,6 +221,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
     function refreshConnectControls(): void {
         const platform = platformSelect.getValue()
         const canConnect = isSignedIn()
+        yahooAttribution.style.display = platform === 'Retrieve from Yahoo' ? '' : 'none'
         signInPrompt.style.display  = canConnect ? 'none' : ''
         connectButton.style.display = canConnect ? '' : 'none'
         connectStatus.style.display = canConnect ? '' : 'none'

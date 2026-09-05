@@ -100,7 +100,7 @@ def draft_and_score(field_session, deviator_session, seat: int, candidate_limit:
             session       = deviator_session if drafter_index == seat else field_session
             result        = rank_candidates(session, assignments, drafter_name, [], None, 0, candidate_limit)
             assert result.candidates, f'no candidates for {drafter_name}, round {pick_row + 1}'
-            assignments[drafter_name].append(result.candidates[0].name)
+            assignments[drafter_name].append(result.candidates[0].player_id)
 
     scores = deviator_session.agent.get_h_scores(assignments, deviator, n_iterations)['Scores']
     return float(scores[scores.idxmax()])
@@ -125,7 +125,7 @@ def draft_population(session_by_seat: dict
             session       = session_by_seat[drafter_index]
             result        = rank_candidates(session, assignments, drafter_name, [], None, 0, candidate_limit)
             assert result.candidates, f'no candidates for {drafter_name}, round {pick_row + 1}'
-            assignments[drafter_name].append(result.candidates[0].name)
+            assignments[drafter_name].append(result.candidates[0].player_id)
     return assignments
 
 

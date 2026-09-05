@@ -64,14 +64,14 @@ export interface Roster {
 // ─── API request types ────────────────────────────────────────────────────────
 
 export interface ModelSettings {
-    omega: number
-    gamma: number
+    // Window of the truncated-max future-pick model: how many surviving players each
+    // future pick effectively chooses among (the punt-aggressiveness dial).
+    pick_pool_size: number
     beth: number
     upsilon: number
     psi: number
     chi: number
     aleph: number
-    kappa: number
     // Peak L1 pull of category weights toward neutral (the algorithm's lambda). Named
     // reg_lambda to match the wire field, since lambda is a Python keyword server-side.
     reg_lambda: number

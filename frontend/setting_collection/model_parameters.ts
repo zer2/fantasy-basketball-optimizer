@@ -1,4 +1,4 @@
-// Collects: all model parameters (upsilon, psi, chi, aleph, omega, gamma, beth, n_iterations)
+// Collects: all model parameters (upsilon, psi, chi, aleph, pick_pool_size, beth, n_iterations)
 // Mirrors player_stat_param_popover() + algorithm_param_popover()
 //   in src/setting_collection/parameters.py
 //
@@ -11,7 +11,7 @@ import { pref, savePref } from '../preferences.js'
 
 interface ParamSpec {
     id:      string
-    key:     string        // key in config.options (e.g. 'omega', 'S')
+    key:     string        // key in config.options (e.g. 'pick_pool_size', 'S')
     label:   string
     caption: string
     step:    number
@@ -39,10 +39,6 @@ const PARAM_SPECS: ParamSpec[] = [
         caption: 'Extra correlation added between volume-based categories (for Rotisserie).',
     },
     {
-        id: 'mp-kappa', key: 'kappa', label: 'κ (kappa)', step: 0.1,
-        caption: 'Anti-crowded-punt strength. Early picks are gently steered away from punts the field is crowding into. 0 disables it.',
-    },
-    {
         id: 'mp-opponent-confidence', key: 'opponent_model_confidence', label: 'C (confidence)', step: 0.1,
         caption: 'How confident the algorithm is that other drafters are pursuing the punt strategies '
                + 'it predicts for them. 0 treats them as neutral pickers with no strategy at all; 1 '
@@ -55,12 +51,10 @@ const PARAM_SPECS: ParamSpec[] = [
                + 'off entirely.',
     },
     {
-        id: 'mp-omega', key: 'omega', label: 'ω (omega)', step: 0.05,
-        caption: 'Controls punting aggressiveness. Higher values cause the algorithm to punt more aggressively.',
-    },
-    {
-        id: 'mp-gamma', key: 'gamma', label: 'γ (gamma)', step: 0.05,
-        caption: 'Complements omega. Higher values require more general value to be sacrificed to pursue a punting strategy.',
+        id: 'mp-pick-pool-size', key: 'pick_pool_size', label: 'M (pool size)', step: 1,
+        caption: 'How many available players each future pick effectively chooses among. Larger '
+               + 'windows give future picks more freedom to pursue the build, making punting more '
+               + 'aggressive; smaller windows keep builds balanced.',
     },
     {
         id: 'mp-beth', key: 'beth', label: 'ב (beth)', step: 0.5,
@@ -156,11 +150,9 @@ export function getModelSettings(): ModelSettings {
         psi:             readNumberInput('mp-psi'),
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
-        kappa:           readNumberInput('mp-kappa'),
         reg_lambda:      readNumberInput('mp-reg-lambda'),
         opponent_model_confidence: readNumberInput('mp-opponent-confidence'),
-        omega:           readNumberInput('mp-omega'),
-        gamma:           readNumberInput('mp-gamma'),
+        pick_pool_size:  readNumberInput('mp-pick-pool-size'),
         beth:            readNumberInput('mp-beth'),
         n_iterations:    readNumberInput('mp-n-iterations'),
         streaming_noise: readNumberInput('mp-s'),
