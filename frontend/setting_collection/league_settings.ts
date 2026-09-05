@@ -197,9 +197,19 @@ export function renderLeagueSettings(container: HTMLElement): void {
     yahooAttribution.rel       = 'noopener'
     const yahooAttributionLabel = document.createElement('span')
     yahooAttributionLabel.textContent = 'Fantasy data provided by'
-    const yahooAttributionLogo = document.createElement('img')
-    yahooAttributionLogo.src = 'https://763445962456-brand-assets.s3.us-west-2.amazonaws.com/brandwebsite/s3fs-public/Yahoo_Fantasy.svg'
-    yahooAttributionLogo.alt = 'Yahoo Fantasy'
+    const yahooAttributionLogo = document.createElement('span')
+    yahooAttributionLogo.setAttribute('role', 'img')
+    yahooAttributionLogo.setAttribute('aria-label', 'Yahoo Fantasy')
+    // Self-hosted copy of Yahoo's wordmark, cropped to its artwork (the original ships
+    // the strip of lettering inside a 293x293 canvas, so uncropped it renders as a
+    // near-invisible sliver). Inlined rather than an <img>: an embedded SVG is an
+    // isolated document that cannot see the page's color-scheme, so the "fantasy"
+    // letterforms (black in Yahoo's light-background treatment, white in the dark one)
+    // could never follow the theme. Inline, styles.css drives their fill with
+    // light-dark() like every other themed surface.
+    fetch('/assets/yahoo_fantasy.svg')
+        .then(response => response.text())
+        .then(svgMarkup => { yahooAttributionLogo.innerHTML = svgMarkup })
     yahooAttribution.append(yahooAttributionLabel, yahooAttributionLogo)
     connectCell.append(yahooAttribution)
 

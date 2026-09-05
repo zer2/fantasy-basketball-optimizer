@@ -138,4 +138,5 @@ def serve_index():
     return FileResponse('frontend/app.html')
 
 app.mount('/styles', StaticFiles(directory='frontend/styles'), name='styles')
+app.mount('/assets', StaticFiles(directory='frontend/assets'), name='assets')
 app.mount('/dist',   StaticFiles(directory='frontend/dist'),   name='dist')
