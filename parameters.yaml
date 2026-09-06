@@ -292,7 +292,7 @@ NBA:
       default : 0.2
       min : 0.0
       max: 1.0
-    reg_lambda :
+    lambda_c :
       # Peak strength of the L1 pull of category weights toward neutral on an empty roster, as a
       # fraction of the descent's per-iteration step (0.05 shrinks up to 5% of each step; see
       # REG_LAMBDA_UNIT — step-denominated so the meaning survives learning-rate recalibrations).
@@ -302,6 +302,16 @@ NBA:
       default : 0.05
       min : 0
       max: 0.5
+    lambda_p :
+      # Peak strength of the L1 pull of flex-position shares toward uniform, in the same
+      # step-fraction units as lambda_c but on its own scale (shares live on a coarser simplex).
+      # Dose-response at the docs' Giannis board (2024-25 EC): 5 gives a moderated positional lean
+      # (C takes 1.55 of 3 Util slots), 2.5 a strong one (2.21), 0.5 near-saturated (2.72), 0 a
+      # one-hot corner (2.99). Default 4.0 chosen by eyeball on live boards. The ceiling is where
+      # the pull starts pinning shares at exact uniform, deadening the flex-strategy display.
+      default : 4
+      min : 0
+      max: 25
     most_categories_weight :
       # How much of the Head-to-Head objective is the probability of taking the majority of
       # categories, the rest being the average per-category win probability. 0 reproduces Each

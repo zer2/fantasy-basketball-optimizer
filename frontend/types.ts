@@ -72,9 +72,12 @@ export interface ModelSettings {
     psi: number
     chi: number
     aleph: number
-    // Peak L1 pull of category weights toward neutral (the algorithm's lambda). Named
-    // reg_lambda to match the wire field, since lambda is a Python keyword server-side.
-    reg_lambda: number
+    // Peak L1 pulls toward neutral. lambda_c pulls category weights toward balanced;
+    // lambda_p pulls flex-position shares toward uniform (its own scale — shares live on
+    // a coarser simplex). Named to match the wire fields, since lambda is a Python
+    // keyword server-side.
+    lambda_c: number
+    lambda_p: number
     // How strongly other drafters are modelled as pursuing the punts H-scoring predicts for them,
     // from 0 (neutral pickers with no strategy) to 1 (the prediction taken at face value).
     opponent_model_confidence: number
