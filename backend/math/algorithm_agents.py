@@ -780,6 +780,11 @@ class HAgent:
                 self.transformation_matrix_inverted,
                 cdf_original + self.transformation_addition_constant,
             )
+            # The Bayesian model treats win rates as unconstrained Gaussians, so its optimum can
+            # legitimately leave (0, 1) for extreme builds (measured: one category at 0.999 with the
+            # rest at 0.01 maps to 1.094 at n=9, beth=3) — which ndtri would turn into NaN and poison
+            # the candidate's whole evaluate. Saturate the correction at the boundary instead.
+            cdf_mod = np.clip(cdf_mod, 1e-6, 1 - 1e-6)
             corrected_strength = _normal_ppf(cdf_mod, scale=np.sqrt(diff_vars.mean(axis=2)))
             x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
