@@ -24,6 +24,7 @@ COPY coefficient_exploration_output/ coefficient_exploration_output/
 # Frontend static assets
 COPY frontend/app.html frontend/app.html
 COPY frontend/styles/  frontend/styles/
+COPY frontend/assets/  frontend/assets/
 COPY --from=frontend-builder /build/frontend/dist/ frontend/dist/
 
 EXPOSE 8080
