@@ -1101,7 +1101,7 @@
 <figure>
 <p><img alt="G-score expectation breakdown" src="../img/hexp.png" /></p>
 <figcaption>
-<p>Expectations for a team considering Dyson Daniels in round two, having taken Giannis in round one. Each Category, 2024-25</p>
+<p>Expectations for a team considering Dyson Daniels in round two, having taken Giannis in round one. Each Category, 2024-25. </p>
 </figcaption>
 </figure>
 <p>'Current diff' represents the G-score differential for the draft so far, including players already drafted in the current round and excluding the candidate player. Teams that have not made their pick for the round are filled in with an estimate of the statistics of their next player. So in this case above, 'Current diff' represents other teams' picks so far vs. a team that has already taken Giannis, with estimates filled in for teams that have not yet drafted. 'Future diff' is the expected difference between future picks made by the drafter and those made by other teams, based on the strategy adopted by H-scoring. In this case the G-score for Free Throws is heavily negative because the algorithm wants to punt it with future picks. 'Current diff' plus the candidate player plus 'Future diff' equals the total differential versus other teams, which H-scoring uses to calculate win probabilities.</p>
@@ -1110,7 +1110,7 @@
 <figure>
 <p><img alt="Future pick strategy table" src="../img/hstrat.png" /></p>
 <figcaption>
-<p>Category weights for future picks, for a team considering Daniels after taking Giannis. Each Category, 2024-25</p>
+<p>Category weights for future picks, for a team considering Daniels after taking Giannis. Each Category, 2024-25. Free Throw % and Threes are the two punted categories.</p>
 </figcaption>
 </figure>
 <p>The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks. Category weights show what the algorithm is thinking in terms of which categories it wants to punt. </p>
@@ -1124,10 +1124,11 @@
 <p>The mathematical model for how category weights change expected statistics</p>
 </figcaption>
 </figure>
-<p>This model works reasonably well in practice, but it has a flaw. The resulting weights end up diverging significantly from the gradients relative to the categories, which is a direct way of describing the marginal value of each category. This makes interpretation confusing; the weights don't do a good job of representing what the weights really would be if the manager had to choose based on linear weights in the future. </p>
+<p>This model worked reasonably well in practice, but it has a flaw. The resulting weights end up diverging significantly from the gradients relative to the categories, which is a direct way of describing the marginal value of each category. This makes interpretation confusing; the weights don't do a good job of representing what the weights really would be if the manager had to choose based on linear weights in the future. </p>
 <p>The reason that the original model had that problem was that it assumed that degradation in total value was a linear function of how aberrant the weights were. In reality that is not a linear relationship, it is diminishing. That led the weight form to erroneously condense around typical weights. </p>
-<p>To fix that problem, I designed a new model that generates similar categorical expectations and does about as well in testing, with sounder weights. I will include a more detailed explanation of how it works at some point in the future. </p>
+<p>To fix that problem, I worked with Claude to design a new model that generates similar categorical expectations and does about as well in testing, with sounder weights. An explanation is available <a href="https://claude.ai/code/artifact/a2553c2f-98a1-4b6e-b770-96f6718189b9">here</a> </p>
 </details>
+<p>One might note that the algorithm does not drive the weight for punted categories all the way to zero. That's because there is still some chance of winning the punted categories, and value in that category increases that chance, however slightly. </p>
 <h3 id="flex-position-strategy">Flex position strategy</h3>
 <figure>
 <p><img alt="Flex position allocations" src="../img/hflex.png" /></p>
@@ -1273,11 +1274,11 @@ w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]
 <p>Fantasy basketball analysts often advocate for taking the best player available for the first few picks, and waiting until later to commit to a punt. The idea is to start flexibly, and decide which categories to punt based on which star players end up on the team. A manager would not want to commit to e.g. punting blocks before a star shot-blocker falls into their lap. </p>
 <p>Ideally, the algorithm would model a probability distribution of how circumstances could change, and choose a strategy based on expected value. Instead, for practical reasons, the algorithm is designed to maximize the best strategy under a point estimate of how its strategies would turn out. The lack of understanding of alternate scenarios is a weakness of H-scoring. It does not consider a spectrum of possibilities, so it does not know which strategies are resilient and which are flimsy. </p>
 <p>In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights into H-scores. The algorithm can still plan on a punt, but regularization incentivizes it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. </p>
-<p>The strength of that pull is the λ (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick.</p>
-<p>λ is also scaled by a diminishing factor as the draft goes on. This ensures that regularization applies most for early picks; once the algorithm settles on a strategy, it stops applying as much. </p>
+<p>The strength of that pull is the λ_c (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick. There is also a corresponding λ_p for flex position allocations, which defaults to 4. </p>
+<p>Both λs are scaled by a diminishing factor as the draft goes on. This ensures that regularization applies most for early picks; once the algorithm settles on a strategy, it stops applying as much. </p>
 <details class="note">
 <summary>How does the website enforce regularization?</summary>
-<p>The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring, plus an equivalent mechanism for flex positions. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. </p>
+<p>The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring, plus the equivalent mechanism for flex positions. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. </p>
 <p>The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, the weight for pick <span class="arithmatex">\(n\)</span> is <span class="arithmatex">\(\lambda\)</span> multiplied by the phi function evaluated at <span class="arithmatex">\(\frac{4n}{k}\)</span> where <span class="arithmatex">\(k\)</span> is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. </p>
 <p>The flex position regularizer has the same scheduler, just scaled up because the flex position numbers tend to vary more. </p>
 </details>
