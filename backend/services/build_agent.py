@@ -344,7 +344,8 @@ def build_session_agent(session: Session) -> None:
         sport_params   = sport_params,
         slot_counts    = slot_counts,
         aleph          = current_settings['aleph'],
-        reg_lambda     = current_settings['reg_lambda'],
+        lambda_c       = current_settings['lambda_c'],
+        lambda_p       = current_settings['lambda_p'],
         opponent_model_confidence = current_settings['opponent_model_confidence'],
         beth           = current_settings['beth'],
     )

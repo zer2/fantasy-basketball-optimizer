@@ -95,6 +95,13 @@ export async function lockInDraftPick(page, playerName) {
     const wrap = page.locator('[data-testid="draft-pick-select-wrapper"]').first()
     await chooseDropdownOption(page, wrap,
         wrapper => wrapper.locator('.cs-dropdown .cs-option').filter({ hasText: playerName }).first())
+    // The option click can silently fail to register on the hidden input (late re-render),
+    // in which case "Lock in selection" would draft whoever the select defaulted to.
+    // Verify the trigger actually shows the requested player before locking.
+    const selectedLabel = (await wrap.locator('.cs-trigger').innerText()).trim()
+    if (!selectedLabel.includes(playerName)) {
+        throw new Error(`draft pick select shows "${selectedLabel}" after choosing "${playerName}"`)
+    }
     await page.locator('.pick-control-row .pick-btn', { hasText: 'Lock in selection' }).click()
     await waitEval(page)
 }

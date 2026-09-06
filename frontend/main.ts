@@ -30,7 +30,7 @@ import {
     getSelectedCategories,
 } from './setting_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, markUploadedSourcesExpired } from './setting_collection/player_stats.js'
-import { renderModelSettings, refreshOpponentConfidenceControl, getModelSettings } from './setting_collection/model_parameters.js'
+import { renderModelSettings, refreshFormatParameterControls, refreshStreamingNoiseControl, getModelSettings } from './setting_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
@@ -146,6 +146,7 @@ getModeSelectElement().addEventListener('change', () => {
     patchSessionForModeChange()                                     // 1. patch the session's league type
     if (getLeagueSettings().mode !== 'Season Mode') applyLayout()   // 2. instant layout (Season defers to the patch)
     refreshSeasonRostersIfLive()                                    // 3. season live-roster sync
+    refreshStreamingNoiseControl(getLeagueSettings().mode)          // 4. SAVOR noise is Auction-only
 })
 
 // On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
@@ -268,7 +269,7 @@ const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
 const applyFormatChange = makeApplyChain('Format & categories apply')
 formatSection.addEventListener('change', () => {
-    refreshOpponentConfidenceControl(getScoringFormat())
+    refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
     applyFormatChange(4, { league: {
         scoring_format:         getScoringFormat(),
         most_categories_weight: getMostCategoriesWeight(),
@@ -281,8 +282,10 @@ formatSection.addEventListener('change', () => {
 
 const modelSection = createSection(sidebarSections, 'Model Parameters')
 renderModelSettings(modelSection)
-// The format section is built first, so its current value decides the control's initial visibility.
-refreshOpponentConfidenceControl(getScoringFormat())
+// The format section is built first, so its current value decides these controls' initial visibility.
+refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
+// Likewise the league section: the current mode decides whether the SAVOR control shows at all.
+refreshStreamingNoiseControl(getLeagueSettings().mode)
 const applyModelSettings = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
     applyModelSettings(3, { model_settings: getModelSettings() })

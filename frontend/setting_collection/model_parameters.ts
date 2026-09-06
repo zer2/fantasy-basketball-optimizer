@@ -45,10 +45,16 @@ const PARAM_SPECS: ParamSpec[] = [
                + 'takes the prediction at face value. Rotisserie always uses 1.',
     },
     {
-        id: 'mp-reg-lambda', key: 'reg_lambda', label: 'λ (lambda)', step: 0.01,
+        id: 'mp-lambda-c', key: 'lambda_c', label: 'λ<sub>c</sub> (category reg)', step: 0.01,
         caption: 'How strongly early-round category weights are pulled back toward balanced. Higher '
                + 'values punt less committally, keeping more room to pivot later; 0 turns the pull '
                + 'off entirely.',
+    },
+    {
+        id: 'mp-lambda-p', key: 'lambda_p', label: 'λ<sub>p</sub> (position reg)', step: 0.5,
+        caption: 'How strongly the flex-position strategy for future picks is pulled back toward a '
+               + 'balanced positional mix. Higher values hedge across positions; 0 lets the strategy '
+               + 'commit entirely to the positions that fit the build.',
     },
     {
         id: 'mp-pick-pool-size', key: 'pick_pool_size', label: 'M (pool size)', step: 1,
@@ -96,13 +102,32 @@ export function renderModelSettings(container: HTMLElement): void {
     }
 }
 
-/** Shows the opponent-confidence control only where it can apply. Rotisserie pins it to full
- *  confidence — there is no equivalent uncertainty about punting in a format that barely punts — so
- *  offering the number there would imply a choice the algorithm ignores. */
-export function refreshOpponentConfidenceControl(scoringFormat: string): void {
-    const item = document.getElementById('mp-opponent-confidence')?.closest('.param-item')
+/** Shows each format-dependent parameter only where it can apply — the sidebar's standard is to
+ *  hide parameters the current format ignores.
+ *  - Opponent confidence: hidden under Rotisserie, which pins it to full confidence.
+ *  - chi: week-to-season variance scaling, consumed only by Rotisserie's objective.
+ *  - aleph: adjusts the category-correlation matrix, which is built under Rotisserie and
+ *    whenever the Most-Categories weight is above zero. */
+export function refreshFormatParameterControls(
+    scoringFormat: string
+    , mostCategoriesWeight: number | null
+): void {
+    const isRotisserie = scoringFormat === 'Rotisserie'
+    const setVisible = (id: string, visible: boolean) => {
+        const item = document.getElementById(id)?.closest('.param-item')
+        if (item instanceof HTMLElement) item.style.display = visible ? '' : 'none'
+    }
+    setVisible('mp-opponent-confidence', !isRotisserie)
+    setVisible('mp-chi', isRotisserie)
+    setVisible('mp-aleph', isRotisserie || (mostCategoriesWeight ?? 0) > 0)
+}
+
+/** Shows the SAVOR streaming-noise control only in Auction Mode — the parameter is inert in
+ *  Draft and Season Modes, and the sidebar's standard is to hide parameters that cannot apply. */
+export function refreshStreamingNoiseControl(mode: string): void {
+    const item = document.getElementById('mp-s')?.closest('.param-item')
     if (item instanceof HTMLElement) {
-        item.style.display = scoringFormat === 'Rotisserie' ? 'none' : ''
+        item.style.display = mode === 'Auction Mode' ? '' : 'none'
     }
 }
 
@@ -150,7 +175,8 @@ export function getModelSettings(): ModelSettings {
         psi:             readNumberInput('mp-psi'),
         chi:             readNumberInput('mp-chi'),
         aleph:           readNumberInput('mp-aleph'),
-        reg_lambda:      readNumberInput('mp-reg-lambda'),
+        lambda_c:        readNumberInput('mp-lambda-c'),
+        lambda_p:        readNumberInput('mp-lambda-p'),
         opponent_model_confidence: readNumberInput('mp-opponent-confidence'),
         pick_pool_size:  readNumberInput('mp-pick-pool-size'),
         beth:            readNumberInput('mp-beth'),

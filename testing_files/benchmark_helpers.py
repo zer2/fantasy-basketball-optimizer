@@ -47,7 +47,11 @@ def record_benchmark(label: str, seconds: float) -> None:
 
 _PARAMS_PATH = 'parameters.yaml'
 _SEASON      = '2024-25'
-_SCORE_TOL   = 0.05   # allowed deviation from expected H-score (percentage points)
+# Allowed deviation from an expected H-score (percentage points). Goldens are stored at one
+# decimal, so 0.05 is exactly the rounding ceiling — an actual sitting at x.x5 then passes or
+# fails on sub-1e-4 run jitter (measured: Roto first-round Towns at ~8.850). 0.06 leaves margin
+# above the rounding boundary without weakening detection; real regressions drift >= 0.1.
+_SCORE_TOL   = 0.06
 
 with open(_PARAMS_PATH) as _f:
     _NBA_PARAMS = yaml.safe_load(_f)['NBA']
@@ -135,7 +139,8 @@ def _build_session_request(
             'psi':             nba_options['psi']['default'],
             'chi':             nba_options['chi']['default'],
             'aleph':           nba_options['aleph']['default'],
-            'reg_lambda':      nba_options['reg_lambda']['default'],
+            'lambda_c':        nba_options['lambda_c']['default'],
+            'lambda_p':        nba_options['lambda_p']['default'],
             # Follows the app default: goldens, benchmarks, and experiments all encode
             # exactly the opponent-punt softening the app ships with.
             'opponent_model_confidence': nba_options['opponent_model_confidence']['default'],

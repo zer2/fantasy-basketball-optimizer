@@ -86,12 +86,13 @@ _LOWVAR_TILT = 0.5
 # committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
 # deviate. The per-pick strength lambda follows a Gaussian (phi) schedule (built per agent from n_picks
 # in __init__): it starts at the peak on an empty roster and decays to ~0 by the final pick.
-# Regularisation strength: the peak of the decay schedule (the lambda on an empty roster), as a
-# FRACTION of the per-iteration category step. Surfaced as the session parameter reg_lambda; this
-# value is what parameters.yaml defaults it to — 5% of each Adam step, the ratio testing settled on
-# (as 0.00005 against the original 0.001 rate).
-_REG_STEP_FRACTION = 0.05
-# reg_lambda is denominated in per-iteration category steps: the proximal shrink competes with
+# Regularisation strengths: the peaks of the decay schedule (the lambda on an empty roster), as
+# FRACTIONS of the per-iteration category step. Surfaced as the session parameters lambda_c
+# (category weights) and lambda_p (flex-position shares); these values are what parameters.yaml
+# defaults them to. lambda_c = 5% of each Adam step is the ratio testing settled on (as 0.00005
+# against the original 0.001 rate).
+_LAMBDA_C_DEFAULT = 0.05
+# lambda_c and lambda_p are denominated in per-iteration category steps: the proximal shrink competes with
 # Adam's step (capped at +/- the learning rate per coordinate), so a raw weight-unit lambda would
 # silently change meaning whenever the rate is recalibrated — the 0.001 -> 0.01 change for the
 # truncated-max model's longer travel distances would have made it 10x weaker. Tying the unit to
@@ -100,12 +101,19 @@ REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
 # component from the w==v ray. Snapping onto v is only cosmetic for the truncated-max path (finite at
 # w == v via its rho clamp; the term_five 0/0 lived in the legacy simplified-form methods), so the
-# guard stays off; raise it if reg_lambda's ceiling (0.5 x REG_LAMBDA_UNIT = half a step) is ever
+# guard stays off; raise it if lambda_c's ceiling (0.5 x REG_LAMBDA_UNIT = half a step) is ever
 # actually used and neutral-adjacent builds start pinning to exact v.
 _REG_FLOOR = 0.0
-# Position/flex-share reg strength as a multiple of the category reg: shares live on a coarser simplex
-# (few bases), so they need a firmer pull toward uniform to have a comparable effect.
-_POSITION_REG_MULT = 1000.0
+# Flex-position share regularisation peak, in the same step-fraction units as lambda_c. History:
+# this was a hidden ×1000 multiple of the category lambda, calibrated when REG_LAMBDA_UNIT was
+# 1e-3; the unit's move to _CATEGORY_LEARNING_RATE (0.01) silently made that a 0.5/iteration pull
+# — larger than any share deviation, pinning flex shares to exactly uniform wherever the reg was
+# active (the whole early draft; found 2026-09-06 via a flat docs screenshot). Now its own surfaced
+# parameter. Dose-response at the Giannis board (2024-25 EC), in lambda_p units: 5 gives a
+# moderated lean (C 1.55 of 3 Util slots), 2.5 a strong one (C 2.21), 0.5 near-saturated (C 2.72),
+# 0 a one-hot corner (C 2.99). Default 4.0 by user eyeball on live boards — between the moderated
+# and strong points: shares may lean decisively, with a real hedge kept.
+_LAMBDA_P_DEFAULT = 4.0
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
 # empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
@@ -355,7 +363,8 @@ class HAgent:
                  , sport_params: dict
                  , slot_counts: dict
                  , aleph: float = 0.0
-                 , reg_lambda: float = _REG_STEP_FRACTION
+                 , lambda_c: float = _LAMBDA_C_DEFAULT
+                 , lambda_p: float = _LAMBDA_P_DEFAULT
                  , opponent_model_confidence: float = 0.5
                  , pick_pool_size: int = 25
                  # ── original optional args ──
@@ -397,14 +406,16 @@ class HAgent:
         is_rotisserie       = scoring_format == 'Rotisserie'
         self.seed_mode = 'lowvar' if is_rotisserie else 'multistart'
 
-        # Gaussian (phi) regulariser schedule built from the draft length: strength reg_lambda (the
-        # peak) on an empty roster, decaying to ~0 by the final pick (indexed by roster size),
-        # with a concave shoulder set by _REG_SHAPE_B.
-        reg_peak = reg_lambda * REG_LAMBDA_UNIT
-        _phi0    = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
-        self.reg_schedule = [reg_peak * (np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
-                                         - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
-                             for k in range(n_picks)]
+        # Gaussian (phi) regulariser schedules built from the draft length: strength lambda_c /
+        # lambda_p (the peaks) on an empty roster, decaying to ~0 by the final pick (indexed by
+        # roster size), with a concave shoulder set by _REG_SHAPE_B. Same shape for both; only the
+        # peaks differ.
+        _phi0          = 1.0 - np.exp(-_REG_SHAPE_B ** 2 / 2)
+        schedule_shape = [(np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
+                           - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
+                          for k in range(n_picks)]
+        self.reg_schedule          = [lambda_c * REG_LAMBDA_UNIT * s for s in schedule_shape]
+        self.position_reg_schedule = [lambda_p * REG_LAMBDA_UNIT * s for s in schedule_shape]
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
@@ -1774,6 +1785,8 @@ class HAgent:
             # decaying to 0 by mid-draft (see self.reg_schedule), so early picks stay flexible.
             reg_lambda  = (self.reg_schedule[len(self.players)]
                            if len(self.players) < len(self.reg_schedule) else 0.0)
+            position_reg_lambda = (self.position_reg_schedule[len(self.players)]
+                                   if len(self.players) < len(self.position_reg_schedule) else 0.0)
             # Warm-started rows skip the regulariser: it is a COLD-start robustness device, and on a warm
             # start it drags an already-converged equilibrium build back toward neutral -- worse, at the
             # reduced warm-start step sizes its pull exceeds the descent step, snapping weights exactly
@@ -1850,11 +1863,11 @@ class HAgent:
                         logit_grad = shares * (share_grad - (share_grad * shares).sum(axis=1, keepdims=True))
                         master_grad[:, self.position_indices[pos_code]] += logit_grad
                     master_logits = master_logits + optimizers['Shares'].minimize(master_grad)
-                    if reg_lambda > 0.0:
-                        # L1 reg toward uniform on the shared per-position shares (mirrors the category
-                        # weights x _POSITION_REG_MULT); re-derive the logits so the pull persists.
+                    if position_reg_lambda > 0.0:
+                        # L1 reg toward uniform on the shared per-position shares (lambda_p's own
+                        # schedule); re-derive the logits so the pull persists.
                         # Warm rows are exempt, exactly like the category weights (paired build halves).
-                        pos_reg       = reg_lambda * _POSITION_REG_MULT * cold_row_multiplier
+                        pos_reg       = position_reg_lambda * cold_row_multiplier
                         master_shares = _softmax_rows(master_logits)
                         uniform       = 1.0 / master_shares.shape[1]
                         dev           = master_shares - uniform

@@ -920,27 +920,29 @@ def test_evaluate_nonexistent_session():
 
 
 def test_lambda_reaches_the_regulariser_schedule_in_its_surfaced_units():
-    """reg_lambda is surfaced in units of 1e-5 so the sidebar reads 5 rather than 0.00005. The
-    conversion happens in exactly one place, and this pins it: what the session asks for is what the
-    schedule peaks at."""
+    """lambda_c / lambda_p are surfaced in step-fraction units. The conversion happens in exactly
+    one place, and this pins it: what the session asks for is what each schedule peaks at."""
     request = _build_default_session_request()
-    request['model_settings']['reg_lambda'] = 0.2
+    request['model_settings']['lambda_c'] = 0.2
+    request['model_settings']['lambda_p'] = 4.0
 
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, response.text
     session = get_session(response.json()['session_id'])
 
-    assert session.current_settings['reg_lambda'] == 0.2
+    assert session.current_settings['lambda_c'] == 0.2
+    assert session.current_settings['lambda_p'] == 4.0
     assert session.agent.reg_schedule[0] == pytest.approx(0.2 * REG_LAMBDA_UNIT)
+    assert session.agent.position_reg_schedule[0] == pytest.approx(4.0 * REG_LAMBDA_UNIT)
 
 
 def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
     """What the parameter is for. The L1 pull is what stops a first-round pick committing to a punt
     it cannot back out of, so raising it has to visibly shrink how far the weights stray from the
     neutral vector -- otherwise the control is inert and the sidebar is lying."""
-    def furthest_weight_from_neutral(reg_lambda: float) -> float:
+    def furthest_weight_from_neutral(lambda_c: float) -> float:
         request = _build_default_session_request()
-        request['model_settings']['reg_lambda'] = reg_lambda
+        request['model_settings']['lambda_c'] = lambda_c
         response = client.post('/sessions', json=request)
         assert response.status_code == 201, response.text
 
