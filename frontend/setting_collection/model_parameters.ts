@@ -100,6 +100,24 @@ export function renderModelSettings(container: HTMLElement): void {
     for (const spec of PARAM_SPECS) {
         grid.append(makeParamItem(spec))
     }
+
+    // Restore every parameter to its parameters.yaml default — including the saved
+    // preferences, so the reset survives a reload. One bubbled change event afterwards
+    // lets the section's listener patch the session once with the restored values.
+    const restoreBtn = document.createElement('button')
+    restoreBtn.type = 'button'
+    restoreBtn.className = 'section-apply-btn'
+    restoreBtn.textContent = 'Restore defaults'
+    restoreBtn.addEventListener('click', () => {
+        for (const spec of PARAM_SPECS) {
+            const resolved = resolveSpec(spec)
+            const input = document.getElementById(spec.id) as HTMLInputElement
+            input.value = String(resolved.default)
+            savePref(spec.key, resolved.default)
+        }
+        container.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    container.append(restoreBtn)
 }
 
 /** Shows each format-dependent parameter only where it can apply — the sidebar's standard is to

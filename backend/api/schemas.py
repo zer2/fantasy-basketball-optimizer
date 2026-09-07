@@ -47,6 +47,9 @@ class LeagueSettings(BaseModel):
         """Head to Head needs the dial; Rotisserie must not carry one. Rejected here rather than
         defaulted, so a client that forgets it hears about it instead of silently drafting to a
         different objective than the one it meant."""
+        if not self.categories:
+            raise ValueError('categories must be a non-empty list. There is no server-side '
+                             'default: the client chooses what the league scores.')
         if self.scoring_format == 'Rotisserie':
             if self.most_categories_weight is not None:
                 raise ValueError('most_categories_weight does not apply to Rotisserie.')

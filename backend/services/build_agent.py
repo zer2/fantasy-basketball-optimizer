@@ -14,8 +14,12 @@ The projection-file parser this module orchestrates around lives in projection_p
 
 from __future__ import annotations
 
+import copy
+import json
 import time
 import threading
+
+from collections import OrderedDict
 
 import pandas as pd
 from pathlib import Path
@@ -318,8 +322,49 @@ def build_scoring_info(session: Session) -> None:
 
 # ── Step 5: build the session's agent ─────────────────────────────────────────
 
+# Agent cache: populate_default_h_scores is the expensive one-time self-play build (~6s),
+# and it is deterministic per configuration (fixed rngs — the reason single-run probes
+# suffice elsewhere). That determinism makes caching semantically invisible: a deep copy of
+# a cached agent is identical to a fresh build for the same settings, so toggling a setting
+# away and back — the EC/MC dial especially — costs a copy instead of a rebuild. Keyed on
+# the full current_settings minus the cosmetic team names: over-keying can only cost
+# misses, never wrongness (uploads key by their per-upload data_id, so changed file
+# contents can never collide). Entries hold fully-populated agents (large), so the cap
+# stays small; the session always receives its own copy, so draft-time mutation never
+# touches a cached entry.
+_AGENT_CACHE_MAX = 4
+_agent_cache: 'OrderedDict[str, object]' = OrderedDict()
+_agent_cache_lock = threading.Lock()
+agent_cache_hits = 0     # introspection for tests and ops; no behavior reads these
+agent_cache_misses = 0
+
+
+def _agent_cache_key(current_settings: dict) -> str:
+    keyed = {key: value for key, value in current_settings.items() if key != 'team_names'}
+    return json.dumps(keyed, sort_keys=True, default=str)
+
+
+def clear_agent_cache() -> None:
+    """Drop every cached agent (companion to clear_v0_cache on the cache-clear route)."""
+    with _agent_cache_lock:
+        _agent_cache.clear()
+
+
 def build_session_agent(session: Session) -> None:
-    """Build the HAgent from the scored data and prime its neutral baseline — the whole agent."""
+    """Build the HAgent from the scored data and prime its neutral baseline — the whole agent.
+    Served from the agent cache when this exact configuration has been built before."""
+    global agent_cache_hits, agent_cache_misses
+
+    cache_key = _agent_cache_key(session.current_settings)
+    with _agent_cache_lock:
+        cached = _agent_cache.get(cache_key)
+        if cached is not None:
+            _agent_cache.move_to_end(cache_key)
+    if cached is not None:
+        agent_cache_hits += 1
+        session.agent = copy.deepcopy(cached)
+        return
+    agent_cache_misses += 1
 
     _, sport_params, sport = _resolve_sport_params(session)
     current_settings = session.current_settings
@@ -360,6 +405,14 @@ def build_session_agent(session: Session) -> None:
         if cash_per_team is not None else None
     )
     session.agent.populate_default_h_scores(current_settings['n_iterations'], default_cash)
+
+    # Freshly built: snapshot into the cache. The session keeps the original; the cache holds
+    # its own copy, so later draft-time mutation of this session's agent cannot leak in.
+    with _agent_cache_lock:
+        _agent_cache[cache_key] = copy.deepcopy(session.agent)
+        _agent_cache.move_to_end(cache_key)
+        while len(_agent_cache) > _AGENT_CACHE_MAX:
+            _agent_cache.popitem(last=False)
 
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────

@@ -59,6 +59,9 @@ def normalize_objective_settings(current_settings: dict) -> None:
     and experiments (HAgent.__init__, plus narrower checks in process_player_data and
     algorithm_helpers). Removing any one layer loses a distinct guarantee.
     """
+    if not current_settings['categories']:
+        raise ValueError('categories must be a non-empty list — a session cannot score nothing.')
+
     if current_settings['scoring_format'] == 'Rotisserie':
         current_settings['most_categories_weight'] = None
         current_settings['tiebreaker_category']    = None
