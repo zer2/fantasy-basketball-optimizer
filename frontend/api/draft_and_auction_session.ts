@@ -162,6 +162,10 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
     const { signal } = evaluateController
     try {
         const scoreSeat = (stillOwner: () => boolean) => withSessionRetry(async () => {
+            // The session is in hand from here on: what follows is scoring, so the indicator
+            // reads "Updating..." — the session build above (the one-time self-play populate)
+            // showed "Starting..." (see the busy state below and issue #420).
+            if (stillOwner()) setIndicatorState('evaluating')
             const mode = getMode()
             const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
 
@@ -259,9 +263,18 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             setBasePlayerResults(basePlayersBySession.get(getSessionId()!)!)
             setCandidatePlayerResults(players)
             return null
+        }, () => {
+            // Before each attempt's ensureSession: a missing session means the expensive
+            // one-time build (self-play populate) is about to run inside this evaluate —
+            // that phase is "Starting...", not "Updating..." (issue #420). Covers both the
+            // first load and the recreate after a 404-expired session.
+            if (!getSessionId() && stillOwner()) setIndicatorState('fetching')
         })
         return await withDisplayOwnership(
-            { busy: 'evaluating', onSuccess: 'idle', onFailure: 'idle' }, scoreSeat)
+            // First load: no session yet, so the claim itself starts at "Starting..." too —
+            // the flip to 'evaluating' happens inside scoreSeat once the session exists.
+            { busy: getSessionId() ? 'evaluating' : 'fetching', onSuccess: 'idle', onFailure: 'idle' },
+            scoreSeat)
     } catch (err: any) {
         if (err.name === 'AbortError') return null
         throw err

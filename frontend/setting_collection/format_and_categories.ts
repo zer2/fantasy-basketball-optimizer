@@ -59,7 +59,10 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     const defaultCategories = config.default_categories
 
     const savedCategories = pref<string[] | null>('categories', null)
-    const initialCategories = savedCategories ?? defaultCategories
+    // An empty saved list would boot the app into an invalid selection (see the validation
+    // below), so only a non-empty preference overrides the defaults.
+    const initialCategories = (savedCategories && savedCategories.length > 0)
+        ? savedCategories : defaultCategories
 
     _selectedCategories = [...initialCategories]
 
@@ -104,6 +107,13 @@ export function renderFormatAndCategories(container: HTMLElement): void {
         initialCategories,
     )
 
+    // Validation: a league must score at least one category. The message mirrors the
+    // slot-count pattern; isCategorySelectionValid gates the apply in main.ts.
+    const categoryValidationMsg = document.createElement('div')
+    categoryValidationMsg.id = 'fc-cat-validation'
+    categoryValidationMsg.className = 'sidebar-error'
+    container.append(categoryValidationMsg)
+
     // Tiebreaker: only reachable when a matchup can actually tie — an even number of categories,
     // scored by majority. Its options are the categories currently in play, so it is built after
     // the multiselect above.
@@ -119,6 +129,8 @@ export function renderFormatAndCategories(container: HTMLElement): void {
         new MutationObserver(() => {
             if (_suppressCategoryEvents) return
             savePref('categories', [..._selectedCategories])
+            categoryValidationMsg.textContent = _selectedCategories.length === 0
+                ? 'Select at least one category.' : ''
             refreshTiebreakerControl()
             container.dispatchEvent(new Event('change', { bubbles: true }))
         }).observe(inputArea, { childList: true })
@@ -300,4 +312,11 @@ export function getSelectedCategories(): string[] {
     return [..._selectedCategories].sort(
         (a, b) => (orderIndex.get(a) ?? Infinity) - (orderIndex.get(b) ?? Infinity),
     )
+}
+
+/** A league must score at least one category. Call before applying format changes to the
+ *  backend, mirroring isSlotCountsValid — the inline message under the multiselect explains
+ *  the block to the user. */
+export function isCategorySelectionValid(): boolean {
+    return _selectedCategories.length > 0
 }

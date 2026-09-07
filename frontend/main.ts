@@ -27,7 +27,7 @@ import {
 import { TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
-    getSelectedCategories,
+    getSelectedCategories, isCategorySelectionValid,
 } from './setting_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, markUploadedSourcesExpired } from './setting_collection/player_stats.js'
 import { renderModelSettings, refreshFormatParameterControls, refreshStreamingNoiseControl, getModelSettings } from './setting_collection/model_parameters.js'
@@ -268,14 +268,24 @@ playerStatsSection.addEventListener('change', (event) => {
 const formatSection = createSection(sidebarSections, 'Format & Categories')
 renderFormatAndCategories(formatSection)
 const applyFormatChange = makeApplyChain('Format & categories apply')
-formatSection.addEventListener('change', () => {
-    refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
+// Debounced like the player-stats section: each category chip click fires a change, and an
+// immediate patch per click serializes ~6s pipeline rebuilds behind the session lock (the
+// abort cancels the fetch, but the server finishes the abandoned rebuild anyway). Rapid
+// clicks coalesce into one patch of the final selection; the debouncer shows the spinner
+// immediately.
+const formatDebouncer = makeDebouncer(() => {
+    if (!isCategorySelectionValid()) return   // the inline message explains the block
     applyFormatChange(4, { league: {
         scoring_format:         getScoringFormat(),
         most_categories_weight: getMostCategoriesWeight(),
         tiebreaker_category:    getTiebreakerCategory(),
         categories:             getSelectedCategories(),
     } })
+}, 800)
+formatSection.addEventListener('change', () => {
+    refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
+    if (!isCategorySelectionValid()) { formatDebouncer.cancel(); return }
+    formatDebouncer.fire()
 })
 
 // ─── 4. Model Parameters ──────────────────────────────────────────────────────

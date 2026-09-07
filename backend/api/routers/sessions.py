@@ -32,11 +32,12 @@ router = APIRouter()
 
 # ── Request/response mapping helpers (transport-tier: request DTO <-> plain dicts) ──────
 
-def _build_current_settings(req: SessionRequest, all_params: dict) -> dict:
+def _build_current_settings(req: SessionRequest) -> dict:
     """Flatten a SessionRequest into the flat current_settings dict."""
     sport      = req.league.sport
     p          = req.model_settings
-    categories = req.league.categories or all_params[sport]['default-categories']
+    # Non-emptiness is guaranteed by the LeagueSettings validator; no silent default here.
+    categories = req.league.categories
     n          = req.league.n_drafters
 
     return {
@@ -182,7 +183,7 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
 
     # Resolve any live-platform connection up front so a bad league fails before the pipeline.
     platform_config = resolve_platform_config(req.platform, req.platform_config, user_key)
-    current_settings = _build_current_settings(req, all_params)
+    current_settings = _build_current_settings(req)
 
     try:
         session = build_session(

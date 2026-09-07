@@ -919,6 +919,25 @@ def test_evaluate_nonexistent_session():
     assert response.status_code == 404
 
 
+def test_empty_categories_are_rejected_on_create_and_patch():
+    """A league must score at least one category (issue #339). The old behavior silently
+    substituted the default nine, so the frontend errored against a session scoring
+    categories it never asked for. Layered like the rest of objective validation: the
+    schema rejects the create outright, and the merged-state normalizer catches a patch."""
+    request = _build_default_session_request()
+    request['league']['categories'] = []
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 422, response.text
+    assert 'categories' in response.text
+
+    created = client.post('/sessions', json=_build_default_session_request())
+    assert created.status_code == 201, created.text
+    patched = client.patch(f"/sessions/{created.json()['session_id']}",
+                           json={'from_step': 4, 'league': {'categories': []}})
+    assert patched.status_code == 400, patched.text
+    assert 'categories' in patched.text
+
+
 def test_lambda_reaches_the_regulariser_schedule_in_its_surfaced_units():
     """lambda_c / lambda_p are surfaced in step-fraction units. The conversion happens in exactly
     one place, and this pins it: what the session asks for is what each schedule peaks at."""
