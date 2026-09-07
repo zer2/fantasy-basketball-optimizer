@@ -19,7 +19,7 @@ from backend.parameters import load_all_params
 from backend.api.helpers import fail, require_session, resolve_platform_config
 from backend.state.session import Session, delete_session
 from backend.services.session_management import build_session, apply_patch
-from backend.services.build_agent import clear_v0_cache, derive_effective_objective, InsufficientPlayerPoolError
+from backend.services.build_agent import clear_v0_cache, clear_agent_cache, derive_effective_objective, InsufficientPlayerPoolError
 from backend.services.projection_parsing import parse_projection_upload
 from backend.state.upload_store import get_upload
 from backend.api.schemas import (
@@ -264,6 +264,7 @@ def get_g_scores_route(session: Session = Depends(require_session)):
 @router.post('/cache/clear', status_code=status.HTTP_204_NO_CONTENT)
 def clear_cache_route():
     clear_v0_cache()
+    clear_agent_cache()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -197,10 +197,17 @@ export interface Debouncer {
 }
 
 /** Creates a debouncer that calls `fn` only after `delayMs` ms of inactivity.
- *  Each `fire()` also sets the eval indicator to "evaluating" so the spinner is
- *  visible during the debounce window; the eventual `fn()` is expected to clear
- *  it (e.g. via runEvaluate's finally). */
-export function makeDebouncer(fn: () => void, delayMs = 300): Debouncer {
+ *  Each `fire()` also sets the eval indicator so the spinner is visible during the
+ *  debounce window; the eventual `fn()` is expected to clear it (e.g. via runEvaluate's
+ *  finally). `busy` picks the label: 'evaluating' ("Updating...") for changes that only
+ *  re-score, 'fetching' ("Starting...") for changes whose patch rebuilds the session —
+ *  the label the rebuild itself will show, so the user never sees an "Updating..." flash
+ *  before a "Starting..." phase (issue #420's cousin). */
+export function makeDebouncer(
+    fn: () => void
+    , delayMs = 300
+    , busy: 'evaluating' | 'fetching' = 'evaluating'
+): Debouncer {
     let timer: ReturnType<typeof setTimeout> | null = null
     return {
         fire() {
@@ -209,7 +216,7 @@ export function makeDebouncer(fn: () => void, delayMs = 300): Debouncer {
             // window cannot flash 'Updated' over this spinner; the debounced fn claims
             // again itself when it starts.
             claimDisplay()
-            setIndicatorState('evaluating')
+            setIndicatorState(busy)
             timer = setTimeout(() => { timer = null; fn() }, delayMs)
         },
         cancel() {

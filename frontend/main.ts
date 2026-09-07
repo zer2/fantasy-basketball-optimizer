@@ -248,7 +248,7 @@ const changeKeepsPlayerPool = (eventTarget: EventTarget | null): boolean =>
     eventTarget instanceof HTMLElement && eventTarget.id.startsWith('ps-w-')
 
 let playerStatsChangeKeepsPool = false
-const playerStatsDebouncer = makeDebouncer(() => applyPlayerStats(undefined, playerStatsChangeKeepsPool), 800)
+const playerStatsDebouncer = makeDebouncer(() => applyPlayerStats(undefined, playerStatsChangeKeepsPool), 800, 'fetching')
 let playerStatsController: AbortController | null = null
 
 playerStatsSection.addEventListener('input', (event) => {
@@ -281,7 +281,7 @@ const formatDebouncer = makeDebouncer(() => {
         tiebreaker_category:    getTiebreakerCategory(),
         categories:             getSelectedCategories(),
     } })
-}, 800)
+}, 800, 'fetching')
 formatSection.addEventListener('change', () => {
     refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
     if (!isCategorySelectionValid()) { formatDebouncer.cancel(); return }

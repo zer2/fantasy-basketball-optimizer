@@ -919,6 +919,41 @@ def test_evaluate_nonexistent_session():
     assert response.status_code == 404
 
 
+def test_agent_cache_serves_identical_sessions_fast():
+    """The step-5 agent cache: a second session with the same configuration must be served
+    from the cache (no rebuild) and produce an identical evaluate payload — the build is
+    deterministic per config, which is what makes the cache semantically invisible."""
+    import json as json_module
+    import time as time_module
+
+    from backend.services import build_agent as build_agent_module
+
+    def create_and_evaluate():
+        response = client.post('/sessions', json=_build_default_session_request())
+        assert response.status_code == 201, response.text
+        session_id = response.json()['session_id']
+        n_drafters = _build_default_session_request()['league']['n_drafters']
+        teams = {f'Drafter {i + 1}': [] for i in range(n_drafters)}
+        evaluate = client.post(f'/sessions/{session_id}/evaluate',
+                               json={'player_assignments': teams,
+                                     'my_team_id': 'Drafter 1', 'exclusion_list': []})
+        assert evaluate.status_code == 200, evaluate.text
+        return json_module.dumps(evaluate.json(), sort_keys=True)
+
+    first_payload = create_and_evaluate()
+    hits_before = build_agent_module.agent_cache_hits
+
+    start = time_module.perf_counter()
+    second_payload = create_and_evaluate()
+    second_create_seconds = time_module.perf_counter() - start
+
+    assert build_agent_module.agent_cache_hits == hits_before + 1, \
+        'second identical create did not hit the agent cache'
+    assert second_payload == first_payload, 'cache hit changed the evaluate payload'
+    # Not a benchmark: just wide-enough proof the ~6s populate did not rerun.
+    assert second_create_seconds < 4.0, f'cache hit took {second_create_seconds:.1f}s'
+
+
 def test_empty_categories_are_rejected_on_create_and_patch():
     """A league must score at least one category (issue #339). The old behavior silently
     substituted the default nine, so the frontend errored against a session scoring
