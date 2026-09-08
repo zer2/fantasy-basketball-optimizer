@@ -264,6 +264,14 @@ def write_experiment_report_files(base_directory):
     _os.makedirs(reports_dir, exist_ok=True)
     stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
+    # Archive: experiment_results/ keeps only the LATEST run of each section (a rerun
+    # overwrites — measured cost: a partial rerun clobbered a full run's rows). Every
+    # report-mode run therefore also lands in its own timestamped folder under
+    # experiment_archive/ (gitignored, local-only), so no measurement is ever lost.
+    archive_dir = _os.path.join(base_directory, 'experiment_archive',
+                                datetime.now().strftime('%Y-%m-%dT%H%M%S'))
+    _os.makedirs(archive_dir, exist_ok=True)
+
     for section, table in _REPORT.items():
         payload = {
             'title':       section,
@@ -272,6 +280,9 @@ def write_experiment_report_files(base_directory):
             'rows':        table['rows'],
             'generated':   stamp,
         }
+        with open(_os.path.join(archive_dir, f'{_section_slug(section)}.json'), 'w',
+                  encoding='utf-8') as archive_file:
+            json.dump(payload, archive_file, indent=2)
         with open(_os.path.join(reports_dir, f'{_section_slug(section)}.json'), 'w',
                   encoding='utf-8') as stored_file:
             json.dump(payload, stored_file, indent=1)
@@ -647,8 +658,12 @@ def test_h_scoring_beats_g_field(format_key):
     pooled = []
     n_seats = None
     for season in _SEASONS:
-        # beth=0, kappa=0: the season-sim conventions (see the header notes).
-        session = _build_session(_FORMATS[format_key], season=season, beth=0)
+        # beth=0 and opponent_model_confidence=0: the H-vs-G conventions. Historical stats are
+        # objectively correct (no shrinkage), and modeling G-drafters as punt-pursuers is a
+        # knowably wrong belief — the canonical baseline (testing_files/baselines/
+        # h_vs_g_c0_baseline.jsonl) is recorded at C=0, so this must match to stay comparable.
+        session = _build_session(_FORMATS[format_key], season=season, beth=0,
+                                 opponent_model_confidence=0)
         n_seats = _SIM_SEATS or session.current_settings['n_drafters']
         scores  = [100 * _draft_h_seat_in_g_field(session, seat) for seat in range(n_seats)]
         pooled.extend(scores)

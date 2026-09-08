@@ -104,16 +104,21 @@ REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
 # guard stays off; raise it if lambda_c's ceiling (0.5 x REG_LAMBDA_UNIT = half a step) is ever
 # actually used and neutral-adjacent builds start pinning to exact v.
 _REG_FLOOR = 0.0
-# Flex-position share regularisation peak, in the same step-fraction units as lambda_c. History:
-# this was a hidden ×1000 multiple of the category lambda, calibrated when REG_LAMBDA_UNIT was
-# 1e-3; the unit's move to _CATEGORY_LEARNING_RATE (0.01) silently made that a 0.5/iteration pull
-# — larger than any share deviation, pinning flex shares to exactly uniform wherever the reg was
-# active (the whole early draft; found 2026-09-06 via a flat docs screenshot). Now its own surfaced
-# parameter. Dose-response at the Giannis board (2024-25 EC), in lambda_p units: 5 gives a
-# moderated lean (C 1.55 of 3 Util slots), 2.5 a strong one (C 2.21), 0.5 near-saturated (C 2.72),
-# 0 a one-hot corner (C 2.99). Default 4.0 by user eyeball on live boards — between the moderated
-# and strong points: shares may lean decisively, with a real hedge kept.
-_LAMBDA_P_DEFAULT = 4.0
+# Flex-position share regularisation: lambda_p is a fraction of the SHARES optimizer's own
+# per-iteration step, exactly as lambda_c is a fraction of the category step. The proximal
+# shrink acts on the MASTER shares — one softmax over all k base positions — so the step it
+# must beat is _SHARES_LEARNING_RATE x (1/k)(1 - 1/k), the uniform softmax sensitivity
+# (0.16 for NBA's five base positions). The unit is derived per agent in __init__ (k is
+# sport/config-dependent), tied to the rate and to k rather than hardcoded, so a
+# recalibration preserves lambda_p's meaning — the same tie that protects lambda_c
+# (REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE), whose absence caused the original cliff:
+# the pull was once denominated in the CATEGORY step (0.01), squeezing the whole usable
+# dial into (0, ~6) with everything above indistinguishably pinned (audit, 2026-09-07).
+# With this unit, lambda_p = 1 is exactly the pick-one pinning threshold (the shrink
+# removes at least a full step per iteration, so shares can never leave uniform); the
+# Gaussian schedule lowers the bar as the roster fills. Values below 1 are a continuous
+# dial; 0.8 is (within 5%) the strength shipped as old-units 4.
+_LAMBDA_P_DEFAULT = 0.8
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
 # empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
@@ -414,8 +419,12 @@ class HAgent:
         schedule_shape = [(np.exp(-(_REG_SHAPE_B * k / n_picks) ** 2 / 2)
                            - np.exp(-_REG_SHAPE_B ** 2 / 2)) / _phi0
                           for k in range(n_picks)]
-        self.reg_schedule          = [lambda_c * REG_LAMBDA_UNIT * s for s in schedule_shape]
-        self.position_reg_schedule = [lambda_p * REG_LAMBDA_UNIT * s for s in schedule_shape]
+        self.reg_schedule = [lambda_c * REG_LAMBDA_UNIT * s for s in schedule_shape]
+        # The position schedule needs the base-position count (its unit is the master
+        # softmax's step; see the lambda_p notes at the module top) — built once
+        # position_structure exists, further down in this constructor.
+        self._reg_schedule_shape = schedule_shape
+        self._lambda_p = lambda_p
 
         # ── store explicit context ─────────────────────────────────────────────
         self.sport  = sport
@@ -641,6 +650,15 @@ class HAgent:
 
         # ── position structure (replaces get_position_structure()) ────────────
         self.position_structure = self.position_config.position_structure
+
+        # lambda_p's unit: the master softmax's per-iteration share step (see the notes at
+        # _LAMBDA_P_DEFAULT). lambda_p = 1 pins the flex shares at uniform on the first
+        # pick; the Gaussian schedule then lowers the bar as the roster fills.
+        n_base_positions = len(self.position_structure['base_list'])
+        uniform_sensitivity = (1.0 / n_base_positions) * (1.0 - 1.0 / n_base_positions)
+        position_reg_unit = _SHARES_LEARNING_RATE * uniform_sensitivity
+        self.position_reg_schedule = [self._lambda_p * position_reg_unit * s
+                                      for s in self._reg_schedule_shape]
         self.position_indices   = self.position_config.position_indices
 
         self.initial_category_weights = None

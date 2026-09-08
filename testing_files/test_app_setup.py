@@ -972,29 +972,45 @@ def test_empty_categories_are_rejected_on_create_and_patch():
     assert patched.status_code == 400, patched.text
     assert 'categories' in patched.text
 
+    # A rejected patch must be atomic: the session keeps its old settings and stays usable
+    # (audit catch: the merge used to land before validation, bricking the session).
+    session = get_session(created.json()['session_id'])
+    assert session.current_settings['categories'], 'rejected patch corrupted the settings'
+    teams = {f'Drafter {i + 1}': [] for i in range(12)}
+    evaluate = client.post(f"/sessions/{created.json()['session_id']}/evaluate",
+                           json={'player_assignments': teams,
+                                 'my_team_id': 'Drafter 1', 'exclusion_list': []})
+    assert evaluate.status_code == 200, f'session unusable after rejected patch: {evaluate.text}'
+
 
 def test_lambda_reaches_the_regulariser_schedule_in_its_surfaced_units():
     """lambda_c / lambda_p are surfaced in step-fraction units. The conversion happens in exactly
     one place, and this pins it: what the session asks for is what each schedule peaks at."""
     request = _build_default_session_request()
     request['model_settings']['lambda_c'] = 0.2
-    request['model_settings']['lambda_p'] = 4.0
+    request['model_settings']['lambda_p'] = 0.5
 
     response = client.post('/sessions', json=request)
     assert response.status_code == 201, response.text
     session = get_session(response.json()['session_id'])
 
     assert session.current_settings['lambda_c'] == 0.2
-    assert session.current_settings['lambda_p'] == 4.0
+    assert session.current_settings['lambda_p'] == 0.5
     assert session.agent.reg_schedule[0] == pytest.approx(0.2 * REG_LAMBDA_UNIT)
-    assert session.agent.position_reg_schedule[0] == pytest.approx(4.0 * REG_LAMBDA_UNIT)
+    # lambda_p's unit is the shares optimizer's per-iteration step bound: shares learning rate 0.3
+    # times the softmax sensitivity at uniform, (1/5)(1 - 1/5) for NBA's five base positions,
+    # = 0.048. Pinned as a literal so a learning-rate or formula regression fails here.
+    assert session.agent.position_reg_schedule[0] == pytest.approx(0.5 * 0.048)
 
 
 def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
     """What the parameter is for. The L1 pull is what stops a first-round pick committing to a punt
     it cannot back out of, so raising it has to visibly shrink how far the weights stray from the
-    neutral vector -- otherwise the control is inert and the sidebar is lying."""
-    def furthest_weight_from_neutral(lambda_c: float) -> float:
+    neutral vector -- otherwise the control is inert and the sidebar is lying. Measured as the mean
+    deviation pooled over the top candidates: any single candidate's deepest punt barely responds
+    (the best player's signature punt survives the pull), but the pooled deviation falls decisively
+    (about 21 -> 16 as lambda_c goes 0.01 -> 0.5), well clear of optimizer-path jitter."""
+    def mean_weight_deviation_from_neutral(lambda_c: float) -> float:
         request = _build_default_session_request()
         request['model_settings']['lambda_c'] = lambda_c
         response = client.post('/sessions', json=request)
@@ -1006,11 +1022,13 @@ def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
                                      'my_team_id': team_names[0], 'exclusion_list': []})
         assert evaluate.status_code == 200, evaluate.text
         # category_weights are a percentage of the neutral vector, so 100 is neutral.
-        weights = evaluate.json()['candidates'][0]['category_weights']
-        return max(abs(weight - 100.0) for weight in weights)
+        deviations = [abs(weight - 100.0)
+                      for candidate in evaluate.json()['candidates'][:20]
+                      for weight in candidate['category_weights']]
+        return sum(deviations) / len(deviations)
 
-    gentle = furthest_weight_from_neutral(0.01)
-    firm   = furthest_weight_from_neutral(0.5)
-    assert firm < gentle, (
-        f'a 50x stronger pull should hold weights nearer neutral, got {firm:.2f} vs {gentle:.2f}'
+    gentle = mean_weight_deviation_from_neutral(0.01)
+    firm   = mean_weight_deviation_from_neutral(0.5)
+    assert firm < gentle - 1.0, (
+        f'a 50x stronger pull should hold weights visibly nearer neutral, got {firm:.2f} vs {gentle:.2f}'
     )
