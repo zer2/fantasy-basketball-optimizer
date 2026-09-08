@@ -65,4 +65,5 @@ node_modules/
 testing_files/experiment_report.md
 testing_files/experiment_report.html
 testing_files/experiment_results/
+testing_files/experiment_archive/
 testing_files/benchmark_history.jsonl

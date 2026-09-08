@@ -64,10 +64,10 @@ def test_evaluate_auction():
     # too large. Dollar values are differences of H-scores, so they show that mismatch more sharply
     # than the H-scores do — Tatum's your-vs-generic gap moves most.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',     -2.2,  90.4, 92.6, 90.8),
-        ('Tyrese Haliburton',           8.7,  66.0, 57.3, 56.3),
-        ('Dyson Daniels',               23.7,  60.1, 36.4, 35.7),
-        ('Jayson Tatum',                -0.4,  40.7, 41.1, 40.3),
+        ('Shai Gilgeous-Alexander',     -8.5,  89.2, 97.7, 95.8),
+        ('Tyrese Haliburton',           1.5,  62.6, 61.2, 59.9),
+        ('Dyson Daniels',               8.1,  60.8, 52.7, 51.7),
+        ('Jayson Tatum',                -0.9,  37.8, 38.6, 37.9),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):

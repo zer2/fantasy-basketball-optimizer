@@ -51,10 +51,11 @@ const PARAM_SPECS: ParamSpec[] = [
                + 'off entirely.',
     },
     {
-        id: 'mp-lambda-p', key: 'lambda_p', label: 'λ<sub>p</sub> (position reg)', step: 0.5,
+        id: 'mp-lambda-p', key: 'lambda_p', label: 'λ<sub>p</sub> (position reg)', step: 0.05,
         caption: 'How strongly the flex-position strategy for future picks is pulled back toward a '
                + 'balanced positional mix. Higher values hedge across positions; 0 lets the strategy '
-               + 'commit entirely to the positions that fit the build.',
+               + 'commit entirely to the positions that fit the build, and 1 holds it fully balanced '
+               + 'through the early draft.',
     },
     {
         id: 'mp-pick-pool-size', key: 'pick_pool_size', label: 'M (pool size)', step: 1,

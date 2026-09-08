@@ -156,10 +156,16 @@ def apply_patch(
         while len(session.pipeline_cache) > _PIPELINE_CACHE_ENTRIES:
             session.pipeline_cache.popitem(last=False)
 
-    session.current_settings.update(patch)
+    # Validate on a MERGED COPY before touching the session: normalize can reject the result
+    # (e.g. empty categories), and a rejected patch must leave the session exactly as it was —
+    # otherwise the 400 goes out while the session keeps the bad settings and every later
+    # evaluate 500s (found by audit: the empty-categories guard bricked the session).
     # After the merge, not before: a patch can change the format, the weight, or both, and the
     # rule is about the pair that results.
-    normalize_objective_settings(session.current_settings)
+    merged_settings = dict(session.current_settings)
+    merged_settings.update(patch)
+    normalize_objective_settings(merged_settings)
+    session.current_settings = merged_settings
 
     if platform_config is not None:
         session.platform_config = platform_config

@@ -76,13 +76,14 @@ class ModelSettings(BaseModel):
     psi: float
     chi: float
     aleph: float
-    # Peak L1 pulls toward neutral, as fractions of the descent's per-iteration category step
-    # (see REG_LAMBDA_UNIT). lambda_c pulls the category weights toward balanced (0.05 shrinks
-    # up to 5% of a step); lambda_p pulls the flex-position shares toward uniform, on its own
-    # scale since shares live on a coarser simplex. Named lambda_c / lambda_p rather than
-    # lambda, which is a Python keyword.
+    # lambda_c pulls the category weights toward balanced, as a fraction of the category
+    # optimizer's per-iteration step (0.05 shrinks up to 5% of a step; see REG_LAMBDA_UNIT).
+    # lambda_p pulls the flex-position shares toward uniform, as a fraction of the SHARES
+    # optimizer's step, derived per agent from the base-position count — 1.0 pins shares at
+    # uniform on the first pick, values below are a continuous dial. Named lambda_c /
+    # lambda_p rather than lambda, which is a Python keyword.
     lambda_c: float = 0.05
-    lambda_p: float = 4.0
+    lambda_p: float = 0.8
     # How sharply opponents are expected to pursue their predicted punts, and at 0 whether they are
     # modelled as strategic at all. Pinned to 1.0 under Rotisserie by the agent.
     opponent_model_confidence: float = 0.5
