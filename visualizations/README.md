@@ -28,6 +28,12 @@ gives back the same video rather than a new sample.
 `prepare_assignment_data.py` is a second prep script, for the roster-slot scene. It needs the
 headshots the first one writes, so run that one first.
 
+`prepare_draft_equivalence_data.py`, `prepare_payoff_formats_data.py`,
+`prepare_self_play_data.py` and `prepare_seed_landscape_data.py` stand alone. The first reads a
+season; the other three are pure computation — a search, a twelve-seat field, and an objective
+surface — and need neither a season pull nor headshots. Each prints what it found, and each one
+found something the planning note had not predicted; their docstrings record it.
+
 `prepare_truncated_max_data.py` is a third, for the truncated-max scenes. It stands alone —
 it reads the real category correlations off
 `coefficient_exploration_output/correlations_2024-25.csv` and calls
@@ -47,6 +53,11 @@ spreads can be read against each other.
 | `z_versus_g.py` → `VarianceQuadrature` | Why 86 and 104 make 137: the two sources are independent, so their **variances** add. |
 | `punting.py` → `PuntingSearch` | Nine categories against an opponent at parity. The bell never moves; the threshold does. Abandoning three outright wins 4.625 categories against the 4.500 that perfect balance gets. |
 | `assignment.py` → `RosterSlotAssignment` | The thirteen-slot assignment problem. A drafted player scores 0 wherever he is eligible, so the optimiser is not placing him to be useful — it is moving him out of the way of the picks still to come. |
+| `draft_equivalence.py` → `DraftEquivalence` | Why random drafting is not a cop-out: assume value is linear in pick order plus a value-neutral tilt R, and a snake draft's pick numbers pair to the same totals for every seat, so the baselines cancel and two teams differ only by their draws of R. Ends on where the assumption strains, and on the reminder that no static ranking can be right. Narrated. |
+| `category_gradient.py` → `CategoryGradient` | The marginal value of a category, which the punting scene already draws without labelling: the height of the bell where the bar crosses. Sweeps one bar to show the peak at parity, then reads all nine off at the punt optimum — six contested marginals level, three abandoned ones lower, which is the first-order condition made visible. |
+| `payoff_formats.py` → `ThreeFormats` | Each Category, Most Categories and Rotisserie under one search. **Measured, against the plan's prediction: all three punt exactly three categories.** What differs is what it is worth — +9.5%, +2.8%, +1.1% over perfect balance — and the single-category payoff curves say why. |
+| `self_play.py` → `SelfPlayLoop` | Twelve seats best-responding to each other. Searching freely against the latest field, every seat herds onto the same three punts and the drift never falls; responding from where it already is, the field settles in a few passes and the punts spread across categories. |
+| `seed_landscape.py` → `SeedLandscape` | The objective over a plane through three of its optima. The balanced build is a stationary point — the cold start scores 4.5000 and takes zero steps — while every challenger seed climbs to a corner near 4.6247, and the warm start gets there in a fraction of the steps. |
 | `truncated_max_plane.py` → `TruncatedMaxPlane` | The truncated-max pick model **in a plane**: two real categories, a pool of M = 25 survivors under the value bar, and the pick jumping from player to player as the weights turn. Ends on x(w) as the centre of a cloud of selections, with the shipped model's closed form laid over the simulated one. |
 | `truncated_max_reduction.py` → `TruncatedMaxReduction` | The **same fifty players** replotted as (s, u). The cloud is an ellipse whose tilt is ρ, the value bar is a horizontal line, and the score's marginal goes from normal to skew-normal. C categories in, (σ_s, ρ) out. |
 | `truncated_max_scalar_core.py` → `TruncatedMaxScalarCore` | The **scalar core**: the skew-normal g(t), the best-of-M density M g G^(M−1) as M animates 5 → 25 → 100, the ledge where the tail is 1/M, and the Gumbel step up to e(ρ) — shown beside the exact mean it is approximating. |

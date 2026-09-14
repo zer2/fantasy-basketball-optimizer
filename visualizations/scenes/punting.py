@@ -146,6 +146,15 @@ class PuntingSearch(Scene):
 
     # ── One category ──────────────────────────────────────────────────────────────────
 
+    def current_weight(self, category_index: int) -> float:
+        """The effort in one category right now.
+
+        Read through a method rather than off `weights_at` directly so a scene that moves a
+        single category on its own -- CategoryGradient does -- can override where one weight
+        comes from without touching the drawing code or the drain path.
+        """
+        return float(weights_at(self.progress.get_value())[category_index])
+
     def _build_shading(self, category_index: int) -> VGroup:
         """The three regions that say what this category is worth, and the bar dividing them.
 
@@ -154,8 +163,7 @@ class PuntingSearch(Scene):
         of the mean that abandoning the category has given back. Only ever two of the three are
         present at once, because the bar is either right of the mean or left of it.
         """
-        weight = weights_at(self.progress.get_value())[category_index]
-        threshold = self._threshold_offset(weight)
+        threshold = self._threshold_offset(self.current_weight(category_index))
 
         regions = VGroup()
         # The part of the win region that was there before any effort was spent.

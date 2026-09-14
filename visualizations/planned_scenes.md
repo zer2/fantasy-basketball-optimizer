@@ -3,6 +3,24 @@
 Sketches for scenes not yet built, in the order I'd build them. Each says what it shows, how it
 goes, what has to be computed first, and roughly what it costs.
 
+**Status, 2026-09-13: every sketch below has now been built as a first draft.** Three of them
+came back with a result that contradicts what the sketch predicted, and in each case the scene
+was rebuilt around the measurement rather than the prediction:
+
+- **Three formats** predicted that Most Categories would punt harder and Rotisserie less. It
+  does not: all three formats punt exactly three categories. What differs is how much the punt
+  is WORTH — Most Categories +9.5% over perfect balance, Each Category +2.8%, Rotisserie +1.1%.
+- **Self-play** predicted that best-responding to the running average is what damps the
+  oscillation. In the model it is not enough on its own: a field searching globally still
+  thrashes when averaged. What settles it is responding LOCALLY, from where each seat already
+  is — which is what a warm start does. That may be a property of the toy; it is recorded as
+  what the toy did.
+- **Cold, multi and warm starts** predicted a cold start climbing to a nearby, worse peak. It
+  does worse than that: perfect balance is a stationary point of the objective, so the cold
+  start does not climb at all. Zero steps, 4.5000, while every challenger seed reaches 4.6247.
+
+The sketches are kept below as written, because what they got wrong is part of the record.
+
 Regularization was considered and deliberately held. As "an L1 penalty pulls the weights toward
 neutral" it is a bar chart being tugged, and the idea is already clear in a sentence of prose.
 It only earns an animation as a narrative — two teams drafting the same board, one regularized
