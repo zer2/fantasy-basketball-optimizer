@@ -52,6 +52,13 @@ docs/_build/
 # Streamlit secrets
 .streamlit/secrets.toml
 
+# The other credential file. Already excluded from the Docker and Cloud Build contexts, but it
+# was never excluded from git — and some SDKs (manim-voiceover's ElevenLabs backend among them)
+# create one on import, so a real key can appear here without anyone deciding to put it there.
+.env
+.env.*
+!.env.example
+
 # Persisted platform OAuth credentials (per-client token dirs)
 .platform_credentials/
 

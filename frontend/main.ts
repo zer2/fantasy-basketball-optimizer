@@ -352,6 +352,17 @@ buildTableHeader()
 waitForSeasons()
     .then(() => runModeEval())
     .then(() => applyLayout())
-    .catch(err => console.error('Initial load failed:', err))
+    .catch(err => {
+        // A remembered upload id can be dead by first load (backend restart, or the upload
+        // store's TTL), which fails the session create before anything renders. Same recovery
+        // as the player-stats patch path: say so on the upload's status line, forget the dead
+        // ids, and load once more without them.
+        if (String(err).includes('data_id') && markUploadedSourcesExpired()) {
+            return runModeEval()
+                .then(() => applyLayout())
+                .catch(retryErr => console.error('Initial load failed after dropping expired uploads:', retryErr))
+        }
+        console.error('Initial load failed:', err)
+    })
 
 })()
