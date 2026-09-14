@@ -26,5 +26,22 @@ export interface PlatformConnector {
     onDeselected?(): void
 }
 
-/** Builds a connector; `setStatus` writes to the shared connect status line. */
-export type ConnectorFactory = (setStatus: (message: string) => void) => PlatformConnector
+/**
+ * The status line under the connect controls, shared by every connector.
+ *
+ * Success says nothing. What a successful step produces — a populated league list, a dialog
+ * that closes itself, the live layout appearing — is the feedback, and a sentence restating it
+ * is just a line of text under the sidebar going stale. The line exists for the two states the
+ * rest of the UI cannot show on its own: something is in flight, or something failed.
+ */
+export interface ConnectStatus {
+    /** Empty the line. What every success path calls. */
+    clear(): void
+    /** An action is running. Whatever finishes it clears or replaces this. */
+    showProgress(message: string): void
+    /** An action failed. Shown in red, and stays until the next call. */
+    showError(message: string): void
+}
+
+/** Builds a connector; `status` writes to the shared connect status line. */
+export type ConnectorFactory = (status: ConnectStatus) => PlatformConnector

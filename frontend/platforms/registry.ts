@@ -2,7 +2,7 @@
 // Frontend connector registry — the counterpart to the backend's integration registry,
 // keyed by the same platform labels.
 
-import { PlatformConnector, ConnectorFactory } from './connector.js'
+import { PlatformConnector, ConnectorFactory, ConnectStatus } from './connector.js'
 import { makeFantraxConnector } from './fantrax_connector.js'
 import { makeYahooConnector } from './yahoo_connector.js'
 import { makeEspnConnector } from './espn_connector.js'
@@ -19,6 +19,6 @@ export function connectorPlatforms(): string[] {
 }
 
 /** Instantiate every connector (sharing the given status callback). */
-export function makeConnectors(setStatus: (message: string) => void): PlatformConnector[] {
-    return Object.values(CONNECTOR_FACTORIES).map(make => make(setStatus))
+export function makeConnectors(status: ConnectStatus): PlatformConnector[] {
+    return Object.values(CONNECTOR_FACTORIES).map(make => make(status))
 }
