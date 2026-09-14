@@ -22,6 +22,9 @@ site/
 mkdocs.yml
 *.md
 
+# ── Explanatory Manim scenes and the video they render to — watched, never served ─
+visualizations/
+
 # ── Tests, tooling, editor and CI config — never part of the runtime image ────────
 testing_files/
 scripts/

@@ -38,6 +38,9 @@ __pycache__/
 # ── Tests and experiment artefacts — by far the largest thing in the tree ─────
 testing_files/
 
+# ── Explanatory Manim scenes and their rendered video — watched, never served ─
+visualizations/
+
 # ── Developer tooling, editor state, CI config — not part of the service ──────
 scripts/
 screenshot_review/
