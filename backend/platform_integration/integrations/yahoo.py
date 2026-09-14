@@ -171,7 +171,23 @@ class YahooIntegration(PlatformIntegration):
             },
             auth=HTTPBasicAuth(client_id, client_secret),
         )
-        response.raise_for_status()
+        if response.status_code != 200:
+            # Yahoo's own reason, rather than a bare "400 Client Error" that says nothing about
+            # which of the several possible faults this is. The reused-code case gets named
+            # explicitly because its consequence is invisible and severe: per RFC 6749 4.1.2 an
+            # authorization server SHOULD revoke every token already issued from a code that is
+            # presented twice, so a duplicate exchange does not merely fail -- it kills the
+            # working token the FIRST exchange just stored, and every later call then reports an
+            # invalid cookie with nothing to connect it back to this moment.
+            reason = response.text[:400]
+            reused = 'invalid_grant' in reason or 'invalid_code' in reason
+            raise RuntimeError(
+                f'Yahoo rejected the authorization code (HTTP {response.status_code}): {reason}'
+                + ('. This code has already been used. A code works once: request a fresh one '
+                   'from the authorization page -- and note that reusing one also revokes the '
+                   'token the first exchange produced, so you must authorize again.'
+                   if reused else '')
+            )
         token_data = response.json()
 
         # Verify the grant can actually read fantasy data before persisting it. A scope-less grant
@@ -319,6 +335,32 @@ class YahooIntegration(PlatformIntegration):
             injured_players    = injured_players,
         )
 
+    def _empty_board(
+        self
+        , config: PlatformConfig
+        , status: str
+        , with_costs: bool = False
+    ) -> PlatformSelections:
+        """Every team in the league, nobody drafted yet.
+
+        An empty board is a real board, not the absence of one. Before a draft starts the league
+        still has its teams, and the app must be able to evaluate against them -- pre-draft is
+        exactly when a ranking is most wanted. Returning an empty dict instead put a board on the
+        wire with no teams in it at all, which fails the moment anything looks up the seat being
+        evaluated for: a 500 out of the H-score solve, reading 'Evaluation failed.'
+
+        `with_costs` seeds the per-team cost lists an auction needs, so remaining_cash comes back
+        as the full budget for everyone rather than None (which the evaluate route rejects for an
+        auction league).
+        """
+        return PlatformSelections(
+            player_assignments = {team_name: [] for team_name in config.teams_dict},
+            status             = status,
+            injured_players    = [],
+            costs              = {team_name: [] for team_name in config.teams_dict} if with_costs
+                                 else None,
+        )
+
     def _get_draft_board(
         self
         , config: PlatformConfig
@@ -329,14 +371,11 @@ class YahooIntegration(PlatformIntegration):
             draft_results = query.get_league_draft_results()
         except Exception:
             # yfpy errors before the draft starts (and after it shuts API access off).
-            return PlatformSelections(player_assignments={}, status='Draft has not started yet', injured_players=[])
+            return self._empty_board(config, 'Draft has not started yet')
 
         if draft_results and getattr(draft_results[0], 'cost', None) is not None:
-            return PlatformSelections(
-                player_assignments={},
-                status='This is an auction, not a draft! Change the game mode',
-                injured_players=[],
-            )
+            return self._empty_board(
+                config, 'This is an auction, not a draft! Change the game mode')
 
         player_assignments, _ = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(
@@ -357,14 +396,11 @@ class YahooIntegration(PlatformIntegration):
         try:
             draft_results = query.get_league_draft_results()
         except Exception:
-            return PlatformSelections(player_assignments={}, status='Auction has not started', injured_players=[])
+            return self._empty_board(config, 'Auction has not started', with_costs=True)
 
         if draft_results and getattr(draft_results[0], 'cost', None) is None:
-            return PlatformSelections(
-                player_assignments={},
-                status='This is a draft, not an auction! Change the game mode',
-                injured_players=[],
-            )
+            return self._empty_board(
+                config, 'This is a draft, not an auction! Change the game mode', with_costs=True)
 
         player_assignments, costs = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(

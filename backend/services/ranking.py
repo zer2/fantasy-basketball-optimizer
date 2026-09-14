@@ -34,6 +34,17 @@ class UnknownRosterPlayersError(ValueError):
     """
 
 
+class UnknownTeamError(ValueError):
+    """The team being evaluated for is not one of the teams on the board.
+
+    Happens when the seat and the board come from different identity sets -- connecting a live
+    platform replaces the generic team names with the league's own, and a seat still pointing at
+    'Team 1' is evaluated against a board keyed by the platform's names. Surfaced as a 400 for
+    the same reason as the sibling above: the alternative is a KeyError several frames deep in
+    the H-score solve, reported as 'Evaluation failed.' with nothing in it to act on.
+    """
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
@@ -75,6 +86,13 @@ def rank_candidates(
     # holds. A stale board (identities changed by a data-source switch) would otherwise
     # crash on a KeyError deep inside the H-score math. Unknown ids resolve to names via
     # the registry where possible, so the message stays actionable.
+    if my_team_id not in player_assignments:
+        raise UnknownTeamError(
+            f'The team being evaluated for, {my_team_id!r}, is not on this board. '
+            f'The board has: {", ".join(sorted(player_assignments))}. '
+            f'Reselect your team, or reconnect the league if its teams have changed.'
+        )
+
     rostered_players = [
         player_id for team_players in player_assignments.values()
         for player_id in team_players
