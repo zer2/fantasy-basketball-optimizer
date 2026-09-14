@@ -4,7 +4,7 @@
 
 import { PlayerResult } from '../types.js'
 import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat } from '../app_state.js'
-import { getLeagueSettings, getPlatformConfig, getMode } from '../setting_collection/league_settings.js'
+import { getLeagueSettings, getPlatformConfig, getMode, DraftMode } from '../setting_collection/league_settings.js'
 import { getSlotCounts } from '../setting_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
@@ -54,6 +54,21 @@ function setLivePlayerAssignments(
 function clearLivePlayerAssignments(): void {
     livePlayerAssignments = null
     liveRemainingCash = null
+}
+
+/**
+ * Polls the connected platform for the current board and stores it as the live state.
+ *
+ * Shared by the Refresh Analysis button and by the first evaluate after a connection, which
+ * has no board yet: connecting clears the previous league's assignments, so every evaluate
+ * between the connection and the first manual refresh -- a sidebar apply, a seat change, the
+ * bootstrap -- would otherwise fail on a state the user had no way to have loaded.
+ * Must run inside withSessionRetry: it reads the session id.
+ */
+async function pollLiveDraftState(mode: DraftMode): Promise<Record<string, number[]>> {
+    const state = await fetchDraftState(getSessionId()!, mode)
+    setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
+    return state.player_assignments
 }
 
 export function getFullTeamResult(): { h_score: number; win_rates: number[] } | null {
@@ -146,7 +161,19 @@ document.addEventListener('platform-connected', () => {
         slot_counts: getSlotCounts(),
         platform,
         platform_config: getPlatformConfig(),
-    }).catch(err => console.error('Platform connect patch failed:', err))
+    })
+        .then(() => {
+            // Connecting is the moment the league's board becomes readable, so evaluate it here
+            // rather than leaving the table empty until something else happens to trigger a run.
+            // Nothing else reliably does: the seat selector re-evaluates only when the seat
+            // actually CHANGES, and a league whose teams are named "Team 1".."Team 4" — Yahoo's
+            // own naming for unclaimed mock seats — leaves the seat exactly where it was.
+            // Evaluating after the patch, not beside it, because the patch is what puts the
+            // platform config and the league's counts on the session this reads.
+            // Season Mode fills its roster grid instead, from main.ts.
+            if (getMode() !== 'Season Mode') return runEvaluate()
+        })
+        .catch(err => console.error('Platform connect patch failed:', err))
 })
 
 // ─── Evaluate ────────────────────────────────────────────────────────────────
@@ -171,14 +198,14 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
 
             let evalReq: Parameters<typeof evaluate>[1]
             if (isLivePlatform) {
-                // Live platforms supply assignments (and, for auctions, remaining cash)
-                // via the Refresh Analysis poll instead of a manual board.
-                if (livePlayerAssignments === null) {
-                    throw new Error('No live draft state loaded; click Refresh Analysis first')
-                }
+                // Live platforms supply assignments (and, for auctions, remaining cash) from the
+                // platform poll instead of a manual board. Polling here when there is nothing
+                // stored covers the first evaluate after a connection; Refresh Analysis is then
+                // the way to pick up picks made SINCE, not a precondition for evaluating at all.
+                const assignments = livePlayerAssignments ?? await pollLiveDraftState(mode)
                 evalReq = (mode === 'Auction Mode')
-                    ? { player_assignments: livePlayerAssignments, my_team_id: seat, remaining_cash: liveRemainingCash ?? undefined }
-                    : { player_assignments: livePlayerAssignments, my_team_id: seat }
+                    ? { player_assignments: assignments, my_team_id: seat, remaining_cash: liveRemainingCash ?? undefined }
+                    : { player_assignments: assignments, my_team_id: seat }
             } else if (mode === 'Auction Mode') {
                 const { player_assignments, remaining_cash } = getAuctionState()
                 evalReq = { player_assignments, my_team_id: seat, remaining_cash }
@@ -344,11 +371,7 @@ export async function refreshLiveAnalysis(): Promise<void> {
     // write to make: runEvaluate has claimed the display itself and owns the ending state,
     // including for its own failures.
     await withDisplayOwnership({ busy: 'fetching', onFailure: 'idle' }, async () => {
-        await withSessionRetry(async () => {
-            const mode = getMode()
-            const state = await fetchDraftState(getSessionId()!, mode)
-            setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
-        })
+        await withSessionRetry(() => pollLiveDraftState(getMode()))
         await runEvaluate()
     })
 }

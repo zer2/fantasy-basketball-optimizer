@@ -98,14 +98,16 @@ renderLeagueSettings(createSection(sidebarSections, 'League Settings'))
 // container. The widget keeps the app-state seat in sync itself; what a seat change CAUSES
 // is decided here — and the same flow runs when a null seat adopts a team, since adoption
 // deliberately dispatches no event (see refreshSeatOptions).
-function handleSeatChanged(): void {
+function handleSeatChanged({ evaluate = true } = {}): void {
     clearFullTeamResult()
     buildTableHeader()
+    if (!evaluate) return
     runModeEval()
         .then(() => applyLayout())
         .catch(err => console.error('Seat change evaluate failed:', err))
 }
-renderSeatSelector().addEventListener('change', handleSeatChanged)
+// Wrapped rather than passed directly: the listener would hand the Event in as the options bag.
+renderSeatSelector().addEventListener('change', () => handleSeatChanged())
 
 // Mode change, step 1: patch the session's league type. is_auction is a session parameter:
 // the backend requires remaining_cash on every evaluate exactly when it is set, and entering
@@ -198,7 +200,16 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
 // first new team, that adoption is a real seat change and runs the same flow a manual
 // selection would.
 document.getElementById('ls-team-names')!.addEventListener('input', () => {
-    if (refreshSeatOptions() !== null) handleSeatChanged()
+    if (refreshSeatOptions() === null) return
+    // With a live platform the identities come FROM the league, so this fires as a step of
+    // CONNECTING — and the connect flow runs its own evaluate once the session has been patched
+    // with the platform config that evaluate depends on. Evaluating here too raced it, and lost
+    // in the worst way: this one runs first, while platformConnected is still false (the flag is
+    // set on the line after the names are written), so it took the not-connected branch and
+    // painted default rankings, leaving the real evaluate to be aborted. That is the "first
+    // Connect does nothing, second one works" behaviour — by the second click the seat is
+    // already one of the league's teams, so nothing changes here and only the real evaluate runs.
+    handleSeatChanged({ evaluate: getLeagueSettings().platform === 'Enter your own data' })
 })
 
 // A team's display label changed (header input). Identity/value is unchanged, so only relabel
