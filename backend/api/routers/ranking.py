@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from backend.api.helpers import fail, require_session
 from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
-from backend.services.ranking import rank_candidates, UnknownRosterPlayersError
+from backend.services.ranking import rank_candidates, UnknownRosterPlayersError, UnknownTeamError
 from backend.infra.server_timing import begin_timing, server_timing_header
 from backend.api.schemas import EvaluateRequest
 from backend.models import EvaluateResponse
@@ -57,7 +57,7 @@ def rank_candidates_route(req: EvaluateRequest, response: Response,
                 candidate_offset   = req.candidate_offset,
                 candidate_limit    = req.candidate_limit,
             )
-    except UnknownRosterPlayersError as exc:
+    except (UnknownRosterPlayersError, UnknownTeamError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Evaluation failed.')

@@ -8,7 +8,7 @@ import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
-import { PlatformConnector } from '../platforms/connector.js'
+import { PlatformConnector, ConnectStatus } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
 
@@ -168,8 +168,21 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
     const connectStatus = document.createElement('div')
     connectStatus.id        = 'ls-connect-status'
-    connectStatus.className = 'pick-control-label'
-    const setConnectStatus = (message: string): void => { connectStatus.textContent = message }
+    connectStatus.className = 'ls-connect-status'
+    const setConnectStatus: ConnectStatus = {
+        clear() {
+            connectStatus.textContent = ''
+            connectStatus.classList.remove('sidebar-error')
+        },
+        showProgress(message: string) {
+            connectStatus.textContent = message
+            connectStatus.classList.remove('sidebar-error')
+        },
+        showError(message: string) {
+            connectStatus.textContent = message
+            connectStatus.classList.add('sidebar-error')
+        },
+    }
 
     // Each platform's connect/auth controls live in its own connector module. Build them
     // all once, append them, and show the active one — no per-platform branching here.
@@ -255,10 +268,10 @@ export function renderLeagueSettings(container: HTMLElement): void {
         if (!connector) return
         const selection = connector.getSelection()
         if (selection === null) {
-            setConnectStatus('Select or enter a league first.')
+            setConnectStatus.showError('Select or enter a league first.')
             return
         }
-        setConnectStatus('Connecting...')
+        setConnectStatus.showProgress('Connecting...')
         connectPlatform(connector.platform, selection.league_id, selection.division_id)
             .then(resp => {
                 // Restrict the mode selector to what this platform supports.
@@ -278,9 +291,11 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // name lookup) and counts. Routed through an event so this module doesn't import
                 // the session layer (which imports this one — would be a cycle).
                 document.dispatchEvent(new Event('platform-connected'))
-                setConnectStatus(`Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`)
+                // Nothing to announce: the team names, the counts and the live layout have all
+                // just changed on screen, which says "connected" better than a sentence can.
+                setConnectStatus.clear()
             })
-            .catch(err => { setConnectStatus(`Connect failed: ${err.message}`) })
+            .catch(err => { setConnectStatus.showError(`Connect failed: ${err.message}`) })
     })
 
     // ── Own-data-dependent and mode-dependent visibility ──────────────────

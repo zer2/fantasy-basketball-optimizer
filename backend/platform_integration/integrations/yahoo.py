@@ -53,20 +53,60 @@ _logger = logging.getLogger('fbbo.yahoo')
 _GAME_CODE = 'nba'
 _YAHOO_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
 _YAHOO_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
-# Yahoo's out-of-band flow ('oob') still exchanges codes but issues grants carrying no scope and no
-# user GUID -- every fantasy call then 403s. A REGISTERED redirect URI produces an intact grant, and
-# the paste-a-code UX survives: the browser lands on the redirect with ?code=... in the address bar
-# even when nothing is listening there. Set YAHOO_REDIRECT_URI to the exact string registered on the
-# Yahoo app; it must match at both the authorize and token steps, which is why it is read once here.
+# Out-of-band ('oob') is Yahoo's documented redirect for applications that cannot receive a
+# callback, and it is what this app WANTS: consent ends on a Yahoo page showing a short code to
+# paste back, rather than dumping the user on a dead callback URL to dig a long code out of the
+# address bar. It is the deliberate default in every environment, not a fallback for missing
+# configuration. Setting YAHOO_REDIRECT_URI overrides it with a real callback, which requires that
+# exact string to be registered on the Yahoo app -- Yahoo matches it at both the authorize and the
+# token step, which is why it is read once here rather than per call.
 _REDIRECT_URI = get_secret('YAHOO_REDIRECT_URI') or 'oob'
-# Yahoo grants scopes at consent time, not from the app's permission page: an authorization request
-# that asks for nothing gets a grant authorized for nothing, which still exchanges cleanly and then
-# 403s on every user-scoped call. fspt-r is Fantasy Sports read.
-_SCOPE = 'fspt-r'
 _DEFAULT_N_PICKS = 13           # Streamlit hard-codes this (ZR there: fix)
+
+# What the authorization probe reads: the cheapest fantasy endpoint there is, so a grant that
+# cannot read fantasy data says so at authorization time instead of at connect time.
+_FANTASY_PROBE_URL = 'https://fantasysports.yahooapis.com/fantasy/v2/game/nba/metadata?format=json'
+# Read only when that probe fails, to say how wide the refusal is. The two fantasy reads are the
+# ones the integration itself depends on -- the league list the connect flow opens with, and the
+# bare game resource underneath every other call -- and an application Yahoo has not entitled is
+# refused on both alike, where one refusing while the other answers would indict the probe rather
+# than the grant. The non-fantasy read is the control: Yahoo honouring the same bearer token there
+# proves the handshake produced a working token, leaving the fantasy entitlement as the only thing
+# missing. It is only evidence in that direction, since this app never requests the OpenID scopes
+# that endpoint wants -- a refusal there says nothing either way.
+_CORROBORATION_URLS = {
+    'fantasy_user_leagues': 'https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games?format=json',
+    'fantasy_game_nba':     'https://fantasysports.yahooapis.com/fantasy/v2/game/nba?format=json',
+    'non_fantasy_userinfo': 'https://api.login.yahoo.com/openid/v1/userinfo',
+}
 
 # yfpy roster slot positions meaning "injured", excluded in Season Mode.
 _INJURED_POSITIONS = {'IL', 'IL+'}
+
+
+def _read_corroborating_endpoints(access_token: str) -> dict[str, str]:
+    """{label: HTTP status or error} for each corroborating endpoint, for the failure log only.
+
+    Never raises: this runs while reporting a failure, so a second failure here must not replace
+    the reason being reported.
+    """
+    statuses: dict[str, str] = {}
+    for label, url in _CORROBORATION_URLS.items():
+        try:
+            response = requests.get(
+                url,
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=20,
+            )
+            # The WWW-Authenticate challenge is the part that says WHY a bearer token was refused:
+            # 'insufficient_scope' means Yahoo accepted the token and withheld a permission, while
+            # 'invalid_token' means it rejected the token itself. The status code alone conflates
+            # the two. It is a standard error header, and carries no secret.
+            challenge = response.headers.get('WWW-Authenticate', '')
+            statuses[label] = f'{response.status_code} {challenge}'.strip()
+        except requests.RequestException as request_error:
+            statuses[label] = f'{type(request_error).__name__}'
+    return statuses
 
 
 class YahooIntegration(PlatformIntegration):
@@ -97,9 +137,15 @@ class YahooIntegration(PlatformIntegration):
 
     @staticmethod
     def build_auth_url(client_id: str) -> str:
-        """The Yahoo page the user visits to obtain an authorization code to paste back."""
+        """The Yahoo page the user visits to obtain an authorization code to paste back.
+
+        No scope parameter: Yahoo grants what the application's own registration was approved for,
+        and yahoo_oauth -- the library yfpy drives this handshake with, and the reference every
+        working Python integration uses -- asks for none either. Requesting one explicitly can only
+        differ from the path known to work.
+        """
         return (f'{_YAHOO_AUTH_URL}?client_id={client_id}&redirect_uri={_REDIRECT_URI}'
-                f'&response_type=code&scope={_SCOPE}')
+                f'&response_type=code')
 
     @staticmethod
     def exchange_auth_code(
@@ -125,7 +171,23 @@ class YahooIntegration(PlatformIntegration):
             },
             auth=HTTPBasicAuth(client_id, client_secret),
         )
-        response.raise_for_status()
+        if response.status_code != 200:
+            # Yahoo's own reason, rather than a bare "400 Client Error" that says nothing about
+            # which of the several possible faults this is. The reused-code case gets named
+            # explicitly because its consequence is invisible and severe: per RFC 6749 4.1.2 an
+            # authorization server SHOULD revoke every token already issued from a code that is
+            # presented twice, so a duplicate exchange does not merely fail -- it kills the
+            # working token the FIRST exchange just stored, and every later call then reports an
+            # invalid cookie with nothing to connect it back to this moment.
+            reason = response.text[:400]
+            reused = 'invalid_grant' in reason or 'invalid_code' in reason
+            raise RuntimeError(
+                f'Yahoo rejected the authorization code (HTTP {response.status_code}): {reason}'
+                + ('. This code has already been used. A code works once: request a fresh one '
+                   'from the authorization page -- and note that reusing one also revokes the '
+                   'token the first exchange produced, so you must authorize again.'
+                   if reused else '')
+            )
         token_data = response.json()
 
         # Verify the grant can actually read fantasy data before persisting it. A scope-less grant
@@ -135,13 +197,21 @@ class YahooIntegration(PlatformIntegration):
         # Tested by use rather than by inspecting the response shape, which Yahoo has changed before.
         access_token = token_data.get('access_token', '')
         probe = requests.get(
-            'https://fantasysports.yahooapis.com/fantasy/v2/game/nba/metadata?format=json',
+            _FANTASY_PROBE_URL,
             headers={'Authorization': f'Bearer {access_token}'},
             timeout=20,
         )
         if probe.status_code != 200:
-            _logger.error('Yahoo authorization probe failed (%s); token response carried keys %s',
-                          probe.status_code, sorted(token_data.keys()))
+            # The redirect URI in force is logged because it is the one input to the handshake
+            # that varies by environment, and a mismatch with what the Yahoo app has registered
+            # fails here rather than at the exchange. The token keys go with it: they say whether
+            # Yahoo returned anything unusual alongside the access token. The corroborating reads
+            # separate an unentitled application, which is refused everywhere, from a probe that
+            # happens to have picked an endpoint with rules of its own.
+            _logger.error('Yahoo authorization probe failed (%s); token response carried keys %s, '
+                          'redirect_uri %s, corroborating endpoints %s',
+                          probe.status_code, sorted(token_data.keys()), _REDIRECT_URI,
+                          _read_corroborating_endpoints(access_token))
             raise RuntimeError(
                 f'Yahoo accepted the code but the token cannot read fantasy data '
                 f"(HTTP {probe.status_code}: {probe.text[:600]}). Either the application's "
@@ -149,6 +219,10 @@ class YahooIntegration(PlatformIntegration):
                 f"or the grant lacks the fantasy scope -- Yahoo's own message above is the "
                 f'authoritative reason. Nothing was stored; re-authorize freshly once access is active.'
             )
+        # Yahoo has deprecated xoauth_yahoo_guid on this flow (their docs point at OpenID Connect's
+        # id_token for a GUID), so its absence says nothing about the grant and must not be read as
+        # a broken handshake. Carried through when present because yahoo_oauth reads it back out of
+        # token.json, with the same None default it applies to a token response that omits it.
         guid = token_data.get('xoauth_yahoo_guid')
 
         os.makedirs(auth_dir, exist_ok=True)
@@ -261,6 +335,32 @@ class YahooIntegration(PlatformIntegration):
             injured_players    = injured_players,
         )
 
+    def _empty_board(
+        self
+        , config: PlatformConfig
+        , status: str
+        , with_costs: bool = False
+    ) -> PlatformSelections:
+        """Every team in the league, nobody drafted yet.
+
+        An empty board is a real board, not the absence of one. Before a draft starts the league
+        still has its teams, and the app must be able to evaluate against them -- pre-draft is
+        exactly when a ranking is most wanted. Returning an empty dict instead put a board on the
+        wire with no teams in it at all, which fails the moment anything looks up the seat being
+        evaluated for: a 500 out of the H-score solve, reading 'Evaluation failed.'
+
+        `with_costs` seeds the per-team cost lists an auction needs, so remaining_cash comes back
+        as the full budget for everyone rather than None (which the evaluate route rejects for an
+        auction league).
+        """
+        return PlatformSelections(
+            player_assignments = {team_name: [] for team_name in config.teams_dict},
+            status             = status,
+            injured_players    = [],
+            costs              = {team_name: [] for team_name in config.teams_dict} if with_costs
+                                 else None,
+        )
+
     def _get_draft_board(
         self
         , config: PlatformConfig
@@ -271,14 +371,11 @@ class YahooIntegration(PlatformIntegration):
             draft_results = query.get_league_draft_results()
         except Exception:
             # yfpy errors before the draft starts (and after it shuts API access off).
-            return PlatformSelections(player_assignments={}, status='Draft has not started yet', injured_players=[])
+            return self._empty_board(config, 'Draft has not started yet')
 
         if draft_results and getattr(draft_results[0], 'cost', None) is not None:
-            return PlatformSelections(
-                player_assignments={},
-                status='This is an auction, not a draft! Change the game mode',
-                injured_players=[],
-            )
+            return self._empty_board(
+                config, 'This is an auction, not a draft! Change the game mode')
 
         player_assignments, _ = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(
@@ -299,14 +396,11 @@ class YahooIntegration(PlatformIntegration):
         try:
             draft_results = query.get_league_draft_results()
         except Exception:
-            return PlatformSelections(player_assignments={}, status='Auction has not started', injured_players=[])
+            return self._empty_board(config, 'Auction has not started', with_costs=True)
 
         if draft_results and getattr(draft_results[0], 'cost', None) is None:
-            return PlatformSelections(
-                player_assignments={},
-                status='This is a draft, not an auction! Change the game mode',
-                injured_players=[],
-            )
+            return self._empty_board(
+                config, 'This is a draft, not an auction! Change the game mode', with_costs=True)
 
         player_assignments, costs = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(

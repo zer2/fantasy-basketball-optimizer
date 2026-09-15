@@ -6,11 +6,11 @@ import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
 import { pref, savePref } from '../preferences.js'
 import { fetchDivisions } from '../api/client.js'
-import { PlatformConnector } from './connector.js'
+import { PlatformConnector, ConnectStatus } from './connector.js'
 
 const PLATFORM = 'Retrieve from Fantrax'
 
-export function makeFantraxConnector(setStatus: (message: string) => void): PlatformConnector {
+export function makeFantraxConnector(status: ConnectStatus): PlatformConnector {
     const element = document.createElement('div')
     element.id = 'ls-fantrax-wrap'
 
@@ -18,7 +18,7 @@ export function makeFantraxConnector(setStatus: (message: string) => void): Plat
     const leagueIdInput = document.createElement('input')
     leagueIdInput.type      = 'text'
     leagueIdInput.id        = 'ls-league-id'
-    leagueIdInput.className = 'team-name-input'
+    leagueIdInput.className = 'sidebar-input'
     leagueIdInput.value     = pref('platform_league_id', '')
     element.append(leagueIdInput)
 
@@ -46,7 +46,7 @@ export function makeFantraxConnector(setStatus: (message: string) => void): Plat
 
     leagueIdInput.addEventListener('change', () => {
         savePref('platform_league_id', leagueIdInput.value)
-        loadDivisions().catch(err => setStatus(`Could not load divisions: ${err.message}`))
+        loadDivisions().catch(err => status.showError(`Could not load divisions: ${err.message}`))
     })
 
     return {

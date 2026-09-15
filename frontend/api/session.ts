@@ -154,16 +154,22 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
         tiebreaker_category: getTiebreakerCategory(), categories,
     }
     if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
+    const platformConfig = getPlatformConfig()
     const req: SessionRequest = {
         league,
         is_auction: mode === 'Auction Mode',
-        platform,
+        // A platform means something to a session only together with its config: the config is
+        // what carries the league shape the draft-state poll and the name lookup need, and the
+        // backend refuses a live platform without one. Selecting a live platform is therefore
+        // not yet a live session -- nor is reloading the page, which restores the dropdown from
+        // preferences but not the connection. Until the connect patch arrives with both, this
+        // is deliberately a manual session, which is what showDefaultRankings wants to evaluate.
+        platform: platformConfig ? platform : 'Enter your own data',
         slot_counts: getSlotCounts(),
         model_settings: getModelSettings(),
         data_source,
         injured_players,
     }
-    const platformConfig = getPlatformConfig()
     if (platformConfig) req.platform_config = platformConfig
     // Warm the pool's headshots in parallel with the build: H-score setup is CPU-bound
     // server-side while image serving is pure I/O, so the build window is free time.
