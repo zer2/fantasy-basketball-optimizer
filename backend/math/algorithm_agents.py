@@ -763,6 +763,11 @@ class HAgent:
         available_mask = (
             ~self.x_scores.index.isin(players_chosen + exclusion_list)
             & self.x_scores.index.isin(self.positions.index)
+            # The replacement player is a placeholder for a pick that did not resolve to anyone,
+            # never somebody to draft. He used to be excluded from here for the wrong reason --
+            # he was missing from `positions` -- which stopped being true once he was given a
+            # position row so that rosters holding him could be slotted at all.
+            & (self.x_scores.index != RP_PLAYER_ID)
         )
         # x_scores_available is the FULL available pool, exactly as it has always meant. The opponent /
         # future-pick model (get_diff_distributions) reads its top players, so it must stay complete.

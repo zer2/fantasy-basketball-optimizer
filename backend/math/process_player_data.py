@@ -468,6 +468,20 @@ def process_player_data(player_stats_v2: pd.DataFrame
             for position in base_position_list
         })
 
+    # The replacement player gets a position row too, eligible for every base slot.
+    #
+    # He already has X- and G-score rows (above) but was left out of `positions`, which is built
+    # from player_means and joined inwards — so a roster holding him crashed the position-aware
+    # solve on a lookup he had no row for. He stands for a drafted player who did not resolve to
+    # anyone in the pool, and such a player HAS taken a roster spot, so the least-wrong assumption
+    # is that he can fill any of them; his -1 scores already make him worthless to field.
+    #
+    # Added here, after every statistical pool has been sliced out of players_and_positions, so he
+    # cannot skew a position mean or a covariance estimate. He is kept out of the candidate list
+    # explicitly in algorithm_agents (he used to be excluded only as a side effect of missing from
+    # this table, which would have made him draftable the moment he was added).
+    positions = pd.concat([positions, pd.Series({RP_PLAYER_ID: list(base_position_list)})])
+
     info = {
         'G-scores':            g_scores,
         'X-scores':            x_scores,
