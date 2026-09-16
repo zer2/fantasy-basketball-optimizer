@@ -604,6 +604,9 @@ class HAgent:
         # populate_default_h_scores (and cleared before the serve) — it must never exist mid-draft, so
         # reset_draft_state deliberately leaves it alone (passes reset state while the window is live).
         self._bootstrap_field_snapshots = None
+        # Set to a list by a caller that wants every self-play pass recorded (see the append
+        # site in the bootstrap loop); left None everywhere else, recording nothing.
+        self.self_play_trace = None
         # True while a nested opponent-inference solve is running: caps the recursion at one level of
         # best-response (the nested solve reads the stored team states, never refreshes them) and
         # suppresses the post-evaluate team-entry hook (the refresh loop stores the entry itself, keyed
@@ -2626,12 +2629,25 @@ class HAgent:
                 previous_average = running_average
                 stacked = pd.concat([snap for snap, _ in snapshots])
                 running_average = stacked.groupby(level=0).mean()
+                drift = None
                 if previous_average is not None:
                     shared = running_average.index.intersection(previous_average.index)
                     drift = float(np.mean(np.abs(running_average.loc[shared].to_numpy()
                                                  - previous_average.loc[shared].to_numpy())))
                     logging.getLogger('fbbo').info(
                         'self-play pass %d average-field drift: %.4f', pass_index, drift)
+                # The same per-pass state that line summarises, KEPT rather than only logged,
+                # when a caller has asked for it. One consumer:
+                # visualizations/prepare_self_play_data.py records a real bootstrap so the
+                # self-play scene animates the field this loop actually settles into rather
+                # than a toy standing in for it. None -- the default, and the state during
+                # every app build -- costs one attribute check per pass.
+                if self.self_play_trace is not None:
+                    self.self_play_trace.append({
+                        'pass_index': pass_index,
+                        'drift':      drift,
+                        'field':      running_average.copy(),
+                    })
                 # Complementary groups: every _SOLVE_GROUP_COUNT passes, a fresh random
                 # permutation splits the universe into that many disjoint groups, and the
                 # passes of the cycle solve them in turn — every player is re-solved
