@@ -103,8 +103,9 @@ test('error handling and recovery', async t => {
         })
 
         await t.test('a backend-rejected league setting fails visibly and the app recovers', async () => {
-            // n_drafters=1 passes the frontend (the input's min is not enforced on change)
-            // but the backend cannot build a 1-team league — today that surfaces as a 500.
+            // n_drafters=1 passes the frontend (the input's min is not enforced on change) but a
+            // one-drafter league has no opponents, so the backend rejects it up front — it used
+            // to crash deep in the pipeline instead, as a bare 500.
             await setNumberInput('ls-n-drafters', 1)
             await waitAppSettled(app)
 
@@ -112,6 +113,10 @@ test('error handling and recovery', async t => {
             assert.ok(failures.length > 0, 'the impossible league should be rejected by the backend')
             assert.ok(await page.locator('#hscoretable .playerheaderdiv, #hscoretable').first().isVisible(),
                       'the app should not wedge after the rejection')
+            // The rejection has to be visible where the table would be, not only in the console.
+            const message = page.locator('#hscoretable .table-message-error')
+            assert.equal(await message.count(), 1, 'the failure should be shown in the table area')
+            assert.match(await message.first().textContent(), /league settings/i)
 
             await setNumberInput('ls-n-drafters', 12)
             await waitAppSettled(app)

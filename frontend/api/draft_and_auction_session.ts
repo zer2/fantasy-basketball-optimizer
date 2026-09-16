@@ -10,6 +10,7 @@ import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
 import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, clearTailSpace } from '../table/player_table.js'
+import { showFailureInTable } from '../table/failure_message.js'
 
 import {
     startFreshSession, getSessionId, resetSession, setIndicatorState,
@@ -27,6 +28,9 @@ import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlay
 // decision-relevant board — and it is the autodraft consideration window, since autopilot
 // scores only the first batch (drafts.md documents autodrafters as "top 100" for this reason).
 const CANDIDATE_BATCH_SIZE = 100
+
+/** Dispatched on document after a platform poll stores a new board. */
+export const LIVE_BOARD_UPDATED = 'live-board-updated'
 
 // ─── Draft/auction state ─────────────────────────────────────────────────────
 
@@ -51,6 +55,12 @@ function setLivePlayerAssignments(
     liveRemainingCash = remainingCash ?? null
 }
 
+/** The board most recently polled from the connected platform, or null before the first poll.
+ *  Read by the layout's team panel, which has no data-entry grid to read from when live. */
+export function getLivePlayerAssignments(): Record<string, number[]> | null {
+    return livePlayerAssignments
+}
+
 function clearLivePlayerAssignments(): void {
     livePlayerAssignments = null
     liveRemainingCash = null
@@ -68,6 +78,11 @@ function clearLivePlayerAssignments(): void {
 async function pollLiveDraftState(mode: DraftMode): Promise<Record<string, number[]>> {
     const state = await fetchDraftState(getSessionId()!, mode)
     setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
+    // The board has moved on, which is the whole reason for polling: a live seat's team panel
+    // reads these assignments, and nothing else would tell it they changed. The full-team event
+    // only fires once a roster is COMPLETE, and a seat change only when the seat changes — so
+    // without this the team statistics sat on the roster from whenever the tab was opened.
+    document.dispatchEvent(new Event(LIVE_BOARD_UPDATED))
     return state.player_assignments
 }
 
@@ -173,7 +188,10 @@ document.addEventListener('platform-connected', () => {
             // Season Mode fills its roster grid instead, from main.ts.
             if (getMode() !== 'Season Mode') return runEvaluate()
         })
-        .catch(err => console.error('Platform connect patch failed:', err))
+        .catch(err => {
+            console.error('Platform connect patch failed:', err)
+            showFailureInTable(err)
+        })
 })
 
 // ─── Evaluate ────────────────────────────────────────────────────────────────
