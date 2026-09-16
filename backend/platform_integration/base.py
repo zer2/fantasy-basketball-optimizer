@@ -22,10 +22,19 @@ from typing import Optional
 class LeagueShape:
     """League metadata needed to configure a session, fetched before any roster
     data and therefore without requiring session.agent.info."""
+    # Every seat in the league, occupied or not: one name per drafter. A draft room that is
+    # still filling has fewer joined teams than seats, and the app needs an identity for each
+    # (the seat selector, the board columns and evaluate's my_team_id all index by it).
     team_names: list[str]
     n_drafters: int
     n_picks:    int
+    # ONLY the teams that have actually joined. This is the name <-> platform-id map every
+    # roster call goes through, so an unoccupied seat must not appear in it: it has no id.
     teams_dict: dict[str, str]   # team_name -> platform team_id
+    # True for an auction league, False for a snake draft, None when the platform does not say.
+    # None is a real third state, not a default standing in for False: it means "do not judge the
+    # user's chosen mode against this", which is what platforms that never report it need.
+    is_auction_draft: Optional[bool] = None
 
 
 @dataclass
@@ -35,8 +44,12 @@ class PlatformConfig:
     platform:           str
     league_id:          str
     division_id:        Optional[str]
-    teams_dict:         dict[str, str]   # team_name -> platform team_id
+    teams_dict:         dict[str, str]   # joined teams only: team_name -> platform team_id
     player_name_column: str
+    # Every seat, in draft order — the joined teams plus placeholders for the ones still open.
+    # Boards are seeded from this so a seat that nobody has taken yet is still a team with an
+    # empty roster rather than missing from the league entirely.
+    seat_names:         list[str]
 
 
 @dataclass

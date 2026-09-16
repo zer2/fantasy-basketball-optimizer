@@ -44,6 +44,22 @@ export function getPlatformSelectElement(): HTMLElement {
     return platformSelectHandle.element
 }
 
+/**
+ * The complaint to show when the chosen mode cannot read this league's draft, or null when it
+ * can. `isAuctionDraft` is null for platforms that do not report the draft type, which is not
+ * evidence of either kind — so nothing is claimed.
+ */
+function describeModeMismatch(mode: string, isAuctionDraft: boolean | null): string | null {
+    if (isAuctionDraft === null || mode === 'Season Mode') return null
+    if (isAuctionDraft && mode === 'Draft Mode') {
+        return 'This league drafts by auction. Switch the mode to Auction Mode, then connect.'
+    }
+    if (!isAuctionDraft && mode === 'Auction Mode') {
+        return 'This league uses a snake draft, not an auction. Switch the mode to Draft Mode, then connect.'
+    }
+    return null
+}
+
 /** Whether a live platform connection has been established (Connect succeeded). */
 export function isPlatformConnected(): boolean {
     return platformConnected
@@ -274,6 +290,17 @@ export function renderLeagueSettings(container: HTMLElement): void {
         setConnectStatus.showProgress('Connecting...')
         connectPlatform(connector.platform, selection.league_id, selection.division_id)
             .then(resp => {
+                // A league that drafts by auction cannot be followed in Draft Mode, or the other
+                // way round: the poll returns a board the mode cannot read, which shows up as an
+                // empty draft rather than as a mistake. The platform reports the draft type
+                // before a single pick exists, so say so now instead of letting the user work in
+                // the wrong mode for a whole draft. Season Mode is exempt — the draft is over and
+                // how it ran no longer matters.
+                const modeMismatch = describeModeMismatch(modeSelect.getValue(), resp.is_auction_draft)
+                if (modeMismatch !== null) {
+                    setConnectStatus.showError(modeMismatch)
+                    return
+                }
                 // Restrict the mode selector to what this platform supports.
                 modeSelect.setOptions(resp.available_modes.map(m => ({ value: m, label: m })))
                 if (!resp.available_modes.includes(modeSelect.getValue())) {

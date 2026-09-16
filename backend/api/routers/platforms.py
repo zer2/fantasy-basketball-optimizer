@@ -81,10 +81,11 @@ def connect_platform_route(platform: str, req: PlatformConfigRequest, user_key: 
     except Exception:
         raise fail(502, 'Failed to connect to the platform league.')
     return ConnectResponse(
-        team_names      = shape.team_names,
-        n_drafters      = shape.n_drafters,
-        n_picks         = shape.n_picks,
-        available_modes = integration.available_modes,
+        team_names       = shape.team_names,
+        n_drafters       = shape.n_drafters,
+        n_picks          = shape.n_picks,
+        available_modes  = integration.available_modes,
+        is_auction_draft = shape.is_auction_draft,
     )
 
 

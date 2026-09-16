@@ -109,6 +109,26 @@ def _read_corroborating_endpoints(access_token: str) -> dict[str, str]:
     return statuses
 
 
+def _pad_with_open_seats(joined_names: list[str], n_drafters: int) -> list[str]:
+    """One name per seat: the teams that have joined, then a placeholder for each empty seat.
+
+    Yahoo names unclaimed teams "Team N", so these are deliberately worded differently — a
+    placeholder here means "nobody has taken this seat yet", and it is replaced by the real name
+    on the next connect once someone does.
+    """
+    seats = list(joined_names)
+    taken = set(seats)
+    for seat_number in range(len(seats) + 1, n_drafters + 1):
+        label = f'Open seat {seat_number}'
+        collision = 2
+        while label in taken:
+            label = f'Open seat {seat_number} ({collision})'
+            collision += 1
+        seats.append(label)
+        taken.add(label)
+    return seats
+
+
 class YahooIntegration(PlatformIntegration):
     # Organized by workflow, like fantrax.py: metadata → auth → connection → roster/draft.
 
@@ -280,19 +300,80 @@ class YahooIntegration(PlatformIntegration):
             teams = list(teams.values())
         return [(team.name.decode('UTF-8'), str(team.team_id)) for team in teams]
 
+    def _read_league_settings(self, league_id: str):
+        """The league's own settings object, or None when Yahoo will not give it up.
+
+        Fetched once because several answers come out of it — how many seats the room holds and
+        whether it drafts by auction — and each is a round trip to Yahoo otherwise. Returns None
+        rather than raising: a league that cannot describe itself is still worth connecting to on
+        whatever the team list says, and the callers below each say what they do without it.
+        """
+        try:
+            return self._make_query(league_id).get_league_settings()
+        except Exception as error:
+            _logger.warning('Yahoo league %s did not return its settings (%s); the drafter count '
+                            'falls back to the teams that have joined and the draft type is '
+                            'unknown', league_id, error)
+            return None
+
+    @staticmethod
+    def _read_seat_count(settings, joined: int) -> int:
+        """How many seats the room was created with, however many are occupied right now.
+
+        `max_teams` is fixed when the league is created; the team list only reports seats that
+        have been taken. Connecting to a draft room before it fills therefore used to describe a
+        four-team — or one-team — league, and a one-team league has no opponents at all, which
+        crashed the pipeline rebuild several frames deep. Measured on a real room: four teams
+        joined, `max_teams` 14, and thirteen teams present three minutes later.
+        """
+        if settings is None:
+            return joined
+        try:
+            # A league can never have fewer seats than teams sitting in them; if Yahoo says
+            # otherwise, the teams are the thing we can see.
+            return max(int(settings.max_teams), joined)
+        except (TypeError, ValueError) as error:
+            _logger.warning('Yahoo reported an unreadable max_teams (%s); falling back to the '
+                            '%d team(s) that have joined', error, joined)
+            return joined
+
+    @staticmethod
+    def _read_is_auction(settings) -> Optional[bool]:
+        """Whether the league drafts by auction, or None when Yahoo will not say.
+
+        Known before a single pick exists, which is the point: the board itself only reveals the
+        draft type once picks carry (or lack) a cost, by which time the user has been working in
+        the wrong mode for the whole draft.
+        """
+        if settings is None:
+            return None
+        try:
+            return bool(int(settings.is_auction_draft))
+        except (TypeError, ValueError) as error:
+            _logger.warning('Yahoo reported an unreadable is_auction_draft (%s); the draft type '
+                            'stays unknown', error)
+            return None
+
     def fetch_league_shape(
         self
         , league_id: str
         , division_id: Optional[str]
     ) -> LeagueShape:
-        """Return the league's team names and drafter count (n_picks hard-coded to 13)."""
+        """The league's seats, drafter count and roster size (n_picks still hard-coded to 13).
+
+        team_names covers EVERY seat, padding the joined teams with placeholders; teams_dict
+        keeps only the teams that exist on Yahoo's side, since it is the platform-id map.
+        """
         teams_dict = deduplicate_team_names(self._fetch_team_pairs(league_id))
-        team_names = list(teams_dict.keys())
+        joined_names = list(teams_dict.keys())
+        settings   = self._read_league_settings(league_id)
+        n_drafters = self._read_seat_count(settings, len(joined_names))
         return LeagueShape(
-            team_names = team_names,
-            n_drafters = len(team_names),
-            n_picks    = _DEFAULT_N_PICKS,
-            teams_dict = teams_dict,
+            team_names        = _pad_with_open_seats(joined_names, n_drafters),
+            n_drafters        = n_drafters,
+            n_picks           = _DEFAULT_N_PICKS,
+            teams_dict        = teams_dict,
+            is_auction_draft  = self._read_is_auction(settings),
         )
 
     # ── Roster / draft state ───────────────────────────────────────────────────
@@ -315,7 +396,9 @@ class YahooIntegration(PlatformIntegration):
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
         injured_players: list[int] = []
-        player_assignments: dict[str, list[int]] = {}
+        # Every seat starts empty; the joined teams then fill theirs. A season league is always
+        # full, so this differs from teams_dict only in the half-filled draft-room case.
+        player_assignments: dict[str, list[int]] = {seat: [] for seat in config.seat_names}
 
         for team_name, team_id in config.teams_dict.items():
             roster = query.get_team_roster_by_week(team_id=int(team_id))
@@ -354,11 +437,10 @@ class YahooIntegration(PlatformIntegration):
         auction league).
         """
         return PlatformSelections(
-            player_assignments = {team_name: [] for team_name in config.teams_dict},
+            player_assignments = {seat: [] for seat in config.seat_names},
             status             = status,
             injured_players    = [],
-            costs              = {team_name: [] for team_name in config.teams_dict} if with_costs
-                                 else None,
+            costs              = {seat: [] for seat in config.seat_names} if with_costs else None,
         )
 
     def _get_draft_board(
@@ -424,8 +506,12 @@ class YahooIntegration(PlatformIntegration):
         'Drafter <id>' (mirrors Streamlit).
         """
         team_name_by_id = {team_id: team_name for team_name, team_id in config.teams_dict.items()}
-        player_assignments: dict[str, list[int]] = {team_name: [] for team_name in config.teams_dict}
-        costs: dict[str, list] = {team_name: [] for team_name in config.teams_dict}
+        # Seeded from the SEATS, not the joined teams: an unfilled seat is a drafter with an empty
+        # roster, not a team missing from the league. Picks are still keyed back to real names
+        # through teams_dict, so a seat that filled after connect lands under the 'Drafter <id>'
+        # fallback below until the next connect picks up its name.
+        player_assignments: dict[str, list[int]] = {seat: [] for seat in config.seat_names}
+        costs: dict[str, list] = {seat: [] for seat in config.seat_names}
 
         for draft_obj in draft_results:
             if not draft_obj.player_key:
