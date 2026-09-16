@@ -92,7 +92,7 @@ the height being talked about. Worth noting the scene currently marks ±1 standa
 during act four — if the narration is about the height at the middle, those markers may be
 competing for attention and could come out.
 
-## Z versus G — `z_versus_g.py` → `VarianceQuadrature` (NARRATED)
+## Z versus G — `g_score.py` → `GScoreFull` (NARRATED, placeholder lines)
 
 This one is wired for voice already. Its lines live in the `NARRATION` dict at the top of the
 scene file, currently filled with placeholders that state the beat rather than the wording. Edit
@@ -118,11 +118,11 @@ One thing the script should probably not claim: the triangle closes to 135 again
 137. That is sampling noise at ten thousand draws, not an error, but a line asserting the three
 numbers fit exactly would be overstating it.
 
-## The three differential scenes
+## The differential scenes
 
-`team_differential.py` → `TeamDifferentialFull`, `z_versus_g.py` → `FixedMatchupFull`,
-`weekly_differential.py` → `WeeklyDifferentialFull`. These keep two on-screen labels that are
-not narration and should stay: the axis caption, and the standard-deviation readout in act four.
+`team_differential.py` → `TeamDifferentialFull` and both simulations inside `g_score.py` →
+`GScoreFull`. These keep two on-screen labels that are not narration and should stay: the axis
+caption, and the standard-deviation readout in act four.
 
 One line was removed from act five and belongs in the voice instead:
 
@@ -137,13 +137,7 @@ exponential vanishes. If anything is said over it, the point is that **the heigh
 a dead heat is one over sigma root two pi** — so the tighter the distribution, the more a small
 edge moves the odds. That is the whole reason the spread is the number worth knowing.
 
-Note that `FixedMatchupFull` is the exception to μ = 0: that curve sits over a real edge of about
+Note that the fixed-matchup simulation is the exception to μ = 0: that curve sits over a real edge of about
 +125, because one of those two teams genuinely is better. Do not narrate it as centred.
 
 ---
-
-## The truncated-max scenes
-
-`truncated_max_plane.py`, `truncated_max_reduction.py`, `truncated_max_scalar_core.py` still
-carry their own on-screen text, unlike the scenes above. If they are to match, the text comes out
-and the lines move here.

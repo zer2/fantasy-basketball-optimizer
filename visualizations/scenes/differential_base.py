@@ -88,7 +88,18 @@ class DifferentialSceneBase(Scene):
     # ── Setup ─────────────────────────────────────────────────────────────────────────
 
     def setup(self) -> None:
-        self.prepared = load_prepared_data(_DATA_DIR / self.data_filename)
+        self.load_dataset(self.data_filename)
+
+    def load_dataset(self, data_filename: str) -> None:
+        """Point the scene at a prepared dataset, ready to deal from the first draw.
+
+        Split out of setup so one scene can run TWO simulations in sequence: the G-score story
+        replays a fixed matchup in real weeks and then lets the draft vary as well, and those two
+        only compare because everything about them except the data is identical. Every derived
+        quantity is rebuilt here, the draw counter included, so a second simulation starts from
+        an empty histogram instead of inheriting the first one's.
+        """
+        self.prepared = load_prepared_data(_DATA_DIR / data_filename)
         self.team_size = self.prepared['team_size']
         self.differentials = self.prepared['totals'][:, 0] - self.prepared['totals'][:, 1]
 

@@ -1,128 +1,135 @@
-"""What a Z-score misses, and what a G-score adds.
+"""The week is not settled by the draft -- and the score that admits it.
 
-A Z-score standardises a player against the spread of OTHER PLAYERS. A G-score widens that
-denominator to include how much a player swings from week to week. This is the pair of scenes
-that shows the difference is real and says how large it is.
+The second of the two scenes about what a score has to measure. The first (team_differential.py)
+dealt two random teams, gave every player his season average, and read a Z-score off the height
+of the resulting bell. That scene made an assumption it never examined: a player contributes the
+same number every time, so the ONLY thing varying between matchups is who was drafted.
 
-Three simulations, all on 2025-26, all in points-per-week, each isolating one source:
+This scene takes the assumption away, in two simulations and a piece of arithmetic.
 
-    who you drafted, at their weekly average      sd  86   <- all a Z-score sees
-    one fixed matchup, replayed in real weeks     sd 104   <- all a Z-score ignores
-    both varying                                  sd 137   <- what a G-score prices
+    Part one holds the draft completely still and replays the same twenty-six players in real
+    weeks. The outcome swings anyway -- wider, in fact, than drafting differently made it -- so
+    a matchup is not decided by the player base.
 
-The two sources are independent, so their variances add rather than their spreads:
-sqrt(86^2 + 104^2) = 135, against a measured 137 -- agreement to about one percent, which is
-sampling noise at ten thousand draws. That is the arithmetic VarianceQuadrature draws.
+    Part two lets both vary, which is the honest case, and lands wider still.
 
-VarianceQuadrature is NARRATED, through manim-voiceover and gTTS. It needs a network connection
-on a first render to synthesise its lines, after which they are cached under `media/voiceovers`.
+    Part three puts the three numbers together. The two sources are independent, so their
+    VARIANCES add rather than their spreads, and the three form a right triangle. That wider
+    denominator is what a G-score divides by and a Z-score does not.
 
-    manim -ql visualizations/scenes/z_versus_g.py VarianceQuadrature
-    manim -ql visualizations/scenes/z_versus_g.py FixedMatchupFull
+Every spread on screen is read back out of the prepared simulations rather than written down, so
+re-running the prep script with a different season or seed moves the scene with the data.
+
+    python visualizations/prepare_season_data.py      # writes all three datasets
+    manim -ql visualizations/scenes/g_score.py GScoreFull
 """
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, Line, Polygon, Text, MathTex,
+    Group, VGroup, Line, Polygon, Text, MathTex,
     FadeIn, FadeOut, Create, Write,
     DOWN, LEFT,
-    YELLOW, WHITE, GREY_B, BLUE_B, RED_B,
+    BLUE_B, RED_B, YELLOW, WHITE, GREY_B,
 )
 from manim_voiceover import VoiceoverScene
 from manim_voiceover.services.gtts import GTTSService
 
-from differential_base import DifferentialSceneBase, _DATA_DIR
+from differential_base import DifferentialSceneBase
 
 
 # ── The spoken track ─────────────────────────────────────────────────────────────────
-# PLACEHOLDERS. Every line below is written to be replaced; each says which beat it covers so
-# the brief travels with the slot. Edit only this block -- the scene reads these by key and
-# times every animation off however long the audio turns out to be, so a rewritten line
-# retimes the picture rather than desynchronising it.
+# Edit only this block. Each beat plays inside the line that covers it, so a rewritten line
+# retimes its own beat rather than desynchronising everything after it.
 #
-# Keep an eye on length. These placeholders are roughly the duration the beat wants, so a
-# finished line that is much shorter or longer will visibly change the pacing of that beat.
+# PLACEHOLDER lines are mine, holding the timing until the real ones are written.
 
 NARRATION = {
+    'fixed_matchup':
+        'Placeholder. The last scene let the draft vary and held every player at his average. '
+        'Do the opposite: keep one draft, these same twenty-six players, and replay the week.',
+    'fixed_matchup_result':
+        'Placeholder. The result still swings, and it swings wider than drafting differently '
+        'did. Notice too that this bell is not centred on zero. One of these two teams really '
+        'is better, which is the question the whole exercise exists to answer.',
+    'both_vary':
+        'Placeholder. Now let both vary at once, which is what a real week actually is: a draft '
+        'you did not choose, played out in a week nobody can predict.',
+    'both_vary_result':
+        'Placeholder. Wider again. This is the spread a score has to reckon with.',
     'opening':
         'Placeholder. Say what a Z-score measures a player against, and that a G-score widens '
         'that denominator to take in something a Z-score leaves out.',
     'cross_player':
         'Placeholder. This curve is the first source of variation: which players you happened '
-        'to draft, with every one of them performing at exactly their weekly average. Eighty-six '
-        'points.',
+        'to draft, with every one of them performing at exactly their weekly average.',
     'week_to_week':
         'Placeholder. This curve holds the draft still and changes only the week. The same '
-        'twenty-six players, a different week of basketball. A hundred and four.',
+        'twenty-six players, a different week of basketball.',
     'both':
-        'Placeholder. This curve lets both vary, and comes out at a hundred and thirty-seven. '
-        'That is the spread a G-score prices, and a Z-score sees only the first of the three.',
+        'Placeholder. This curve lets both vary, and comes out wider than either alone.',
     'the_question':
-        'Placeholder. Point out that eighty-six and a hundred and four do not add up to a '
-        'hundred and thirty-seven.',
+        'Placeholder. Ask why the third is not simply the first plus the second.',
     'right_angle':
-        'Placeholder. Say that the two combine at a right angle because they are independent: '
-        'which draft you got tells you nothing about which weeks your players then had.',
+        'Placeholder. Because the two sources are independent, they meet at a right angle.',
     'squares':
-        'Placeholder. The squares are what add. The areas are variances. Standard deviations do '
-        'not add; variances do.',
+        'Placeholder. So the squares add, not the spreads, and the hypotenuse is what a '
+        'G-score divides by.',
 }
 
 
-class FixedMatchupDifferential(DifferentialSceneBase):
-    """One draft, replayed ten thousand times in different weeks.
+# ── The two simulations ──────────────────────────────────────────────────────────────
 
-    The middle term of the three, and the only one that isolates week-to-week variation: the
-    same twenty-six players every time, so nothing varies except which week they played. It is
-    also the only one not centred on zero -- one of these two teams really is better -- which is
-    exactly the question H-scoring exists to answer.
+FIXED_MATCHUP_DATA = 'matchup_2025_26.json'
+BOTH_VARY_DATA     = 'weekly_2025_26.json'
+
+_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
+
+
+class WeeklyUnitDifferential(DifferentialSceneBase):
+    """Both simulations in this scene, which differ only in which dataset is dealt from.
+
+    One axis, one binning, one caption: the whole argument is that the second spread is wider
+    than the first, and a chart that changed its own scale between them could not make it.
     """
 
-    data_filename      = 'matchup_2025_26.json'
-    differential_limit = 420          # the same axis as the weekly scene, so the two compare
+    data_filename      = FIXED_MATCHUP_DATA
+    # Four and a half times the axis of the averages scene, because the spread really is that
+    # much larger: weekly totals run about three times a per-game number, and real weeks add
+    # half again on top. Three standard deviations either way, as there.
+    differential_limit = 420
     bin_width          = 20
     axis_tick_step     = 140
     total_caption      = 'Points in the week'
     spread_caption     = 'standard deviation: {spread:.0f} points in the week'
     axis_caption       = 'the same two teams, a different week'
+    # Once the dealing is done the faces have nothing left to say, so they clear out and the
+    # chart takes the full frame for the curve.
+    dismiss_rosters_after_montage = True
 
     def contribution_values(self, simulation_index: int) -> np.ndarray:
         """Each player's dealt week, apportioned so act one's totals climb as faces land.
 
         The prepared data stores team totals rather than the individual weeks behind them, so the
-        split across a side is reconstructed in proportion to weekly averages. Both sides still
-        finish on exactly the stored total.
+        split across a side is reconstructed in proportion to season averages. Act one uses this
+        only to animate the totals climbing; both sides still finish on exactly the stored total,
+        so nothing downstream can disagree with the histogram.
         """
         roster = self.prepared['rosters'][simulation_index]
-        averages = np.array(
+        season_averages = np.array(
             [player[self.prepared['value_key']] for player in self.prepared['pool']])
-        drawn = averages[roster]
+        drawn_averages = season_averages[roster]
 
         contributions = np.empty(len(roster))
         for side_index in range(2):
             side = slice(side_index * self.team_size, (side_index + 1) * self.team_size)
-            share = drawn[side] / drawn[side].sum()
+            share = drawn_averages[side] / drawn_averages[side].sum()
             contributions[side] = share * self.prepared['totals'][simulation_index][side_index]
         return contributions
-
-
-class FixedMatchupFull(FixedMatchupDifferential):
-    """The renderable cut of the fixed matchup, all five acts."""
-
-    def construct(self) -> None:
-        self.play_all_acts()
-
-
-class FixedMatchupActOne(FixedMatchupDifferential):
-    """Act one alone, for tuning without re-rendering the whole thing."""
-
-    def construct(self) -> None:
-        self.build_static_frame()
-        self.play_act_one_single_draw()
 
 
 # ── The payoff: how the two spreads combine ──────────────────────────────────────────
@@ -135,7 +142,7 @@ WIDEST_SPREAD    = 137.0     # the scale everything is drawn against
 TRIANGLE_SCALE   = 0.021     # scene units per point of standard deviation
 
 
-def _measured_spreads() -> dict[str, float]:
+def measured_spreads() -> dict[str, float]:
     """The three standard deviations, read back out of the prepared simulations.
 
     Read rather than written down so the scene cannot drift from the data: re-run the prep
@@ -143,28 +150,58 @@ def _measured_spreads() -> dict[str, float]:
     """
     spreads = {}
     for label, filename in (('cross_player', 'pool_2025_26.json'),
-                            ('week_to_week', 'matchup_2025_26.json'),
-                            ('both',         'weekly_2025_26.json')):
+                            ('week_to_week', FIXED_MATCHUP_DATA),
+                            ('both',         BOTH_VARY_DATA)):
         totals = np.array(json.loads(
             (_DATA_DIR / filename).read_text(encoding='utf-8'))['simulation_totals'])
         spreads[label] = float((totals[:, 0] - totals[:, 1]).std())
     return spreads
 
 
-class VarianceQuadrature(VoiceoverScene):
-    """Three spreads, and why the first two make the third by squares rather than by sums.
-
-    Narrated. The scene carries numbers but no prose: what each curve IS gets said rather than
-    captioned, and every animation is timed off the length of the line being spoken, so
-    rewriting a sentence retimes the picture instead of desynchronising it.
-    """
+class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
+    """Both simulations and the arithmetic that joins them, as one narrated scene."""
 
     def setup(self) -> None:
-        self.spreads = _measured_spreads()
-        # gTTS: no key, no account, and good enough to cut against. This is the only line that
-        # has to change to swap in a better voice later, and the timings follow whatever the
-        # service returns rather than being pinned to this one.
+        super().setup()
+        self.spreads = measured_spreads()
+        # gTTS: no key, no account, and good enough to cut against. The only line to change to
+        # swap in a better voice, and the timings follow whatever the service returns.
         self.set_speech_service(GTTSService(lang='en'))
+
+    # ── Between the parts ─────────────────────────────────────────────────────────────
+
+    def clear_frame(self) -> None:
+        """Take everything off screen between simulations.
+
+        The two parts share one apparatus -- same axis, same histogram, same roster slots -- so
+        the second cannot simply draw over the first: the first's always_redraw histogram is
+        still bound to the draw counter they both use. Clearing drops those updaters along with
+        the mobjects carrying them.
+        """
+        if self.mobjects:
+            self.play(FadeOut(Group(*self.mobjects)), run_time=0.8)
+        self.clear()
+
+    def play_simulation(
+        self
+        , data_filename: str
+        , axis_caption: str
+        , opening_line: str
+        , result_line: str
+    ) -> None:
+        """One full simulation: deal, fill the histogram, and draw the curve over it."""
+        self.load_dataset(data_filename)
+        self.axis_caption = axis_caption
+
+        with self.voiceover(text=opening_line):
+            self.build_static_frame()
+            self.play_act_one_single_draw()
+            self.play_act_two_repeated_draws()
+        with self.voiceover(text=result_line):
+            self.play_act_three_montage()
+            self.play_act_four_normal_curve()
+
+    # ── The three bells and the triangle ──────────────────────────────────────────────
 
     def _bell(self, spread: float, colour, opacity: float) -> VGroup:
         """One Normal curve, all three drawn to a common scale so widths are comparable."""
@@ -186,7 +223,8 @@ class VarianceQuadrature(VoiceoverScene):
             for start, end in zip(points, points[1:])
         ])
 
-    def construct(self) -> None:
+    def play_quadrature(self) -> None:
+        """Three spreads, and why the first two make the third by squares rather than by sums."""
         cross_player = self.spreads['cross_player']
         week_to_week = self.spreads['week_to_week']
         both = self.spreads['both']
@@ -271,4 +309,27 @@ class VarianceQuadrature(VoiceoverScene):
         with self.voiceover(text=NARRATION['squares']):
             self.play(Create(squares), run_time=1.4)
             self.play(Write(arithmetic), run_time=1.3)
-            self.wait(1.0)
+            self.wait(1.2)
+
+    def construct(self) -> None:
+        # One draft, many weeks: the assumption the Z-score scene made, taken away.
+        self.play_simulation(
+            FIXED_MATCHUP_DATA, 'the same two teams, a different week',
+            NARRATION['fixed_matchup'], NARRATION['fixed_matchup_result'])
+        self.clear_frame()
+
+        # Both varying, which is what a real matchup is.
+        self.play_simulation(
+            BOTH_VARY_DATA, 'a different draft, in a different week',
+            NARRATION['both_vary'], NARRATION['both_vary_result'])
+        self.clear_frame()
+
+        self.play_quadrature()
+
+
+class GScoreFixedMatchupActOne(WeeklyUnitDifferential):
+    """Act one of the first simulation alone, for tuning without rendering the whole thing."""
+
+    def construct(self) -> None:
+        self.build_static_frame()
+        self.play_act_one_single_draw()
