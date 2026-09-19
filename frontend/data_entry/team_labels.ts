@@ -1,5 +1,5 @@
 // data_entry/team_labels.ts
-// Per-drafter DISPLAY labels — presentation only. Team *identity* stays "Team N" (see
+// Per-drafter DISPLAY labels — presentation only. Team *identity* is what the sidebar holds (see
 // league_settings #ls-team-names / getTeamIdentitiesFromSidebar); a label is purely what's shown in the UI.
 // Editing a label changes nothing in logic (my_team_id, draft/auction state, the backend all
 // use the identity), so it can never reset the draft or affect an evaluate.
@@ -19,9 +19,21 @@ function getRawTeamLabel(index: number): string {
     return pref(`team_label_${index}`, '') as string
 }
 
-/** The resolved display label: the saved custom label, or the default "Team N". */
+/** The team's own name: the identity the sidebar holds for this seat, or "Team N" if it has none.
+ *
+ *  Read from the DOM rather than imported, because league_settings imports this module and the
+ *  hidden #ls-team-names textarea exists precisely so that readers can get identities without
+ *  one. With own data the identities ARE "Team N", so this changes nothing there; connected to a
+ *  live platform they are the league's real team names, which is what a header should say.
+ */
+function identityLabel(index: number): string {
+    const identities = document.getElementById('ls-team-names') as HTMLTextAreaElement | null
+    return identities?.value.split('\n')[index]?.trim() || defaultTeamLabel(index)
+}
+
+/** The resolved display label: the saved custom label, else the team's own name. */
 export function getTeamLabel(index: number): string {
-    return getRawTeamLabel(index).trim() || defaultTeamLabel(index)
+    return getRawTeamLabel(index).trim() || identityLabel(index)
 }
 
 /** Persists a custom label (empty/whitespace clears back to the default) and notifies listeners. */
@@ -37,7 +49,7 @@ export function makeTeamLabelInput(index: number, signal?: AbortSignal): HTMLInp
     input.type        = 'text'
     input.className    = 'team-label-input'
     input.value       = getRawTeamLabel(index)
-    input.placeholder = defaultTeamLabel(index)
+    input.placeholder = identityLabel(index)
     input.addEventListener('input', () => setTeamLabel(index, input.value), { signal })
     return input
 }

@@ -25,9 +25,19 @@ export type Platform = string
 // delegate to whichever platform is selected.
 let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
 
-// True once a live platform has been connected successfully (Connect succeeded); reset
-// when the platform changes. Gates the live-layout "Refresh Analysis" button.
-let platformConnected = false
+// What the last successful Connect was a connection TO. A connection is to a specific league,
+// on a specific platform, in a specific mode -- change any of them and it is no longer the thing
+// that was connected. Holding a bare boolean meant typing a new league id, or switching from
+// Auction Mode to Draft Mode, left the app claiming a connection it did not have: the live
+// layout stayed up, Refresh Analysis stayed enabled, and the board showed default team names
+// while the session still pointed at the previous league.
+interface ConnectedTo {
+    platform:   string
+    leagueId:   string
+    divisionId: string | null
+    mode:       string
+}
+let connectedTo: ConnectedTo | null = null
 
 // The mode/platform select handles, exposed so main.ts can attach its change listeners to
 // the widgets' own event roots instead of reaching through this section's DOM nesting.
@@ -60,9 +70,31 @@ function describeModeMismatch(mode: string, isAuctionDraft: boolean | null): str
     return null
 }
 
-/** Whether a live platform connection has been established (Connect succeeded). */
+/** Whether a live platform connection has been established AND still describes what is selected.
+ *
+ * Compared rather than invalidated by event, so there is no way to change the selection without
+ * this noticing: any control that feeds `describeSelection` is covered by construction. */
 export function isPlatformConnected(): boolean {
-    return platformConnected
+    const selected = describeSelection()
+    if (connectedTo === null || selected === null) return false
+    return connectedTo.platform === selected.platform
+        && connectedTo.leagueId === selected.leagueId
+        && connectedTo.divisionId === selected.divisionId
+        && connectedTo.mode === selected.mode
+}
+
+/** The connection the current controls describe, or null when they do not describe one yet. */
+function describeSelection(): ConnectedTo | null {
+    if (platformSelectHandle === null || modeSelectHandle === null) return null
+    const platform = platformSelectHandle.getValue()
+    const selection = connectorsByPlatform.get(platform)?.getSelection() ?? null
+    if (selection === null) return null
+    return {
+        platform,
+        leagueId:   selection.league_id,
+        divisionId: selection.division_id ?? null,
+        mode:       modeSelectHandle.getValue(),
+    }
 }
 
 
@@ -118,7 +150,6 @@ export function renderLeagueSettings(container: HTMLElement): void {
     platformSelectHandle = platformSelect
     platformSelect.element.addEventListener('change', () => {
         savePref('platform', platformSelect.getValue())
-        platformConnected = false   // changing platform invalidates the previous connection
     })
     platformCell.append(platformSelect.element)
     grid.append(platformCell)
@@ -313,7 +344,9 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 nPicksInput.value    = String(resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
-                platformConnected = true   // enables the live-layout Refresh Analysis button
+                // Enables the live-layout Refresh Analysis button, for as long as the controls
+                // still describe this league in this mode.
+                connectedTo = describeSelection()
                 // Patch the session with the platform's config (drives the draft-state poll +
                 // name lookup) and counts. Routed through an event so this module doesn't import
                 // the session layer (which imports this one — would be a cycle).

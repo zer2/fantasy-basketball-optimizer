@@ -215,8 +215,8 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
     // With a live platform the identities come FROM the league, so this fires as a step of
     // CONNECTING — and the connect flow runs its own evaluate once the session has been patched
     // with the platform config that evaluate depends on. Evaluating here too raced it, and lost
-    // in the worst way: this one runs first, while platformConnected is still false (the flag is
-    // set on the line after the names are written), so it took the not-connected branch and
+    // in the worst way: this one runs first, while the connection is not yet recorded (it is
+    // recorded on the line after the names are written), so it took the not-connected branch and
     // painted default rankings, leaving the real evaluate to be aborted. That is the "first
     // Connect does nothing, second one works" behaviour — by the second click the seat is
     // already one of the league's teams, so nothing changes here and only the real evaluate runs.
