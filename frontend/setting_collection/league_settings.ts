@@ -8,7 +8,7 @@ import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
-import { PlatformConnector } from '../platforms/connector.js'
+import { PlatformConnector, ConnectStatus } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
 
@@ -25,9 +25,19 @@ export type Platform = string
 // delegate to whichever platform is selected.
 let connectorsByPlatform: Map<string, PlatformConnector> = new Map()
 
-// True once a live platform has been connected successfully (Connect succeeded); reset
-// when the platform changes. Gates the live-layout "Refresh Analysis" button.
-let platformConnected = false
+// What the last successful Connect was a connection TO. A connection is to a specific league,
+// on a specific platform, in a specific mode -- change any of them and it is no longer the thing
+// that was connected. Holding a bare boolean meant typing a new league id, or switching from
+// Auction Mode to Draft Mode, left the app claiming a connection it did not have: the live
+// layout stayed up, Refresh Analysis stayed enabled, and the board showed default team names
+// while the session still pointed at the previous league.
+interface ConnectedTo {
+    platform:   string
+    leagueId:   string
+    divisionId: string | null
+    mode:       string
+}
+let connectedTo: ConnectedTo | null = null
 
 // The mode/platform select handles, exposed so main.ts can attach its change listeners to
 // the widgets' own event roots instead of reaching through this section's DOM nesting.
@@ -44,9 +54,47 @@ export function getPlatformSelectElement(): HTMLElement {
     return platformSelectHandle.element
 }
 
-/** Whether a live platform connection has been established (Connect succeeded). */
+/**
+ * The complaint to show when the chosen mode cannot read this league's draft, or null when it
+ * can. `isAuctionDraft` is null for platforms that do not report the draft type, which is not
+ * evidence of either kind — so nothing is claimed.
+ */
+function describeModeMismatch(mode: string, isAuctionDraft: boolean | null): string | null {
+    if (isAuctionDraft === null || mode === 'Season Mode') return null
+    if (isAuctionDraft && mode === 'Draft Mode') {
+        return 'This league drafts by auction. Switch the mode to Auction Mode, then connect.'
+    }
+    if (!isAuctionDraft && mode === 'Auction Mode') {
+        return 'This league uses a snake draft, not an auction. Switch the mode to Draft Mode, then connect.'
+    }
+    return null
+}
+
+/** Whether a live platform connection has been established AND still describes what is selected.
+ *
+ * Compared rather than invalidated by event, so there is no way to change the selection without
+ * this noticing: any control that feeds `describeSelection` is covered by construction. */
 export function isPlatformConnected(): boolean {
-    return platformConnected
+    const selected = describeSelection()
+    if (connectedTo === null || selected === null) return false
+    return connectedTo.platform === selected.platform
+        && connectedTo.leagueId === selected.leagueId
+        && connectedTo.divisionId === selected.divisionId
+        && connectedTo.mode === selected.mode
+}
+
+/** The connection the current controls describe, or null when they do not describe one yet. */
+function describeSelection(): ConnectedTo | null {
+    if (platformSelectHandle === null || modeSelectHandle === null) return null
+    const platform = platformSelectHandle.getValue()
+    const selection = connectorsByPlatform.get(platform)?.getSelection() ?? null
+    if (selection === null) return null
+    return {
+        platform,
+        leagueId:   selection.league_id,
+        divisionId: selection.division_id ?? null,
+        mode:       modeSelectHandle.getValue(),
+    }
 }
 
 
@@ -102,7 +150,6 @@ export function renderLeagueSettings(container: HTMLElement): void {
     platformSelectHandle = platformSelect
     platformSelect.element.addEventListener('change', () => {
         savePref('platform', platformSelect.getValue())
-        platformConnected = false   // changing platform invalidates the previous connection
     })
     platformCell.append(platformSelect.element)
     grid.append(platformCell)
@@ -168,8 +215,21 @@ export function renderLeagueSettings(container: HTMLElement): void {
 
     const connectStatus = document.createElement('div')
     connectStatus.id        = 'ls-connect-status'
-    connectStatus.className = 'pick-control-label'
-    const setConnectStatus = (message: string): void => { connectStatus.textContent = message }
+    connectStatus.className = 'ls-connect-status'
+    const setConnectStatus: ConnectStatus = {
+        clear() {
+            connectStatus.textContent = ''
+            connectStatus.classList.remove('sidebar-error')
+        },
+        showProgress(message: string) {
+            connectStatus.textContent = message
+            connectStatus.classList.remove('sidebar-error')
+        },
+        showError(message: string) {
+            connectStatus.textContent = message
+            connectStatus.classList.add('sidebar-error')
+        },
+    }
 
     // Each platform's connect/auth controls live in its own connector module. Build them
     // all once, append them, and show the active one — no per-platform branching here.
@@ -255,12 +315,23 @@ export function renderLeagueSettings(container: HTMLElement): void {
         if (!connector) return
         const selection = connector.getSelection()
         if (selection === null) {
-            setConnectStatus('Select or enter a league first.')
+            setConnectStatus.showError('Select or enter a league first.')
             return
         }
-        setConnectStatus('Connecting...')
+        setConnectStatus.showProgress('Connecting...')
         connectPlatform(connector.platform, selection.league_id, selection.division_id)
             .then(resp => {
+                // A league that drafts by auction cannot be followed in Draft Mode, or the other
+                // way round: the poll returns a board the mode cannot read, which shows up as an
+                // empty draft rather than as a mistake. The platform reports the draft type
+                // before a single pick exists, so say so now instead of letting the user work in
+                // the wrong mode for a whole draft. Season Mode is exempt — the draft is over and
+                // how it ran no longer matters.
+                const modeMismatch = describeModeMismatch(modeSelect.getValue(), resp.is_auction_draft)
+                if (modeMismatch !== null) {
+                    setConnectStatus.showError(modeMismatch)
+                    return
+                }
                 // Restrict the mode selector to what this platform supports.
                 modeSelect.setOptions(resp.available_modes.map(m => ({ value: m, label: m })))
                 if (!resp.available_modes.includes(modeSelect.getValue())) {
@@ -273,14 +344,18 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 nPicksInput.value    = String(resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
-                platformConnected = true   // enables the live-layout Refresh Analysis button
+                // Enables the live-layout Refresh Analysis button, for as long as the controls
+                // still describe this league in this mode.
+                connectedTo = describeSelection()
                 // Patch the session with the platform's config (drives the draft-state poll +
                 // name lookup) and counts. Routed through an event so this module doesn't import
                 // the session layer (which imports this one — would be a cycle).
                 document.dispatchEvent(new Event('platform-connected'))
-                setConnectStatus(`Connected — ${resp.team_names.length} teams, ${resp.n_picks} picks. Click Refresh Analysis.`)
+                // Nothing to announce: the team names, the counts and the live layout have all
+                // just changed on screen, which says "connected" better than a sentence can.
+                setConnectStatus.clear()
             })
-            .catch(err => { setConnectStatus(`Connect failed: ${err.message}`) })
+            .catch(err => { setConnectStatus.showError(`Connect failed: ${err.message}`) })
     })
 
     // ── Own-data-dependent and mode-dependent visibility ──────────────────

@@ -12,7 +12,10 @@ import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
 import { getLeagueSettings, isPlatformConnected } from './setting_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
-import { getFullTeamResult, refreshLiveAnalysis } from './api/draft_and_auction_session.js'
+import {
+    getFullTeamResult, refreshLiveAnalysis, getLivePlayerAssignments, LIVE_BOARD_UPDATED,
+} from './api/draft_and_auction_session.js'
+import { showFailureInTable } from './table/failure_message.js'
 import { setIndicatorState, claimDisplay } from './api/session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
@@ -22,23 +25,24 @@ let currentSeasonTab: string | null = null  // null means no tab activated yet
 let currentAuctionTab = 'candidates'
 let currentDraftTab   = 'candidates'
 
-// Refresh the active "my team" panel when session.ts signals that the full-team
-// H-score result has arrived (dispatched after the evaluate await resolves).
-// Guarded by the CURRENT mode: each mode's tab state persists while the other mode is
-// active, so an unguarded refresh would repaint the inactive mode's (hidden, stale)
-// panel with the wrong board's rosters.
-document.addEventListener('full-team-result-updated', () => {
+/** Repaint whichever "my team" panel is currently on screen, if either is.
+ *
+ *  Guarded by the CURRENT mode: each mode's tab state persists while the other mode is active,
+ *  so an unguarded refresh would repaint the inactive mode's (hidden, stale) panel with the
+ *  wrong board's rosters.
+ */
+function refreshActiveTeamPanel(): void {
     const { mode } = getLeagueSettings()
     if (mode === 'Draft Mode'   && currentDraftTab   === 'my-team') refreshDraftGScore()
     if (mode === 'Auction Mode' && currentAuctionTab === 'my-team') refreshAuctionGScore()
-})
+}
 
-// Refresh the active "my team" panel whenever the seat changes (including during autopilot).
-document.addEventListener('seat-changed', () => {
-    const { mode } = getLeagueSettings()
-    if (mode === 'Draft Mode'   && currentDraftTab   === 'my-team') refreshDraftGScore()
-    if (mode === 'Auction Mode' && currentAuctionTab === 'my-team') refreshAuctionGScore()
-})
+// The three things that change what the panel should say: the full-team H-score result landing
+// (dispatched after the evaluate await resolves), the seat changing (including under autopilot),
+// and a platform poll bringing in a board with more picks on it than the last one.
+document.addEventListener('full-team-result-updated', refreshActiveTeamPanel)
+document.addEventListener('seat-changed', refreshActiveTeamPanel)
+document.addEventListener(LIVE_BOARD_UPDATED, refreshActiveTeamPanel)
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -54,7 +58,7 @@ export function applyLayout(): void {
         if (platform === 'Enter your own data') {
             showOwnDataLayout(mode)
         } else {
-            showLiveLayout()
+            showLiveLayout(mode)
         }
     }
 }
@@ -113,8 +117,8 @@ function showOwnDataLayout(mode: string): void {
 
 // ─── Live-platform layout (Draft or Auction) ──────────────────────────────────
 
-/** Renders the live-platform layout: seat selector only (no data-entry grid). */
-function showLiveLayout(): void {
+/** Renders the live-platform layout: seat selector and tabs, but no data-entry grid. */
+function showLiveLayout(mode: string): void {
     hide('season-nav')
     hide('live-bar')
     hide('left-panel')
@@ -146,7 +150,10 @@ function showLiveLayout(): void {
     refreshButton.disabled     = !isPlatformConnected()
     refreshButton.addEventListener('click', () => {
         if (refreshButton.disabled) return
-        refreshLiveAnalysis().catch(err => console.error('Refresh analysis failed:', err))
+        refreshLiveAnalysis().catch(err => {
+            console.error('Refresh analysis failed:', err)
+            showFailureInTable(err)
+        })
     })
     const tabRow = document.getElementById('tab-row')!
     tabRow.insertBefore(refreshButton, document.getElementById('eval-indicator'))
@@ -158,8 +165,19 @@ function showLiveLayout(): void {
     claimDisplay()
     setIndicatorState(isPlatformConnected() ? 'idle' : 'unconnected')
 
-    show('hscoretable')
-    hide('draft-gscore')
+    // The same two tabs manual entry gets: the candidate table, and team statistics for the
+    // selected seat. Only the roster SOURCE differs — a live seat's players come from the
+    // platform poll rather than a board (see currentSeatRoster) — so the panels themselves,
+    // their tab state and their refresh triggers are shared rather than duplicated.
+    if (mode === 'Auction Mode') {
+        hide('draft-gscore')
+        buildModeTabBar(rightSubHeader, 'auction-tab-bar', currentAuctionTab, activateAuctionTab)
+        activateAuctionTab(currentAuctionTab)
+    } else {
+        hide('auction-gscore')
+        buildModeTabBar(rightSubHeader, 'draft-tab-bar', currentDraftTab, activateDraftTab)
+        activateDraftTab(currentDraftTab)
+    }
 }
 
 /** Removes the live-platform Refresh Analysis button from the tab-row, if present. */
@@ -321,19 +339,34 @@ function activateAuctionTab(tabId: string): void {
     }
 }
 
+/** The selected seat's roster, from whichever board is driving the current layout.
+ *
+ *  A live platform has no manual entry grid: its rosters arrive from the draft-state poll, and
+ *  the draft/auction board stays empty for the whole session. Reading the board there would show
+ *  an empty team however many players the seat actually holds.
+ */
+function currentSeatRoster(mode: string): number[] {
+    const seat = getCurrentSeat() ?? ''
+    if (getLeagueSettings().platform !== 'Enter your own data') {
+        // Null until the first poll lands, which reads as an empty team — the same thing an
+        // un-started manual board shows.
+        return getLivePlayerAssignments()?.[seat] ?? []
+    }
+    const { player_assignments } = mode === 'Auction Mode' ? getAuctionState() : getDraftState()
+    return player_assignments[seat] ?? []
+}
+
 function refreshDraftGScore(): void {
-    const { player_assignments } = getDraftState()
     renderTeamGScoreTable(
-        player_assignments[getCurrentSeat() ?? ''] ?? []
+        currentSeatRoster('Draft Mode')
         , document.getElementById('draft-gscore')!
         , getFullTeamResult()
     )
 }
 
 function refreshAuctionGScore(): void {
-    const { player_assignments } = getAuctionState()
     renderTeamGScoreTable(
-        player_assignments[getCurrentSeat() ?? ''] ?? []
+        currentSeatRoster('Auction Mode')
         , document.getElementById('auction-gscore')!
         , getFullTeamResult()
     )

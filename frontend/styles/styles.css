@@ -1072,6 +1072,14 @@ tr {
     font-size: 0.85rem;
 }
 
+/* A failure in the table's place, distinct from the informational messages that share it. */
+.table-message-error {
+    color: #e06c6c;
+    line-height: 1.5;
+    max-width: 62ch;
+    margin: 0 auto;
+}
+
 /* 1. Top-Left Corner */
 #hscoretable > thead > tr:first-child > :first-child {
   border-top-left-radius: 12px;
@@ -2310,7 +2318,31 @@ tr {
 
 /* ─── ESPN auth-instructions pop-up (espn_connector.ts) ───────────────────────── */
 
-.espn-modal-overlay {
+/* The connect status line. Empty on success — the populated league list and the live layout
+   are the confirmation — so it collapses rather than holding a blank row under the Yahoo
+   attribution. It wraps, unlike the .pick-control-label it used to borrow, which is why the
+   old "Connected — 11 teams, 13 picks..." line ran off the edge of the sidebar. */
+
+.ls-connect-status {
+    color: light-dark(#555555, #aaaaaa);
+    font-family: "Source Sans 3";
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.ls-connect-status:empty { display: none; }
+
+/* Two classes, so this beats .sidebar-error's own colour rule whichever order they land in. */
+.ls-connect-status.sidebar-error,
+.ls-dialog-status.sidebar-error {
+    color: #e06c6c;
+}
+
+/* Connector dialog: the in-page pop-up a platform's setup steps live in (connector_dialog.ts),
+   standing in for the Streamlit @st.dialog the original used. Shared by every connector, so
+   nothing here is named for one of them. */
+
+.ls-dialog-overlay {
     position: fixed;
     inset: 0;
     z-index: 1100;
@@ -2321,11 +2353,12 @@ tr {
     font-family: "Source Sans 3";
 }
 
-.espn-modal-box {
+.ls-dialog-box {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    max-width: 420px;
+    gap: 16px;
+    width: 420px;
+    max-width: calc(100vw - 32px);
     margin: 16px;
     padding: 24px 28px;
     border: 1px solid light-dark(#e5e5e5, #3d3d55);
@@ -2334,28 +2367,68 @@ tr {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
-.espn-modal-title {
+.ls-dialog-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ls-dialog-title {
     font-size: 1.2rem;
     font-weight: 700;
     color: light-dark(#222222, #e6e6ff);
 }
 
-.espn-modal-body {
+.ls-dialog-close {
+    padding: 0 2px;
+    border: none;
+    background: none;
+    color: light-dark(#999999, #666688);
+    font-family: inherit;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ls-dialog-close:hover { color: light-dark(#555555, #aaaacc); }
+
+/* Every control the caller appends is full-width and evenly spaced, which is the point of
+   putting them in here: the connect controls used to be a ragged stack of mismatched widths. */
+.ls-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ls-dialog-body .section-apply-btn { margin-top: 0; }
+
+.ls-dialog-text {
     margin: 0;
+    /* The app's sidebar type scale (.sidebar-input, .section-apply-btn) so prose in the dialog
+       does not tower over the controls it is describing. */
+    font-size: 0.9rem;
     line-height: 1.5;
     color: light-dark(#444444, #b8b8d4);
 }
 
-.espn-modal-body code {
+.ls-dialog-text code {
     padding: 1px 5px;
     border-radius: 4px;
     background: light-dark(#f0f0f2, #2a2a3e);
     font-size: 0.9em;
 }
 
-.espn-modal-body a { color: light-dark(#3a6ea5, #8ab4f8); }
+.ls-dialog-text a { color: light-dark(#3a6ea5, #8ab4f8); }
 
-.espn-modal-box .section-apply-btn { align-self: flex-end; }
+/* The step-by-step feedback line. Empty between steps, so it must not hold space when it has
+   nothing to say — the dialog's gap would otherwise leave a gap that opens and closes. */
+.ls-dialog-status {
+    font-size: 0.85rem;
+    color: light-dark(#666666, #9a9ab8);
+}
+
+.ls-dialog-status:empty { display: none; }
 
 /* ─── Sidebar account row (signed-in name + sign out) ─────────────────────────── */
 

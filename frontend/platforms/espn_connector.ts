@@ -5,11 +5,12 @@
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
 import { fetchLeagues, submitEspnCredentials } from '../api/client.js'
-import { PlatformConnector } from './connector.js'
+import { PlatformConnector, ConnectStatus } from './connector.js'
+import { makeConnectorDialog } from './connector_dialog.js'
 
 const PLATFORM = 'Retrieve from ESPN'
 
-export function makeEspnConnector(setStatus: (message: string) => void): PlatformConnector {
+export function makeEspnConnector(status: ConnectStatus): PlatformConnector {
     const element = document.createElement('div')
     element.id = 'ls-espn-wrap'
 
@@ -17,7 +18,7 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
     const s2Input = document.createElement('input')
     s2Input.type      = 'text'
     s2Input.id        = 'ls-espn-s2'
-    s2Input.className = 'team-name-input'
+    s2Input.className = 'sidebar-input'
     s2Input.placeholder = 'Paste espn_s2'
     element.append(s2Input)
 
@@ -25,7 +26,7 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
     const swidInput = document.createElement('input')
     swidInput.type      = 'text'
     swidInput.id        = 'ls-espn-swid'
-    swidInput.className = 'team-name-input'
+    swidInput.className = 'sidebar-input'
     swidInput.placeholder = 'Paste SWID'
     element.append(swidInput)
 
@@ -39,31 +40,31 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
     const leagueSelect = makeCustomSelect('ls-espn-league', [{ value: '', label: '(save credentials first)' }])
     element.append(leagueSelect.element)
 
-    // Instructions pop-up (mirrors the Streamlit @st.dialog "Authenticate with ESPN"). ESPN has no
-    // OAuth, so the user has to fetch two cookies by hand — this pop-up explains how. It is shown
-    // when ESPN becomes the selected platform (see onSelected) and dismissed once read.
-    const modal = buildInstructionsModal()
+    // Instructions dialog. ESPN has no OAuth, so the user has to fetch two cookies by hand and
+    // this explains how. Shown when ESPN becomes the selected platform (see onSelected) and
+    // dismissed once read.
+    const dialog = buildInstructionsDialog()
 
     /** Loads the user's ESPN leagues into the league select. */
     async function loadLeagues(): Promise<void> {
         const leagues = await fetchLeagues(PLATFORM)
         if (leagues.length === 0) {
             leagueSelect.setOptions([{ value: '', label: '(no leagues found)' }])
-            setStatus('Saved, but no leagues were found.')
         } else {
             leagueSelect.setOptions(leagues.map(league => ({ value: league.id, label: league.name })))
-            setStatus('Credentials saved. Pick a league and click Connect.')
         }
+        // The select says which of those two happened; the line stays empty either way.
+        status.clear()
     }
 
     saveButton.addEventListener('click', () => {
         const s2   = s2Input.value.trim()
         const swid = swidInput.value.trim()
-        if (!s2 || !swid) { setStatus('Enter both the s2 and SWID cookies first.'); return }
-        setStatus('Saving credentials...')
+        if (!s2 || !swid) { status.showError('Enter both the s2 and SWID cookies first.'); return }
+        status.showProgress('Saving credentials...')
         submitEspnCredentials(s2, swid)
             .then(() => loadLeagues())
-            .catch(err => setStatus(`Could not save credentials: ${err.message}`))
+            .catch(err => status.showError(`Could not save credentials: ${err.message}`))
     })
 
     return {
@@ -74,31 +75,18 @@ export function makeEspnConnector(setStatus: (message: string) => void): Platfor
             if (!leagueId) return null
             return { league_id: leagueId, division_id: null }
         },
-        onSelected()   { modal.style.display = 'flex' },
-        onDeselected() { modal.style.display = 'none' },
+        onSelected()   { dialog.open() },
+        onDeselected() { dialog.close() },
     }
 }
 
-/** Builds the ESPN auth-instructions pop-up (appended to <body>, hidden until onSelected).
- *  Text copied from the original Streamlit dialog. */
-function buildInstructionsModal(): HTMLElement {
-    // Rebuilt on every renderLeagueSettings — drop any previous instance so it can't accumulate.
-    document.getElementById('ls-espn-modal')?.remove()
-
-    const overlay = document.createElement('div')
-    overlay.id        = 'ls-espn-modal'
-    overlay.className = 'espn-modal-overlay'
-    overlay.style.display = 'none'
-
-    const box = document.createElement('div')
-    box.className = 'espn-modal-box'
-
-    const title = document.createElement('div')
-    title.className   = 'espn-modal-title'
-    title.textContent = 'Connecting to ESPN'
+/** Builds the ESPN auth-instructions dialog. Text carried over from the original Streamlit
+ *  dialog this replaces. */
+function buildInstructionsDialog() {
+    const dialog = makeConnectorDialog('ls-espn-dialog', 'Connecting to ESPN')
 
     const body = document.createElement('p')
-    body.className = 'espn-modal-body'
+    body.className = 'ls-dialog-text'
     body.innerHTML =
         'Find your ESPN <code>s2</code> and <code>SWID</code> by opening a tab with '
         + '<a href="https://www.espn.com/fantasy/" target="_blank" rel="noopener">ESPN</a>, logging into '
@@ -111,12 +99,8 @@ function buildInstructionsModal(): HTMLElement {
     closeButton.type        = 'button'
     closeButton.className   = 'section-apply-btn'
     closeButton.textContent = 'Got it'
-    closeButton.addEventListener('click', () => { overlay.style.display = 'none' })
+    closeButton.addEventListener('click', () => dialog.close())
 
-    box.append(title, body, closeButton)
-    overlay.append(box)
-    // Dismiss when clicking the backdrop (but not the box itself).
-    overlay.addEventListener('click', event => { if (event.target === overlay) overlay.style.display = 'none' })
-    document.body.append(overlay)
-    return overlay
+    dialog.body.append(body, closeButton)
+    return dialog
 }

@@ -108,14 +108,16 @@ function resetVirtualState(): void {
 }
 
 /** Clears the candidate table and shows a single centred message row. */
-export function showTableMessage(message: string): void {
+export function showTableMessage(message: string, { isError = false } = {}): void {
     table.innerHTML = ''
     resetVirtualState()
     renderCtx = null
     const row = table.createTBody().insertRow()
     const cell = row.insertCell()
     cell.colSpan = 100
-    cell.className = 'table-message'
+    // Failures are coloured so they cannot be mistaken for the informational messages that share
+    // this spot ("Your team is full.").
+    cell.className = isError ? 'table-message table-message-error' : 'table-message'
     cell.textContent = message
 }
 

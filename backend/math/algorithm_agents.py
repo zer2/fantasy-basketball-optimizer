@@ -766,6 +766,11 @@ class HAgent:
         available_mask = (
             ~self.x_scores.index.isin(players_chosen + exclusion_list)
             & self.x_scores.index.isin(self.positions.index)
+            # The replacement player is a placeholder for a pick that did not resolve to anyone,
+            # never somebody to draft. He used to be excluded from here for the wrong reason --
+            # he was missing from `positions` -- which stopped being true once he was given a
+            # position row so that rosters holding him could be slotted at all.
+            & (self.x_scores.index != RP_PLAYER_ID)
         )
         # x_scores_available is the FULL available pool, exactly as it has always meant. The opponent /
         # future-pick model (get_diff_distributions) reads its top players, so it must stay complete.
@@ -776,6 +781,13 @@ class HAgent:
         # full pool either way, so each batch's H-scores match a single full evaluation.
         if candidate_subset is not None:
             x_scores_batch = x_scores_available[x_scores_available.index.isin(candidate_subset)]
+            if len(x_scores_batch) == 0:
+                # Every requested candidate is already on a roster, excluded, or absent from the
+                # pool. Scoring proceeds regardless and dies several frames later broadcasting an
+                # empty weights array against the value vector, which says nothing about why.
+                raise ValueError(
+                    f'No candidate in {list(candidate_subset)!r} is available to score: each is '
+                    f'already rostered, excluded, or missing from the player pool.')
         else:
             x_scores_batch = x_scores_available
 
@@ -1501,6 +1513,14 @@ class HAgent:
         for team, roster_players in player_assignments.items():
             roster = [p for p in roster_players if p == p]
             if not roster or len(roster) >= self.n_picks:
+                continue
+            # A seat whose latest pick is the replacement-player sentinel has nothing to replay:
+            # RP means "this pick did not resolve to anyone in the pool", so there is no decision
+            # to infer a build from. It also cannot be replayed even in principle — every seat's
+            # unmatched picks collapse onto the SAME id, so a second seat holding one makes the
+            # replayed pick unavailable in its own replay, leaving the solve with no candidate at
+            # all. The seat keeps whatever build it already had.
+            if roster[-1] == RP_PLAYER_ID:
                 continue
             state = self._team_states.get(team)
             if state is None or state['roster_key'] != frozenset(roster):

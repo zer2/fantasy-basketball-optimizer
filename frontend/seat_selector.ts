@@ -69,8 +69,15 @@ export function renderSeatSelector(): HTMLElement {
  *  existing selection survived. */
 export function refreshSeatOptions(): string | null {
     const names = getTeamIdentitiesFromSidebar()
-    requireSeatSelect().setOptions(names.map(buildSeatOption), getCurrentSeat() ?? names[0])
-    if (getCurrentSeat() === null && names.length > 0) {
+    // A seat is kept across a refresh only while it is still one of the teams. Connecting a
+    // live platform replaces the generic identities with the league's own, and a seat left
+    // pointing at 'Team 1' is not merely stale: it is sent as my_team_id on every evaluate,
+    // against a board keyed by the platform's names, where no such team exists. Identities are
+    // compared, not labels -- a relabel changes what a team is called, never which team it is.
+    const seat = getCurrentSeat()
+    const keptSeat = seat !== null && names.includes(seat) ? seat : null
+    requireSeatSelect().setOptions(names.map(buildSeatOption), keptSeat ?? names[0])
+    if (keptSeat === null && names.length > 0) {
         setCurrentSeat(names[0])
         return names[0]
     }
