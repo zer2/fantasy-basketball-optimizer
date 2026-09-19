@@ -67,6 +67,11 @@ def load_prepared_data(data_path: Path) -> dict:
 
 
 class DifferentialSceneBase(Scene):
+    # How many decimals the totals are written to. A week of basketball is whole made baskets,
+    # so the weekly scenes set this to zero; season averages are genuinely fractional and keep
+    # a decimal place.
+    decimal_places = 1
+
     """Two rosters, a histogram, and the four acts that drive them.
 
     Each act is a method, so a subclass can render one at a time while tuning it or all four in
@@ -129,7 +134,7 @@ class DifferentialSceneBase(Scene):
         ])
 
         self.team_total_numbers = VGroup(*[
-            DecimalNumber(0, num_decimal_places=1, font_size=34, color=colour)
+            DecimalNumber(0, num_decimal_places=self.decimal_places, font_size=34, color=colour)
             .move_to([side * ROSTER_CENTRE_X, ROSTER_TOP_Y - 6 * ROSTER_ROW_GAP - 0.78, 0])
             for colour, side in zip(TEAM_COLOURS, (-1, 1))
         ])
@@ -284,8 +289,10 @@ class DifferentialSceneBase(Scene):
     def _differential_readout(self, simulation_index: int) -> Text:
         """The one-line arithmetic above the histogram for a given simulation."""
         left_total, right_total = self.prepared['totals'][simulation_index]
+        places = self.decimal_places
         readout = Text(
-            f'{left_total:.1f}  -  {right_total:.1f}  =  {left_total - right_total:+.1f}',
+            f'{left_total:.{places}f}  -  {right_total:.{places}f}  '
+            f'=  {left_total - right_total:+.{places}f}',
             font_size=30, color=WHITE,
         )
         readout.move_to([0, ROSTER_TOP_Y + 0.72, 0])

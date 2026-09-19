@@ -22,6 +22,9 @@ Render one act while tuning it, the whole thing when it is right:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import numpy as np
 from manim import (
     Group, VGroup, Circle, Line, MathTex, FadeIn, FadeOut, Write,
@@ -30,42 +33,11 @@ from manim import (
 from manim_voiceover import VoiceoverScene
 from manim_voiceover.services.gtts import GTTSService
 
-from differential_base import DifferentialSceneBase
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.differential_base import DifferentialSceneBase   # noqa: E402
 
 
-# ── The spoken track ─────────────────────────────────────────────────────────────────
-# Edit only this block. Each act plays inside the line that covers it, so a rewritten line
-# retimes that act rather than desynchronising everything after it.
-
-NARRATION = {
-    'pool':
-        'Real drafting behavior is complicated. To make a justification for Z-scores, we need to imagine a simpler '
-        'version of fantasy basketball, which is that players are chosen randomly from a pool of fantasy-relevent players. '
-        'Obviously this is not perfectly accurate to real fantasy basketball, but it is not too crazy either, and it has '
-        'convenient properties that will make Z-scores simple.',
-    'two_teams':
-        'For a weekly matchup, we have two teams of thirteen players chosen randomly, for a '
-        'total of twenty-six players. That is quite a few, and it means that the central limit '
-        'theorem comes into play, which says that when you add or subtract a bunch of random '
-        'numbers together, the end result looks like a random bell curve.',
-    # Split in two so each half has its own act to run under. As one line it was twenty-four
-    # seconds of audio over four seconds of animation.
-    'bar_height':
-        'Notice how the height of the bar tells us how important a single additional point is. '
-        'If we move over to the right when the bar is high, that is a lot of scenarios where the '
-        'extra point helped us win.',
-    'simple_expression':
-        'So we can say, the height of the bar is how important the stat is. Fortunately, there '
-        'is a simple expression for how high the bar is at the top, based on the fact that this is '
-        'roughly a bell curve, or a normal distribution.',
-    'inverse_sigma':
-        'So category importance is inversely proportional to the standard deviation.',
-    'numerator':
-        'To make the average zero, we can have the top be the difference from the average.',
-    'z_score':
-        'This is the formula for a Z-score. It is not perfect, but it has stood the test of time as a '
-        'reasonable way to evaluate players',
-}
+from narration import NARRATION   # noqa: E402
 
 
 # ── The opening: the whole draftable pool, and two teams pulled out of it ─────────────
@@ -192,7 +164,7 @@ class TeamDifferentialFull(VoiceoverScene, SeasonAverageDifferential):
     def setup(self) -> None:
         super().setup()
         # gTTS: no key, no account. This is the only line to change to swap in a better voice.
-        self.set_speech_service(GTTSService(lang='en'))
+        self.set_speech_service(GTTSService())
 
     def play_act_six_z_score(self) -> None:
         """From the height of the curve to the formula everyone already knows.

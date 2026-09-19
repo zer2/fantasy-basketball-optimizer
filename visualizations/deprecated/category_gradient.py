@@ -31,6 +31,7 @@ from manim import (
     YELLOW, WHITE, GREY_B, GREY_D, BLUE_B,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / '5_punting'))
 from punting import (
     PuntingSearch, CATEGORY_NAMES, CATEGORY_COUNT, OPPONENT_EFFORT,
     weights_at, CURVE_HEIGHT,

@@ -48,7 +48,7 @@ ALTERNATIVE_WEIGHTS = np.array([1.5, 0.5])
 NEUTRAL_COLOUR = (255, 214, 80)
 ALTERNATIVE_COLOUR = (110, 170, 255)
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
 _IMAGE_DIR = _VISUALIZATIONS_DIR / 'assets' / 'plane_story'
 _CORRELATION_PATH = (_VISUALIZATIONS_DIR.parent / 'coefficient_exploration_output'
                      / 'correlations_2024-25.csv')

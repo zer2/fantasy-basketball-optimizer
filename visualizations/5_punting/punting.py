@@ -33,6 +33,14 @@ from manim import (
     DOWN, RIGHT,
     YELLOW, WHITE, GREY_B, GREEN_B, RED_C,
 )
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.gtts import GTTSService
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from narration import NARRATION
 
 
 CATEGORY_NAMES = [
@@ -47,6 +55,9 @@ OPPONENT_EFFORT = 1.0     # what the opponent puts into every category, so parit
 # The order categories are abandoned in. Free Throw % first is not arbitrary -- it is the punt
 # the algorithm reaches for most often, and the one fantasy players will recognise.
 ABANDON_ORDER = [1, 7, 2, 0]
+
+# How long a punt is left on screen after the slider stops, before the next line starts.
+SETTLE_AFTER_A_PUNT = 1.0
 
 # One panel of the three-by-three grid.
 PANEL_WIDTH, PANEL_HEIGHT = 4.15, 1.95
@@ -95,7 +106,7 @@ def categories_won(weights: np.ndarray) -> float:
     return float(sum(win_probability(weight) for weight in weights))
 
 
-class PuntingSearch(Scene):
+class PuntingSearch(VoiceoverScene):
     """Walk the punt one category at a time and watch the expected haul rise, then fall."""
 
     def setup(self) -> None:
@@ -216,6 +227,7 @@ class PuntingSearch(Scene):
     # ── The scene ─────────────────────────────────────────────────────────────────────
 
     def construct(self) -> None:
+        self.set_speech_service(GTTSService())
         titles = VGroup(*[
             Text(name, font_size=16, color=GREY_B).move_to(
                 self._panel_centre(index) + np.array([0.0, CURVE_HEIGHT * 1.36, 0.0]))
@@ -227,19 +239,35 @@ class PuntingSearch(Scene):
             for index in range(CATEGORY_COUNT)
         ])
 
-        self.play(FadeIn(titles), FadeIn(bells), run_time=1.0)
-        self.add(shading)
-        self.wait(1.4)
+        with self.voiceover(text=NARRATION['opening']):
+            self.play(FadeIn(titles), FadeIn(bells), run_time=1.0)
+            self.add(shading)
+            self.wait(1.4)
 
-        self.add(always_redraw(self._build_score_readout))
-        self.wait(1.6)
+        with self.voiceover(text=NARRATION['score']):
+            self.add(always_redraw(self._build_score_readout))
+            self.wait(1.6)
 
         # Abandon them one at a time. The first three each pay for themselves; the fourth gives
         # ground back, and watching it fail is what makes three the answer rather than a claim.
-        for abandoned in range(len(ABANDON_ORDER)):
-            self.play(self.progress.animate.set_value(abandoned + 1.0), run_time=2.4)
-            self.wait(1.0)
+        # One line apiece, so that the fourth's reversal gets said as it happens.
+        abandonment_lines = [NARRATION['abandon'], NARRATION['abandon_again'],
+                             NARRATION['abandon_third'], NARRATION['abandon_too_far']]
+        if len(abandonment_lines) != len(ABANDON_ORDER):
+            raise ValueError(
+                f'{len(abandonment_lines)} narration lines for {len(ABANDON_ORDER)} categories '
+                f'abandoned: narration.py and ABANDON_ORDER have to agree.')
+        for abandoned, line in enumerate(abandonment_lines):
+            # The slider moves for as long as the line describing it lasts. These lines talk
+            # about the investment being moved WHILE it moves ("as we move it far..."), so a
+            # fixed two seconds of motion followed by twenty seconds of still frame would be
+            # describing something that had already finished happening.
+            with self.voiceover(text=line) as tracker:
+                self.play(self.progress.animate.set_value(abandoned + 1.0),
+                          run_time=max(2.4, tracker.duration - SETTLE_AFTER_A_PUNT))
+                self.wait(SETTLE_AFTER_A_PUNT)
 
         # Walk back to the best the search found and rest there.
-        self.play(self.progress.animate.set_value(3.0), run_time=1.2)
-        self.wait(3.0)
+        with self.voiceover(text=NARRATION['settle']):
+            self.play(self.progress.animate.set_value(3.0), run_time=1.2)
+            self.wait(3.0)

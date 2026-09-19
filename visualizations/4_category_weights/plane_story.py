@@ -29,10 +29,16 @@ from pathlib import Path
 import numpy as np
 from manim import (
     Scene, VGroup, ImageMobject, Circle, Dot, Line, DashedLine, Text, DecimalNumber,
-    FadeIn, FadeOut, Create, Transform, GrowArrow, Arrow,
+    FadeIn, FadeOut, Create, Transform,
     DOWN, UP, LEFT, RIGHT,
     WHITE, GREY_A, GREY_B, GREY_D,
 )
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.gtts import GTTSService
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from narration import NARRATION
 
 
 PLANE_CENTRE = np.array([-2.55, 0.15, 0.0])
@@ -60,7 +66,7 @@ def load_plane_story() -> dict:
     return json.loads(_DATA_PATH.read_text(encoding='utf-8'))
 
 
-class PlaneStory(Scene):
+class PlaneStory(VoiceoverScene):
     """Pool, bar, two score lines, experiments, then the distributions they were sampling."""
 
     def setup(self) -> None:
@@ -251,18 +257,19 @@ class PlaneStory(Scene):
         Only the two pick distributions are shown. The pool's own density could go underneath
         them, but it is the one field nobody is asking about -- where players are is the setup,
         and where each strategy ENDS UP is the answer, so the frame is given to the answer.
+
+        Both clouds and both centres arrive in ONE cut. Shown one after the other, the first one
+        up reads as the answer and the second as a correction to it; side by side they read as
+        what they are, two strategies choosing differently out of the same pool.
+
+        Nothing is animated once they are on screen. Added rather than faded in, because
+        ImageMobject.set_opacity does not dim an image -- it overwrites every pixel's alpha with
+        a single value, and alpha is what carries the density here. And no animation may play
+        while they are up: an animation re-bakes the static frame, which composites these images
+        without their alpha and washes the plane out for the length of the animation.
         """
         self.play(FadeOut(self.pool), FadeOut(self.score_lines),
                   FadeOut(self.picked_marks), run_time=0.9)
-
-        # Added rather than faded in. ImageMobject.set_opacity does not dim an image, it
-        # overwrites every pixel's alpha with a single value -- and since alpha is what carries
-        # the density here, fading it in would turn it into a solid rectangle. Reveals in this
-        # scene are cuts, and the pauses around them are what give each one room.
-        self.add(self._density_image('pick_density_neutral.png'))
-        self.wait(1.7)
-        self.add(self._density_image('pick_density_alternative.png'))
-        self.wait(1.7)
 
         # The mean of each cloud IS x(w) for that weighting. The neutral one sits just under the
         # bar rather than on it, which is the truncation bias the model subtracts off before it
@@ -271,24 +278,18 @@ class PlaneStory(Scene):
             Dot(self._at(self.settings[label]['pick_mean']), radius=0.10, color=colour)
             for (label, _, colour) in self.weightings
         ])
-        self.play(Create(self.mean_dots), run_time=0.8)
-        self.wait(1.4)
-
-    # ── Act five: the gap between them ────────────────────────────────────────────────
-
-    def play_act_five_tilt(self) -> None:
-        """The only thing the model actually reports is the distance between those two dots."""
-        tilt_arrow = Arrow(
-            self._at(self.settings['neutral']['pick_mean']),
-            self._at(self.settings['alternative']['pick_mean']),
-            color=WHITE, stroke_width=5, buff=0.10, max_tip_length_to_length_ratio=0.12,
-        )
-        self.play(GrowArrow(tilt_arrow), run_time=1.2)
-        self.wait(3.2)
+        self.add(self._density_image('pick_density_neutral.png'),
+                 self._density_image('pick_density_alternative.png'),
+                 self.mean_dots)
+        self.wait(6.0)
 
     def construct(self) -> None:
-        self.play_act_one_pool()
-        self.play_act_two_score_lines()
-        self.play_act_three_experiments()
-        self.play_act_four_pick_densities()
-        self.play_act_five_tilt()
+        self.set_speech_service(GTTSService())
+        for line, act in (
+            (NARRATION['pool'],        self.play_act_one_pool)
+            , (NARRATION['score_lines'], self.play_act_two_score_lines)
+            , (NARRATION['experiments'], self.play_act_three_experiments)
+            , (NARRATION['densities'],   self.play_act_four_pick_densities)
+        ):
+            with self.voiceover(text=line):
+                act()

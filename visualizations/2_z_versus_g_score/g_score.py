@@ -27,6 +27,7 @@ re-running the prep script with a different season or seed moves the scene with 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -39,47 +40,11 @@ from manim import (
 from manim_voiceover import VoiceoverScene
 from manim_voiceover.services.gtts import GTTSService
 
-from differential_base import DifferentialSceneBase
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.differential_base import DifferentialSceneBase   # noqa: E402
 
 
-# ── The spoken track ─────────────────────────────────────────────────────────────────
-# Edit only this block. Each beat plays inside the line that covers it, so a rewritten line
-# retimes its own beat rather than desynchronising everything after it.
-#
-# PLACEHOLDER lines are mine, holding the timing until the real ones are written.
-
-NARRATION = {
-    'fixed_matchup':
-        'Placeholder. The last scene let the draft vary and held every player at his average. '
-        'Do the opposite: keep one draft, these same twenty-six players, and replay the week.',
-    'fixed_matchup_result':
-        'Placeholder. The result still swings, and it swings wider than drafting differently '
-        'did. Notice too that this bell is not centred on zero. One of these two teams really '
-        'is better, which is the question the whole exercise exists to answer.',
-    'both_vary':
-        'Placeholder. Now let both vary at once, which is what a real week actually is: a draft '
-        'you did not choose, played out in a week nobody can predict.',
-    'both_vary_result':
-        'Placeholder. Wider again. This is the spread a score has to reckon with.',
-    'opening':
-        'Placeholder. Say what a Z-score measures a player against, and that a G-score widens '
-        'that denominator to take in something a Z-score leaves out.',
-    'cross_player':
-        'Placeholder. This curve is the first source of variation: which players you happened '
-        'to draft, with every one of them performing at exactly their weekly average.',
-    'week_to_week':
-        'Placeholder. This curve holds the draft still and changes only the week. The same '
-        'twenty-six players, a different week of basketball.',
-    'both':
-        'Placeholder. This curve lets both vary, and comes out wider than either alone.',
-    'the_question':
-        'Placeholder. Ask why the third is not simply the first plus the second.',
-    'right_angle':
-        'Placeholder. Because the two sources are independent, they meet at a right angle.',
-    'squares':
-        'Placeholder. So the squares add, not the spreads, and the hypotenuse is what a '
-        'G-score divides by.',
-}
+from narration import NARRATION   # noqa: E402
 
 
 # ── The two simulations ──────────────────────────────────────────────────────────────
@@ -91,6 +56,9 @@ _DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 
 
 class WeeklyUnitDifferential(DifferentialSceneBase):
+    # One week of one category, counted in made baskets and rebounds: whole numbers.
+    decimal_places = 0
+
     """Both simulations in this scene, which differ only in which dataset is dealt from.
 
     One axis, one binning, one caption: the whole argument is that the second spread is wider
@@ -134,28 +102,44 @@ class WeeklyUnitDifferential(DifferentialSceneBase):
 
 # ── The payoff: how the two spreads combine ──────────────────────────────────────────
 
-CURVE_BASELINE_Y = -1.15     # where the three comparison bells stand
-CURVE_HEIGHT     = 1.75      # height of the WIDEST bell; narrower ones stand taller
+CURVE_BASELINE_Y = -2.20     # where the three comparison bells stand
+CURVE_HEIGHT     = 1.15      # height of the WIDEST bell; narrower ones stand taller
 CURVE_HALF_WIDTH = 5.6       # half-width of the widest bell, in scene units
-WIDEST_SPREAD    = 137.0     # the scale everything is drawn against
+# The scale everything is drawn against: the widest of the three, whatever it turns out to be.
 
 TRIANGLE_SCALE   = 0.021     # scene units per point of standard deviation
 
 
+def _differential_spread(filename: str) -> float:
+    totals = np.array(json.loads(
+        (_DATA_DIR / filename).read_text(encoding='utf-8'))['simulation_totals'])
+    return float((totals[:, 0] - totals[:, 1]).std())
+
+
 def measured_spreads() -> dict[str, float]:
-    """The three standard deviations, read back out of the prepared simulations.
+    """The three standard deviations the closing arithmetic is built from.
 
     Read rather than written down so the scene cannot drift from the data: re-run the prep
     script with a different seed or season and these follow.
+
+    The week-to-week one is NOT the spread of the fixed-matchup simulation, even though that is
+    the simulation the scene has just shown. That run replays ONE pair of randomly drafted teams,
+    so its spread is a single draw from the distribution of possible matchups -- fine as the
+    answer to "what does one matchup do across weeks", which is what that act asks, and wrong as
+    a general quantity to carry into the arithmetic.
+
+    The general one is available exactly. A differential is the sum of twenty-six independent
+    player-weeks, so the week-to-week variance of a random matchup, averaged over matchups, is
+    twenty-six times the mean of the players' own week-to-week variances. Measured on 2025-26 it
+    comes to 105, against 104 for the single matchup that happened to be drawn.
     """
-    spreads = {}
-    for label, filename in (('cross_player', 'pool_2025_26.json'),
-                            ('week_to_week', FIXED_MATCHUP_DATA),
-                            ('both',         BOTH_VARY_DATA)):
-        totals = np.array(json.loads(
-            (_DATA_DIR / filename).read_text(encoding='utf-8'))['simulation_totals'])
-        spreads[label] = float((totals[:, 0] - totals[:, 1]).std())
-    return spreads
+    weekly = json.loads((_DATA_DIR / BOTH_VARY_DATA).read_text(encoding='utf-8'))
+    player_variances = np.array([np.var(weeks) for weeks in weekly['weekly_values']])
+    return {
+        'cross_player': _differential_spread('pool_2025_26.json'),
+        'week_to_week': float(np.sqrt(2 * weekly['team_size'] * player_variances.mean())),
+        'both':         _differential_spread(BOTH_VARY_DATA),
+    }
 
 
 class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
@@ -166,7 +150,7 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
         self.spreads = measured_spreads()
         # gTTS: no key, no account, and good enough to cut against. The only line to change to
         # swap in a better voice, and the timings follow whatever the service returns.
-        self.set_speech_service(GTTSService(lang='en'))
+        self.set_speech_service(GTTSService())
 
     # ── Between the parts ─────────────────────────────────────────────────────────────
 
@@ -193,11 +177,16 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
         self.load_dataset(data_filename)
         self.axis_caption = axis_caption
 
+        # The frame goes up first, in silence: the opening line talks about the two teams, so it
+        # starts as they are being dealt rather than over an empty set of roster slots.
+        self.build_static_frame()
         with self.voiceover(text=opening_line):
-            self.build_static_frame()
             self.play_act_one_single_draw()
-            self.play_act_two_repeated_draws()
+
+        # And the simulation itself waits for the line that calls it one. Repeated draws under
+        # the opening line had the thing running well before it was named.
         with self.voiceover(text=result_line):
+            self.play_act_two_repeated_draws()
             self.play_act_three_montage()
             self.play_act_four_normal_curve()
 
@@ -209,8 +198,9 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
         # same area. Drawing them at equal height would be the more obvious choice and the wrong
         # one: these are densities, and the whole point is that the same total probability is
         # spread over more ground, not that there is more of it.
-        half_width = CURVE_HALF_WIDTH * (spread / WIDEST_SPREAD)
-        height = CURVE_HEIGHT * (WIDEST_SPREAD / spread)
+        widest = max(self.spreads.values())
+        half_width = CURVE_HALF_WIDTH * (spread / widest)
+        height = CURVE_HEIGHT * (widest / spread)
         offsets = np.linspace(-3.2, 3.2, 200)
         points = [
             np.array([offset * half_width / 3.2,
@@ -224,7 +214,7 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
         ])
 
     def play_quadrature(self) -> None:
-        """Three spreads, and why the first two make the third by squares rather than by sums."""
+        """Three spreads, and the triangle that says how the first two make the third."""
         cross_player = self.spreads['cross_player']
         week_to_week = self.spreads['week_to_week']
         both = self.spreads['both']
@@ -232,25 +222,31 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
         baseline = Line([-6.4, CURVE_BASELINE_Y, 0], [6.4, CURVE_BASELINE_Y, 0],
                         color=GREY_B, stroke_width=2)
 
+        # The axis never appears on its own: an empty pair of axes drawn under a line of
+        # narration is a held breath, so the baseline arrives with the first curve on it.
+        first_curve = self._bell(cross_player, BLUE_B, 1.0)
         with self.voiceover(text=NARRATION['opening']):
-            self.play(Create(baseline), run_time=0.8)
+            self.play(Create(baseline), Create(first_curve), run_time=1.4)
 
         # Each spread arrives with the question it answers, narrowest first, so the widening
         # is what the eye follows. The line spoken over each one is what identifies it --
         # there are no headings, because a heading and a voice saying the same thing is one
         # of them too many.
         entries = [
-            (cross_player, BLUE_B, NARRATION['cross_player']),
-            (week_to_week, RED_B, NARRATION['week_to_week']),
-            (both, YELLOW, NARRATION['both']),
+            (cross_player, BLUE_B, NARRATION['cross_player'], first_curve),
+            (week_to_week, RED_B, NARRATION['week_to_week'], None),
+            (both, YELLOW, NARRATION['both'], None),
         ]
         drawn_curves = []
-        for spread, colour, line in entries:
-            curve = self._bell(spread, colour, 1.0)
+        for spread, colour, line, existing in entries:
+            curve = existing if existing is not None else self._bell(spread, colour, 1.0)
             value = Text(f'sd {spread:.0f}', font_size=26, color=colour).move_to(
                 [0, CURVE_BASELINE_Y - 0.55, 0])
             with self.voiceover(text=line):
-                self.play(Create(curve), FadeIn(value), run_time=1.3)
+                if existing is None:
+                    self.play(Create(curve), FadeIn(value), run_time=1.3)
+                else:
+                    self.play(FadeIn(value), run_time=0.5)
                 self.wait(0.6)
                 self.play(FadeOut(value), run_time=0.4)
             drawn_curves.append(curve)
@@ -258,12 +254,16 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
             for earlier in drawn_curves[:-1]:
                 earlier.set_stroke(opacity=0.35)
 
-        with self.voiceover(text=NARRATION['the_question']):
-            self.wait(0.9)
-            self.play(*[FadeOut(curve) for curve in drawn_curves], FadeOut(baseline),
-                      run_time=0.9)
-
-        corner = np.array([-2.55, -1.05, 0.0])
+        # One beat for the whole close. The triangle is offered as an ANALOGY -- the two
+        # spreads behave like the legs of a right triangle, so the answer behaves like its
+        # hypotenuse -- which is a thing a viewer already knows the shape of. The earlier
+        # version built the right angle first and explained it afterwards, which asked the
+        # viewer to accept the picture before being told what it was for.
+        #
+        # It is built ABOVE the curves rather than in place of them: the legs are the two
+        # widths still on screen, in their own colours, so the claim can be checked against the
+        # thing it is a claim about instead of being remembered from a frame ago.
+        corner = np.array([-3.40, 0.45, 0.0])
         horizontal_leg = cross_player * TRIANGLE_SCALE
         vertical_leg = week_to_week * TRIANGLE_SCALE
         along = corner + np.array([horizontal_leg, 0.0, 0.0])
@@ -287,27 +287,15 @@ class GScoreFull(VoiceoverScene, WeeklyUnitDifferential):
             Text(f'{both:.0f}', font_size=30, color=YELLOW)
             .move_to((along + up) / 2 + np.array([0.85, 0.55, 0.0])),
         )
+        arithmetic = MathTex(
+            rf'\sqrt{{{cross_player:.0f}^2 + {week_to_week:.0f}^2}} = '
+            rf'{np.hypot(cross_player, week_to_week):.0f}',
+            font_size=46, color=WHITE,
+        ).move_to([2.55, 1.75, 0])
 
-        with self.voiceover(text=NARRATION['right_angle']):
+        with self.voiceover(text=NARRATION['the_question']):
             self.play(Create(triangle), Create(right_angle), run_time=1.5)
             self.play(FadeIn(leg_labels), run_time=0.8)
-
-        squares = VGroup(
-            Polygon(corner, along, along + np.array([0, -horizontal_leg, 0]),
-                    corner + np.array([0, -horizontal_leg, 0]),
-                    stroke_color=BLUE_B, stroke_width=3, fill_color=BLUE_B, fill_opacity=0.25),
-            Polygon(corner, up, up + np.array([-vertical_leg, 0, 0]),
-                    corner + np.array([-vertical_leg, 0, 0]),
-                    stroke_color=RED_B, stroke_width=3, fill_color=RED_B, fill_opacity=0.25),
-        )
-        arithmetic = MathTex(
-            rf'{cross_player:.0f}^2 + {week_to_week:.0f}^2 = '
-            rf'{np.hypot(cross_player, week_to_week):.0f}^2',
-            font_size=46, color=WHITE,
-        ).move_to([3.15, 0.55, 0])
-
-        with self.voiceover(text=NARRATION['squares']):
-            self.play(Create(squares), run_time=1.4)
             self.play(Write(arithmetic), run_time=1.3)
             self.wait(1.2)
 

@@ -29,6 +29,14 @@ from manim import (
 )
 
 
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.gtts import GTTSService
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from narration import NARRATION
+
+
 # ── Where things sit (Manim's frame is 14.2 x 8 units, origin at the centre) ───────────
 # Thirteen columns is the binding constraint: at any wider cell the grid runs off the right of
 # the frame, and at any narrower one a signed three-decimal reward stops being legible.
@@ -50,7 +58,6 @@ SLOT_HEADER_FONT   = 15
 ROW_LABEL_FONT     = 15
 # How long the frame holds where a line of narration goes. The scene carries no text of its
 # own, so these pauses are the only room the voice has.
-NARRATION_BEAT_SECONDS = 0.9
 
 _DATA_PATH    = Path(__file__).resolve().parent.parent / 'data' / 'assignment_2025_26.json'
 _HEADSHOT_DIR = Path(__file__).resolve().parent.parent / 'assets' / 'headshots'
@@ -108,7 +115,7 @@ def align_future_rows_to(
     return aligned
 
 
-class RosterSlotAssignment(Scene):
+class RosterSlotAssignment(VoiceoverScene):
     """Build the matrix, state the constraint, guess wrong, then solve it."""
 
     def setup(self) -> None:
@@ -284,75 +291,59 @@ class RosterSlotAssignment(Scene):
             color=GREY_D, stroke_width=1.6,
         )
 
-    def _narration_beat(self, seconds: float = NARRATION_BEAT_SECONDS) -> None:
-        """Hold the frame where a line of narration goes.
-
-        This scene carries no explanatory text: it is narrated instead. The pauses still have to
-        be here, though, and at the points where the captions used to be -- those are the moments
-        that need saying out loud, and an animation that runs straight through them leaves the
-        voice with nowhere to put the sentence.
-        """
-        self.wait(seconds)
-
     # ── Act one: the matrix ───────────────────────────────────────────────────────────
 
     def play_act_one_eligibility(self) -> None:
-        self.play(FadeIn(self.slot_headers), run_time=1.0)
-        self._narration_beat()
+        with self.voiceover(text=NARRATION['slots']):
+            self.play(FadeIn(self.slot_headers), run_time=1.0)
 
-        self.drafted_cells = {}
-        for row_index in range(self.drafted_count):
-            row_cells = VGroup(*[
-                self._build_drafted_cell(row_index, column_index)
-                for column_index in range(self.slot_count)
-            ])
-            for column_index in range(self.slot_count):
-                self.drafted_cells[(row_index, column_index)] = row_cells[column_index]
-            self.play(
-                FadeIn(self.drafted_row_labels[row_index], shift=RIGHT * 0.2),
-                FadeIn(row_cells),
-                run_time=0.55,
-            )
-        self.wait(0.6)
-
-        self._narration_beat()
-        self.wait(2.0)
+        with self.voiceover(text=NARRATION['the_roster']):
+            self.drafted_cells = {}
+            for row_index in range(self.drafted_count):
+                row_cells = VGroup(*[
+                    self._build_drafted_cell(row_index, column_index)
+                    for column_index in range(self.slot_count)
+                ])
+                for column_index in range(self.slot_count):
+                    self.drafted_cells[(row_index, column_index)] = row_cells[column_index]
+                self.play(
+                    FadeIn(self.drafted_row_labels[row_index], shift=RIGHT * 0.2),
+                    FadeIn(row_cells),
+                    run_time=0.55,
+                )
+            self.wait(0.6)
 
     # ── Act two: where the value actually is ──────────────────────────────────────────
 
     def play_act_two_future_rewards(self) -> None:
-        self.play(Create(self.half_divider), run_time=0.6)
-        self._narration_beat()
+        with self.voiceover(text=NARRATION['future_picks']):
+            self.play(Create(self.half_divider), run_time=0.6)
 
-        self.future_cells = {}
-        for future_index in range(self.future_pick_count):
-            row_index = self.drafted_count + future_index
-            row_cells = VGroup(*[
-                self._build_future_cell(row_index, column_index)
-                for column_index in range(self.slot_count)
-            ])
-            for column_index in range(self.slot_count):
-                self.future_cells[(row_index, column_index)] = row_cells[column_index]
-            self.play(
-                FadeIn(self.future_row_labels[future_index], shift=RIGHT * 0.2),
-                FadeIn(row_cells),
-                run_time=0.42 if future_index < 2 else 0.22,
-            )
-        self.wait(0.8)
+        with self.voiceover(text=NARRATION['future_rows']):
+            self.future_cells = {}
+            for future_index in range(self.future_pick_count):
+                row_index = self.drafted_count + future_index
+                row_cells = VGroup(*[
+                    self._build_future_cell(row_index, column_index)
+                    for column_index in range(self.slot_count)
+                ])
+                for column_index in range(self.slot_count):
+                    self.future_cells[(row_index, column_index)] = row_cells[column_index]
+                self.play(
+                    FadeIn(self.future_row_labels[future_index], shift=RIGHT * 0.2),
+                    FadeIn(row_cells),
+                    run_time=0.42 if future_index < 2 else 0.22,
+                )
+            self.wait(0.8)
 
         best_column = int(np.argmax(self.future_pick_row))
-        worst_column = int(np.argmin(self.future_pick_row))
-        self._narration_beat()
-        self.wait(1.4)
-
-        self.play(
-            *[Indicate(self.future_cells[(self.drafted_count + future_index, best_column)],
-                       color=GREEN_B, scale_factor=1.12)
-              for future_index in range(self.future_pick_count)],
-            run_time=1.0,
-        )
-        self._narration_beat()
-        self.wait(2.0)
+        with self.voiceover(text=NARRATION['best_slot']):
+            self.play(
+                *[Indicate(self.future_cells[(self.drafted_count + future_index, best_column)],
+                           color=GREEN_B, scale_factor=1.12)
+                  for future_index in range(self.future_pick_count)],
+                run_time=1.0,
+            )
 
     # ── Act three: what an assignment is allowed to be ────────────────────────────────
 
@@ -369,12 +360,12 @@ class RosterSlotAssignment(Scene):
         return marker
 
     def play_act_three_constraint(self) -> None:
-        self._narration_beat()
-
-        for row_index, column_index in enumerate(self.naive_assignment):
-            self.markers[row_index] = self._build_marker(row_index, column_index)
-            self.play(Create(self.markers[row_index]), run_time=0.30 if row_index < 5 else 0.13)
-        self.wait(0.8)
+        with self.voiceover(text=NARRATION['one_slot_each']):
+            for row_index, column_index in enumerate(self.naive_assignment):
+                self.markers[row_index] = self._build_marker(row_index, column_index)
+                self.play(Create(self.markers[row_index]),
+                          run_time=0.30 if row_index < 5 else 0.13)
+            self.wait(0.8)
 
         # The violation to show is found rather than staged: the first drafted player who is
         # eligible for a slot another drafted player has already taken. With two centre-only
@@ -390,32 +381,34 @@ class RosterSlotAssignment(Scene):
         contested_column = self.naive_assignment[occupied_row]
         legal_column = self.naive_assignment[offending_row]
 
-        self.play(self.markers[offending_row].animate.move_to(
-            self._cell_centre(offending_row, contested_column)), run_time=0.7)
-        self.play(
-            self.markers[offending_row].animate.set_stroke(RED_D),
-            self.markers[occupied_row].animate.set_stroke(RED_D),
-            run_time=0.4,
-        )
+        with self.voiceover(text=NARRATION['the_clash']):
+            self.play(self.markers[offending_row].animate.move_to(
+                self._cell_centre(offending_row, contested_column)), run_time=0.7)
+            self.play(
+                self.markers[offending_row].animate.set_stroke(RED_D),
+                self.markers[occupied_row].animate.set_stroke(RED_D),
+                run_time=0.4,
+            )
 
-        rejection = VGroup(*[
-            Line(self._cell_centre(row, contested_column) + np.array([-0.3, -0.16 * sign, 0.0]),
-                 self._cell_centre(row, contested_column) + np.array([0.3, 0.16 * sign, 0.0]),
-                 color=RED_D, stroke_width=4)
-            for row in (offending_row, occupied_row) for sign in (-1, 1)
-        ])
-        self.play(Create(rejection), run_time=0.5)
-        self._narration_beat()
-        self.wait(1.6)
-
-        self.play(FadeOut(rejection), run_time=0.3)
-        self.play(
-            self.markers[offending_row].animate.move_to(
-                self._cell_centre(offending_row, legal_column)).set_stroke(YELLOW),
-            self.markers[occupied_row].animate.set_stroke(YELLOW),
-            run_time=0.6,
-        )
-        self.wait(0.5)
+            rejection = VGroup(*[
+                Line(self._cell_centre(row, contested_column)
+                     + np.array([-0.3, -0.16 * sign, 0.0]),
+                     self._cell_centre(row, contested_column)
+                     + np.array([0.3, 0.16 * sign, 0.0]),
+                     color=RED_D, stroke_width=4)
+                for row in (offending_row, occupied_row) for sign in (-1, 1)
+            ])
+            self.play(Create(rejection), run_time=0.5)
+            self.wait(0.6)
+            # The repair belongs to this line too: the sentence ends on "not permissible", and
+            # leaving the illegal board on screen after that would contradict it.
+            self.play(FadeOut(rejection), run_time=0.3)
+            self.play(
+                self.markers[offending_row].animate.move_to(
+                    self._cell_centre(offending_row, legal_column)).set_stroke(YELLOW),
+                self.markers[occupied_row].animate.set_stroke(YELLOW),
+                run_time=0.6,
+            )
 
     # ── Act four: the assignment a person would guess ─────────────────────────────────
 
@@ -441,16 +434,13 @@ class RosterSlotAssignment(Scene):
         return readout
 
     def play_act_four_naive_assignment(self) -> None:
-        flexible_player = self.drafted_players[self.decisive_row]
-        naive_column = self.naive_assignment[self.decisive_row]
+        with self.voiceover(text=NARRATION['the_greedy_guess']):
+            self.play(Indicate(self.markers[self.decisive_row], color=WHITE, scale_factor=1.25),
+                      run_time=0.9)
 
-        self._narration_beat()
-        self.play(Indicate(self.markers[self.decisive_row], color=WHITE, scale_factor=1.25),
-                  run_time=0.9)
-
-        self.total_readout = self._build_total_readout()
-        self.play(FadeIn(self.total_readout), run_time=0.8)
-        self.wait(1.6)
+        with self.voiceover(text=NARRATION['the_total']):
+            self.total_readout = self._build_total_readout()
+            self.play(FadeIn(self.total_readout), run_time=0.8)
 
     # ── Act five: what the solver actually does ───────────────────────────────────────
 
@@ -464,37 +454,40 @@ class RosterSlotAssignment(Scene):
             row for row in range(self.drafted_count, self.slot_count)
             if self.optimal_assignment[row] == naive_column)
 
-        self._narration_beat()
-        self.wait(1.2)
-
         # Every marker moves to the solved assignment at once, so the answer arrives as one
         # permutation rather than as a sequence of local repairs -- which is what the Hungarian
         # algorithm returns and, more to the point, is why it cannot be reasoned out row by row.
-        self.play(
-            *[self.markers[row_index].animate.move_to(self._cell_centre(row_index, column_index))
-              for row_index, column_index in enumerate(self.optimal_assignment)],
-            self.total_number.animate.set_value(self.prepared['optimal_total']),
-            run_time=1.6,
-        )
-        self.wait(0.6)
+        with self.voiceover(text=NARRATION['solve_it_whole']):
+            self.play(
+                *[self.markers[row].animate.move_to(self._cell_centre(row, column))
+                  for row, column in enumerate(self.optimal_assignment)],
+                self.total_number.animate.set_value(self.prepared['optimal_total']),
+                run_time=1.6,
+            )
 
-        self._narration_beat()
-        self.play(
-            Indicate(self.markers[self.decisive_row], color=GREEN_B, scale_factor=1.3),
-            Indicate(self.markers[inheriting_row], color=GREEN_B, scale_factor=1.3),
-            run_time=1.2,
-        )
-        self.wait(0.8)
+        with self.voiceover(text=NARRATION['the_swap']):
+            self.play(
+                Indicate(self.markers[self.decisive_row], color=GREEN_B, scale_factor=1.3),
+                Indicate(self.markers[inheriting_row], color=GREEN_B, scale_factor=1.3),
+                run_time=1.2,
+            )
 
-        self._narration_beat()
-        self.wait(2.4)
-
-        self._narration_beat()
-        self.wait(3.0)
-
-    # ── The whole thing ───────────────────────────────────────────────────────────────
+        # The close is about what the solved board is FOR: it says which slots the picks still
+        # to come will land in, so lighting those rows up is the line's own subject. What is
+        # missing from them is the point -- no future pick reaches a centre slot, because both
+        # are already held, and that is a rebound and block total the team will not get.
+        future_rows = range(self.drafted_count, self.slot_count)
+        with self.voiceover(text=NARRATION['why_important']):
+            self.play(*[Indicate(self.markers[row], color=BLUE_B, scale_factor=1.18)
+                        for row in future_rows], run_time=1.6)
+            closed_columns = sorted({self.optimal_assignment[row]
+                                     for row in range(self.drafted_count)})
+            self.play(*[Indicate(self.slot_headers[column], color=RED_D, scale_factor=1.2)
+                        for column in closed_columns], run_time=1.4)
+            self.wait(1.0)
 
     def construct(self) -> None:
+        self.set_speech_service(GTTSService())
         self.build_grid_frame()
         self.play_act_one_eligibility()
         self.play_act_two_future_rewards()

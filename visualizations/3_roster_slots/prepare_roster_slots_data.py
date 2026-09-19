@@ -38,8 +38,8 @@ import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
 # Import the app itself rather than reimplementing its numbers.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))   # the repository
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))          # visualizations/
 
 from backend.api.routers.sessions import _build_current_settings            # noqa: E402
 from backend.math.position_config import PositionConfig                     # noqa: E402
@@ -47,7 +47,7 @@ from backend.math.position_optimization import (                            # no
     get_future_player_rows, get_player_rows, optimize_positions_all_players,
 )
 from backend.services.session_management import build_session               # noqa: E402
-from prepare_season_data import build_default_session_request               # noqa: E402
+from shared.prepare_season_data import build_default_session_request               # noqa: E402
 
 
 SEASON = '2025-26'
@@ -69,7 +69,7 @@ DRAFTED_PLAYER_IDS = [
     1628368,    # De'Aaron Fox        PG, SG    -- round 5 (rank 52); fills out the back court
 ]
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
 _HEADSHOT_DIR = _VISUALIZATIONS_DIR / 'assets' / 'headshots'
 
 

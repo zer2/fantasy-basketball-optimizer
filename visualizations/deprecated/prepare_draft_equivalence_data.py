@@ -24,14 +24,14 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))   # the repository
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))          # visualizations/
 
 from backend.api.routers.sessions import _build_current_settings          # noqa: E402
 from backend.services.session_management import build_session             # noqa: E402
-from prepare_season_data import build_default_session_request, SEASON, SPORT   # noqa: E402
+from shared.prepare_season_data import build_default_session_request, SEASON, SPORT   # noqa: E402
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
 
 
 def measure_ladder_share(session, pool_size: int) -> list[dict]:

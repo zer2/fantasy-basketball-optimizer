@@ -30,7 +30,7 @@ import pandas as pd
 from PIL import Image, ImageDraw
 
 # Import the app itself rather than reimplementing its numbers.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from backend.api.routers.sessions import _build_current_settings          # noqa: E402
 from backend.api.schemas import (                                         # noqa: E402
@@ -61,7 +61,7 @@ RANDOM_SEED = 4242            # fixed so every render of the scene shows the sam
 # frame, so this is a modest oversample -- 256 was two and a half times the display size
 # and quadrupled what these committed assets cost.
 HEADSHOT_PIXELS = 128
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
 _HEADSHOT_SOURCE_DIR = _VISUALIZATIONS_DIR.parent / '.cache' / 'headshots'
 
 

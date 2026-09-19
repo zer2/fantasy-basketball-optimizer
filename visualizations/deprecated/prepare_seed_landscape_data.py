@@ -32,7 +32,7 @@ import numpy as np
 from PIL import Image
 from scipy.stats import norm
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
 
 CATEGORY_COUNT = 9
 EFFORT_BUDGET = 9.0

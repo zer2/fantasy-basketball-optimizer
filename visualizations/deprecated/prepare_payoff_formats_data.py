@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
 
 CATEGORY_COUNT = 9
 EFFORT_BUDGET = 9.0
