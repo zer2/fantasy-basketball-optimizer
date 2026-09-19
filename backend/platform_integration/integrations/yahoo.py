@@ -53,6 +53,13 @@ from backend.player_identity import RP_PLAYER_ID
 _logger = logging.getLogger('fbbo.yahoo')
 
 _GAME_CODE = 'nba'
+
+# Which season's game key each league belongs to, keyed by (auth dir, league id) so two accounts
+# cannot read each other's answers. Module level because integrations are built per request; see
+# _game_id_for. A miss is stored as None -- "asked, and this league is not the account's" -- which
+# is why lookups need a sentinel to tell that apart from "never asked".
+_GAME_ID_BY_LEAGUE: dict[tuple[str, str], Optional[int]] = {}
+_UNRESOLVED = object()
 _YAHOO_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
 _YAHOO_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
 # Out-of-band ('oob') is Yahoo's documented redirect for applications that cannot receive a
@@ -139,10 +146,7 @@ class YahooIntegration(PlatformIntegration):
         # The registry spreads the creds bag into this param: get_integration(
         # 'Retrieve from Yahoo', {'auth_dir': ...}) -> YahooIntegration(auth_dir=...).
         self._auth_dir = auth_dir
-        # Resolved lazily and kept: the league -> season map costs one call per season, and
-        # every request for a league needs it.
         self._games = None
-        self._game_id_by_league: dict[str, Optional[int]] = {}
 
     # ── Platform metadata ──────────────────────────────────────────────────────
 
@@ -306,15 +310,24 @@ class YahooIntegration(PlatformIntegration):
         None is the right answer for a league the account cannot see in its own list -- a mock
         draft room, most of all, which Yahoo does not publish as a league. yfpy then falls back
         to the current season, which is where a mock lives anyway.
+
+        Cached beyond this instance on purpose. An integration is constructed per request, so a
+        per-instance cache would be thrown away between polls and every Refresh Analysis during
+        a live draft would spend five calls (the account's games, then each season's leagues)
+        re-learning the same answer -- slow, and a rate limit waiting to happen. The mapping it
+        caches cannot change during a draft: a league does not move seasons.
         """
         if not league_id:
             return None
-        if league_id not in self._game_id_by_league:
-            for game in self._user_games():
-                for league in self._leagues_in(game):
-                    self._game_id_by_league.setdefault(str(league.league_id), int(game.game_id))
-            self._game_id_by_league.setdefault(league_id, None)
-        return self._game_id_by_league[league_id]
+        known = _GAME_ID_BY_LEAGUE.get((self._auth_dir, league_id), _UNRESOLVED)
+        if known is not _UNRESOLVED:
+            return known
+        for game in self._user_games():
+            for league in self._leagues_in(game):
+                _GAME_ID_BY_LEAGUE.setdefault((self._auth_dir, str(league.league_id)),
+                                              int(game.game_id))
+        _GAME_ID_BY_LEAGUE.setdefault((self._auth_dir, league_id), None)
+        return _GAME_ID_BY_LEAGUE[(self._auth_dir, league_id)]
 
     def _bare_query(self) -> YahooFantasySportsQuery:
         """A query for account-level calls, which belong to no league and so need no season."""
@@ -338,7 +351,8 @@ class YahooIntegration(PlatformIntegration):
         listed = []
         for game in self._user_games():
             for league in self._leagues_in(game):
-                self._game_id_by_league.setdefault(str(league.league_id), int(game.game_id))
+                _GAME_ID_BY_LEAGUE.setdefault((self._auth_dir, str(league.league_id)),
+                                              int(game.game_id))
                 name = league.name.decode('UTF-8') if isinstance(league.name, bytes) else league.name
                 listed.append({'id': league.league_id, 'name': name, 'season': league.season})
         return listed
